@@ -1,11 +1,10 @@
 import { HydratedDocument, Model, Schema, Types, model } from 'mongoose';
-import { JORNADAS, Jornada } from '../constants/enums';
 
 export interface IGroup {
   sede_id: Types.ObjectId;
   academic_year_id: Types.ObjectId;
   grade_id: Types.ObjectId;
-  jornada: Jornada;
+  jornada_id: Types.ObjectId;
   nomenclatura: string;
   cupo_maximo: number;
   cupos_ocupados: number;
@@ -26,7 +25,7 @@ const groupSchema = new Schema<IGroup, GroupModel>(
     sede_id: { type: Schema.Types.ObjectId, ref: 'Campus', required: true },
     academic_year_id: { type: Schema.Types.ObjectId, ref: 'AcademicYear', required: true },
     grade_id: { type: Schema.Types.ObjectId, ref: 'Grade', required: true },
-    jornada: { type: String, enum: JORNADAS, required: true },
+    jornada_id: { type: Schema.Types.ObjectId, ref: 'JornadaOperativa', required: true },
     nomenclatura: { type: String, required: true, trim: true, uppercase: true },
     cupo_maximo: { type: Number, required: true, min: 1 },
     cupos_ocupados: { type: Number, default: 0, min: 0 },
@@ -36,7 +35,7 @@ const groupSchema = new Schema<IGroup, GroupModel>(
 );
 
 groupSchema.index(
-  { academic_year_id: 1, sede_id: 1, jornada: 1, grade_id: 1, nomenclatura: 1 },
+  { academic_year_id: 1, sede_id: 1, jornada_id: 1, grade_id: 1, nomenclatura: 1 },
   { unique: true }
 );
 

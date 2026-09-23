@@ -111,9 +111,10 @@ curl -s -X POST $BASE/institution/setup \
   }"
 
 # 4) Crear un grupo (usando sede_id, academic_year_id, grade_id devueltos arriba / GET /grades manual)
+# jornada_id referencia una JornadaOperativa (sede_id + nombre) ya creada; aun no hay endpoint expuesto para crearla.
 curl -s -X POST $BASE/groups \
   -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
-  -d '{"sede_id":"<sede_id>","academic_year_id":"<academic_year_id>","grade_id":"<grade_id>","jornada":"MANANA","nomenclatura":"10-A","cupo_maximo":35}'
+  -d '{"sede_id":"<sede_id>","academic_year_id":"<academic_year_id>","grade_id":"<grade_id>","jornada_id":"<jornada_id>","nomenclatura":"10-A","cupo_maximo":35}'
 
 # 5) Crear un estudiante y matricularlo
 curl -s -X POST $BASE/enrollments \

@@ -1,4 +1,3 @@
-import { Jornada } from '../constants/enums';
 import Group from '../models/group.model';
 import catchAsync from '../utils/catchAsync';
 
@@ -6,7 +5,7 @@ interface CreateGroupBody {
   sede_id: string;
   academic_year_id: string;
   grade_id: string;
-  jornada: Jornada;
+  jornada_id: string;
   nomenclatura: string;
   cupo_maximo: number;
   director_grupo_id?: string | null;
@@ -21,10 +20,10 @@ interface ListGroupsQuery {
   academic_year_id?: string;
   sede_id?: string;
   grade_id?: string;
-  jornada?: Jornada;
+  jornada_id?: string;
 }
 
-const FILTER_KEYS: Array<keyof ListGroupsQuery> = ['academic_year_id', 'sede_id', 'grade_id', 'jornada'];
+const FILTER_KEYS: Array<keyof ListGroupsQuery> = ['academic_year_id', 'sede_id', 'grade_id', 'jornada_id'];
 
 export const listGroups = catchAsync<unknown, unknown, unknown, ListGroupsQuery>(async (req, res) => {
   const filter: Record<string, string> = {};
@@ -36,6 +35,7 @@ export const listGroups = catchAsync<unknown, unknown, unknown, ListGroupsQuery>
   const groups = await Group.find(filter)
     .populate('grade_id', 'nivel numero nombre')
     .populate('sede_id', 'nombre')
+    .populate('jornada_id', 'nombre')
     .populate('director_grupo_id', 'nombre apellido')
     .sort({ nomenclatura: 1 });
 

@@ -15,7 +15,7 @@ export const myLoad = catchAsync(async (req, res) => {
   if (!req.user) throw new ApiError(401, 'No autenticado.');
 
   const assignments = await TeacherAssignment.find({ docente_id: req.user._id })
-    .populate('group_id', 'nomenclatura jornada cupo_maximo')
+    .populate('group_id', 'nomenclatura jornada_id cupo_maximo')
     .populate('subject_id', 'nombre intensidad_horaria_semanal')
     .populate('academic_year_id', 'year calendario')
     .sort({ createdAt: -1 });

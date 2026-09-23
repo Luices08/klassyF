@@ -9,6 +9,7 @@ import Attendance from '../models/attendance.model';
 import { CampusDocument } from '../models/campus.model';
 import Enrollment from '../models/enrollment.model';
 import Group from '../models/group.model';
+import { JornadaOperativaDocument } from '../models/jornadaOperativa.model';
 import StudyPlanAssignment from '../models/studyPlanAssignment.model';
 import { SubjectDocument } from '../models/subject.model';
 import StudentProfile from '../models/studentProfile.model';
@@ -140,7 +141,13 @@ export async function generateReportCard(
   });
   if (!enrollment) throw new ApiError(404, 'El estudiante no tiene una matricula activa en ese año lectivo.');
 
-  const group = await Group.findById(enrollment.group_id).populate<{ sede_id: CampusDocument }>('sede_id', 'nombre');
+  const group = await Group.findById(enrollment.group_id).populate<{
+    sede_id: CampusDocument;
+    jornada_id: JornadaOperativaDocument;
+  }>([
+    { path: 'sede_id', select: 'nombre' },
+    { path: 'jornada_id', select: 'nombre' },
+  ]);
   if (!group) throw new ApiError(404, 'Grupo no encontrado.');
 
   // ---- 1. Carga cruda (una sola vez para todo el grupo) ----
@@ -326,7 +333,7 @@ export async function generateReportCard(
       nombre_completo: `${student.nombre} ${student.apellido}`,
       documento: student.numero_documento,
       grupo: group.nomenclatura,
-      jornada: group.jornada,
+      jornada: group.jornada_id.nombre,
       sede: group.sede_id.nombre,
     },
     periodo: params.periodo_numero,

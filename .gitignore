@@ -1,0 +1,21 @@
+# Dependencies (root + any subdirectory: backend/, frontend/, etc.)
+node_modules/
+
+# Environment variables
+.env
+.env.*.local
+
+# Build output
+dist/
+build/
+out/
+*.tsbuildinfo
+
+# Logs
+*.log
+npm-debug.log*
+
+# OS / editor
+.DS_Store
+*.swp
+.~lock.*#

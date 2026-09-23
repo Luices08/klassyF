@@ -1,0 +1,12 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "rootDir": ".",
+    "noEmit": true,
+    // Config solo de verificacion (tsc --noEmit sobre scripts/ + src/): nunca
+    // debe escribir en dist/, para no colisionar con el cache incremental
+    // del build real (tsconfig.json) que si emite a dist/.
+    "incremental": false
+  },
+  "include": ["scripts/**/*.ts", "src/**/*.ts"]
+}

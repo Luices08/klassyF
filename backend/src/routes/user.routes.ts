@@ -13,14 +13,14 @@ router.use(authenticate);
 
 router.post(
   '/',
-  checkRole(ROLES.SUPERADMIN, ROLES.RECTOR, ROLES.COORDINADOR, ROLES.SECRETARIA),
+  checkRole(ROLES.SUPERADMIN, ROLES.ADMIN, ROLES.COORDINADOR, ROLES.SECRETARIA),
   validate(userValidator.createUser),
   createUser
 );
 
 router.get(
   '/',
-  checkRole(ROLES.SUPERADMIN, ROLES.RECTOR, ROLES.COORDINADOR, ROLES.SECRETARIA, ROLES.DOCENTE),
+  checkRole(ROLES.SUPERADMIN, ROLES.ADMIN, ROLES.COORDINADOR, ROLES.SECRETARIA, ROLES.DOCENTE),
   validate(userValidator.listUsers),
   listUsers
 );
@@ -28,14 +28,14 @@ router.get(
 // Hoja de vida del estudiante (StudentProfile) - anidada bajo /users/:userId
 router.put(
   '/:userId/student-profile',
-  checkRole(ROLES.SUPERADMIN, ROLES.RECTOR, ROLES.COORDINADOR, ROLES.SECRETARIA),
+  checkRole(ROLES.SUPERADMIN, ROLES.ADMIN, ROLES.COORDINADOR, ROLES.SECRETARIA),
   validate(studentProfileValidator.upsertProfile),
   upsertProfile
 );
 
 router.get(
   '/:userId/student-profile',
-  checkRole(ROLES.SUPERADMIN, ROLES.RECTOR, ROLES.COORDINADOR, ROLES.SECRETARIA, ROLES.DOCENTE),
+  checkRole(ROLES.SUPERADMIN, ROLES.ADMIN, ROLES.COORDINADOR, ROLES.SECRETARIA, ROLES.DOCENTE),
   validate(studentProfileValidator.getProfile),
   getProfile
 );

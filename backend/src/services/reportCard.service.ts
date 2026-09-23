@@ -72,7 +72,7 @@ export interface ReportCardResult {
 }
 
 async function assertCanViewReportCard(student: UserDocument, requestingUser: UserDocument): Promise<void> {
-  const STAFF_ROLES = [ROLES.SUPERADMIN, ROLES.RECTOR, ROLES.COORDINADOR, ROLES.SECRETARIA, ROLES.DOCENTE];
+  const STAFF_ROLES = [ROLES.SUPERADMIN, ROLES.ADMIN, ROLES.COORDINADOR, ROLES.SECRETARIA, ROLES.DOCENTE];
   if (STAFF_ROLES.includes(requestingUser.rol)) return;
 
   if (requestingUser.rol === ROLES.ESTUDIANTE) {

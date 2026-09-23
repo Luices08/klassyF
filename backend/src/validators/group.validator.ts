@@ -1,4 +1,5 @@
 import Joi from 'joi';
+import { ESTADOS_GRUPO } from '../constants/enums';
 import { ValidationSchema } from '../middlewares/validate.middleware';
 import { objectId } from './common.validator';
 
@@ -9,7 +10,7 @@ export const createGroup: ValidationSchema = {
     grade_id: objectId.required(),
     jornada_id: objectId.required(),
     nomenclatura: Joi.string().required(),
-    cupo_maximo: Joi.number().integer().min(1).required(),
+    max_capacity: Joi.number().integer().min(1).required(),
     director_grupo_id: objectId.allow(null),
   }),
 };
@@ -20,5 +21,17 @@ export const listGroups: ValidationSchema = {
     sede_id: objectId,
     grade_id: objectId,
     jornada_id: objectId,
+    estado: Joi.string().valid(...ESTADOS_GRUPO),
+  }),
+};
+
+export const actualizarEstado: ValidationSchema = {
+  params: Joi.object({
+    groupId: objectId.required(),
+  }),
+  body: Joi.object({
+    estado: Joi.string()
+      .valid(...ESTADOS_GRUPO)
+      .required(),
   }),
 };

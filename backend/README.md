@@ -34,7 +34,7 @@ Este directorio es el paquete `backend/` de un monorepo (`klassyfinal/`); el fut
 ```bash
 npm install
 cp .env.example .env   # ajustar MONGO_URI, JWT_SECRET, credenciales SEED_*
-npm run seed            # crea el primer SUPERADMIN + catálogo de grados (Transición a Once)
+npm run seed            # crea el primer SUPERADMIN + catálogo de grados (Pre-jardín a Once)
 npm run dev              # http://localhost:4000  (tsx watch, hot-reload)
 ```
 
@@ -58,10 +58,11 @@ src/
   types/express/       augmentación de Request (req.user: UserDocument)
   config/              env.ts, db.ts
   constants/           enums.ts (fuente única de verdad + union types), roles.ts
-  models/              User, Institution, Campus, AcademicYear, Grade, Group, StudentProfile,
-                        Enrollment, Counter — cada uno con su interfaz IXxx + XxxDocument
+  models/              User, Institution, Campus, JornadaOperativa, AcademicYear, Grade, Group,
+                        StudentProfile, Enrollment, Counter — cada uno con su interfaz IXxx + XxxDocument
   middlewares/         auth (authenticate/checkRole), validate (Joi), error (centralizado)
   services/            token, folio (auto-incremento atómico), institution (setup transaccional),
+                        campus (crearSede), jornadaOperativa (crearJornada),
                         enrollment (matrícula/retiro a prueba de condiciones de carrera),
                         studyPlan (malla, validación 100% por área), teacherAssignment,
                         curricularDevelopment (workflow docente ↔ coordinador),
@@ -90,17 +91,17 @@ TOKEN=$(curl -s -X POST $BASE/auth/login \
   -H "Content-Type: application/json" \
   -d '{"email":"superadmin@klassy.edu.co","password":"ChangeMe123!"}' | jq -r .token)
 
-# 2) Crear usuario RECTOR
-RECTOR_ID=$(curl -s -X POST $BASE/users \
+# 2) Crear usuario ADMIN (administrador institucional)
+ADMIN_ID=$(curl -s -X POST $BASE/users \
   -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
-  -d '{"nombre":"Ana","apellido":"Gomez","tipo_documento":"CC","numero_documento":"111","email":"rector@colegio.edu.co","password":"password123","rol":"RECTOR"}' \
+  -d '{"nombre":"Ana","apellido":"Gomez","tipo_documento":"CC","numero_documento":"111","email":"admin@colegio.edu.co","password":"password123","rol":"ADMIN"}' \
   | jq -r .data._id)
 
 # 3) Setup institucional (colegio + sede principal + año lectivo con 4 periodos)
 curl -s -X POST $BASE/institution/setup \
   -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
   -d "{
-    \"institucion\": {\"nombre\":\"IE Klassy\",\"codigo_dane\":\"111001000123\",\"nit\":\"900123456-1\",\"resolucion_aprobacion\":\"Res. 001 de 2020\",\"rector_id\":\"$RECTOR_ID\"},
+    \"institucion\": {\"nombre\":\"IE Klassy\",\"codigo_dane\":\"111001000123\",\"nit\":\"900123456-1\",\"resolucion_aprobacion\":\"Res. 001 de 2020\",\"administrador_id\":\"$ADMIN_ID\"},
     \"sede_principal\": {\"nombre\":\"Sede Principal\",\"codigo_dane_sede\":\"111001000123\",\"direccion\":\"Cra 1 # 2-34\"},
     \"anio_lectivo\": {\"year\":2026,\"calendario\":\"A\",\"periodos\":[
       {\"numero\":1,\"nombre\":\"Periodo 1\",\"porcentaje\":25,\"fecha_inicio\":\"2026-01-26\",\"fecha_fin\":\"2026-04-03\"},
@@ -110,11 +111,25 @@ curl -s -X POST $BASE/institution/setup \
     ]}
   }"
 
+# 3b) Crear una sede adicional (la principal ya quedo creada en el setup)
+curl -s -X POST $BASE/campuses \
+  -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+  -d '{"institucion_id":"<institucion_id>","nombre":"Sede Norte","codigo_dane_sede":"111001000456","direccion":"Cll 10 # 20-30"}'
+
+# 3c) Habilitar una jornada operativa para la sede (pertenece a la sede, no a la institución)
+JORNADA_ID=$(curl -s -X POST $BASE/shifts \
+  -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+  -d '{"sede_id":"<sede_id>","nombre":"MANANA"}' | jq -r .data._id)
+
 # 4) Crear un grupo (usando sede_id, academic_year_id, grade_id devueltos arriba / GET /grades manual)
-# jornada_id referencia una JornadaOperativa (sede_id + nombre) ya creada; aun no hay endpoint expuesto para crearla.
 curl -s -X POST $BASE/groups \
   -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
-  -d '{"sede_id":"<sede_id>","academic_year_id":"<academic_year_id>","grade_id":"<grade_id>","jornada_id":"<jornada_id>","nomenclatura":"10-A","cupo_maximo":35}'
+  -d "{\"sede_id\":\"<sede_id>\",\"academic_year_id\":\"<academic_year_id>\",\"grade_id\":\"<grade_id>\",\"jornada_id\":\"$JORNADA_ID\",\"nomenclatura\":\"10-A\",\"max_capacity\":35}"
+
+# 4b) Cerrar el grupo cuando ya no reciba mas matriculas
+curl -s -X PATCH $BASE/groups/<group_id> \
+  -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+  -d '{"estado":"CLOSED"}'
 
 # 5) Crear un estudiante y matricularlo
 curl -s -X POST $BASE/enrollments \
@@ -164,7 +179,7 @@ CD_ID=$(curl -s -X POST $BASE/curricular-developments -H "Authorization: Bearer 
 
 curl -s -X PATCH $BASE/curricular-developments/$CD_ID/submit -H "Authorization: Bearer $DOCENTE_TOKEN"
 
-# Coordinador/Rector/Superadmin aprueba o devuelve con observaciones
+# Coordinador/Admin/Superadmin aprueba o devuelve con observaciones
 curl -s -X PATCH $BASE/curricular-developments/$CD_ID/review -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
   -d '{"decision":"DEVUELTO_OBSERVACIONES","observacion":"Falta profundizar en evidencias."}'
 ```
@@ -203,17 +218,17 @@ curl -s "$BASE/reports/report-card?student_id=<id1>&academic_year_id=<academic_y
 
 ## Notas de diseño
 
-- **Concurrencia de cupos**: `Group.findOneAndUpdate` usa `$expr: { $lt: ['$cupos_ocupados', '$cupo_maximo'] } }`
+- **Concurrencia de cupos**: `Group.findOneAndUpdate` usa `$expr: { $lt: ['$cupos_ocupados', '$max_capacity'] } }`
   junto con `$inc`, de modo que la verificación y el incremento son una sola operación atómica de MongoDB.
   Esto se ejecuta dentro de una transacción (`session.startTransaction()`, ver `src/utils/runTransaction.ts`)
   que también crea el documento `Enrollment` y el folio, garantizando que todo se confirme o revierta junto.
 - **Reintento de transacciones**: bajo contención real (varias matrículas concurrentes contra el mismo grupo),
   MongoDB puede abortar una transacción con `WriteConflict`/`TransientTransactionError` en vez de resolverlo
   por sí solo. `runTransaction()` reintenta automáticamente con backoff exponencial + jitter — verificado con
-  una prueba de estrés de 25 matrículas simultáneas contra un grupo con `cupo_maximo=7`: exactamente 7
+  una prueba de estrés de 25 matrículas simultáneas contra un grupo con `max_capacity=7`: exactamente 7
   matriculadas, 18 con 409 limpio, cero errores.
 - **RBAC contextual**: además del `checkRole` por ruta, `user.controller.ts` aplica una regla de negocio
-  adicional — solo `SUPERADMIN` puede crear usuarios con rol `SUPERADMIN` o `RECTOR`.
+  adicional — solo `SUPERADMIN` puede crear usuarios con rol `SUPERADMIN` o `ADMIN`.
 - **Tipado estricto**: cada modelo Mongoose expone una interfaz `IXxx` (forma del documento) y un tipo
   `XxxDocument = HydratedDocument<IXxx, ...>`. `req.user` está tipado globalmente vía
   `src/types/express/index.d.ts`. Los controladores usan los genéricos de Express
@@ -223,7 +238,7 @@ curl -s "$BASE/reports/report-card?student_id=<id1>&academic_year_id=<academic_y
   modelos y validadores nunca queden desincronizados.
 - **Endpoints de soporte** (`POST/GET /users`, `PUT/GET /users/:userId/student-profile`) no estaban en la
   lista explícita de "endpoints requeridos" del prompt, pero son indispensables para poder ejercitar el
-  flujo completo (crear rector/docentes/estudiantes antes de matricular) y para dar acceso al modelo
+  flujo completo (crear admin/docentes/estudiantes antes de matricular) y para dar acceso al modelo
   `StudentProfile` pedido en el modelado de datos.
 - **Prompt 2 — malla por área, no por grado completo**: `POST /curriculum/study-plan` reemplaza atómicamente
   (delete + insert en una transacción) todas las `StudyPlanAssignment` de un `grade_id`+`academic_year_id`,

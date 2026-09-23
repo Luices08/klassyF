@@ -20,7 +20,7 @@ export const setup: ValidationSchema = {
         .required(),
       nit: Joi.string().required(),
       resolucion_aprobacion: Joi.string().required(),
-      rector_id: objectId,
+      administrador_id: objectId,
     }).required(),
 
     sede_principal: Joi.object({

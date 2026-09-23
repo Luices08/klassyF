@@ -1,3 +1,5 @@
+import * as campusService from '../services/campus.service';
+import { CrearSedeInput } from '../services/campus.service';
 import Campus from '../models/campus.model';
 import catchAsync from '../utils/catchAsync';
 
@@ -11,4 +13,9 @@ export const listCampuses = catchAsync<unknown, unknown, unknown, ListCampusesQu
 
   const campuses = await Campus.find(filter).sort({ nombre: 1 });
   res.status(200).json({ success: true, count: campuses.length, data: campuses });
+});
+
+export const crearSede = catchAsync<unknown, unknown, CrearSedeInput>(async (req, res) => {
+  const sede = await campusService.crearSede(req.body);
+  res.status(201).json({ success: true, data: sede });
 });

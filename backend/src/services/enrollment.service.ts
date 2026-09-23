@@ -24,8 +24,8 @@ export interface CreateEnrollmentInput {
  *  1. Transaccion atomica de MongoDB (session.startTransaction(), con
  *     reintento ante TransientTransactionError - ver utils/runTransaction).
  *  2. Verificacion Y reserva del cupo en una unica operacion atomica
- *     (findOneAndUpdate con $expr: cupos_ocupados < cupo_maximo), lo que
- *     impide que dos matriculas concurrentes sobrepasen el cupo_maximo
+ *     (findOneAndUpdate con $expr: cupos_ocupados < max_capacity), lo que
+ *     impide que dos matriculas concurrentes sobrepasen el max_capacity
  *     incluso si llegan en el mismo instante.
  *  3. Si no hay cupo disponible, se hace rollback y se lanza 409 Conflict.
  */
@@ -53,7 +53,7 @@ export async function createEnrollment({
       {
         _id: group_id,
         academic_year_id,
-        $expr: { $lt: ['$cupos_ocupados', '$cupo_maximo'] },
+        $expr: { $lt: ['$cupos_ocupados', '$max_capacity'] },
       },
       { $inc: { cupos_ocupados: 1 } },
       { new: true, session }

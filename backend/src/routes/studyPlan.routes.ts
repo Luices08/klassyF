@@ -11,7 +11,7 @@ router.use(authenticate);
 
 router.post(
   '/',
-  checkRole(ROLES.SUPERADMIN, ROLES.RECTOR, ROLES.COORDINADOR),
+  checkRole(ROLES.SUPERADMIN, ROLES.ADMIN, ROLES.COORDINADOR),
   validate(studyPlanValidator.setStudyPlan),
   setStudyPlan
 );

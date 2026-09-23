@@ -10,7 +10,7 @@ export type TipoDocumento = (typeof TIPOS_DOCUMENTO)[number];
 
 export const ROLES = [
   'SUPERADMIN',
-  'RECTOR',
+  'ADMIN',
   'COORDINADOR',
   'DOCENTE',
   'SECRETARIA',
@@ -64,6 +64,9 @@ export const ESTADOS_ASISTENCIA = [
   'RETARDO',
 ] as const;
 export type EstadoAsistencia = (typeof ESTADOS_ASISTENCIA)[number];
+
+export const ESTADOS_GRUPO = ['ACTIVE', 'CLOSED'] as const;
+export type EstadoGrupo = (typeof ESTADOS_GRUPO)[number];
 
 // PeriodLock reutiliza el mismo enum ABIERTO/CERRADO que AcademicYear.periodos.estado
 // (ver ESTADOS_PERIODO arriba) para no duplicar la misma pareja de valores dos veces.

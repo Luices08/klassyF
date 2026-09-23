@@ -136,7 +136,7 @@ export async function submitForReview(id: string, requestingUser: UserDocument):
 }
 
 /**
- * Coordinador/Rector/Superadmin aprueban o devuelven con observaciones un
+ * Coordinador/Admin/Superadmin aprueban o devuelven con observaciones un
  * desarrollo que este en ENVIADO_REVISION. Cada decision queda registrada en
  * historial_revisiones para trazabilidad.
  */

@@ -15,7 +15,9 @@ type GradeModel = Model<IGrade>;
 const gradeSchema = new Schema<IGrade, GradeModel>(
   {
     nivel: { type: String, enum: NIVELES_EDUCATIVOS, required: true },
-    numero: { type: Number, required: true, min: 0, max: 11 },
+    // numero (numeric_order) admite -2 y -1 para Pre-jardin y Jardin: Preescolar
+    // incluye subniveles previos a Transicion (numero 0) segun el documento maestro.
+    numero: { type: Number, required: true, min: -2, max: 11 },
     nombre: { type: String, required: true, trim: true },
   },
   { timestamps: true }

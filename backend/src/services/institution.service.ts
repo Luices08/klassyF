@@ -14,7 +14,7 @@ export interface SetupInstitutionInput {
     codigo_dane: string;
     nit: string;
     resolucion_aprobacion: string;
-    rector_id?: string | Types.ObjectId;
+    administrador_id?: string | Types.ObjectId;
   };
   sede_principal: {
     nombre: string;
@@ -51,11 +51,11 @@ export async function setupInstitution({
   sede_principal,
   anio_lectivo,
 }: SetupInstitutionInput): Promise<SetupInstitutionResult> {
-  if (institucion.rector_id) {
-    const rector = await User.findById(institucion.rector_id);
-    if (!rector) throw new ApiError(404, 'rector_id no corresponde a un usuario existente.');
-    if (rector.rol !== ROLES.RECTOR) {
-      throw new ApiError(400, 'El usuario referenciado en rector_id no tiene rol RECTOR.');
+  if (institucion.administrador_id) {
+    const administrador = await User.findById(institucion.administrador_id);
+    if (!administrador) throw new ApiError(404, 'administrador_id no corresponde a un usuario existente.');
+    if (administrador.rol !== ROLES.ADMIN) {
+      throw new ApiError(400, 'El usuario referenciado en administrador_id no tiene rol ADMIN.');
     }
   }
 

@@ -10,7 +10,7 @@ const router = Router();
 router.patch(
   '/lock',
   authenticate,
-  checkRole(ROLES.SUPERADMIN, ROLES.RECTOR, ROLES.COORDINADOR),
+  checkRole(ROLES.SUPERADMIN, ROLES.ADMIN, ROLES.COORDINADOR),
   validate(periodLockValidator.setPeriodLock),
   setPeriodLock
 );

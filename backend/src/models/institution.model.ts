@@ -5,7 +5,7 @@ export interface IInstitution {
   codigo_dane: string;
   nit: string;
   resolucion_aprobacion: string;
-  rector_id: Types.ObjectId | null;
+  administrador_id: Types.ObjectId | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -24,7 +24,7 @@ const institutionSchema = new Schema<IInstitution, InstitutionModel>(
     },
     nit: { type: String, required: true, trim: true },
     resolucion_aprobacion: { type: String, required: true, trim: true },
-    rector_id: { type: Schema.Types.ObjectId, ref: 'User', default: null },
+    administrador_id: { type: Schema.Types.ObjectId, ref: 'User', default: null },
   },
   { timestamps: true }
 );

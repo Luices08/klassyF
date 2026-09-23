@@ -8,7 +8,7 @@ import * as enrollmentValidator from '../validators/enrollment.validator';
 
 const router = Router();
 
-const STAFF_MATRICULAS: Rol[] = [ROLES.SUPERADMIN, ROLES.RECTOR, ROLES.COORDINADOR, ROLES.SECRETARIA];
+const STAFF_MATRICULAS: Rol[] = [ROLES.SUPERADMIN, ROLES.ADMIN, ROLES.COORDINADOR, ROLES.SECRETARIA];
 
 router.use(authenticate);
 

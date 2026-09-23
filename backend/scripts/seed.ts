@@ -1,7 +1,7 @@
 /**
  * Seed inicial:
  *  - Crea el primer usuario SUPERADMIN (idempotente, usa variables SEED_* del .env).
- *  - Carga el catalogo estandar de grados (Transicion a Once, Ley 115/1994).
+ *  - Carga el catalogo estandar de grados (Pre-jardin a Once, Ley 115/1994).
  *
  * Uso: npm run seed
  */
@@ -23,6 +23,8 @@ interface GradoSeed {
 }
 
 const GRADOS_COLOMBIA: GradoSeed[] = [
+  { nivel: 'PREESCOLAR', numero: -2, nombre: 'Pre-jardín' },
+  { nivel: 'PREESCOLAR', numero: -1, nombre: 'Jardín' },
   { nivel: 'PREESCOLAR', numero: 0, nombre: 'Transición' },
   { nivel: 'PRIMARIA', numero: 1, nombre: 'Primero' },
   { nivel: 'PRIMARIA', numero: 2, nombre: 'Segundo' },

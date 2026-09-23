@@ -6,8 +6,8 @@ import catchAsync from '../utils/catchAsync';
 
 // Roles cuya creacion queda reservada exclusivamente a SUPERADMIN (permiso contextual,
 // no solo por ruta): un COORDINADOR o SECRETARIA no debe poder crearse a si mismo un
-// usuario RECTOR/SUPERADMIN.
-const ROLES_RESTRINGIDOS: Rol[] = [ROLES.SUPERADMIN, ROLES.RECTOR];
+// usuario ADMIN/SUPERADMIN.
+const ROLES_RESTRINGIDOS: Rol[] = [ROLES.SUPERADMIN, ROLES.ADMIN];
 
 interface CreateUserBody {
   nombre: string;
@@ -22,7 +22,7 @@ interface CreateUserBody {
 
 export const createUser = catchAsync<unknown, unknown, CreateUserBody>(async (req, res) => {
   if (ROLES_RESTRINGIDOS.includes(req.body.rol) && req.user?.rol !== ROLES.SUPERADMIN) {
-    throw new ApiError(403, 'Solo un SUPERADMIN puede crear usuarios con rol SUPERADMIN o RECTOR.');
+    throw new ApiError(403, 'Solo un SUPERADMIN puede crear usuarios con rol SUPERADMIN o ADMIN.');
   }
 
   const { password, ...rest } = req.body;

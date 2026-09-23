@@ -5,7 +5,7 @@ import { NAV_ITEMS } from '../components/layout/navigation';
 
 const ROLE_LABELS: Record<string, string> = {
   SUPERADMIN: 'Super administrador',
-  RECTOR: 'Rector',
+  ADMIN: 'Administrador',
   COORDINADOR: 'Coordinador',
   DOCENTE: 'Docente',
   SECRETARIA: 'Secretaría académica',

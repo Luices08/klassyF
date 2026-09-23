@@ -8,7 +8,7 @@ export interface SetupInstitutionInput {
     codigo_dane: string;
     nit: string;
     resolucion_aprobacion: string;
-    rector_id?: string;
+    administrador_id?: string;
   };
   sede_principal: {
     nombre: string;

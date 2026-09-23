@@ -1,4 +1,5 @@
 import { type FormEvent, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { Alert, errorMessage } from '../../components/ui/Alert';
 import { Button } from '../../components/ui/Button';
 import { Card, CardHeader } from '../../components/ui/Card';
@@ -67,7 +68,11 @@ export function InstitutionSetupPage() {
       {setup.isSuccess && (
         <Alert tone="success">
           Institución creada correctamente. Año lectivo {setup.data.academic_year.year}, sede{' '}
-          {setup.data.sede_principal.nombre}.
+          {setup.data.sede_principal.nombre}. Continúa en{' '}
+          <Link to="/admin/sedes" className="font-semibold underline">
+            Sedes y jornadas
+          </Link>{' '}
+          para agregar sedes adicionales y habilitar jornadas antes de crear grupos.
         </Alert>
       )}
 

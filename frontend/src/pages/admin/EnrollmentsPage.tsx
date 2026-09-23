@@ -68,7 +68,7 @@ export function EnrollmentsPage() {
             <option value="">Selecciona...</option>
             {groupsQuery.data?.map((g) => (
               <option key={g._id} value={g._id}>
-                {g.nomenclatura} ({g.cupos_ocupados}/{g.cupo_maximo})
+                {g.nomenclatura} ({g.cupos_ocupados}/{g.max_capacity})
               </option>
             ))}
           </Select>

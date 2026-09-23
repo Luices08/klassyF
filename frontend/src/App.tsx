@@ -8,6 +8,7 @@ import { ReportCardPage } from './pages/ReportCardPage';
 import { EnrollmentsPage } from './pages/admin/EnrollmentsPage';
 import { GroupsPage } from './pages/admin/GroupsPage';
 import { InstitutionSetupPage } from './pages/admin/InstitutionSetupPage';
+import { SedesPage } from './pages/admin/SedesPage';
 import { UsersPage } from './pages/admin/UsersPage';
 
 export default function App() {
@@ -24,12 +25,16 @@ export default function App() {
             <Route path="/admin/setup" element={<InstitutionSetupPage />} />
           </Route>
 
-          <Route element={<ProtectedRoute allowedRoles={['SUPERADMIN', 'RECTOR', 'COORDINADOR', 'SECRETARIA']} />}>
+          <Route element={<ProtectedRoute allowedRoles={['SUPERADMIN', 'ADMIN']} />}>
+            <Route path="/admin/sedes" element={<SedesPage />} />
+          </Route>
+
+          <Route element={<ProtectedRoute allowedRoles={['SUPERADMIN', 'ADMIN', 'COORDINADOR', 'SECRETARIA']} />}>
             <Route path="/admin/users" element={<UsersPage />} />
             <Route path="/admin/enrollments" element={<EnrollmentsPage />} />
           </Route>
 
-          <Route element={<ProtectedRoute allowedRoles={['SUPERADMIN', 'RECTOR', 'COORDINADOR']} />}>
+          <Route element={<ProtectedRoute allowedRoles={['SUPERADMIN', 'ADMIN', 'COORDINADOR']} />}>
             <Route path="/admin/groups" element={<GroupsPage />} />
           </Route>
         </Route>

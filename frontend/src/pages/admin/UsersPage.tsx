@@ -10,7 +10,7 @@ import { useCreateUser, useUsers, type CreateUserInput } from '../../hooks/useUs
 import { ROLES, type Rol } from '../../types/api';
 import { TIPOS_DOCUMENTO, type TipoDocumento } from '../../types/domain';
 
-const RESTRICTED_ROLES: Rol[] = ['SUPERADMIN', 'RECTOR'];
+const RESTRICTED_ROLES: Rol[] = ['SUPERADMIN', 'ADMIN'];
 
 const EMPTY_FORM: CreateUserInput = {
   nombre: '',
@@ -44,7 +44,7 @@ export function UsersPage() {
     <div className="space-y-6">
       <div>
         <h1 className="text-xl font-bold text-slate-900">Usuarios</h1>
-        <p className="text-sm text-slate-500">Crea rectores, coordinadores, docentes, estudiantes y acudientes.</p>
+        <p className="text-sm text-slate-500">Crea administradores, coordinadores, docentes, estudiantes y acudientes.</p>
       </div>
 
       <Card>

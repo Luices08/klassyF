@@ -10,7 +10,7 @@ import { useInstitutionConfig } from '../context/InstitutionConfigContext';
 import { useReportCard, type ReportCardQuery } from '../hooks/useReportCard';
 import { useUsers } from '../hooks/useUsers';
 
-const STAFF_ROLES = ['SUPERADMIN', 'RECTOR', 'COORDINADOR', 'SECRETARIA', 'DOCENTE'] as const;
+const STAFF_ROLES = ['SUPERADMIN', 'ADMIN', 'COORDINADOR', 'SECRETARIA', 'DOCENTE'] as const;
 
 export function ReportCardPage() {
   const { user } = useAuth();

@@ -6,9 +6,9 @@ import { Card, CardHeader } from '../../components/ui/Card';
 import { Input, Select } from '../../components/ui/Field';
 import { Spinner } from '../../components/ui/Spinner';
 import { useInstitutionConfig } from '../../context/InstitutionConfigContext';
-import { useCampuses, useGrades } from '../../hooks/useCatalogs';
-import { useCreateGroup, useGroups } from '../../hooks/useGroups';
-import { JORNADAS, type Jornada } from '../../types/domain';
+import { useCampuses, useGrades, useJornadas } from '../../hooks/useCatalogs';
+import { useActualizarEstadoGrupo, useCreateGroup, useGroups } from '../../hooks/useGroups';
+import type { EstadoGrupo } from '../../types/domain';
 
 export function GroupsPage() {
   const { config } = useInstitutionConfig();
@@ -18,12 +18,22 @@ export function GroupsPage() {
   const campusesQuery = useCampuses(config?.institutionId);
   const groupsQuery = useGroups({ academic_year_id: academicYearId });
   const createGroup = useCreateGroup();
+  const actualizarEstado = useActualizarEstadoGrupo();
 
   const [sedeId, setSedeId] = useState('');
   const [gradeId, setGradeId] = useState('');
-  const [jornada, setJornada] = useState<Jornada>('MANANA');
+  const [jornadaId, setJornadaId] = useState('');
   const [nomenclatura, setNomenclatura] = useState('');
-  const [cupoMaximo, setCupoMaximo] = useState(30);
+  const [maxCapacity, setMaxCapacity] = useState(30);
+
+  const jornadasQuery = useJornadas(sedeId || undefined);
+
+  // La jornada depende de la sede elegida: al cambiar de sede, la jornada
+  // seleccionada ya no aplica (se limpia en el propio evento, no en un efecto).
+  function handleSedeChange(nuevaSedeId: string) {
+    setSedeId(nuevaSedeId);
+    setJornadaId('');
+  }
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -32,11 +42,17 @@ export function GroupsPage() {
       sede_id: sedeId,
       academic_year_id: academicYearId,
       grade_id: gradeId,
-      jornada,
+      jornada_id: jornadaId,
       nomenclatura,
-      cupo_maximo: cupoMaximo,
+      max_capacity: maxCapacity,
     });
     setNomenclatura('');
+  }
+
+  async function handleToggleEstado(groupId: string, estadoActual: EstadoGrupo) {
+    actualizarEstado.reset();
+    const siguienteEstado: EstadoGrupo = estadoActual === 'ACTIVE' ? 'CLOSED' : 'ACTIVE';
+    await actualizarEstado.mutateAsync({ groupId, estado: siguienteEstado });
   }
 
   return (
@@ -59,7 +75,7 @@ export function GroupsPage() {
         <form onSubmit={handleSubmit} className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-3">
           <Input label="Año lectivo (ID)" required value={academicYearId} onChange={(e) => setAcademicYearId(e.target.value)} />
 
-          <Select label="Sede" required value={sedeId} onChange={(e) => setSedeId(e.target.value)}>
+          <Select label="Sede" required value={sedeId} onChange={(e) => handleSedeChange(e.target.value)}>
             <option value="">Selecciona...</option>
             {campusesQuery.data?.map((c) => (
               <option key={c._id} value={c._id}>
@@ -77,10 +93,24 @@ export function GroupsPage() {
             ))}
           </Select>
 
-          <Select label="Jornada" value={jornada} onChange={(e) => setJornada(e.target.value as Jornada)}>
-            {JORNADAS.map((j) => (
-              <option key={j} value={j}>
-                {j}
+          <Select
+            label="Jornada"
+            required
+            value={jornadaId}
+            onChange={(e) => setJornadaId(e.target.value)}
+            disabled={!sedeId}
+            hint={
+              !sedeId
+                ? 'Selecciona primero una sede.'
+                : jornadasQuery.data?.length === 0
+                  ? 'Esta sede no tiene jornadas habilitadas (ver "Sedes y jornadas").'
+                  : undefined
+            }
+          >
+            <option value="">Selecciona...</option>
+            {jornadasQuery.data?.map((j) => (
+              <option key={j._id} value={j._id}>
+                {j.nombre}
               </option>
             ))}
           </Select>
@@ -97,8 +127,8 @@ export function GroupsPage() {
             type="number"
             min={1}
             required
-            value={cupoMaximo}
-            onChange={(e) => setCupoMaximo(Number(e.target.value))}
+            value={maxCapacity}
+            onChange={(e) => setMaxCapacity(Number(e.target.value))}
           />
 
           <div className="sm:col-span-3">
@@ -113,6 +143,7 @@ export function GroupsPage() {
         <CardHeader title="Grupos del año lectivo" />
         {groupsQuery.isLoading && <Spinner />}
         {groupsQuery.isError && <Alert tone="error">{errorMessage(groupsQuery.error)}</Alert>}
+        {actualizarEstado.isError && <Alert tone="error">{errorMessage(actualizarEstado.error)}</Alert>}
         {groupsQuery.data && (
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-slate-200 text-sm">
@@ -122,6 +153,8 @@ export function GroupsPage() {
                   <th className="py-2 pr-4">Grado</th>
                   <th className="py-2 pr-4">Jornada</th>
                   <th className="py-2 pr-4">Cupos</th>
+                  <th className="py-2 pr-4">Estado</th>
+                  <th className="py-2 pr-4" />
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
@@ -132,16 +165,30 @@ export function GroupsPage() {
                       {typeof g.grade_id === 'object' ? g.grade_id.nombre : g.grade_id}
                     </td>
                     <td className="py-2 pr-4">
-                      <Badge>{g.jornada}</Badge>
+                      <Badge>{typeof g.jornada_id === 'object' ? g.jornada_id.nombre : g.jornada_id}</Badge>
                     </td>
                     <td className="py-2 pr-4 text-slate-600">
-                      {g.cupos_ocupados} / {g.cupo_maximo}
+                      {g.cupos_ocupados} / {g.max_capacity}
+                    </td>
+                    <td className="py-2 pr-4">
+                      <Badge tone={g.estado === 'ACTIVE' ? 'green' : 'slate'}>{g.estado}</Badge>
+                    </td>
+                    <td className="py-2 pr-4">
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        className="px-2.5 py-1 text-xs"
+                        isLoading={actualizarEstado.isPending}
+                        onClick={() => handleToggleEstado(g._id, g.estado)}
+                      >
+                        {g.estado === 'ACTIVE' ? 'Cerrar' : 'Reactivar'}
+                      </Button>
                     </td>
                   </tr>
                 ))}
                 {groupsQuery.data.length === 0 && (
                   <tr>
-                    <td colSpan={4} className="py-4 text-center text-slate-400">
+                    <td colSpan={6} className="py-4 text-center text-slate-400">
                       Sin grupos para este año lectivo.
                     </td>
                   </tr>

@@ -37,7 +37,7 @@ export interface Institution {
   codigo_dane: string;
   nit: string;
   resolucion_aprobacion: string;
-  rector_id: string | null;
+  administrador_id: string | null;
 }
 
 export interface Campus {
@@ -47,6 +47,12 @@ export interface Campus {
   codigo_dane_sede: string;
   direccion: string;
   es_principal: boolean;
+}
+
+export interface JornadaOperativa {
+  _id: string;
+  sede_id: string | { _id: string; nombre: string };
+  nombre: Jornada;
 }
 
 export interface AcademicYear {
@@ -65,16 +71,20 @@ export interface Grade {
   nombre: string;
 }
 
+export const ESTADOS_GRUPO = ['ACTIVE', 'CLOSED'] as const;
+export type EstadoGrupo = (typeof ESTADOS_GRUPO)[number];
+
 export interface Group {
   _id: string;
   sede_id: string | { _id: string; nombre: string };
   academic_year_id: string;
   grade_id: string | { _id: string; nivel: string; numero: number; nombre: string };
-  jornada: Jornada;
+  jornada_id: string | { _id: string; nombre: Jornada };
   nomenclatura: string;
-  cupo_maximo: number;
+  max_capacity: number;
   cupos_ocupados: number;
   cupos_disponibles?: number;
+  estado: EstadoGrupo;
   director_grupo_id: string | null;
 }
 

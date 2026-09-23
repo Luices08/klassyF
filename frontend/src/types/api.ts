@@ -28,7 +28,7 @@ export class ApiError extends Error {
 
 export const ROLES = [
   'SUPERADMIN',
-  'RECTOR',
+  'ADMIN',
   'COORDINADOR',
   'DOCENTE',
   'SECRETARIA',

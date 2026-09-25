@@ -4,6 +4,7 @@ import { Alert, errorMessage } from '../../components/ui/Alert';
 import { Button } from '../../components/ui/Button';
 import { Card, CardHeader } from '../../components/ui/Card';
 import { Input, Select } from '../../components/ui/Field';
+import { PageHeader } from '../../components/ui/PageHeader';
 import { useInstitutionConfig } from '../../context/InstitutionConfigContext';
 import { useSetupInstitution } from '../../hooks/useInstitution';
 import type { Periodo } from '../../types/domain';
@@ -57,12 +58,10 @@ export function InstitutionSetupPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-xl font-bold text-slate-900">Configuración institucional</h1>
-        <p className="text-sm text-slate-500">
-          Crea el colegio, su sede principal y el año lectivo inicial con sus 4 periodos.
-        </p>
-      </div>
+      <PageHeader
+        title="Configuración institucional"
+        subtitle="Crea el colegio, su sede principal y el año lectivo inicial con sus 4 periodos."
+      />
 
       {setup.isError && <Alert tone="error">{errorMessage(setup.error)}</Alert>}
       {setup.isSuccess && (
@@ -157,7 +156,7 @@ export function InstitutionSetupPage() {
             {periodos.map((p, i) => (
               <div key={p.numero} className="grid grid-cols-2 gap-2 sm:grid-cols-5 sm:items-end">
                 <div className="col-span-2 sm:col-span-1">
-                  <p className="mb-1 text-sm font-medium text-slate-700">Periodo {p.numero}</p>
+                  <p className="mb-1 text-sm font-medium text-body">Periodo {p.numero}</p>
                   <Input label="Nombre" value={p.nombre} onChange={(e) => updatePeriodo(i, { nombre: e.target.value })} />
                 </div>
                 <Input
@@ -186,7 +185,7 @@ export function InstitutionSetupPage() {
             ))}
           </div>
 
-          <p className={`mt-3 text-sm font-semibold ${porcentajeOk ? 'text-emerald-600' : 'text-red-600'}`}>
+          <p className={`mt-3 text-sm font-semibold ${porcentajeOk ? 'text-success' : 'text-danger'}`}>
             Suma actual: {totalPorcentaje}% {porcentajeOk ? '✓' : '(debe ser 100%)'}
           </p>
         </Card>

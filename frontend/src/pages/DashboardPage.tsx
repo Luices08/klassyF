@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { Card, CardHeader } from '../components/ui/Card';
+import { PageHeader } from '../components/ui/PageHeader';
 import { useAuth } from '../context/AuthContext';
 import { NAV_ITEMS } from '../components/layout/navigation';
 
@@ -21,27 +21,22 @@ export function DashboardPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-xl font-bold text-slate-900">
-          Hola, {user.nombre} {user.apellido}
-        </h1>
-        <p className="text-sm text-slate-500">{ROLE_LABELS[user.rol] ?? user.rol}</p>
-      </div>
+      <PageHeader title={`Hola, ${user.nombre} ${user.apellido}`} subtitle={ROLE_LABELS[user.rol] ?? user.rol} />
 
-      <Card>
-        <CardHeader title="Accesos rápidos" />
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          {links.map((link) => (
-            <Link
-              key={link.to}
-              to={link.to}
-              className="rounded-lg border border-slate-200 p-4 text-sm font-medium text-slate-700 transition-colors hover:border-indigo-300 hover:bg-indigo-50 hover:text-indigo-700"
-            >
-              {link.label}
-            </Link>
-          ))}
-        </div>
-      </Card>
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        {links.map((link) => (
+          <Link
+            key={link.to}
+            to={link.to}
+            className="flex items-center gap-3 rounded-xl border border-border bg-surface p-4 text-sm font-semibold text-ink transition-colors hover:border-primary/40 hover:bg-primary-soft hover:text-primary"
+          >
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary-soft text-primary">
+              <link.icon className="h-[18px] w-[18px]" />
+            </span>
+            {link.label}
+          </Link>
+        ))}
+      </div>
     </div>
   );
 }

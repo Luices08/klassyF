@@ -1,10 +1,15 @@
 import { type FormEvent, useState } from 'react';
 import { Alert, errorMessage } from '../../components/ui/Alert';
-import { Badge } from '../../components/ui/Badge';
+import { Chip, CupoBadge, EstadoGrupoBadge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import { Card, CardHeader } from '../../components/ui/Card';
+import { Drawer } from '../../components/ui/Drawer';
 import { Input, Select } from '../../components/ui/Field';
+import { IconButton } from '../../components/ui/IconButton';
+import { PageHeader } from '../../components/ui/PageHeader';
 import { Spinner } from '../../components/ui/Spinner';
+import { EmptyRow, Table, TableBody, TableHead, Td, Th } from '../../components/ui/Table';
+import { PlusIcon, RefreshIcon, TrashIcon } from '../../components/ui/icons';
 import { useInstitutionConfig } from '../../context/InstitutionConfigContext';
 import { useCampuses, useGrades, useJornadas } from '../../hooks/useCatalogs';
 import { useActualizarEstadoGrupo, useCreateGroup, useGroups } from '../../hooks/useGroups';
@@ -20,6 +25,7 @@ export function GroupsPage() {
   const createGroup = useCreateGroup();
   const actualizarEstado = useActualizarEstadoGrupo();
 
+  const [drawerOpen, setDrawerOpen] = useState(false);
   const [sedeId, setSedeId] = useState('');
   const [gradeId, setGradeId] = useState('');
   const [jornadaId, setJornadaId] = useState('');
@@ -47,6 +53,7 @@ export function GroupsPage() {
       max_capacity: maxCapacity,
     });
     setNomenclatura('');
+    setDrawerOpen(false);
   }
 
   async function handleToggleEstado(groupId: string, estadoActual: EstadoGrupo) {
@@ -57,10 +64,16 @@ export function GroupsPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-xl font-bold text-slate-900">Grupos</h1>
-        <p className="text-sm text-slate-500">Crea y consulta los grupos de un año lectivo.</p>
-      </div>
+      <PageHeader
+        title="Grupos"
+        subtitle="Crea y consulta los grupos de un año lectivo."
+        action={
+          <Button onClick={() => setDrawerOpen(true)}>
+            <PlusIcon className="h-4 w-4" />
+            Nuevo grupo
+          </Button>
+        }
+      />
 
       {!config && (
         <Alert tone="info">
@@ -70,73 +83,18 @@ export function GroupsPage() {
       )}
 
       <Card>
-        <CardHeader title="Nuevo grupo" />
-        {createGroup.isError && <Alert tone="error">{errorMessage(createGroup.error)}</Alert>}
-        <form onSubmit={handleSubmit} className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-3">
-          <Input label="Año lectivo (ID)" required value={academicYearId} onChange={(e) => setAcademicYearId(e.target.value)} />
-
-          <Select label="Sede" required value={sedeId} onChange={(e) => handleSedeChange(e.target.value)}>
-            <option value="">Selecciona...</option>
-            {campusesQuery.data?.map((c) => (
-              <option key={c._id} value={c._id}>
-                {c.nombre}
-              </option>
-            ))}
-          </Select>
-
-          <Select label="Grado" required value={gradeId} onChange={(e) => setGradeId(e.target.value)}>
-            <option value="">Selecciona...</option>
-            {gradesQuery.data?.map((g) => (
-              <option key={g._id} value={g._id}>
-                {g.nombre}
-              </option>
-            ))}
-          </Select>
-
-          <Select
-            label="Jornada"
-            required
-            value={jornadaId}
-            onChange={(e) => setJornadaId(e.target.value)}
-            disabled={!sedeId}
-            hint={
-              !sedeId
-                ? 'Selecciona primero una sede.'
-                : jornadasQuery.data?.length === 0
-                  ? 'Esta sede no tiene jornadas habilitadas (ver "Sedes y jornadas").'
-                  : undefined
-            }
-          >
-            <option value="">Selecciona...</option>
-            {jornadasQuery.data?.map((j) => (
-              <option key={j._id} value={j._id}>
-                {j.nombre}
-              </option>
-            ))}
-          </Select>
-
-          <Input
-            label="Nomenclatura (ej. 10-A)"
-            required
-            value={nomenclatura}
-            onChange={(e) => setNomenclatura(e.target.value)}
-          />
-
-          <Input
-            label="Cupo máximo"
-            type="number"
-            min={1}
-            required
-            value={maxCapacity}
-            onChange={(e) => setMaxCapacity(Number(e.target.value))}
-          />
-
-          <div className="sm:col-span-3">
-            <Button type="submit" isLoading={createGroup.isPending}>
-              Crear grupo
-            </Button>
-          </div>
-        </form>
+        <CardHeader
+          title="Año lectivo"
+          action={
+            <Input
+              label="Año lectivo (ID)"
+              required
+              className="w-64"
+              value={academicYearId}
+              onChange={(e) => setAcademicYearId(e.target.value)}
+            />
+          }
+        />
       </Card>
 
       <Card>
@@ -145,59 +103,107 @@ export function GroupsPage() {
         {groupsQuery.isError && <Alert tone="error">{errorMessage(groupsQuery.error)}</Alert>}
         {actualizarEstado.isError && <Alert tone="error">{errorMessage(actualizarEstado.error)}</Alert>}
         {groupsQuery.data && (
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-slate-200 text-sm">
-              <thead>
-                <tr className="text-left text-xs font-medium uppercase tracking-wide text-slate-500">
-                  <th className="py-2 pr-4">Grupo</th>
-                  <th className="py-2 pr-4">Grado</th>
-                  <th className="py-2 pr-4">Jornada</th>
-                  <th className="py-2 pr-4">Cupos</th>
-                  <th className="py-2 pr-4">Estado</th>
-                  <th className="py-2 pr-4" />
+          <Table>
+            <TableHead>
+              <Th>Grupo</Th>
+              <Th>Grado</Th>
+              <Th>Jornada</Th>
+              <Th>Cupos</Th>
+              <Th>Estado</Th>
+              <Th />
+            </TableHead>
+            <TableBody>
+              {groupsQuery.data.map((g) => (
+                <tr key={g._id}>
+                  <Td className="font-medium text-ink">{g.nomenclatura}</Td>
+                  <Td>{typeof g.grade_id === 'object' ? g.grade_id.nombre : g.grade_id}</Td>
+                  <Td>
+                    <Chip tone="blue">{typeof g.jornada_id === 'object' ? g.jornada_id.nombre : g.jornada_id}</Chip>
+                  </Td>
+                  <Td>
+                    <CupoBadge ocupados={g.cupos_ocupados} max={g.max_capacity} />
+                  </Td>
+                  <Td>
+                    <EstadoGrupoBadge value={g.estado} />
+                  </Td>
+                  <Td>
+                    <IconButton
+                      tone={g.estado === 'ACTIVE' ? 'danger' : 'success'}
+                      label={g.estado === 'ACTIVE' ? 'Cerrar grupo' : 'Reactivar grupo'}
+                      icon={g.estado === 'ACTIVE' ? <TrashIcon /> : <RefreshIcon />}
+                      disabled={actualizarEstado.isPending}
+                      onClick={() => handleToggleEstado(g._id, g.estado)}
+                    />
+                  </Td>
                 </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {groupsQuery.data.map((g) => (
-                  <tr key={g._id}>
-                    <td className="py-2 pr-4 font-medium text-slate-900">{g.nomenclatura}</td>
-                    <td className="py-2 pr-4 text-slate-600">
-                      {typeof g.grade_id === 'object' ? g.grade_id.nombre : g.grade_id}
-                    </td>
-                    <td className="py-2 pr-4">
-                      <Badge>{typeof g.jornada_id === 'object' ? g.jornada_id.nombre : g.jornada_id}</Badge>
-                    </td>
-                    <td className="py-2 pr-4 text-slate-600">
-                      {g.cupos_ocupados} / {g.max_capacity}
-                    </td>
-                    <td className="py-2 pr-4">
-                      <Badge tone={g.estado === 'ACTIVE' ? 'green' : 'slate'}>{g.estado}</Badge>
-                    </td>
-                    <td className="py-2 pr-4">
-                      <Button
-                        type="button"
-                        variant="secondary"
-                        className="px-2.5 py-1 text-xs"
-                        isLoading={actualizarEstado.isPending}
-                        onClick={() => handleToggleEstado(g._id, g.estado)}
-                      >
-                        {g.estado === 'ACTIVE' ? 'Cerrar' : 'Reactivar'}
-                      </Button>
-                    </td>
-                  </tr>
-                ))}
-                {groupsQuery.data.length === 0 && (
-                  <tr>
-                    <td colSpan={6} className="py-4 text-center text-slate-400">
-                      Sin grupos para este año lectivo.
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
+              ))}
+              {groupsQuery.data.length === 0 && <EmptyRow colSpan={6}>Sin grupos para este año lectivo.</EmptyRow>}
+            </TableBody>
+          </Table>
         )}
       </Card>
+
+      <Drawer
+        open={drawerOpen}
+        title="Nuevo grupo"
+        onClose={() => setDrawerOpen(false)}
+        onSubmit={handleSubmit}
+        submitLabel="Crear grupo"
+        isSubmitting={createGroup.isPending}
+      >
+        {createGroup.isError && <Alert tone="error">{errorMessage(createGroup.error)}</Alert>}
+
+        <Select label="Sede" required value={sedeId} onChange={(e) => handleSedeChange(e.target.value)}>
+          <option value="">Selecciona...</option>
+          {campusesQuery.data?.map((c) => (
+            <option key={c._id} value={c._id}>
+              {c.nombre}
+            </option>
+          ))}
+        </Select>
+
+        <Select label="Grado" required value={gradeId} onChange={(e) => setGradeId(e.target.value)}>
+          <option value="">Selecciona...</option>
+          {gradesQuery.data?.map((g) => (
+            <option key={g._id} value={g._id}>
+              {g.nombre}
+            </option>
+          ))}
+        </Select>
+
+        <Select
+          label="Jornada"
+          required
+          value={jornadaId}
+          onChange={(e) => setJornadaId(e.target.value)}
+          disabled={!sedeId}
+          hint={
+            !sedeId
+              ? 'Selecciona primero una sede.'
+              : jornadasQuery.data?.length === 0
+                ? 'Esta sede no tiene jornadas habilitadas (ver "Sedes y jornadas").'
+                : undefined
+          }
+        >
+          <option value="">Selecciona...</option>
+          {jornadasQuery.data?.map((j) => (
+            <option key={j._id} value={j._id}>
+              {j.nombre}
+            </option>
+          ))}
+        </Select>
+
+        <Input label="Nomenclatura (ej. 10-A)" required value={nomenclatura} onChange={(e) => setNomenclatura(e.target.value)} />
+
+        <Input
+          label="Cupo máximo"
+          type="number"
+          min={1}
+          required
+          value={maxCapacity}
+          onChange={(e) => setMaxCapacity(Number(e.target.value))}
+        />
+      </Drawer>
     </div>
   );
 }

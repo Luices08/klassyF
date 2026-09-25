@@ -3,6 +3,8 @@ import { Alert, errorMessage } from '../components/ui/Alert';
 import { Button } from '../components/ui/Button';
 import { Card, CardHeader } from '../components/ui/Card';
 import { Input, Select } from '../components/ui/Field';
+import { PageHeader } from '../components/ui/PageHeader';
+import { SearchIcon } from '../components/ui/icons';
 import { Spinner } from '../components/ui/Spinner';
 import { ReportCardView } from '../components/reportCard/ReportCardView';
 import { useAuth } from '../context/AuthContext';
@@ -33,10 +35,10 @@ export function ReportCardPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-xl font-bold text-slate-900">Boletín académico</h1>
-        <p className="text-sm text-slate-500">Consulta el boletín de un estudiante por año lectivo y periodo.</p>
-      </div>
+      <PageHeader
+        title="Boletín académico"
+        subtitle="Consulta el boletín de un estudiante por año lectivo y periodo."
+      />
 
       <Card>
         <CardHeader title="Buscar boletín" />
@@ -77,6 +79,7 @@ export function ReportCardPage() {
           </Select>
 
           <Button type="submit" isLoading={reportCardQuery.isFetching}>
+            <SearchIcon className="h-4 w-4" />
             Consultar
           </Button>
         </form>

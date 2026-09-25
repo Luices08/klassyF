@@ -1,9 +1,12 @@
 import { type FormEvent, useState } from 'react';
 import { Alert, errorMessage } from '../../components/ui/Alert';
-import { Badge } from '../../components/ui/Badge';
+import { Chip } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import { Card, CardHeader } from '../../components/ui/Card';
+import { Drawer } from '../../components/ui/Drawer';
 import { Input, Select } from '../../components/ui/Field';
+import { PageHeader } from '../../components/ui/PageHeader';
+import { PlusIcon } from '../../components/ui/icons';
 import { useInstitutionConfig } from '../../context/InstitutionConfigContext';
 import { useCreateEnrollment, useUpdateEnrollmentStatus } from '../../hooks/useEnrollments';
 import { useGroups } from '../../hooks/useGroups';
@@ -19,13 +22,16 @@ export function EnrollmentsPage() {
   const studentsQuery = useUsers({ rol: 'ESTUDIANTE' });
   const groupsQuery = useGroups({ academic_year_id: academicYearId });
   const createEnrollment = useCreateEnrollment();
+  const [enrollDrawerOpen, setEnrollDrawerOpen] = useState(false);
 
   async function handleEnroll(e: FormEvent) {
     e.preventDefault();
     createEnrollment.reset();
     await createEnrollment.mutateAsync({ student_id: studentId, group_id: groupId, academic_year_id: academicYearId });
+    setEnrollDrawerOpen(false);
   }
 
+  const [statusDrawerOpen, setStatusDrawerOpen] = useState(false);
   const [statusEnrollmentId, setStatusEnrollmentId] = useState('');
   const [statusEstado, setStatusEstado] = useState<EstadoMatricula>('RETIRADO');
   const updateStatus = useUpdateEnrollmentStatus();
@@ -34,78 +40,101 @@ export function EnrollmentsPage() {
     e.preventDefault();
     updateStatus.reset();
     await updateStatus.mutateAsync({ id: statusEnrollmentId, estado: statusEstado });
+    setStatusDrawerOpen(false);
   }
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-xl font-bold text-slate-900">Matrículas</h1>
-        <p className="text-sm text-slate-500">Matricula estudiantes en un grupo y gestiona retiros/traslados.</p>
-      </div>
-
-      <Card>
-        <CardHeader title="Matricular estudiante" />
-        {createEnrollment.isError && <Alert tone="error">{errorMessage(createEnrollment.error)}</Alert>}
-        {createEnrollment.isSuccess && (
-          <Alert tone="success">
-            Matrícula creada — folio <strong>{createEnrollment.data.folio_matricula}</strong>, estado{' '}
-            {createEnrollment.data.estado}. ID: <code>{createEnrollment.data._id}</code>
-          </Alert>
-        )}
-        <form onSubmit={handleEnroll} className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-4 sm:items-end">
-          <Input label="Año lectivo (ID)" required value={academicYearId} onChange={(e) => setAcademicYearId(e.target.value)} />
-
-          <Select label="Estudiante" required value={studentId} onChange={(e) => setStudentId(e.target.value)}>
-            <option value="">Selecciona...</option>
-            {studentsQuery.data?.map((s) => (
-              <option key={s._id} value={s._id}>
-                {s.nombre} {s.apellido} · {s.numero_documento}
-              </option>
-            ))}
-          </Select>
-
-          <Select label="Grupo" required value={groupId} onChange={(e) => setGroupId(e.target.value)}>
-            <option value="">Selecciona...</option>
-            {groupsQuery.data?.map((g) => (
-              <option key={g._id} value={g._id}>
-                {g.nomenclatura} ({g.cupos_ocupados}/{g.max_capacity})
-              </option>
-            ))}
-          </Select>
-
-          <Button type="submit" isLoading={createEnrollment.isPending}>
+      <PageHeader
+        title="Matrículas"
+        subtitle="Matricula estudiantes en un grupo y gestiona retiros/traslados."
+        action={
+          <Button onClick={() => setEnrollDrawerOpen(true)}>
+            <PlusIcon className="h-4 w-4" />
             Matricular
           </Button>
-        </form>
-      </Card>
+        }
+      />
+
+      {createEnrollment.isSuccess && (
+        <Alert tone="success">
+          Matrícula creada — folio <strong>{createEnrollment.data.folio_matricula}</strong>, estado{' '}
+          {createEnrollment.data.estado}. ID: <code>{createEnrollment.data._id}</code>
+        </Alert>
+      )}
 
       <Card>
-        <CardHeader title="Retirar / trasladar matrícula" subtitle="Ingresa el ID de la matrícula (ver arriba tras crearla)." />
-        {updateStatus.isError && <Alert tone="error">{errorMessage(updateStatus.error)}</Alert>}
+        <CardHeader
+          title="Retirar / trasladar matrícula"
+          subtitle="Ingresa el ID de la matrícula (ver arriba tras crearla)."
+          action={
+            <Button type="button" variant="outline" onClick={() => setStatusDrawerOpen(true)}>
+              Cambiar estado
+            </Button>
+          }
+        />
         {updateStatus.isSuccess && (
           <Alert tone="success">
-            Matrícula actualizada a <Badge>{updateStatus.data.estado}</Badge>
+            Matrícula actualizada a <Chip tone="blue">{updateStatus.data.estado}</Chip>
           </Alert>
         )}
-        <form onSubmit={handleStatusChange} className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-3 sm:items-end">
-          <Input
-            label="ID de la matrícula"
-            required
-            value={statusEnrollmentId}
-            onChange={(e) => setStatusEnrollmentId(e.target.value)}
-          />
-          <Select label="Nuevo estado" value={statusEstado} onChange={(e) => setStatusEstado(e.target.value as EstadoMatricula)}>
-            {ESTADOS_MATRICULA.map((estado) => (
-              <option key={estado} value={estado}>
-                {estado}
-              </option>
-            ))}
-          </Select>
-          <Button type="submit" variant="secondary" isLoading={updateStatus.isPending}>
-            Actualizar estado
-          </Button>
-        </form>
       </Card>
+
+      <Drawer
+        open={enrollDrawerOpen}
+        title="Matricular estudiante"
+        onClose={() => setEnrollDrawerOpen(false)}
+        onSubmit={handleEnroll}
+        submitLabel="Matricular"
+        isSubmitting={createEnrollment.isPending}
+      >
+        {createEnrollment.isError && <Alert tone="error">{errorMessage(createEnrollment.error)}</Alert>}
+
+        <Input label="Año lectivo (ID)" required value={academicYearId} onChange={(e) => setAcademicYearId(e.target.value)} />
+
+        <Select label="Estudiante" required value={studentId} onChange={(e) => setStudentId(e.target.value)}>
+          <option value="">Selecciona...</option>
+          {studentsQuery.data?.map((s) => (
+            <option key={s._id} value={s._id}>
+              {s.nombre} {s.apellido} · {s.numero_documento}
+            </option>
+          ))}
+        </Select>
+
+        <Select label="Grupo" required value={groupId} onChange={(e) => setGroupId(e.target.value)}>
+          <option value="">Selecciona...</option>
+          {groupsQuery.data?.map((g) => (
+            <option key={g._id} value={g._id}>
+              {g.nomenclatura} ({g.cupos_ocupados}/{g.max_capacity})
+            </option>
+          ))}
+        </Select>
+      </Drawer>
+
+      <Drawer
+        open={statusDrawerOpen}
+        title="Retirar / trasladar matrícula"
+        onClose={() => setStatusDrawerOpen(false)}
+        onSubmit={handleStatusChange}
+        submitLabel="Actualizar estado"
+        isSubmitting={updateStatus.isPending}
+      >
+        {updateStatus.isError && <Alert tone="error">{errorMessage(updateStatus.error)}</Alert>}
+
+        <Input
+          label="ID de la matrícula"
+          required
+          value={statusEnrollmentId}
+          onChange={(e) => setStatusEnrollmentId(e.target.value)}
+        />
+        <Select label="Nuevo estado" value={statusEstado} onChange={(e) => setStatusEstado(e.target.value as EstadoMatricula)}>
+          {ESTADOS_MATRICULA.map((estado) => (
+            <option key={estado} value={estado}>
+              {estado}
+            </option>
+          ))}
+        </Select>
+      </Drawer>
     </div>
   );
 }

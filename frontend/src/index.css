@@ -1,10 +1,46 @@
 @import "tailwindcss";
 
+/**
+ * Design tokens — Klassy UI Spec (doc/Klassy_UI_Spec_1.docx).
+ * 4 familias de color x 2 tonos (oscuro = texto/icono/relleno solido,
+ * suave = fondo de chip/boton) + escala neutra + tipografia Plus Jakarta Sans.
+ */
 @theme {
-  --font-sans:
-    ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --font-sans: 'Plus Jakarta Sans', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+
+  --color-primary: #2878ea;
+  --color-primary-soft: #eaf3ff;
+  --color-success: #1faf73;
+  --color-success-soft: #e5f7ef;
+  --color-warning: #f2a23a;
+  --color-warning-soft: #fff5e6;
+  --color-danger: #ef5350;
+  --color-danger-soft: #fff0f0;
+
+  --color-ink: #172235;
+  --color-body: #3f4d61;
+  --color-muted: #788794;
+  --color-border: #dde4ec;
+  --color-surface: #ffffff;
+  --color-soft: #f1f5f9;
+
+  --text-h1: 42px;
+  --text-h1--line-height: 48px;
+  --text-h1--font-weight: 600;
+  --text-h2: 28px;
+  --text-h2--line-height: 34px;
+  --text-h2--font-weight: 600;
+  --text-h3: 20px;
+  --text-h3--line-height: 26px;
+  --text-h3--font-weight: 600;
+  --text-body: 15px;
+  --text-body--line-height: 22px;
+  --text-label: 13px;
+  --text-label--line-height: 18px;
+  --text-label--font-weight: 500;
 }
 
 body {
-  @apply bg-slate-50 text-slate-900 antialiased;
+  @apply bg-soft text-body antialiased;
+  font-feature-settings: 'ss01';
 }

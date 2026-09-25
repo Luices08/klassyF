@@ -1,36 +1,96 @@
 import type { ReactNode } from 'react';
+import type { Rol } from '../../types/api';
+import type { EstadoGrupo, EstadoMatricula } from '../../types/domain';
 import type { Desempeno } from '../../types/reportCard';
 
-const DESEMPENO_CLASSES: Record<Desempeno, string> = {
-  Superior: 'bg-emerald-50 text-emerald-700 ring-emerald-600/20',
-  Alto: 'bg-sky-50 text-sky-700 ring-sky-600/20',
-  Básico: 'bg-amber-50 text-amber-700 ring-amber-600/20',
-  Bajo: 'bg-red-50 text-red-700 ring-red-600/20',
+export type Tone = 'blue' | 'green' | 'orange' | 'red' | 'neutral';
+
+const TONE_CLASSES: Record<Tone, string> = {
+  blue: 'bg-primary-soft text-primary',
+  green: 'bg-success-soft text-success',
+  orange: 'bg-warning-soft text-warning',
+  red: 'bg-danger-soft text-danger',
+  neutral: 'bg-soft text-muted',
 };
 
-export function DesempenoBadge({ value }: { value: Desempeno }) {
+/** Pildora con fondo claro y texto en el tono oscuro de su misma familia (Klassy UI Spec). */
+export function Chip({ children, tone = 'neutral' }: { children: ReactNode; tone?: Tone }) {
   return (
-    <span
-      className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ring-inset ${DESEMPENO_CLASSES[value]}`}
-    >
-      {value}
+    <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold ${TONE_CLASSES[tone]}`}>
+      {children}
     </span>
   );
 }
 
-const NEUTRAL_CLASSES: Record<string, string> = {
-  slate: 'bg-slate-100 text-slate-700 ring-slate-500/20',
-  green: 'bg-emerald-50 text-emerald-700 ring-emerald-600/20',
-  red: 'bg-red-50 text-red-700 ring-red-600/20',
-  amber: 'bg-amber-50 text-amber-700 ring-amber-600/20',
+/** @deprecated usar Chip — se conserva como alias mientras se migran los usos existentes. */
+export const Badge = Chip;
+
+const DESEMPENO_TONE: Record<Desempeno, Tone> = {
+  Superior: 'green',
+  Alto: 'blue',
+  Básico: 'orange',
+  Bajo: 'red',
 };
 
-export function Badge({ children, tone = 'slate' }: { children: ReactNode; tone?: keyof typeof NEUTRAL_CLASSES }) {
-  return (
-    <span
-      className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ring-inset ${NEUTRAL_CLASSES[tone]}`}
-    >
-      {children}
-    </span>
-  );
+export function DesempenoBadge({ value }: { value: Desempeno }) {
+  return <Chip tone={DESEMPENO_TONE[value]}>{value}</Chip>;
+}
+
+const ROL_LABELS: Record<Rol, string> = {
+  SUPERADMIN: 'Superadministrador',
+  ADMIN: 'Administrador',
+  COORDINADOR: 'Coordinador',
+  DOCENTE: 'Docente',
+  SECRETARIA: 'Secretaría',
+  ESTUDIANTE: 'Estudiante',
+  ACUDIENTE: 'Acudiente',
+};
+
+const ROL_TONE: Record<Rol, Tone> = {
+  SUPERADMIN: 'blue',
+  ADMIN: 'blue',
+  COORDINADOR: 'blue',
+  SECRETARIA: 'blue',
+  DOCENTE: 'green',
+  ESTUDIANTE: 'orange',
+  ACUDIENTE: 'neutral',
+};
+
+export function RolBadge({ value }: { value: Rol }) {
+  return <Chip tone={ROL_TONE[value]}>{ROL_LABELS[value]}</Chip>;
+}
+
+export function EstadoUsuarioBadge({ value }: { value: 'activo' | 'inactivo' }) {
+  return <Chip tone={value === 'activo' ? 'green' : 'red'}>{value === 'activo' ? 'Activo' : 'Inactivo'}</Chip>;
+}
+
+const GRUPO_LABELS: Record<EstadoGrupo, string> = { ACTIVE: 'Activo', CLOSED: 'Cerrado' };
+
+export function EstadoGrupoBadge({ value }: { value: EstadoGrupo }) {
+  return <Chip tone={value === 'ACTIVE' ? 'green' : 'red'}>{GRUPO_LABELS[value]}</Chip>;
+}
+
+const MATRICULA_LABELS: Record<EstadoMatricula, string> = {
+  PREINSCRITO: 'Preinscrito',
+  MATRICULADO: 'Matriculado',
+  RETIRADO: 'Retirado',
+  TRASLADADO: 'Trasladado',
+};
+
+const MATRICULA_TONE: Record<EstadoMatricula, Tone> = {
+  PREINSCRITO: 'neutral',
+  MATRICULADO: 'green',
+  RETIRADO: 'red',
+  TRASLADADO: 'orange',
+};
+
+export function EstadoMatriculaBadge({ value }: { value: EstadoMatricula }) {
+  return <Chip tone={MATRICULA_TONE[value]}>{MATRICULA_LABELS[value]}</Chip>;
+}
+
+/** Cupos de un grupo: rojo si esta lleno, naranja si casi lleno (>=80%), verde en el resto. */
+export function CupoBadge({ ocupados, max }: { ocupados: number; max: number }) {
+  const ratio = max > 0 ? ocupados / max : 0;
+  const tone: Tone = ratio >= 1 ? 'red' : ratio >= 0.8 ? 'orange' : 'green';
+  return <Chip tone={tone}>{`${ocupados} / ${max}`}</Chip>;
 }

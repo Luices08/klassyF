@@ -1,7 +1,7 @@
 import { type InputHTMLAttributes, type ReactNode, type SelectHTMLAttributes, forwardRef } from 'react';
 
 const baseFieldClasses =
-  'block w-full rounded-md border-0 py-1.5 px-3 text-sm text-slate-900 ring-1 ring-inset ring-slate-300 placeholder:text-slate-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600 disabled:bg-slate-100 disabled:text-slate-500';
+  'block w-full rounded-lg border-0 py-2 px-3 text-sm text-ink ring-1 ring-inset ring-border placeholder:text-muted focus:ring-2 focus:ring-inset focus:ring-primary disabled:bg-soft disabled:text-muted';
 
 interface FieldWrapperProps {
   label: string;
@@ -14,12 +14,12 @@ interface FieldWrapperProps {
 export function FieldWrapper({ label, htmlFor, error, hint, children }: FieldWrapperProps) {
   return (
     <div>
-      <label htmlFor={htmlFor} className="mb-1 block text-sm font-medium text-slate-700">
+      <label htmlFor={htmlFor} className="mb-1.5 block text-label text-body">
         {label}
       </label>
       {children}
-      {hint && !error && <p className="mt-1 text-xs text-slate-500">{hint}</p>}
-      {error && <p className="mt-1 text-xs text-red-600">{error}</p>}
+      {hint && !error && <p className="mt-1 text-xs text-muted">{hint}</p>}
+      {error && <p className="mt-1 text-xs text-danger">{error}</p>}
     </div>
   );
 }

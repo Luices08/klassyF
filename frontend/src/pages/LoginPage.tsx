@@ -30,14 +30,14 @@ export function LoginPage() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-slate-50 px-4">
+    <div className="flex min-h-screen items-center justify-center bg-soft px-4">
       <div className="w-full max-w-sm">
         <div className="mb-8 text-center">
-          <h1 className="text-2xl font-extrabold text-indigo-600">Klassy</h1>
-          <p className="mt-1 text-sm text-slate-500">Gestor académico y administrativo</p>
+          <h1 className="text-h2 text-primary">Klassy</h1>
+          <p className="mt-1 text-sm text-muted">Gestor académico y administrativo</p>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4 rounded-xl bg-white p-6 shadow-sm ring-1 ring-slate-200">
+        <form onSubmit={handleSubmit} className="space-y-4 rounded-xl border border-border bg-surface p-6">
           {error && <Alert tone="error">{error}</Alert>}
 
           <Input

@@ -58,8 +58,10 @@ const academicYearSchema = new Schema<IAcademicYear, AcademicYearModel>(
     periodos: {
       type: [periodoSchema],
       validate: {
-        validator: (periodos: Types.DocumentArray<IPeriodo>) => Array.isArray(periodos) && periodos.length > 0,
-        message: 'El año lectivo debe tener al menos un periodo.',
+        // Colombia no exige exactamente 4 periodos por año lectivo; se permite entre 2 y 4.
+        validator: (periodos: Types.DocumentArray<IPeriodo>) =>
+          Array.isArray(periodos) && periodos.length >= 2 && periodos.length <= 4,
+        message: 'El año lectivo debe tener entre 2 y 4 periodos.',
       },
     },
   },

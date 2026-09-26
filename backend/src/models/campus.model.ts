@@ -1,11 +1,14 @@
 import { HydratedDocument, Model, Schema, Types, model } from 'mongoose';
+import { ESTADOS_USUARIO, EstadoUsuario } from '../constants/enums';
 
 export interface ICampus {
   institucion_id: Types.ObjectId;
   nombre: string;
   codigo_dane_sede: string;
   direccion: string;
+  telefono: string | null;
   es_principal: boolean;
+  estado: EstadoUsuario;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -23,7 +26,9 @@ const campusSchema = new Schema<ICampus, CampusModel>(
       match: [/^\d{12}$/, 'El codigo DANE de la sede debe tener exactamente 12 digitos numericos.'],
     },
     direccion: { type: String, required: true, trim: true },
+    telefono: { type: String, default: null, trim: true },
     es_principal: { type: Boolean, default: false },
+    estado: { type: String, enum: ESTADOS_USUARIO, default: 'activo' },
   },
   { timestamps: true }
 );

@@ -25,7 +25,7 @@ router.patch(
 
 router.patch(
   '/:id/review',
-  checkRole(ROLES.COORDINADOR, ROLES.ADMIN, ROLES.SUPERADMIN),
+  checkRole(ROLES.COORDINADOR, ROLES.ADMIN),
   validate(curricularDevelopmentValidator.review),
   review
 );

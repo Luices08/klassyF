@@ -9,10 +9,10 @@ const router = Router();
 
 router.use(authenticate);
 
-// Administracion estructural de la sede: solo SUPERADMIN/ADMIN habilitan jornadas.
+// Administracion estructural de la sede: solo ADMIN habilita jornadas.
 router.post(
   '/',
-  checkRole(ROLES.SUPERADMIN, ROLES.ADMIN),
+  checkRole(ROLES.ADMIN),
   validate(jornadaOperativaValidator.crearJornada),
   crearJornada
 );

@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import type { Rol } from '../../types/api';
-import type { EstadoGrupo, EstadoMatricula } from '../../types/domain';
+import type { EstadoActivo, EstadoGrupo, EstadoMatricula } from '../../types/domain';
 import type { Desempeno } from '../../types/reportCard';
 
 export type Tone = 'blue' | 'green' | 'orange' | 'red' | 'neutral';
@@ -37,7 +37,6 @@ export function DesempenoBadge({ value }: { value: Desempeno }) {
 }
 
 const ROL_LABELS: Record<Rol, string> = {
-  SUPERADMIN: 'Superadministrador',
   ADMIN: 'Administrador',
   COORDINADOR: 'Coordinador',
   DOCENTE: 'Docente',
@@ -47,7 +46,6 @@ const ROL_LABELS: Record<Rol, string> = {
 };
 
 const ROL_TONE: Record<Rol, Tone> = {
-  SUPERADMIN: 'blue',
   ADMIN: 'blue',
   COORDINADOR: 'blue',
   SECRETARIA: 'blue',
@@ -60,7 +58,8 @@ export function RolBadge({ value }: { value: Rol }) {
   return <Chip tone={ROL_TONE[value]}>{ROL_LABELS[value]}</Chip>;
 }
 
-export function EstadoUsuarioBadge({ value }: { value: 'activo' | 'inactivo' }) {
+/** Activo/inactivo generico: reusado por usuarios, sedes, instituciones y grados. */
+export function EstadoUsuarioBadge({ value }: { value: EstadoActivo }) {
   return <Chip tone={value === 'activo' ? 'green' : 'red'}>{value === 'activo' ? 'Activo' : 'Inactivo'}</Chip>;
 }
 

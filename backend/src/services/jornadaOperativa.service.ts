@@ -7,6 +7,8 @@ import ApiError from '../utils/ApiError';
 export interface CrearJornadaInput {
   sede_id: string | Types.ObjectId;
   nombre: Jornada;
+  hora_inicio: string;
+  hora_fin: string;
 }
 
 // Habilita una jornada (MANANA/TARDE/UNICA/NOCTURNA) para una sede existente.

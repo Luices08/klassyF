@@ -1,4 +1,5 @@
 import { HydratedDocument, Model, Schema, Types, model } from 'mongoose';
+import { ESTADOS_USUARIO, EstadoUsuario } from '../constants/enums';
 
 export interface IInstitution {
   nombre: string;
@@ -6,6 +7,9 @@ export interface IInstitution {
   nit: string;
   resolucion_aprobacion: string;
   administrador_id: Types.ObjectId | null;
+  /** Logo institucional como data URI (base64); se muestra en boletines/certificados. */
+  logo_url: string | null;
+  estado: EstadoUsuario;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -25,6 +29,8 @@ const institutionSchema = new Schema<IInstitution, InstitutionModel>(
     nit: { type: String, required: true, trim: true },
     resolucion_aprobacion: { type: String, required: true, trim: true },
     administrador_id: { type: Schema.Types.ObjectId, ref: 'User', default: null },
+    logo_url: { type: String, default: null },
+    estado: { type: String, enum: ESTADOS_USUARIO, default: 'activo' },
   },
   { timestamps: true }
 );

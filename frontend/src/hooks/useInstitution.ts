@@ -1,6 +1,6 @@
-import { useMutation } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../lib/apiClient';
-import type { Periodo, SetupInstitutionResult } from '../types/domain';
+import type { Calendario, EstadoActivo, Institution, Periodo, SetupInstitutionResult } from '../types/domain';
 
 export interface SetupInstitutionInput {
   institucion: {
@@ -17,14 +17,46 @@ export interface SetupInstitutionInput {
   };
   anio_lectivo: {
     year: number;
-    calendario: 'A' | 'B';
+    calendario: Calendario;
     periodos: Periodo[];
   };
 }
 
+/** Solo existe una institucion por despliegue: no recibe id. */
+export function useInstitution() {
+  return useQuery({
+    queryKey: ['institution'],
+    queryFn: () => api.get<Institution | null>('/institution'),
+  });
+}
+
 export function useSetupInstitution() {
+  const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (input: SetupInstitutionInput) =>
       api.post<SetupInstitutionResult>('/institution/setup', input),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['institution'] });
+    },
+  });
+}
+
+export interface UpdateInstitutionInput {
+  nombre: string;
+  codigo_dane: string;
+  nit: string;
+  resolucion_aprobacion: string;
+  estado?: EstadoActivo;
+  logo_url?: string | null;
+  confirm_password: string;
+}
+
+export function useUpdateInstitution() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: UpdateInstitutionInput) => api.patch<Institution>('/institution', input),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['institution'] });
+    },
   });
 }

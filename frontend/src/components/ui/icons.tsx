@@ -151,6 +151,13 @@ export const AlertTriangleIcon = (p: IconProps) => (
   </Icon>
 );
 
+export const GraduationCapIcon = (p: IconProps) => (
+  <Icon {...p}>
+    <path d="m12 4 10 5-10 5L2 9Z" />
+    <path d="M6 11v5c0 1.1 2.7 3 6 3s6-1.9 6-3v-5M22 9v6" />
+  </Icon>
+);
+
 export const XCircleIcon = (p: IconProps) => (
   <Icon {...p}>
     <circle cx="12" cy="12" r="9" />

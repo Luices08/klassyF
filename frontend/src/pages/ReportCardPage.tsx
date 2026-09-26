@@ -12,7 +12,7 @@ import { useInstitutionConfig } from '../context/InstitutionConfigContext';
 import { useReportCard, type ReportCardQuery } from '../hooks/useReportCard';
 import { useUsers } from '../hooks/useUsers';
 
-const STAFF_ROLES = ['SUPERADMIN', 'ADMIN', 'COORDINADOR', 'SECRETARIA', 'DOCENTE'] as const;
+const STAFF_ROLES = ['ADMIN', 'COORDINADOR', 'SECRETARIA', 'DOCENTE'] as const;
 
 export function ReportCardPage() {
   const { user } = useAuth();
@@ -34,7 +34,7 @@ export function ReportCardPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <PageHeader
         title="Boletín académico"
         subtitle="Consulta el boletín de un estudiante por año lectivo y periodo."

@@ -1,6 +1,6 @@
 /**
  * Seed inicial:
- *  - Crea el primer usuario SUPERADMIN (idempotente, usa variables SEED_* del .env).
+ *  - Crea el primer usuario ADMIN (idempotente, usa variables SEED_* del .env).
  *  - Carga el catalogo estandar de grados (Pre-jardin a Once, Ley 115/1994).
  *
  * Uso: npm run seed
@@ -39,27 +39,27 @@ const GRADOS_COLOMBIA: GradoSeed[] = [
   { nivel: 'MEDIA', numero: 11, nombre: 'Once' },
 ];
 
-async function seedSuperAdmin(): Promise<void> {
-  const email = process.env.SEED_SUPERADMIN_EMAIL as string;
+async function seedAdmin(): Promise<void> {
+  const email = process.env.SEED_ADMIN_EMAIL as string;
   const existing = await User.findOne({ email });
   if (existing) {
-    console.log(`[seed] SUPERADMIN ya existe (${email}), se omite.`);
+    console.log(`[seed] ADMIN ya existe (${email}), se omite.`);
     return;
   }
 
   const user = new User({
-    nombre: process.env.SEED_SUPERADMIN_NOMBRE,
-    apellido: process.env.SEED_SUPERADMIN_APELLIDO,
-    tipo_documento: process.env.SEED_SUPERADMIN_TIPO_DOCUMENTO,
-    numero_documento: process.env.SEED_SUPERADMIN_NUMERO_DOCUMENTO,
+    nombre: process.env.SEED_ADMIN_NOMBRE,
+    apellido: process.env.SEED_ADMIN_APELLIDO,
+    tipo_documento: process.env.SEED_ADMIN_TIPO_DOCUMENTO,
+    numero_documento: process.env.SEED_ADMIN_NUMERO_DOCUMENTO,
     email,
-    rol: ROLES.SUPERADMIN,
+    rol: ROLES.ADMIN,
     estado: 'activo',
   });
-  user.password = process.env.SEED_SUPERADMIN_PASSWORD as string;
+  user.password = process.env.SEED_ADMIN_PASSWORD as string;
   await user.save();
 
-  console.log(`[seed] SUPERADMIN creado: ${email}`);
+  console.log(`[seed] ADMIN creado: ${email}`);
 }
 
 async function seedGrades(): Promise<void> {
@@ -73,7 +73,7 @@ async function run(): Promise<void> {
   await mongoose.connect(env.mongoUri);
   console.log('[seed] Conectado a MongoDB.');
 
-  await seedSuperAdmin();
+  await seedAdmin();
   await seedGrades();
 
   await mongoose.disconnect();

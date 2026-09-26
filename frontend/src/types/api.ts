@@ -26,15 +26,9 @@ export class ApiError extends Error {
   }
 }
 
-export const ROLES = [
-  'SUPERADMIN',
-  'ADMIN',
-  'COORDINADOR',
-  'DOCENTE',
-  'SECRETARIA',
-  'ESTUDIANTE',
-  'ACUDIENTE',
-] as const;
+// Un solo rol administrativo (ADMIN): Klassy es de una institucion por
+// instalacion, no hay un nivel "super" por encima del admin institucional.
+export const ROLES = ['ADMIN', 'COORDINADOR', 'DOCENTE', 'SECRETARIA', 'ESTUDIANTE', 'ACUDIENTE'] as const;
 export type Rol = (typeof ROLES)[number];
 
 export interface AuthUser {
@@ -42,6 +36,7 @@ export interface AuthUser {
   nombre: string;
   apellido: string;
   email: string;
+  numero_documento: string;
   rol: Rol;
   estado?: 'activo' | 'inactivo';
 }

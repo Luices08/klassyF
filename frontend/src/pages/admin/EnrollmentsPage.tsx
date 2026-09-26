@@ -44,7 +44,7 @@ export function EnrollmentsPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <PageHeader
         title="Matrículas"
         subtitle="Matricula estudiantes en un grupo y gestiona retiros/traslados."

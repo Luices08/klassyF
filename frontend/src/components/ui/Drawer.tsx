@@ -1,4 +1,4 @@
-import type { FormEvent, ReactNode } from 'react';
+import type { ComponentProps, FormEvent, ReactNode } from 'react';
 import { Button } from './Button';
 import { XIcon } from './icons';
 
@@ -9,6 +9,7 @@ interface DrawerProps {
   onClose: () => void;
   onSubmit?: (e: FormEvent) => void;
   submitLabel?: string;
+  submitVariant?: ComponentProps<typeof Button>['variant'];
   isSubmitting?: boolean;
   submitDisabled?: boolean;
   children: ReactNode;
@@ -25,6 +26,7 @@ export function Drawer({
   onClose,
   onSubmit,
   submitLabel = 'Guardar',
+  submitVariant = 'primary',
   isSubmitting,
   submitDisabled,
   children,
@@ -66,7 +68,7 @@ export function Drawer({
               <Button type="button" variant="secondary" onClick={onClose}>
                 Cancelar
               </Button>
-              <Button type="submit" isLoading={isSubmitting} disabled={submitDisabled}>
+              <Button type="submit" variant={submitVariant} isLoading={isSubmitting} disabled={submitDisabled}>
                 {submitLabel}
               </Button>
             </div>

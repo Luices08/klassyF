@@ -102,5 +102,9 @@ export const api = {
     const res = await request<ApiSuccess<T>>(path, { method: 'PUT', body });
     return res.data;
   },
+  delete: async <T>(path: string): Promise<T> => {
+    const res = await request<ApiSuccess<T>>(path, { method: 'DELETE' });
+    return res.data;
+  },
   raw: request,
 };

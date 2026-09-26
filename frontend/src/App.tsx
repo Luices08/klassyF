@@ -6,6 +6,7 @@ import { LoginPage } from './pages/LoginPage';
 import { NotFoundPage } from './pages/NotFoundPage';
 import { ReportCardPage } from './pages/ReportCardPage';
 import { EnrollmentsPage } from './pages/admin/EnrollmentsPage';
+import { GradesPage } from './pages/admin/GradesPage';
 import { GroupsPage } from './pages/admin/GroupsPage';
 import { InstitutionSetupPage } from './pages/admin/InstitutionSetupPage';
 import { SedesPage } from './pages/admin/SedesPage';
@@ -21,20 +22,18 @@ export default function App() {
           <Route path="/" element={<DashboardPage />} />
           <Route path="/report-card" element={<ReportCardPage />} />
 
-          <Route element={<ProtectedRoute allowedRoles={['SUPERADMIN']} />}>
+          <Route element={<ProtectedRoute allowedRoles={['ADMIN']} />}>
             <Route path="/admin/setup" element={<InstitutionSetupPage />} />
-          </Route>
-
-          <Route element={<ProtectedRoute allowedRoles={['SUPERADMIN', 'ADMIN']} />}>
             <Route path="/admin/sedes" element={<SedesPage />} />
+            <Route path="/admin/grades" element={<GradesPage />} />
           </Route>
 
-          <Route element={<ProtectedRoute allowedRoles={['SUPERADMIN', 'ADMIN', 'COORDINADOR', 'SECRETARIA']} />}>
+          <Route element={<ProtectedRoute allowedRoles={['ADMIN', 'COORDINADOR', 'SECRETARIA']} />}>
             <Route path="/admin/users" element={<UsersPage />} />
             <Route path="/admin/enrollments" element={<EnrollmentsPage />} />
           </Route>
 
-          <Route element={<ProtectedRoute allowedRoles={['SUPERADMIN', 'ADMIN', 'COORDINADOR']} />}>
+          <Route element={<ProtectedRoute allowedRoles={['ADMIN', 'COORDINADOR']} />}>
             <Route path="/admin/groups" element={<GroupsPage />} />
           </Route>
         </Route>

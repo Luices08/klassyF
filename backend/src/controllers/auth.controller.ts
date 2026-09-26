@@ -4,16 +4,14 @@ import ApiError from '../utils/ApiError';
 import catchAsync from '../utils/catchAsync';
 
 interface LoginBody {
-  email?: string;
-  numero_documento?: string;
+  numero_documento: string;
   password: string;
 }
 
 export const login = catchAsync<unknown, unknown, LoginBody>(async (req, res) => {
-  const { email, numero_documento, password } = req.body;
+  const { numero_documento, password } = req.body;
 
-  const query = email ? { email } : { numero_documento };
-  const user = await User.findOne(query).select('+password_hash');
+  const user = await User.findOne({ numero_documento }).select('+password_hash');
 
   if (!user) {
     throw new ApiError(401, 'Credenciales invalidas.');
@@ -37,6 +35,7 @@ export const login = catchAsync<unknown, unknown, LoginBody>(async (req, res) =>
       nombre: user.nombre,
       apellido: user.apellido,
       email: user.email,
+      numero_documento: user.numero_documento,
       rol: user.rol,
       estado: user.estado,
     },

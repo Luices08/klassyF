@@ -4,7 +4,6 @@ import { useAuth } from '../context/AuthContext';
 import { NAV_ITEMS } from '../components/layout/navigation';
 
 const ROLE_LABELS: Record<string, string> = {
-  SUPERADMIN: 'Super administrador',
   ADMIN: 'Administrador',
   COORDINADOR: 'Coordinador',
   DOCENTE: 'Docente',
@@ -20,7 +19,7 @@ export function DashboardPage() {
   const links = NAV_ITEMS.filter((item) => item.to !== '/' && (!item.roles || item.roles.includes(user.rol)));
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <PageHeader title={`Hola, ${user.nombre} ${user.apellido}`} subtitle={ROLE_LABELS[user.rol] ?? user.rol} />
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">

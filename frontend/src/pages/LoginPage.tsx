@@ -9,7 +9,7 @@ export function LoginPage() {
   const { login, isAuthenticated, isLoading } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
-  const [email, setEmail] = useState('');
+  const [numeroDocumento, setNumeroDocumento] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
 
@@ -22,7 +22,7 @@ export function LoginPage() {
     e.preventDefault();
     setError(null);
     try {
-      await login(email, password);
+      await login(numeroDocumento, password);
       navigate('/', { replace: true });
     } catch (err) {
       setError(errorMessage(err));
@@ -41,13 +41,13 @@ export function LoginPage() {
           {error && <Alert tone="error">{error}</Alert>}
 
           <Input
-            label="Correo electrónico"
-            type="email"
-            name="email"
+            label="Número de documento"
+            type="text"
+            name="numero_documento"
             autoComplete="username"
             required
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
+            value={numeroDocumento}
+            onChange={(e) => setNumeroDocumento(e.target.value)}
           />
           <Input
             label="Contraseña"

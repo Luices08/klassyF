@@ -20,10 +20,26 @@ export function GroupsPage() {
   const [academicYearId, setAcademicYearId] = useState(config?.academicYearId ?? '');
 
   const gradesQuery = useGrades();
+  const gradesActivosQuery = useGrades('activo');
   const campusesQuery = useCampuses(config?.institutionId);
-  const groupsQuery = useGroups({ academic_year_id: academicYearId });
   const createGroup = useCreateGroup();
   const actualizarEstado = useActualizarEstadoGrupo();
+
+  const [filtroSede, setFiltroSede] = useState('');
+  const [filtroJornada, setFiltroJornada] = useState('');
+  const [filtroGrado, setFiltroGrado] = useState('');
+  const jornadasFiltroQuery = useJornadas(filtroSede || undefined);
+  const groupsQuery = useGroups({
+    academic_year_id: academicYearId,
+    sede_id: filtroSede || undefined,
+    jornada_id: filtroJornada || undefined,
+    grade_id: filtroGrado || undefined,
+  });
+
+  function handleFiltroSedeChange(nuevaSedeId: string) {
+    setFiltroSede(nuevaSedeId);
+    setFiltroJornada('');
+  }
 
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [sedeId, setSedeId] = useState('');
@@ -63,7 +79,7 @@ export function GroupsPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <PageHeader
         title="Grupos"
         subtitle="Crea y consulta los grupos de un año lectivo."
@@ -98,7 +114,39 @@ export function GroupsPage() {
       </Card>
 
       <Card>
-        <CardHeader title="Grupos del año lectivo" />
+        <CardHeader title="Grupos del año lectivo" subtitle="Filtra por sede, jornada o grado." />
+        <div className="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-3">
+          <Select label="Sede" value={filtroSede} onChange={(e) => handleFiltroSedeChange(e.target.value)}>
+            <option value="">Todas las sedes</option>
+            {campusesQuery.data?.map((c) => (
+              <option key={c._id} value={c._id}>
+                {c.nombre}
+              </option>
+            ))}
+          </Select>
+          <Select
+            label="Jornada"
+            value={filtroJornada}
+            onChange={(e) => setFiltroJornada(e.target.value)}
+            disabled={!filtroSede}
+            hint={!filtroSede ? 'Selecciona primero una sede.' : undefined}
+          >
+            <option value="">Todas las jornadas</option>
+            {jornadasFiltroQuery.data?.map((j) => (
+              <option key={j._id} value={j._id}>
+                {j.nombre}
+              </option>
+            ))}
+          </Select>
+          <Select label="Grado" value={filtroGrado} onChange={(e) => setFiltroGrado(e.target.value)}>
+            <option value="">Todos los grados</option>
+            {gradesQuery.data?.map((g) => (
+              <option key={g._id} value={g._id}>
+                {g.nombre}
+              </option>
+            ))}
+          </Select>
+        </div>
         {groupsQuery.isLoading && <Spinner />}
         {groupsQuery.isError && <Alert tone="error">{errorMessage(groupsQuery.error)}</Alert>}
         {actualizarEstado.isError && <Alert tone="error">{errorMessage(actualizarEstado.error)}</Alert>}
@@ -162,9 +210,15 @@ export function GroupsPage() {
           ))}
         </Select>
 
-        <Select label="Grado" required value={gradeId} onChange={(e) => setGradeId(e.target.value)}>
+        <Select
+          label="Grado"
+          required
+          value={gradeId}
+          onChange={(e) => setGradeId(e.target.value)}
+          hint="Solo se listan los grados activos en el catálogo institucional."
+        >
           <option value="">Selecciona...</option>
-          {gradesQuery.data?.map((g) => (
+          {gradesActivosQuery.data?.map((g) => (
             <option key={g._id} value={g._id}>
               {g.nombre}
             </option>

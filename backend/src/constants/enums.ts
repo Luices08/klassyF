@@ -8,17 +8,14 @@
 export const TIPOS_DOCUMENTO = ['CC', 'TI', 'CE', 'RC'] as const;
 export type TipoDocumento = (typeof TIPOS_DOCUMENTO)[number];
 
-export const ROLES = [
-  'SUPERADMIN',
-  'ADMIN',
-  'COORDINADOR',
-  'DOCENTE',
-  'SECRETARIA',
-  'ESTUDIANTE',
-  'ACUDIENTE',
-] as const;
+// Un solo rol administrativo (ADMIN): Klassy es de una institucion por
+// instalacion (ver CLAUDE.md), asi que no hay un nivel "super" por encima del
+// admin de la institucion — ADMIN ya tiene el maximo privilegio del sistema.
+export const ROLES = ['ADMIN', 'COORDINADOR', 'DOCENTE', 'SECRETARIA', 'ESTUDIANTE', 'ACUDIENTE'] as const;
 export type Rol = (typeof ROLES)[number];
 
+// Estado activo/inactivo generico, reusado por User, Campus, Grade e Institution
+// (misma pareja de valores en las cuatro entidades, no se duplica el array).
 export const ESTADOS_USUARIO = ['activo', 'inactivo'] as const;
 export type EstadoUsuario = (typeof ESTADOS_USUARIO)[number];
 
@@ -34,7 +31,7 @@ export type EstadoPeriodo = (typeof ESTADOS_PERIODO)[number];
 export const NIVELES_EDUCATIVOS = ['PREESCOLAR', 'PRIMARIA', 'SECUNDARIA', 'MEDIA'] as const;
 export type NivelEducativo = (typeof NIVELES_EDUCATIVOS)[number];
 
-export const JORNADAS = ['MANANA', 'TARDE', 'UNICA', 'NOCTURNA'] as const;
+export const JORNADAS = ['MANANA', 'TARDE', 'UNICA', 'NOCTURNA', 'SABATINA'] as const;
 export type Jornada = (typeof JORNADAS)[number];
 
 export const ESTADOS_MATRICULA = ['PREINSCRITO', 'MATRICULADO', 'RETIRADO', 'TRASLADADO'] as const;

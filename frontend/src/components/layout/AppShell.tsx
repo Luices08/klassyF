@@ -59,7 +59,9 @@ export function AppShell() {
           </header>
 
           <main className="flex-1 p-4 sm:p-6">
-            <div className="mx-auto max-w-5xl">
+            {/* Contenedor global: max-w-7xl (no max-w-5xl) para que tablas anchas
+                (Usuarios, Grupos) no scrolleen antes de tiempo en pantallas grandes. */}
+            <div className="mx-auto max-w-7xl">
               <Outlet />
             </div>
           </main>

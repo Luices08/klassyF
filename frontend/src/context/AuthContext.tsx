@@ -26,7 +26,7 @@ interface AuthContextValue {
   user: AuthUser | null;
   isAuthenticated: boolean;
   isLoading: boolean;
-  login: (email: string, password: string) => Promise<AuthUser>;
+  login: (numeroDocumento: string, password: string) => Promise<AuthUser>;
   logout: () => void;
 }
 
@@ -47,12 +47,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => window.removeEventListener(UNAUTHORIZED_EVENT, logout);
   }, [logout]);
 
-  const login = useCallback(async (email: string, password: string) => {
+  const login = useCallback(async (numeroDocumento: string, password: string) => {
     setIsLoading(true);
     try {
       const res = await api.raw<LoginResponse>('/auth/login', {
         method: 'POST',
-        body: { email, password },
+        body: { numero_documento: numeroDocumento, password },
       });
       setStoredToken(res.token);
       writeStoredUser(res.user);

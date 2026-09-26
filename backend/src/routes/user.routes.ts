@@ -1,7 +1,13 @@
 import { Router } from 'express';
 import { ROLES } from '../constants/roles';
 import { getProfile, upsertProfile } from '../controllers/studentProfile.controller';
-import { createUser, listUsers } from '../controllers/user.controller';
+import {
+  actualizarEstadoUsuario,
+  createUser,
+  eliminarUsuario,
+  listUsers,
+  updateUser,
+} from '../controllers/user.controller';
 import { authenticate, checkRole } from '../middlewares/auth.middleware';
 import validate from '../middlewares/validate.middleware';
 import * as studentProfileValidator from '../validators/studentProfile.validator';
@@ -13,29 +19,50 @@ router.use(authenticate);
 
 router.post(
   '/',
-  checkRole(ROLES.SUPERADMIN, ROLES.ADMIN, ROLES.COORDINADOR, ROLES.SECRETARIA),
+  checkRole(ROLES.ADMIN, ROLES.COORDINADOR, ROLES.SECRETARIA),
   validate(userValidator.createUser),
   createUser
 );
 
 router.get(
   '/',
-  checkRole(ROLES.SUPERADMIN, ROLES.ADMIN, ROLES.COORDINADOR, ROLES.SECRETARIA, ROLES.DOCENTE),
+  checkRole(ROLES.ADMIN, ROLES.COORDINADOR, ROLES.SECRETARIA, ROLES.DOCENTE),
   validate(userValidator.listUsers),
   listUsers
+);
+
+router.patch(
+  '/:id',
+  checkRole(ROLES.ADMIN, ROLES.COORDINADOR, ROLES.SECRETARIA),
+  validate(userValidator.updateUser),
+  updateUser
+);
+
+router.patch(
+  '/:id/estado',
+  checkRole(ROLES.ADMIN, ROLES.COORDINADOR, ROLES.SECRETARIA),
+  validate(userValidator.actualizarEstado),
+  actualizarEstadoUsuario
+);
+
+router.delete(
+  '/:id',
+  checkRole(ROLES.ADMIN, ROLES.COORDINADOR, ROLES.SECRETARIA),
+  validate(userValidator.eliminarUsuario),
+  eliminarUsuario
 );
 
 // Hoja de vida del estudiante (StudentProfile) - anidada bajo /users/:userId
 router.put(
   '/:userId/student-profile',
-  checkRole(ROLES.SUPERADMIN, ROLES.ADMIN, ROLES.COORDINADOR, ROLES.SECRETARIA),
+  checkRole(ROLES.ADMIN, ROLES.COORDINADOR, ROLES.SECRETARIA),
   validate(studentProfileValidator.upsertProfile),
   upsertProfile
 );
 
 router.get(
   '/:userId/student-profile',
-  checkRole(ROLES.SUPERADMIN, ROLES.ADMIN, ROLES.COORDINADOR, ROLES.SECRETARIA, ROLES.DOCENTE),
+  checkRole(ROLES.ADMIN, ROLES.COORDINADOR, ROLES.SECRETARIA, ROLES.DOCENTE),
   validate(studentProfileValidator.getProfile),
   getProfile
 );

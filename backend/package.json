@@ -8,6 +8,8 @@
     "build": "tsc",
     "start": "node dist/server.js",
     "seed": "tsx scripts/seed.ts",
+    "migrate:superadmin-to-admin": "tsx scripts/migrateSuperadminToAdmin.ts",
+    "reset-admin-password": "tsx scripts/resetAdminPassword.ts",
     "typecheck": "tsc --noEmit",
     "typecheck:all": "tsc --noEmit && tsc -p tsconfig.scripts.json"
   },

@@ -55,7 +55,7 @@ export function ReportCardView({ reportCard }: { reportCard: ReportCard }) {
   const { estudiante, asistencia_periodo: asistencia } = reportCard;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <Card>
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>

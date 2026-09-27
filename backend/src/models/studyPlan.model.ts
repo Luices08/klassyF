@@ -1,5 +1,6 @@
 import { HydratedDocument, Model, Schema, Types, model } from 'mongoose';
 import { METODOS_CALCULO_EVALUACION, MetodoCalculoEvaluacion } from '../constants/enums';
+import AcademicYear from './academicYear.model';
 
 /**
  * m06_study_plans: el plan de estudios de una institucion para un año
@@ -240,6 +241,24 @@ const studyPlanSchema = new Schema<IStudyPlan, StudyPlanModel>(
 
 // Un unico plan de estudios por institucion y año lectivo.
 studyPlanSchema.index({ institucion_id: 1, academic_year_id: 1 }, { unique: true });
+
+// institucion_id se guarda de forma redundante (mismo patron que Area), pero
+// nunca puede desincronizarse del institucion_id real del año lectivo al que
+// pertenece: mismo enfoque que group.model.ts valida jornada_id contra la
+// sede_id de su JornadaOperativa.
+studyPlanSchema.pre('validate', async function validarInstitucionDelAnioLectivo(this: IStudyPlan, next) {
+  if (!this.institucion_id || !this.academic_year_id) return next();
+  if (!this.isModified('institucion_id') && !this.isModified('academic_year_id')) return next();
+
+  const academicYear = await AcademicYear.findById(this.academic_year_id);
+  if (!academicYear) {
+    return next(new Error('academic_year_id no corresponde a un año lectivo existente.'));
+  }
+  if (String(academicYear.institucion_id) !== String(this.institucion_id)) {
+    return next(new Error('institucion_id no coincide con la institucion del año lectivo seleccionado.'));
+  }
+  next();
+});
 
 studyPlanSchema.pre('validate', function validarGradosUnicos(this: IStudyPlan, next) {
   const gradeIds = this.grades.map((g) => g.grade_id);

@@ -1,4 +1,5 @@
 import { Types } from 'mongoose';
+import { MetodoCalculoEvaluacion } from '../constants/enums';
 import { ROLES } from '../constants/roles';
 import { SIEE_WEIGHTS, DesempenoCualitativo } from '../constants/siee';
 import AcademicYear from '../models/academicYear.model';
@@ -10,8 +11,8 @@ import { CampusDocument } from '../models/campus.model';
 import Enrollment from '../models/enrollment.model';
 import Group from '../models/group.model';
 import { JornadaOperativaDocument } from '../models/jornadaOperativa.model';
-import StudyPlanAssignment from '../models/studyPlanAssignment.model';
-import { SubjectDocument } from '../models/subject.model';
+import StudyPlan from '../models/studyPlan.model';
+import Subject, { SubjectDocument } from '../models/subject.model';
 import StudentProfile from '../models/studentProfile.model';
 import TeacherAssignment from '../models/teacherAssignment.model';
 import User, { UserDocument } from '../models/user.model';
@@ -95,7 +96,8 @@ async function assertCanViewReportCard(student: UserDocument, requestingUser: Us
 
 interface AreaGroup {
   area: AreaDocument;
-  entries: Array<{ subject: SubjectDocument; porcentaje: number }>;
+  metodo: MetodoCalculoEvaluacion;
+  entries: Array<{ subject: SubjectDocument; porcentaje: number | null }>;
 }
 
 interface StudentComputed {
@@ -110,8 +112,12 @@ interface StudentComputed {
  *  - Nota de componente = promedio ponderado (peso_en_componente) de las
  *    actividades calificadas de ese componente. Sin actividades calificadas -> 0.
  *  - Nota de asignatura = Saber*0.4 + Hacer*0.4 + Ser*0.2 (SIEE_WEIGHTS).
- *  - Nota de area = suma ponderada de sus asignaturas segun la malla
- *    (StudyPlanAssignment.porcentaje_en_area).
+ *  - Nota de area = segun el metodo_calculo configurado en M06 para el area
+ *    dentro del grado del estudiante (StudyPlan.grades[].evaluaciones_area):
+ *    PONDERADO usa el porcentaje de cada asignatura, ARITMETICO promedia las
+ *    asignaturas de esa area con el mismo peso. Si el area del grupo tiene su
+ *    propia evaluacion personalizada (Distribucion por Grupos, RN-EVAL-02) se
+ *    usa esa en vez de la del grado.
  *  - Promedio general = promedio aritmetico simple de las notas de area.
  *  - Puesto de grupo = ranking por promedio general entre los MATRICULADOS del
  *    grupo (ranking de competencia estandar: los empatados comparten puesto y
@@ -160,16 +166,50 @@ export async function generateReportCard(
   const studentIds = groupEnrollments.map((e) => String(e.student_id));
   if (!studentIds.includes(String(student._id))) studentIds.push(String(student._id));
 
-  const studyPlan = await StudyPlanAssignment.find({
-    grade_id: group.grade_id,
-    academic_year_id: academicYear._id,
-  }).populate<{ subject_id: SubjectDocument }>('subject_id');
+  const studyPlan = await StudyPlan.findOne({ academic_year_id: academicYear._id });
+  const gradoPlan = studyPlan?.grades.find((g) => String(g.grade_id) === String(group.grade_id));
+  const personalizacion = gradoPlan?.personalizaciones_grupo.find((p) => String(p.group_id) === String(group._id));
 
-  const areaIds = [...new Set(studyPlan.map((sp) => String(sp.subject_id.area_id)))];
+  // Malla efectiva del grupo (M06): asignaturas de la Configuracion General
+  // del grado mas las asignaturas especificas agregadas para este grupo en
+  // Distribucion por Grupos. La intensidad horaria no participa del calculo
+  // de notas, solo la ponderacion de Configuracion de Evaluacion.
+  const subjectIdsMalla = [
+    ...(gradoPlan?.asignaturas.map((a) => String(a.subject_id)) ?? []),
+    ...(personalizacion?.asignaturas_agregadas.map((a) => String(a.subject_id)) ?? []),
+  ];
+
+  const subjects = await Subject.find({ _id: { $in: subjectIdsMalla } });
+  const subjectById = new Map(subjects.map((s) => [String(s._id), s]));
+
+  const areaIds = [...new Set(subjects.map((s) => String(s.area_id)))];
   const areas = await Area.find({ _id: { $in: areaIds } });
   const areaById = new Map(areas.map((a) => [String(a._id), a]));
 
-  const subjectIds = studyPlan.map((sp) => sp.subject_id._id);
+  // Evaluacion efectiva de un area: la personalizada del grupo si existe
+  // (RN-EVAL-02), si no la del grado; sin ninguna configurada aun, se asume
+  // ARITMETICO (mismo peso) para no bloquear la generacion del boletin.
+  const evaluacionCache = new Map<string, { metodo: MetodoCalculoEvaluacion; porcentajes: Map<string, number> }>();
+  function evaluacionParaArea(areaId: string): { metodo: MetodoCalculoEvaluacion; porcentajes: Map<string, number> } {
+    if (!evaluacionCache.has(areaId)) {
+      const personalizada = personalizacion?.evaluaciones_area_personalizadas.find(
+        (e) => String(e.area_id) === areaId
+      );
+      const evaluacion = personalizada ?? gradoPlan?.evaluaciones_area.find((e) => String(e.area_id) === areaId);
+      evaluacionCache.set(
+        areaId,
+        evaluacion
+          ? {
+              metodo: evaluacion.metodo_calculo,
+              porcentajes: new Map(evaluacion.asignaturas.map((a) => [String(a.subject_id), a.porcentaje])),
+            }
+          : { metodo: 'ARITMETICO', porcentajes: new Map() }
+      );
+    }
+    return evaluacionCache.get(areaId) as { metodo: MetodoCalculoEvaluacion; porcentajes: Map<string, number> };
+  }
+
+  const subjectIds = subjects.map((s) => s._id);
   const assignments = await TeacherAssignment.find({
     subject_id: { $in: subjectIds },
     group_id: group._id,
@@ -221,13 +261,16 @@ export async function generateReportCard(
   }
 
   const areaGroups = new Map<string, AreaGroup>();
-  for (const sp of studyPlan) {
-    const subject = sp.subject_id;
+  for (const subjectId of subjectIdsMalla) {
+    const subject = subjectById.get(subjectId);
+    if (!subject) continue;
     const areaId = String(subject.area_id);
     const area = areaById.get(areaId);
     if (!area) continue;
-    const bucket = areaGroups.get(areaId) ?? { area, entries: [] };
-    bucket.entries.push({ subject, porcentaje: sp.porcentaje_en_area });
+
+    const { metodo, porcentajes } = evaluacionParaArea(areaId);
+    const bucket = areaGroups.get(areaId) ?? { area, metodo, entries: [] };
+    bucket.entries.push({ subject, porcentaje: porcentajes.get(subjectId) ?? null });
     areaGroups.set(areaId, bucket);
   }
 
@@ -270,14 +313,18 @@ export async function generateReportCard(
   function computeStudent(studentId: string): StudentComputed {
     const areasResult: ReportCardArea[] = [];
 
-    for (const { area, entries } of areaGroups.values()) {
+    for (const { area, metodo, entries } of areaGroups.values()) {
+      // Con ARITMETICO no hay ponderacion configurada: se muestra el peso
+      // equivalente (100/n) solo a modo informativo, el calculo usa promedio simple.
+      const pesoEquivalente = entries.length > 0 ? round2(100 / entries.length) : 0;
+
       const asignaturas: ReportCardAsignatura[] = entries.map(({ subject, porcentaje }) => {
         const { nota, componentes } = subjectGrade(subject, studentId);
         const fallas = fallasPorAsignatura.get(`${String(subject._id)}_${studentId}`) ?? 0;
         return {
           subject_id: String(subject._id),
           nombre: subject.nombre,
-          porcentaje_en_area: porcentaje,
+          porcentaje_en_area: metodo === 'PONDERADO' ? porcentaje ?? 0 : pesoEquivalente,
           nota_asignatura: nota,
           desempeno: desempenoCualitativo(nota),
           fallas_asignatura: fallas,
@@ -285,9 +332,12 @@ export async function generateReportCard(
         };
       });
 
-      const notaArea = round2(
-        asignaturas.reduce((sum, a) => sum + a.nota_asignatura * (a.porcentaje_en_area / 100), 0)
-      );
+      const notaArea =
+        metodo === 'PONDERADO'
+          ? round2(asignaturas.reduce((sum, a) => sum + a.nota_asignatura * (a.porcentaje_en_area / 100), 0))
+          : asignaturas.length > 0
+            ? round2(asignaturas.reduce((sum, a) => sum + a.nota_asignatura, 0) / asignaturas.length)
+            : 0;
 
       areasResult.push({
         area_id: String(area._id),

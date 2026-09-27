@@ -154,6 +154,14 @@ const gradoPlanSchema = new Schema<IGradoPlan>(
 
 const idsUnicos = (ids: unknown[]): boolean => new Set(ids.map(String)).size === ids.length;
 
+// Los errores de negocio de estos hooks deben responder 400, no el 500 por
+// defecto del middleware de errores (ver academicYear.model.ts, mismo patron).
+function errorDeValidacion(mensaje: string): Error & { statusCode: number } {
+  const err = new Error(mensaje) as Error & { statusCode: number };
+  err.statusCode = 400;
+  return err;
+}
+
 // Reglas de integridad propias del documento (no requieren consultar otras
 // colecciones, por eso viven aqui y no en el servicio):
 // - Sin duplicados: una asignatura/area/grupo no puede aparecer dos veces
@@ -168,13 +176,13 @@ const idsUnicos = (ids: unknown[]): boolean => new Set(ids.map(String)).size ===
 gradoPlanSchema.pre('validate', function validarIntegridadGrado(this: IGradoPlan, next) {
   const subjectIds = this.asignaturas.map((a) => a.subject_id);
   if (!idsUnicos(subjectIds)) {
-    return next(new Error('No se puede repetir una asignatura en la Configuracion General de un mismo grado.'));
+    return next(errorDeValidacion('No se puede repetir una asignatura en la Configuracion General de un mismo grado.'));
   }
   const subjectIdsDelGrado = new Set(subjectIds.map(String));
 
   const areaIds = this.evaluaciones_area.map((e) => e.area_id);
   if (!idsUnicos(areaIds)) {
-    return next(new Error('No se puede repetir un area en la Configuracion de Evaluacion de un mismo grado.'));
+    return next(errorDeValidacion('No se puede repetir un area en la Configuracion de Evaluacion de un mismo grado.'));
   }
   for (const evaluacion of this.evaluaciones_area) {
     const asignaturaFueraDelGrado = evaluacion.asignaturas.find(
@@ -191,13 +199,13 @@ gradoPlanSchema.pre('validate', function validarIntegridadGrado(this: IGradoPlan
 
   const groupIds = this.personalizaciones_grupo.map((p) => p.group_id);
   if (!idsUnicos(groupIds)) {
-    return next(new Error('No se puede repetir un grupo en la Distribucion por Grupos de un mismo grado.'));
+    return next(errorDeValidacion('No se puede repetir un grupo en la Distribucion por Grupos de un mismo grado.'));
   }
 
   for (const personalizacion of this.personalizaciones_grupo) {
     const idsPersonalizados = personalizacion.intensidades_personalizadas.map((i) => i.subject_id);
     if (!idsUnicos(idsPersonalizados)) {
-      return next(new Error('No se puede repetir una asignatura en las intensidades personalizadas de un grupo.'));
+      return next(errorDeValidacion('No se puede repetir una asignatura en las intensidades personalizadas de un grupo.'));
     }
     const noPerteneceAlGrado = idsPersonalizados.find((id) => !subjectIdsDelGrado.has(String(id)));
     if (noPerteneceAlGrado) {
@@ -210,7 +218,7 @@ gradoPlanSchema.pre('validate', function validarIntegridadGrado(this: IGradoPlan
 
     const idsAgregados = personalizacion.asignaturas_agregadas.map((a) => a.subject_id);
     if (!idsUnicos(idsAgregados)) {
-      return next(new Error('No se puede agregar dos veces la misma asignatura especifica a un grupo.'));
+      return next(errorDeValidacion('No se puede agregar dos veces la misma asignatura especifica a un grupo.'));
     }
     const yaEstaEnElGrado = idsAgregados.find((id) => subjectIdsDelGrado.has(String(id)));
     if (yaEstaEnElGrado) {
@@ -223,7 +231,7 @@ gradoPlanSchema.pre('validate', function validarIntegridadGrado(this: IGradoPlan
 
     const idsEvaluacionPersonalizada = personalizacion.evaluaciones_area_personalizadas.map((e) => e.area_id);
     if (!idsUnicos(idsEvaluacionPersonalizada)) {
-      return next(new Error('No se puede repetir un area en la evaluacion personalizada de un mismo grupo.'));
+      return next(errorDeValidacion('No se puede repetir un area en la evaluacion personalizada de un mismo grupo.'));
     }
   }
 
@@ -252,10 +260,10 @@ studyPlanSchema.pre('validate', async function validarInstitucionDelAnioLectivo(
 
   const academicYear = await AcademicYear.findById(this.academic_year_id);
   if (!academicYear) {
-    return next(new Error('academic_year_id no corresponde a un año lectivo existente.'));
+    return next(errorDeValidacion('academic_year_id no corresponde a un año lectivo existente.'));
   }
   if (String(academicYear.institucion_id) !== String(this.institucion_id)) {
-    return next(new Error('institucion_id no coincide con la institucion del año lectivo seleccionado.'));
+    return next(errorDeValidacion('institucion_id no coincide con la institucion del año lectivo seleccionado.'));
   }
   next();
 });
@@ -263,7 +271,7 @@ studyPlanSchema.pre('validate', async function validarInstitucionDelAnioLectivo(
 studyPlanSchema.pre('validate', function validarGradosUnicos(this: IStudyPlan, next) {
   const gradeIds = this.grades.map((g) => g.grade_id);
   if (!idsUnicos(gradeIds)) {
-    return next(new Error('No se puede repetir un grado dentro del mismo plan de estudios.'));
+    return next(errorDeValidacion('No se puede repetir un grado dentro del mismo plan de estudios.'));
   }
   next();
 });

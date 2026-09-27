@@ -151,6 +151,84 @@ const gradoPlanSchema = new Schema<IGradoPlan>(
   { _id: false }
 );
 
+const idsUnicos = (ids: unknown[]): boolean => new Set(ids.map(String)).size === ids.length;
+
+// Reglas de integridad propias del documento (no requieren consultar otras
+// colecciones, por eso viven aqui y no en el servicio):
+// - Sin duplicados: una asignatura/area/grupo no puede aparecer dos veces
+//   dentro del mismo grado o de la misma personalizacion.
+// - "Posdata: NO se debe duplicar asignaturas... solo se llaman del catalogo":
+//   evaluaciones_area solo puede ponderar asignaturas que ya esten en la
+//   Configuracion General del grado (this.asignaturas).
+// - Distribucion por Grupos: intensidades_personalizadas solo puede editar
+//   asignaturas que YA vienen del grado (si no esta, es "agregada", no
+//   "personalizada"); asignaturas_agregadas, al contrario, no puede repetir
+//   una asignatura que el grado ya trae (para eso existe intensidades_personalizadas).
+gradoPlanSchema.pre('validate', function validarIntegridadGrado(this: IGradoPlan, next) {
+  const subjectIds = this.asignaturas.map((a) => a.subject_id);
+  if (!idsUnicos(subjectIds)) {
+    return next(new Error('No se puede repetir una asignatura en la Configuracion General de un mismo grado.'));
+  }
+  const subjectIdsDelGrado = new Set(subjectIds.map(String));
+
+  const areaIds = this.evaluaciones_area.map((e) => e.area_id);
+  if (!idsUnicos(areaIds)) {
+    return next(new Error('No se puede repetir un area en la Configuracion de Evaluacion de un mismo grado.'));
+  }
+  for (const evaluacion of this.evaluaciones_area) {
+    const asignaturaFueraDelGrado = evaluacion.asignaturas.find(
+      (a) => !subjectIdsDelGrado.has(String(a.subject_id))
+    );
+    if (asignaturaFueraDelGrado) {
+      return next(
+        new Error(
+          'La Configuracion de Evaluacion solo puede ponderar asignaturas que ya esten en la Configuracion General del grado.'
+        )
+      );
+    }
+  }
+
+  const groupIds = this.personalizaciones_grupo.map((p) => p.group_id);
+  if (!idsUnicos(groupIds)) {
+    return next(new Error('No se puede repetir un grupo en la Distribucion por Grupos de un mismo grado.'));
+  }
+
+  for (const personalizacion of this.personalizaciones_grupo) {
+    const idsPersonalizados = personalizacion.intensidades_personalizadas.map((i) => i.subject_id);
+    if (!idsUnicos(idsPersonalizados)) {
+      return next(new Error('No se puede repetir una asignatura en las intensidades personalizadas de un grupo.'));
+    }
+    const noPerteneceAlGrado = idsPersonalizados.find((id) => !subjectIdsDelGrado.has(String(id)));
+    if (noPerteneceAlGrado) {
+      return next(
+        new Error(
+          'Solo se puede personalizar la intensidad horaria de una asignatura que ya este en la Configuracion General del grado.'
+        )
+      );
+    }
+
+    const idsAgregados = personalizacion.asignaturas_agregadas.map((a) => a.subject_id);
+    if (!idsUnicos(idsAgregados)) {
+      return next(new Error('No se puede agregar dos veces la misma asignatura especifica a un grupo.'));
+    }
+    const yaEstaEnElGrado = idsAgregados.find((id) => subjectIdsDelGrado.has(String(id)));
+    if (yaEstaEnElGrado) {
+      return next(
+        new Error(
+          'Una asignatura especifica agregada a un grupo no puede ser una que el grado ya tenga en su Configuracion General (usar intensidades_personalizadas para ajustarla).'
+        )
+      );
+    }
+
+    const idsEvaluacionPersonalizada = personalizacion.evaluaciones_area_personalizadas.map((e) => e.area_id);
+    if (!idsUnicos(idsEvaluacionPersonalizada)) {
+      return next(new Error('No se puede repetir un area en la evaluacion personalizada de un mismo grupo.'));
+    }
+  }
+
+  next();
+});
+
 const studyPlanSchema = new Schema<IStudyPlan, StudyPlanModel>(
   {
     institucion_id: { type: Schema.Types.ObjectId, ref: 'Institution', required: true },
@@ -162,6 +240,14 @@ const studyPlanSchema = new Schema<IStudyPlan, StudyPlanModel>(
 
 // Un unico plan de estudios por institucion y año lectivo.
 studyPlanSchema.index({ institucion_id: 1, academic_year_id: 1 }, { unique: true });
+
+studyPlanSchema.pre('validate', function validarGradosUnicos(this: IStudyPlan, next) {
+  const gradeIds = this.grades.map((g) => g.grade_id);
+  if (!idsUnicos(gradeIds)) {
+    return next(new Error('No se puede repetir un grado dentro del mismo plan de estudios.'));
+  }
+  next();
+});
 
 export const StudyPlan = model<IStudyPlan, StudyPlanModel>('StudyPlan', studyPlanSchema);
 export default StudyPlan;

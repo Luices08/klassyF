@@ -56,6 +56,14 @@ export const configurarDistribucionGrupo: ValidationSchema = {
   }),
 };
 
+export const crearPlanDesdeAnioAnterior: ValidationSchema = {
+  body: Joi.object({
+    institucion_id: objectId.required(),
+    academic_year_id: objectId.required(),
+    academic_year_id_anterior: objectId.required(),
+  }),
+};
+
 export const obtenerStudyPlan: ValidationSchema = {
   query: Joi.object({
     institucion_id: objectId.required(),

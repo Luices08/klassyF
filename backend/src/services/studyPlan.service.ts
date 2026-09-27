@@ -281,6 +281,75 @@ export async function configurarDistribucionGrupo(input: ConfigurarDistribucionG
 }
 
 // ---------------------------------------------------------------------------
+// "Crear a partir del plan del año anterior": copia la malla de un año
+// lectivo ya configurado como punto de partida de uno nuevo.
+// ---------------------------------------------------------------------------
+
+export interface CrearPlanDesdeAnioAnteriorInput {
+  institucion_id: string;
+  academic_year_id: string;
+  academic_year_id_anterior: string;
+}
+
+/**
+ * Copia la Configuracion General y la Configuracion de Evaluacion del plan de
+ * un año lectivo anterior hacia uno nuevo, como punto de partida editable.
+ *
+ * La Distribucion por Grupos NO se copia: cada `group_id` pertenece a un
+ * `Group` que es unico por `academic_year_id` (ver group.model.ts), asi que
+ * los grupos del año anterior no existen en el año nuevo. Los grupos del
+ * nuevo año heredan automaticamente la Configuracion General de su grado
+ * (regla de oro de herencia del Analisis_M06_Klassy); si alguno necesita su
+ * propia distribucion, se configura de nuevo con configurarDistribucionGrupo.
+ */
+export async function crearPlanDesdeAnioAnterior(input: CrearPlanDesdeAnioAnteriorInput): Promise<StudyPlanDocument> {
+  const academicYearNuevo = await AcademicYear.findById(input.academic_year_id);
+  if (!academicYearNuevo) throw new ApiError(404, 'Año lectivo no encontrado.');
+  if (String(academicYearNuevo.institucion_id) !== input.institucion_id) {
+    throw new ApiError(400, 'institucion_id no coincide con la institucion del año lectivo seleccionado.');
+  }
+
+  const yaExiste = await StudyPlan.findOne({
+    institucion_id: input.institucion_id,
+    academic_year_id: input.academic_year_id,
+  });
+  if (yaExiste) {
+    throw new ApiError(409, 'Ya existe un plan de estudios configurado para este año lectivo.');
+  }
+
+  const planAnterior = await StudyPlan.findOne({
+    institucion_id: input.institucion_id,
+    academic_year_id: input.academic_year_id_anterior,
+  });
+  if (!planAnterior) {
+    throw new ApiError(404, 'No hay un plan de estudios configurado para el año lectivo anterior seleccionado.');
+  }
+
+  const nuevoPlan = new StudyPlan({
+    institucion_id: input.institucion_id,
+    academic_year_id: input.academic_year_id,
+    grades: planAnterior.grades.map(
+      (grado): IGradoPlan => ({
+        grade_id: grado.grade_id,
+        asignaturas: grado.asignaturas.map((a) => ({
+          subject_id: a.subject_id,
+          intensidad_horaria_semanal: a.intensidad_horaria_semanal,
+        })),
+        evaluaciones_area: grado.evaluaciones_area.map((e) => ({
+          area_id: e.area_id,
+          metodo_calculo: e.metodo_calculo,
+          asignaturas: e.asignaturas.map((a) => ({ subject_id: a.subject_id, porcentaje: a.porcentaje })),
+        })),
+        personalizaciones_grupo: [],
+      })
+    ),
+  });
+
+  await nuevoPlan.save();
+  return nuevoPlan;
+}
+
+// ---------------------------------------------------------------------------
 // Consulta
 // ---------------------------------------------------------------------------
 

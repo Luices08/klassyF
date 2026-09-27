@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import activityRoutes from './activity.routes';
+import academicYearRoutes from './academicYear.routes';
 import areaRoutes from './area.routes';
 import attendanceRoutes from './attendance.routes';
 import authRoutes from './auth.routes';
@@ -25,6 +26,7 @@ router.use('/users', userRoutes);
 router.use('/institution', institutionRoutes);
 router.use('/campuses', campusRoutes);
 router.use('/shifts', jornadaOperativaRoutes);
+router.use('/academic-years', academicYearRoutes);
 router.use('/grades', gradeRoutes);
 router.use('/groups', groupRoutes);
 router.use('/enrollments', enrollmentRoutes);

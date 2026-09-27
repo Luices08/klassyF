@@ -4,6 +4,7 @@ import {
   configurarAsignaturasGrado,
   configurarDistribucionGrupo,
   configurarEvaluacionArea,
+  crearPlanDesdeAnioAnterior,
   obtenerStudyPlan,
 } from '../controllers/studyPlan.controller';
 import { authenticate, checkRole } from '../middlewares/auth.middleware';
@@ -15,6 +16,15 @@ const router = Router();
 router.use(authenticate);
 
 router.get('/', validate(studyPlanValidator.obtenerStudyPlan), obtenerStudyPlan);
+
+// "Crear a partir del plan del año anterior": copia Configuracion General y
+// de Evaluacion hacia un año lectivo nuevo que todavia no tiene plan.
+router.post(
+  '/copiar-anio-anterior',
+  checkRole(ROLES.ADMIN, ROLES.COORDINADOR),
+  validate(studyPlanValidator.crearPlanDesdeAnioAnterior),
+  crearPlanDesdeAnioAnterior
+);
 
 // 2.1 Configuracion General: asignaturas e intensidad horaria por grado.
 router.post(

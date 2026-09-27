@@ -1,11 +1,17 @@
+import { ParsedQs } from 'qs';
 import * as studyPlanService from '../services/studyPlan.service';
 import {
   ConfigurarAsignaturasGradoInput,
   ConfigurarDistribucionGrupoInput,
   ConfigurarEvaluacionAreaInput,
-  ObtenerStudyPlanInput,
+  CrearPlanDesdeAnioAnteriorInput,
 } from '../services/studyPlan.service';
 import catchAsync from '../utils/catchAsync';
+
+interface ObtenerStudyPlanQuery extends ParsedQs {
+  institucion_id: string;
+  academic_year_id: string;
+}
 
 export const configurarAsignaturasGrado = catchAsync<unknown, unknown, ConfigurarAsignaturasGradoInput>(
   async (req, res) => {
@@ -28,7 +34,14 @@ export const configurarDistribucionGrupo = catchAsync<unknown, unknown, Configur
   }
 );
 
-export const obtenerStudyPlan = catchAsync<unknown, unknown, unknown, ObtenerStudyPlanInput>(async (req, res) => {
+export const crearPlanDesdeAnioAnterior = catchAsync<unknown, unknown, CrearPlanDesdeAnioAnteriorInput>(
+  async (req, res) => {
+    const plan = await studyPlanService.crearPlanDesdeAnioAnterior(req.body);
+    res.status(201).json({ success: true, data: plan });
+  }
+);
+
+export const obtenerStudyPlan = catchAsync<unknown, unknown, unknown, ObtenerStudyPlanQuery>(async (req, res) => {
   const plan = await studyPlanService.obtenerStudyPlan(req.query);
   res.status(200).json({ success: true, data: plan });
 });

@@ -5,11 +5,13 @@ import { DashboardPage } from './pages/DashboardPage';
 import { LoginPage } from './pages/LoginPage';
 import { NotFoundPage } from './pages/NotFoundPage';
 import { ReportCardPage } from './pages/ReportCardPage';
+import { AcademicCatalogPage } from './pages/admin/AcademicCatalogPage';
 import { EnrollmentsPage } from './pages/admin/EnrollmentsPage';
 import { GradesPage } from './pages/admin/GradesPage';
 import { GroupsPage } from './pages/admin/GroupsPage';
 import { InstitutionSetupPage } from './pages/admin/InstitutionSetupPage';
 import { SedesPage } from './pages/admin/SedesPage';
+import { StudyPlanPage } from './pages/admin/StudyPlanPage';
 import { UsersPage } from './pages/admin/UsersPage';
 
 export default function App() {
@@ -35,6 +37,8 @@ export default function App() {
 
           <Route element={<ProtectedRoute allowedRoles={['ADMIN', 'COORDINADOR']} />}>
             <Route path="/admin/groups" element={<GroupsPage />} />
+            <Route path="/admin/academic-catalog" element={<AcademicCatalogPage />} />
+            <Route path="/admin/study-plan" element={<StudyPlanPage />} />
           </Route>
         </Route>
       </Route>

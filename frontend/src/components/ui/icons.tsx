@@ -164,3 +164,11 @@ export const XCircleIcon = (p: IconProps) => (
     <path d="m9.5 9.5 5 5m0-5-5 5" />
   </Icon>
 );
+
+export const BookIcon = (p: IconProps) => (
+  <Icon {...p}>
+    <path d="M4 19.5V5.5A2 2 0 0 1 6 3.5h10a2 2 0 0 1 2 2v14" />
+    <path d="M4 19.5A2 2 0 0 0 6 21.5h12" />
+    <path d="M4 19.5A2 2 0 0 1 6 17.5h12v4" />
+  </Icon>
+);

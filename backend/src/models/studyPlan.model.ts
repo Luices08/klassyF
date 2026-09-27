@@ -254,7 +254,7 @@ studyPlanSchema.index({ institucion_id: 1, academic_year_id: 1 }, { unique: true
 // nunca puede desincronizarse del institucion_id real del año lectivo al que
 // pertenece: mismo enfoque que group.model.ts valida jornada_id contra la
 // sede_id de su JornadaOperativa.
-studyPlanSchema.pre('validate', async function validarInstitucionDelAnioLectivo(this: IStudyPlan, next) {
+studyPlanSchema.pre('validate', async function validarInstitucionDelAnioLectivo(this: StudyPlanDocument, next) {
   if (!this.institucion_id || !this.academic_year_id) return next();
   if (!this.isModified('institucion_id') && !this.isModified('academic_year_id')) return next();
 

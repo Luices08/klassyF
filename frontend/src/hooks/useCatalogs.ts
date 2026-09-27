@@ -1,6 +1,15 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../lib/apiClient';
-import type { Campus, EstadoActivo, Grade, Jornada, JornadaOperativa } from '../types/domain';
+import type { AcademicYear, Campus, EstadoActivo, Grade, Jornada, JornadaOperativa } from '../types/domain';
+
+export function useAcademicYears(institucionId: string | undefined) {
+  return useQuery({
+    queryKey: ['academic-years', institucionId],
+    queryFn: () => api.get<AcademicYear[]>('/academic-years', { institucion_id: institucionId }),
+    enabled: Boolean(institucionId),
+    staleTime: 5 * 60_000,
+  });
+}
 
 export function useGrades(estado?: EstadoActivo) {
   return useQuery({

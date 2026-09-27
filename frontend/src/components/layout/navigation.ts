@@ -1,6 +1,7 @@
 import type { ComponentType, SVGProps } from 'react';
 import type { Rol } from '../../types/api';
 import {
+  BookIcon,
   BuildingIcon,
   ClipboardListIcon,
   FileTextIcon,
@@ -30,5 +31,7 @@ export const NAV_ITEMS: NavItem[] = [
   { to: '/admin/grades', label: 'Catálogo de grados', icon: GraduationCapIcon, roles: STRUCTURAL_ADMINS },
   { to: '/admin/users', label: 'Usuarios', icon: UsersIcon, roles: STAFF },
   { to: '/admin/groups', label: 'Grupos', icon: LayersIcon, roles: GROUP_MANAGERS },
+  { to: '/admin/academic-catalog', label: 'Catálogo académico', icon: BookIcon, roles: GROUP_MANAGERS },
+  { to: '/admin/study-plan', label: 'Plan de estudios', icon: ClipboardListIcon, roles: GROUP_MANAGERS },
   { to: '/admin/enrollments', label: 'Matrículas', icon: ClipboardListIcon, roles: STAFF },
 ];

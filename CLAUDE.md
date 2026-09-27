@@ -157,8 +157,11 @@ nuevos para lo que ya existe aquí** — extenderlos si falta un caso, no duplic
   rol→color o estado→color en una página), `Card`/`CardHeader`, `Table`/`TableHead`/`Th`/
   `TableBody`/`Td`/`EmptyRow`, `Drawer` (formularios de creación/edición; su botón principal
   acepta `submitVariant` para casos como confirmar un borrado en rojo), `PageHeader` (título +
-  subtítulo + acción de la página), `Field` (`Input`/`Select`), `Alert`, `Spinner`, e iconos SVG
-  propios en `components/ui/icons.tsx` (no se agregó ninguna librería de iconos).
+  subtítulo + acción de la página), `Field` (`Input`/`Select`), `Alert`, `Spinner`, `Tabs`
+  (selector de pestañas simple, subrayado azul en la activa — agregado en M06 para las tres
+  secciones de Gestión de Planes de Estudio; reusar en vez de reinventar un switch de pestañas
+  en otra página), e iconos SVG propios en `components/ui/icons.tsx` (no se agregó ninguna
+  librería de iconos).
 - **Contenedor global y densidad** (`components/layout/AppShell.tsx`): el `<main>` centra el
   contenido en `max-w-7xl` (no `max-w-5xl`) para que las tablas anchas (Usuarios, Grupos) no
   scrolleen antes de tiempo en pantallas grandes. Cada página usa `space-y-4` (no `space-y-6`)

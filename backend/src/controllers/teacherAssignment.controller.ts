@@ -16,7 +16,7 @@ export const myLoad = catchAsync(async (req, res) => {
 
   const assignments = await TeacherAssignment.find({ docente_id: req.user._id })
     .populate('group_id', 'nomenclatura jornada_id max_capacity')
-    .populate('subject_id', 'nombre intensidad_horaria_semanal')
+    .populate('subject_id', 'nombre abreviatura')
     .populate('academic_year_id', 'year calendario')
     .sort({ createdAt: -1 });
 

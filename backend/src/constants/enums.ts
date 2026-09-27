@@ -49,10 +49,6 @@ export type EstadoArea = (typeof ESTADOS_AREA)[number];
 export const TIPOS_ASIGNATURA = ['OBLIGATORIA', 'OPTATIVA'] as const;
 export type TipoAsignatura = (typeof TIPOS_ASIGNATURA)[number];
 
-// Estados del ciclo de vida de una version del plan de estudios (M06).
-export const ESTADOS_VERSION_PLAN = ['EN_PREPARACION', 'PROGRAMADO', 'VIGENTE', 'CERRADO'] as const;
-export type EstadoVersionPlan = (typeof ESTADOS_VERSION_PLAN)[number];
-
 // Metodo de calculo del resultado de un area a partir de sus asignaturas (M06).
 export const METODOS_CALCULO_EVALUACION = ['PONDERADO', 'ARITMETICO'] as const;
 export type MetodoCalculoEvaluacion = (typeof METODOS_CALCULO_EVALUACION)[number];

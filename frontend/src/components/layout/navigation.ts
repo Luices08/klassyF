@@ -21,6 +21,7 @@ export interface NavItem {
 
 const STAFF: Rol[] = ['ADMIN', 'COORDINADOR', 'SECRETARIA'];
 const GROUP_MANAGERS: Rol[] = ['ADMIN', 'COORDINADOR'];
+const CURRICULUM_MANAGERS: Rol[] = ['COORDINADOR'];
 const STRUCTURAL_ADMINS: Rol[] = ['ADMIN'];
 
 export const NAV_ITEMS: NavItem[] = [
@@ -31,7 +32,7 @@ export const NAV_ITEMS: NavItem[] = [
   { to: '/admin/grades', label: 'Catálogo de grados', icon: GraduationCapIcon, roles: STRUCTURAL_ADMINS },
   { to: '/admin/users', label: 'Usuarios', icon: UsersIcon, roles: STAFF },
   { to: '/admin/groups', label: 'Grupos', icon: LayersIcon, roles: GROUP_MANAGERS },
-  { to: '/admin/academic-catalog', label: 'Catálogo académico', icon: BookIcon, roles: GROUP_MANAGERS },
-  { to: '/admin/study-plan', label: 'Plan de estudios', icon: ClipboardListIcon, roles: GROUP_MANAGERS },
+  { to: '/admin/academic-catalog', label: 'Catálogo académico', icon: BookIcon, roles: CURRICULUM_MANAGERS },
+  { to: '/admin/study-plan', label: 'Plan de estudios', icon: ClipboardListIcon, roles: CURRICULUM_MANAGERS },
   { to: '/admin/enrollments', label: 'Matrículas', icon: ClipboardListIcon, roles: STAFF },
 ];

@@ -37,6 +37,9 @@ export default function App() {
 
           <Route element={<ProtectedRoute allowedRoles={['ADMIN', 'COORDINADOR']} />}>
             <Route path="/admin/groups" element={<GroupsPage />} />
+          </Route>
+
+          <Route element={<ProtectedRoute allowedRoles={['COORDINADOR']} />}>
             <Route path="/admin/academic-catalog" element={<AcademicCatalogPage />} />
             <Route path="/admin/study-plan" element={<StudyPlanPage />} />
           </Route>

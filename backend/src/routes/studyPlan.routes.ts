@@ -21,7 +21,7 @@ router.get('/', validate(studyPlanValidator.obtenerStudyPlan), obtenerStudyPlan)
 // de Evaluacion hacia un año lectivo nuevo que todavia no tiene plan.
 router.post(
   '/copiar-anio-anterior',
-  checkRole(ROLES.ADMIN, ROLES.COORDINADOR),
+  checkRole(ROLES.COORDINADOR),
   validate(studyPlanValidator.crearPlanDesdeAnioAnterior),
   crearPlanDesdeAnioAnterior
 );
@@ -29,7 +29,7 @@ router.post(
 // 2.1 Configuracion General: asignaturas e intensidad horaria por grado.
 router.post(
   '/asignaturas-grado',
-  checkRole(ROLES.ADMIN, ROLES.COORDINADOR),
+  checkRole(ROLES.COORDINADOR),
   validate(studyPlanValidator.configurarAsignaturasGrado),
   configurarAsignaturasGrado
 );
@@ -37,7 +37,7 @@ router.post(
 // 2.3 Configuracion de Evaluacion: metodo de calculo y ponderacion por area.
 router.post(
   '/evaluacion-area',
-  checkRole(ROLES.ADMIN, ROLES.COORDINADOR),
+  checkRole(ROLES.COORDINADOR),
   validate(studyPlanValidator.configurarEvaluacionArea),
   configurarEvaluacionArea
 );
@@ -45,7 +45,7 @@ router.post(
 // 2.2 Distribucion por Grupos: personalizacion de un grupo sobre su grado.
 router.post(
   '/distribucion-grupo',
-  checkRole(ROLES.ADMIN, ROLES.COORDINADOR),
+  checkRole(ROLES.COORDINADOR),
   validate(studyPlanValidator.configurarDistribucionGrupo),
   configurarDistribucionGrupo
 );

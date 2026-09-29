@@ -11,7 +11,6 @@ import { PageHeader } from '../../components/ui/PageHeader';
 import { Spinner } from '../../components/ui/Spinner';
 import { EmptyRow, Table, TableBody, TableHead, Td, Th } from '../../components/ui/Table';
 import { CheckCircleIcon, FileTextIcon, UploadIcon, XCircleIcon } from '../../components/ui/icons';
-import { useInstitutionConfig } from '../../context/InstitutionConfigContext';
 import {
   useCambiarGrupoMatricula,
   useCargarDocumentoMatricula,
@@ -30,7 +29,6 @@ export function EnrollmentDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const enrollmentQuery = useEnrollment(id);
-  const { config } = useInstitutionConfig();
 
   const [retirarOpen, setRetirarOpen] = useState<EstadoMatricula | null>(null);
   const [motivo, setMotivo] = useState('');
@@ -46,7 +44,7 @@ export function EnrollmentDetailPage() {
   const [cambiarGrupoOpen, setCambiarGrupoOpen] = useState(false);
   const [nuevoGrupo, setNuevoGrupo] = useState('');
   const cambiarGrupo = useCambiarGrupoMatricula();
-  const groupsQuery = useGroups({ academic_year_id: config?.academicYearId });
+  const groupsQuery = useGroups({ academic_year_id: enrollmentQuery.data?.academic_year_id });
 
   const cargarDocumento = useCargarDocumentoMatricula();
   const revisarDocumento = useRevisarDocumentoMatricula();

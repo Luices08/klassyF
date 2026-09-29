@@ -12,7 +12,7 @@ import { Spinner } from '../../components/ui/Spinner';
 import { EmptyRow, Table, TableBody, TableHead, Td, Th } from '../../components/ui/Table';
 import { EyeIcon, PlusIcon, SearchIcon } from '../../components/ui/icons';
 import { useAuth } from '../../context/AuthContext';
-import { useInstitutionConfig } from '../../context/InstitutionConfigContext';
+import { useAnioDeTrabajo } from '../../hooks/useAniosLectivos';
 import { useCampuses, useGrades, useJornadas } from '../../hooks/useCatalogs';
 import { useCreateEnrollment, useEnrollmentsList, type EnrollmentsFilter } from '../../hooks/useEnrollments';
 import { useGroups } from '../../hooks/useGroups';
@@ -42,7 +42,8 @@ const FORM_VACIO = {
 export function EnrollmentsPage() {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { config } = useInstitutionConfig();
+  const { anio } = useAnioDeTrabajo();
+  const anioId = anio?._id;
   const institutionQuery = useInstitution();
   const institucionId = institutionQuery.data?._id ?? '';
 
@@ -55,7 +56,7 @@ export function EnrollmentsPage() {
   const [filtroJornada, setFiltroJornada] = useState('');
 
   const cuposQuery = useGroups({
-    academic_year_id: config?.academicYearId,
+    academic_year_id: anioId,
     sede_id: filtroSede || undefined,
     grade_id: filtroGrado || undefined,
     jornada_id: filtroJornada || undefined,
@@ -76,7 +77,7 @@ export function EnrollmentsPage() {
   }, [searchInput]);
 
   const filter: EnrollmentsFilter = {
-    academic_year_id: config?.academicYearId,
+    academic_year_id: anioId,
     estado: filterEstado || undefined,
     search: search || undefined,
     page,
@@ -88,17 +89,17 @@ export function EnrollmentsPage() {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [form, setForm] = useState(FORM_VACIO);
   const studentsQuery = useUsers({ rol: 'ESTUDIANTE' });
-  const groupsQuery = useGroups({ academic_year_id: config?.academicYearId });
+  const groupsQuery = useGroups({ academic_year_id: anioId });
   const createEnrollment = useCreateEnrollment();
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
-    if (!config) return;
+    if (!anioId) return;
     createEnrollment.reset();
     await createEnrollment.mutateAsync({
       student_id: form.student_id,
       group_id: form.group_id,
-      academic_year_id: config.academicYearId,
+      academic_year_id: anioId,
       tipo_ingreso: form.tipo_ingreso,
       estado_inicial: form.estado_inicial,
       fecha_limite_compromiso: form.estado_inicial === 'MATRICULADO_CONDICIONAL' ? form.fecha_limite_compromiso : undefined,
@@ -117,14 +118,14 @@ export function EnrollmentsPage() {
         title="Matrículas"
         subtitle="Cupos por sede/jornada/grado, formalización de matrícula y novedades."
         action={
-          <Button onClick={() => setDrawerOpen(true)} disabled={!config}>
+          <Button onClick={() => setDrawerOpen(true)} disabled={!anioId}>
             <PlusIcon className="h-4 w-4" />
             Formalizar matrícula
           </Button>
         }
       />
 
-      {!config && <Alert tone="warning">Configura primero el año lectivo activo (Configuración institucional).</Alert>}
+      {!anio && <Alert tone="warning">Aún no hay un año lectivo. Créalo en "Año lectivo".</Alert>}
 
       <Card>
         <CardHeader

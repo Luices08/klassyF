@@ -10,25 +10,24 @@ import { PageHeader } from '../../components/ui/PageHeader';
 import { Spinner } from '../../components/ui/Spinner';
 import { EmptyRow, Table, TableBody, TableHead, Td, Th } from '../../components/ui/Table';
 import { BanIcon, PlusIcon, RefreshIcon } from '../../components/ui/icons';
-import { useInstitutionConfig } from '../../context/InstitutionConfigContext';
-import { useAniosLectivos } from '../../hooks/useAniosLectivos';
+import { useAnioDeTrabajo } from '../../hooks/useAniosLectivos';
 import { useCampuses, useGrades, useJornadas } from '../../hooks/useCatalogs';
 import { useActualizarEstadoGrupo, useCreateGroup, useGroups } from '../../hooks/useGroups';
+import { useInstitution } from '../../hooks/useInstitution';
 import type { EstadoGrupo } from '../../types/domain';
 
 export function GroupsPage() {
-  const { config } = useInstitutionConfig();
-  const aniosQuery = useAniosLectivos();
-  const anios = aniosQuery.data ?? [];
-  // Sin selección explícita se trabaja sobre la vigencia activa (o, si no hay, el año más reciente).
+  const institutionQuery = useInstitution();
+  const { anio: anioPorDefecto, anios, query: aniosQuery } = useAnioDeTrabajo();
+  // Sin selección explícita se trabaja sobre la vigencia activa (o, si no hay, el más reciente sin cerrar).
   const [anioElegidoId, setAnioElegidoId] = useState('');
-  const anioActual = anios.find((a) => a._id === anioElegidoId) ?? anios.find((a) => a.estado === 'EN_CURSO') ?? anios[0];
+  const anioActual = anios.find((a) => a._id === anioElegidoId) ?? anioPorDefecto;
   const academicYearId = anioActual?._id ?? '';
   const anioCerrado = anioActual?.estado === 'CERRADO';
 
   const gradesQuery = useGrades();
   const gradesActivosQuery = useGrades('activo');
-  const campusesQuery = useCampuses(config?.institutionId);
+  const campusesQuery = useCampuses(institutionQuery.data?._id);
   const createGroup = useCreateGroup();
   const actualizarEstado = useActualizarEstadoGrupo();
 
@@ -98,10 +97,9 @@ export function GroupsPage() {
         }
       />
 
-      {!config && (
-        <Alert tone="info">
-          Aún no hay una institución configurada en esta sesión. Ve a "Configuración institucional".
-        </Alert>
+      {institutionQuery.isError && <Alert tone="error">{errorMessage(institutionQuery.error)}</Alert>}
+      {!institutionQuery.isLoading && !institutionQuery.isError && !institutionQuery.data && (
+        <Alert tone="info">Aún no hay una institución configurada. Ve a "Configuración institucional".</Alert>
       )}
 
       <Card>

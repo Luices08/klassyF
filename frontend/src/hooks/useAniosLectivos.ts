@@ -19,6 +19,18 @@ export function useAniosLectivos() {
   });
 }
 
+/**
+ * Año sobre el que se trabaja por defecto (grupos, matrículas, admisiones): la vigencia activa; si aún no hay,
+ * el más reciente que no esté cerrado (p. ej. uno en planificación); y si no, el último. Sale del servidor,
+ * no de una configuración guardada en el navegador.
+ */
+export function useAnioDeTrabajo() {
+  const query = useAniosLectivos();
+  const anios = query.data ?? [];
+  const anio = anios.find((a) => a.estado === 'EN_CURSO') ?? anios.find((a) => a.estado !== 'CERRADO') ?? anios[0];
+  return { anio, anios, query };
+}
+
 export interface PeriodoInput {
   numero: number;
   nombre: string;

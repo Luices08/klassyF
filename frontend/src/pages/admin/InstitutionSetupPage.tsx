@@ -11,7 +11,6 @@ import { PageHeader } from '../../components/ui/PageHeader';
 import { Spinner } from '../../components/ui/Spinner';
 import { Table, TableBody, TableHead, Td, Th } from '../../components/ui/Table';
 import { BuildingIcon, PlusIcon, TrashIcon } from '../../components/ui/icons';
-import { useInstitutionConfig } from '../../context/InstitutionConfigContext';
 import { avisosCalendario } from '../../lib/calendarioColombia';
 import { useInstitution, useSetupInstitution, useUpdateInstitution } from '../../hooks/useInstitution';
 import type { Calendario, EstadoActivo, Institution, Periodo } from '../../types/domain';
@@ -297,7 +296,6 @@ function InstitutionOverview({ institution }: { institution: Institution }) {
 
 function InstitutionWizard() {
   const setup = useSetupInstitution();
-  const { setConfig } = useInstitutionConfig();
 
   const [institucion, setInstitucion] = useState({ nombre: '', codigo_dane: '', nit: '', resolucion_aprobacion: '' });
   const [sede, setSede] = useState({ nombre: 'Sede Principal', codigo_dane_sede: '', direccion: '' });
@@ -327,19 +325,10 @@ function InstitutionWizard() {
     e.preventDefault();
     setup.reset();
 
-    const result = await setup.mutateAsync({
+    await setup.mutateAsync({
       institucion,
       sede_principal: sede,
       anio_lectivo: { year, calendario, periodos: periodos.map(({ _key, ...p }) => p) },
-    });
-
-    setConfig({
-      institutionId: result.institution._id,
-      institutionName: result.institution.nombre,
-      sedeId: result.sede_principal._id,
-      sedeName: result.sede_principal.nombre,
-      academicYearId: result.academic_year._id,
-      academicYearYear: result.academic_year.year,
     });
   }
 

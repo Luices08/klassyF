@@ -8,7 +8,7 @@ import { SearchIcon } from '../components/ui/icons';
 import { Spinner } from '../components/ui/Spinner';
 import { ReportCardView } from '../components/reportCard/ReportCardView';
 import { useAuth } from '../context/AuthContext';
-import { useInstitutionConfig } from '../context/InstitutionConfigContext';
+import { useAnioDeTrabajo } from '../hooks/useAniosLectivos';
 import { useReportCard, type ReportCardQuery } from '../hooks/useReportCard';
 import { useUsers } from '../hooks/useUsers';
 
@@ -16,12 +16,13 @@ const STAFF_ROLES = ['ADMIN', 'COORDINADOR', 'SECRETARIA', 'DOCENTE'] as const;
 
 export function ReportCardPage() {
   const { user } = useAuth();
-  const { config } = useInstitutionConfig();
+  const { anio: anioPorDefecto, anios } = useAnioDeTrabajo();
   const isStudent = user?.rol === 'ESTUDIANTE';
   const canBrowseStudents = user ? (STAFF_ROLES as readonly string[]).includes(user.rol) : false;
 
   const [studentId, setStudentId] = useState(isStudent ? (user?.id ?? '') : '');
-  const [academicYearId, setAcademicYearId] = useState(config?.academicYearId ?? '');
+  const [anioElegidoId, setAnioElegidoId] = useState('');
+  const academicYearId = anioElegidoId || anioPorDefecto?._id || '';
   const [periodo, setPeriodo] = useState(1);
   const [query, setQuery] = useState<ReportCardQuery | null>(null);
 
@@ -63,13 +64,14 @@ export function ReportCardPage() {
             />
           )}
 
-          <Input
-            label="Año lectivo (ID)"
-            value={academicYearId}
-            onChange={(e) => setAcademicYearId(e.target.value)}
-            hint={config ? `Último configurado: ${config.academicYearYear}` : undefined}
-            required
-          />
+          <Select label="Año lectivo" value={academicYearId} onChange={(e) => setAnioElegidoId(e.target.value)} required>
+            {anios.map((a) => (
+              <option key={a._id} value={a._id}>
+                {a.nombre}
+                {a.estado === 'EN_CURSO' ? ' (vigente)' : a.estado === 'CERRADO' ? ' (histórico)' : ''}
+              </option>
+            ))}
+          </Select>
 
           <Select label="Periodo" value={periodo} onChange={(e) => setPeriodo(Number(e.target.value))}>
             <option value={1}>Periodo 1</option>

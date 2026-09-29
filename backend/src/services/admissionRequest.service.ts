@@ -10,6 +10,7 @@ import Group from '../models/group.model';
 import StudentProfile from '../models/studentProfile.model';
 import User from '../models/user.model';
 import ApiError from '../utils/ApiError';
+import { ESTADO_ACTIVO } from '../utils/filtroEstado';
 import { generarPasswordTemporal } from '../utils/generarPasswordTemporal';
 import { runTransaction } from '../utils/runTransaction';
 import { buscarMatriculaDePreinscripcion, construirDetalle, PreinscripcionDetalle } from './preinscripcionPublica.service';
@@ -34,7 +35,7 @@ export interface CrearSolicitudInput {
 
 /** Solicitud publica (M04): sin autenticar, no crea cuentas ni consume cupos todavia. */
 export async function crearSolicitud(input: CrearSolicitudInput): Promise<AdmissionRequestDocument> {
-  const grado = await Grade.findOne({ _id: input.grado_deseado_id, estado: 'activo' });
+  const grado = await Grade.findOne({ _id: input.grado_deseado_id, estado: ESTADO_ACTIVO });
   if (!grado) throw new ApiError(400, 'El grado seleccionado no existe o no esta activo.');
 
   const yaTieneAbierta = await AdmissionRequest.findOne({

@@ -3,6 +3,7 @@ import { EstadoUsuario } from '../constants/enums';
 import Grade from '../models/grade.model';
 import ApiError from '../utils/ApiError';
 import catchAsync from '../utils/catchAsync';
+import { filtroPorEstado } from '../utils/filtroEstado';
 
 interface ListGradesQuery {
   estado?: EstadoUsuario;
@@ -10,8 +11,8 @@ interface ListGradesQuery {
 
 // Catalogo pequeño y global (Transicion a Once, ver scripts/seed.ts).
 export const listGrades = catchAsync<unknown, unknown, unknown, ListGradesQuery>(async (req, res) => {
-  const filter: Partial<Record<'estado', string>> = {};
-  if (req.query.estado) filter.estado = req.query.estado;
+  const filter: Record<string, unknown> = {};
+  if (req.query.estado) filter.estado = filtroPorEstado(req.query.estado);
 
   const grades = await Grade.find(filter).sort({ numero: 1 });
   res.status(200).json({ success: true, count: grades.length, data: grades });

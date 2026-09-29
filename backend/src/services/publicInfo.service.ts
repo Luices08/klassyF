@@ -3,6 +3,7 @@ import Grade from '../models/grade.model';
 import Institution from '../models/institution.model';
 import JornadaOperativa from '../models/jornadaOperativa.model';
 import ApiError from '../utils/ApiError';
+import { ESTADO_ACTIVO } from '../utils/filtroEstado';
 
 export const KLASSY_VERSION = '1.0.0';
 
@@ -11,14 +12,14 @@ export const KLASSY_VERSION = '1.0.0';
  * solo campos seguros de exponer — nunca administrador_id ni datos internos.
  */
 export async function obtenerInfoPublica() {
-  const institucion = await Institution.findOne({ estado: 'activo' });
+  const institucion = await Institution.findOne({ estado: ESTADO_ACTIVO });
   if (!institucion) throw new ApiError(404, 'La institución todavía no tiene configuración pública disponible.');
 
-  const sedes = await Campus.find({ institucion_id: institucion._id, estado: 'activo' }).sort({ es_principal: -1 });
+  const sedes = await Campus.find({ institucion_id: institucion._id, estado: ESTADO_ACTIVO }).sort({ es_principal: -1 });
   const sedeIds = sedes.map((s) => s._id);
 
   const [grados, jornadas] = await Promise.all([
-    Grade.find({ estado: 'activo' }).sort({ numero: 1 }),
+    Grade.find({ estado: ESTADO_ACTIVO }).sort({ numero: 1 }),
     JornadaOperativa.find({ sede_id: { $in: sedeIds } }),
   ]);
 

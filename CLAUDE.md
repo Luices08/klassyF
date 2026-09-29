@@ -82,6 +82,17 @@ Los 5 sub-módulos de M01 están implementados; no rehacer, solo extender si se 
    índice compuesto, `max_capacity`, `estado` ACTIVE/CLOSED). `GroupsPage` filtra por sede,
    jornada y grado.
 
+**Dos reglas transversales que salieron de bugs reales de M01:**
+
+- **"Activo" en una consulta es `ESTADO_ACTIVO`** (`utils/filtroEstado.ts`, `{ $ne: 'inactivo' }`), nunca `{ estado: 'activo' }`.
+  Los documentos creados antes de que existiera el campo `estado` no lo tienen guardado: Mongoose los lee como
+  'activo' (default del schema) pero ese filtro los excluye (el catálogo de grados mostraba 2 de 12). Datos viejos:
+  `npm run migrate:estado-por-defecto`.
+- **Ninguna pantalla depende de estado guardado en el navegador** (se eliminó `InstitutionConfigContext`, que solo se
+  llenaba al correr el asistente en ese navegador y dejaba "Grupos"/"Matrículas" inutilizables en cualquier otro).
+  La institución sale de `useInstitution()` y el año de trabajo de `useAnioDeTrabajo()` (vigencia activa, o el más
+  reciente sin cerrar); un ID no se pide ni se pega a mano.
+
 ### M05 (Año lectivo y periodos) — estado: completo
 
 Backend `/academic-years` (modelo `AcademicYear` + `PeriodoProrroga`), frontend `/anio-lectivo`

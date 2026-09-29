@@ -1,6 +1,11 @@
 import { Router } from 'express';
 import { ROLES } from '../constants/roles';
-import { getInstitution, setupInstitution, updateInstitution } from '../controllers/institution.controller';
+import {
+  actualizarPlantillaFranjas,
+  getInstitution,
+  setupInstitution,
+  updateInstitution,
+} from '../controllers/institution.controller';
 import { authenticate, checkRole } from '../middlewares/auth.middleware';
 import validate from '../middlewares/validate.middleware';
 import * as institutionValidator from '../validators/institution.validator';
@@ -24,6 +29,14 @@ router.patch(
   checkRole(ROLES.ADMIN),
   validate(institutionValidator.updateInstitution),
   updateInstitution
+);
+
+router.put(
+  '/plantilla-franjas',
+  authenticate,
+  checkRole(ROLES.ADMIN),
+  validate(institutionValidator.plantillaFranjas),
+  actualizarPlantillaFranjas
 );
 
 export default router;

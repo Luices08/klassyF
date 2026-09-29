@@ -100,6 +100,8 @@ export interface Institution {
   logo_url: string | null;
   correo_secretaria: string | null;
   horario_atencion: string | null;
+  /** Estructura de tiempo base que se carga en cada jornada (M01/M05); M09 usa las franjas resultantes. */
+  plantilla_franjas: FranjaPlantilla[];
   modalidad: ModalidadInstitucion;
   /** M10: qué pasa si el cupo de un grupo excede el aforo de su aula. */
   politica_aforo_aula: PoliticaAforoAula;
@@ -117,12 +119,47 @@ export interface Campus {
   estado: EstadoActivo;
 }
 
+export const TIPOS_FRANJA = ['CLASE', 'DESCANSO'] as const;
+export type TipoFranja = (typeof TIPOS_FRANJA)[number];
+
+export const NOMBRES_TIPO_FRANJA: Record<TipoFranja, string> = { CLASE: 'Clase', DESCANSO: 'Descanso' };
+
+/** Días de la semana en formato ISO (1 = lunes ... 7 = domingo), como los guarda el backend. */
+export const NOMBRES_DIA_SEMANA: Record<number, string> = {
+  1: 'Lunes',
+  2: 'Martes',
+  3: 'Miércoles',
+  4: 'Jueves',
+  5: 'Viernes',
+  6: 'Sábado',
+  7: 'Domingo',
+};
+export const DIAS_SEMANA_ISO = [1, 2, 3, 4, 5, 6, 7] as const;
+
+/** Bloque de clase o descanso de una jornada, con horas reales. */
+export interface Franja {
+  nombre: string;
+  tipo: TipoFranja;
+  hora_inicio: string;
+  hora_fin: string;
+}
+
+/** Bloque de la plantilla institucional: solo duración, se encadena desde el inicio de cada jornada. */
+export interface FranjaPlantilla {
+  nombre: string;
+  tipo: TipoFranja;
+  duracion_min: number;
+}
+
 export interface JornadaOperativa {
   _id: string;
   sede_id: string | { _id: string; nombre: string };
   nombre: Jornada;
   hora_inicio: string;
   hora_fin: string;
+  /** Días en que opera la jornada (1 lunes ... 7 domingo). */
+  dias_habiles: number[];
+  franjas: Franja[];
 }
 
 export type EstadoAnioLectivo = 'PLANIFICACION' | 'EN_CURSO' | 'CERRADO';

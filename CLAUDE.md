@@ -93,6 +93,19 @@ Los 5 sub-módulos de M01 están implementados; no rehacer, solo extender si se 
   La institución sale de `useInstitution()` y el año de trabajo de `useAnioDeTrabajo()` (vigencia activa, o el más
   reciente sin cerrar); un ID no se pide ni se pega a mano.
 
+### M02 (Usuarios) — Jerarquía institucional de gestión
+
+Backend `/users` (modelo `User`), frontend `/admin/users` (`UsersPage`).
+- **Matriz de permisos y jerarquía estricta** (`backend/src/constants/roles.ts`, `frontend/src/types/api.ts`):
+  `ADMIN (100) > COORDINADOR (70) > SECRETARIA (40) = DOCENTE (40) > ESTUDIANTE (10) = ACUDIENTE (10)`.
+  Un usuario solo puede crear, editar, cambiar estado, resetear contraseña, cerrar sesiones o eliminar a
+  usuarios de rango estrictamente MENOR (con la excepción de que un ADMIN sí puede gestionar a otros ADMIN,
+  salvo a sí mismo).
+- **Secretaría en M02**: mantiene la consulta global del directorio de usuarios, pero todas las acciones sobre
+  roles jerárquicamente iguales o superiores (`ADMIN`, `COORDINADOR`, `DOCENTE`, `SECRETARIA`) quedan bloqueadas
+  tanto en frontend (`IconButton disabled` con tooltip explicativo) como en backend (403 con mensaje de
+  jerarquía). Solo puede gestionar o crear usuarios con roles de soporte escolar (`ESTUDIANTE` y `ACUDIENTE`).
+
 ### M05 (Año lectivo y periodos) — estado: completo
 
 Backend `/academic-years` (modelo `AcademicYear` + `PeriodoProrroga`), frontend `/anio-lectivo`
@@ -123,6 +136,18 @@ solo extender si se pide algo nuevo. Reglas que no se ven leyendo un solo archiv
   (M20, aún no existe); M13 no consulta `esDiaLectivo` todavía; matrículas y admisiones no se bloquean en un
   año cerrado (solo `POST /groups` lo valida); los festivos colombianos no se descuentan de las semanas.
 
+### Estructura de tiempo de las jornadas (M01/M05, la comparte M10 y la usará M09)
+
+- **Nunca hay días ni horas fijos en el código.** Cada `JornadaOperativa` guarda sus `dias_habiles` (ISO 1=lunes … 7=domingo;
+  por defecto L–V, y solo sábado para `SABATINA`, editable para tener sábado/domingo) y sus `franjas`: bloques reales de
+  `CLASE` y `DESCANSO` con hora de inicio y fin. Empiezan vacías: hasta que se definan, la malla de espacios muestra un aviso, no
+  una cuadrícula inventada. El modelo valida que estén dentro de la jornada, en orden y sin traslapes (`utils/franjas.ts`).
+- **Plantilla base**: `Institution.plantilla_franjas` (bloques por *duración*, sin hora fija, para que sirva a mañana y tarde). Se
+  edita en Configuración institucional (`PUT /institution/plantilla-franjas`, ADMIN) y se "carga" en una jornada
+  (`GET /shifts/:id/horario/plantilla` devuelve las franjas encadenadas desde su hora de inicio, sin guardar; el usuario las revisa y
+  guarda con `PATCH /shifts/:id/horario`, ADMIN o COORDINADOR). Si la plantilla no cabe en la jornada da 409, no recorta en silencio;
+  cambiar la plantilla no toca las jornadas ya configuradas. **M09 debe leer `JornadaOperativa.franjas`, no definir su propia estructura.**
+
 ### M10 (Espacios físicos) — estado: núcleo completo
 
 Backend `/espacios` (modelo `Espacio`), frontend `/admin/espacios` (`EspaciosPage`, ADMIN y COORDINADOR; la lectura de
@@ -145,8 +170,8 @@ Backend `/espacios` (modelo `Espacio`), frontend `/admin/espacios` (`EspaciosPag
   espacio no se cambia. Reducir el aforo por debajo del cupo de un grupo asignado no se impide: el espacio y el grupo quedan
   marcados con "sobrecupo".
 - `areas_exclusivas` y `recursos`/`computadores_operativos` se guardan y se editan, pero **aún no los consume nadie**: los
-  usará el motor de horarios (M09). La malla semanal solo muestra ocupación por grupo titular; la ocupación por asignatura
-  llega con M09.
+  usará el motor de horarios (M09). La malla semanal se arma **por espacio y jornada** con los días y franjas reales de la jornada (ver
+  arriba) y solo muestra ocupación por grupo titular; la ocupación por asignatura llega con M09.
 
 ### Cargas masivas por CSV (M02 usuarios, M03 estudiantes)
 

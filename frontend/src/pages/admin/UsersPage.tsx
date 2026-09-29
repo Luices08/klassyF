@@ -38,11 +38,9 @@ import {
   type CreateUserInput,
   type UpdateUserInput,
 } from '../../hooks/useUsers';
-import { ROLES, type Rol } from '../../types/api';
+import { ROLES, type Rol, puedeGestionarRol } from '../../types/api';
 import { TIPOS_DOCUMENTO, type TipoDocumento, type User } from '../../types/domain';
 
-// Un solo rol de maximo privilegio (ADMIN) desde que se quito SUPERADMIN.
-const RESTRICTED_ROLES: Rol[] = ['ADMIN'];
 const DEFAULT_ROLES_FILTRO: Rol[] = ['ADMIN', 'COORDINADOR', 'DOCENTE', 'SECRETARIA'];
 const PAGE_SIZE = 20;
 
@@ -155,8 +153,7 @@ export function UsersPage() {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [form, setForm] = useState<CreateUserInput>(EMPTY_FORM);
 
-  const esAdmin = currentUser?.rol === 'ADMIN';
-  const assignableRoles = ROLES.filter((r) => esAdmin || !RESTRICTED_ROLES.includes(r));
+  const assignableRoles = ROLES.filter((r) => currentUser && puedeGestionarRol(currentUser.rol, r));
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -236,11 +233,11 @@ export function UsersPage() {
     await bulkImport.mutateAsync(archivo);
   }
 
-  /** Un COORDINADOR/SECRETARIA no puede tocar una cuenta ADMIN, y nadie se edita el estado a si mismo. */
+  /** Jerarquía institucional (M02): solo se gestionan usuarios de rango inferior (o ADMIN a otros ADMIN). Nadie se edita a sí mismo. */
   function puedeGestionar(u: User): boolean {
-    if (u._id === currentUser?.id) return false;
-    if (u.rol === 'ADMIN' && !esAdmin) return false;
-    return true;
+    if (!currentUser) return false;
+    if (u._id === currentUser.id) return false;
+    return puedeGestionarRol(currentUser.rol, u.rol);
   }
 
   const paginaInfo = usersQuery.data;
@@ -354,14 +351,14 @@ export function UsersPage() {
                       <div className="flex justify-end gap-2">
                         <IconButton
                           tone="edit"
-                          label="Editar usuario"
+                          label={puedeGestionar(u) ? 'Editar usuario' : 'Sin permisos jerárquicos para editar este rol'}
                           icon={<PencilIcon />}
                           disabled={!puedeGestionar(u)}
                           onClick={() => abrirEditar(u)}
                         />
                         <IconButton
                           tone="neutral"
-                          label="Resetear contraseña"
+                          label={puedeGestionar(u) ? 'Resetear contraseña' : 'Sin permisos jerárquicos para resetear clave de este rol'}
                           icon={<KeyIcon />}
                           disabled={!puedeGestionar(u)}
                           onClick={() => {
@@ -372,21 +369,27 @@ export function UsersPage() {
                         />
                         <IconButton
                           tone="neutral"
-                          label="Cerrar sesiones activas"
+                          label={puedeGestionar(u) ? 'Cerrar sesiones activas' : 'Sin permisos jerárquicos para cerrar sesiones de este rol'}
                           icon={<LogOutIcon />}
                           disabled={!puedeGestionar(u)}
                           onClick={() => setUsuarioCerrando(u)}
                         />
                         <IconButton
                           tone={u.estado === 'activo' ? 'neutral' : 'success'}
-                          label={u.estado === 'activo' ? 'Desactivar usuario' : 'Activar usuario'}
+                          label={
+                            !puedeGestionar(u)
+                              ? 'Sin permisos jerárquicos para cambiar estado de este rol'
+                              : u.estado === 'activo'
+                              ? 'Desactivar usuario'
+                              : 'Activar usuario'
+                          }
                           icon={u.estado === 'activo' ? <BanIcon /> : <RefreshIcon />}
                           disabled={!puedeGestionar(u) || actualizarEstado.isPending}
                           onClick={() => handleToggleEstado(u)}
                         />
                         <IconButton
                           tone="danger"
-                          label="Eliminar usuario"
+                          label={puedeGestionar(u) ? 'Eliminar usuario' : 'Sin permisos jerárquicos para eliminar este rol'}
                           icon={<TrashIcon />}
                           disabled={!puedeGestionar(u)}
                           onClick={() => setUsuarioEliminando(u)}
@@ -535,7 +538,7 @@ export function UsersPage() {
           value={formEditar.rol}
           onChange={(e) => setFormEditar((f) => ({ ...f, rol: e.target.value as Rol }))}
         >
-          {ROLES.filter((r) => esAdmin || !RESTRICTED_ROLES.includes(r) || r === usuarioEditando?.rol).map((r) => (
+          {ROLES.filter((r) => currentUser && (puedeGestionarRol(currentUser.rol, r) || r === usuarioEditando?.rol)).map((r) => (
             <option key={r} value={r}>
               {r}
             </option>

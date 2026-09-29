@@ -3,6 +3,7 @@ import { api } from '../lib/apiClient';
 import type {
   Calendario,
   EstadoActivo,
+  FranjaPlantilla,
   Institution,
   ModalidadInstitucion,
   Periodo,
@@ -68,6 +69,17 @@ export function useUpdateInstitution() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (input: UpdateInstitutionInput) => api.patch<Institution>('/institution', input),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['institution'] });
+    },
+  });
+}
+
+/** Plantilla base de franjas horarias de la institución; se carga en las jornadas y M09 usa el resultado. */
+export function useActualizarPlantillaFranjas() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (franjas: FranjaPlantilla[]) => api.put<Institution>('/institution/plantilla-franjas', { franjas }),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['institution'] });
     },

@@ -1,5 +1,5 @@
 import Joi from 'joi';
-import { CALENDARIOS, ESTADOS_USUARIO, MODALIDADES_INSTITUCION, POLITICAS_AFORO_AULA } from '../constants/enums';
+import { CALENDARIOS, ESTADOS_USUARIO, MODALIDADES_INSTITUCION, POLITICAS_AFORO_AULA, TIPOS_FRANJA } from '../constants/enums';
 import { ValidationSchema } from '../middlewares/validate.middleware';
 import { objectId } from './common.validator';
 
@@ -46,6 +46,23 @@ export const setup: ValidationSchema = {
 // El sistema es de una sola institucion por instalacion (se vende/despliega un
 // dominio por colegio); una vez creada, sus datos se editan aqui en vez de
 // volver a pasar por /setup.
+export const plantillaFranjas: ValidationSchema = {
+  body: Joi.object({
+    // Vacia = sin plantilla (las jornadas se configuran a mano).
+    franjas: Joi.array()
+      .items(
+        Joi.object({
+          nombre: Joi.string().trim().required(),
+          tipo: Joi.string()
+            .valid(...TIPOS_FRANJA)
+            .required(),
+          duracion_min: Joi.number().integer().min(5).max(480).required(),
+        })
+      )
+      .required(),
+  }),
+};
+
 export const updateInstitution: ValidationSchema = {
   body: Joi.object({
     nombre: Joi.string().required(),

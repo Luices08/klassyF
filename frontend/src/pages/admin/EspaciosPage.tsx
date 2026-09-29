@@ -1,5 +1,6 @@
 import { type FormEvent, useState } from 'react';
 import { EspacioDrawer } from '../../components/espacios/EspacioDrawer';
+import { FranjasJornadaDrawer } from '../../components/jornadas/FranjasJornadaDrawer';
 import { MallaOcupacionEspacio } from '../../components/espacios/MallaOcupacionEspacio';
 import { Alert, errorMessage } from '../../components/ui/Alert';
 import { Chip, EstadoEspacioBadge } from '../../components/ui/Badge';
@@ -13,13 +14,14 @@ import { Spinner } from '../../components/ui/Spinner';
 import { EmptyRow, Table, TableBody, TableHead, Td, Th } from '../../components/ui/Table';
 import { BanIcon, PencilIcon, PlusIcon, RefreshIcon, TrashIcon } from '../../components/ui/icons';
 import { useAnioDeTrabajo } from '../../hooks/useAniosLectivos';
-import { useCampuses } from '../../hooks/useCatalogs';
+import { useCampuses, useJornadas } from '../../hooks/useCatalogs';
 import { useCambiarEstadoEspacio, useEliminarEspacio, useEspacios } from '../../hooks/useEspacios';
 import { useInstitution } from '../../hooks/useInstitution';
 import {
   NOMBRES_TIPO_ESPACIO,
   TIPOS_ESPACIO,
   type Espacio,
+  type JornadaOperativa,
   type RecursoEspacio,
   type TipoEspacio,
 } from '../../types/domain';
@@ -57,6 +59,13 @@ export function EspaciosPage() {
 
   const [mallaId, setMallaId] = useState('');
   const espacioMalla = espacios.find((e) => e._id === mallaId) ?? espacios[0];
+
+  // La malla es por espacio Y jornada: los días y las franjas salen de la jornada de la sede del espacio.
+  const jornadasQuery = useJornadas(espacioMalla?.sede_id._id);
+  const jornadas = jornadasQuery.data ?? [];
+  const [jornadaMallaId, setJornadaMallaId] = useState('');
+  const jornadaMalla = jornadas.find((j) => j._id === jornadaMallaId) ?? jornadas[0];
+  const [configurandoFranjas, setConfigurandoFranjas] = useState<JornadaOperativa | null>(null);
 
   async function handleEliminar(e: FormEvent) {
     e.preventDefault();
@@ -217,18 +226,44 @@ export function EspaciosPage() {
             title="Malla semanal de ocupación"
             subtitle="Qué franjas de la semana tiene tomadas el espacio y por qué grupo."
             action={
-              <Select label="Espacio" value={espacioMalla._id} onChange={(e) => setMallaId(e.target.value)} className="w-64">
-                {espacios.map((e) => (
-                  <option key={e._id} value={e._id}>
-                    {e.sede_id.nombre} · {e.nombre}
-                  </option>
-                ))}
-              </Select>
+              <div className="flex flex-wrap justify-end gap-3">
+                <Select label="Espacio" value={espacioMalla._id} onChange={(e) => setMallaId(e.target.value)} className="w-60">
+                  {espacios.map((e) => (
+                    <option key={e._id} value={e._id}>
+                      {e.sede_id.nombre} · {e.nombre}
+                    </option>
+                  ))}
+                </Select>
+                <Select
+                  label="Jornada"
+                  value={jornadaMalla?._id ?? ''}
+                  onChange={(e) => setJornadaMallaId(e.target.value)}
+                  disabled={jornadas.length === 0}
+                  className="w-56"
+                >
+                  {jornadas.length === 0 && <option value="">Sin jornadas</option>}
+                  {jornadas.map((j) => (
+                    <option key={j._id} value={j._id}>
+                      {j.nombre} · {j.hora_inicio}–{j.hora_fin}
+                    </option>
+                  ))}
+                </Select>
+              </div>
             }
           />
-          <MallaOcupacionEspacio espacio={espacioMalla} />
+          <MallaOcupacionEspacio
+            espacio={espacioMalla}
+            jornada={jornadaMalla}
+            onConfigurarFranjas={() => jornadaMalla && setConfigurandoFranjas(jornadaMalla)}
+          />
         </Card>
       )}
+
+      <FranjasJornadaDrawer
+        open={configurandoFranjas !== null}
+        jornada={configurandoFranjas}
+        onClose={() => setConfigurandoFranjas(null)}
+      />
 
       <EspacioDrawer
         open={drawer !== null}

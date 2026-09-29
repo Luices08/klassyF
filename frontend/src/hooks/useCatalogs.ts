@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../lib/apiClient';
-import type { Area, Campus, EstadoActivo, Grade, Jornada, JornadaOperativa } from '../types/domain';
+import type { Area, Campus, EstadoActivo, Franja, Grade, Jornada, JornadaOperativa } from '../types/domain';
 
 export function useGrades(estado?: EstadoActivo) {
   return useQuery({
@@ -119,5 +119,31 @@ export function useCrearJornada() {
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['jornadas'] });
     },
+  });
+}
+
+export interface ActualizarHorarioJornadaInput {
+  id: string;
+  dias_habiles: number[];
+  franjas: Franja[];
+}
+
+/** Define los días hábiles y las franjas (clases y descansos) de una jornada: la estructura de tiempo de M10 y M09. */
+export function useActualizarHorarioJornada() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, ...horario }: ActualizarHorarioJornadaInput) =>
+      api.patch<JornadaOperativa>(`/shifts/${id}/horario`, horario),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['jornadas'] });
+    },
+  });
+}
+
+/** Franjas que resultan de aplicar la plantilla institucional a una jornada (no guarda: el usuario las revisa). */
+export function useFranjasDesdePlantilla() {
+  return useMutation({
+    mutationFn: (jornadaId: string) =>
+      api.get<{ franjas: Franja[]; minutos_libres: number }>(`/shifts/${jornadaId}/horario/plantilla`),
   });
 }

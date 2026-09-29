@@ -6,6 +6,8 @@ import Campus, { CampusDocument } from '../models/campus.model';
 import Institution, { InstitutionDocument } from '../models/institution.model';
 import User from '../models/user.model';
 import ApiError from '../utils/ApiError';
+import { FranjaPlantilla } from '../utils/franjas';
+import { registrarEvento } from './audit.service';
 import { runTransaction } from '../utils/runTransaction';
 
 export interface UpdateInstitutionInput {
@@ -120,6 +122,31 @@ export async function setupInstitution({
       academic_year: academicYear,
     };
   });
+}
+
+/**
+ * Plantilla base de franjas (clases y descansos, por duracion) que se carga en las jornadas. No lleva contraseña de
+ * confirmacion: no toca datos legales de la institucion, y editarla no altera las jornadas ya configuradas.
+ */
+export async function actualizarPlantillaFranjas(
+  franjas: FranjaPlantilla[],
+  { usuarioId, ip }: { usuarioId: Types.ObjectId | string; ip?: string | null }
+): Promise<InstitutionDocument> {
+  const institucion = await Institution.findOne();
+  if (!institucion) throw new ApiError(404, 'No hay una institución configurada todavía.');
+
+  institucion.set('plantilla_franjas', franjas);
+  await institucion.save();
+
+  await registrarEvento({
+    usuario_id: usuarioId,
+    accion: 'PLANTILLA_FRANJAS_ACTUALIZADA',
+    entidad: 'Institution',
+    entidad_id: institucion._id,
+    detalle: `${franjas.length} bloque(s), ${franjas.reduce((s, f) => s + f.duracion_min, 0)} minutos en total`,
+    ip,
+  });
+  return institucion;
 }
 
 /** Como solo existe una institucion por despliegue, no recibe ni necesita un id. */

@@ -63,6 +63,18 @@ export type NivelEducativo = (typeof NIVELES_EDUCATIVOS)[number];
 export const JORNADAS = ['MANANA', 'TARDE', 'UNICA', 'NOCTURNA', 'SABATINA'] as const;
 export type Jornada = (typeof JORNADAS)[number];
 
+// Dias de la semana en formato ISO (1 = lunes ... 7 = domingo): los dias habiles de una jornada se guardan asi.
+export const DIAS_SEMANA_ISO = [1, 2, 3, 4, 5, 6, 7] as const;
+
+/** Dias habiles por omision de una jornada nueva: la sabatina, el sabado; las demas, de lunes a viernes. Se puede editar. */
+export function diasHabilesPorDefecto(jornada: Jornada): number[] {
+  return jornada === 'SABATINA' ? [6] : [1, 2, 3, 4, 5];
+}
+
+// Franja de una jornada: bloque de clase o descanso (recreo, almuerzo).
+export const TIPOS_FRANJA = ['CLASE', 'DESCANSO'] as const;
+export type TipoFranja = (typeof TIPOS_FRANJA)[number];
+
 // M04: maquina de estados formal de la matricula. "Traslado" ya no es un
 // estado (se solapaba con MATRICULADO/RETIRADO) sino un TIPO_INGRESO — de
 // donde viene el estudiante, no en que estado esta su matricula actual.

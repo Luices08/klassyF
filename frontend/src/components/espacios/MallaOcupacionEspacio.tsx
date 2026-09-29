@@ -1,51 +1,58 @@
-import type { Espacio, GrupoAsignadoEspacio } from '../../types/domain';
+import { NOMBRES_DIA_SEMANA, type Espacio, type JornadaOperativa } from '../../types/domain';
+import { Alert } from '../ui/Alert';
+import { Button } from '../ui/Button';
 import { Chip } from '../ui/Badge';
-import { EmptyRow, Table, TableBody, TableHead, Td, Th } from '../ui/Table';
+import { ClockIcon } from '../ui/icons';
+import { Table, TableBody, TableHead, Td, Th } from '../ui/Table';
 
-const DIAS_SEMANA = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes'] as const;
-const HORA_INICIO_POR_DEFECTO = 6;
-const HORA_FIN_POR_DEFECTO = 18;
-
-const aMinutos = (hhmm: string): number => {
-  const [h, m] = hhmm.split(':').map(Number);
-  return (h ?? 0) * 60 + (m ?? 0);
-};
-
-const etiquetaHora = (hora: number): string => `${String(hora).padStart(2, '0')}:00`;
-
-/** La jornada sabatina se dicta solo el sábado; las demás de lunes a viernes. */
-function ocupaDia(grupo: GrupoAsignadoEspacio, dia: string): boolean {
-  if (!grupo.jornada) return false;
-  return grupo.jornada.nombre === 'SABATINA' ? dia === 'Sábado' : dia !== 'Sábado';
-}
-
-function ocupaHora(grupo: GrupoAsignadoEspacio, hora: number): boolean {
-  if (!grupo.jornada) return false;
-  return aMinutos(grupo.jornada.hora_inicio) < (hora + 1) * 60 && aMinutos(grupo.jornada.hora_fin) > hora * 60;
+interface MallaOcupacionEspacioProps {
+  espacio: Espacio;
+  /** Jornada cuya ocupación se muestra; undefined si la sede aún no tiene jornadas. */
+  jornada: JornadaOperativa | undefined;
+  /** Abre el editor de franjas de la jornada (Alert de "sin franjas"). */
+  onConfigurarFranjas: () => void;
 }
 
 /**
- * Malla semanal de ocupación de un espacio (M10): qué franjas tiene tomadas por sus grupos titulares. La ocupación
- * por asignatura se sumará cuando exista el motor de horarios (M09); hoy solo hay salón titular por jornada.
+ * Malla semanal de ocupación de un espacio en una jornada (M10). Nada está fijo en el código: los días salen de los
+ * días hábiles de la jornada (con sábado o domingo si aplica) y las filas son sus franjas reales de clase y descanso
+ * (M01), la misma estructura que usará el motor de horarios (M09). Hoy solo hay ocupación por salón titular; la de
+ * cada asignatura llegará con M09.
  */
-export function MallaOcupacionEspacio({ espacio }: { espacio: Espacio }) {
-  const grupos = espacio.grupos_asignados.filter((g) => g.jornada);
-  const dias = grupos.some((g) => g.jornada?.nombre === 'SABATINA') ? [...DIAS_SEMANA, 'Sábado'] : [...DIAS_SEMANA];
+export function MallaOcupacionEspacio({ espacio, jornada, onConfigurarFranjas }: MallaOcupacionEspacioProps) {
+  if (!jornada) {
+    return (
+      <Alert tone="info">
+        La sede {espacio.sede_id.nombre} aún no tiene jornadas habilitadas. Créalas en Sedes y jornadas para ver la ocupación.
+      </Alert>
+    );
+  }
 
-  const inicios = grupos.map((g) => Math.floor(aMinutos(g.jornada!.hora_inicio) / 60));
-  const fines = grupos.map((g) => Math.ceil(aMinutos(g.jornada!.hora_fin) / 60));
-  const desde = grupos.length ? Math.min(...inicios) : HORA_INICIO_POR_DEFECTO;
-  const hasta = grupos.length ? Math.max(...fines) : HORA_FIN_POR_DEFECTO;
-  const horas = Array.from({ length: Math.max(0, hasta - desde) }, (_, i) => desde + i);
+  if (jornada.franjas.length === 0) {
+    return (
+      <div className="space-y-3">
+        <Alert tone="info">
+          La jornada {jornada.nombre} ({jornada.hora_inicio}–{jornada.hora_fin}) aún no tiene franjas horarias. Defínelas o
+          cárgalas desde la plantilla institucional: el módulo de horarios (M09) usará esta misma estructura de tiempo.
+        </Alert>
+        <Button type="button" variant="outline" onClick={onConfigurarFranjas}>
+          <ClockIcon className="h-4 w-4" />
+          Configurar franjas de la jornada
+        </Button>
+      </div>
+    );
+  }
 
+  const dias = [...jornada.dias_habiles].sort((a, b) => a - b);
+  const grupos = espacio.grupos_asignados.filter((g) => g.jornada?._id === jornada._id);
   const noOperativo = espacio.estado !== 'DISPONIBLE';
 
   return (
     <div className="space-y-3">
       <p className="text-xs text-muted">
         {grupos.length === 0
-          ? 'Sin grupos titulares en este año lectivo: el espacio está libre toda la semana.'
-          : 'Franjas ocupadas por el salón titular de cada grupo. La ocupación por asignatura llegará con el motor de horarios (M09).'}
+          ? `Sin grupos titulares en la jornada ${jornada.nombre}: el espacio está libre en todas sus franjas de clase.`
+          : 'Franjas de clase ocupadas por el salón titular de cada grupo. La ocupación por asignatura llegará con el motor de horarios (M09).'}
       </p>
       {noOperativo && (
         <Chip tone="orange">
@@ -54,26 +61,32 @@ export function MallaOcupacionEspacio({ espacio }: { espacio: Espacio }) {
       )}
       <Table>
         <TableHead>
-          <Th>Hora</Th>
+          <Th>Franja</Th>
           {dias.map((d) => (
-            <Th key={d}>{d}</Th>
+            <Th key={d}>{NOMBRES_DIA_SEMANA[d]}</Th>
           ))}
         </TableHead>
         <TableBody>
-          {horas.map((hora) => (
-            <tr key={hora}>
-              <Td className="whitespace-nowrap font-mono text-xs text-muted">
-                {etiquetaHora(hora)} – {etiquetaHora(hora + 1)}
+          {jornada.franjas.map((franja, i) => (
+            <tr key={`${franja.hora_inicio}-${i}`}>
+              <Td className="whitespace-nowrap">
+                <p className="text-sm font-medium text-ink">{franja.nombre}</p>
+                <p className="font-mono text-xs text-muted">
+                  {franja.hora_inicio} – {franja.hora_fin}
+                </p>
               </Td>
-              {dias.map((dia) => {
-                const ocupantes = grupos.filter((g) => ocupaDia(g, dia) && ocupaHora(g, hora));
-                return (
-                  <Td key={dia} className={ocupantes.length ? 'bg-primary-soft/40' : ''}>
-                    {ocupantes.length === 0 ? (
+              {franja.tipo === 'DESCANSO' ? (
+                <Td colSpan={dias.length} className="bg-soft text-center text-xs text-muted">
+                  Descanso
+                </Td>
+              ) : (
+                dias.map((d) => (
+                  <Td key={d} className={grupos.length ? 'bg-primary-soft/40' : ''}>
+                    {grupos.length === 0 ? (
                       <span className="text-xs text-muted">Libre</span>
                     ) : (
                       <div className="flex flex-wrap gap-1">
-                        {ocupantes.map((g) => (
+                        {grupos.map((g) => (
                           <Chip key={g._id} tone="blue">
                             {g.nomenclatura}
                           </Chip>
@@ -81,11 +94,10 @@ export function MallaOcupacionEspacio({ espacio }: { espacio: Espacio }) {
                       </div>
                     )}
                   </Td>
-                );
-              })}
+                ))
+              )}
             </tr>
           ))}
-          {horas.length === 0 && <EmptyRow colSpan={dias.length + 1}>Sin franjas por mostrar.</EmptyRow>}
         </TableBody>
       </Table>
     </div>

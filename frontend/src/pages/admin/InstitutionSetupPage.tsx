@@ -1,7 +1,7 @@
 import { type ChangeEvent, type FormEvent, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Alert, errorMessage } from '../../components/ui/Alert';
-import { EstadoUsuarioBadge } from '../../components/ui/Badge';
+import { Chip, EstadoUsuarioBadge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import { Card, CardHeader } from '../../components/ui/Card';
 import { Drawer } from '../../components/ui/Drawer';
@@ -11,6 +11,7 @@ import { PageHeader } from '../../components/ui/PageHeader';
 import { Spinner } from '../../components/ui/Spinner';
 import { Table, TableBody, TableHead, Td, Th } from '../../components/ui/Table';
 import { BuildingIcon, PlusIcon, TrashIcon } from '../../components/ui/icons';
+import { PlantillaFranjasDrawer } from '../../components/jornadas/PlantillaFranjasDrawer';
 import { avisosCalendario } from '../../lib/calendarioColombia';
 import { useInstitution, useSetupInstitution, useUpdateInstitution } from '../../hooks/useInstitution';
 import {
@@ -84,6 +85,7 @@ function InstitutionOverview({ institution }: { institution: Institution }) {
   const updateInstitution = useUpdateInstitution();
 
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [plantillaAbierta, setPlantillaAbierta] = useState(false);
   const [logoError, setLogoError] = useState<string | null>(null);
   const [form, setForm] = useState({
     nombre: institution.nombre,
@@ -202,6 +204,32 @@ function InstitutionOverview({ institution }: { institution: Institution }) {
       </div>
 
       <Card>
+        <CardHeader
+          title="Plantilla de franjas horarias"
+          subtitle="Clases y descansos base que se cargan en cada jornada; el módulo de horarios (M09) usa esa misma estructura."
+          action={
+            <Button type="button" variant="outline" onClick={() => setPlantillaAbierta(true)}>
+              {institution.plantilla_franjas.length > 0 ? 'Editar plantilla' : 'Definir plantilla'}
+            </Button>
+          }
+        />
+        {institution.plantilla_franjas.length === 0 ? (
+          <p className="text-sm text-muted">
+            Aún no hay plantilla: cada jornada se configura a mano en Sedes y jornadas. Con una plantilla podrás cargar
+            la estructura completa en todas las jornadas con un clic.
+          </p>
+        ) : (
+          <div className="flex flex-wrap gap-2">
+            {institution.plantilla_franjas.map((b, i) => (
+              <Chip key={`${b.nombre}-${i}`} tone={b.tipo === 'CLASE' ? 'blue' : 'neutral'}>
+                {b.nombre} · {b.duracion_min} min
+              </Chip>
+            ))}
+          </div>
+        )}
+      </Card>
+
+      <Card>
         <CardHeader title="Institución registrada" />
         <Table>
           <TableHead>
@@ -229,6 +257,12 @@ function InstitutionOverview({ institution }: { institution: Institution }) {
           </TableBody>
         </Table>
       </Card>
+
+      <PlantillaFranjasDrawer
+        open={plantillaAbierta}
+        plantilla={institution.plantilla_franjas}
+        onClose={() => setPlantillaAbierta(false)}
+      />
 
       <Drawer
         open={drawerOpen}

@@ -127,6 +127,36 @@ export type EstadoAsistencia = (typeof ESTADOS_ASISTENCIA)[number];
 export const ESTADOS_GRUPO = ['ACTIVE', 'CLOSED'] as const;
 export type EstadoGrupo = (typeof ESTADOS_GRUPO)[number];
 
+// --- M10: Espacios fisicos (aulas, laboratorios, canchas...) ---
+
+export const TIPOS_ESPACIO = [
+  'AULA_REGULAR',
+  'LABORATORIO',
+  'SALA_INFORMATICA',
+  'ESPACIO_DEPORTIVO',
+  'AUDITORIO',
+  'TALLER_TECNICO',
+] as const;
+export type TipoEspacio = (typeof TIPOS_ESPACIO)[number];
+
+// Disponible: el motor de horarios puede asignarlo. En mantenimiento e inactivo no.
+export const ESTADOS_ESPACIO = ['DISPONIBLE', 'EN_MANTENIMIENTO', 'INACTIVO'] as const;
+export type EstadoEspacio = (typeof ESTADOS_ESPACIO)[number];
+
+// Checklist de dotacion. La cantidad de computadores va aparte (computadores_operativos).
+export const RECURSOS_ESPACIO = ['VIDEO_BEAM_TV', 'CLIMATIZACION', 'INTERNET', 'RED_CABLEADA', 'LAVAMANOS_GAS'] as const;
+export type RecursoEspacio = (typeof RECURSOS_ESPACIO)[number];
+
+// Modalidad de la institucion. Una institucion VIRTUAL no tiene aulas ni espacios fisicos: M10 (espacios) se apaga
+// por completo y los grupos no llevan aula. PRESENCIAL (por defecto) los habilita; ahi el aula sigue siendo opcional.
+export const MODALIDADES_INSTITUCION = ['PRESENCIAL', 'VIRTUAL'] as const;
+export type ModalidadInstitucion = (typeof MODALIDADES_INSTITUCION)[number];
+
+// Que hacer cuando el cupo de un grupo excede el aforo del aula elegida. Es una regla que cada
+// institucion decide (no se quema en codigo): BLOQUEAR impide crear el grupo; ADVERTIR lo permite y deja auditoria.
+export const POLITICAS_AFORO_AULA = ['BLOQUEAR', 'ADVERTIR'] as const;
+export type PoliticaAforoAula = (typeof POLITICAS_AFORO_AULA)[number];
+
 // --- M03: Expediente y hoja de vida del estudiante ---
 
 export const GENEROS = ['M', 'F', 'OTRO'] as const;

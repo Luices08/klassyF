@@ -1,6 +1,14 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../lib/apiClient';
-import type { Calendario, EstadoActivo, Institution, Periodo, SetupInstitutionResult } from '../types/domain';
+import type {
+  Calendario,
+  EstadoActivo,
+  Institution,
+  ModalidadInstitucion,
+  Periodo,
+  PoliticaAforoAula,
+  SetupInstitutionResult,
+} from '../types/domain';
 
 export interface SetupInstitutionInput {
   institucion: {
@@ -8,6 +16,7 @@ export interface SetupInstitutionInput {
     codigo_dane: string;
     nit: string;
     resolucion_aprobacion: string;
+    modalidad?: ModalidadInstitucion;
     administrador_id?: string;
   };
   sede_principal: {
@@ -50,6 +59,8 @@ export interface UpdateInstitutionInput {
   logo_url?: string | null;
   correo_secretaria?: string | null;
   horario_atencion?: string | null;
+  modalidad?: ModalidadInstitucion;
+  politica_aforo_aula?: PoliticaAforoAula;
   confirm_password: string;
 }
 

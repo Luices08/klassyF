@@ -4,11 +4,13 @@ import type {
   EstadoActivo,
   EstadoAnioLectivo,
   EstadoDocumentoMatricula,
+  EstadoEspacio,
   EstadoEstudiante,
   EstadoGrupo,
   EstadoMatricula,
   EstadoPeriodoAcademico,
 } from '../../types/domain';
+import { NOMBRES_ESTADO_ESPACIO } from '../../types/domain';
 import type { Desempeno } from '../../types/reportCard';
 
 export type Tone = 'blue' | 'green' | 'orange' | 'red' | 'neutral';
@@ -176,4 +178,15 @@ const PERIODO_TONE: Record<EstadoPeriodoAcademico, Tone> = {
 /** Semaforo del periodo academico (M05): programado, en curso, en digitacion, cerrado. */
 export function EstadoPeriodoBadge({ value }: { value: EstadoPeriodoAcademico }) {
   return <Chip tone={PERIODO_TONE[value]}>{PERIODO_LABELS[value]}</Chip>;
+}
+
+const ESPACIO_TONE: Record<EstadoEspacio, Tone> = {
+  DISPONIBLE: 'green',
+  EN_MANTENIMIENTO: 'orange',
+  INACTIVO: 'red',
+};
+
+/** Estado operativo de un espacio físico (M10): solo los disponibles se pueden asignar. */
+export function EstadoEspacioBadge({ value }: { value: EstadoEspacio }) {
+  return <Chip tone={ESPACIO_TONE[value]}>{NOMBRES_ESTADO_ESPACIO[value]}</Chip>;
 }

@@ -2,14 +2,19 @@ import { NavLink, Outlet } from 'react-router-dom';
 import { RolBadge } from '../ui/Badge';
 import { LogOutIcon } from '../ui/icons';
 import { useAuth } from '../../context/AuthContext';
+import { useInstitution } from '../../hooks/useInstitution';
 import { ForcedPasswordChangeGate } from './ForcedPasswordChangeGate';
 import { NAV_ITEMS } from './navigation';
 
 export function AppShell() {
   const { user, logout } = useAuth();
+  const { data: institucion } = useInstitution();
   if (!user) return null;
 
-  const items = NAV_ITEMS.filter((item) => !item.roles || item.roles.includes(user.rol));
+  const esVirtual = institucion?.modalidad === 'VIRTUAL';
+  const items = NAV_ITEMS.filter(
+    (item) => (!item.roles || item.roles.includes(user.rol)) && !(item.soloPresencial && esVirtual)
+  );
 
   return (
     <ForcedPasswordChangeGate>

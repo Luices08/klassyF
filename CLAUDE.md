@@ -123,6 +123,31 @@ solo extender si se pide algo nuevo. Reglas que no se ven leyendo un solo archiv
   (M20, aún no existe); M13 no consulta `esDiaLectivo` todavía; matrículas y admisiones no se bloquean en un
   año cerrado (solo `POST /groups` lo valida); los festivos colombianos no se descuentan de las semanas.
 
+### M10 (Espacios físicos) — estado: núcleo completo
+
+Backend `/espacios` (modelo `Espacio`), frontend `/admin/espacios` (`EspaciosPage`, ADMIN y COORDINADOR; la lectura de
+`GET /espacios` está abierta a cualquier rol autenticado). Reglas que no se ven leyendo un solo archivo:
+
+- **Es opcional en dos niveles (adaptabilidad institucional).** (1) `Institution.modalidad` (`PRESENCIAL` por defecto, o
+  `VIRTUAL`) se configura al crear la institución y en Configuración institucional: en una institución virtual M10 se apaga
+  por completo (`exigirEspaciosFisicos()` rechaza con 409 crear espacios y asignar aula; se oculta "Espacios y aulas" del menú,
+  el selector y la columna de aula en Grupos; la política de aforo deja de mostrarse). Al pasar a virtual, los espacios ya
+  registrados se conservan. Los documentos sin el campo cuentan como PRESENCIAL. (2) En una institución presencial, `Group.aula_id`
+  sigue siendo nullable: una sede que no registra aulas crea grupos igual que antes. Nada de M01 exige M10.
+- **Regla M01 ↔ M10** (`validarAulaParaGrupo` en `espacio.service.ts`, llamada al crear y al reactivar un grupo): el salón
+  titular debe ser un `AULA_REGULAR` `DISPONIBLE` de la misma sede; no puede ser titular de otro grupo ACTIVO de la misma
+  jornada y año (salvo `admite_grupos_simultaneos`); y el cupo no debe pasar del aforo. Un aula sí puede servir a grupos de
+  jornadas distintas (mañana y tarde).
+- **Exceder el aforo es política de la institución, no código quemado**: `Institution.politica_aforo_aula` =
+  `BLOQUEAR` (por defecto: 409) o `ADVERTIR` (permite, y deja auditoría `GRUPO_EXCEDE_AFORO_AULA`). Se cambia en
+  Configuración institucional. El modal "Nuevo grupo" refleja la política (error + botón deshabilitado, o solo aviso).
+- Un espacio que fue salón titular de algún grupo no se elimina (se inhabilita: `EN_MANTENIMIENTO`/`INACTIVO`); la sede de un
+  espacio no se cambia. Reducir el aforo por debajo del cupo de un grupo asignado no se impide: el espacio y el grupo quedan
+  marcados con "sobrecupo".
+- `areas_exclusivas` y `recursos`/`computadores_operativos` se guardan y se editan, pero **aún no los consume nadie**: los
+  usará el motor de horarios (M09). La malla semanal solo muestra ocupación por grupo titular; la ocupación por asignatura
+  llega con M09.
+
 ### Cargas masivas por CSV (M02 usuarios, M03 estudiantes)
 
 - Todo CSV subido se lee con `leerCsv` (`backend/src/utils/csv.ts`), nunca con `toString('utf-8')` + parser a mano:
@@ -235,7 +260,7 @@ nuevos para lo que ya existe aquí** — extenderlos si falta un caso, no duplic
   mapeo rol→color o estado→color en una página), `Card`/`CardHeader`, `Table`/`TableHead`/`Th`/
   `TableBody`/`Td`/`EmptyRow`, `Drawer` (formularios de creación/edición; su botón principal
   acepta `submitVariant` para casos como confirmar un borrado en rojo), `PageHeader` (título +
-  subtítulo + acción de la página), `Field` (`Input`/`Select`), `MultiSelect` (selector desplegable de selección múltiple con checkboxes, contador y badges de rol/estado), `Alert`, `Spinner`, `GuiaColumnas` (guía colapsable de columnas de una carga CSV), `ProgressBar` (barra de avance con tono, ej. semanas lectivas vs. el mínimo de 40), `Tabs`/`TabPanel`
+  subtítulo + acción de la página), `Field` (`Input`/`Select`), `MultiSelect` (selector desplegable de selección múltiple con checkboxes, contador y badges de rol/estado), `Alert`, `Spinner`, `EstadoEspacioBadge` (M10), `GuiaColumnas` (guía colapsable de columnas de una carga CSV), `ProgressBar` (barra de avance con tono, ej. semanas lectivas vs. el mínimo de 40), `Tabs`/`TabPanel`
   (navegación por pestañas con subrayado azul en la activa — usado en la ficha 360° de Estudiantes,
   M03), `Stepper` (indicador de pasos para formularios largos por secciones, ej. el asistente de
   creación de estudiante en M03: no se reconstruye el paso a paso a mano en una página nueva), e

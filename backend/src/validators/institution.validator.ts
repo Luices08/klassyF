@@ -1,5 +1,5 @@
 import Joi from 'joi';
-import { CALENDARIOS, ESTADOS_USUARIO } from '../constants/enums';
+import { CALENDARIOS, ESTADOS_USUARIO, MODALIDADES_INSTITUCION, POLITICAS_AFORO_AULA } from '../constants/enums';
 import { ValidationSchema } from '../middlewares/validate.middleware';
 import { objectId } from './common.validator';
 
@@ -20,6 +20,7 @@ export const setup: ValidationSchema = {
         .required(),
       nit: Joi.string().required(),
       resolucion_aprobacion: Joi.string().required(),
+      modalidad: Joi.string().valid(...MODALIDADES_INSTITUCION),
       administrador_id: objectId,
     }).required(),
 
@@ -58,6 +59,8 @@ export const updateInstitution: ValidationSchema = {
     logo_url: Joi.string().dataUri().max(800_000).allow(null),
     correo_secretaria: Joi.string().email().allow('', null),
     horario_atencion: Joi.string().allow('', null),
+    modalidad: Joi.string().valid(...MODALIDADES_INSTITUCION),
+    politica_aforo_aula: Joi.string().valid(...POLITICAS_AFORO_AULA),
     confirm_password: Joi.string().required(),
   }),
 };

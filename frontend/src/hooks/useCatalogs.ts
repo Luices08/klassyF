@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../lib/apiClient';
-import type { Campus, EstadoActivo, Grade, Jornada, JornadaOperativa } from '../types/domain';
+import type { Area, Campus, EstadoActivo, Grade, Jornada, JornadaOperativa } from '../types/domain';
 
 export function useGrades(estado?: EstadoActivo) {
   return useQuery({
@@ -18,6 +18,15 @@ export function useActualizarEstadoGrado() {
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['grades'] });
     },
+  });
+}
+
+/** Áreas académicas (M06): las usa M10 para restringir un espacio a ciertas áreas. */
+export function useAreas() {
+  return useQuery({
+    queryKey: ['areas'],
+    queryFn: () => api.get<Area[]>('/curriculum/areas'),
+    staleTime: 5 * 60_000,
   });
 }
 

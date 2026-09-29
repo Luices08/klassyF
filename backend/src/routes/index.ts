@@ -10,6 +10,7 @@ import campusRoutes from './campus.routes';
 import curricularDevelopmentRoutes from './curricularDevelopment.routes';
 import dbaBankRoutes from './dbaBank.routes';
 import enrollmentRoutes from './enrollment.routes';
+import espacioRoutes from './espacio.routes';
 import gradeRoutes from './grade.routes';
 import groupRoutes from './group.routes';
 import guardianRoutes from './guardian.routes';
@@ -35,6 +36,9 @@ router.use('/shifts', jornadaOperativaRoutes);
 router.use('/grades', gradeRoutes);
 router.use('/groups', groupRoutes);
 router.use('/enrollments', enrollmentRoutes);
+
+// M10: Espacios fisicos (aulas, laboratorios, canchas)
+router.use('/espacios', espacioRoutes);
 
 // M05: Año lectivo, periodos académicos y calendario
 router.use('/academic-years', academicYearRoutes);

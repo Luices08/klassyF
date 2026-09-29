@@ -11,6 +11,7 @@ import { AnioLectivoPage } from './pages/AnioLectivoPage';
 import { AdmissionRequestsPage } from './pages/admin/AdmissionRequestsPage';
 import { EnrollmentDetailPage } from './pages/admin/EnrollmentDetailPage';
 import { EnrollmentsPage } from './pages/admin/EnrollmentsPage';
+import { EspaciosPage } from './pages/admin/EspaciosPage';
 import { GradesPage } from './pages/admin/GradesPage';
 import { GroupsPage } from './pages/admin/GroupsPage';
 import { InstitutionSetupPage } from './pages/admin/InstitutionSetupPage';
@@ -49,6 +50,7 @@ export default function App() {
 
           <Route element={<ProtectedRoute allowedRoles={['ADMIN', 'COORDINADOR']} />}>
             <Route path="/admin/groups" element={<GroupsPage />} />
+            <Route path="/admin/espacios" element={<EspaciosPage />} />
           </Route>
         </Route>
       </Route>

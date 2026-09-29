@@ -78,6 +78,18 @@ export interface Periodo {
   estado?: EstadoPeriodoAcademico;
 }
 
+/** VIRTUAL: la institución no tiene espacios físicos (módulo de espacios apagado, grupos sin aula). */
+export const MODALIDADES_INSTITUCION = ['PRESENCIAL', 'VIRTUAL'] as const;
+export type ModalidadInstitucion = (typeof MODALIDADES_INSTITUCION)[number];
+
+export const NOMBRES_MODALIDAD: Record<ModalidadInstitucion, string> = {
+  PRESENCIAL: 'Presencial (usa aulas y espacios físicos)',
+  VIRTUAL: 'Virtual (sin espacios físicos)',
+};
+
+export const POLITICAS_AFORO_AULA = ['BLOQUEAR', 'ADVERTIR'] as const;
+export type PoliticaAforoAula = (typeof POLITICAS_AFORO_AULA)[number];
+
 export interface Institution {
   _id: string;
   nombre: string;
@@ -88,6 +100,9 @@ export interface Institution {
   logo_url: string | null;
   correo_secretaria: string | null;
   horario_atencion: string | null;
+  modalidad: ModalidadInstitucion;
+  /** M10: qué pasa si el cupo de un grupo excede el aforo de su aula. */
+  politica_aforo_aula: PoliticaAforoAula;
   estado: EstadoActivo;
 }
 
@@ -210,13 +225,89 @@ export interface Group {
   sede_id: string | { _id: string; nombre: string };
   academic_year_id: string;
   grade_id: string | { _id: string; nivel: string; numero: number; nombre: string };
-  jornada_id: string | { _id: string; nombre: Jornada };
+  jornada_id: string | { _id: string; nombre: Jornada; hora_inicio?: string; hora_fin?: string };
+  /** Salón titular (M10), opcional. */
+  aula_id?: string | { _id: string; nombre: string; capacidad: number } | null;
   nomenclatura: string;
   max_capacity: number;
   cupos_ocupados: number;
   cupos_disponibles?: number;
   estado: EstadoGrupo;
   director_grupo_id: string | null;
+}
+
+// --- M10: Espacios físicos ---
+
+export const TIPOS_ESPACIO = [
+  'AULA_REGULAR',
+  'LABORATORIO',
+  'SALA_INFORMATICA',
+  'ESPACIO_DEPORTIVO',
+  'AUDITORIO',
+  'TALLER_TECNICO',
+] as const;
+export type TipoEspacio = (typeof TIPOS_ESPACIO)[number];
+
+export const NOMBRES_TIPO_ESPACIO: Record<TipoEspacio, string> = {
+  AULA_REGULAR: 'Aula regular',
+  LABORATORIO: 'Laboratorio de ciencias',
+  SALA_INFORMATICA: 'Sala de informática / sistemas',
+  ESPACIO_DEPORTIVO: 'Espacio deportivo / cancha',
+  AUDITORIO: 'Auditorio / aula máxima',
+  TALLER_TECNICO: 'Taller técnico',
+};
+
+export const ESTADOS_ESPACIO = ['DISPONIBLE', 'EN_MANTENIMIENTO', 'INACTIVO'] as const;
+export type EstadoEspacio = (typeof ESTADOS_ESPACIO)[number];
+
+export const NOMBRES_ESTADO_ESPACIO: Record<EstadoEspacio, string> = {
+  DISPONIBLE: 'Disponible',
+  EN_MANTENIMIENTO: 'En mantenimiento',
+  INACTIVO: 'Inactivo',
+};
+
+export const RECURSOS_ESPACIO = ['VIDEO_BEAM_TV', 'CLIMATIZACION', 'INTERNET', 'RED_CABLEADA', 'LAVAMANOS_GAS'] as const;
+export type RecursoEspacio = (typeof RECURSOS_ESPACIO)[number];
+
+export const NOMBRES_RECURSO_ESPACIO: Record<RecursoEspacio, string> = {
+  VIDEO_BEAM_TV: 'Video beam / TV',
+  CLIMATIZACION: 'Aire acondicionado / ventiladores',
+  INTERNET: 'Conectividad a internet',
+  RED_CABLEADA: 'Puntos de red cableada',
+  LAVAMANOS_GAS: 'Lavamanos / gas para laboratorio',
+};
+
+export interface GrupoAsignadoEspacio {
+  _id: string;
+  nomenclatura: string;
+  grado: string;
+  max_capacity: number;
+  jornada: { _id: string; nombre: Jornada; hora_inicio: string; hora_fin: string } | null;
+}
+
+export interface Espacio {
+  _id: string;
+  sede_id: { _id: string; nombre: string };
+  nombre: string;
+  tipo_espacio: TipoEspacio;
+  capacidad: number;
+  estado: EstadoEspacio;
+  piso_bloque: string | null;
+  recursos: RecursoEspacio[];
+  computadores_operativos: number;
+  areas_exclusivas: string[];
+  admite_grupos_simultaneos: boolean;
+  /** Grupos ACTIVOS que lo usan como salón titular (del año pedido). */
+  grupos_asignados: GrupoAsignadoEspacio[];
+  /** Algún grupo asignado tiene más cupo que el aforo del espacio. */
+  sobrecupo: boolean;
+}
+
+export interface Area {
+  _id: string;
+  nombre: string;
+  codigo: string;
+  estado: EstadoActivo;
 }
 
 export interface ChecklistItem {

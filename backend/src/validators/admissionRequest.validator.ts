@@ -1,6 +1,6 @@
 import Joi from 'joi';
 import { ESTADOS_SOLICITUD } from '../models/admissionRequest.model';
-import { JORNADAS, TIPOS_DOCUMENTO } from '../constants/enums';
+import { JORNADAS, TIPOS_DOCUMENTO, TIPOS_DOCUMENTO_MATRICULA } from '../constants/enums';
 import { ValidationSchema } from '../middlewares/validate.middleware';
 import { objectId } from './common.validator';
 
@@ -31,6 +31,24 @@ export const consultarEstado: ValidationSchema = {
   }),
 };
 
+const credencialesPreinscripcion = {
+  numero_documento: Joi.string().required(),
+  fecha_nacimiento: Joi.date().required(),
+};
+
+export const descargarComprobante: ValidationSchema = {
+  body: Joi.object(credencialesPreinscripcion),
+};
+
+export const subirDocumentoPublico: ValidationSchema = {
+  params: Joi.object({
+    tipoDocumento: Joi.string()
+      .valid(...TIPOS_DOCUMENTO_MATRICULA)
+      .required(),
+  }),
+  body: Joi.object(credencialesPreinscripcion),
+};
+
 export const listarSolicitudes: ValidationSchema = {
   query: Joi.object({
     estado: Joi.string().valid(...ESTADOS_SOLICITUD),
@@ -49,6 +67,7 @@ export const aprobarSolicitud: ValidationSchema = {
   body: Joi.object({
     group_id: objectId.required(),
     academic_year_id: objectId.required(),
+    fecha_limite_legalizacion: Joi.date().greater('now'),
   }),
 };
 

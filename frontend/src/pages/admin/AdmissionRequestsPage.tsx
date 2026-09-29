@@ -41,6 +41,7 @@ export function AdmissionRequestsPage() {
 
   const [aprobando, setAprobando] = useState<AdmissionRequest | null>(null);
   const [groupId, setGroupId] = useState('');
+  const [fechaLimite, setFechaLimite] = useState('');
   const groupsQuery = useGroups({
     academic_year_id: config?.academicYearId,
     grade_id: aprobando ? (typeof aprobando.grado_deseado_id === 'string' ? aprobando.grado_deseado_id : aprobando.grado_deseado_id._id) : undefined,
@@ -51,9 +52,15 @@ export function AdmissionRequestsPage() {
     e.preventDefault();
     if (!aprobando || !config) return;
     aprobar.reset();
-    await aprobar.mutateAsync({ id: aprobando._id, group_id: groupId, academic_year_id: config.academicYearId });
+    await aprobar.mutateAsync({
+      id: aprobando._id,
+      group_id: groupId,
+      academic_year_id: config.academicYearId,
+      fecha_limite_legalizacion: fechaLimite || undefined,
+    });
     setAprobando(null);
     setGroupId('');
+    setFechaLimite('');
   }
 
   const [rechazando, setRechazando] = useState<AdmissionRequest | null>(null);
@@ -204,6 +211,14 @@ export function AdmissionRequestsPage() {
             </option>
           ))}
         </Select>
+        <Input
+          label="Fecha límite para legalizar la matrícula (opcional)"
+          type="date"
+          min={new Date().toISOString().slice(0, 10)}
+          value={fechaLimite}
+          onChange={(e) => setFechaLimite(e.target.value)}
+          hint="Si la dejas vacía se dan 15 días. El acudiente la ve al consultar su solicitud."
+        />
       </Drawer>
 
       <Drawer

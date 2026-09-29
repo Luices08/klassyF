@@ -112,6 +112,20 @@ solo extender si se pide algo nuevo. Reglas que no se ven leyendo un solo archiv
   (M20, aún no existe); M13 no consulta `esDiaLectivo` todavía; matrículas y admisiones no se bloquean en un
   año cerrado (solo `POST /groups` lo valida); los festivos colombianos no se descuentan de las semanas.
 
+### Cargas masivas por CSV (M02 usuarios, M03 estudiantes)
+
+- Todo CSV subido se lee con `leerCsv` (`backend/src/utils/csv.ts`), nunca con `toString('utf-8')` + parser a mano:
+  detecta el separador (coma o punto y coma, que es lo que guarda Excel en español), quita el BOM, cae a
+  Windows-1252 si el archivo no es UTF-8 (tildes y ñ), tolera la línea `sep=;` y normaliza los encabezados
+  (`Tipo Documento` = `tipo_documento`). Exige las columnas obligatorias una sola vez y con mensaje claro.
+- Las listas cerradas (tipo de documento, rol, género, RH, régimen, grupo étnico, parentesco) aceptan minúsculas pero un
+  valor fuera de la lista es **error de fila**, nunca se descarta en silencio. Las fechas van YYYY-MM-DD (también
+  DD/MM/AAAA, lo que Excel guarda). Toda la fila se valida antes de crear el usuario, y si algo falla después se
+  deshace (no quedan estudiantes sin perfil). Varias sedes en `sedes_codigos` se separan con `|`.
+- La guía de formato que ve el usuario es `GuiaColumnas` (colapsable) alimentada por `lib/columnasImportacion.ts`, que
+  toma los valores válidos de las mismas constantes de dominio: al agregar o cambiar una columna del importador,
+  se actualiza ahí en el mismo cambio.
+
 ### Folio del Libro de Matrícula (M04)
 
 - **El folio se asigna al legalizar la matrícula, no al preinscribir**: `Enrollment.folio_matricula`,
@@ -122,6 +136,14 @@ solo extender si se pide algo nuevo. Reglas que no se ven leyendo un solo archiv
 - Reglas: la condicional exige `fecha_limite_compromiso`; una matrícula con folio no vuelve a `PREINSCRITO`;
   retirar/anular una ya legalizada conserva su folio (es un asiento del libro). Invariante en el modelo: todo
   `MATRICULADO_*` tiene folio. Los índices únicos de folio son parciales (ignoran `null`).
+- **Preinscripción pública (sitio sin login)**: cuando la solicitud está APROBADA, `GET /public/admission-requests/status`
+  devuelve `preinscripcion` (grado/grupo/sede/jornada asignados, `fecha_limite_legalizacion`, documentos con su estado
+  y motivo de rechazo). Comprobante en PDF: `POST /public/admission-requests/comprobante`; carga de documentos:
+  `POST /public/admission-requests/documentos/:tipo`. Sin sesión, todo se autoriza con documento del aspirante +
+  fecha de nacimiento (por eso `POST`: no van en la URL) y se valida el tipo real por firma de bytes. Un documento
+  APROBADO no se reemplaza; solo se sube mientras la matrícula es PREINSCRITO o MATRICULADO_CONDICIONAL. El plazo
+  (`Enrollment.fecha_limite_legalizacion`) lo fija secretaría al aprobar; por omisión `DIAS_PLAZO_LEGALIZACION` (15).
+  Es informativo: no se anula nada automáticamente al vencer.
 - Nunca asumir que `folio_matricula` es un string: en frontend y PDFs manejar `null`.
 - Bases anteriores a este cambio: `npm run migrate:folio-al-matricular` (libera folios de preinscritos, reemplaza
   los índices y reajusta el contador; un hueco en medio del libro solo se reporta, no se renumera).
@@ -202,7 +224,7 @@ nuevos para lo que ya existe aquí** — extenderlos si falta un caso, no duplic
   mapeo rol→color o estado→color en una página), `Card`/`CardHeader`, `Table`/`TableHead`/`Th`/
   `TableBody`/`Td`/`EmptyRow`, `Drawer` (formularios de creación/edición; su botón principal
   acepta `submitVariant` para casos como confirmar un borrado en rojo), `PageHeader` (título +
-  subtítulo + acción de la página), `Field` (`Input`/`Select`), `MultiSelect` (selector desplegable de selección múltiple con checkboxes, contador y badges de rol/estado), `Alert`, `Spinner`, `ProgressBar` (barra de avance con tono, ej. semanas lectivas vs. el mínimo de 40), `Tabs`/`TabPanel`
+  subtítulo + acción de la página), `Field` (`Input`/`Select`), `MultiSelect` (selector desplegable de selección múltiple con checkboxes, contador y badges de rol/estado), `Alert`, `Spinner`, `GuiaColumnas` (guía colapsable de columnas de una carga CSV), `ProgressBar` (barra de avance con tono, ej. semanas lectivas vs. el mínimo de 40), `Tabs`/`TabPanel`
   (navegación por pestañas con subrayado azul en la activa — usado en la ficha 360° de Estudiantes,
   M03), `Stepper` (indicador de pasos para formularios largos por secciones, ej. el asistente de
   creación de estudiante en M03: no se reconstruye el paso a paso a mano en una página nueva), e

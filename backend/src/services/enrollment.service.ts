@@ -332,7 +332,8 @@ export async function cargarDocumento(
   enrollmentId: string,
   tipoDocumento: TipoDocumentoMatricula,
   archivoPath: string,
-  actor: { id: string | Types.ObjectId }
+  // null = el acudiente subio el documento desde el sitio publico, sin sesion.
+  actor: { id: string | Types.ObjectId | null }
 ): Promise<EnrollmentDocument> {
   const enrollment = await Enrollment.findById(enrollmentId);
   if (!enrollment) throw new ApiError(404, 'Matricula no encontrada.');

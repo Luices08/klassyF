@@ -33,6 +33,8 @@ export interface IEnrollment {
   fecha_matricula: Date;
   /** Plazo del acta de compromiso mientras la matricula esta MATRICULADO_CONDICIONAL. */
   fecha_limite_compromiso: Date | null;
+  /** Plazo para entregar documentos y legalizar el cupo mientras la matricula esta PREINSCRITO. */
+  fecha_limite_legalizacion: Date | null;
   motivo_retiro: string | null;
   checklist: Types.DocumentArray<IChecklistItem>;
   createdAt: Date;
@@ -66,6 +68,7 @@ const enrollmentSchema = new Schema<IEnrollment, EnrollmentModel>(
     estado: { type: String, enum: ESTADOS_MATRICULA, default: 'PREINSCRITO' },
     fecha_matricula: { type: Date, default: Date.now },
     fecha_limite_compromiso: { type: Date, default: null },
+    fecha_limite_legalizacion: { type: Date, default: null },
     motivo_retiro: { type: String, default: null },
     checklist: { type: [checklistItemSchema], default: [] },
   },

@@ -1,6 +1,6 @@
 import { Types } from 'mongoose';
 import { Jornada, TipoDocumento } from '../constants/enums';
-import { DOCUMENTOS_REQUERIDOS_POR_NIVEL } from '../constants/matriculaChecklist';
+import { DIAS_PLAZO_LEGALIZACION, DOCUMENTOS_REQUERIDOS_POR_NIVEL } from '../constants/matriculaChecklist';
 import { ROLES } from '../constants/roles';
 import AcademicYear from '../models/academicYear.model';
 import AdmissionRequest, { AdmissionRequestDocument } from '../models/admissionRequest.model';
@@ -12,6 +12,7 @@ import User from '../models/user.model';
 import ApiError from '../utils/ApiError';
 import { generarPasswordTemporal } from '../utils/generarPasswordTemporal';
 import { runTransaction } from '../utils/runTransaction';
+import { buscarMatriculaDePreinscripcion, construirDetalle, PreinscripcionDetalle } from './preinscripcionPublica.service';
 
 const SOLICITUDES_ABIERTAS = ['PENDIENTE', 'EN_REVISION'] as const;
 
@@ -47,18 +48,34 @@ export async function crearSolicitud(input: CrearSolicitudInput): Promise<Admiss
   return AdmissionRequest.create({ ...input, estado: 'PENDIENTE' });
 }
 
+export interface EstadoSolicitudPublico {
+  estado: string;
+  fecha_solicitud: Date;
+  motivo_rechazo: string | null;
+  /** Solo con la solicitud APROBADA: grado asignado, plazo, documentos y si aun puede subirlos. */
+  preinscripcion: PreinscripcionDetalle | null;
+}
+
 /** Consulta publica de estado (M04): exige documento + fecha de nacimiento para evitar enumeracion trivial. */
 export async function consultarEstado(
   numeroDocumento: string,
   fechaNacimiento: string
-): Promise<{ estado: string; fecha_solicitud: Date; motivo_rechazo: string | null } | null> {
+): Promise<EstadoSolicitudPublico | null> {
   const solicitud = await AdmissionRequest.findOne({
     numero_documento: numeroDocumento,
     fecha_nacimiento: new Date(fechaNacimiento),
   }).sort({ createdAt: -1 });
 
   if (!solicitud) return null;
-  return { estado: solicitud.estado, fecha_solicitud: solicitud.createdAt, motivo_rechazo: solicitud.motivo_rechazo };
+
+  const matricula =
+    solicitud.estado === 'APROBADA' ? await buscarMatriculaDePreinscripcion(numeroDocumento, fechaNacimiento) : null;
+  return {
+    estado: solicitud.estado,
+    fecha_solicitud: solicitud.createdAt,
+    motivo_rechazo: solicitud.motivo_rechazo,
+    preinscripcion: matricula ? construirDetalle(matricula.enrollment) : null,
+  };
 }
 
 export interface ListarSolicitudesFilter {
@@ -100,9 +117,17 @@ export async function obtenerSolicitud(id: string): Promise<AdmissionRequestDocu
   return solicitud;
 }
 
+// Fecha de calendario (medianoche UTC, como el resto de fechas del sistema) N dias despues de hoy en Colombia (UTC-5).
+function plazoLegalizacionPorDefecto(): Date {
+  const hoyColombia = Date.now() - 5 * 3_600_000;
+  return new Date(new Date(hoyColombia + DIAS_PLAZO_LEGALIZACION * 86_400_000).toISOString().slice(0, 10));
+}
+
 export interface AprobarSolicitudInput {
   group_id: string;
   academic_year_id: string;
+  /** Plazo para legalizar la matricula; por defecto DIAS_PLAZO_LEGALIZACION dias desde la aprobacion. */
+  fecha_limite_legalizacion?: string | Date;
 }
 
 /**
@@ -115,7 +140,7 @@ export interface AprobarSolicitudInput {
  */
 export async function aprobarSolicitud(
   id: string,
-  { group_id, academic_year_id }: AprobarSolicitudInput,
+  { group_id, academic_year_id, fecha_limite_legalizacion }: AprobarSolicitudInput,
   revisorId: string | Types.ObjectId
 ): Promise<AdmissionRequestDocument> {
   return runTransaction(async (session) => {
@@ -174,6 +199,9 @@ export async function aprobarSolicitud(
           tipo_ingreso: 'NUEVO',
           estado: 'PREINSCRITO',
           fecha_matricula: new Date(),
+          fecha_limite_legalizacion: fecha_limite_legalizacion
+            ? new Date(fecha_limite_legalizacion)
+            : plazoLegalizacionPorDefecto(),
           checklist,
         },
       ],

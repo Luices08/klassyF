@@ -1,4 +1,4 @@
-import { PipelineStage } from 'mongoose';
+import { PipelineStage, Types } from 'mongoose';
 import { EstadoEstudiante, GENEROS, GRUPOS_ETNICOS, GRUPOS_SANGUINEOS, PARENTESCOS, REGIMENES_SALUD, TIPOS_DOCUMENTO } from '../constants/enums';
 import { ROLES } from '../constants/roles';
 import Enrollment from '../models/enrollment.model';
@@ -7,7 +7,7 @@ import StudentGuardian from '../models/studentGuardian.model';
 import StudentProfile from '../models/studentProfile.model';
 import User from '../models/user.model';
 import ApiError from '../utils/ApiError';
-import { csvARegistros, parseCsv } from '../utils/csv';
+import { leerCsv } from '../utils/csv';
 import { generarPasswordTemporal } from '../utils/generarPasswordTemporal';
 
 export interface ListarEstudiantesFilter {
@@ -105,6 +105,51 @@ function esVerdadero(valor: string): boolean {
   return ['si', 'sí', 'true', '1', 'x'].includes(valor.trim().toLowerCase());
 }
 
+const COLUMNAS_OBLIGATORIAS_ESTUDIANTES = [
+  'tipo_documento',
+  'numero_documento',
+  'nombre',
+  'apellido',
+  'email',
+  'fecha_nacimiento',
+];
+
+/**
+ * Valor de una lista cerrada (acepta minusculas). Vacio -> undefined; con valor pero fuera de la
+ * lista -> error de fila, en vez de descartarlo en silencio y perder el dato.
+ */
+function valorDeLista<T extends string>(campo: string, valor: string | undefined, lista: readonly T[]): T | undefined {
+  const limpio = (valor ?? '').trim();
+  if (!limpio) return undefined;
+  const hallado = lista.find((v) => v.toUpperCase() === limpio.toUpperCase());
+  if (!hallado) throw new ApiError(400, `${campo} "${limpio}" no es valido. Usa: ${lista.join(', ')}.`);
+  return hallado;
+}
+
+/** Fecha de calendario como YYYY-MM-DD (o DD/MM/YYYY, lo que Excel en español guarda al mostrar fechas). Medianoche UTC. */
+function parsearFechaNacimiento(valor: string): Date {
+  const iso = /^(\d{4})-(\d{1,2})-(\d{1,2})$/.exec(valor);
+  const latina = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/.exec(valor);
+  const partes = iso ? [Number(iso[1]), Number(iso[2]), Number(iso[3])] : latina ? [Number(latina[3]), Number(latina[2]), Number(latina[1])] : null;
+  if (!partes) throw new ApiError(400, `fecha_nacimiento "${valor}" no tiene formato valido. Usa YYYY-MM-DD (ej. 2015-03-24).`);
+
+  const [anio, mes, dia] = partes as [number, number, number];
+  const fecha = new Date(Date.UTC(anio, mes - 1, dia));
+  if (fecha.getUTCFullYear() !== anio || fecha.getUTCMonth() !== mes - 1 || fecha.getUTCDate() !== dia) {
+    throw new ApiError(400, `fecha_nacimiento "${valor}" no es una fecha real.`);
+  }
+  if (fecha.getTime() > Date.now()) throw new ApiError(400, `fecha_nacimiento "${valor}" no puede ser futura.`);
+  return fecha;
+}
+
+const COLUMNAS_ACUDIENTE = [
+  'acudiente_numero_documento',
+  'acudiente_nombre',
+  'acudiente_apellido',
+  'acudiente_telefono',
+  'acudiente_parentesco',
+] as const;
+
 /**
  * Carga masiva (M03): CSV con encabezado
  * tipo_documento,numero_documento,nombre,apellido,email,fecha_nacimiento,genero,rh,eps,
@@ -112,9 +157,10 @@ function esVerdadero(valor: string): boolean {
  * victima_conflicto,tiene_discapacidad,tiene_talento_excepcional,institucion_procedencia,
  * acudiente_tipo_documento,acudiente_numero_documento,acudiente_nombre,acudiente_apellido,
  * acudiente_telefono,acudiente_parentesco
+ * Separador coma o punto y coma (se detecta). Toda la fila se valida ANTES de crear el usuario.
  */
 export async function importarEstudiantesCsv(buffer: Buffer) {
-  const registros = csvARegistros(parseCsv(buffer.toString('utf-8')));
+  const { registros } = leerCsv(buffer, COLUMNAS_OBLIGATORIAS_ESTUDIANTES);
   if (registros.length === 0) throw new ApiError(400, 'El archivo no tiene filas de datos.');
 
   const errores: FilaImportacionError[] = [];
@@ -124,6 +170,7 @@ export async function importarEstudiantesCsv(buffer: Buffer) {
     const fila = i + 2;
     const r = registros[i]!;
     const numeroDocumento = r.numero_documento;
+    let estudianteId: Types.ObjectId | null = null;
 
     try {
       if (!r.tipo_documento || !numeroDocumento || !r.nombre || !r.apellido || !r.email || !r.fecha_nacimiento) {
@@ -132,14 +179,38 @@ export async function importarEstudiantesCsv(buffer: Buffer) {
           'Faltan columnas obligatorias (tipo_documento, numero_documento, nombre, apellido, email, fecha_nacimiento).'
         );
       }
-      if (!(TIPOS_DOCUMENTO as readonly string[]).includes(r.tipo_documento)) {
-        throw new ApiError(400, `tipo_documento "${r.tipo_documento}" no es valido.`);
+      const tipoDocumento = valorDeLista('tipo_documento', r.tipo_documento, TIPOS_DOCUMENTO);
+      const fechaNacimiento = parsearFechaNacimiento(r.fecha_nacimiento);
+      const genero = valorDeLista('genero', r.genero, GENEROS);
+      const rh = valorDeLista('rh', r.rh, GRUPOS_SANGUINEOS);
+      const regimenSalud = valorDeLista('regimen_salud', r.regimen_salud, REGIMENES_SALUD);
+      const grupoEtnico = valorDeLista('grupo_etnico', r.grupo_etnico, GRUPOS_ETNICOS);
+
+      let estrato: number | undefined;
+      if (r.estrato) {
+        estrato = Number(r.estrato);
+        if (!Number.isInteger(estrato) || estrato < 1 || estrato > 6) {
+          throw new ApiError(400, `estrato "${r.estrato}" no es valido. Usa un numero entero de 1 a 6.`);
+        }
+      }
+
+      // Acudiente: o se completan todas sus columnas o ninguna (antes una fila incompleta lo omitia sin avisar).
+      const acudienteEscrito = COLUMNAS_ACUDIENTE.some((c) => r[c]);
+      let parentesco: (typeof PARENTESCOS)[number] | undefined;
+      let acudienteTipoDocumento: (typeof TIPOS_DOCUMENTO)[number] = 'CC';
+      if (acudienteEscrito) {
+        const faltantes = COLUMNAS_ACUDIENTE.filter((c) => !r[c]);
+        if (faltantes.length > 0) {
+          throw new ApiError(400, `Datos del acudiente incompletos: falta ${faltantes.join(', ')}.`);
+        }
+        parentesco = valorDeLista('acudiente_parentesco', r.acudiente_parentesco, PARENTESCOS);
+        acudienteTipoDocumento = valorDeLista('acudiente_tipo_documento', r.acudiente_tipo_documento, TIPOS_DOCUMENTO) ?? 'CC';
       }
 
       const student = new User({
         nombre: r.nombre,
         apellido: r.apellido,
-        tipo_documento: r.tipo_documento,
+        tipo_documento: tipoDocumento,
         numero_documento: numeroDocumento,
         email: r.email,
         rol: ROLES.ESTUDIANTE,
@@ -147,37 +218,31 @@ export async function importarEstudiantesCsv(buffer: Buffer) {
       });
       student.password = generarPasswordTemporal();
       await student.save();
+      estudianteId = student._id;
 
       await StudentProfile.create({
         user_id: student._id,
-        fecha_nacimiento: new Date(r.fecha_nacimiento),
-        genero: (GENEROS as readonly string[]).includes(r.genero ?? '') ? r.genero : undefined,
-        rh: (GRUPOS_SANGUINEOS as readonly string[]).includes(r.rh ?? '') ? r.rh : undefined,
+        fecha_nacimiento: fechaNacimiento,
+        genero,
+        rh,
         eps: r.eps || undefined,
-        regimen_salud: (REGIMENES_SALUD as readonly string[]).includes(r.regimen_salud ?? '')
-          ? r.regimen_salud
-          : undefined,
-        estrato: r.estrato ? Number(r.estrato) : undefined,
+        regimen_salud: regimenSalud,
+        estrato,
         direccion_residencia: r.direccion_residencia || undefined,
         barrio_vereda: r.barrio_vereda || undefined,
         municipio: r.municipio || undefined,
-        grupo_etnico: (GRUPOS_ETNICOS as readonly string[]).includes(r.grupo_etnico ?? '') ? r.grupo_etnico : undefined,
+        grupo_etnico: grupoEtnico,
         victima_conflicto: r.victima_conflicto ? esVerdadero(r.victima_conflicto) : undefined,
         tiene_discapacidad: r.tiene_discapacidad ? esVerdadero(r.tiene_discapacidad) : undefined,
         tiene_talento_excepcional: r.tiene_talento_excepcional ? esVerdadero(r.tiene_talento_excepcional) : undefined,
         institucion_procedencia: r.institucion_procedencia || undefined,
       });
 
-      if (r.acudiente_numero_documento && r.acudiente_nombre && r.acudiente_apellido && r.acudiente_telefono) {
-        if (!(PARENTESCOS as readonly string[]).includes(r.acudiente_parentesco ?? '')) {
-          throw new ApiError(400, `acudiente_parentesco "${r.acudiente_parentesco}" no es valido.`);
-        }
+      if (parentesco) {
         let guardian = await Guardian.findOne({ numero_documento: r.acudiente_numero_documento });
         if (!guardian) {
           guardian = await Guardian.create({
-            tipo_documento: (TIPOS_DOCUMENTO as readonly string[]).includes(r.acudiente_tipo_documento ?? '')
-              ? r.acudiente_tipo_documento
-              : 'CC',
+            tipo_documento: acudienteTipoDocumento,
             numero_documento: r.acudiente_numero_documento,
             nombre: r.acudiente_nombre,
             apellido: r.acudiente_apellido,
@@ -187,13 +252,21 @@ export async function importarEstudiantesCsv(buffer: Buffer) {
         await StudentGuardian.create({
           student_id: student._id,
           guardian_id: guardian._id,
-          parentesco: r.acudiente_parentesco,
+          parentesco,
           es_principal: true,
         });
       }
 
       creados += 1;
     } catch (err) {
+      // Si algo fallo despues de crear el usuario, no se deja un estudiante a medias (sin perfil o sin acudiente).
+      if (estudianteId) {
+        await Promise.all([
+          StudentGuardian.deleteMany({ student_id: estudianteId }),
+          StudentProfile.deleteOne({ user_id: estudianteId }),
+          User.deleteOne({ _id: estudianteId }),
+        ]);
+      }
       const motivo =
         err instanceof ApiError
           ? err.message

@@ -192,6 +192,11 @@ export function EnrollmentDetailPage() {
           }
         />
         <p className="text-sm text-muted">Tipo de ingreso: {enrollment.tipo_ingreso}</p>
+        {esPreinscrito && enrollment.fecha_limite_legalizacion && (
+          <p className="text-sm text-muted">
+            Plazo para legalizar la matrícula: {formatoFechaCalendario(enrollment.fecha_limite_legalizacion)}
+          </p>
+        )}
         {enrollment.fecha_limite_compromiso && (
           <p className="text-sm text-muted">
             Fecha límite del acta de compromiso: {formatoFechaCalendario(enrollment.fecha_limite_compromiso)}

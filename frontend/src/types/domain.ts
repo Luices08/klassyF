@@ -241,6 +241,8 @@ export interface Enrollment {
   estado: EstadoMatricula;
   fecha_matricula: string;
   fecha_limite_compromiso: string | null;
+  /** Plazo para entregar documentos y legalizar el cupo mientras está PREINSCRITO. */
+  fecha_limite_legalizacion: string | null;
   motivo_retiro: string | null;
   checklist: ChecklistItem[];
 }
@@ -378,6 +380,28 @@ export interface PublicGrade {
   nivel: string;
   numero: number;
   nombre: string;
+}
+
+/** Lo que ve el acudiente en el sitio público cuando la solicitud está APROBADA. */
+export interface DocumentoPreinscripcion {
+  tipo_documento: TipoDocumentoMatricula;
+  nombre: string;
+  estado: EstadoDocumentoMatricula;
+  /** Motivo del rechazo, para que sepa qué corregir. */
+  comentario: string | null;
+}
+
+export interface PreinscripcionDetalle {
+  grado: string;
+  grupo: string;
+  sede: string;
+  jornada: string;
+  fecha_limite_legalizacion: string | null;
+  plazo_vencido: boolean;
+  matricula_estado: EstadoMatricula;
+  folio_matricula: string | null;
+  documentos: DocumentoPreinscripcion[];
+  puede_subir_documentos: boolean;
 }
 
 export interface AdmissionRequest {

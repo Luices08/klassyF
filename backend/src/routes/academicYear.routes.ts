@@ -11,7 +11,7 @@ const soloAdmin = [authenticate, checkRole(ROLES.ADMIN)];
 // El coordinador controla aperturas de planillas y prorrogas (CU-CRD-05).
 const adminOCoordinador = [authenticate, checkRole(ROLES.ADMIN, ROLES.COORDINADOR)];
 
-// Consulta del calendario: cualquier usuario autenticado (docentes y estudiantes en solo lectura).
+// Consulta del calendario: cualquier usuario autenticado (docentes y estudiantes en solo lectura, y selector de M06).
 router.get('/', authenticate, ctrl.listarAnios);
 router.get('/actual', authenticate, ctrl.obtenerAnioActivo);
 router.get('/:id', authenticate, validate(v.anioPorId), ctrl.obtenerAnio);

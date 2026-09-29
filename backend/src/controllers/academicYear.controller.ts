@@ -41,6 +41,9 @@ export const listarAnios = catchAsync(async (_req, res) => {
   res.status(200).json({ success: true, count: anios.length, data: anios });
 });
 
+// Alias retrocompatible para consultas de solo lectura en otros modulos (M06)
+export const listAcademicYears = listarAnios;
+
 export const obtenerAnioActivo = catchAsync(async (_req, res) => {
   res.status(200).json({ success: true, data: await anioService.obtenerAnioActivo() });
 });

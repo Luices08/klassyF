@@ -114,8 +114,18 @@ export type TipoDocumentoMatricula = (typeof TIPOS_DOCUMENTO_MATRICULA)[number];
 export const GRUPOS_SANGUINEOS = ['O+', 'O-', 'A+', 'A-', 'B+', 'B-', 'AB+', 'AB-'] as const;
 export type GrupoSanguineo = (typeof GRUPOS_SANGUINEOS)[number];
 
+// Reusado por Area y Subject (catalogo academico de M06): misma pareja
+// activo/inactivo, nunca se elimina un area/asignatura por trazabilidad.
 export const ESTADOS_AREA = ['activo', 'inactivo'] as const;
 export type EstadoArea = (typeof ESTADOS_AREA)[number];
+
+// Tipo de asignatura dentro del catalogo academico (M06).
+export const TIPOS_ASIGNATURA = ['OBLIGATORIA', 'OPTATIVA'] as const;
+export type TipoAsignatura = (typeof TIPOS_ASIGNATURA)[number];
+
+// Metodo de calculo del resultado de un area a partir de sus asignaturas (M06).
+export const METODOS_CALCULO_EVALUACION = ['PONDERADO', 'ARITMETICO'] as const;
+export type MetodoCalculoEvaluacion = (typeof METODOS_CALCULO_EVALUACION)[number];
 
 export const ESTADOS_DESARROLLO_CURRICULAR = [
   'BORRADOR',

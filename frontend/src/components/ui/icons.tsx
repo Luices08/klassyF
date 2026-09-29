@@ -58,6 +58,19 @@ export const XIcon = (p: IconProps) => (
   </Icon>
 );
 
+export const CheckIcon = (p: IconProps) => (
+  <Icon {...p}>
+    <path d="M20 6 9 17l-5-5" />
+  </Icon>
+);
+
+export const CalendarIcon = (p: IconProps) => (
+  <Icon {...p}>
+    <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
+    <path d="M16 2v4M8 2v4M3 10h18" />
+  </Icon>
+);
+
 export const LogOutIcon = (p: IconProps) => (
   <Icon {...p}>
     <path d="M9 21H5a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h4M16 17l5-5-5-5M21 12H9" />
@@ -171,6 +184,14 @@ export const XCircleIcon = (p: IconProps) => (
   </Icon>
 );
 
+export const BookIcon = (p: IconProps) => (
+  <Icon {...p}>
+    <path d="M4 19.5V5.5A2 2 0 0 1 6 3.5h10a2 2 0 0 1 2 2v14" />
+    <path d="M4 19.5A2 2 0 0 0 6 21.5h12" />
+    <path d="M4 19.5A2 2 0 0 1 6 17.5h12v4" />
+  </Icon>
+);
+
 export const BanIcon = (p: IconProps) => (
   <Icon {...p}>
     <circle cx="12" cy="12" r="9" />
@@ -203,7 +224,7 @@ export const UserIcon = (p: IconProps) => (
 
 export const EyeIcon = (p: IconProps) => (
   <Icon {...p}>
-    <path d="M2.5 12S6 5 12 5s9.5 7 9.5 7-3.5 7-9.5 7-9.5-7-9.5-7Z" />
+    <path d="M2.5 12S6 5 12 5s9.5 7 9.5 7-3.5 7-9.5 7-9.5-7Z" />
     <circle cx="12" cy="12" r="3" />
   </Icon>
 );
@@ -224,14 +245,6 @@ export const FolderIcon = (p: IconProps) => (
 export const StarIcon = (p: IconProps) => (
   <Icon {...p}>
     <path d="m12 3 2.6 5.6 6.1.6-4.6 4.1 1.3 6-5.4-3.2-5.4 3.2 1.3-6-4.6-4.1 6.1-.6Z" />
-  </Icon>
-);
-
-
-export const CalendarIcon = (p: IconProps) => (
-  <Icon {...p}>
-    <rect x="4" y="5" width="16" height="16" rx="2" />
-    <path d="M4 10h16M8 3v4M16 3v4" />
   </Icon>
 );
 

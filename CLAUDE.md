@@ -285,11 +285,7 @@ nuevos para lo que ya existe aquí** — extenderlos si falta un caso, no duplic
   mapeo rol→color o estado→color en una página), `Card`/`CardHeader`, `Table`/`TableHead`/`Th`/
   `TableBody`/`Td`/`EmptyRow`, `Drawer` (formularios de creación/edición; su botón principal
   acepta `submitVariant` para casos como confirmar un borrado en rojo), `PageHeader` (título +
-  subtítulo + acción de la página), `Field` (`Input`/`Select`), `MultiSelect` (selector desplegable de selección múltiple con checkboxes, contador y badges de rol/estado), `Alert`, `Spinner`, `EstadoEspacioBadge` (M10), `GuiaColumnas` (guía colapsable de columnas de una carga CSV), `ProgressBar` (barra de avance con tono, ej. semanas lectivas vs. el mínimo de 40), `Tabs`/`TabPanel`
-  (navegación por pestañas con subrayado azul en la activa — usado en la ficha 360° de Estudiantes,
-  M03), `Stepper` (indicador de pasos para formularios largos por secciones, ej. el asistente de
-  creación de estudiante en M03: no se reconstruye el paso a paso a mano en una página nueva), e
-  iconos SVG propios en `components/ui/icons.tsx` (no se agregó ninguna librería de iconos).
+  subtítulo + acción de la página), `Field` (`Input`/`Select`), `MultiSelect` (selector desplegable de selección múltiple con checkboxes, contador y badges de rol/estado), `Alert`, `Spinner`, `EstadoEspacioBadge` (M10), `GuiaColumnas` (guía colapsable de columnas de una carga CSV), `ProgressBar` (barra de avance con tono, ej. semanas lectivas vs. el mínimo de 40), `Tabs`/`TabPanel` (navegación por pestañas con subrayado azul en la activa; reusar en vez de reinventar un switch de pestañas en otra página), `Stepper` (indicador de pasos para formularios largos por secciones, ej. el asistente de creación de estudiante en M03), e iconos SVG propios en `components/ui/icons.tsx` (no se agregó ninguna librería de iconos).
 - **Contenedor global y densidad** (`components/layout/AppShell.tsx`): el `<main>` centra el
   contenido en `max-w-7xl` (no `max-w-5xl`) para que las tablas anchas (Usuarios, Grupos) no
   scrolleen antes de tiempo en pantallas grandes. Cada página usa `space-y-4` (no `space-y-6`)

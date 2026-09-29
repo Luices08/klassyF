@@ -8,6 +8,7 @@ import { NotFoundPage } from './pages/NotFoundPage';
 import { ReportCardPage } from './pages/ReportCardPage';
 import { HomePage } from './pages/public/HomePage';
 import { AnioLectivoPage } from './pages/AnioLectivoPage';
+import { AcademicCatalogPage } from './pages/admin/AcademicCatalogPage';
 import { AdmissionRequestsPage } from './pages/admin/AdmissionRequestsPage';
 import { EnrollmentDetailPage } from './pages/admin/EnrollmentDetailPage';
 import { EnrollmentsPage } from './pages/admin/EnrollmentsPage';
@@ -18,6 +19,7 @@ import { InstitutionSetupPage } from './pages/admin/InstitutionSetupPage';
 import { SedesPage } from './pages/admin/SedesPage';
 import { StudentDetailPage } from './pages/admin/StudentDetailPage';
 import { StudentsPage } from './pages/admin/StudentsPage';
+import { StudyPlanPage } from './pages/admin/StudyPlanPage';
 import { UsersPage } from './pages/admin/UsersPage';
 
 export default function App() {
@@ -51,6 +53,11 @@ export default function App() {
           <Route element={<ProtectedRoute allowedRoles={['ADMIN', 'COORDINADOR']} />}>
             <Route path="/admin/groups" element={<GroupsPage />} />
             <Route path="/admin/espacios" element={<EspaciosPage />} />
+          </Route>
+
+          <Route element={<ProtectedRoute allowedRoles={['COORDINADOR']} />}>
+            <Route path="/admin/academic-catalog" element={<AcademicCatalogPage />} />
+            <Route path="/admin/study-plan" element={<StudyPlanPage />} />
           </Route>
         </Route>
       </Route>

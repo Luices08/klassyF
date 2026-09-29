@@ -4,6 +4,7 @@ import { ESTADOS_AREA, EstadoArea } from '../constants/enums';
 export interface IArea {
   institucion_id: Types.ObjectId;
   nombre: string;
+  descripcion: string;
   codigo: string;
   estado: EstadoArea;
   createdAt: Date;
@@ -17,6 +18,7 @@ const areaSchema = new Schema<IArea, AreaModel>(
   {
     institucion_id: { type: Schema.Types.ObjectId, ref: 'Institution', required: true },
     nombre: { type: String, required: true, trim: true },
+    descripcion: { type: String, required: true, trim: true },
     codigo: { type: String, required: true, trim: true, uppercase: true },
     estado: { type: String, enum: ESTADOS_AREA, default: 'activo' },
   },

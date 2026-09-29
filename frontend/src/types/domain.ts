@@ -375,6 +375,82 @@ export interface Enrollment {
   checklist: ChecklistItem[];
 }
 
+// ---------------------------------------------------------------------------
+// M06 — Plan de estudios, áreas y asignaturas
+// ---------------------------------------------------------------------------
+
+export const NIVELES_EDUCATIVOS = ['PREESCOLAR', 'PRIMARIA', 'SECUNDARIA', 'MEDIA'] as const;
+export type NivelEducativo = (typeof NIVELES_EDUCATIVOS)[number];
+
+export const TIPOS_ASIGNATURA = ['OBLIGATORIA', 'OPTATIVA'] as const;
+export type TipoAsignatura = (typeof TIPOS_ASIGNATURA)[number];
+
+export const METODOS_CALCULO_EVALUACION = ['PONDERADO', 'ARITMETICO'] as const;
+export type MetodoCalculoEvaluacion = (typeof METODOS_CALCULO_EVALUACION)[number];
+
+export interface Area {
+  _id: string;
+  institucion_id: string;
+  nombre: string;
+  descripcion: string;
+  codigo: string;
+  estado: EstadoActivo;
+}
+
+export interface Subject {
+  _id: string;
+  area_id: string;
+  nombre: string;
+  abreviatura: string;
+  descripcion: string;
+  tipo: TipoAsignatura;
+  estado: EstadoActivo;
+  niveles_educativos: NivelEducativo[];
+}
+
+export interface AsignaturaGrado {
+  subject_id: string;
+  intensidad_horaria_semanal: number;
+}
+
+export interface PonderacionAsignatura {
+  subject_id: string;
+  porcentaje: number;
+}
+
+export interface EvaluacionArea {
+  area_id: string;
+  metodo_calculo: MetodoCalculoEvaluacion;
+  asignaturas: PonderacionAsignatura[];
+}
+
+export interface AsignaturaPersonalizadaGrupo {
+  subject_id: string;
+  intensidad_horaria_semanal: number;
+  observacion: string;
+}
+
+export interface PersonalizacionGrupo {
+  group_id: string;
+  intensidades_personalizadas: AsignaturaPersonalizadaGrupo[];
+  asignaturas_agregadas: AsignaturaPersonalizadaGrupo[];
+  evaluaciones_area_personalizadas: EvaluacionArea[];
+}
+
+export interface GradoPlan {
+  grade_id: string;
+  asignaturas: AsignaturaGrado[];
+  evaluaciones_area: EvaluacionArea[];
+  personalizaciones_grupo: PersonalizacionGrupo[];
+}
+
+export interface StudyPlan {
+  _id: string;
+  institucion_id: string;
+  academic_year_id: string;
+  grades: GradoPlan[];
+}
+
 export interface SetupInstitutionResult {
   institution: Institution;
   sede_principal: Campus;

@@ -1,6 +1,7 @@
 import type { ComponentType, SVGProps } from 'react';
 import type { Rol } from '../../types/api';
 import {
+  BookIcon,
   BuildingIcon,
   CalendarIcon,
   ClipboardListIcon,
@@ -27,6 +28,7 @@ export interface NavItem {
 
 const STAFF: Rol[] = ['ADMIN', 'COORDINADOR', 'SECRETARIA'];
 const GROUP_MANAGERS: Rol[] = ['ADMIN', 'COORDINADOR'];
+const CURRICULUM_MANAGERS: Rol[] = ['COORDINADOR'];
 const STRUCTURAL_ADMINS: Rol[] = ['ADMIN'];
 
 export const NAV_ITEMS: NavItem[] = [
@@ -42,6 +44,8 @@ export const NAV_ITEMS: NavItem[] = [
   { to: '/admin/students', label: 'Estudiantes', icon: FolderIcon, roles: STAFF },
   { to: '/admin/groups', label: 'Grupos', icon: LayersIcon, roles: GROUP_MANAGERS },
   { to: '/admin/espacios', label: 'Espacios y aulas', icon: DoorIcon, roles: GROUP_MANAGERS, soloPresencial: true },
+  { to: '/admin/academic-catalog', label: 'Catálogo académico', icon: BookIcon, roles: CURRICULUM_MANAGERS },
+  { to: '/admin/study-plan', label: 'Plan de estudios', icon: ClipboardListIcon, roles: CURRICULUM_MANAGERS },
   { to: '/admin/enrollments', label: 'Matrículas', icon: ClipboardListIcon, roles: STAFF },
   { to: '/admin/admisiones', label: 'Admisiones', icon: InboxIcon, roles: STAFF },
 ];

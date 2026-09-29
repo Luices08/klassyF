@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { ROLES } from '../constants/roles';
 import {
   configurarAsignaturasGrado,
+  configurarAsignaturasMultiplesGrados,
   configurarDistribucionGrupo,
   configurarEvaluacionArea,
   crearPlanDesdeAnioAnterior,
@@ -32,6 +33,14 @@ router.post(
   checkRole(ROLES.COORDINADOR),
   validate(studyPlanValidator.configurarAsignaturasGrado),
   configurarAsignaturasGrado
+);
+
+// 2.1 Configuracion General: asignaturas e intensidad horaria para múltiples grados en bloque.
+router.post(
+  '/asignaturas-grados',
+  checkRole(ROLES.COORDINADOR),
+  validate(studyPlanValidator.configurarAsignaturasMultiplesGrados),
+  configurarAsignaturasMultiplesGrados
 );
 
 // 2.3 Configuracion de Evaluacion: metodo de calculo y ponderacion por area.

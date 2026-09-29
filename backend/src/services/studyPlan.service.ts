@@ -95,7 +95,9 @@ export async function configurarAsignaturasGrado(input: ConfigurarAsignaturasGra
   if (new Set(subjectIds).size !== subjectIds.length) {
     throw new ApiError(400, 'No se puede repetir la misma asignatura en la Configuracion General de un grado.');
   }
-  await validarSubjectsDelNivel(subjectIds, grade.nivel);
+  if (subjectIds.length > 0) {
+    await validarSubjectsDelNivel(subjectIds, grade.nivel);
+  }
 
   const plan = await obtenerOCrearStudyPlan(input.institucion_id, input.academic_year_id);
   const grado = obtenerOCrearGrado(plan, input.grade_id);
@@ -105,6 +107,55 @@ export async function configurarAsignaturasGrado(input: ConfigurarAsignaturasGra
       intensidad_horaria_semanal: a.intensidad_horaria_semanal,
     })
   );
+
+  await plan.save();
+  return plan;
+}
+
+export interface ConfigurarAsignaturasGradosItemInput {
+  grade_id: string;
+  asignaturas: AsignaturaGradoInput[];
+}
+
+export interface ConfigurarAsignaturasMultiplesGradosInput {
+  institucion_id: string;
+  academic_year_id: string;
+  grados: ConfigurarAsignaturasGradosItemInput[];
+}
+
+/**
+ * Configura las asignaturas e intensidades horarias para múltiples grados en una sola operación atómica.
+ */
+export async function configurarAsignaturasMultiplesGrados(
+  input: ConfigurarAsignaturasMultiplesGradosInput
+): Promise<StudyPlanDocument> {
+  for (const item of input.grados) {
+    const grade = await Grade.findById(item.grade_id);
+    if (!grade) throw new ApiError(404, `Grado no encontrado: ${item.grade_id}.`);
+    if (grade.estado !== 'activo') throw new ApiError(400, `El grado "${grade.nombre}" está inactivo.`);
+
+    const subjectIds = item.asignaturas.map((a) => a.subject_id);
+    if (new Set(subjectIds).size !== subjectIds.length) {
+      throw new ApiError(
+        400,
+        `No se puede repetir la misma asignatura en la Configuración General del grado "${grade.nombre}".`
+      );
+    }
+    if (subjectIds.length > 0) {
+      await validarSubjectsDelNivel(subjectIds, grade.nivel);
+    }
+  }
+
+  const plan = await obtenerOCrearStudyPlan(input.institucion_id, input.academic_year_id);
+  for (const item of input.grados) {
+    const grado = obtenerOCrearGrado(plan, item.grade_id);
+    grado.asignaturas = item.asignaturas.map(
+      (a): IAsignaturaGrado => ({
+        subject_id: oid(a.subject_id),
+        intensidad_horaria_semanal: a.intensidad_horaria_semanal,
+      })
+    );
+  }
 
   await plan.save();
   return plan;

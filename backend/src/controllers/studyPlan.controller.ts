@@ -2,6 +2,7 @@ import { ParsedQs } from 'qs';
 import * as studyPlanService from '../services/studyPlan.service';
 import {
   ConfigurarAsignaturasGradoInput,
+  ConfigurarAsignaturasMultiplesGradosInput,
   ConfigurarDistribucionGrupoInput,
   ConfigurarEvaluacionAreaInput,
   CrearPlanDesdeAnioAnteriorInput,
@@ -16,6 +17,13 @@ interface ObtenerStudyPlanQuery extends ParsedQs {
 export const configurarAsignaturasGrado = catchAsync<unknown, unknown, ConfigurarAsignaturasGradoInput>(
   async (req, res) => {
     const plan = await studyPlanService.configurarAsignaturasGrado(req.body);
+    res.status(200).json({ success: true, data: plan });
+  }
+);
+
+export const configurarAsignaturasMultiplesGrados = catchAsync<unknown, unknown, ConfigurarAsignaturasMultiplesGradosInput>(
+  async (req, res) => {
+    const plan = await studyPlanService.configurarAsignaturasMultiplesGrados(req.body);
     res.status(200).json({ success: true, data: plan });
   }
 );

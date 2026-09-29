@@ -41,6 +41,24 @@ export function useConfigurarAsignaturasGrado() {
   });
 }
 
+export interface ConfigurarAsignaturasMultiplesGradosInput {
+  institucion_id: string;
+  academic_year_id: string;
+  grados: {
+    grade_id: string;
+    asignaturas: AsignaturaGrado[];
+  }[];
+}
+
+export function useConfigurarAsignaturasMultiplesGrados() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: ConfigurarAsignaturasMultiplesGradosInput) =>
+      api.post<StudyPlan>('/curriculum/study-plan/asignaturas-grados', input),
+    onSuccess: () => invalidateStudyPlan(queryClient),
+  });
+}
+
 export interface ConfigurarEvaluacionAreaInput {
   institucion_id: string;
   academic_year_id: string;

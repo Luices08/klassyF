@@ -13,7 +13,23 @@ export const configurarAsignaturasGrado: ValidationSchema = {
     institucion_id: objectId.required(),
     academic_year_id: objectId.required(),
     grade_id: objectId.required(),
-    asignaturas: Joi.array().items(asignaturaGradoSchema).min(1).required(),
+    asignaturas: Joi.array().items(asignaturaGradoSchema).default([]),
+  }),
+};
+
+export const configurarAsignaturasMultiplesGrados: ValidationSchema = {
+  body: Joi.object({
+    institucion_id: objectId.required(),
+    academic_year_id: objectId.required(),
+    grados: Joi.array()
+      .items(
+        Joi.object({
+          grade_id: objectId.required(),
+          asignaturas: Joi.array().items(asignaturaGradoSchema).default([]),
+        })
+      )
+      .min(1)
+      .required(),
   }),
 };
 

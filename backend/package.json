@@ -14,7 +14,8 @@
     "migrate:estado-por-defecto": "tsx scripts/migrateEstadoPorDefecto.ts",
     "reset-admin-password": "tsx scripts/resetAdminPassword.ts",
     "typecheck": "tsc --noEmit",
-    "typecheck:all": "tsc --noEmit && tsc -p tsconfig.scripts.json"
+    "typecheck:all": "tsc --noEmit && tsc -p tsconfig.scripts.json",
+    "lint": "oxlint src scripts"
   },
   "license": "UNLICENSED",
   "dependencies": {
@@ -40,6 +41,7 @@
     "@types/multer": "^2.2.0",
     "@types/node": "^22.20.2",
     "@types/pdfkit": "^0.17.6",
+    "oxlint": "^1.86.0",
     "tsx": "^4.23.13",
     "typescript": "^5.9.3"
   }

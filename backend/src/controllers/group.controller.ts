@@ -1,6 +1,7 @@
 import { ParamsDictionary } from 'express-serve-static-core';
 import { EstadoGrupo } from '../constants/enums';
 import Group from '../models/group.model';
+import { asegurarAnioNoCerrado } from '../services/academicYear.service';
 import ApiError from '../utils/ApiError';
 import catchAsync from '../utils/catchAsync';
 
@@ -15,6 +16,7 @@ interface CreateGroupBody {
 }
 
 export const createGroup = catchAsync<unknown, unknown, CreateGroupBody>(async (req, res) => {
+  await asegurarAnioNoCerrado(req.body.academic_year_id);
   const group = await Group.create(req.body);
   res.status(201).json({ success: true, data: group });
 });

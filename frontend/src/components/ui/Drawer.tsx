@@ -12,6 +12,8 @@ interface DrawerProps {
   submitVariant?: ComponentProps<typeof Button>['variant'];
   isSubmitting?: boolean;
   submitDisabled?: boolean;
+  /** 'lg' para formularios con varias columnas (p. ej. periodos del año lectivo); por defecto 'md'. */
+  size?: 'md' | 'lg';
   children: ReactNode;
 }
 
@@ -29,6 +31,7 @@ export function Drawer({
   submitVariant = 'primary',
   isSubmitting,
   submitDisabled,
+  size = 'md',
   children,
 }: DrawerProps) {
   if (!open) return null;
@@ -45,7 +48,7 @@ export function Drawer({
         onClick={onClose}
         type="button"
       />
-      <div className="absolute right-0 top-0 flex h-full w-full max-w-md flex-col bg-surface shadow-xl">
+      <div className={`absolute right-0 top-0 flex h-full w-full ${size === 'lg' ? 'max-w-2xl' : 'max-w-md'} flex-col bg-surface shadow-xl`}>
         <div className="flex items-start justify-between gap-3 border-b border-border px-6 py-4">
           <div>
             <h2 className="text-h3 text-ink">{title}</h2>

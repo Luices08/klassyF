@@ -9,15 +9,22 @@ import { IconButton } from '../../components/ui/IconButton';
 import { PageHeader } from '../../components/ui/PageHeader';
 import { Spinner } from '../../components/ui/Spinner';
 import { EmptyRow, Table, TableBody, TableHead, Td, Th } from '../../components/ui/Table';
-import { PlusIcon, RefreshIcon, TrashIcon } from '../../components/ui/icons';
+import { BanIcon, PlusIcon, RefreshIcon } from '../../components/ui/icons';
 import { useInstitutionConfig } from '../../context/InstitutionConfigContext';
+import { useAniosLectivos } from '../../hooks/useAniosLectivos';
 import { useCampuses, useGrades, useJornadas } from '../../hooks/useCatalogs';
 import { useActualizarEstadoGrupo, useCreateGroup, useGroups } from '../../hooks/useGroups';
 import type { EstadoGrupo } from '../../types/domain';
 
 export function GroupsPage() {
   const { config } = useInstitutionConfig();
-  const [academicYearId, setAcademicYearId] = useState(config?.academicYearId ?? '');
+  const aniosQuery = useAniosLectivos();
+  const anios = aniosQuery.data ?? [];
+  // Sin selección explícita se trabaja sobre la vigencia activa (o, si no hay, el año más reciente).
+  const [anioElegidoId, setAnioElegidoId] = useState('');
+  const anioActual = anios.find((a) => a._id === anioElegidoId) ?? anios.find((a) => a.estado === 'EN_CURSO') ?? anios[0];
+  const academicYearId = anioActual?._id ?? '';
+  const anioCerrado = anioActual?.estado === 'CERRADO';
 
   const gradesQuery = useGrades();
   const gradesActivosQuery = useGrades('activo');
@@ -84,7 +91,7 @@ export function GroupsPage() {
         title="Grupos"
         subtitle="Crea y consulta los grupos de un año lectivo."
         action={
-          <Button onClick={() => setDrawerOpen(true)}>
+          <Button onClick={() => setDrawerOpen(true)} disabled={!academicYearId || anioCerrado}>
             <PlusIcon className="h-4 w-4" />
             Nuevo grupo
           </Button>
@@ -93,24 +100,35 @@ export function GroupsPage() {
 
       {!config && (
         <Alert tone="info">
-          Aún no hay una institución configurada en esta sesión. Ve a "Configuración institucional" o ingresa el
-          ID del año lectivo manualmente abajo.
+          Aún no hay una institución configurada en esta sesión. Ve a "Configuración institucional".
         </Alert>
       )}
 
       <Card>
         <CardHeader
           title="Año lectivo"
+          subtitle="Cada grupo pertenece a un año lectivo; los años cerrados son de solo lectura."
           action={
-            <Input
-              label="Año lectivo (ID)"
-              required
+            <Select
+              label="Año lectivo"
               className="w-64"
               value={academicYearId}
-              onChange={(e) => setAcademicYearId(e.target.value)}
-            />
+              onChange={(e) => setAnioElegidoId(e.target.value)}
+            >
+              {anios.map((a) => (
+                <option key={a._id} value={a._id}>
+                  {a.nombre}
+                  {a.estado === 'EN_CURSO' ? ' (vigente)' : a.estado === 'CERRADO' ? ' (histórico)' : ''}
+                </option>
+              ))}
+            </Select>
           }
         />
+        {aniosQuery.isError && <Alert tone="error">{errorMessage(aniosQuery.error)}</Alert>}
+        {!aniosQuery.isLoading && anios.length === 0 && (
+          <Alert tone="info">Aún no hay años lectivos. Créalo en "Año lectivo".</Alert>
+        )}
+        {anioCerrado && <Alert tone="info">Año cerrado: solo consulta, no se pueden crear grupos.</Alert>}
       </Card>
 
       <Card>
@@ -176,9 +194,9 @@ export function GroupsPage() {
                   </Td>
                   <Td>
                     <IconButton
-                      tone={g.estado === 'ACTIVE' ? 'danger' : 'success'}
+                      tone={g.estado === 'ACTIVE' ? 'neutral' : 'success'}
                       label={g.estado === 'ACTIVE' ? 'Cerrar grupo' : 'Reactivar grupo'}
-                      icon={g.estado === 'ACTIVE' ? <TrashIcon /> : <RefreshIcon />}
+                      icon={g.estado === 'ACTIVE' ? <BanIcon /> : <RefreshIcon />}
                       disabled={actualizarEstado.isPending}
                       onClick={() => handleToggleEstado(g._id, g.estado)}
                     />

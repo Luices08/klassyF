@@ -28,6 +28,10 @@ interface AuthContextValue {
   isLoading: boolean;
   login: (numeroDocumento: string, password: string) => Promise<AuthUser>;
   logout: () => void;
+  /** Aplica un cambio local al usuario en sesion (ej. debe_cambiar_password) sin volver a llamar al login. */
+  actualizarUsuarioEnSesion: (patch: Partial<AuthUser>) => void;
+  /** Reemplaza el token tras reemitirlo (ej. cambio de la propia contraseña). */
+  actualizarToken: (token: string) => void;
 }
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
@@ -63,9 +67,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  const actualizarUsuarioEnSesion = useCallback((patch: Partial<AuthUser>) => {
+    setUser((prev) => {
+      if (!prev) return prev;
+      const next = { ...prev, ...patch };
+      writeStoredUser(next);
+      return next;
+    });
+  }, []);
+
+  const actualizarToken = useCallback((token: string) => {
+    setStoredToken(token);
+  }, []);
+
   const value = useMemo<AuthContextValue>(
-    () => ({ user, isAuthenticated: user !== null, isLoading, login, logout }),
-    [user, isLoading, login, logout]
+    () => ({ user, isAuthenticated: user !== null, isLoading, login, logout, actualizarUsuarioEnSesion, actualizarToken }),
+    [user, isLoading, login, logout, actualizarUsuarioEnSesion, actualizarToken]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

@@ -1,4 +1,4 @@
-import { ComponenteSiee } from '../constants/enums';
+import { ComponenteSiee, ESTADOS_MATRICULA_ACTIVOS } from '../constants/enums';
 import Activity, { ActivityDocument } from '../models/activity.model';
 import ActivitySubmission, { ActivitySubmissionDocument } from '../models/activitySubmission.model';
 import DBABank from '../models/dbaBank.model';
@@ -74,7 +74,7 @@ export async function createSubmission(
   const enrollment = await Enrollment.findOne({
     student_id: student._id,
     group_id: assignment.group_id,
-    estado: 'MATRICULADO',
+    estado: { $in: ESTADOS_MATRICULA_ACTIVOS },
   });
   if (!enrollment) {
     throw new ApiError(403, 'El estudiante no esta matriculado en el grupo de esta actividad.');
@@ -125,7 +125,12 @@ export async function gradeActivity(
     throw new ApiError(403, 'Solo el docente titular puede calificar esta actividad.');
   }
 
-  await assertPeriodNotLocked(assignment.academic_year_id, assignment.group_id, activity.periodo_numero);
+  await assertPeriodNotLocked(
+    assignment.academic_year_id,
+    assignment.group_id,
+    activity.periodo_numero,
+    requestingUser._id
+  );
 
   const studentIds = entries.map((e) => e.student_id);
   if (new Set(studentIds).size !== studentIds.length) {
@@ -135,7 +140,7 @@ export async function gradeActivity(
   const enrollments = await Enrollment.find({
     student_id: { $in: studentIds },
     group_id: assignment.group_id,
-    estado: 'MATRICULADO',
+    estado: { $in: ESTADOS_MATRICULA_ACTIVOS },
   });
   const enrolledSet = new Set(enrollments.map((e) => String(e.student_id)));
   const noMatriculados = studentIds.filter((id) => !enrolledSet.has(id));

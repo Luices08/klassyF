@@ -9,6 +9,10 @@ import apiV1Routes from './routes';
 
 const app = express();
 
+// Necesario para que req.ip refleje la IP real del cliente (auditoria M02)
+// cuando el backend corre detras de un proxy/balanceador.
+app.set('trust proxy', 1);
+
 app.use(helmet());
 app.use(cors());
 app.use(express.json());

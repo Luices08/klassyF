@@ -5,7 +5,7 @@ import { IconButton } from '../../components/ui/IconButton';
 import { PageHeader } from '../../components/ui/PageHeader';
 import { Spinner } from '../../components/ui/Spinner';
 import { EmptyRow, Table, TableBody, TableHead, Td, Th } from '../../components/ui/Table';
-import { RefreshIcon, TrashIcon } from '../../components/ui/icons';
+import { BanIcon, RefreshIcon } from '../../components/ui/icons';
 import { useActualizarEstadoGrado, useGrades } from '../../hooks/useCatalogs';
 import type { EstadoActivo } from '../../types/domain';
 
@@ -59,9 +59,9 @@ export function GradesPage() {
                   <Td>
                     <div className="flex justify-end">
                       <IconButton
-                        tone={g.estado === 'activo' ? 'danger' : 'success'}
+                        tone={g.estado === 'activo' ? 'neutral' : 'success'}
                         label={g.estado === 'activo' ? 'Desactivar grado' : 'Activar grado'}
-                        icon={g.estado === 'activo' ? <TrashIcon /> : <RefreshIcon />}
+                        icon={g.estado === 'activo' ? <BanIcon /> : <RefreshIcon />}
                         disabled={actualizarEstado.isPending}
                         onClick={() => handleToggle(g._id, g.estado)}
                       />

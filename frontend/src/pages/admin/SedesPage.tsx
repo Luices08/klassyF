@@ -9,7 +9,7 @@ import { IconButton } from '../../components/ui/IconButton';
 import { PageHeader } from '../../components/ui/PageHeader';
 import { Spinner } from '../../components/ui/Spinner';
 import { EmptyRow, Table, TableBody, TableHead, Td, Th } from '../../components/ui/Table';
-import { PencilIcon, PlusIcon, RefreshIcon, TrashIcon } from '../../components/ui/icons';
+import { BanIcon, PencilIcon, PlusIcon, RefreshIcon, TrashIcon } from '../../components/ui/icons';
 import {
   useActualizarEstadoSede,
   useActualizarSede,
@@ -156,7 +156,7 @@ export function SedesPage() {
                     <div className="flex justify-end gap-2">
                       <IconButton tone="edit" label="Editar sede" icon={<PencilIcon />} onClick={() => abrirEditar(c)} />
                       <IconButton
-                        tone={c.estado === 'activo' ? 'danger' : 'success'}
+                        tone={c.estado === 'activo' ? 'neutral' : 'success'}
                         label={
                           c.es_principal
                             ? 'La sede principal no se puede desactivar'
@@ -164,7 +164,7 @@ export function SedesPage() {
                               ? 'Desactivar sede'
                               : 'Activar sede'
                         }
-                        icon={c.estado === 'activo' ? <TrashIcon /> : <RefreshIcon />}
+                        icon={c.estado === 'activo' ? <BanIcon /> : <RefreshIcon />}
                         disabled={c.es_principal || actualizarEstadoSede.isPending}
                         onClick={() => handleToggleEstadoSede(c)}
                       />

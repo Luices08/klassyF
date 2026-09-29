@@ -1,6 +1,6 @@
 import { Types } from 'mongoose';
 import { ROLES } from '../constants/roles';
-import { Calendario, EstadoPeriodo, EstadoUsuario } from '../constants/enums';
+import { Calendario, EstadoUsuario } from '../constants/enums';
 import AcademicYear, { AcademicYearDocument } from '../models/academicYear.model';
 import Campus, { CampusDocument } from '../models/campus.model';
 import Institution, { InstitutionDocument } from '../models/institution.model';
@@ -15,6 +15,8 @@ export interface UpdateInstitutionInput {
   resolucion_aprobacion: string;
   estado?: EstadoUsuario;
   logo_url?: string | null;
+  correo_secretaria?: string | null;
+  horario_atencion?: string | null;
 }
 
 export interface SetupInstitutionInput {
@@ -39,7 +41,6 @@ export interface SetupInstitutionInput {
       porcentaje: number;
       fecha_inicio: Date | string;
       fecha_fin: Date | string;
-      estado?: EstadoPeriodo;
     }>;
   };
 }
@@ -103,7 +104,7 @@ export async function setupInstitution({
           year: anio_lectivo.year,
           calendario: anio_lectivo.calendario,
           estado: 'PLANIFICACION',
-          periodos: anio_lectivo.periodos.map((p) => ({ ...p, estado: 'CERRADO' })),
+          periodos: anio_lectivo.periodos.map((p) => ({ ...p, estado: 'PROGRAMADO' })),
         },
       ],
       { session }
@@ -143,6 +144,8 @@ export async function updateInstitution(
   institucion.resolucion_aprobacion = input.resolucion_aprobacion;
   if (input.estado !== undefined) institucion.estado = input.estado;
   if (input.logo_url !== undefined) institucion.logo_url = input.logo_url;
+  if (input.correo_secretaria !== undefined) institucion.correo_secretaria = input.correo_secretaria;
+  if (input.horario_atencion !== undefined) institucion.horario_atencion = input.horario_atencion;
   await institucion.save();
 
   return institucion;

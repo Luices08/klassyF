@@ -9,6 +9,10 @@ export interface IInstitution {
   administrador_id: Types.ObjectId | null;
   /** Logo institucional como data URI (base64); se muestra en boletines/certificados. */
   logo_url: string | null;
+  /** Contacto y atencion presencial (home publico, M04): correo de secretaria academica. */
+  correo_secretaria: string | null;
+  /** Horario de atencion en ventanilla (texto libre, ej. "Lunes a viernes 7:00 a 3:00 p.m."). */
+  horario_atencion: string | null;
   estado: EstadoUsuario;
   createdAt: Date;
   updatedAt: Date;
@@ -30,6 +34,8 @@ const institutionSchema = new Schema<IInstitution, InstitutionModel>(
     resolucion_aprobacion: { type: String, required: true, trim: true },
     administrador_id: { type: Schema.Types.ObjectId, ref: 'User', default: null },
     logo_url: { type: String, default: null },
+    correo_secretaria: { type: String, default: null, trim: true, lowercase: true },
+    horario_atencion: { type: String, default: null, trim: true },
     estado: { type: String, enum: ESTADOS_USUARIO, default: 'activo' },
   },
   { timestamps: true }

@@ -23,7 +23,10 @@ export function errorHandler(err: Error, _req: Request, res: Response, _next: Ne
   let statusCode = apiErr.statusCode || 500;
   let message = apiErr.message || 'Error interno del servidor.';
 
-  if (err instanceof MongooseError.ValidationError) {
+  if (err.name === 'MulterError') {
+    statusCode = 400;
+    message = err.message === 'File too large' ? 'El archivo supera el tamaño máximo permitido (5MB).' : err.message;
+  } else if (err instanceof MongooseError.ValidationError) {
     statusCode = 400;
     message = Object.values(err.errors)
       .map((e) => e.message)

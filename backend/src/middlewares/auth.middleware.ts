@@ -27,6 +27,9 @@ export const authenticate = catchAsync(async (req, _res, next) => {
   if (!user || user.estado !== 'activo') {
     throw new ApiError(401, 'Usuario no autorizado o inactivo.');
   }
+  if (user.version_sesion !== payload.ver) {
+    throw new ApiError(401, 'La sesión ya no es válida, inicia sesión nuevamente.');
+  }
 
   req.user = user;
   next();

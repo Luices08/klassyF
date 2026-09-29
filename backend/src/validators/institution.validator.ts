@@ -56,6 +56,8 @@ export const updateInstitution: ValidationSchema = {
     estado: Joi.string().valid(...ESTADOS_USUARIO),
     // Logo institucional como data URI (base64), tope ~600KB para no inflar el documento.
     logo_url: Joi.string().dataUri().max(800_000).allow(null),
+    correo_secretaria: Joi.string().email().allow('', null),
+    horario_atencion: Joi.string().allow('', null),
     confirm_password: Joi.string().required(),
   }),
 };

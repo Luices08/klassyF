@@ -39,6 +39,7 @@ export interface AuthUser {
   numero_documento: string;
   rol: Rol;
   estado?: 'activo' | 'inactivo';
+  debe_cambiar_password?: boolean;
 }
 
 export interface LoginResponse extends ApiEnvelopeBase {

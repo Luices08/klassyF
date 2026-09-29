@@ -12,6 +12,7 @@ import { Spinner } from '../../components/ui/Spinner';
 import { Table, TableBody, TableHead, Td, Th } from '../../components/ui/Table';
 import { BuildingIcon, PlusIcon, TrashIcon } from '../../components/ui/icons';
 import { useInstitutionConfig } from '../../context/InstitutionConfigContext';
+import { avisosCalendario } from '../../lib/calendarioColombia';
 import { useInstitution, useSetupInstitution, useUpdateInstitution } from '../../hooks/useInstitution';
 import type { Calendario, EstadoActivo, Institution, Periodo } from '../../types/domain';
 
@@ -30,62 +31,6 @@ function nuevoPeriodo(numero: number): PeriodoForm {
 
 function defaultPeriodos(): PeriodoForm[] {
   return [1, 2, 3, 4].map((numero) => ({ ...nuevoPeriodo(numero), porcentaje: 25 }));
-}
-
-/**
- * Reglas del calendario escolar colombiano (Decreto 1075 de 2015 y calendarios A/B del MEN):
- * el calendario A corre entre ene/feb y nov/dic del mismo año; el calendario B, entre
- * ago/sept de un año y jun/jul del siguiente. Se usan solo como aviso, no como bloqueo,
- * porque cada institucion puede ajustar sus fechas exactas dentro del año lectivo.
- */
-const REGLAS_CALENDARIO: Record<Calendario, { inicio: [number, number]; inicioAnio: number; fin: [number, number]; finAnio: number }> = {
-  A: { inicio: [1, 2], inicioAnio: 2026, fin: [11, 12], finAnio: 2026 },
-  B: { inicio: [8, 9], inicioAnio: 2026, fin: [6, 7], finAnio: 2027 },
-};
-
-const MESES = [
-  '',
-  'enero',
-  'febrero',
-  'marzo',
-  'abril',
-  'mayo',
-  'junio',
-  'julio',
-  'agosto',
-  'septiembre',
-  'octubre',
-  'noviembre',
-  'diciembre',
-];
-
-function mesAnio(fecha: string): { anio: number; mes: number } | null {
-  if (!fecha) return null;
-  const [anio, mes] = fecha.split('-').map(Number);
-  if (!anio || !mes) return null;
-  return { anio, mes };
-}
-
-function avisosCalendario(calendario: Calendario, periodos: Periodo[]): string[] {
-  if (periodos.length === 0) return [];
-  const regla = REGLAS_CALENDARIO[calendario];
-  const avisos: string[] = [];
-
-  const inicio = mesAnio(periodos[0].fecha_inicio);
-  if (inicio && (inicio.anio !== regla.inicioAnio || !regla.inicio.includes(inicio.mes))) {
-    avisos.push(
-      `Calendario ${calendario}: el periodo inicial suele empezar entre ${MESES[regla.inicio[0]]} y ${MESES[regla.inicio[1]]} de ${regla.inicioAnio}.`
-    );
-  }
-
-  const fin = mesAnio(periodos[periodos.length - 1].fecha_fin);
-  if (fin && (fin.anio !== regla.finAnio || !regla.fin.includes(fin.mes))) {
-    avisos.push(
-      `Calendario ${calendario}: el periodo final suele terminar entre ${MESES[regla.fin[0]]} y ${MESES[regla.fin[1]]} de ${regla.finAnio}.`
-    );
-  }
-
-  return avisos;
 }
 
 export function InstitutionSetupPage() {
@@ -139,6 +84,8 @@ function InstitutionOverview({ institution }: { institution: Institution }) {
     resolucion_aprobacion: institution.resolucion_aprobacion,
     estado: institution.estado,
     logo_url: institution.logo_url,
+    correo_secretaria: institution.correo_secretaria ?? '',
+    horario_atencion: institution.horario_atencion ?? '',
     confirm_password: '',
   });
 
@@ -152,6 +99,8 @@ function InstitutionOverview({ institution }: { institution: Institution }) {
       resolucion_aprobacion: institution.resolucion_aprobacion,
       estado: institution.estado,
       logo_url: institution.logo_url,
+      correo_secretaria: institution.correo_secretaria ?? '',
+      horario_atencion: institution.horario_atencion ?? '',
       confirm_password: '',
     });
     setDrawerOpen(true);
@@ -215,6 +164,8 @@ function InstitutionOverview({ institution }: { institution: Institution }) {
             <StaticField label="Código DANE" value={institution.codigo_dane} />
             <StaticField label="NIT" value={institution.nit} />
             <StaticField label="Resolución de aprobación" value={institution.resolucion_aprobacion} />
+            <StaticField label="Correo de secretaría" value={institution.correo_secretaria || '—'} />
+            <StaticField label="Horario de atención" value={institution.horario_atencion || '—'} />
           </div>
         </Card>
 
@@ -294,6 +245,20 @@ function InstitutionOverview({ institution }: { institution: Institution }) {
           <option value="inactivo">Inactiva</option>
         </Select>
 
+        <Input
+          label="Correo de secretaría académica (opcional)"
+          type="email"
+          value={form.correo_secretaria}
+          onChange={(e) => setForm((f) => ({ ...f, correo_secretaria: e.target.value }))}
+          hint="Se muestra en el pie de página del sitio público."
+        />
+        <Input
+          label="Horario de atención en ventanilla (opcional)"
+          value={form.horario_atencion}
+          onChange={(e) => setForm((f) => ({ ...f, horario_atencion: e.target.value }))}
+          hint='Ej. "Lunes a viernes, 7:00 a.m. – 3:00 p.m."'
+        />
+
         <div>
           {form.logo_url && (
             <div className="mb-2 flex items-center gap-3">
@@ -342,7 +307,7 @@ function InstitutionWizard() {
 
   const totalPorcentaje = periodos.reduce((sum, p) => sum + (Number(p.porcentaje) || 0), 0);
   const porcentajeOk = totalPorcentaje === 100;
-  const avisos = avisosCalendario(calendario, periodos);
+  const avisos = avisosCalendario(calendario, year, periodos);
 
   function updatePeriodo(index: number, patch: Partial<Periodo>) {
     setPeriodos((prev) => prev.map((p, i) => (i === index ? { ...p, ...patch } : p)));

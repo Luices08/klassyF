@@ -16,7 +16,7 @@ export function DashboardPage() {
   const { user } = useAuth();
   if (!user) return null;
 
-  const links = NAV_ITEMS.filter((item) => item.to !== '/' && (!item.roles || item.roles.includes(user.rol)));
+  const links = NAV_ITEMS.filter((item) => item.to !== '/panel' && (!item.roles || item.roles.includes(user.rol)));
 
   return (
     <div className="space-y-4">

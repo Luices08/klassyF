@@ -1,4 +1,5 @@
 import { Types } from 'mongoose';
+import { ESTADOS_MATRICULA_ACTIVOS } from '../constants/enums';
 import { ROLES } from '../constants/roles';
 import { SIEE_WEIGHTS, DesempenoCualitativo } from '../constants/siee';
 import AcademicYear from '../models/academicYear.model';
@@ -12,7 +13,8 @@ import Group from '../models/group.model';
 import { JornadaOperativaDocument } from '../models/jornadaOperativa.model';
 import StudyPlanAssignment from '../models/studyPlanAssignment.model';
 import { SubjectDocument } from '../models/subject.model';
-import StudentProfile from '../models/studentProfile.model';
+import Guardian from '../models/guardian.model';
+import StudentGuardian from '../models/studentGuardian.model';
 import TeacherAssignment from '../models/teacherAssignment.model';
 import User, { UserDocument } from '../models/user.model';
 import ApiError from '../utils/ApiError';
@@ -83,8 +85,13 @@ async function assertCanViewReportCard(student: UserDocument, requestingUser: Us
   }
 
   if (requestingUser.rol === ROLES.ACUDIENTE) {
-    const profile = await StudentProfile.findOne({ user_id: student._id, acudiente_id: requestingUser._id });
-    if (!profile) {
+    // El acudiente (M03) es una entidad propia (Guardian), no un User: se
+    // ubica por el user_id que se le habilito para el portal y se verifica el
+    // vinculo N:M con el estudiante en StudentGuardian.
+    const guardian = await Guardian.findOne({ user_id: requestingUser._id });
+    const vinculo =
+      guardian && (await StudentGuardian.findOne({ student_id: student._id, guardian_id: guardian._id }));
+    if (!vinculo) {
       throw new ApiError(403, 'Solo puede consultar el boletín de estudiantes a su cargo.');
     }
     return;
@@ -137,7 +144,7 @@ export async function generateReportCard(
   const enrollment = await Enrollment.findOne({
     student_id: student._id,
     academic_year_id: academicYear._id,
-    estado: 'MATRICULADO',
+    estado: { $in: ESTADOS_MATRICULA_ACTIVOS },
   });
   if (!enrollment) throw new ApiError(404, 'El estudiante no tiene una matricula activa en ese año lectivo.');
 
@@ -155,7 +162,7 @@ export async function generateReportCard(
   const groupEnrollments = await Enrollment.find({
     group_id: group._id,
     academic_year_id: academicYear._id,
-    estado: 'MATRICULADO',
+    estado: { $in: ESTADOS_MATRICULA_ACTIVOS },
   });
   const studentIds = groupEnrollments.map((e) => String(e.student_id));
   if (!studentIds.includes(String(student._id))) studentIds.push(String(student._id));

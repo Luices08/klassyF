@@ -1,0 +1,208 @@
+import { PipelineStage } from 'mongoose';
+import { EstadoEstudiante, GENEROS, GRUPOS_ETNICOS, GRUPOS_SANGUINEOS, PARENTESCOS, REGIMENES_SALUD, TIPOS_DOCUMENTO } from '../constants/enums';
+import { ROLES } from '../constants/roles';
+import Enrollment from '../models/enrollment.model';
+import Guardian from '../models/guardian.model';
+import StudentGuardian from '../models/studentGuardian.model';
+import StudentProfile from '../models/studentProfile.model';
+import User from '../models/user.model';
+import ApiError from '../utils/ApiError';
+import { csvARegistros, parseCsv } from '../utils/csv';
+import { generarPasswordTemporal } from '../utils/generarPasswordTemporal';
+
+export interface ListarEstudiantesFilter {
+  search?: string;
+  estado?: EstadoEstudiante;
+  eps?: string;
+  discapacidad?: boolean;
+  page?: number;
+  limit?: number;
+}
+
+function escapeRegex(texto: string): string {
+  return texto.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+export async function listarEstudiantes(filter: ListarEstudiantesFilter) {
+  const page = Math.max(1, filter.page ?? 1);
+  const limit = Math.min(100, Math.max(1, filter.limit ?? 20));
+
+  const matchUser: Record<string, unknown> = { rol: ROLES.ESTUDIANTE };
+  if (filter.search) {
+    const regex = new RegExp(escapeRegex(filter.search), 'i');
+    matchUser.$or = [{ nombre: regex }, { apellido: regex }, { numero_documento: regex }, { email: regex }];
+  }
+
+  const pipeline: PipelineStage[] = [
+    { $match: matchUser },
+    // No usar aggregate() salta el select:false/toJSON del schema: se excluyen
+    // aqui a mano los campos sensibles para que nunca lleguen al resultado.
+    { $project: { password_hash: 0, version_sesion: 0, __v: 0 } },
+    {
+      $lookup: { from: 'studentprofiles', localField: '_id', foreignField: 'user_id', as: 'perfil' },
+    },
+    { $unwind: { path: '$perfil', preserveNullAndEmptyArrays: true } },
+  ];
+
+  const matchPerfil: Record<string, unknown> = {};
+  if (filter.estado) matchPerfil['perfil.estado'] = filter.estado;
+  if (filter.eps) matchPerfil['perfil.eps'] = new RegExp(escapeRegex(filter.eps), 'i');
+  if (filter.discapacidad !== undefined) matchPerfil['perfil.tiene_discapacidad'] = filter.discapacidad;
+  if (Object.keys(matchPerfil).length > 0) pipeline.push({ $match: matchPerfil });
+
+  pipeline.push(
+    { $sort: { apellido: 1, nombre: 1 } },
+    {
+      $facet: {
+        data: [{ $skip: (page - 1) * limit }, { $limit: limit }],
+        totalCount: [{ $count: 'count' }],
+      },
+    }
+  );
+
+  const [resultado] = await User.aggregate(pipeline);
+  const data: Array<Record<string, unknown>> = resultado?.data ?? [];
+  const total: number = resultado?.totalCount?.[0]?.count ?? 0;
+
+  const ids = data.map((d) => d._id);
+  const principales = await StudentGuardian.find({ student_id: { $in: ids }, es_principal: true }).populate(
+    'guardian_id',
+    'nombre apellido telefono_principal email'
+  );
+  const principalPorEstudiante = new Map(principales.map((p) => [String(p.student_id), p.guardian_id]));
+
+  const items = data.map((d) => ({
+    ...d,
+    acudiente_principal: principalPorEstudiante.get(String(d._id)) ?? null,
+  }));
+
+  return { data: items, total, page, pages: Math.max(1, Math.ceil(total / limit)) };
+}
+
+export async function obtenerFicha360(studentId: string) {
+  const estudiante = await User.findOne({ _id: studentId, rol: ROLES.ESTUDIANTE });
+  if (!estudiante) throw new ApiError(404, 'El usuario no existe o no tiene rol ESTUDIANTE.');
+
+  const [perfil, acudientes, matriculas] = await Promise.all([
+    StudentProfile.findOne({ user_id: studentId }),
+    StudentGuardian.find({ student_id: studentId }).populate('guardian_id').sort({ es_principal: -1 }),
+    Enrollment.find({ student_id: studentId })
+      .populate('group_id', 'nomenclatura grade_id sede_id')
+      .populate('academic_year_id', 'year calendario')
+      .sort({ fecha_matricula: -1 }),
+  ]);
+
+  return { estudiante, perfil, acudientes, matriculas };
+}
+
+interface FilaImportacionError {
+  fila: number;
+  numero_documento?: string;
+  motivo: string;
+}
+
+function esVerdadero(valor: string): boolean {
+  return ['si', 'sí', 'true', '1', 'x'].includes(valor.trim().toLowerCase());
+}
+
+/**
+ * Carga masiva (M03): CSV con encabezado
+ * tipo_documento,numero_documento,nombre,apellido,email,fecha_nacimiento,genero,rh,eps,
+ * regimen_salud,estrato,direccion_residencia,barrio_vereda,municipio,grupo_etnico,
+ * victima_conflicto,tiene_discapacidad,tiene_talento_excepcional,institucion_procedencia,
+ * acudiente_tipo_documento,acudiente_numero_documento,acudiente_nombre,acudiente_apellido,
+ * acudiente_telefono,acudiente_parentesco
+ */
+export async function importarEstudiantesCsv(buffer: Buffer) {
+  const registros = csvARegistros(parseCsv(buffer.toString('utf-8')));
+  if (registros.length === 0) throw new ApiError(400, 'El archivo no tiene filas de datos.');
+
+  const errores: FilaImportacionError[] = [];
+  let creados = 0;
+
+  for (let i = 0; i < registros.length; i++) {
+    const fila = i + 2;
+    const r = registros[i]!;
+    const numeroDocumento = r.numero_documento;
+
+    try {
+      if (!r.tipo_documento || !numeroDocumento || !r.nombre || !r.apellido || !r.email || !r.fecha_nacimiento) {
+        throw new ApiError(
+          400,
+          'Faltan columnas obligatorias (tipo_documento, numero_documento, nombre, apellido, email, fecha_nacimiento).'
+        );
+      }
+      if (!(TIPOS_DOCUMENTO as readonly string[]).includes(r.tipo_documento)) {
+        throw new ApiError(400, `tipo_documento "${r.tipo_documento}" no es valido.`);
+      }
+
+      const student = new User({
+        nombre: r.nombre,
+        apellido: r.apellido,
+        tipo_documento: r.tipo_documento,
+        numero_documento: numeroDocumento,
+        email: r.email,
+        rol: ROLES.ESTUDIANTE,
+        debe_cambiar_password: true,
+      });
+      student.password = generarPasswordTemporal();
+      await student.save();
+
+      await StudentProfile.create({
+        user_id: student._id,
+        fecha_nacimiento: new Date(r.fecha_nacimiento),
+        genero: (GENEROS as readonly string[]).includes(r.genero ?? '') ? r.genero : undefined,
+        rh: (GRUPOS_SANGUINEOS as readonly string[]).includes(r.rh ?? '') ? r.rh : undefined,
+        eps: r.eps || undefined,
+        regimen_salud: (REGIMENES_SALUD as readonly string[]).includes(r.regimen_salud ?? '')
+          ? r.regimen_salud
+          : undefined,
+        estrato: r.estrato ? Number(r.estrato) : undefined,
+        direccion_residencia: r.direccion_residencia || undefined,
+        barrio_vereda: r.barrio_vereda || undefined,
+        municipio: r.municipio || undefined,
+        grupo_etnico: (GRUPOS_ETNICOS as readonly string[]).includes(r.grupo_etnico ?? '') ? r.grupo_etnico : undefined,
+        victima_conflicto: r.victima_conflicto ? esVerdadero(r.victima_conflicto) : undefined,
+        tiene_discapacidad: r.tiene_discapacidad ? esVerdadero(r.tiene_discapacidad) : undefined,
+        tiene_talento_excepcional: r.tiene_talento_excepcional ? esVerdadero(r.tiene_talento_excepcional) : undefined,
+        institucion_procedencia: r.institucion_procedencia || undefined,
+      });
+
+      if (r.acudiente_numero_documento && r.acudiente_nombre && r.acudiente_apellido && r.acudiente_telefono) {
+        if (!(PARENTESCOS as readonly string[]).includes(r.acudiente_parentesco ?? '')) {
+          throw new ApiError(400, `acudiente_parentesco "${r.acudiente_parentesco}" no es valido.`);
+        }
+        let guardian = await Guardian.findOne({ numero_documento: r.acudiente_numero_documento });
+        if (!guardian) {
+          guardian = await Guardian.create({
+            tipo_documento: (TIPOS_DOCUMENTO as readonly string[]).includes(r.acudiente_tipo_documento ?? '')
+              ? r.acudiente_tipo_documento
+              : 'CC',
+            numero_documento: r.acudiente_numero_documento,
+            nombre: r.acudiente_nombre,
+            apellido: r.acudiente_apellido,
+            telefono_principal: r.acudiente_telefono,
+          });
+        }
+        await StudentGuardian.create({
+          student_id: student._id,
+          guardian_id: guardian._id,
+          parentesco: r.acudiente_parentesco,
+          es_principal: true,
+        });
+      }
+
+      creados += 1;
+    } catch (err) {
+      const motivo =
+        err instanceof ApiError
+          ? err.message
+          : (err as { code?: number }).code === 11000
+            ? 'El numero de documento o el correo ya estan registrados.'
+            : 'No se pudo crear el estudiante.';
+      errores.push({ fila, numero_documento: numeroDocumento, motivo });
+    }
+  }
+
+  return { total_filas: registros.length, creados, fallidos: errores.length, errores };
+}

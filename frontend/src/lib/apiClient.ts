@@ -81,6 +81,75 @@ async function request<TEnvelope extends ApiEnvelopeBase>(
 }
 
 /**
+ * Como `request`, pero para `multipart/form-data` (carga de archivos): no
+ * serializa el body a JSON ni fuerza el Content-Type (el navegador pone el
+ * boundary correcto al mandar un FormData).
+ */
+async function uploadRequest<TEnvelope extends ApiEnvelopeBase>(path: string, formData: FormData): Promise<TEnvelope> {
+  const token = getStoredToken();
+
+  const res = await fetch(buildUrl(path), {
+    method: 'POST',
+    headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+    body: formData,
+  });
+
+  let json: TEnvelope | ApiFailure | undefined;
+  try {
+    json = await res.json();
+  } catch {
+    // respuesta sin cuerpo
+  }
+
+  if (!res.ok || !json || json.success !== true) {
+    const message = json && 'message' in json ? json.message : `Error ${res.status}`;
+    if (res.status === 401) {
+      window.dispatchEvent(new Event(UNAUTHORIZED_EVENT));
+    }
+    throw new ApiError(res.status, message, json && 'details' in json ? json.details : undefined);
+  }
+
+  return json;
+}
+
+/**
+ * Descarga un archivo binario (PDF, imagen) de una ruta autenticada y
+ * devuelve un blob URL listo para <a href>/<img src> o window.open. A
+ * diferencia de `request`, nunca intenta parsear la respuesta como JSON.
+ * Con `method: 'POST'` envía las credenciales en el cuerpo, no en la URL (sitio público).
+ */
+async function downloadBlob(
+  path: string,
+  options: { method?: 'GET' | 'POST'; body?: unknown } = {}
+): Promise<{ url: string; blob: Blob }> {
+  const token = getStoredToken();
+
+  const res = await fetch(buildUrl(path), {
+    method: options.method ?? 'GET',
+    headers: {
+      ...(options.body !== undefined ? { 'Content-Type': 'application/json' } : {}),
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    body: options.body !== undefined ? JSON.stringify(options.body) : undefined,
+  });
+
+  if (!res.ok) {
+    if (res.status === 401) window.dispatchEvent(new Event(UNAUTHORIZED_EVENT));
+    let message = `Error ${res.status}`;
+    try {
+      const json = (await res.json()) as ApiFailure;
+      if (json?.message) message = json.message;
+    } catch {
+      // respuesta binaria de error sin cuerpo JSON (poco comun)
+    }
+    throw new ApiError(res.status, message);
+  }
+
+  const blob = await res.blob();
+  return { url: URL.createObjectURL(blob), blob };
+}
+
+/**
  * Helpers "data-only": la forma mas comun (GET lista/detalle, POST/PATCH que
  * devuelven `data`). Usa `request` directamente para endpoints con forma
  * distinta (ej. /auth/login, que trae `token` y `user` junto a `data`).
@@ -106,5 +175,10 @@ export const api = {
     const res = await request<ApiSuccess<T>>(path, { method: 'DELETE' });
     return res.data;
   },
+  upload: async <T>(path: string, formData: FormData): Promise<T> => {
+    const res = await uploadRequest<ApiSuccess<T>>(path, formData);
+    return res.data;
+  },
+  downloadBlob,
   raw: request,
 };

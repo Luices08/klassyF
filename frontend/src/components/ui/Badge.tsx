@@ -1,6 +1,16 @@
 import type { ReactNode } from 'react';
 import type { Rol } from '../../types/api';
-import type { EstadoActivo, EstadoGrupo, EstadoMatricula } from '../../types/domain';
+import type {
+  EstadoActivo,
+  EstadoAnioLectivo,
+  EstadoDocumentoMatricula,
+  EstadoEspacio,
+  EstadoEstudiante,
+  EstadoGrupo,
+  EstadoMatricula,
+  EstadoPeriodoAcademico,
+} from '../../types/domain';
+import { NOMBRES_ESTADO_ESPACIO } from '../../types/domain';
 import type { Desempeno } from '../../types/reportCard';
 
 export type Tone = 'blue' | 'green' | 'orange' | 'red' | 'neutral';
@@ -16,7 +26,7 @@ const TONE_CLASSES: Record<Tone, string> = {
 /** Pildora con fondo claro y texto en el tono oscuro de su misma familia (Klassy UI Spec). */
 export function Chip({ children, tone = 'neutral' }: { children: ReactNode; tone?: Tone }) {
   return (
-    <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold ${TONE_CLASSES[tone]}`}>
+    <span className={`inline-flex items-center whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-semibold ${TONE_CLASSES[tone]}`}>
       {children}
     </span>
   );
@@ -36,7 +46,7 @@ export function DesempenoBadge({ value }: { value: Desempeno }) {
   return <Chip tone={DESEMPENO_TONE[value]}>{value}</Chip>;
 }
 
-const ROL_LABELS: Record<Rol, string> = {
+export const ROL_LABELS: Record<Rol, string> = {
   ADMIN: 'Administrador',
   COORDINADOR: 'Coordinador',
   DOCENTE: 'Docente',
@@ -71,20 +81,60 @@ export function EstadoGrupoBadge({ value }: { value: EstadoGrupo }) {
 
 const MATRICULA_LABELS: Record<EstadoMatricula, string> = {
   PREINSCRITO: 'Preinscrito',
-  MATRICULADO: 'Matriculado',
+  MATRICULADO_CONDICIONAL: 'Matriculado (condicional)',
+  MATRICULADO_DEFINITIVO: 'Matriculado (definitivo)',
   RETIRADO: 'Retirado',
-  TRASLADADO: 'Trasladado',
+  ANULADO: 'Anulado',
 };
 
 const MATRICULA_TONE: Record<EstadoMatricula, Tone> = {
   PREINSCRITO: 'neutral',
-  MATRICULADO: 'green',
+  MATRICULADO_CONDICIONAL: 'orange',
+  MATRICULADO_DEFINITIVO: 'green',
   RETIRADO: 'red',
-  TRASLADADO: 'orange',
+  ANULADO: 'red',
 };
 
 export function EstadoMatriculaBadge({ value }: { value: EstadoMatricula }) {
   return <Chip tone={MATRICULA_TONE[value]}>{MATRICULA_LABELS[value]}</Chip>;
+}
+
+const ESTUDIANTE_LABELS: Record<EstadoEstudiante, string> = {
+  ACTIVO: 'Activo',
+  INACTIVO: 'Inactivo',
+  RETIRADO: 'Retirado',
+  GRADUADO: 'Graduado',
+};
+
+const ESTUDIANTE_TONE: Record<EstadoEstudiante, Tone> = {
+  ACTIVO: 'green',
+  INACTIVO: 'neutral',
+  RETIRADO: 'red',
+  GRADUADO: 'blue',
+};
+
+/** Estado del expediente (M03): distinto del activo/inactivo generico de la cuenta de acceso. */
+export function EstadoEstudianteBadge({ value }: { value: EstadoEstudiante }) {
+  return <Chip tone={ESTUDIANTE_TONE[value]}>{ESTUDIANTE_LABELS[value]}</Chip>;
+}
+
+const DOCUMENTO_LABELS: Record<EstadoDocumentoMatricula, string> = {
+  PENDIENTE: 'Pendiente',
+  CARGADO: 'Cargado',
+  APROBADO: 'Aprobado',
+  RECHAZADO: 'Rechazado',
+};
+
+const DOCUMENTO_TONE: Record<EstadoDocumentoMatricula, Tone> = {
+  PENDIENTE: 'neutral',
+  CARGADO: 'blue',
+  APROBADO: 'green',
+  RECHAZADO: 'red',
+};
+
+/** Estado de un item del checklist documental de una matricula (M04). */
+export function EstadoDocumentoBadge({ value }: { value: EstadoDocumentoMatricula }) {
+  return <Chip tone={DOCUMENTO_TONE[value]}>{DOCUMENTO_LABELS[value]}</Chip>;
 }
 
 /** Cupos de un grupo: rojo si esta lleno, naranja si casi lleno (>=80%), verde en el resto. */
@@ -92,4 +142,51 @@ export function CupoBadge({ ocupados, max }: { ocupados: number; max: number }) 
   const ratio = max > 0 ? ocupados / max : 0;
   const tone: Tone = ratio >= 1 ? 'red' : ratio >= 0.8 ? 'orange' : 'green';
   return <Chip tone={tone}>{`${ocupados} / ${max}`}</Chip>;
+}
+
+const ANIO_LABELS: Record<EstadoAnioLectivo, string> = {
+  PLANIFICACION: 'Planificación',
+  EN_CURSO: 'Vigente',
+  CERRADO: 'Cerrado',
+};
+
+const ANIO_TONE: Record<EstadoAnioLectivo, Tone> = {
+  PLANIFICACION: 'neutral',
+  EN_CURSO: 'green',
+  CERRADO: 'red',
+};
+
+/** Estado de la vigencia (M05): solo una puede estar Vigente; las cerradas son historico de solo lectura. */
+export function EstadoAnioLectivoBadge({ value }: { value: EstadoAnioLectivo }) {
+  return <Chip tone={ANIO_TONE[value]}>{ANIO_LABELS[value]}</Chip>;
+}
+
+const PERIODO_LABELS: Record<EstadoPeriodoAcademico, string> = {
+  PROGRAMADO: 'Programado',
+  ABIERTO: 'En curso',
+  EN_DIGITACION: 'En digitación',
+  CERRADO: 'Cerrado',
+};
+
+const PERIODO_TONE: Record<EstadoPeriodoAcademico, Tone> = {
+  PROGRAMADO: 'neutral',
+  ABIERTO: 'green',
+  EN_DIGITACION: 'orange',
+  CERRADO: 'red',
+};
+
+/** Semaforo del periodo academico (M05): programado, en curso, en digitacion, cerrado. */
+export function EstadoPeriodoBadge({ value }: { value: EstadoPeriodoAcademico }) {
+  return <Chip tone={PERIODO_TONE[value]}>{PERIODO_LABELS[value]}</Chip>;
+}
+
+const ESPACIO_TONE: Record<EstadoEspacio, Tone> = {
+  DISPONIBLE: 'green',
+  EN_MANTENIMIENTO: 'orange',
+  INACTIVO: 'red',
+};
+
+/** Estado operativo de un espacio físico (M10): solo los disponibles se pueden asignar. */
+export function EstadoEspacioBadge({ value }: { value: EstadoEspacio }) {
+  return <Chip tone={ESPACIO_TONE[value]}>{NOMBRES_ESTADO_ESPACIO[value]}</Chip>;
 }

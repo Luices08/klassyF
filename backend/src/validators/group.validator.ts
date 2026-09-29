@@ -12,6 +12,7 @@ export const createGroup: ValidationSchema = {
     nomenclatura: Joi.string().required(),
     max_capacity: Joi.number().integer().min(1).required(),
     director_grupo_id: objectId.allow(null),
+    aula_id: objectId.allow(null),
   }),
 };
 

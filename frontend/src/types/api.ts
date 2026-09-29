@@ -31,6 +31,27 @@ export class ApiError extends Error {
 export const ROLES = ['ADMIN', 'COORDINADOR', 'DOCENTE', 'SECRETARIA', 'ESTUDIANTE', 'ACUDIENTE'] as const;
 export type Rol = (typeof ROLES)[number];
 
+/**
+ * Jerarquía institucional de roles (M02).
+ * Nivel numérico mayor = mayor rango jerárquico.
+ * Un usuario solo puede gestionar (crear, editar, cambiar estado,
+ * resetear clave, cerrar sesiones, eliminar) a usuarios de rango estrictamente menor,
+ * con la excepción de que un ADMIN puede gestionar a otros ADMIN (salvo a sí mismo).
+ */
+export const JERARQUIA_ROLES: Record<Rol, number> = {
+  ADMIN: 100,
+  COORDINADOR: 70,
+  SECRETARIA: 40,
+  DOCENTE: 40,
+  ESTUDIANTE: 10,
+  ACUDIENTE: 10,
+};
+
+export function puedeGestionarRol(operadorRol: Rol, objetivoRol: Rol): boolean {
+  if (operadorRol === 'ADMIN') return true;
+  return (JERARQUIA_ROLES[operadorRol] ?? 0) > (JERARQUIA_ROLES[objetivoRol] ?? 0);
+}
+
 export interface AuthUser {
   id: string;
   nombre: string;
@@ -39,6 +60,7 @@ export interface AuthUser {
   numero_documento: string;
   rol: Rol;
   estado?: 'activo' | 'inactivo';
+  debe_cambiar_password?: boolean;
 }
 
 export interface LoginResponse extends ApiEnvelopeBase {

@@ -19,3 +19,7 @@ npm-debug.log*
 .DS_Store
 *.swp
 .~lock.*#
+
+# Documentos de matricula subidos por secretaria (M04): datos personales
+# reales, nunca se versionan. Se respaldan aparte del repositorio.
+backend/uploads/

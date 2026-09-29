@@ -1,5 +1,5 @@
 import bcrypt from 'bcryptjs';
-import { HydratedDocument, Model, Schema, model } from 'mongoose';
+import { HydratedDocument, Model, Schema, Types, model } from 'mongoose';
 import { ESTADOS_USUARIO, EstadoUsuario, ROLES, Rol, TIPOS_DOCUMENTO, TipoDocumento } from '../constants/enums';
 
 const SALT_ROUNDS = 12;
@@ -10,9 +10,20 @@ export interface IUser {
   tipo_documento: TipoDocumento;
   numero_documento: string;
   email: string;
+  telefono: string | null;
+  foto_url: string | null;
   password_hash: string;
   rol: Rol;
   estado: EstadoUsuario;
+  /** Sedes autorizadas (M02): vacio = acceso global (uso tipico de ADMIN). */
+  sedes_ids: Types.ObjectId[];
+  /** Fuerza el cambio de contraseña en el proximo login (alta por admin o reseteo). */
+  debe_cambiar_password: boolean;
+  intentos_fallidos: number;
+  bloqueado_hasta: Date | null;
+  ultimo_login: Date | null;
+  /** Se incrementa para invalidar los JWT ya emitidos (suspension, reseteo, cierre forzado). */
+  version_sesion: number;
   createdAt: Date;
   updatedAt: Date;
   /** Virtual de escritura (no persistido): password en texto plano, hasheado en pre('validate'). */
@@ -42,9 +53,19 @@ const userSchema = new Schema<IUser, UserModel, IUserMethods>(
       lowercase: true,
       match: [/^[^\s@]+@[^\s@]+\.[^\s@]+$/, 'El email no tiene un formato valido.'],
     },
+    telefono: { type: String, default: null, trim: true },
+    foto_url: { type: String, default: null },
     password_hash: { type: String, required: true, select: false },
     rol: { type: String, enum: ROLES, required: true },
     estado: { type: String, enum: ESTADOS_USUARIO, default: 'activo' },
+    sedes_ids: { type: [{ type: Schema.Types.ObjectId, ref: 'Campus' }], default: [] },
+    debe_cambiar_password: { type: Boolean, default: false },
+    intentos_fallidos: { type: Number, default: 0 },
+    bloqueado_hasta: { type: Date, default: null },
+    ultimo_login: { type: Date, default: null },
+    // Sin select:false: se necesita en la mayoria de cargas para comparar contra
+    // el JWT (auth.middleware); se oculta de las respuestas en el toJSON de abajo.
+    version_sesion: { type: Number, default: 0 },
   },
   { timestamps: true }
 );
@@ -80,6 +101,7 @@ userSchema.set('toJSON', {
   transform: (_doc, ret) => {
     const obj = ret as unknown as Record<string, unknown>;
     delete obj.password_hash;
+    delete obj.version_sesion;
     delete obj.__v;
     return obj;
   },

@@ -26,6 +26,8 @@ export interface CreateGroupInput {
   jornada_id: string;
   nomenclatura: string;
   max_capacity: number;
+  /** Salón titular (M10), opcional. */
+  aula_id?: string | null;
 }
 
 export function useCreateGroup() {
@@ -34,6 +36,8 @@ export function useCreateGroup() {
     mutationFn: (input: CreateGroupInput) => api.post<Group>('/groups', input),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['groups'] });
+      // Un grupo (des)ocupa su aula: el directorio de espacios muestra esa ocupación.
+      void queryClient.invalidateQueries({ queryKey: ['espacios'] });
     },
   });
 }
@@ -51,6 +55,8 @@ export function useActualizarEstadoGrupo() {
       api.patch<Group>(`/groups/${groupId}`, { estado }),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['groups'] });
+      // Un grupo (des)ocupa su aula: el directorio de espacios muestra esa ocupación.
+      void queryClient.invalidateQueries({ queryKey: ['espacios'] });
     },
   });
 }

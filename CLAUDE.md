@@ -82,6 +82,133 @@ Los 5 sub-módulos de M01 están implementados; no rehacer, solo extender si se 
    índice compuesto, `max_capacity`, `estado` ACTIVE/CLOSED). `GroupsPage` filtra por sede,
    jornada y grado.
 
+**Dos reglas transversales que salieron de bugs reales de M01:**
+
+- **"Activo" en una consulta es `ESTADO_ACTIVO`** (`utils/filtroEstado.ts`, `{ $ne: 'inactivo' }`), nunca `{ estado: 'activo' }`.
+  Los documentos creados antes de que existiera el campo `estado` no lo tienen guardado: Mongoose los lee como
+  'activo' (default del schema) pero ese filtro los excluye (el catálogo de grados mostraba 2 de 12). Datos viejos:
+  `npm run migrate:estado-por-defecto`.
+- **Ninguna pantalla depende de estado guardado en el navegador** (se eliminó `InstitutionConfigContext`, que solo se
+  llenaba al correr el asistente en ese navegador y dejaba "Grupos"/"Matrículas" inutilizables en cualquier otro).
+  La institución sale de `useInstitution()` y el año de trabajo de `useAnioDeTrabajo()` (vigencia activa, o el más
+  reciente sin cerrar); un ID no se pide ni se pega a mano.
+
+### M02 (Usuarios) — Jerarquía institucional de gestión
+
+Backend `/users` (modelo `User`), frontend `/admin/users` (`UsersPage`).
+- **Matriz de permisos y jerarquía estricta** (`backend/src/constants/roles.ts`, `frontend/src/types/api.ts`):
+  `ADMIN (100) > COORDINADOR (70) > SECRETARIA (40) = DOCENTE (40) > ESTUDIANTE (10) = ACUDIENTE (10)`.
+  Un usuario solo puede crear, editar, cambiar estado, resetear contraseña, cerrar sesiones o eliminar a
+  usuarios de rango estrictamente MENOR (con la excepción de que un ADMIN sí puede gestionar a otros ADMIN,
+  salvo a sí mismo).
+- **Secretaría en M02**: mantiene la consulta global del directorio de usuarios, pero todas las acciones sobre
+  roles jerárquicamente iguales o superiores (`ADMIN`, `COORDINADOR`, `DOCENTE`, `SECRETARIA`) quedan bloqueadas
+  tanto en frontend (`IconButton disabled` con tooltip explicativo) como en backend (403 con mensaje de
+  jerarquía). Solo puede gestionar o crear usuarios con roles de soporte escolar (`ESTUDIANTE` y `ACUDIENTE`).
+
+### M05 (Año lectivo y periodos) — estado: completo
+
+Backend `/academic-years` (modelo `AcademicYear` + `PeriodoProrroga`), frontend `/anio-lectivo`
+(`AnioLectivoPage`, visible para todos los roles: los controles de gestión dependen del rol). No rehacer,
+solo extender si se pide algo nuevo. Reglas que no se ven leyendo un solo archivo:
+
+- **Estados del año**: `PLANIFICACION` → `EN_CURSO` (la vigencia activa, única por institución: lo garantiza
+  un índice único parcial además del chequeo del servicio) → `CERRADO` (histórico de solo lectura, no se
+  reactiva). Crear un año nuevo puede copiar los grupos ACTIVOS del anterior (grupos nuevos, sin matrículas).
+- **Semáforo del periodo**: `PROGRAMADO` → `ABIERTO` → `EN_DIGITACION` → `CERRADO` (tabla
+  `TRANSICIONES_PERIODO` en `constants/anioLectivo.ts`); reabrir uno CERRADO solo lo hace ADMIN y con motivo.
+  `ESTADOS_PERIODO` (ABIERTO/CERRADO) es otra cosa: el cierre de un periodo *para un grupo* (`PeriodLock`).
+- **Permisos**: ADMIN crea/edita/activa/cierra el año y edita eventos y calendarios por sede; ADMIN y
+  COORDINADOR cambian el estado de los periodos y otorgan/revocan prórrogas; el resto de roles solo consulta.
+- **`assertPeriodNotLocked(año, grupo, periodo, docenteId)` es el único punto que decide si se pueden digitar
+  notas**: año EN_CURSO, periodo ABIERTO/EN_DIGITACION y dentro de su ventana (la de la sede del grupo si esta
+  tiene calendario propio), o una prórroga vigente para ese docente/grupo; además el `PeriodLock` del grupo.
+  Todo módulo que mute notas debe pasar por ahí (hoy lo hace `gradeActivity`).
+- **Fechas**: las fechas de calendario se guardan a medianoche UTC. Para compararlas con "ahora" se usa
+  `inicioDelDia`/`finDelDia` de `utils/calendarioAcademico.ts` (UTC-5, cierre inclusivo); en el frontend se
+  formatean con `lib/fechas.ts`, nunca con `toLocaleDateString()` (mostraría el día anterior).
+- `esDiaLectivo(dia, eventos)` es el contrato para que M13 (asistencia) no exija lista en recesos/vacaciones/
+  desarrollo institucional; las semanas lectivas (mínimo 40) se calculan con las mismas reglas.
+- **Cierre de vigencia en dos pasos**: `GET /:id/cierre` (verificación) y `POST /:id/cerrar` (contraseña del
+  ADMIN + escribir el año). Revoca las prórrogas pendientes. Todo cambio queda en auditoría (M31).
+- Años creados antes de M05: `npm run migrate:m05-anio-lectivo` (idempotente).
+- **Pendiente, a propósito fuera de alcance**: la verificación de cierre no revisa las comisiones de evaluación
+  (M20, aún no existe); M13 no consulta `esDiaLectivo` todavía; matrículas y admisiones no se bloquean en un
+  año cerrado (solo `POST /groups` lo valida); los festivos colombianos no se descuentan de las semanas.
+
+### Estructura de tiempo de las jornadas (M01/M05, la comparte M10 y la usará M09)
+
+- **Nunca hay días ni horas fijos en el código.** Cada `JornadaOperativa` guarda sus `dias_habiles` (ISO 1=lunes … 7=domingo;
+  por defecto L–V, y solo sábado para `SABATINA`, editable para tener sábado/domingo) y sus `franjas`: bloques reales de
+  `CLASE` y `DESCANSO` con hora de inicio y fin. Empiezan vacías: hasta que se definan, la malla de espacios muestra un aviso, no
+  una cuadrícula inventada. El modelo valida que estén dentro de la jornada, en orden y sin traslapes (`utils/franjas.ts`).
+- **Plantilla base**: `Institution.plantilla_franjas` (bloques por *duración*, sin hora fija, para que sirva a mañana y tarde). Se
+  edita en Configuración institucional (`PUT /institution/plantilla-franjas`, ADMIN) y se "carga" en una jornada
+  (`GET /shifts/:id/horario/plantilla` devuelve las franjas encadenadas desde su hora de inicio, sin guardar; el usuario las revisa y
+  guarda con `PATCH /shifts/:id/horario`, ADMIN o COORDINADOR). Si la plantilla no cabe en la jornada da 409, no recorta en silencio;
+  cambiar la plantilla no toca las jornadas ya configuradas. **M09 debe leer `JornadaOperativa.franjas`, no definir su propia estructura.**
+
+### M10 (Espacios físicos) — estado: núcleo completo
+
+Backend `/espacios` (modelo `Espacio`), frontend `/admin/espacios` (`EspaciosPage`, ADMIN y COORDINADOR; la lectura de
+`GET /espacios` está abierta a cualquier rol autenticado). Reglas que no se ven leyendo un solo archivo:
+
+- **Es opcional en dos niveles (adaptabilidad institucional).** (1) `Institution.modalidad` (`PRESENCIAL` por defecto, o
+  `VIRTUAL`) se configura al crear la institución y en Configuración institucional: en una institución virtual M10 se apaga
+  por completo (`exigirEspaciosFisicos()` rechaza con 409 crear espacios y asignar aula; se oculta "Espacios y aulas" del menú,
+  el selector y la columna de aula en Grupos; la política de aforo deja de mostrarse). Al pasar a virtual, los espacios ya
+  registrados se conservan. Los documentos sin el campo cuentan como PRESENCIAL. (2) En una institución presencial, `Group.aula_id`
+  sigue siendo nullable: una sede que no registra aulas crea grupos igual que antes. Nada de M01 exige M10.
+- **Regla M01 ↔ M10** (`validarAulaParaGrupo` en `espacio.service.ts`, llamada al crear y al reactivar un grupo): el salón
+  titular debe ser un `AULA_REGULAR` `DISPONIBLE` de la misma sede; no puede ser titular de otro grupo ACTIVO de la misma
+  jornada y año (salvo `admite_grupos_simultaneos`); y el cupo no debe pasar del aforo. Un aula sí puede servir a grupos de
+  jornadas distintas (mañana y tarde).
+- **Exceder el aforo es política de la institución, no código quemado**: `Institution.politica_aforo_aula` =
+  `BLOQUEAR` (por defecto: 409) o `ADVERTIR` (permite, y deja auditoría `GRUPO_EXCEDE_AFORO_AULA`). Se cambia en
+  Configuración institucional. El modal "Nuevo grupo" refleja la política (error + botón deshabilitado, o solo aviso).
+- Un espacio que fue salón titular de algún grupo no se elimina (se inhabilita: `EN_MANTENIMIENTO`/`INACTIVO`); la sede de un
+  espacio no se cambia. Reducir el aforo por debajo del cupo de un grupo asignado no se impide: el espacio y el grupo quedan
+  marcados con "sobrecupo".
+- `areas_exclusivas` y `recursos`/`computadores_operativos` se guardan y se editan, pero **aún no los consume nadie**: los
+  usará el motor de horarios (M09). La malla semanal se arma **por espacio y jornada** con los días y franjas reales de la jornada (ver
+  arriba) y solo muestra ocupación por grupo titular; la ocupación por asignatura llega con M09.
+
+### Cargas masivas por CSV (M02 usuarios, M03 estudiantes)
+
+- Todo CSV subido se lee con `leerCsv` (`backend/src/utils/csv.ts`), nunca con `toString('utf-8')` + parser a mano:
+  detecta el separador (coma o punto y coma, que es lo que guarda Excel en español), quita el BOM, cae a
+  Windows-1252 si el archivo no es UTF-8 (tildes y ñ), tolera la línea `sep=;` y normaliza los encabezados
+  (`Tipo Documento` = `tipo_documento`). Exige las columnas obligatorias una sola vez y con mensaje claro.
+- Las listas cerradas (tipo de documento, rol, género, RH, régimen, grupo étnico, parentesco) aceptan minúsculas pero un
+  valor fuera de la lista es **error de fila**, nunca se descarta en silencio. Las fechas van YYYY-MM-DD (también
+  DD/MM/AAAA, lo que Excel guarda). Toda la fila se valida antes de crear el usuario, y si algo falla después se
+  deshace (no quedan estudiantes sin perfil). Varias sedes en `sedes_codigos` se separan con `|`.
+- La guía de formato que ve el usuario es `GuiaColumnas` (colapsable) alimentada por `lib/columnasImportacion.ts`, que
+  toma los valores válidos de las mismas constantes de dominio: al agregar o cambiar una columna del importador,
+  se actualiza ahí en el mismo cambio.
+
+### Folio del Libro de Matrícula (M04)
+
+- **El folio se asigna al legalizar la matrícula, no al preinscribir**: `Enrollment.folio_matricula`,
+  `numero_libro` y `numero_folio` son `null` mientras la matrícula está `PREINSCRITO` (así un aspirante que
+  desiste no deja huecos en el consecutivo oficial). Se generan en `updateEnrollmentStatus` en la transición
+  `PREINSCRITO` → `MATRICULADO_CONDICIONAL|DEFINITIVO`, dentro de la misma transacción del cambio de estado
+  (rollback si algo falla). `createEnrollment` (matrícula directa, ya matriculada) lo asigna al crearla.
+- Reglas: la condicional exige `fecha_limite_compromiso`; una matrícula con folio no vuelve a `PREINSCRITO`;
+  retirar/anular una ya legalizada conserva su folio (es un asiento del libro). Invariante en el modelo: todo
+  `MATRICULADO_*` tiene folio. Los índices únicos de folio son parciales (ignoran `null`).
+- **Preinscripción pública (sitio sin login)**: cuando la solicitud está APROBADA, `GET /public/admission-requests/status`
+  devuelve `preinscripcion` (grado/grupo/sede/jornada asignados, `fecha_limite_legalizacion`, documentos con su estado
+  y motivo de rechazo). Comprobante en PDF: `POST /public/admission-requests/comprobante`; carga de documentos:
+  `POST /public/admission-requests/documentos/:tipo`. Sin sesión, todo se autoriza con documento del aspirante +
+  fecha de nacimiento (por eso `POST`: no van en la URL) y se valida el tipo real por firma de bytes. Un documento
+  APROBADO no se reemplaza; solo se sube mientras la matrícula es PREINSCRITO o MATRICULADO_CONDICIONAL. El plazo
+  (`Enrollment.fecha_limite_legalizacion`) lo fija secretaría al aprobar; por omisión `DIAS_PLAZO_LEGALIZACION` (15).
+  Es informativo: no se anula nada automáticamente al vencer.
+- Nunca asumir que `folio_matricula` es un string: en frontend y PDFs manejar `null`.
+- Bases anteriores a este cambio: `npm run migrate:folio-al-matricular` (libera folios de preinscritos, reemplaza
+  los índices y reajusta el contador; un hueco en medio del libro solo se reporta, no se renumera).
+
 ## 4. Principios SOLID
 
 - **S — Responsabilidad única**: un modelo valida su propia forma; un servicio orquesta una
@@ -127,8 +254,9 @@ Referencia completa: `doc/Klassy_UI_Spec_1.docx`. Resumen para uso diario:
   Cuerpo 15/22 Regular, Etiqueta 13/18 Medium.
 - **Botones**: usar las variantes ya definidas, no inventar nuevas — principal (azul sólido),
   outline de acción, búsqueda (azul sólido + icono), acción suave (editar, azul suave),
-  peligro suave (eliminar, rojo suave), éxito suave (reactivar, verde suave), secundario
-  (cancelar, blanco/gris). Botones de icono en tablas: círculo 32px, icono 16px.
+  peligro suave (eliminar, rojo suave + icono papelera), desactivar (gris neutro suave + icono círculo tachado),
+  éxito suave (reactivar, verde suave + icono refrescar), secundario (cancelar, blanco/gris).
+  Botones de icono en tablas: círculo 32px, icono 16px.
 - **Chips/estados**: píldora con fondo claro y texto en el tono oscuro de su misma familia.
 - **Tabla**: contenedor blanco con borde `#DDE4EC`, encabezado azul suave con texto en
   mayúsculas, acciones por fila con botones circulares.
@@ -152,16 +280,12 @@ nuevos para lo que ya existe aquí** — extenderlos si falta un caso, no duplic
   `secondary`, `soft-edit`, `soft-danger`, `soft-success`), `IconButton` (botón circular 32px
   para acciones de tabla, tonos `edit`/`danger`/`success`/`neutral`), `Chip` (píldora de
   estado/tono; alias `Badge` se mantiene por compatibilidad pero usar `Chip` en código nuevo),
-  `RolBadge`/`EstadoUsuarioBadge`/`EstadoGrupoBadge`/`EstadoMatriculaBadge`/`CupoBadge`/
-  `DesempenoBadge` (chips ya mapeados a la familia de color correcta — no reinventar el mapeo
-  rol→color o estado→color en una página), `Card`/`CardHeader`, `Table`/`TableHead`/`Th`/
+  `RolBadge`/`EstadoUsuarioBadge`/`EstadoGrupoBadge`/`EstadoMatriculaBadge`/`EstadoEstudianteBadge`/
+  `CupoBadge`/`DesempenoBadge`/`EstadoAnioLectivoBadge`/`EstadoPeriodoBadge` (M05) (chips ya mapeados a la familia de color correcta — no reinventar el
+  mapeo rol→color o estado→color en una página), `Card`/`CardHeader`, `Table`/`TableHead`/`Th`/
   `TableBody`/`Td`/`EmptyRow`, `Drawer` (formularios de creación/edición; su botón principal
   acepta `submitVariant` para casos como confirmar un borrado en rojo), `PageHeader` (título +
-  subtítulo + acción de la página), `Field` (`Input`/`Select`), `Alert`, `Spinner`, `Tabs`
-  (selector de pestañas simple, subrayado azul en la activa — agregado en M06 para las tres
-  secciones de Gestión de Planes de Estudio; reusar en vez de reinventar un switch de pestañas
-  en otra página), e iconos SVG propios en `components/ui/icons.tsx` (no se agregó ninguna
-  librería de iconos).
+  subtítulo + acción de la página), `Field` (`Input`/`Select`), `MultiSelect` (selector desplegable de selección múltiple con checkboxes, contador y badges de rol/estado), `Alert`, `Spinner`, `EstadoEspacioBadge` (M10), `GuiaColumnas` (guía colapsable de columnas de una carga CSV), `ProgressBar` (barra de avance con tono, ej. semanas lectivas vs. el mínimo de 40), `Tabs`/`TabPanel` (navegación por pestañas con subrayado azul en la activa; reusar en vez de reinventar un switch de pestañas en otra página), `Stepper` (indicador de pasos para formularios largos por secciones, ej. el asistente de creación de estudiante en M03), e iconos SVG propios en `components/ui/icons.tsx` (no se agregó ninguna librería de iconos).
 - **Contenedor global y densidad** (`components/layout/AppShell.tsx`): el `<main>` centra el
   contenido en `max-w-7xl` (no `max-w-5xl`) para que las tablas anchas (Usuarios, Grupos) no
   scrolleen antes de tiempo en pantallas grandes. Cada página usa `space-y-4` (no `space-y-6`)
@@ -170,6 +294,10 @@ nuevos para lo que ya existe aquí** — extenderlos si falta un caso, no duplic
   `space-y-6` en una pantalla nueva sin pedirlo explícitamente, y el padding interno de
   `Table`/`Th`/`Td` no se toca por esta regla de densidad (es un ajuste del contenedor, no de
   las tablas).
+- `Drawer` acepta `size="lg"` (opcional, por defecto `md`) para formularios de varias columnas, como la
+  parametrización del año lectivo. Los componentes propios de M05 viven en `components/anioLectivo/`
+  (`PeriodoCard`, drawers de año, cierre, prórroga, eventos y calendario por sede); las reglas de aviso de
+  calendario A/B están en `lib/calendarioColombia.ts` y el formato de fechas en `lib/fechas.ts`.
 - Todo módulo nuevo del frontend (M02 en adelante) debe construirse sobre estas mismas piezas.
 
 ### Regla dura para módulos futuros: reusar antes de crear
@@ -198,6 +326,40 @@ se rompa ni se desvíe en pantallas futuras:
   varios pasos) se construye como componente nuevo en `components/ui/`, no inline dentro de la
   página del módulo — y se agrega a esta lista antes de dar la tarea por terminada, para que la
   siguiente sesión lo encuentre aquí en vez de reconstruirlo.
+
+## 7. Manejo de datos en frontend: TanStack Query (v5)
+
+Todo el frontend ya migró su fetching de datos de servidor a `@tanstack/react-query` v5
+(`QueryClientProvider` en `main.tsx`, cliente configurado en `lib/queryClient.ts`). Todo módulo
+nuevo (M02 en adelante) — incluyendo notificaciones, actividades y entregas de docentes/
+estudiantes — se construye sobre este mismo patrón, nunca con `useEffect` + `useState` manual:
+
+- **Un hook por dominio, no por página**: la lógica de datos vive en `frontend/src/hooks/use<Dominio>.ts`
+  (ej. `useCatalogs.ts`, `useGroups.ts`, `useUsers.ts`, `useEnrollments.ts`), no inline en el
+  componente de página. Un módulo nuevo (`useNotifications.ts`, `useActividades.ts`,
+  `useEntregas.ts`, etc.) sigue el mismo esquema.
+- **Lectura con `useQuery`**, sintaxis de objeto de v5:
+  `useQuery({ queryKey: ['dominio', ...params], queryFn: () => api.get(...), staleTime, enabled })`.
+  `queryKey` empieza siempre por el nombre del recurso en plural (`'grades'`, `'groups'`,
+  `'notifications'`) seguido de los parámetros de filtro que afectan la respuesta — así
+  `invalidateQueries` puede apuntar a ese prefijo y refrescar todas las variantes filtradas.
+- **Escritura con `useMutation`**, también sintaxis de objeto:
+  `useMutation({ mutationFn: (input) => api.post/patch/delete(...), onSuccess: () => { void queryClient.invalidateQueries({ queryKey: ['dominio'] }); } })`.
+  Toda mutación que crea, edita, cambia estado o elimina invalida en su `onSuccess` la(s)
+  `queryKey` del recurso afectado — así la tabla se refresca sola sin recargar la página ni
+  volver a llamar manualmente al fetch.
+- **`useState` se reserva para estado local de UI/formulario** (valores de un drawer, filtros
+  antes de aplicarlos, pestaña activa, texto de búsqueda) — nunca para guardar la respuesta de
+  una petición al backend ni para un flag de loading/error manual; eso ya lo da `useQuery`/
+  `useMutation` (`isLoading`, `isPending`, `isError`, `error`, `data`).
+- **No tocar el markup de la tabla** al conectar datos: los componentes de tabla
+  (`Table`/`TableHead`/`Th`/`TableBody`/`Td`/`EmptyRow`, ver sección 6) solo reciben `data` del
+  `useQuery` correspondiente vía `.map(...)` — el cambio de fetching nunca debe traer cambios de
+  clases, estructura de `<table>` o de los componentes de UI.
+- El `QueryClient` global (`lib/queryClient.ts`) ya define `retry`, `staleTime` por defecto y
+  `refetchOnWindowFocus: false` — no crear un `QueryClient` nuevo ni pasar `defaultOptions` desde
+  una página; si un caso puntual necesita otro comportamiento, se pasa como opción de ese
+  `useQuery`/`useMutation` específico, no cambiando el cliente global.
 
 ## Documentos fuente
 

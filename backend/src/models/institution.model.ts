@@ -1,5 +1,14 @@
 import { HydratedDocument, Model, Schema, Types, model } from 'mongoose';
-import { ESTADOS_USUARIO, EstadoUsuario } from '../constants/enums';
+import {
+  TIPOS_FRANJA,
+  TipoFranja,
+  ESTADOS_USUARIO,
+  EstadoUsuario,
+  MODALIDADES_INSTITUCION,
+  ModalidadInstitucion,
+  POLITICAS_AFORO_AULA,
+  PoliticaAforoAula,
+} from '../constants/enums';
 
 export interface IInstitution {
   nombre: string;
@@ -9,6 +18,16 @@ export interface IInstitution {
   administrador_id: Types.ObjectId | null;
   /** Logo institucional como data URI (base64); se muestra en boletines/certificados. */
   logo_url: string | null;
+  /** Contacto y atencion presencial (home publico, M04): correo de secretaria academica. */
+  correo_secretaria: string | null;
+  /** Horario de atencion en ventanilla (texto libre, ej. "Lunes a viernes 7:00 a 3:00 p.m."). */
+  horario_atencion: string | null;
+  /** Estructura de tiempo base (clases y descansos, por duracion) que se carga en cada jornada; M09 usa las franjas resultantes. */
+  plantilla_franjas: Array<{ nombre: string; tipo: TipoFranja; duracion_min: number }>;
+  /** VIRTUAL: sin espacios fisicos (M10 apagado, grupos sin aula). Los documentos anteriores a este campo son PRESENCIAL. */
+  modalidad: ModalidadInstitucion;
+  /** M10: que pasa si el cupo de un grupo excede el aforo de su aula (bloquear o solo advertir). */
+  politica_aforo_aula: PoliticaAforoAula;
   estado: EstadoUsuario;
   createdAt: Date;
   updatedAt: Date;
@@ -16,6 +35,15 @@ export interface IInstitution {
 
 export type InstitutionDocument = HydratedDocument<IInstitution>;
 type InstitutionModel = Model<IInstitution>;
+
+const franjaPlantillaSchema = new Schema(
+  {
+    nombre: { type: String, required: true, trim: true },
+    tipo: { type: String, enum: TIPOS_FRANJA, required: true },
+    duracion_min: { type: Number, required: true, min: 5, max: 480 },
+  },
+  { _id: false }
+);
 
 const institutionSchema = new Schema<IInstitution, InstitutionModel>(
   {
@@ -30,6 +58,11 @@ const institutionSchema = new Schema<IInstitution, InstitutionModel>(
     resolucion_aprobacion: { type: String, required: true, trim: true },
     administrador_id: { type: Schema.Types.ObjectId, ref: 'User', default: null },
     logo_url: { type: String, default: null },
+    correo_secretaria: { type: String, default: null, trim: true, lowercase: true },
+    horario_atencion: { type: String, default: null, trim: true },
+    plantilla_franjas: { type: [franjaPlantillaSchema], default: [] },
+    modalidad: { type: String, enum: MODALIDADES_INSTITUCION, default: 'PRESENCIAL' },
+    politica_aforo_aula: { type: String, enum: POLITICAS_AFORO_AULA, default: 'BLOQUEAR' },
     estado: { type: String, enum: ESTADOS_USUARIO, default: 'activo' },
   },
   { timestamps: true }

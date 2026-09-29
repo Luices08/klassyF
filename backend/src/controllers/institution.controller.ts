@@ -1,6 +1,7 @@
 import * as institutionService from '../services/institution.service';
 import { SetupInstitutionInput, UpdateInstitutionInput } from '../services/institution.service';
 import catchAsync from '../utils/catchAsync';
+import { FranjaPlantilla } from '../utils/franjas';
 
 export const setupInstitution = catchAsync<unknown, unknown, SetupInstitutionInput>(async (req, res) => {
   const { institucion, sede_principal, anio_lectivo } = req.body;
@@ -11,6 +12,14 @@ export const setupInstitution = catchAsync<unknown, unknown, SetupInstitutionInp
 
 export const getInstitution = catchAsync(async (_req, res) => {
   const institution = await institutionService.getInstitution();
+  res.status(200).json({ success: true, data: institution });
+});
+
+export const actualizarPlantillaFranjas = catchAsync<unknown, unknown, { franjas: FranjaPlantilla[] }>(async (req, res) => {
+  const institution = await institutionService.actualizarPlantillaFranjas(req.body.franjas, {
+    usuarioId: req.user!._id,
+    ip: req.ip ?? null,
+  });
   res.status(200).json({ success: true, data: institution });
 });
 

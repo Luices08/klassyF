@@ -9,7 +9,8 @@ import { IconButton } from '../../components/ui/IconButton';
 import { PageHeader } from '../../components/ui/PageHeader';
 import { Spinner } from '../../components/ui/Spinner';
 import { EmptyRow, Table, TableBody, TableHead, Td, Th } from '../../components/ui/Table';
-import { PencilIcon, PlusIcon, RefreshIcon, TrashIcon } from '../../components/ui/icons';
+import { FranjasJornadaDrawer } from '../../components/jornadas/FranjasJornadaDrawer';
+import { BanIcon, ClockIcon, PencilIcon, PlusIcon, RefreshIcon, TrashIcon } from '../../components/ui/icons';
 import {
   useActualizarEstadoSede,
   useActualizarSede,
@@ -20,7 +21,7 @@ import {
   useJornadas,
 } from '../../hooks/useCatalogs';
 import { useInstitution } from '../../hooks/useInstitution';
-import { JORNADAS, type Campus, type Jornada } from '../../types/domain';
+import { JORNADAS, NOMBRES_DIA_SEMANA, type Campus, type Jornada, type JornadaOperativa } from '../../types/domain';
 
 const SEDE_VACIA = { nombre: '', codigo_dane_sede: '', direccion: '', telefono: '' };
 
@@ -103,6 +104,8 @@ export function SedesPage() {
     setDrawerJornadaOpen(false);
   }
 
+  const [jornadaConfigurando, setJornadaConfigurando] = useState<JornadaOperativa | null>(null);
+
   const sedeSeleccionadaNombre = sedesQuery.data?.find((c) => c._id === sedeSeleccionada)?.nombre ?? '';
 
   return (
@@ -156,7 +159,7 @@ export function SedesPage() {
                     <div className="flex justify-end gap-2">
                       <IconButton tone="edit" label="Editar sede" icon={<PencilIcon />} onClick={() => abrirEditar(c)} />
                       <IconButton
-                        tone={c.estado === 'activo' ? 'danger' : 'success'}
+                        tone={c.estado === 'activo' ? 'neutral' : 'success'}
                         label={
                           c.es_principal
                             ? 'La sede principal no se puede desactivar'
@@ -164,7 +167,7 @@ export function SedesPage() {
                               ? 'Desactivar sede'
                               : 'Activar sede'
                         }
-                        icon={c.estado === 'activo' ? <TrashIcon /> : <RefreshIcon />}
+                        icon={c.estado === 'activo' ? <BanIcon /> : <RefreshIcon />}
                         disabled={c.es_principal || actualizarEstadoSede.isPending}
                         onClick={() => handleToggleEstadoSede(c)}
                       />
@@ -220,11 +223,29 @@ export function SedesPage() {
             {crearJornada.isError && <Alert tone="error">{errorMessage(crearJornada.error)}</Alert>}
             {jornadasQuery.isLoading && <Spinner />}
             {jornadasQuery.isError && <Alert tone="error">{errorMessage(jornadasQuery.error)}</Alert>}
-            <div className="flex flex-wrap gap-2">
+            <div className="space-y-2">
               {jornadasQuery.data?.map((j) => (
-                <Chip key={j._id} tone="blue">
-                  {j.nombre} · {j.hora_inicio}–{j.hora_fin}
-                </Chip>
+                <div key={j._id} className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border px-4 py-3">
+                  <div className="flex flex-wrap items-center gap-3">
+                    <Chip tone="blue">
+                      {j.nombre} · {j.hora_inicio}–{j.hora_fin}
+                    </Chip>
+                    <span className="text-sm text-body">
+                      {[...j.dias_habiles].sort((a, b) => a - b).map((d) => NOMBRES_DIA_SEMANA[d]?.slice(0, 3)).join(', ')}
+                    </span>
+                    {j.franjas.length > 0 ? (
+                      <Chip tone="green">{j.franjas.length} franjas</Chip>
+                    ) : (
+                      <Chip tone="orange">Sin franjas</Chip>
+                    )}
+                  </div>
+                  <IconButton
+                    tone="edit"
+                    label="Configurar días y franjas de la jornada"
+                    icon={<ClockIcon />}
+                    onClick={() => setJornadaConfigurando(j)}
+                  />
+                </div>
               ))}
               {jornadasQuery.data?.length === 0 && (
                 <p className="text-sm text-muted">Sin jornadas para esta sede.</p>
@@ -322,6 +343,12 @@ export function SedesPage() {
           ¿Eliminar la sede <strong>{sedeEliminando?.nombre}</strong>?
         </p>
       </Drawer>
+
+      <FranjasJornadaDrawer
+        open={jornadaConfigurando !== null}
+        jornada={jornadaConfigurando}
+        onClose={() => setJornadaConfigurando(null)}
+      />
 
       <Drawer
         open={drawerJornadaOpen}

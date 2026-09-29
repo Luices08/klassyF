@@ -1,4 +1,4 @@
-import { EstadoAsistencia } from '../constants/enums';
+import { ESTADOS_MATRICULA_ACTIVOS, EstadoAsistencia } from '../constants/enums';
 import Attendance, { AttendanceDocument } from '../models/attendance.model';
 import Enrollment from '../models/enrollment.model';
 import Group from '../models/group.model';
@@ -62,7 +62,7 @@ export async function registerAttendance(
   const enrollments = await Enrollment.find({
     student_id: { $in: studentIds },
     group_id: input.group_id,
-    estado: 'MATRICULADO',
+    estado: { $in: ESTADOS_MATRICULA_ACTIVOS },
   });
   const enrolledSet = new Set(enrollments.map((e) => String(e.student_id)));
   const noMatriculados = studentIds.filter((id) => !enrolledSet.has(id));

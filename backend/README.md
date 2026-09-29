@@ -46,6 +46,9 @@ npm run dev              # http://localhost:4000  (tsx watch, hot-reload)
 | `npm run build` | `tsc` — compila `src/**/*.ts` a `dist/` (JS plano, listo para producción). |
 | `npm start` | `node dist/server.js` — ejecuta el build compilado. |
 | `npm run seed` | `tsx scripts/seed.ts` — crea el SUPERADMIN inicial y el catálogo de grados. |
+| `npm run migrate:m05-anio-lectivo` | Migra los años lectivos creados antes de M05 (nombre, fechas, eventos y semáforo de periodos). Idempotente. |
+| `npm run migrate:folio-al-matricular` | Migra el Libro de Matrícula al nuevo esquema: el folio se asigna al legalizar la matrícula, no al preinscribir. Idempotente. |
+| `npm run migrate:estado-por-defecto` | Guarda `estado: 'activo'` en grados, sedes, institución y usuarios creados antes de que existiera ese campo. Idempotente. |
 | `npm run typecheck` | `tsc --noEmit` — valida tipos de `src/` sin emitir archivos. |
 | `npm run typecheck:all` | Igual, pero incluye también `scripts/` (fuera de `rootDir`, por eso usa `tsconfig.scripts.json`). |
 
@@ -211,7 +214,7 @@ curl -s -X PATCH $BASE/periods/lock -H "Authorization: Bearer $TOKEN" -H "Conten
   -d "{\"academic_year_id\":\"<academic_year_id>\",\"periodo_numero\":1,\"group_id\":\"<group_id>\",\"estado\":\"CERRADO\"}"
 
 # 6) Boletín (docente/coordinación pueden consultar cualquiera; el estudiante solo el propio;
-#    el acudiente solo el de su estudiante a cargo — ver StudentProfile.acudiente_id)
+#    el acudiente solo el de su estudiante a cargo — ver Guardian/StudentGuardian, M03)
 curl -s "$BASE/reports/report-card?student_id=<id1>&academic_year_id=<academic_year_id>&periodo=1" \
   -H "Authorization: Bearer $TOKEN"
 ```

@@ -1,9 +1,12 @@
 import { Types } from 'mongoose';
+import { ESTADOS_PERIODO_CALIFICABLES } from '../constants/anioLectivo';
 import { EstadoPeriodo } from '../constants/enums';
 import AcademicYear from '../models/academicYear.model';
 import Group from '../models/group.model';
 import PeriodLock, { PeriodLockDocument } from '../models/periodLock.model';
 import ApiError from '../utils/ApiError';
+import { periodosEfectivos, ventanaNotas } from '../utils/calendarioAcademico';
+import { existeProrrogaVigente } from './periodoProrroga.service';
 
 export interface SetPeriodLockInput {
   academic_year_id: string;
@@ -39,16 +42,58 @@ export async function setPeriodLock(input: SetPeriodLockInput): Promise<PeriodLo
   return lock;
 }
 
+const formatoFecha = (fecha: Date): string => fecha.toISOString().slice(0, 10);
+
 /**
- * Bloqueo extemporaneo: toda mutacion de nota debe pasar por aqui. La ausencia
- * de un PeriodLock para la combinacion (año, grupo, periodo) se interpreta como
- * ABIERTO por defecto (no es necesario pre-crear un registro para cada grupo).
+ * Bloqueo extemporaneo: toda mutacion de nota debe pasar por aqui. Exige (M05)
+ * que el año lectivo este vigente y que el periodo admita notas: estado ABIERTO o
+ * EN_DIGITACION y, si tiene ventana de calificacion (la de la sede del grupo,
+ * si esta tiene calendario propio), dentro de ella. Una prorroga vigente
+ * habilita a su docente/grupo aunque el periodo ya no admita notas.
+ *
+ * Ademas, la ausencia de un PeriodLock para la combinacion (año, grupo,
+ * periodo) se interpreta como ABIERTO por defecto (no es necesario pre-crear
+ * un registro para cada grupo).
  */
 export async function assertPeriodNotLocked(
   academicYearId: Types.ObjectId | string,
   groupId: Types.ObjectId | string,
-  periodoNumero: number
+  periodoNumero: number,
+  docenteId: Types.ObjectId | string | null = null
 ): Promise<void> {
+  const [anio, grupo] = await Promise.all([AcademicYear.findById(academicYearId), Group.findById(groupId)]);
+  if (!anio) throw new ApiError(404, 'Año lectivo no encontrado.');
+  if (!grupo) throw new ApiError(404, 'Grupo no encontrado.');
+
+  if (anio.estado !== 'EN_CURSO') {
+    throw new ApiError(409, `El año lectivo ${anio.year} no está vigente; no se pueden modificar notas.`);
+  }
+
+  const periodo = anio.periodos.find((p) => p.numero === periodoNumero);
+  if (!periodo) throw new ApiError(400, `El año lectivo ${anio.year} no tiene periodo ${periodoNumero}.`);
+
+  const calendarioSede = anio.calendarios_sede.find((c) => String(c.sede_id) === String(grupo.sede_id));
+  const efectivo = periodosEfectivos(anio.periodos, calendarioSede).find((p) => p.numero === periodoNumero);
+  const ventana = efectivo ?? periodo;
+  const { apertura, cierre } = ventanaNotas(ventana);
+  const ahora = new Date();
+
+  let motivoBloqueo: string | null = null;
+  if (!ESTADOS_PERIODO_CALIFICABLES.includes(periodo.estado)) {
+    motivoBloqueo =
+      periodo.estado === 'PROGRAMADO'
+        ? `El periodo ${periodoNumero} aún no está abierto para calificar.`
+        : `El periodo ${periodoNumero} está CERRADO; las planillas están bloqueadas.`;
+  } else if (apertura && ventana.fecha_apertura_notas && ahora < apertura) {
+    motivoBloqueo = `La digitación de notas del periodo ${periodoNumero} abre el ${formatoFecha(ventana.fecha_apertura_notas)}.`;
+  } else if (cierre && ventana.fecha_cierre_notas && ahora > cierre) {
+    motivoBloqueo = `La ventana de digitación de notas del periodo ${periodoNumero} cerró el ${formatoFecha(ventana.fecha_cierre_notas)}.`;
+  }
+
+  if (motivoBloqueo && !(await existeProrrogaVigente(anio._id, periodoNumero, groupId, docenteId))) {
+    throw new ApiError(409, `${motivoBloqueo} Solicita una prórroga al coordinador si necesitas registrar notas.`);
+  }
+
   const lock = await PeriodLock.findOne({
     academic_year_id: academicYearId,
     group_id: groupId,

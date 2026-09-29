@@ -9,19 +9,26 @@ import { IconButton } from '../../components/ui/IconButton';
 import { PageHeader } from '../../components/ui/PageHeader';
 import { Spinner } from '../../components/ui/Spinner';
 import { EmptyRow, Table, TableBody, TableHead, Td, Th } from '../../components/ui/Table';
-import { PlusIcon, RefreshIcon, TrashIcon } from '../../components/ui/icons';
-import { useInstitutionConfig } from '../../context/InstitutionConfigContext';
+import { BanIcon, PlusIcon, RefreshIcon } from '../../components/ui/icons';
+import { useAnioDeTrabajo } from '../../hooks/useAniosLectivos';
 import { useCampuses, useGrades, useJornadas } from '../../hooks/useCatalogs';
+import { useEspacios } from '../../hooks/useEspacios';
 import { useActualizarEstadoGrupo, useCreateGroup, useGroups } from '../../hooks/useGroups';
-import type { EstadoGrupo } from '../../types/domain';
+import { useInstitution } from '../../hooks/useInstitution';
+import type { Espacio, EstadoGrupo } from '../../types/domain';
 
 export function GroupsPage() {
-  const { config } = useInstitutionConfig();
-  const [academicYearId, setAcademicYearId] = useState(config?.academicYearId ?? '');
+  const institutionQuery = useInstitution();
+  const { anio: anioPorDefecto, anios, query: aniosQuery } = useAnioDeTrabajo();
+  // Sin selección explícita se trabaja sobre la vigencia activa (o, si no hay, el más reciente sin cerrar).
+  const [anioElegidoId, setAnioElegidoId] = useState('');
+  const anioActual = anios.find((a) => a._id === anioElegidoId) ?? anioPorDefecto;
+  const academicYearId = anioActual?._id ?? '';
+  const anioCerrado = anioActual?.estado === 'CERRADO';
 
   const gradesQuery = useGrades();
   const gradesActivosQuery = useGrades('activo');
-  const campusesQuery = useCampuses(config?.institutionId);
+  const campusesQuery = useCampuses(institutionQuery.data?._id);
   const createGroup = useCreateGroup();
   const actualizarEstado = useActualizarEstadoGrupo();
 
@@ -50,11 +57,32 @@ export function GroupsPage() {
 
   const jornadasQuery = useJornadas(sedeId || undefined);
 
+  // Aula / salón titular (M10): opcional. Las aulas y su ocupación salen del inventario de espacios de la sede.
+  const [aulaId, setAulaId] = useState('');
+  // Institución virtual: sin espacios físicos, los grupos no llevan aula (ni selector, ni columna, ni consulta).
+  const usaEspacios = institutionQuery.data?.modalidad !== 'VIRTUAL';
+  const politicaAforo = institutionQuery.data?.politica_aforo_aula ?? 'BLOQUEAR';
+  const espaciosQuery = useEspacios({ sede_id: sedeId, academic_year_id: academicYearId }, Boolean(usaEspacios && sedeId && academicYearId));
+  const aulas = (espaciosQuery.data ?? []).filter((e) => e.tipo_espacio === 'AULA_REGULAR' && e.estado === 'DISPONIBLE');
+  // Un aula ya es salón titular de otro grupo en esa jornada (salvo las de uso simultáneo, que admiten varios).
+  const ocupanteDe = (aula: Espacio, jornada: string) =>
+    !jornada || aula.admite_grupos_simultaneos ? undefined : aula.grupos_asignados.find((g) => g.jornada?._id === jornada);
+  const aulaElegida = aulas.find((a) => a._id === aulaId);
+  const excedeAforo = aulaElegida !== undefined && maxCapacity > aulaElegida.capacidad;
+  const bloqueadoPorAforo = excedeAforo && politicaAforo === 'BLOQUEAR';
+
   // La jornada depende de la sede elegida: al cambiar de sede, la jornada
   // seleccionada ya no aplica (se limpia en el propio evento, no en un efecto).
   function handleSedeChange(nuevaSedeId: string) {
     setSedeId(nuevaSedeId);
     setJornadaId('');
+    setAulaId('');
+  }
+
+  // Si el aula elegida ya está tomada en la nueva jornada, deja de aplicar.
+  function handleJornadaChange(nuevaJornadaId: string) {
+    setJornadaId(nuevaJornadaId);
+    if (aulaElegida && ocupanteDe(aulaElegida, nuevaJornadaId)) setAulaId('');
   }
 
   async function handleSubmit(e: FormEvent) {
@@ -67,8 +95,10 @@ export function GroupsPage() {
       jornada_id: jornadaId,
       nomenclatura,
       max_capacity: maxCapacity,
+      aula_id: aulaId || null,
     });
     setNomenclatura('');
+    setAulaId('');
     setDrawerOpen(false);
   }
 
@@ -84,33 +114,43 @@ export function GroupsPage() {
         title="Grupos"
         subtitle="Crea y consulta los grupos de un año lectivo."
         action={
-          <Button onClick={() => setDrawerOpen(true)}>
+          <Button onClick={() => setDrawerOpen(true)} disabled={!academicYearId || anioCerrado}>
             <PlusIcon className="h-4 w-4" />
             Nuevo grupo
           </Button>
         }
       />
 
-      {!config && (
-        <Alert tone="info">
-          Aún no hay una institución configurada en esta sesión. Ve a "Configuración institucional" o ingresa el
-          ID del año lectivo manualmente abajo.
-        </Alert>
+      {institutionQuery.isError && <Alert tone="error">{errorMessage(institutionQuery.error)}</Alert>}
+      {!institutionQuery.isLoading && !institutionQuery.isError && !institutionQuery.data && (
+        <Alert tone="info">Aún no hay una institución configurada. Ve a "Configuración institucional".</Alert>
       )}
 
       <Card>
         <CardHeader
           title="Año lectivo"
+          subtitle="Cada grupo pertenece a un año lectivo; los años cerrados son de solo lectura."
           action={
-            <Input
-              label="Año lectivo (ID)"
-              required
+            <Select
+              label="Año lectivo"
               className="w-64"
               value={academicYearId}
-              onChange={(e) => setAcademicYearId(e.target.value)}
-            />
+              onChange={(e) => setAnioElegidoId(e.target.value)}
+            >
+              {anios.map((a) => (
+                <option key={a._id} value={a._id}>
+                  {a.nombre}
+                  {a.estado === 'EN_CURSO' ? ' (vigente)' : a.estado === 'CERRADO' ? ' (histórico)' : ''}
+                </option>
+              ))}
+            </Select>
           }
         />
+        {aniosQuery.isError && <Alert tone="error">{errorMessage(aniosQuery.error)}</Alert>}
+        {!aniosQuery.isLoading && anios.length === 0 && (
+          <Alert tone="info">Aún no hay años lectivos. Créalo en "Año lectivo".</Alert>
+        )}
+        {anioCerrado && <Alert tone="info">Año cerrado: solo consulta, no se pueden crear grupos.</Alert>}
       </Card>
 
       <Card>
@@ -156,6 +196,7 @@ export function GroupsPage() {
               <Th>Grupo</Th>
               <Th>Grado</Th>
               <Th>Jornada</Th>
+              {usaEspacios && <Th>Aula</Th>}
               <Th>Cupos</Th>
               <Th>Estado</Th>
               <Th />
@@ -168,6 +209,20 @@ export function GroupsPage() {
                   <Td>
                     <Chip tone="blue">{typeof g.jornada_id === 'object' ? g.jornada_id.nombre : g.jornada_id}</Chip>
                   </Td>
+                  {usaEspacios && (
+                  <Td>
+                    {typeof g.aula_id === 'object' && g.aula_id ? (
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        <span className="text-ink">{g.aula_id.nombre}</span>
+                        <Chip tone={g.max_capacity > g.aula_id.capacidad ? 'red' : 'neutral'}>
+                          {g.max_capacity > g.aula_id.capacidad ? `Excede el aforo (${g.aula_id.capacidad})` : `Aforo ${g.aula_id.capacidad}`}
+                        </Chip>
+                      </div>
+                    ) : (
+                      <span className="text-muted">—</span>
+                    )}
+                  </Td>
+                  )}
                   <Td>
                     <CupoBadge ocupados={g.cupos_ocupados} max={g.max_capacity} />
                   </Td>
@@ -176,16 +231,16 @@ export function GroupsPage() {
                   </Td>
                   <Td>
                     <IconButton
-                      tone={g.estado === 'ACTIVE' ? 'danger' : 'success'}
+                      tone={g.estado === 'ACTIVE' ? 'neutral' : 'success'}
                       label={g.estado === 'ACTIVE' ? 'Cerrar grupo' : 'Reactivar grupo'}
-                      icon={g.estado === 'ACTIVE' ? <TrashIcon /> : <RefreshIcon />}
+                      icon={g.estado === 'ACTIVE' ? <BanIcon /> : <RefreshIcon />}
                       disabled={actualizarEstado.isPending}
                       onClick={() => handleToggleEstado(g._id, g.estado)}
                     />
                   </Td>
                 </tr>
               ))}
-              {groupsQuery.data.length === 0 && <EmptyRow colSpan={6}>Sin grupos para este año lectivo.</EmptyRow>}
+              {groupsQuery.data.length === 0 && <EmptyRow colSpan={usaEspacios ? 7 : 6}>Sin grupos para este año lectivo.</EmptyRow>}
             </TableBody>
           </Table>
         )}
@@ -198,10 +253,11 @@ export function GroupsPage() {
         onSubmit={handleSubmit}
         submitLabel="Crear grupo"
         isSubmitting={createGroup.isPending}
+        submitDisabled={bloqueadoPorAforo}
       >
         {createGroup.isError && <Alert tone="error">{errorMessage(createGroup.error)}</Alert>}
 
-        <Select label="Sede" required value={sedeId} onChange={(e) => handleSedeChange(e.target.value)}>
+        <Select id="grupo-sede" label="Sede" required value={sedeId} onChange={(e) => handleSedeChange(e.target.value)}>
           <option value="">Selecciona...</option>
           {campusesQuery.data?.map((c) => (
             <option key={c._id} value={c._id}>
@@ -211,6 +267,7 @@ export function GroupsPage() {
         </Select>
 
         <Select
+          id="grupo-grado"
           label="Grado"
           required
           value={gradeId}
@@ -226,10 +283,11 @@ export function GroupsPage() {
         </Select>
 
         <Select
+          id="grupo-jornada"
           label="Jornada"
           required
           value={jornadaId}
-          onChange={(e) => setJornadaId(e.target.value)}
+          onChange={(e) => handleJornadaChange(e.target.value)}
           disabled={!sedeId}
           hint={
             !sedeId
@@ -247,16 +305,65 @@ export function GroupsPage() {
           ))}
         </Select>
 
-        <Input label="Nomenclatura (ej. 10-A)" required value={nomenclatura} onChange={(e) => setNomenclatura(e.target.value)} />
+        {usaEspacios && (
+        <Select
+          id="grupo-aula"
+          label="Aula / Salón asignado (opcional)"
+          value={aulaId}
+          onChange={(e) => setAulaId(e.target.value)}
+          disabled={!sedeId}
+          hint={
+            !sedeId
+              ? 'Selecciona primero una sede.'
+              : espaciosQuery.isLoading
+                ? 'Cargando aulas...'
+                : aulas.length === 0
+                  ? 'Esta sede no tiene aulas disponibles registradas. Es opcional (ver "Espacios y aulas").'
+                  : !jornadaId
+                    ? 'Elige la jornada para ver qué aulas están libres.'
+                    : 'Solo aulas regulares disponibles de la sede; su aforo limita el cupo del grupo.'
+          }
+        >
+          <option value="">Sin aula asignada</option>
+          {aulas.map((a) => {
+            const ocupante = ocupanteDe(a, jornadaId);
+            return (
+              <option key={a._id} value={a._id} disabled={Boolean(ocupante)}>
+                {a.nombre} · aforo {a.capacidad}
+                {a.piso_bloque ? ` · ${a.piso_bloque}` : ''}
+                {ocupante ? ` — ocupada por ${ocupante.nomenclatura}` : ''}
+              </option>
+            );
+          })}
+        </Select>
+        )}
+
+        <Input id="grupo-nomenclatura" label="Nomenclatura (ej. 10-A)" required value={nomenclatura} onChange={(e) => setNomenclatura(e.target.value)} />
 
         <Input
+          id="grupo-cupo"
           label="Cupo máximo"
           type="number"
           min={1}
           required
           value={maxCapacity}
           onChange={(e) => setMaxCapacity(Number(e.target.value))}
+          hint={aulaElegida && !excedeAforo ? `Aforo del aula "${aulaElegida.nombre}": ${aulaElegida.capacidad} puestos.` : undefined}
         />
+
+        {aulaElegida && excedeAforo && (
+          <>
+            <Alert tone={bloqueadoPorAforo ? 'error' : 'warning'}>
+              El cupo máximo ({maxCapacity}) supera el aforo del aula "{aulaElegida.nombre}" ({aulaElegida.capacidad} puestos).{' '}
+              {bloqueadoPorAforo
+                ? 'Reduce el cupo o elige otra aula para poder crear el grupo.'
+                : 'Puedes guardar igualmente, pero habrá sobrecupo físico y quedará registrado en auditoría.'}
+            </Alert>
+            <Button type="button" variant="soft-edit" onClick={() => setMaxCapacity(aulaElegida.capacidad)}>
+              Ajustar el cupo a {aulaElegida.capacidad}
+            </Button>
+          </>
+        )}
       </Drawer>
     </div>
   );

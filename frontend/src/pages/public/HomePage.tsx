@@ -8,7 +8,8 @@ import { Drawer } from '../../components/ui/Drawer';
 import { Input, Select } from '../../components/ui/Field';
 import { Spinner } from '../../components/ui/Spinner';
 import { BuildingIcon, ClipboardListIcon, FileTextIcon, GraduationCapIcon, InboxIcon } from '../../components/ui/icons';
-import { useConsultarEstadoSolicitud, useSolicitarCupo } from '../../hooks/useAdmissionRequests';
+import { PreinscripcionAprobada } from '../../components/public/PreinscripcionAprobada';
+import { useEstadoSolicitud, useSolicitarCupo, type CredencialesPreinscripcion } from '../../hooks/useAdmissionRequests';
 import { usePublicGrades, usePublicInstitutionInfo } from '../../hooks/usePublicInfo';
 import { JORNADAS, TIPOS_DOCUMENTO, type Jornada, type TipoDocumento } from '../../types/domain';
 
@@ -371,27 +372,42 @@ export function HomePage() {
 function ConsultarEstadoDrawer({ open, onClose }: { open: boolean; onClose: () => void }) {
   const [numeroDocumento, setNumeroDocumento] = useState('');
   const [fechaNacimiento, setFechaNacimiento] = useState('');
-  const consultar = useConsultarEstadoSolicitud();
+  // Credenciales ya enviadas: el resultado se refresca solo tras subir un documento.
+  const [credenciales, setCredenciales] = useState<CredencialesPreinscripcion | null>(null);
+  const estadoQuery = useEstadoSolicitud(credenciales);
 
-  async function handleSubmit(e: FormEvent) {
+  function handleSubmit(e: FormEvent) {
     e.preventDefault();
-    consultar.reset();
-    await consultar.mutateAsync({ numero_documento: numeroDocumento, fecha_nacimiento: fechaNacimiento });
+    const nuevas = { numero_documento: numeroDocumento.trim(), fecha_nacimiento: fechaNacimiento };
+    if (credenciales?.numero_documento === nuevas.numero_documento && credenciales.fecha_nacimiento === nuevas.fecha_nacimiento) {
+      void estadoQuery.refetch();
+    } else {
+      setCredenciales(nuevas);
+    }
   }
+
+  function handleClose() {
+    // No dejar documento ni fecha de nacimiento de un menor en pantalla ni en memoria al cerrar.
+    setCredenciales(null);
+    setNumeroDocumento('');
+    setFechaNacimiento('');
+    onClose();
+  }
+
+  const resultado = estadoQuery.data;
+  const preinscripcion = resultado?.estado === 'APROBADA' ? resultado.preinscripcion : null;
 
   return (
     <Drawer
       open={open}
+      size={preinscripcion ? 'lg' : 'md'}
       title="Consultar estado de solicitud"
-      onClose={() => {
-        onClose();
-        consultar.reset();
-      }}
+      onClose={handleClose}
       onSubmit={handleSubmit}
       submitLabel="Consultar"
-      isSubmitting={consultar.isPending}
+      isSubmitting={estadoQuery.isFetching}
     >
-      {consultar.isError && <Alert tone="error">{errorMessage(consultar.error)}</Alert>}
+      {estadoQuery.isError && <Alert tone="error">{errorMessage(estadoQuery.error)}</Alert>}
       <Input
         label="Número de documento del aspirante"
         required
@@ -406,11 +422,15 @@ function ConsultarEstadoDrawer({ open, onClose }: { open: boolean; onClose: () =
         onChange={(e) => setFechaNacimiento(e.target.value)}
       />
 
-      {consultar.data && (
-        <Alert tone={consultar.data.estado === 'RECHAZADA' ? 'error' : consultar.data.estado === 'APROBADA' ? 'success' : 'info'}>
-          Estado: <strong>{consultar.data.estado}</strong>
-          {consultar.data.motivo_rechazo && ` — ${consultar.data.motivo_rechazo}`}
-        </Alert>
+      {resultado && preinscripcion && credenciales ? (
+        <PreinscripcionAprobada detalle={preinscripcion} credenciales={credenciales} />
+      ) : (
+        resultado && (
+          <Alert tone={resultado.estado === 'RECHAZADA' ? 'error' : resultado.estado === 'APROBADA' ? 'success' : 'info'}>
+            Estado: <strong>{resultado.estado}</strong>
+            {resultado.motivo_rechazo && ` — ${resultado.motivo_rechazo}`}
+          </Alert>
+        )
       )}
     </Drawer>
   );

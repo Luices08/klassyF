@@ -11,6 +11,7 @@
     "migrate:superadmin-to-admin": "tsx scripts/migrateSuperadminToAdmin.ts",
     "migrate:m05-anio-lectivo": "tsx scripts/migrateM05AnioLectivo.ts",
     "migrate:folio-al-matricular": "tsx scripts/migrateFolioAlMatricular.ts",
+    "migrate:estado-por-defecto": "tsx scripts/migrateEstadoPorDefecto.ts",
     "reset-admin-password": "tsx scripts/resetAdminPassword.ts",
     "typecheck": "tsc --noEmit",
     "typecheck:all": "tsc --noEmit && tsc -p tsconfig.scripts.json",

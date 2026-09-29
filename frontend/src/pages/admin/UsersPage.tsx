@@ -7,6 +7,7 @@ import { Drawer } from '../../components/ui/Drawer';
 import { Input, Select } from '../../components/ui/Field';
 import { IconButton } from '../../components/ui/IconButton';
 import { MultiSelect } from '../../components/ui/MultiSelect';
+import { GuiaColumnas } from '../../components/ui/GuiaColumnas';
 import { PageHeader } from '../../components/ui/PageHeader';
 import { Spinner } from '../../components/ui/Spinner';
 import { EmptyRow, Table, TableBody, TableHead, Td, Th } from '../../components/ui/Table';
@@ -21,6 +22,7 @@ import {
   TrashIcon,
   UploadIcon,
 } from '../../components/ui/icons';
+import { COLUMNAS_USUARIOS, NOTAS_CSV_USUARIOS } from '../../lib/columnasImportacion';
 import { useAuth } from '../../context/AuthContext';
 import { useCampuses } from '../../hooks/useCatalogs';
 import { useInstitution } from '../../hooks/useInstitution';
@@ -36,11 +38,10 @@ import {
   type CreateUserInput,
   type UpdateUserInput,
 } from '../../hooks/useUsers';
-import { ROLES, type Rol } from '../../types/api';
+import { ROLES, type Rol, puedeGestionarRol } from '../../types/api';
 import { TIPOS_DOCUMENTO, type TipoDocumento, type User } from '../../types/domain';
 
-// Un solo rol de maximo privilegio (ADMIN) desde que se quito SUPERADMIN.
-const RESTRICTED_ROLES: Rol[] = ['ADMIN'];
+const DEFAULT_ROLES_FILTRO: Rol[] = ['ADMIN', 'COORDINADOR', 'DOCENTE', 'SECRETARIA'];
 const PAGE_SIZE = 20;
 
 const EMPTY_FORM: CreateUserInput = {
@@ -116,7 +117,7 @@ export function UsersPage() {
   const sedesQuery = useCampuses(institucionId || undefined);
   const sedes = sedesQuery.data ?? [];
 
-  const [filterRoles, setFilterRolesState] = useState<Rol[]>(['DOCENTE']);
+  const [filterRoles, setFilterRolesState] = useState<Rol[]>(DEFAULT_ROLES_FILTRO);
   const [filterSede, setFilterSedeState] = useState('');
   const [searchInput, setSearchInput] = useState('');
   const [search, setSearch] = useState('');
@@ -152,8 +153,7 @@ export function UsersPage() {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [form, setForm] = useState<CreateUserInput>(EMPTY_FORM);
 
-  const esAdmin = currentUser?.rol === 'ADMIN';
-  const assignableRoles = ROLES.filter((r) => esAdmin || !RESTRICTED_ROLES.includes(r));
+  const assignableRoles = ROLES.filter((r) => currentUser && puedeGestionarRol(currentUser.rol, r));
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -233,11 +233,11 @@ export function UsersPage() {
     await bulkImport.mutateAsync(archivo);
   }
 
-  /** Un COORDINADOR/SECRETARIA no puede tocar una cuenta ADMIN, y nadie se edita el estado a si mismo. */
+  /** Jerarquía institucional (M02): solo se gestionan usuarios de rango inferior (o ADMIN a otros ADMIN). Nadie se edita a sí mismo. */
   function puedeGestionar(u: User): boolean {
-    if (u._id === currentUser?.id) return false;
-    if (u.rol === 'ADMIN' && !esAdmin) return false;
-    return true;
+    if (!currentUser) return false;
+    if (u._id === currentUser.id) return false;
+    return puedeGestionarRol(currentUser.rol, u.rol);
   }
 
   const paginaInfo = usersQuery.data;
@@ -286,7 +286,7 @@ export function UsersPage() {
                 selected={filterRoles}
                 onChange={setFilterRoles}
                 allLabel="Todos los roles"
-                className="w-48"
+                className="w-52"
               />
               <Select label="Sede" value={filterSede} onChange={(e) => setFilterSede(e.target.value)} className="w-40">
                 <option value="">Todas las sedes</option>
@@ -351,14 +351,14 @@ export function UsersPage() {
                       <div className="flex justify-end gap-2">
                         <IconButton
                           tone="edit"
-                          label="Editar usuario"
+                          label={puedeGestionar(u) ? 'Editar usuario' : 'Sin permisos jerárquicos para editar este rol'}
                           icon={<PencilIcon />}
                           disabled={!puedeGestionar(u)}
                           onClick={() => abrirEditar(u)}
                         />
                         <IconButton
                           tone="neutral"
-                          label="Resetear contraseña"
+                          label={puedeGestionar(u) ? 'Resetear contraseña' : 'Sin permisos jerárquicos para resetear clave de este rol'}
                           icon={<KeyIcon />}
                           disabled={!puedeGestionar(u)}
                           onClick={() => {
@@ -369,21 +369,27 @@ export function UsersPage() {
                         />
                         <IconButton
                           tone="neutral"
-                          label="Cerrar sesiones activas"
+                          label={puedeGestionar(u) ? 'Cerrar sesiones activas' : 'Sin permisos jerárquicos para cerrar sesiones de este rol'}
                           icon={<LogOutIcon />}
                           disabled={!puedeGestionar(u)}
                           onClick={() => setUsuarioCerrando(u)}
                         />
                         <IconButton
                           tone={u.estado === 'activo' ? 'neutral' : 'success'}
-                          label={u.estado === 'activo' ? 'Desactivar usuario' : 'Activar usuario'}
+                          label={
+                            !puedeGestionar(u)
+                              ? 'Sin permisos jerárquicos para cambiar estado de este rol'
+                              : u.estado === 'activo'
+                              ? 'Desactivar usuario'
+                              : 'Activar usuario'
+                          }
                           icon={u.estado === 'activo' ? <BanIcon /> : <RefreshIcon />}
                           disabled={!puedeGestionar(u) || actualizarEstado.isPending}
                           onClick={() => handleToggleEstado(u)}
                         />
                         <IconButton
                           tone="danger"
-                          label="Eliminar usuario"
+                          label={puedeGestionar(u) ? 'Eliminar usuario' : 'Sin permisos jerárquicos para eliminar este rol'}
                           icon={<TrashIcon />}
                           disabled={!puedeGestionar(u)}
                           onClick={() => setUsuarioEliminando(u)}
@@ -532,7 +538,7 @@ export function UsersPage() {
           value={formEditar.rol}
           onChange={(e) => setFormEditar((f) => ({ ...f, rol: e.target.value as Rol }))}
         >
-          {ROLES.filter((r) => esAdmin || !RESTRICTED_ROLES.includes(r) || r === usuarioEditando?.rol).map((r) => (
+          {ROLES.filter((r) => currentUser && (puedeGestionarRol(currentUser.rol, r) || r === usuarioEditando?.rol)).map((r) => (
             <option key={r} value={r}>
               {r}
             </option>
@@ -627,7 +633,8 @@ export function UsersPage() {
       <Drawer
         open={importarOpen}
         title="Carga masiva de usuarios"
-        subtitle="Archivo CSV con encabezado: tipo_documento,numero_documento,nombre,apellido,email,rol,telefono,sedes_codigos"
+        subtitle="Un archivo CSV con un usuario por fila."
+        size="lg"
         onClose={() => {
           setImportarOpen(false);
           setArchivo(null);
@@ -639,10 +646,7 @@ export function UsersPage() {
         submitDisabled={!archivo}
       >
         {bulkImport.isError && <Alert tone="error">{errorMessage(bulkImport.error)}</Alert>}
-        <Alert tone="info">
-          Usa punto y coma (;) para separar varios códigos de sede en la columna "sedes_codigos". A cada usuario
-          creado se le asigna una contraseña temporal que deberá cambiar en su primer ingreso.
-        </Alert>
+        <GuiaColumnas notas={NOTAS_CSV_USUARIOS} columnas={COLUMNAS_USUARIOS} />
         <Input
           label="Archivo CSV"
           type="file"

@@ -18,7 +18,6 @@ import { Spinner } from '../components/ui/Spinner';
 import { EmptyRow, Table, TableBody, TableHead, Td, Th } from '../components/ui/Table';
 import { BanIcon, CalendarIcon, LockIcon, PencilIcon, PlusIcon, RefreshIcon, TrashIcon } from '../components/ui/icons';
 import { useAuth } from '../context/AuthContext';
-import { useInstitutionConfig } from '../context/InstitutionConfigContext';
 import {
   useActivarAnio,
   useAniosLectivos,
@@ -159,7 +158,6 @@ function ConfirmacionDrawer({
 
 export function AnioLectivoPage() {
   const { user } = useAuth();
-  const { config, setConfig } = useInstitutionConfig();
   const esAdmin = user?.rol === 'ADMIN';
   const puedeControlarPeriodos = user?.rol === 'ADMIN' || user?.rol === 'COORDINADOR';
 
@@ -204,8 +202,6 @@ export function AnioLectivoPage() {
     if (!anio) return;
     activar.reset();
     const activado = await activar.mutateAsync(anio._id);
-    // Las pantallas de Grupos/Matrículas/Boletín prellenan el año desde esta configuración local.
-    if (config) setConfig({ ...config, academicYearId: activado._id, academicYearYear: activado.year });
     setSeleccionadoId(activado._id);
   }
 

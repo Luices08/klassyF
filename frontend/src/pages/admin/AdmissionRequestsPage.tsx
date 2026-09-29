@@ -10,7 +10,7 @@ import { PageHeader } from '../../components/ui/PageHeader';
 import { Spinner } from '../../components/ui/Spinner';
 import { EmptyRow, Table, TableBody, TableHead, Td, Th } from '../../components/ui/Table';
 import { CheckCircleIcon, XCircleIcon } from '../../components/ui/icons';
-import { useInstitutionConfig } from '../../context/InstitutionConfigContext';
+import { useAnioDeTrabajo } from '../../hooks/useAniosLectivos';
 import {
   useAdmissionRequestsList,
   useAprobarSolicitud,
@@ -32,7 +32,8 @@ function nombreDe(v: string | { nombre: string }): string {
 }
 
 export function AdmissionRequestsPage() {
-  const { config } = useInstitutionConfig();
+  const { anio } = useAnioDeTrabajo();
+  const anioId = anio?._id;
   const [filterEstado, setFilterEstado] = useState<EstadoSolicitud | ''>('');
   const [page, setPage] = useState(1);
 
@@ -41,19 +42,26 @@ export function AdmissionRequestsPage() {
 
   const [aprobando, setAprobando] = useState<AdmissionRequest | null>(null);
   const [groupId, setGroupId] = useState('');
+  const [fechaLimite, setFechaLimite] = useState('');
   const groupsQuery = useGroups({
-    academic_year_id: config?.academicYearId,
+    academic_year_id: anioId,
     grade_id: aprobando ? (typeof aprobando.grado_deseado_id === 'string' ? aprobando.grado_deseado_id : aprobando.grado_deseado_id._id) : undefined,
   });
   const aprobar = useAprobarSolicitud();
 
   async function handleAprobar(e: FormEvent) {
     e.preventDefault();
-    if (!aprobando || !config) return;
+    if (!aprobando || !anioId) return;
     aprobar.reset();
-    await aprobar.mutateAsync({ id: aprobando._id, group_id: groupId, academic_year_id: config.academicYearId });
+    await aprobar.mutateAsync({
+      id: aprobando._id,
+      group_id: groupId,
+      academic_year_id: anioId,
+      fecha_limite_legalizacion: fechaLimite || undefined,
+    });
     setAprobando(null);
     setGroupId('');
+    setFechaLimite('');
   }
 
   const [rechazando, setRechazando] = useState<AdmissionRequest | null>(null);
@@ -191,7 +199,7 @@ export function AdmissionRequestsPage() {
         submitDisabled={!groupId}
       >
         {aprobar.isError && <Alert tone="error">{errorMessage(aprobar.error)}</Alert>}
-        {!config && <Alert tone="warning">Configura primero el año lectivo activo (Configuración institucional).</Alert>}
+        {!anio && <Alert tone="warning">Aún no hay un año lectivo. Créalo en "Año lectivo".</Alert>}
         <Alert tone="info">
           Al aprobar se crea la cuenta del estudiante (con contraseña temporal) y la matrícula queda en estado
           PREINSCRITO en el grupo seleccionado.
@@ -204,6 +212,14 @@ export function AdmissionRequestsPage() {
             </option>
           ))}
         </Select>
+        <Input
+          label="Fecha límite para legalizar la matrícula (opcional)"
+          type="date"
+          min={new Date().toISOString().slice(0, 10)}
+          value={fechaLimite}
+          onChange={(e) => setFechaLimite(e.target.value)}
+          hint="Si la dejas vacía se dan 15 días. El acudiente la ve al consultar su solicitud."
+        />
       </Drawer>
 
       <Drawer

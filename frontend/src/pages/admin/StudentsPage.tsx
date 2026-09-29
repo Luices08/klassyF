@@ -7,11 +7,13 @@ import { Card, CardHeader } from '../../components/ui/Card';
 import { Drawer } from '../../components/ui/Drawer';
 import { Input, Select } from '../../components/ui/Field';
 import { IconButton } from '../../components/ui/IconButton';
+import { GuiaColumnas } from '../../components/ui/GuiaColumnas';
 import { PageHeader } from '../../components/ui/PageHeader';
 import { Spinner } from '../../components/ui/Spinner';
 import { Stepper } from '../../components/ui/Stepper';
 import { EmptyRow, Table, TableBody, TableHead, Td, Th } from '../../components/ui/Table';
 import { EyeIcon, PlusIcon, SearchIcon, UploadIcon } from '../../components/ui/icons';
+import { COLUMNAS_ESTUDIANTES, NOTAS_CSV_ESTUDIANTES } from '../../lib/columnasImportacion';
 import { useCreateUser } from '../../hooks/useUsers';
 import { useVincularAcudiente } from '../../hooks/useGuardians';
 import {
@@ -576,7 +578,8 @@ export function StudentsPage() {
       <Drawer
         open={importarOpen}
         title="Carga masiva de estudiantes"
-        subtitle="CSV: tipo_documento,numero_documento,nombre,apellido,email,fecha_nacimiento,genero,rh,eps,regimen_salud,estrato,direccion_residencia,barrio_vereda,municipio,grupo_etnico,victima_conflicto,tiene_discapacidad,tiene_talento_excepcional,institucion_procedencia,acudiente_tipo_documento,acudiente_numero_documento,acudiente_nombre,acudiente_apellido,acudiente_telefono,acudiente_parentesco"
+        subtitle="Un archivo CSV con un estudiante por fila."
+        size="lg"
         onClose={() => {
           setImportarOpen(false);
           setArchivo(null);
@@ -588,10 +591,7 @@ export function StudentsPage() {
         submitDisabled={!archivo}
       >
         {bulkImport.isError && <Alert tone="error">{errorMessage(bulkImport.error)}</Alert>}
-        <Alert tone="info">
-          Cada estudiante creado recibe una contraseña temporal que deberá cambiar en su primer ingreso. El acudiente
-          de la fila (si se completa) queda registrado como principal.
-        </Alert>
+        <GuiaColumnas notas={NOTAS_CSV_ESTUDIANTES} columnas={COLUMNAS_ESTUDIANTES} />
         <Input label="Archivo CSV" type="file" accept=".csv,text/csv" onChange={(e) => setArchivo(e.target.files?.[0] ?? null)} />
         {bulkImport.data && (
           <div className="space-y-2">

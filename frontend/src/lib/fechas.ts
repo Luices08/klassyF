@@ -18,6 +18,12 @@ export function formatoRangoCalendario(inicio: string, fin: string): string {
   return `${formatoFechaCalendario(inicio)} – ${formatoFechaCalendario(fin)}`;
 }
 
+/** Días que faltan para que termine (hora Colombia, UTC-5) el día de calendario `iso`; 0 = vence hoy, negativo = ya venció. */
+export function diasHastaFinDelDia(iso: string): number {
+  const finDelDia = new Date(iso).getTime() + 86_400_000 + 5 * 3_600_000;
+  return Math.ceil((finDelDia - Date.now()) / 86_400_000) - 1;
+}
+
 /** Valor para <input type="date">: 'YYYY-MM-DD' (los primeros 10 caracteres del ISO en UTC). */
 export function aInputFecha(iso: string | null | undefined): string {
   return iso ? iso.slice(0, 10) : '';

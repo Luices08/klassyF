@@ -12,6 +12,8 @@ export interface IGroup {
   cupos_ocupados: number;
   estado: EstadoGrupo;
   director_grupo_id: Types.ObjectId | null;
+  /** Salon titular (M10), opcional: las instituciones que no registran espacios crean grupos sin aula. */
+  aula_id: Types.ObjectId | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -34,6 +36,7 @@ const groupSchema = new Schema<IGroup, GroupModel>(
     cupos_ocupados: { type: Number, default: 0, min: 0 },
     estado: { type: String, enum: ESTADOS_GRUPO, default: 'ACTIVE' },
     director_grupo_id: { type: Schema.Types.ObjectId, ref: 'User', default: null },
+    aula_id: { type: Schema.Types.ObjectId, ref: 'Espacio', default: null },
   },
   { timestamps: true }
 );
@@ -44,6 +47,8 @@ groupSchema.index(
   { academic_year_id: 1, sede_id: 1, jornada_id: 1, grade_id: 1, nomenclatura: 1 },
   { unique: true }
 );
+
+groupSchema.index({ aula_id: 1, academic_year_id: 1, jornada_id: 1 });
 
 groupSchema.pre('validate', function validateCupos(this: IGroup, next) {
   if (this.cupos_ocupados > this.max_capacity) {

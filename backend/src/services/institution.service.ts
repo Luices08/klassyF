@@ -1,11 +1,13 @@
 import { Types } from 'mongoose';
 import { ROLES } from '../constants/roles';
-import { Calendario, EstadoUsuario } from '../constants/enums';
+import { Calendario, EstadoUsuario, ModalidadInstitucion, PoliticaAforoAula } from '../constants/enums';
 import AcademicYear, { AcademicYearDocument } from '../models/academicYear.model';
 import Campus, { CampusDocument } from '../models/campus.model';
 import Institution, { InstitutionDocument } from '../models/institution.model';
 import User from '../models/user.model';
 import ApiError from '../utils/ApiError';
+import { FranjaPlantilla } from '../utils/franjas';
+import { registrarEvento } from './audit.service';
 import { runTransaction } from '../utils/runTransaction';
 
 export interface UpdateInstitutionInput {
@@ -17,6 +19,8 @@ export interface UpdateInstitutionInput {
   logo_url?: string | null;
   correo_secretaria?: string | null;
   horario_atencion?: string | null;
+  modalidad?: ModalidadInstitucion;
+  politica_aforo_aula?: PoliticaAforoAula;
 }
 
 export interface SetupInstitutionInput {
@@ -25,6 +29,7 @@ export interface SetupInstitutionInput {
     codigo_dane: string;
     nit: string;
     resolucion_aprobacion: string;
+    modalidad?: ModalidadInstitucion;
     administrador_id?: string | Types.ObjectId;
   };
   sede_principal: {
@@ -119,6 +124,31 @@ export async function setupInstitution({
   });
 }
 
+/**
+ * Plantilla base de franjas (clases y descansos, por duracion) que se carga en las jornadas. No lleva contraseña de
+ * confirmacion: no toca datos legales de la institucion, y editarla no altera las jornadas ya configuradas.
+ */
+export async function actualizarPlantillaFranjas(
+  franjas: FranjaPlantilla[],
+  { usuarioId, ip }: { usuarioId: Types.ObjectId | string; ip?: string | null }
+): Promise<InstitutionDocument> {
+  const institucion = await Institution.findOne();
+  if (!institucion) throw new ApiError(404, 'No hay una institución configurada todavía.');
+
+  institucion.set('plantilla_franjas', franjas);
+  await institucion.save();
+
+  await registrarEvento({
+    usuario_id: usuarioId,
+    accion: 'PLANTILLA_FRANJAS_ACTUALIZADA',
+    entidad: 'Institution',
+    entidad_id: institucion._id,
+    detalle: `${franjas.length} bloque(s), ${franjas.reduce((s, f) => s + f.duracion_min, 0)} minutos en total`,
+    ip,
+  });
+  return institucion;
+}
+
 /** Como solo existe una institucion por despliegue, no recibe ni necesita un id. */
 export async function getInstitution(): Promise<InstitutionDocument | null> {
   return Institution.findOne();
@@ -146,6 +176,8 @@ export async function updateInstitution(
   if (input.logo_url !== undefined) institucion.logo_url = input.logo_url;
   if (input.correo_secretaria !== undefined) institucion.correo_secretaria = input.correo_secretaria;
   if (input.horario_atencion !== undefined) institucion.horario_atencion = input.horario_atencion;
+  if (input.modalidad !== undefined) institucion.modalidad = input.modalidad;
+  if (input.politica_aforo_aula !== undefined) institucion.politica_aforo_aula = input.politica_aforo_aula;
   await institucion.save();
 
   return institucion;

@@ -1,7 +1,7 @@
 import { type ChangeEvent, type FormEvent, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Alert, errorMessage } from '../../components/ui/Alert';
-import { EstadoUsuarioBadge } from '../../components/ui/Badge';
+import { Chip, EstadoUsuarioBadge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import { Card, CardHeader } from '../../components/ui/Card';
 import { Drawer } from '../../components/ui/Drawer';
@@ -11,10 +11,19 @@ import { PageHeader } from '../../components/ui/PageHeader';
 import { Spinner } from '../../components/ui/Spinner';
 import { Table, TableBody, TableHead, Td, Th } from '../../components/ui/Table';
 import { BuildingIcon, PlusIcon, TrashIcon } from '../../components/ui/icons';
-import { useInstitutionConfig } from '../../context/InstitutionConfigContext';
+import { PlantillaFranjasDrawer } from '../../components/jornadas/PlantillaFranjasDrawer';
 import { avisosCalendario } from '../../lib/calendarioColombia';
 import { useInstitution, useSetupInstitution, useUpdateInstitution } from '../../hooks/useInstitution';
-import type { Calendario, EstadoActivo, Institution, Periodo } from '../../types/domain';
+import {
+  MODALIDADES_INSTITUCION,
+  NOMBRES_MODALIDAD,
+  type Calendario,
+  type EstadoActivo,
+  type Institution,
+  type ModalidadInstitucion,
+  type Periodo,
+  type PoliticaAforoAula,
+} from '../../types/domain';
 
 const LOGO_MAX_BYTES = 500 * 1024;
 
@@ -76,6 +85,7 @@ function InstitutionOverview({ institution }: { institution: Institution }) {
   const updateInstitution = useUpdateInstitution();
 
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [plantillaAbierta, setPlantillaAbierta] = useState(false);
   const [logoError, setLogoError] = useState<string | null>(null);
   const [form, setForm] = useState({
     nombre: institution.nombre,
@@ -86,6 +96,8 @@ function InstitutionOverview({ institution }: { institution: Institution }) {
     logo_url: institution.logo_url,
     correo_secretaria: institution.correo_secretaria ?? '',
     horario_atencion: institution.horario_atencion ?? '',
+    modalidad: institution.modalidad ?? 'PRESENCIAL',
+    politica_aforo_aula: institution.politica_aforo_aula ?? 'BLOQUEAR',
     confirm_password: '',
   });
 
@@ -101,6 +113,8 @@ function InstitutionOverview({ institution }: { institution: Institution }) {
       logo_url: institution.logo_url,
       correo_secretaria: institution.correo_secretaria ?? '',
       horario_atencion: institution.horario_atencion ?? '',
+      modalidad: institution.modalidad ?? 'PRESENCIAL',
+      politica_aforo_aula: institution.politica_aforo_aula ?? 'BLOQUEAR',
       confirm_password: '',
     });
     setDrawerOpen(true);
@@ -166,6 +180,13 @@ function InstitutionOverview({ institution }: { institution: Institution }) {
             <StaticField label="Resolución de aprobación" value={institution.resolucion_aprobacion} />
             <StaticField label="Correo de secretaría" value={institution.correo_secretaria || '—'} />
             <StaticField label="Horario de atención" value={institution.horario_atencion || '—'} />
+            <StaticField label="Modalidad" value={institution.modalidad === 'VIRTUAL' ? 'Virtual' : 'Presencial'} />
+            {institution.modalidad !== 'VIRTUAL' && (
+              <StaticField
+                label="Si el cupo de un grupo excede el aforo de su aula"
+                value={institution.politica_aforo_aula === 'ADVERTIR' ? 'Solo advertir' : 'Bloquear la creación'}
+              />
+            )}
           </div>
         </Card>
 
@@ -181,6 +202,32 @@ function InstitutionOverview({ institution }: { institution: Institution }) {
           </Button>
         </Card>
       </div>
+
+      <Card>
+        <CardHeader
+          title="Plantilla de franjas horarias"
+          subtitle="Clases y descansos base que se cargan en cada jornada; el módulo de horarios (M09) usa esa misma estructura."
+          action={
+            <Button type="button" variant="outline" onClick={() => setPlantillaAbierta(true)}>
+              {institution.plantilla_franjas.length > 0 ? 'Editar plantilla' : 'Definir plantilla'}
+            </Button>
+          }
+        />
+        {institution.plantilla_franjas.length === 0 ? (
+          <p className="text-sm text-muted">
+            Aún no hay plantilla: cada jornada se configura a mano en Sedes y jornadas. Con una plantilla podrás cargar
+            la estructura completa en todas las jornadas con un clic.
+          </p>
+        ) : (
+          <div className="flex flex-wrap gap-2">
+            {institution.plantilla_franjas.map((b, i) => (
+              <Chip key={`${b.nombre}-${i}`} tone={b.tipo === 'CLASE' ? 'blue' : 'neutral'}>
+                {b.nombre} · {b.duracion_min} min
+              </Chip>
+            ))}
+          </div>
+        )}
+      </Card>
 
       <Card>
         <CardHeader title="Institución registrada" />
@@ -210,6 +257,12 @@ function InstitutionOverview({ institution }: { institution: Institution }) {
           </TableBody>
         </Table>
       </Card>
+
+      <PlantillaFranjasDrawer
+        open={plantillaAbierta}
+        plantilla={institution.plantilla_franjas}
+        onClose={() => setPlantillaAbierta(false)}
+      />
 
       <Drawer
         open={drawerOpen}
@@ -258,6 +311,29 @@ function InstitutionOverview({ institution }: { institution: Institution }) {
           onChange={(e) => setForm((f) => ({ ...f, horario_atencion: e.target.value }))}
           hint='Ej. "Lunes a viernes, 7:00 a.m. – 3:00 p.m."'
         />
+        <Select
+          label="Modalidad"
+          value={form.modalidad}
+          onChange={(e) => setForm((f) => ({ ...f, modalidad: e.target.value as ModalidadInstitucion }))}
+          hint="Una institución virtual no usa aulas: se oculta el módulo Espacios y aulas y los grupos no llevan aula. Los espacios ya registrados se conservan."
+        >
+          {MODALIDADES_INSTITUCION.map((m) => (
+            <option key={m} value={m}>
+              {NOMBRES_MODALIDAD[m]}
+            </option>
+          ))}
+        </Select>
+        {form.modalidad === 'PRESENCIAL' && (
+          <Select
+            label="Si el cupo de un grupo excede el aforo de su aula"
+            value={form.politica_aforo_aula}
+            onChange={(e) => setForm((f) => ({ ...f, politica_aforo_aula: e.target.value as PoliticaAforoAula }))}
+            hint="Aplica solo a grupos con aula asignada (Espacios y aulas)."
+          >
+            <option value="BLOQUEAR">Bloquear la creación del grupo</option>
+            <option value="ADVERTIR">Solo advertir (queda en auditoría)</option>
+          </Select>
+        )}
 
         <div>
           {form.logo_url && (
@@ -297,9 +373,14 @@ function InstitutionOverview({ institution }: { institution: Institution }) {
 
 function InstitutionWizard() {
   const setup = useSetupInstitution();
-  const { setConfig } = useInstitutionConfig();
 
-  const [institucion, setInstitucion] = useState({ nombre: '', codigo_dane: '', nit: '', resolucion_aprobacion: '' });
+  const [institucion, setInstitucion] = useState({
+    nombre: '',
+    codigo_dane: '',
+    nit: '',
+    resolucion_aprobacion: '',
+    modalidad: 'PRESENCIAL' as ModalidadInstitucion,
+  });
   const [sede, setSede] = useState({ nombre: 'Sede Principal', codigo_dane_sede: '', direccion: '' });
   const [year, setYear] = useState(new Date().getFullYear());
   const [calendario, setCalendario] = useState<Calendario>('A');
@@ -327,19 +408,10 @@ function InstitutionWizard() {
     e.preventDefault();
     setup.reset();
 
-    const result = await setup.mutateAsync({
+    await setup.mutateAsync({
       institucion,
       sede_principal: sede,
       anio_lectivo: { year, calendario, periodos: periodos.map(({ _key, ...p }) => p) },
-    });
-
-    setConfig({
-      institutionId: result.institution._id,
-      institutionName: result.institution.nombre,
-      sedeId: result.sede_principal._id,
-      sedeName: result.sede_principal.nombre,
-      academicYearId: result.academic_year._id,
-      academicYearYear: result.academic_year.year,
     });
   }
 
@@ -376,6 +448,18 @@ function InstitutionWizard() {
               value={institucion.resolucion_aprobacion}
               onChange={(e) => setInstitucion((s) => ({ ...s, resolucion_aprobacion: e.target.value }))}
             />
+            <Select
+              label="Modalidad"
+              value={institucion.modalidad}
+              onChange={(e) => setInstitucion((s) => ({ ...s, modalidad: e.target.value as ModalidadInstitucion }))}
+              hint="Una institución virtual no usa aulas ni espacios físicos. Se puede cambiar después."
+            >
+              {MODALIDADES_INSTITUCION.map((m) => (
+                <option key={m} value={m}>
+                  {NOMBRES_MODALIDAD[m]}
+                </option>
+              ))}
+            </Select>
           </div>
         </Card>
 

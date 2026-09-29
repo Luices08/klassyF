@@ -30,6 +30,15 @@ export const ACCIONES_AUDITORIA = [
   'PRORROGA_OTORGADA',
   'PRORROGA_REVOCADA',
   'CALENDARIO_ACTUALIZADO',
+  // M10: Espacios fisicos
+  'ESPACIO_CREADO',
+  'ESPACIO_ACTUALIZADO',
+  'ESPACIO_ESTADO_CAMBIADO',
+  'ESPACIO_ELIMINADO',
+  'GRUPO_EXCEDE_AFORO_AULA',
+  // M01/M05: estructura de tiempo de las jornadas
+  'JORNADA_HORARIO_ACTUALIZADO',
+  'PLANTILLA_FRANJAS_ACTUALIZADA',
 ] as const;
 export type AccionAuditoria = (typeof ACCIONES_AUDITORIA)[number];
 

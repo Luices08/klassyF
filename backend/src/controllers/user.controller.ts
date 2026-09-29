@@ -1,7 +1,7 @@
 import { ParamsDictionary } from 'express-serve-static-core';
 import { FilterQuery, Types } from 'mongoose';
-import { EstadoUsuario, Rol, TipoDocumento } from '../constants/enums';
-import { ROLES, ROLES_LIST } from '../constants/roles';
+import { EstadoUsuario, Rol, TIPOS_DOCUMENTO, TipoDocumento } from '../constants/enums';
+import { ROLES, ROLES_LIST, puedeGestionarRol } from '../constants/roles';
 import ActivitySubmission from '../models/activitySubmission.model';
 import Attendance from '../models/attendance.model';
 import Campus from '../models/campus.model';
@@ -16,15 +16,14 @@ import TeacherAssignment from '../models/teacherAssignment.model';
 import User, { IUser } from '../models/user.model';
 import { registrarEvento } from '../services/audit.service';
 import { generateToken } from '../services/token.service';
-import { csvARegistros, parseCsv } from '../utils/csv';
+import { leerCsv } from '../utils/csv';
 import { generarPasswordTemporal } from '../utils/generarPasswordTemporal';
 import ApiError from '../utils/ApiError';
 import catchAsync from '../utils/catchAsync';
 
-// Un solo rol de maximo privilegio (ADMIN) desde que se quito SUPERADMIN: solo un
-// ADMIN puede crear, editar o degradar/eliminar a otro ADMIN — un COORDINADOR o
-// SECRETARIA no debe poder tocar una cuenta de administrador.
-const ROLES_RESTRINGIDOS: Rol[] = [ROLES.ADMIN];
+// La jerarquía institucional (puedeGestionarRol de ../constants/roles)
+// rige todas las acciones: ningún rol puede crear, editar, cambiar estado,
+// resetear clave ni eliminar a roles de rango igual o superior.
 
 interface CreateUserBody {
   nombre: string;
@@ -40,8 +39,8 @@ interface CreateUserBody {
 }
 
 export const createUser = catchAsync<unknown, unknown, CreateUserBody>(async (req, res) => {
-  if (ROLES_RESTRINGIDOS.includes(req.body.rol) && req.user?.rol !== ROLES.ADMIN) {
-    throw new ApiError(403, 'Solo un ADMIN puede crear usuarios con rol ADMIN.');
+  if (!req.user || !puedeGestionarRol(req.user.rol, req.body.rol)) {
+    throw new ApiError(403, `Tu rol (${req.user?.rol}) no tiene permisos para crear usuarios con rol ${req.body.rol}.`);
   }
 
   const { password, ...rest } = req.body;
@@ -144,10 +143,12 @@ export const updateUser = catchAsync<UserParams, unknown, UpdateUserBody>(async 
   const user = await User.findById(req.params.id);
   if (!user) throw new ApiError(404, 'Usuario no encontrado.');
 
-  const esOAsignaRolRestringido =
-    ROLES_RESTRINGIDOS.includes(user.rol) || (req.body.rol && ROLES_RESTRINGIDOS.includes(req.body.rol));
-  if (esOAsignaRolRestringido && req.user?.rol !== ROLES.ADMIN) {
-    throw new ApiError(403, 'Solo un ADMIN puede editar una cuenta ADMIN o asignar el rol ADMIN.');
+  if (!req.user || !puedeGestionarRol(req.user.rol, user.rol)) {
+    throw new ApiError(403, `Tu rol (${req.user?.rol}) no tiene permisos para editar un usuario con rol ${user.rol}.`);
+  }
+
+  if (req.body.rol && !puedeGestionarRol(req.user.rol, req.body.rol)) {
+    throw new ApiError(403, `Tu rol (${req.user?.rol}) no tiene permisos para asignar el rol ${req.body.rol}.`);
   }
 
   const { password, ...rest } = req.body;
@@ -191,8 +192,8 @@ export const actualizarEstadoUsuario = catchAsync<UserParams, unknown, Actualiza
   if (String(user._id) === String(req.user?._id)) {
     throw new ApiError(400, 'No puedes cambiar el estado de tu propio usuario.');
   }
-  if (user.rol === ROLES.ADMIN && req.user?.rol !== ROLES.ADMIN) {
-    throw new ApiError(403, 'Solo un ADMIN puede cambiar el estado de una cuenta ADMIN.');
+  if (!req.user || !puedeGestionarRol(req.user.rol, user.rol)) {
+    throw new ApiError(403, `Tu rol (${req.user?.rol}) no tiene permisos para cambiar el estado de un usuario con rol ${user.rol}.`);
   }
   if (user.rol === ROLES.ADMIN && req.body.estado === 'inactivo' && (await esUnicoAdmin(req.params.id, true))) {
     throw new ApiError(400, 'No puedes desactivar al único administrador activo del sistema.');
@@ -243,8 +244,8 @@ export const eliminarUsuario = catchAsync<UserParams>(async (req, res) => {
   if (String(user._id) === String(req.user?._id)) {
     throw new ApiError(400, 'No puedes eliminar tu propio usuario.');
   }
-  if (user.rol === ROLES.ADMIN && req.user?.rol !== ROLES.ADMIN) {
-    throw new ApiError(403, 'Solo un ADMIN puede eliminar una cuenta ADMIN.');
+  if (!req.user || !puedeGestionarRol(req.user.rol, user.rol)) {
+    throw new ApiError(403, `Tu rol (${req.user?.rol}) no tiene permisos para eliminar a un usuario con rol ${user.rol}.`);
   }
   if (user.rol === ROLES.ADMIN && (await esUnicoAdmin(req.params.id, false))) {
     throw new ApiError(400, 'No puedes eliminar al único administrador del sistema.');
@@ -282,8 +283,11 @@ export const resetearPassword = catchAsync<UserParams>(async (req, res) => {
   const user = await User.findById(req.params.id);
   if (!user) throw new ApiError(404, 'Usuario no encontrado.');
 
-  if (user.rol === ROLES.ADMIN && req.user?.rol !== ROLES.ADMIN) {
-    throw new ApiError(403, 'Solo un ADMIN puede resetear la contraseña de una cuenta ADMIN.');
+  if (String(user._id) === String(req.user?._id)) {
+    throw new ApiError(400, 'Para cambiar tu propia contraseña, usa la opción en Mi cuenta.');
+  }
+  if (!req.user || !puedeGestionarRol(req.user.rol, user.rol)) {
+    throw new ApiError(403, `Tu rol (${req.user?.rol}) no tiene permisos para resetear la contraseña de un usuario con rol ${user.rol}.`);
   }
 
   const passwordTemporal = generarPasswordTemporal();
@@ -309,8 +313,8 @@ export const cerrarSesiones = catchAsync<UserParams>(async (req, res) => {
   const user = await User.findById(req.params.id);
   if (!user) throw new ApiError(404, 'Usuario no encontrado.');
 
-  if (user.rol === ROLES.ADMIN && req.user?.rol !== ROLES.ADMIN) {
-    throw new ApiError(403, 'Solo un ADMIN puede cerrar las sesiones de una cuenta ADMIN.');
+  if (!req.user || !puedeGestionarRol(req.user.rol, user.rol)) {
+    throw new ApiError(403, `Tu rol (${req.user?.rol}) no tiene permisos para cerrar las sesiones de un usuario con rol ${user.rol}.`);
   }
 
   user.version_sesion += 1;
@@ -379,12 +383,17 @@ interface FilaImportacionError {
   motivo: string;
 }
 
-/** Carga masiva (M02): CSV con encabezado tipo_documento,numero_documento,nombre,apellido,email,rol,telefono,sedes_codigos */
+const COLUMNAS_OBLIGATORIAS_USUARIOS = ['tipo_documento', 'numero_documento', 'nombre', 'apellido', 'email', 'rol'];
+
+/**
+ * Carga masiva (M02): CSV con encabezado tipo_documento,numero_documento,nombre,apellido,email,rol,telefono,sedes_codigos.
+ * Separador coma o punto y coma (se detecta); varias sedes en "sedes_codigos" se separan con | (o ; / , si la celda va entre comillas).
+ */
 export const bulkImportUsers = catchAsync(async (req, res) => {
   const file = req.file;
   if (!file) throw new ApiError(400, 'Debes adjuntar un archivo CSV en el campo "file".');
 
-  const registros = csvARegistros(parseCsv(file.buffer.toString('utf-8')));
+  const { registros } = leerCsv(file.buffer, COLUMNAS_OBLIGATORIAS_USUARIOS);
   if (registros.length === 0) throw new ApiError(400, 'El archivo no tiene filas de datos.');
 
   const errores: FilaImportacionError[] = [];
@@ -399,16 +408,22 @@ export const bulkImportUsers = catchAsync(async (req, res) => {
       if (!registro.tipo_documento || !numeroDocumento || !registro.nombre || !registro.apellido || !registro.email || !registro.rol) {
         throw new ApiError(400, 'Faltan columnas obligatorias (tipo_documento, numero_documento, nombre, apellido, email, rol).');
       }
-      if (!(ROLES as Record<string, string>)[registro.rol]) {
-        throw new ApiError(400, `Rol "${registro.rol}" no es valido.`);
+      // Excel suele dejar "cc" o "docente" en minusculas: se toleran, pero el valor debe existir.
+      const tipoDocumento = registro.tipo_documento.toUpperCase();
+      const rol = registro.rol.toUpperCase();
+      if (!(TIPOS_DOCUMENTO as readonly string[]).includes(tipoDocumento)) {
+        throw new ApiError(400, `tipo_documento "${registro.tipo_documento}" no es valido. Usa: ${TIPOS_DOCUMENTO.join(', ')}.`);
       }
-      if (ROLES_RESTRINGIDOS.includes(registro.rol as Rol) && req.user?.rol !== ROLES.ADMIN) {
-        throw new ApiError(403, 'Solo un ADMIN puede importar usuarios con rol ADMIN.');
+      if (!(ROLES as Record<string, string>)[rol]) {
+        throw new ApiError(400, `Rol "${registro.rol}" no es valido. Usa: ${ROLES_LIST.join(', ')}.`);
+      }
+      if (!req.user || !puedeGestionarRol(req.user.rol, rol as Rol)) {
+        throw new ApiError(403, `Tu rol (${req.user?.rol}) no tiene permisos para importar usuarios con rol ${rol}.`);
       }
 
       let sedesIds: Types.ObjectId[] = [];
       if (registro.sedes_codigos) {
-        const codigos = registro.sedes_codigos.split(';').map((c) => c.trim()).filter(Boolean);
+        const codigos = registro.sedes_codigos.split(/[;|,]/).map((c) => c.trim()).filter(Boolean);
         const sedes = await Campus.find({ codigo_dane_sede: { $in: codigos } });
         if (sedes.length !== codigos.length) {
           throw new ApiError(400, 'Uno o mas codigos de sede en "sedes_codigos" no existen.');
@@ -419,11 +434,11 @@ export const bulkImportUsers = catchAsync(async (req, res) => {
       const user = new User({
         nombre: registro.nombre,
         apellido: registro.apellido,
-        tipo_documento: registro.tipo_documento,
+        tipo_documento: tipoDocumento,
         numero_documento: numeroDocumento,
         email: registro.email,
         telefono: registro.telefono || undefined,
-        rol: registro.rol,
+        rol,
         sedes_ids: sedesIds,
         debe_cambiar_password: true,
       });

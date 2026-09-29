@@ -12,6 +12,13 @@ export const DOCUMENTOS_REQUERIDOS_POR_NIVEL: Record<NivelEducativo, TipoDocumen
   MEDIA: ['DOCUMENTO_IDENTIDAD', 'CERTIFICADO_GRADO_ANTERIOR', 'FOTO', 'CARNE_EPS'],
 };
 
+/**
+ * Plazo por defecto (dias) para que el acudiente entregue los documentos y se
+ * legalice la matricula de un aspirante aprobado. Secretaria puede fijar otra
+ * fecha al aprobar la solicitud; este es solo el valor por omision.
+ */
+export const DIAS_PLAZO_LEGALIZACION = 15;
+
 export const NOMBRES_DOCUMENTO_MATRICULA: Record<TipoDocumentoMatricula, string> = {
   DOCUMENTO_IDENTIDAD: 'Documento de identidad',
   CERTIFICADO_GRADO_ANTERIOR: 'Certificado del grado anterior',

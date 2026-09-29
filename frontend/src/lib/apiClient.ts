@@ -116,12 +116,21 @@ async function uploadRequest<TEnvelope extends ApiEnvelopeBase>(path: string, fo
  * Descarga un archivo binario (PDF, imagen) de una ruta autenticada y
  * devuelve un blob URL listo para <a href>/<img src> o window.open. A
  * diferencia de `request`, nunca intenta parsear la respuesta como JSON.
+ * Con `method: 'POST'` envía las credenciales en el cuerpo, no en la URL (sitio público).
  */
-async function downloadBlob(path: string): Promise<{ url: string; blob: Blob }> {
+async function downloadBlob(
+  path: string,
+  options: { method?: 'GET' | 'POST'; body?: unknown } = {}
+): Promise<{ url: string; blob: Blob }> {
   const token = getStoredToken();
 
   const res = await fetch(buildUrl(path), {
-    headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+    method: options.method ?? 'GET',
+    headers: {
+      ...(options.body !== undefined ? { 'Content-Type': 'application/json' } : {}),
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    body: options.body !== undefined ? JSON.stringify(options.body) : undefined,
   });
 
   if (!res.ok) {

@@ -4,6 +4,7 @@ import {
   BuildingIcon,
   CalendarIcon,
   ClipboardListIcon,
+  DoorIcon,
   FileTextIcon,
   FolderIcon,
   GraduationCapIcon,
@@ -20,6 +21,8 @@ export interface NavItem {
   label: string;
   icon: ComponentType<SVGProps<SVGSVGElement>>;
   roles?: Rol[];
+  /** Oculto en instituciones virtuales (sin espacios físicos). */
+  soloPresencial?: boolean;
 }
 
 const STAFF: Rol[] = ['ADMIN', 'COORDINADOR', 'SECRETARIA'];
@@ -38,6 +41,7 @@ export const NAV_ITEMS: NavItem[] = [
   { to: '/admin/users', label: 'Usuarios', icon: UsersIcon, roles: STAFF },
   { to: '/admin/students', label: 'Estudiantes', icon: FolderIcon, roles: STAFF },
   { to: '/admin/groups', label: 'Grupos', icon: LayersIcon, roles: GROUP_MANAGERS },
+  { to: '/admin/espacios', label: 'Espacios y aulas', icon: DoorIcon, roles: GROUP_MANAGERS, soloPresencial: true },
   { to: '/admin/enrollments', label: 'Matrículas', icon: ClipboardListIcon, roles: STAFF },
   { to: '/admin/admisiones', label: 'Admisiones', icon: InboxIcon, roles: STAFF },
 ];

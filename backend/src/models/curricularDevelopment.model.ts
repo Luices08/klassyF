@@ -57,7 +57,7 @@ const versionSnapshotSchema = new Schema<IVersionSnapshot>(
     version: { type: Number, required: true },
     fecha: { type: Date, required: true, default: Date.now },
     modificado_por: { type: Schema.Types.ObjectId, ref: 'User', required: true },
-    dba_seleccionados: { type: [Schema.Types.ObjectId], ref: 'DBABank', default: [] },
+    dba_seleccionados: { type: [Schema.Types.ObjectId], ref: 'ReferenteCurricular', default: [] },
     competencias: { type: String, default: '' },
     contenidos_tematicos: { type: [String], default: [] },
     actividades_propuestas: { type: String, default: '' },
@@ -71,7 +71,7 @@ const curricularDevelopmentSchema = new Schema<ICurricularDevelopment, Curricula
   {
     teacher_assignment_id: { type: Schema.Types.ObjectId, ref: 'TeacherAssignment', required: true },
     periodo_numero: { type: Number, required: true, min: 1, max: 4 },
-    dba_seleccionados: { type: [Schema.Types.ObjectId], ref: 'DBABank', default: [] },
+    dba_seleccionados: { type: [Schema.Types.ObjectId], ref: 'ReferenteCurricular', default: [] },
     competencias: { type: String, required: true, trim: true },
     contenidos_tematicos: { type: [String], default: [] },
     ejes_tematicos: { type: [String], default: [] },

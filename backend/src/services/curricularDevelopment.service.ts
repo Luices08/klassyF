@@ -1,5 +1,5 @@
 import CurricularDevelopment, { CurricularDevelopmentDocument } from '../models/curricularDevelopment.model';
-import DBABank from '../models/dbaBank.model';
+import { Dba } from '../models/referenteCurricular.model';
 import Group from '../models/group.model';
 import Subject from '../models/subject.model';
 import TeacherAssignment, { TeacherAssignmentDocument } from '../models/teacherAssignment.model';
@@ -65,15 +65,13 @@ async function validateDbaSeleccionados(
   if (!group) throw new ApiError(404, 'Grupo de la asignación académica no encontrado.');
   if (!subject) throw new ApiError(404, 'Asignatura de la asignación académica no encontrada.');
 
-  const dbas = await DBABank.find({ _id: { $in: dbaIds } });
+  const dbas = await Dba.find({ _id: { $in: dbaIds } });
   if (dbas.length !== new Set(dbaIds).size) {
     throw new ApiError(400, 'Uno o más dba_seleccionados no existen en el banco de DBA.');
   }
 
   const inconsistente = dbas.some(
-    (d) =>
-      (d.grade_id && String(d.grade_id) !== String(group.grade_id)) ||
-      String(d.area_id) !== String(subject.area_id)
+    (d) => String(d.grade_id) !== String(group.grade_id) || String(d.area_id) !== String(subject.area_id)
   );
   if (inconsistente) {
     throw new ApiError(

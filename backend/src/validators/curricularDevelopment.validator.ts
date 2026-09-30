@@ -32,6 +32,8 @@ export const review: ValidationSchema = {
     decision: Joi.string().valid('APROBADO', 'DEVUELTO_OBSERVACIONES').required(),
     observacion: Joi.string().when('decision', {
       is: 'DEVUELTO_OBSERVACIONES',
+      // Joi usa `then` como clave de configuración, no como un thenable.
+      // oxlint-disable-next-line unicorn/no-thenable
       then: Joi.string().min(1).required(),
       otherwise: Joi.string().allow('', null).optional(),
     }),

@@ -27,7 +27,7 @@ async function commitWithRetry(session: ClientSession): Promise<void> {
 async function safeAbort(session: ClientSession): Promise<void> {
   try {
     await session.abortTransaction();
-  } catch (_err) {
+  } catch {
     // La transaccion puede no haber alcanzado a iniciar o ya estar abortada.
   }
 }

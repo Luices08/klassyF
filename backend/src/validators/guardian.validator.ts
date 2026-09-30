@@ -5,7 +5,13 @@ import { objectId } from './common.validator';
 
 /** Requerido solo cuando no se manda `guardian_id` (es decir, se esta registrando un acudiente nuevo). */
 function requeridoSiEsNuevo(schema: Joi.StringSchema): Joi.StringSchema {
-  return schema.when('guardian_id', { is: Joi.exist(), then: Joi.optional(), otherwise: Joi.required() });
+  return schema.when('guardian_id', {
+    is: Joi.exist(),
+    // Joi usa `then` como clave de configuración, no como un thenable.
+    // oxlint-disable-next-line unicorn/no-thenable
+    then: Joi.optional(),
+    otherwise: Joi.required(),
+  });
 }
 
 export const listarAcudientes: ValidationSchema = {

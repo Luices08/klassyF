@@ -630,31 +630,58 @@ export interface AdmissionRequest {
   createdAt: string;
 }
 
-// --- M07: Banco de Referentes Curriculares Oficiales (MEN / ICFES) ---
+// --- M07: Banco de Referentes Curriculares Oficiales (MEN) ---
+// MATRIZ_ICFES queda reservado en el enum: aun no hay documento fuente para
+// sembrarlo. DBA, EBC y LINEAMIENTO tienen su propio contrato (discriminado
+// por tipo_referente), sin campos nulos "por si acaso" de un diseño anterior.
 
 export const TIPOS_REFERENTE = ['DBA', 'EBC', 'MATRIZ_ICFES', 'LINEAMIENTO'] as const;
 export type TipoReferente = (typeof TIPOS_REFERENTE)[number];
 
-export interface DBABankItem {
+export const GRUPOS_GRADOS_EBC = ['1-3', '4-5', '6-7', '8-9', '10-11'] as const;
+export type GrupoGradosEbc = (typeof GRUPOS_GRADOS_EBC)[number];
+
+interface ReferenteBase {
   _id: string;
-  tipo_referente: TipoReferente;
-  grade_id?: { _id: string; nombre: string; numero: number; nivel: string } | string | null;
-  area_id: { _id: string; nombre: string; codigo: string } | string;
-  numero_dba?: number | null;
-  enunciado: string;
-  evidencias_aprendizaje: string[];
-  eje_tematico?: string;
-  organizador: string;
-  ejemplo?: string;
-  grupo_grados?: string;
-  competencia?: string;
-  componente?: string;
+  // Solo es null en un Lineamiento transversal (marco general, no propio de un área).
+  area_id: { _id: string; nombre: string; codigo: string } | string | null;
   etiquetas: string[];
   version: string;
   fuente: string;
+  // activo = Vigente, inactivo = Histórico.
   estado: EstadoActivo;
   createdAt: string;
 }
+
+export interface DbaReferente extends ReferenteBase {
+  tipo_referente: 'DBA';
+  grade_id: { _id: string; nombre: string; numero: number; nivel: string } | string;
+  numero_dba: number;
+  // Pensamiento (Matemáticas) / Factor (Lenguaje) / Entorno (C. Naturales) / Eje (C. Sociales).
+  organizador: string;
+  enunciado: string;
+  evidencias_aprendizaje: string[];
+  ejemplo?: string;
+}
+
+export interface EbcReferente extends ReferenteBase {
+  tipo_referente: 'EBC';
+  grupo_grados: GrupoGradosEbc;
+  organizador: string;
+  competencia: string;
+  enunciado: string;
+  evidencias_aprendizaje: string[];
+  dba_relacionados: DbaReferente[] | string[];
+}
+
+export interface LineamientoReferente extends ReferenteBase {
+  tipo_referente: 'LINEAMIENTO';
+  titulo: string;
+  contenido: string;
+  orden: number;
+}
+
+export type ReferenteCurricular = DbaReferente | EbcReferente | LineamientoReferente;
 
 // --- M08: Gestor de Docentes y Carga Académica ---
 
@@ -759,7 +786,7 @@ export interface CurricularDevelopment {
   _id: string;
   teacher_assignment_id: TeacherAssignment | string;
   periodo_numero: number;
-  dba_seleccionados: DBABankItem[] | string[];
+  dba_seleccionados: DbaReferente[] | string[];
   competencias: string;
   contenidos_tematicos: string[];
   ejes_tematicos: string[];

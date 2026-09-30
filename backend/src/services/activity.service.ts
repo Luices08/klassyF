@@ -1,7 +1,7 @@
 import { ComponenteSiee, ESTADOS_MATRICULA_ACTIVOS } from '../constants/enums';
 import Activity, { ActivityDocument } from '../models/activity.model';
 import ActivitySubmission, { ActivitySubmissionDocument } from '../models/activitySubmission.model';
-import DBABank from '../models/dbaBank.model';
+import { Dba } from '../models/referenteCurricular.model';
 import Enrollment from '../models/enrollment.model';
 import Group from '../models/group.model';
 import Subject from '../models/subject.model';
@@ -35,7 +35,7 @@ export async function createActivity(
   }
 
   if (input.dba_id) {
-    const dba = await DBABank.findById(input.dba_id);
+    const dba = await Dba.findById(input.dba_id);
     if (!dba) throw new ApiError(404, 'dba_id no corresponde a un DBA existente.');
 
     const [group, subject] = await Promise.all([

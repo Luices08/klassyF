@@ -3,6 +3,7 @@ import type { Rol } from '../../types/api';
 import type {
   EstadoActivo,
   EstadoAnioLectivo,
+  EstadoDesarrolloCurricular,
   EstadoDocumentoMatricula,
   EstadoEspacio,
   EstadoEstudiante,
@@ -189,4 +190,28 @@ const ESPACIO_TONE: Record<EstadoEspacio, Tone> = {
 /** Estado operativo de un espacio físico (M10): solo los disponibles se pueden asignar. */
 export function EstadoEspacioBadge({ value }: { value: EstadoEspacio }) {
   return <Chip tone={ESPACIO_TONE[value]}>{NOMBRES_ESTADO_ESPACIO[value]}</Chip>;
+}
+
+const DESARROLLO_CURRICULAR_LABELS: Record<EstadoDesarrolloCurricular, string> = {
+  BORRADOR: 'Borrador',
+  ENVIADO_REVISION: 'Enviado a revisión',
+  DEVUELTO_OBSERVACIONES: 'Devuelto con observaciones',
+  APROBADO: 'Aprobado',
+};
+
+const DESARROLLO_CURRICULAR_TONE: Record<EstadoDesarrolloCurricular, Tone> = {
+  BORRADOR: 'blue',
+  ENVIADO_REVISION: 'orange',
+  DEVUELTO_OBSERVACIONES: 'red',
+  APROBADO: 'green',
+};
+
+/** Estado del workflow de planeación pedagógica (M07): borrador -> enviado -> aprobado/devuelto. */
+export function EstadoDesarrolloCurricularBadge({ value }: { value: EstadoDesarrolloCurricular }) {
+  return <Chip tone={DESARROLLO_CURRICULAR_TONE[value]}>{DESARROLLO_CURRICULAR_LABELS[value]}</Chip>;
+}
+
+/** Vigente/Histórico de un referente del banco M07 (DBA/EBC/Lineamiento): mismo campo `estado` activo/inactivo, otra etiqueta. */
+export function EstadoVigenciaReferenteBadge({ value }: { value: EstadoActivo }) {
+  return <Chip tone={value === 'activo' ? 'green' : 'neutral'}>{value === 'activo' ? 'Vigente' : 'Histórico'}</Chip>;
 }

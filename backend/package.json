@@ -9,7 +9,7 @@
     "start": "node dist/server.js",
     "seed": "tsx scripts/seed.ts",
     "seed:subjects": "tsx scripts/seedSubjects.ts",
-    "seed:dba": "tsx scripts/seedDba.ts",
+    "seed:referentes": "tsx scripts/seedReferentesCurriculares.ts",
     "migrate:superadmin-to-admin": "tsx scripts/migrateSuperadminToAdmin.ts",
     "migrate:m05-anio-lectivo": "tsx scripts/migrateM05AnioLectivo.ts",
     "migrate:folio-al-matricular": "tsx scripts/migrateFolioAlMatricular.ts",

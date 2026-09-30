@@ -49,6 +49,8 @@ export const configurarEvaluacionArea: ValidationSchema = {
       .required(),
     asignaturas: Joi.when('metodo_calculo', {
       is: 'PONDERADO',
+      // Joi usa `then` como clave de configuración, no como un thenable.
+      // oxlint-disable-next-line unicorn/no-thenable
       then: Joi.array().items(ponderacionAsignaturaSchema).min(1).required(),
       otherwise: Joi.array().items(ponderacionAsignaturaSchema).default([]),
     }),

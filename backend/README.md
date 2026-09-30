@@ -80,8 +80,8 @@ src/
 scripts/seed.ts
 ```
 
-Modelos de Prompt 2 (`src/models/`): `Area`, `Subject`, `StudyPlanAssignment`, `DBABank`,
-`TeacherAssignment`, `CurricularDevelopment`. Modelos de Prompt 3: `Activity`, `ActivitySubmission`,
+Modelos de Prompt 2 (`src/models/`): `Area`, `Subject`, `StudyPlanAssignment`, `ReferenteCurricular`
+(discriminadores `Dba`/`Ebc`/`Lineamiento`), `TeacherAssignment`, `CurricularDevelopment`. Modelos de Prompt 3: `Activity`, `ActivitySubmission`,
 `Attendance`, `PeriodLock` — mismo patrón en todos (interfaz `IXxx` + `XxxDocument = HydratedDocument<IXxx>`).
 
 ## Flujo de prueba end-to-end (curl)
@@ -164,10 +164,10 @@ curl -s -X POST $BASE/curriculum/study-plan -H "Authorization: Bearer $TOKEN" -H
     {\"subject_id\":\"<fisica_id>\",\"porcentaje_en_area\":20}
   ]}"
 
-# 3) Banco de DBA (carga individual o masiva con array)
-curl -s -X POST $BASE/curriculum/dba-bank -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
-  -d "{\"grade_id\":\"<grade_id>\",\"area_id\":\"$AREA_ID\",\"numero_dba\":1,\"enunciado\":\"...\",\"eje_tematico\":\"Los seres vivos\"}"
-curl -s "$BASE/curriculum/dba-bank?grade_id=<grade_id>&area_id=$AREA_ID" -H "Authorization: Bearer $TOKEN"
+# 3) Banco de Referentes Curriculares — DBA/EBC/Lineamiento (carga individual o masiva con array)
+curl -s -X POST $BASE/curriculum/referentes -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+  -d "{\"tipo_referente\":\"DBA\",\"grade_id\":\"<grade_id>\",\"area_id\":\"$AREA_ID\",\"numero_dba\":1,\"organizador\":\"Entorno vivo\",\"enunciado\":\"...\"}"
+curl -s "$BASE/curriculum/referentes?tipo_referente=DBA&grade_id=<grade_id>&area_id=$AREA_ID" -H "Authorization: Bearer $TOKEN"
 
 # 4) Carga docente
 TA_ID=$(curl -s -X POST $BASE/teacher-assignments -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
@@ -253,7 +253,7 @@ curl -s "$BASE/reports/report-card?student_id=<id1>&academic_year_id=<academic_y
   para que un docente no pueda asociar un DBA de otro grado o área.
 - **Prompt 2 — endpoints de soporte** (`POST/GET /curriculum/areas`, `POST/GET /curriculum/subjects`): no
   estaban en la lista de "endpoints requeridos", pero sin ellos no hay forma de obtener un `area_id`/`subject_id`
-  válido vía API para probar `dba-bank`, `study-plan` o `teacher-assignments` — mismo criterio usado en
+  válido vía API para probar `referentes`, `study-plan` o `teacher-assignments` — mismo criterio usado en
   Prompt 1 para `/users`.
 - **Prompt 2 — historial_revisiones**: se registra en cada decisión del coordinador, tanto al aprobar como al
   devolver (no solo al devolver), para mantener una traza completa de todo el ciclo de revisión.

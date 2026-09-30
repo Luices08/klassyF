@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Alert, errorMessage } from '../../components/ui/Alert';
-import { Chip } from '../../components/ui/Badge';
+import { EstadoDesarrolloCurricularBadge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import { Card, CardHeader } from '../../components/ui/Card';
 import { Drawer } from '../../components/ui/Drawer';
@@ -13,21 +13,7 @@ import {
   useCurricularDevelopments,
   useRevisarCurricular,
 } from '../../hooks/useCurricularDevelopments';
-import type {
-  CurricularDevelopment,
-  DBABankItem,
-  EstadoDesarrolloCurricular,
-} from '../../types/domain';
-
-const ESTADO_CHIP: Record<
-  EstadoDesarrolloCurricular,
-  { label: string; tone: 'blue' | 'green' | 'orange' | 'red' }
-> = {
-  BORRADOR: { label: 'Borrador', tone: 'blue' },
-  ENVIADO_REVISION: { label: 'Enviado a Revisión', tone: 'orange' },
-  DEVUELTO_OBSERVACIONES: { label: 'Devuelto con Observaciones', tone: 'red' },
-  APROBADO: { label: 'Aprobado Oficial', tone: 'green' },
-};
+import type { CurricularDevelopment, DbaReferente, EstadoDesarrolloCurricular } from '../../types/domain';
 
 export function RevisionCurricularPage() {
   const [filtroEstado, setFiltroEstado] = useState<string>('ENVIADO_REVISION');
@@ -170,9 +156,7 @@ export function RevisionCurricularPage() {
                         {dev.dba_seleccionados.length} DBA
                       </Td>
                       <Td>
-                        <Chip tone={ESTADO_CHIP[dev.estado].tone}>
-                          {ESTADO_CHIP[dev.estado].label}
-                        </Chip>
+                        <EstadoDesarrolloCurricularBadge value={dev.estado} />
                       </Td>
                       <Td className="text-center text-xs text-muted">v{dev.version}</Td>
                       <Td className="text-right">
@@ -211,9 +195,7 @@ export function RevisionCurricularPage() {
                 <span className="font-bold text-ink">
                   Periodo {desarrolloSeleccionado.periodo_numero} · Versión {desarrolloSeleccionado.version}
                 </span>
-                <Chip tone={ESTADO_CHIP[desarrolloSeleccionado.estado].tone}>
-                  {ESTADO_CHIP[desarrolloSeleccionado.estado].label}
-                </Chip>
+                <EstadoDesarrolloCurricularBadge value={desarrolloSeleccionado.estado} />
               </div>
               <p className="text-xs text-muted">
                 {desarrolloSeleccionado.semanas_estimadas} semanas lectivas proyectadas.
@@ -227,7 +209,7 @@ export function RevisionCurricularPage() {
               </h4>
               <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
                 {desarrolloSeleccionado.dba_seleccionados.map((d, idx) => {
-                  const dba = typeof d === 'object' ? (d as DBABankItem) : null;
+                  const dba = typeof d === 'object' ? (d as DbaReferente) : null;
                   return (
                     <div key={idx} className="p-2.5 rounded-lg border border-border bg-surface text-xs space-y-1">
                       <div className="flex items-center justify-between">

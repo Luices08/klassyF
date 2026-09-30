@@ -1,30 +1,21 @@
 import { type FormEvent, useEffect, useState } from 'react';
 import { Alert, errorMessage } from '../components/ui/Alert';
-import { Chip } from '../components/ui/Badge';
+import { EstadoDesarrolloCurricularBadge } from '../components/ui/Badge';
 import { Button } from '../components/ui/Button';
 import { Card, CardHeader } from '../components/ui/Card';
 import { Input, Select } from '../components/ui/Field';
 import { PageHeader } from '../components/ui/PageHeader';
 import { Spinner } from '../components/ui/Spinner';
+import { TabPanel, Tabs } from '../components/ui/Tabs';
 import {
   type GuardarBorradorInput,
   useCurricularDevelopment,
   useEnviarRevisionCurricular,
   useGuardarBorradorCurricular,
 } from '../hooks/useCurricularDevelopments';
-import { useDbaBank, useOrganizadoresPorArea } from '../hooks/useDbaBank';
+import { useOrganizadoresPorArea, usePanelApoyo, useReferentes } from '../hooks/useReferentesCurriculares';
 import { useMyTeacherLoad } from '../hooks/useTeacherAssignments';
-import type { DBABankItem, EstadoDesarrolloCurricular } from '../types/domain';
-
-const ESTADO_CHIP: Record<
-  EstadoDesarrolloCurricular,
-  { label: string; tone: 'blue' | 'green' | 'orange' | 'red' }
-> = {
-  BORRADOR: { label: 'Borrador', tone: 'blue' },
-  ENVIADO_REVISION: { label: 'Enviado a Coordinación', tone: 'orange' },
-  DEVUELTO_OBSERVACIONES: { label: 'Devuelto con Observaciones', tone: 'red' },
-  APROBADO: { label: 'Aprobado Oficial', tone: 'green' },
-};
+import type { DbaReferente } from '../types/domain';
 
 export function DesarrolloCurricularPage() {
   const { data: misAsignaciones = [], isLoading: cargandoCarga } = useMyTeacherLoad();
@@ -55,17 +46,24 @@ export function DesarrolloCurricularPage() {
   // Banco de DBA
   const [organizadorFiltro, setOrganizadorFiltro] = useState<string>('');
   const [busquedaDba, setBusquedaDba] = useState<string>('');
+  const [estadoFiltro, setEstadoFiltro] = useState<'activo' | 'inactivo' | ''>('activo');
+  const [tabApoyo, setTabApoyo] = useState<string>('dba');
 
   const { data: organizadores = [] } = useOrganizadoresPorArea(area?._id);
-  const { data: dbaList = [], isLoading: cargandoDba } = useDbaBank(
+  const { data: dbaList = [], isLoading: cargandoDba } = useReferentes(
     {
+      tipo_referente: 'DBA',
       grade_id: grado?._id,
       area_id: area?._id,
       organizador: organizadorFiltro || undefined,
       q: busquedaDba || undefined,
+      estado: estadoFiltro || undefined,
     },
     Boolean(grado?._id && area?._id)
   );
+  const listaDba = dbaList as DbaReferente[];
+
+  const { data: panelApoyo } = usePanelApoyo(area?._id, grado?._id);
 
   // Formulario local
   const [dbaSeleccionados, setDbaSeleccionados] = useState<string[]>([]);
@@ -183,7 +181,7 @@ export function DesarrolloCurricularPage() {
     <div className="space-y-4">
       <PageHeader
         title="Formulación de Desarrollo Curricular"
-        subtitle="Construcción de la planeación pedagógica de aula a partir del Banco de DBA oficial del MEN."
+        subtitle="Construcción de la planeación pedagógica de aula a partir del Banco de Referentes oficial del MEN."
       />
 
       {/* Selectores de Curso y Periodo */}
@@ -224,12 +222,10 @@ export function DesarrolloCurricularPage() {
             {desarrollo ? (
               <div className="flex items-center gap-2">
                 <span className="text-xs font-semibold text-muted">Versión {desarrollo.version}</span>
-                <Chip tone={ESTADO_CHIP[desarrollo.estado].tone}>
-                  {ESTADO_CHIP[desarrollo.estado].label}
-                </Chip>
+                <EstadoDesarrolloCurricularBadge value={desarrollo.estado} />
               </div>
             ) : (
-              <Chip tone="blue">Sin Formular (Nuevo)</Chip>
+              <span className="text-xs font-semibold text-muted">Sin formular (nuevo)</span>
             )}
           </div>
         </div>
@@ -261,25 +257,48 @@ export function DesarrolloCurricularPage() {
           <div className="lg:col-span-5 space-y-4">
             <Card>
               <CardHeader
-                title="Banco de DBA (MEN)"
-                subtitle={`${grado?.nombre || 'Grado'} · ${area?.nombre || 'Área'} (${dbaSeleccionados.length} seleccionados)`}
+                title="Banco de Referentes Curriculares (MEN)"
+                subtitle={`${grado?.nombre || 'Grado'} · ${area?.nombre || 'Área'} (${dbaSeleccionados.length} DBA seleccionados)`}
               />
 
-              <div className="p-4 border-b border-border space-y-3">
-                <Select
-                  label="Organizador / Pensamiento"
-                  value={organizadorFiltro}
-                  onChange={(e) => setOrganizadorFiltro(e.target.value)}
-                >
-                  <option value="">Todos los organizadores</option>
-                  {organizadores.map((org) => (
-                    <option key={org} value={org}>
-                      {org}
-                    </option>
-                  ))}
-                </Select>
+              <div className="px-4 pt-3">
+                <Tabs
+                  items={[
+                    { key: 'dba', label: 'Banco de DBA' },
+                    { key: 'apoyo', label: 'EBC y Lineamiento (apoyo)' },
+                  ]}
+                  active={tabApoyo}
+                  onChange={setTabApoyo}
+                />
+              </div>
 
-                <div className="relative">
+              <TabPanel active={tabApoyo} tabKey="dba">
+                <div className="px-4 pb-2 border-b border-border space-y-3">
+                  <div className="grid grid-cols-2 gap-3">
+                    <Select
+                      label="Organizador / Pensamiento"
+                      value={organizadorFiltro}
+                      onChange={(e) => setOrganizadorFiltro(e.target.value)}
+                    >
+                      <option value="">Todos los organizadores</option>
+                      {organizadores.map((org) => (
+                        <option key={org} value={org}>
+                          {org}
+                        </option>
+                      ))}
+                    </Select>
+
+                    <Select
+                      label="Estado"
+                      value={estadoFiltro}
+                      onChange={(e) => setEstadoFiltro(e.target.value as 'activo' | 'inactivo' | '')}
+                    >
+                      <option value="activo">Vigente</option>
+                      <option value="inactivo">Histórico</option>
+                      <option value="">Todos</option>
+                    </Select>
+                  </div>
+
                   <Input
                     label="Buscar DBA por palabra clave"
                     type="text"
@@ -288,67 +307,121 @@ export function DesarrolloCurricularPage() {
                     onChange={(e) => setBusquedaDba(e.target.value)}
                   />
                 </div>
-              </div>
 
-              <div className="p-4 max-h-[600px] overflow-y-auto space-y-3">
-                {cargandoDba ? (
-                  <div className="flex justify-center p-6">
-                    <Spinner />
-                  </div>
-                ) : dbaList.length === 0 ? (
-                  <p className="text-sm text-muted text-center py-6">
-                    No se encontraron referentes en el banco para este grado y área.
-                  </p>
-                ) : (
-                  dbaList.map((dba: DBABankItem) => {
-                    const isChecked = dbaSeleccionados.includes(dba._id);
-                    return (
-                      <div
-                        key={dba._id}
-                        onClick={() => toggleDba(dba._id)}
-                        className={`p-3 rounded-lg border text-sm transition-all cursor-pointer ${
-                          isChecked
-                            ? 'border-primary bg-primary-soft/40 shadow-xs'
-                            : 'border-border bg-surface hover:bg-soft/50'
-                        } ${!esEditable ? 'cursor-default opacity-85' : ''}`}
-                      >
-                        <div className="flex items-start gap-2.5">
-                          <input
-                            type="checkbox"
-                            checked={isChecked}
-                            onChange={() => {}} // Manejado por onClick del contenedor
-                            disabled={!esEditable}
-                            className="mt-1 h-4 w-4 rounded text-primary focus:ring-primary border-border"
-                          />
-                          <div className="flex-1 space-y-1">
-                            <div className="flex items-center justify-between gap-2">
-                              <span className="font-bold text-ink">DBA #{dba.numero_dba}</span>
-                              <span className="text-[11px] font-medium text-primary px-2 py-0.5 rounded-full bg-primary-soft">
-                                {dba.organizador}
-                              </span>
-                            </div>
-                            <p className="text-body text-xs leading-relaxed">{dba.enunciado}</p>
-
-                            {/* Evidencias oficiales del MEN */}
-                            {isChecked && dba.evidencias_aprendizaje.length > 0 && (
-                              <div className="mt-2 pt-2 border-t border-border/60">
-                                <span className="text-[11px] font-semibold text-muted block mb-1">
-                                  Evidencias oficiales:
+                <div className="p-4 max-h-[560px] overflow-y-auto space-y-3">
+                  {cargandoDba ? (
+                    <div className="flex justify-center p-6">
+                      <Spinner />
+                    </div>
+                  ) : listaDba.length === 0 ? (
+                    <p className="text-sm text-muted text-center py-6">
+                      No se encontraron referentes en el banco para este grado y área.
+                    </p>
+                  ) : (
+                    listaDba.map((dba) => {
+                      const isChecked = dbaSeleccionados.includes(dba._id);
+                      return (
+                        <div
+                          key={dba._id}
+                          onClick={() => toggleDba(dba._id)}
+                          className={`p-3 rounded-lg border text-sm transition-all cursor-pointer ${
+                            isChecked
+                              ? 'border-primary bg-primary-soft/40 shadow-xs'
+                              : 'border-border bg-surface hover:bg-soft/50'
+                          } ${!esEditable ? 'cursor-default opacity-85' : ''}`}
+                        >
+                          <div className="flex items-start gap-2.5">
+                            <input
+                              type="checkbox"
+                              checked={isChecked}
+                              onChange={() => {}} // Manejado por onClick del contenedor
+                              disabled={!esEditable}
+                              className="mt-1 h-4 w-4 rounded text-primary focus:ring-primary border-border"
+                            />
+                            <div className="flex-1 space-y-1">
+                              <div className="flex items-center justify-between gap-2">
+                                <span className="font-bold text-ink">DBA #{dba.numero_dba}</span>
+                                <span className="text-[11px] font-medium text-primary px-2 py-0.5 rounded-full bg-primary-soft">
+                                  {dba.organizador}
                                 </span>
-                                <ul className="list-disc pl-4 space-y-0.5 text-[11px] text-body">
-                                  {dba.evidencias_aprendizaje.map((ev, idx) => (
-                                    <li key={idx}>{ev}</li>
-                                  ))}
-                                </ul>
                               </div>
-                            )}
+                              <p className="text-body text-xs leading-relaxed">{dba.enunciado}</p>
+
+                              {/* Evidencias oficiales del MEN */}
+                              {isChecked && dba.evidencias_aprendizaje.length > 0 && (
+                                <div className="mt-2 pt-2 border-t border-border/60">
+                                  <span className="text-[11px] font-semibold text-muted block mb-1">
+                                    Evidencias oficiales:
+                                  </span>
+                                  <ul className="list-disc pl-4 space-y-0.5 text-[11px] text-body">
+                                    {dba.evidencias_aprendizaje.map((ev, idx) => (
+                                      <li key={idx}>{ev}</li>
+                                    ))}
+                                  </ul>
+                                </div>
+                              )}
+                              {isChecked && dba.ejemplo && (
+                                <p className="mt-1 text-[11px] italic text-muted">Ejemplo: {dba.ejemplo}</p>
+                              )}
+                            </div>
                           </div>
                         </div>
+                      );
+                    })
+                  )}
+                </div>
+              </TabPanel>
+
+              <TabPanel active={tabApoyo} tabKey="apoyo">
+                <div className="p-4 max-h-[620px] overflow-y-auto space-y-4">
+                  {!area?._id || !grado?._id ? (
+                    <p className="text-sm text-muted text-center py-6">
+                      Selecciona un curso para consultar el material de apoyo.
+                    </p>
+                  ) : (
+                    <>
+                      <div className="space-y-2">
+                        <h4 className="text-xs font-bold uppercase tracking-wider text-muted">
+                          EBC relacionados ({panelApoyo?.ebc.length ?? 0})
+                        </h4>
+                        {!panelApoyo || panelApoyo.ebc.length === 0 ? (
+                          <p className="text-xs text-muted">
+                            No hay estándares (EBC) registrados para el grupo de grados de {grado?.nombre}.
+                          </p>
+                        ) : (
+                          panelApoyo.ebc.map((ebc) => (
+                            <div key={ebc._id} className="p-2.5 rounded-lg border border-border bg-surface text-xs space-y-1">
+                              <div className="flex items-center justify-between">
+                                <span className="font-bold text-primary">{ebc.competencia}</span>
+                                <span className="text-[10px] bg-primary-soft text-primary px-1.5 py-0.5 rounded-full">
+                                  {ebc.organizador}
+                                </span>
+                              </div>
+                              <p className="text-body">{ebc.enunciado}</p>
+                            </div>
+                          ))
+                        )}
                       </div>
-                    );
-                  })
-                )}
-              </div>
+
+                      <div className="space-y-2 pt-2 border-t border-border">
+                        <h4 className="text-xs font-bold uppercase tracking-wider text-muted">
+                          Lineamiento curricular ({panelApoyo?.lineamientos.length ?? 0})
+                        </h4>
+                        {!panelApoyo || panelApoyo.lineamientos.length === 0 ? (
+                          <p className="text-xs text-muted">No hay lineamientos registrados.</p>
+                        ) : (
+                          panelApoyo.lineamientos.map((lin) => (
+                            <div key={lin._id} className="p-2.5 rounded-lg border border-border bg-surface text-xs space-y-1">
+                              <span className="font-bold text-ink block">{lin.titulo}</span>
+                              <p className="text-body leading-relaxed">{lin.contenido}</p>
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    </>
+                  )}
+                </div>
+              </TabPanel>
             </Card>
           </div>
 

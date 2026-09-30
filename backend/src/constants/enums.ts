@@ -135,6 +135,36 @@ export const ESTADOS_DESARROLLO_CURRICULAR = [
 ] as const;
 export type EstadoDesarrolloCurricular = (typeof ESTADOS_DESARROLLO_CURRICULAR)[number];
 
+// M07: Banco de Referentes Curriculares Oficiales (MEN / ICFES)
+// MATRIZ_ICFES queda reservado en el enum: aun no hay documento fuente para
+// sembrarlo (ver analisis M07); DBA, EBC y LINEAMIENTO si tienen banco poblado.
+export const TIPOS_REFERENTE = ['DBA', 'EBC', 'MATRIZ_ICFES', 'LINEAMIENTO'] as const;
+export type TipoReferente = (typeof TIPOS_REFERENTE)[number];
+
+// M07: grupos de grados oficiales del documento de Estandares Basicos de
+// Competencias (EBC) — el MEN los agrupa asi para las 4 areas troncales.
+export const GRUPOS_GRADOS_EBC = ['1-3', '4-5', '6-7', '8-9', '10-11'] as const;
+export type GrupoGradosEbc = (typeof GRUPOS_GRADOS_EBC)[number];
+
+/** A que grupo de grados EBC pertenece un grado por su numero; null si el grado no tiene EBC propio (ej. Transicion). */
+export function grupoGradosDeNumero(numero: number): GrupoGradosEbc | null {
+  if (numero >= 1 && numero <= 3) return '1-3';
+  if (numero >= 4 && numero <= 5) return '4-5';
+  if (numero >= 6 && numero <= 7) return '6-7';
+  if (numero >= 8 && numero <= 9) return '8-9';
+  if (numero >= 10 && numero <= 11) return '10-11';
+  return null;
+}
+
+// M08: Tipos de asignación y carga docente (Decreto 1850 / Ley 115)
+export const TIPOS_ASIGNACION_DOCENTE = [
+  'CLASE',
+  'DIRECCION_GRUPO',
+  'PROYECTO_TRANSVERSAL',
+  'OTRO',
+] as const;
+export type TipoAsignacionDocente = (typeof TIPOS_ASIGNACION_DOCENTE)[number];
+
 export const COMPONENTES_SIEE = ['COGNITIVO_SABER', 'PROCEDIMENTAL_HACER', 'ACTITUDINAL_SER'] as const;
 export type ComponenteSiee = (typeof COMPONENTES_SIEE)[number];
 

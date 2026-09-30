@@ -19,7 +19,7 @@ export const authenticate = catchAsync(async (req, _res, next) => {
   let payload;
   try {
     payload = verifyToken(token);
-  } catch (err) {
+  } catch {
     throw new ApiError(401, 'Token invalido o expirado.');
   }
 

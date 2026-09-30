@@ -148,6 +148,47 @@ solo extender si se pide algo nuevo. Reglas que no se ven leyendo un solo archiv
   guarda con `PATCH /shifts/:id/horario`, ADMIN o COORDINADOR). Si la plantilla no cabe en la jornada da 409, no recorta en silencio;
   cambiar la plantilla no toca las jornadas ya configuradas. **M09 debe leer `JornadaOperativa.franjas`, no definir su propia estructura.**
 
+### M07 (Currículo — Banco de Referentes y Desarrollo Curricular) — estado: núcleo completo
+
+Backend `/curriculum/referentes` (modelo `ReferenteCurricular` con discriminadores `Dba`/`Ebc`/
+`Lineamiento`) y `/curricular-developments` (modelo `CurricularDevelopment`), frontend
+`DesarrolloCurricularPage` (docente) y `RevisionCurricularPage` (`/admin/...`, coordinador).
+Reglas que no se ven leyendo un solo archivo:
+
+- **Un banco, tres contratos.** `ReferenteCurricular` es una sola colección Mongo con
+  discriminador por `tipo_referente` (`DBA`/`EBC`/`LINEAMIENTO`; `MATRIZ_ICFES` queda reservado
+  en el enum sin discriminador propio hasta que se aporte esa fuente): así `Activity.dba_id`
+  (M12) y `CurricularDevelopment.dba_seleccionados` (M07) siguen apuntando a la misma colección
+  por `_id` sin importar el tipo, pero cada tipo tiene su propio contrato estricto (`Dba` exige
+  `grade_id`+`numero_dba`+`organizador`; `Ebc` exige `grupo_grados`+`competencia`; `Lineamiento`
+  exige `titulo`+`contenido`, y su `area_id` es el único que puede ser `null` — un lineamiento
+  transversal, no propio de un área).
+- **El área del banco es la del Plan de Estudios (M06), nunca una nueva.**
+  `scripts/seedReferentesCurriculares.ts` no crea `Area` — resuelve las 4 áreas troncales
+  (Matemáticas, Lengua Castellana, Ciencias Naturales, Ciencias Sociales) buscando, entre las
+  `Subject` que la institución ya creó en M06, una cuyo nombre calce (ej. "Lengua Castellana") y
+  reutiliza su `area_id`, sea cual sea el área a la que esa asignatura pertenezca (ej.
+  "Humanidades..."). Si esa asignatura todavía no existe en M06, esa parte del banco no se
+  siembra — nunca se inventa un área nueva para forzarlo (regla de oro de datos de la sección 3).
+- **`estado` (activo/inactivo) se muestra como Vigente/Histórico** en este módulo
+  (`EstadoVigenciaReferenteBadge`), mismo campo/enum genérico que el resto del sistema — no es un
+  enum nuevo.
+- **EBC↔DBA no es un cruce oficial del MEN.** `dba_relacionados` de cada EBC se calcula al
+  sembrar por área + organizador (normalizado, exacto o por contención) + grado dentro de su
+  `grupo_grados` — es una heurística razonable, documentada como tal en el modelo y en el seed,
+  no una tabla que el MEN publique.
+- **El docente nunca escribe un DBA.** Elige Grado+Área+Periodo (vía su `TeacherAssignment`), el
+  banco se filtra solo por ese grado/área (`GET /curriculum/referentes`), y un panel de apoyo
+  aparte (`GET /curriculum/referentes/apoyo`) le muestra los EBC de su grupo de grados y los
+  Lineamientos del área (más los transversales) — nunca los selecciona, solo los consulta. Todo
+  lo demás (contenidos, actividades, metodología, criterios) es texto libre suyo.
+- **Banco poblado**: 343 DBA + 188 EBC (Matemáticas, Lenguaje, Ciencias Naturales, Ciencias
+  Sociales, grados 1°-11°; ninguno de los 4 documentos DBA del MEN entregados incluye Transición
+  pese a mencionarla en su introducción) + 3 Lineamientos transversales (el documento de
+  Lineamientos entregado es el marco general 2024 "Un viaje curricular", no los lineamientos
+  clásicos de 1998 por área — se usa como tal). Matriz ICFES: sin documento fuente todavía,
+  estructura lista pero banco vacío. `npm run seed:referentes` es idempotente.
+
 ### M10 (Espacios físicos) — estado: núcleo completo
 
 Backend `/espacios` (modelo `Espacio`), frontend `/admin/espacios` (`EspaciosPage`, ADMIN y COORDINADOR; la lectura de

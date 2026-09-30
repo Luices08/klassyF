@@ -1,0 +1,1168 @@
+[
+  {
+    "areaCodigo": "CS-HGD",
+    "gradoNumero": 1,
+    "numero_dba": 1,
+    "organizador": "Relaciones espaciales y ambientales",
+    "enunciado": "Se ubica en el espacio que habita teniendo como referencia su propio cuerpo y los puntos cardinales.",
+    "evidencias_aprendizaje": [
+      "Relaciona su izquierda-derecha, adelante-atrás con los puntos cardinales, al ubicar, en representaciones gráficas de la escuela, aquellos lugares como rectoría, cafetería, patio de recreo, coordinación y sala de profesores, entre otros.",
+      "Dibuja las instituciones sociales de carácter deportivo, educativo, religioso y político, existentes en su barrio, vereda o lugar donde vive.",
+      "Localiza en representaciones gráficas o dibujos de su barrio, vereda o lugar donde vive, algunos referentes (tienda, iglesia, parque, escuela) teniendo en cuenta los puntos cardinales y conoce los acontecimientos que se dan en estos lugares.",
+      "Describe verbalmente el recorrido que realiza entre su casa y la institución educativa donde estudia, señalando aquellos lugares que considera representativos o muy conocidos en su comunidad y el porqué de su importancia."
+    ],
+    "etiquetas": ["puntos cardinales", "ubicación espacial", "entorno cercano", "grado primero"]
+  },
+  {
+    "areaCodigo": "CS-HGD",
+    "gradoNumero": 1,
+    "numero_dba": 2,
+    "organizador": "Relaciones espaciales y ambientales",
+    "enunciado": "Describe las características del paisaje geográfico del barrio, vereda o lugar donde vive, sus componentes y formas.",
+    "evidencias_aprendizaje": [
+      "Reconoce las diferentes formas de relieve en su entorno geográfico o lugar donde vive, por ejemplo: costas, islas, montañas, valles, llanuras y/o mesetas.",
+      "Diferencia los estados del tiempo atmosférico de acuerdo con las sensaciones de calor y frío manifiestas en su cuerpo y con base en los momentos de lluvia y sequía que se dan en el lugar donde vive.",
+      "Identifica aquellas obras de infraestructura que se han realizado en su comunidad y expresa las ventajas que estas traen.",
+      "Representa de diferentes maneras, aquellos problemas ambientales que afectan el entorno de la comunidad en el contexto del barrio, vereda o lugar donde vive."
+    ],
+    "etiquetas": ["paisaje geográfico", "relieve", "clima", "entorno"]
+  },
+  {
+    "areaCodigo": "CS-HGD",
+    "gradoNumero": 1,
+    "numero_dba": 3,
+    "organizador": "Relaciones con la historia y las culturas",
+    "enunciado": "Describe el tiempo personal y se sitúa en secuencias de eventos propios y sociales.",
+    "evidencias_aprendizaje": [
+      "Nombra ordenadamente los días de la semana y los meses del año.",
+      "Diferencia el ayer, el hoy y el mañana desde las actividades cotidianas que realiza y la duración de estas en horas y minutos mediante la lectura del reloj.",
+      "Identifica los miembros de su familia y verbaliza quiénes nacieron antes o después de él.",
+      "Recuerda las fechas de los cumpleaños de sus padres, hermanos, amigos y compañeros de clase más cercanos, diferenciando las edades entre ellos."
+    ],
+    "etiquetas": ["tiempo personal", "secuencia de eventos", "calendario"]
+  },
+  {
+    "areaCodigo": "CS-HGD",
+    "gradoNumero": 1,
+    "numero_dba": 4,
+    "organizador": "Relaciones con la historia y las culturas",
+    "enunciado": "Reconoce la noción de cambio a partir de las transformaciones que ha vivido en los últimos años a nivel personal, de su familia y del entorno barrial, veredal o del lugar donde vive.",
+    "evidencias_aprendizaje": [
+      "Relata los principales acontecimientos sociales ocurridos en el aula de clase, por ejemplo, el inicio de la vida escolar, la celebración del día de los niños, las izadas de bandera o la celebración de cumpleaños, entre otros, diferenciando el antes y el ahora.",
+      "Señala las transformaciones recientes observadas en el entorno físico de su comunidad y el para qué se realizaron.",
+      "Describe aquellas organizaciones sociales a las que pertenece en su comunidad: familia, colegio y vecindario.",
+      "Plantea preguntas acerca de sucesos destacados que han tenido lugar en su comunidad."
+    ],
+    "etiquetas": ["noción de cambio", "transformaciones", "comunidad"]
+  },
+  {
+    "areaCodigo": "CS-HGD",
+    "gradoNumero": 1,
+    "numero_dba": 5,
+    "organizador": "Relaciones ético-políticas",
+    "enunciado": "Reconoce su individualidad y su pertenencia a los diferentes grupos sociales.",
+    "evidencias_aprendizaje": [
+      "Expresa algunas características físicas y emocionales que lo hacen un ser único.",
+      "Compara similitudes y diferencias entre sus gustos, costumbres y formas de comunicarse, con los demás integrantes del salón de clase.",
+      "Reconoce de sí mismo, de sus compañeros y de sus familiares aquellas cualidades que le ayudan a estar mejor entre los demás.",
+      "Reconoce las costumbres y tradiciones culturales de su comunidad mediante los relatos de los abuelos y personas mayores del barrio, vereda o lugar donde vive."
+    ],
+    "ejemplo": "A partir de la conversación con adultos mayores o líderes de la comunidad, reconocidos gracias a sus conocimientos, habilidades o sabiduría ancestral (ya sea en el campo de la música, las artes, las letras, la gastronomía, el deporte...) el estudiante diferencia las costumbres y tradiciones del ayer y del hoy.",
+    "etiquetas": ["individualidad", "grupos sociales", "identidad"]
+  },
+  {
+    "areaCodigo": "CS-HGD",
+    "gradoNumero": 1,
+    "numero_dba": 6,
+    "organizador": "Relaciones espaciales y ambientales",
+    "enunciado": "Comprende cambios en las formas de habitar de los grupos humanos, desde el reconocimiento de los tipos de vivienda que se encuentran en el contexto de su barrio, vereda o lugar donde vive.",
+    "evidencias_aprendizaje": [
+      "Señala los lugares de procedencia de su familia y comprende cómo llegaron a su vivienda actual.",
+      "Nombra los materiales utilizados en la construcción de la casa donde vive y la distribución de las habitaciones que hay en ella.",
+      "Identifica las viviendas que se destacan en su comunidad, que son patrimonio hoy y que deben conservarse.",
+      "Reconoce el valor de la vivienda como el espacio donde tiene lugar su hogar y donde recibe seguridad y cuidado de su familia."
+    ],
+    "etiquetas": ["vivienda", "formas de habitar", "patrimonio"]
+  },
+  {
+    "areaCodigo": "CS-HGD",
+    "gradoNumero": 1,
+    "numero_dba": 7,
+    "organizador": "Relaciones ético-políticas",
+    "enunciado": "Participa en la construcción de acuerdos básicos sobre normas para el logro de metas comunes en su contexto cercano (compañeros y familia) y se compromete con su cumplimiento.",
+    "evidencias_aprendizaje": [
+      "Presenta sus ideas, intereses y sentimientos frente a las normas establecidas en la familia, en el salón de clase y otros espacios.",
+      "Expresa sus opiniones y colabora activamente en la construcción de los acuerdos grupales para la convivencia.",
+      "Plantea alternativas de solución frente a situaciones conflictivas en su familia y salón de clase.",
+      "Reconoce la importancia del trabajo en equipo para el logro de las metas comunes."
+    ],
+    "etiquetas": ["normas", "acuerdos", "convivencia"]
+  },
+  {
+    "areaCodigo": "CS-HGD",
+    "gradoNumero": 1,
+    "numero_dba": 8,
+    "organizador": "Relaciones ético-políticas",
+    "enunciado": "Establece relaciones de convivencia desde el reconocimiento y el respeto de sí mismo y de los demás.",
+    "evidencias_aprendizaje": [
+      "Expresa el valor de sí mismo y de cada uno de los integrantes de la clase, explicando aquello que los diferencia y los identifica: el género, la procedencia, la edad, las ideas y creencias, entre otras.",
+      "Expresa aquello que lo hace igual a los demás en la institución, desde el conocimiento y el respeto a los deberes y derechos establecidos en el Manual de Convivencia.",
+      "Identifica situaciones de maltrato que se dan en su entorno consigo mismo y/o con otras personas y sabe a quiénes acudir para pedir ayuda y protección.",
+      "Participa de acciones que fomentan la sana convivencia en el entorno familiar y escolar."
+    ],
+    "etiquetas": ["convivencia", "respeto", "manual de convivencia"]
+  },
+  {
+    "areaCodigo": "CS-HGD",
+    "gradoNumero": 2,
+    "numero_dba": 1,
+    "organizador": "Relaciones espaciales y ambientales",
+    "enunciado": "Comprende que el paisaje que vemos es resultado de las acciones humanas que se realizan en un espacio geográfico y que por esta razón, dicho paisaje cambia.",
+    "evidencias_aprendizaje": [
+      "Identifica las formas del relieve que se encuentran en la superficie terrestre (montaña, valle, llanura, meseta e islas) y nombra aquellas que se observan en su localidad, comuna o vereda.",
+      "Expresa sus apreciaciones sobre los paisajes que observa en fotografías, folletos, revistas, periódicos y señala aquellos que prefiere.",
+      "Traza las formas básicas del paisaje de su municipio a través de dibujos y la elaboración de maquetas con barro, plastilina o materiales reutilizables que consiga en su contexto.",
+      "Explica los cambios que se han realizado en el paisaje del municipio debido a cultivos, construcciones recientes, carreteras, caminos, edificaciones y parques, entre otros."
+    ],
+    "etiquetas": ["paisaje", "relieve", "cambio geográfico", "grado segundo"]
+  },
+  {
+    "areaCodigo": "CS-HGD",
+    "gradoNumero": 2,
+    "numero_dba": 2,
+    "organizador": "Relaciones espaciales y ambientales",
+    "enunciado": "Reconoce los puntos cardinales y los usa para orientarse en el desplazamiento de un lugar a otro.",
+    "evidencias_aprendizaje": [
+      "Establece relaciones entre el espacio físico del salón de clases y otros espacios que hacen parte de la Institución Educativa a través de dibujos, gráficos o planos, utilizando los puntos cardinales.",
+      "Traza las rutas seguidas por algunos de sus compañeros de clase para llegar a la escuela y las representa en un dibujo.",
+      "Mide distancias reales entre varios lugares, con pasos y otras medidas que pueden inventarse en el grupo, identificando la distancia -cerca o lejos- entre dichos lugares.",
+      "Da orientaciones espaciales verbalmente o de otras formas para llegar a un lugar específico, utilizando expresiones de lateralidad (izquierda, derecha, adelante, atrás) y los puntos cardinales."
+    ],
+    "etiquetas": ["puntos cardinales", "orientación espacial", "rutas"]
+  },
+  {
+    "areaCodigo": "CS-HGD",
+    "gradoNumero": 2,
+    "numero_dba": 3,
+    "organizador": "Relaciones con la historia y las culturas",
+    "enunciado": "Comprende la importancia de las fuentes históricas para la construcción de la memoria individual, familiar y colectiva.",
+    "evidencias_aprendizaje": [
+      "Describe las características de la conformación de su familia antes de su nacimiento.",
+      "Reconoce las procedencias y los recorridos de los integrantes de su núcleo familiar antes de llegar al municipio donde viven actualmente, a través de relatos.",
+      "Establece secuencias de datos históricos a nivel personal y familiar desde la lectura de su registro civil de nacimiento y elabora un árbol genealógico.",
+      "Indaga por los lugares de origen y las razones de los desplazamientos de la población en su comunidad."
+    ],
+    "etiquetas": ["fuentes históricas", "memoria familiar", "árbol genealógico"]
+  },
+  {
+    "areaCodigo": "CS-HGD",
+    "gradoNumero": 2,
+    "numero_dba": 4,
+    "organizador": "Relaciones con la historia y las culturas",
+    "enunciado": "Explica cambios y continuidades en los medios empleados por las personas para transportarse en su municipio, vereda o lugar donde vive.",
+    "evidencias_aprendizaje": [
+      "Diferencia los cambios vividos en los medios de transporte en su entorno cercano, a partir de relatos de su familia.",
+      "Clasifica las formas de transportarse de las personas según el medio utilizado.",
+      "Describe el medio de transporte que más usa para llegar o salir de su casa y expone sus ventajas y desventajas.",
+      "Representa gráficamente la movilidad en su comunidad e identifica sus ventajas y desventajas."
+    ],
+    "ejemplo": "Mediante la observación de los medios de transporte de su municipio (acuáticos, terrestres y aéreos) y apoyado en la lectura de imágenes, identifica su evolución, ventajas y desventajas en relación con los recursos naturales necesarios para su funcionamiento.",
+    "etiquetas": ["medios de transporte", "cambios y continuidades", "movilidad"]
+  },
+  {
+    "areaCodigo": "CS-HGD",
+    "gradoNumero": 2,
+    "numero_dba": 5,
+    "organizador": "Relaciones ético-políticas",
+    "enunciado": "Analiza las actividades económicas de su entorno y el impacto de estas en la comunidad.",
+    "evidencias_aprendizaje": [
+      "Identifica los trabajos u oficios que las personas de su comunidad realizan para obtener su sustento y el de la familia.",
+      "Describe las actividades económicas que realizan los adultos en su hogar y los beneficios que éstas traen para todos los integrantes de la familia.",
+      "Compara los oficios que los abuelos realizaban anteriormente respecto de cómo se realizan hoy y diferencia los trabajos característicos de las zonas urbanas y rurales.",
+      "Reconoce experiencias donde algunos niños son explotados laboralmente y expresa razones para rechazar estas situaciones."
+    ],
+    "etiquetas": ["actividades económicas", "trabajo", "oficios"]
+  },
+  {
+    "areaCodigo": "CS-HGD",
+    "gradoNumero": 2,
+    "numero_dba": 6,
+    "organizador": "Relaciones espaciales y ambientales",
+    "enunciado": "Compara las características de las viviendas de su municipio, vereda o lugar donde vive con las de otros lugares.",
+    "evidencias_aprendizaje": [
+      "Reconoce características de las viviendas rurales y urbanas a partir de los materiales utilizados para su construcción.",
+      "Describe y diferencia características de las viviendas de los grupos étnicos, a partir de la lectura de imágenes.",
+      "Identifica los cambios que se dan en las viviendas con el paso del tiempo.",
+      "Describe las ventajas y desventajas que representa tener vivienda en zona urbana o rural."
+    ],
+    "ejemplo": "A partir de la observación directa que realiza en su municipio y la descripción de imágenes de viviendas de distintas regiones y grupos étnicos de Colombia, reconoce y diferencia varios tipos de vivienda y materiales empleados en dichas construcciones, identifica los grupos étnicos que las habitan y señala las ventajas y desventajas que estas presentan.",
+    "etiquetas": ["vivienda", "grupos étnicos", "zona rural y urbana"]
+  },
+  {
+    "areaCodigo": "CS-HGD",
+    "gradoNumero": 2,
+    "numero_dba": 7,
+    "organizador": "Relaciones espaciales y ambientales",
+    "enunciado": "Reconoce la organización territorial en su municipio, desde: comunas, corregimientos, veredas, localidades y territorios indígenas.",
+    "evidencias_aprendizaje": [
+      "Identifica el croquis de su municipio y lo diferencia entre los demás municipios del departamento.",
+      "Ubica las comunas, corregimientos, localidades y/o territorios indígenas en los que está organizado el territorio de su municipio, teniendo en cuenta los puntos cardinales.",
+      "Nombra topónimos (nombres propios que adoptan los lugares geográficos) en su municipio y diferencia su ubicación en el medio urbano o rural.",
+      "Diferencia la organización de grupos pequeños como la familia, salón de clase, colegio con las de los grupos más grandes como resguardo, territorios afrocolombianos y municipio."
+    ],
+    "etiquetas": ["organización territorial", "municipio", "división político-administrativa"]
+  },
+  {
+    "areaCodigo": "CS-HGD",
+    "gradoNumero": 2,
+    "numero_dba": 8,
+    "organizador": "Relaciones ético-políticas",
+    "enunciado": "Reconoce y rechaza situaciones de exclusión o discriminación en su familia, entre sus amigos y en los compañeros del salón de clase.",
+    "evidencias_aprendizaje": [
+      "Describe diversas características de los grupos humanos (etnia, edad, religión, género) y explica aquello que más le gusta de sus compañeros y lo que pudiera cambiarse para mejorar la convivencia en el grupo.",
+      "Establece semejanzas y diferencias entre los alimentos preferidos (en los integrantes de su familia) y en las preferencias en los juegos entre los compañeros del grupo en la escuela.",
+      "Expresa sus sentimientos cuando es discriminado o aceptado en una actividad escolar y reconoce la importancia que tiene conocer y aceptar a las personas.",
+      "Identifica las acciones que generan discriminación en su entorno y sabe a quién acudir para pedir ayuda y protección."
+    ],
+    "etiquetas": ["discriminación", "exclusión", "diversidad"]
+  },
+  {
+    "areaCodigo": "CS-HGD",
+    "gradoNumero": 3,
+    "numero_dba": 1,
+    "organizador": "Relaciones espaciales y ambientales",
+    "enunciado": "Comprende la importancia de los océanos y mares en la organización económica y social de los pueblos costeros en la actualidad.",
+    "evidencias_aprendizaje": [
+      "Identifica los nombres de los continentes y de los océanos que conforman el planeta Tierra y reconoce las actividades que se realizan en las zonas costeras.",
+      "Diferencia los mares como porciones de los océanos y su importancia en la fijación de límites entre países.",
+      "Plantea preguntas sobre las problemáticas ambientales que viven los océanos en la actualidad y explica el impacto en las poblaciones costeras.",
+      "Relaciona la ubicación geográfica de su departamento, municipio, resguardo o lugar donde vive, con la presencia o no de costas sobre los océanos, y reconoce las ventajas y desventajas de tenerlas."
+    ],
+    "etiquetas": ["océanos", "mares", "pueblos costeros", "grado tercero"]
+  },
+  {
+    "areaCodigo": "CS-HGD",
+    "gradoNumero": 3,
+    "numero_dba": 2,
+    "organizador": "Relaciones espaciales y ambientales",
+    "enunciado": "Relaciona las características biogeográficas de su departamento, municipio, resguardo o lugar donde vive, con las actividades económicas que en ellos se realizan.",
+    "evidencias_aprendizaje": [
+      "Identifica la oferta de recursos naturales presentes en su región respecto del suelo, clima, flora, fauna y agua.",
+      "Reconoce las actividades que se realizan en su región: agricultura, ganadería, pesca, industria, minería o servicios.",
+      "Describe las formas de organización social y económica utilizadas para la explotación de los recursos naturales (empresas, asociaciones, corporaciones autónomas regionales).",
+      "Expresa por qué en espacios con determinados climas no se cuenta con ciertos productos y destaca la importancia del trabajo que realizan quienes producen los alimentos para el bienestar de todos."
+    ],
+    "ejemplo": "Participa en la elaboración de la lista del mercado de su familia e identifica los precios de los alimentos, el lugar de origen, la disposición y distribución de estos en el supermercado, tienda, plaza o lugares donde se comercializan e intercambian.",
+    "etiquetas": ["recursos naturales", "actividades económicas", "biogeografía"]
+  },
+  {
+    "areaCodigo": "CS-HGD",
+    "gradoNumero": 3,
+    "numero_dba": 3,
+    "organizador": "Relaciones espaciales y ambientales",
+    "enunciado": "Explica las acciones humanas que han incidido en las transformaciones del territorio asociadas al número de habitantes e infraestructura, en su departamento, municipio, resguardo o lugar donde vive.",
+    "evidencias_aprendizaje": [
+      "Reconoce los cambios y/o permanencias que se presentan en espacios como la escuela, la plaza principal y el mercado, entre otros.",
+      "Diferencia cambios dados en el territorio local por la construcción de obras públicas (carreteras, parques, alcantarillado, acueducto y hospitales, entre otros).",
+      "Indaga sobre el aumento o disminución de la población en el departamento, municipio, resguardo o lugar donde vive, a partir de diferentes fuentes documentales.",
+      "Identifica problemas sociales relevantes en la población, originados en el uso de los recursos naturales."
+    ],
+    "etiquetas": ["transformación del territorio", "infraestructura", "población"]
+  },
+  {
+    "areaCodigo": "CS-HGD",
+    "gradoNumero": 3,
+    "numero_dba": 4,
+    "organizador": "Relaciones con la historia y las culturas",
+    "enunciado": "Comprende el legado de los grupos humanos en la gastronomía, la música y el paisaje de la región, municipio, resguardo o lugar donde vive.",
+    "evidencias_aprendizaje": [
+      "Identifica en su entorno algunos objetos, herramientas, aparatos, construcciones y documentos que brindan información acerca del pasado de su región.",
+      "Describe algunas costumbres y tradiciones que le permiten reconocerse como miembro de un grupo poblacional y de una nación a través de la historia oral con sus abuelos.",
+      "Compara las fiestas que se celebran en diferentes municipios de su departamento, en aspectos como: origen, propósito, duración y participantes.",
+      "Describe la diversidad en la gastronomía de diferentes regiones o provincias que conforman su departamento."
+    ],
+    "etiquetas": ["legado cultural", "gastronomía", "tradiciones"]
+  },
+  {
+    "areaCodigo": "CS-HGD",
+    "gradoNumero": 3,
+    "numero_dba": 5,
+    "organizador": "Relaciones con la historia y las culturas",
+    "enunciado": "Comprende la importancia del tiempo en la organización de las actividades sociales, económicas y culturales en su comunidad.",
+    "evidencias_aprendizaje": [
+      "Describe el tiempo dedicado en su familia a actividades como trabajar, estudiar, viajar, jugar, practicar deporte y leer.",
+      "Organiza las actividades personales y familiares con base en el uso del calendario.",
+      "Compara las actividades escolares, familiares y de uso del tiempo libre, llevadas a cabo el año pasado con las que realiza actualmente y expresa aquellas que quiere hacer el año próximo.",
+      "Elabora esquemas con la distribución del tiempo dedicado en procesos de producción y/o extracción de un producto típico en su región."
+    ],
+    "etiquetas": ["organización del tiempo", "actividades sociales", "calendario"]
+  },
+  {
+    "areaCodigo": "CS-HGD",
+    "gradoNumero": 3,
+    "numero_dba": 6,
+    "organizador": "Relaciones con la historia y las culturas",
+    "enunciado": "Analiza las contribuciones de los grupos humanos que habitan en su departamento, municipio o lugar donde vive, a partir de sus características culturales: lengua, organización social, tipo de vivienda, cosmovisión y uso del suelo.",
+    "evidencias_aprendizaje": [
+      "Caracteriza aquellos grupos humanos que habitan en su región (afrodescendientes, raizales, blancos, indígenas, gitanos y/o mestizos).",
+      "Describe las expresiones culturales de cada uno de los grupos humanos identificados en su departamento, municipio, resguardo o lugar donde vive.",
+      "Reconoce la diversidad cultural como una característica del pueblo colombiano y explica los aportes de los diferentes grupos humanos.",
+      "Elabora conclusiones sobre la situación social y económica de los indígenas en su región haciendo uso de diferentes fuentes de información."
+    ],
+    "etiquetas": ["diversidad cultural", "grupos étnicos", "cosmovisión"]
+  },
+  {
+    "areaCodigo": "CS-HGD",
+    "gradoNumero": 3,
+    "numero_dba": 7,
+    "organizador": "Relaciones ético-políticas",
+    "enunciado": "Comprende la importancia de participar en las decisiones de su comunidad cercana (institución educativa) mediante la elección del gobierno escolar.",
+    "evidencias_aprendizaje": [
+      "Identifica los mecanismos de elección del gobierno escolar y la importancia de elegir y ser elegido.",
+      "Reconoce el papel que cumplen los representantes de los estudiantes y el consejo estudiantil en la vida de la institución educativa, mediante su participación en la elección de estos.",
+      "Compara las propuestas que presentan los diferentes candidatos a ocupar los cargos de personero estudiantil.",
+      "Explica la organización y el funcionamiento del consejo directivo de su institución educativa."
+    ],
+    "etiquetas": ["gobierno escolar", "participación", "elección"]
+  },
+  {
+    "areaCodigo": "CS-HGD",
+    "gradoNumero": 3,
+    "numero_dba": 8,
+    "organizador": "Relaciones ético-políticas",
+    "enunciado": "Comprende la estructura y el funcionamiento democrático a nivel del departamento como entidad política, administrativa y jurídica.",
+    "evidencias_aprendizaje": [
+      "Diferencia los órganos y las funciones del poder público que tiene el departamento (gobernador, diputados y jueces) de los que tiene el municipio y los resguardos.",
+      "Explica la importancia del gobierno departamental en el mejoramiento de las condiciones de vida de los ciudadanos, en cuanto a educación, obras públicas, salud y recreación.",
+      "Emite sus opiniones frente a las problemáticas observadas en los procesos de elección de cargos políticos en la región.",
+      "Propone acciones que pueden desarrollar las instituciones departamentales para fortalecer la convivencia y la paz en las comunidades."
+    ],
+    "etiquetas": ["departamento", "funcionamiento democrático", "entidad político-administrativa"]
+  },
+  {
+    "areaCodigo": "CS-HGD",
+    "gradoNumero": 4,
+    "numero_dba": 1,
+    "organizador": "Relaciones espaciales y ambientales",
+    "enunciado": "Comprende la importancia de los límites geográficos y el establecimiento de las fronteras en la organización de los territorios.",
+    "evidencias_aprendizaje": [
+      "Reconoce los límites geográficos de Colombia a partir de la lectura de un mapa político.",
+      "Describe actividades económicas y culturales que se dan entre los países que comparten fronteras con Colombia.",
+      "Explica la importancia de las fronteras colombianas como un punto de encuentro con los pueblos vecinos y documenta situaciones vividas recientemente con los países limítrofes.",
+      "Contrasta los límites de los departamentos en que se divide el territorio colombiano con base en su ubicación geográfica y su extensión."
+    ],
+    "etiquetas": ["límites geográficos", "fronteras", "territorio", "grado cuarto"]
+  },
+  {
+    "areaCodigo": "CS-HGD",
+    "gradoNumero": 4,
+    "numero_dba": 2,
+    "organizador": "Relaciones espaciales y ambientales",
+    "enunciado": "Diferencia las características geográficas del medio urbano y el medio rural, mediante el reconocimiento de la concentración de la población y el uso del suelo, que se da en ellos.",
+    "evidencias_aprendizaje": [
+      "Reconoce los usos del suelo propios de las ciudades (comercial, industrial, habitacional, deportivo y educativo, entre otros) y los del campo (agrícola, ganadero, minero, forestal y turístico, entre otros) a partir de la lectura de mapas temáticos.",
+      "Identifica cambios generados en el uso del suelo tanto de las ciudades colombianas como de los espacios rurales en la última década.",
+      "Compara la cantidad de habitantes que viven en las ciudades colombianas con la población ubicada en los sectores rurales (a partir de la información del último censo de población realizado en el país o de otra fuente).",
+      "Expresa razones por las cuales actualmente la población se concentra más en las ciudades que en el campo."
+    ],
+    "etiquetas": ["medio urbano", "medio rural", "uso del suelo"]
+  },
+  {
+    "areaCodigo": "CS-HGD",
+    "gradoNumero": 4,
+    "numero_dba": 3,
+    "organizador": "Relaciones con la historia y las culturas",
+    "enunciado": "Comprende las razones de algunos cambios socioculturales en Colombia, motivados en los últimos años por el uso de la tecnología.",
+    "evidencias_aprendizaje": [
+      "Explica cómo era la vida de los pueblos cuando no existía la energía eléctrica, el acueducto, el alcantarillado y el servicio de teléfono, entre otros.",
+      "Relaciona el acceso a las tecnologías de la salud como los hospitales, las vacunas, y los medicamentos, con el bienestar de las familias.",
+      "Describe la importancia de los medios de comunicación en el desarrollo de la política y la cultura ciudadana del país.",
+      "Expresa sus opiniones sobre los cambios generados en las relaciones con su familia, desde el uso del teléfono, la TV y el Internet entre otras tecnologías y, deduce los efectos que han tenido en la vida de las personas."
+    ],
+    "etiquetas": ["cambios socioculturales", "tecnología", "medios de comunicación"]
+  },
+  {
+    "areaCodigo": "CS-HGD",
+    "gradoNumero": 4,
+    "numero_dba": 4,
+    "organizador": "Relaciones con la historia y las culturas",
+    "enunciado": "Analiza las características de las culturas ancestrales que a la llegada de los españoles, habitaban el territorio nacional.",
+    "evidencias_aprendizaje": [
+      "Reconoce los diferentes pueblos indígenas pertenecientes a las familias lingüísticas que habitaban el territorio colombiano (Chibcha, Caribe y Arawak) y los ubica espacialmente.",
+      "Compara las organizaciones sociales, económicas y religiosas de los pueblos ancestrales que habitaron el territorio colombiano (muiscas, taironas, calimas y zenúes, entre otros).",
+      "Busca información en diferentes fuentes sobre los legados culturales de las comunidades indígenas y describe su situación actual.",
+      "Explica las razones por las cuales la población indígena se vio reducida con la llegada de los europeos."
+    ],
+    "etiquetas": ["culturas ancestrales", "pueblos indígenas", "conquista"]
+  },
+  {
+    "areaCodigo": "CS-HGD",
+    "gradoNumero": 4,
+    "numero_dba": 5,
+    "organizador": "Relaciones con la historia y las culturas",
+    "enunciado": "Evalúa la diversidad étnica y cultural del pueblo colombiano desde el reconocimiento de los grupos humanos existentes en el país: afrodescendientes, raizales, mestizos, indígenas y blancos.",
+    "evidencias_aprendizaje": [
+      "Identifica las características de los diferentes grupos humanos presentes en el territorio nacional.",
+      "Explica tradiciones y costumbres propias de los diversos grupos humanos del país respecto de la alimentación, la vivienda y su cosmovisión.",
+      "Describe el intercambio de saberes que históricamente se ha dado entre las diversas culturas existentes en Colombia y sus aportes a la construcción de la idiosincrasia colombiana.",
+      "Reconoce la importancia de preservar y fomentar las manifestaciones culturales de los diferentes grupos humanos presentes en el territorio nacional y que contribuyen a construir una sociedad más justa."
+    ],
+    "etiquetas": ["diversidad étnica", "grupos humanos", "idiosincrasia colombiana"]
+  },
+  {
+    "areaCodigo": "CS-HGD",
+    "gradoNumero": 4,
+    "numero_dba": 6,
+    "organizador": "Relaciones ético-políticas",
+    "enunciado": "Comprende la importancia de la división de poderes en una democracia y la forma como funciona en Colombia.",
+    "evidencias_aprendizaje": [
+      "Diferencia las ramas del poder público (Legislativa, Ejecutiva y Judicial), sus funciones e importancia en el equilibrio de poderes.",
+      "Reconoce la importancia del voto popular como mecanismo de participación para ejercer la democracia en Colombia a partir del análisis de casos.",
+      "Explica las responsabilidades de los cargos de elección popular (personeros estudiantiles, alcaldes, concejales, gobernadores, diputados, congresistas, presidente de la república).",
+      "Describe el papel de los órganos de control (procuraduría, contraloría y la defensoría del pueblo), para el funcionamiento de la democracia y el equilibrio de poderes."
+    ],
+    "etiquetas": ["división de poderes", "democracia", "ramas del poder público"]
+  },
+  {
+    "areaCodigo": "CS-HGD",
+    "gradoNumero": 4,
+    "numero_dba": 7,
+    "organizador": "Relaciones ético-políticas",
+    "enunciado": "Analiza los derechos que protegen la niñez y los deberes que deben cumplirse en una sociedad democrática para el desarrollo de una sana convivencia.",
+    "evidencias_aprendizaje": [
+      "Describe los derechos de la niñez y asume una posición crítica frente a situaciones de discriminación y abuso por irrespeto a rasgos individuales de las personas.",
+      "Se identifica como un sujeto de derechos con unos deberes para con la comunidad educativa desde su participación en diferentes eventos escolares.",
+      "Reconoce las personas, instituciones y autoridades a las que puede acudir para la protección y defensa de los derechos de la niñez y explica cómo buscar apoyo de ser necesario, en la personería estudiantil, el comité de convivencia escolar, la comisaría de familia, el Instituto Colombiano de Bienestar Familiar (ICBF) y/o la Policía Nacional.",
+      "Describe situaciones en las que se ven vulnerados los derechos de la niñez y propone posibles soluciones para resolverlas."
+    ],
+    "etiquetas": ["derechos de la niñez", "deberes", "convivencia democrática"]
+  },
+  {
+    "areaCodigo": "CS-HGD",
+    "gradoNumero": 4,
+    "numero_dba": 8,
+    "organizador": "Relaciones ético-políticas",
+    "enunciado": "Evalúa la importancia de satisfacer las necesidades básicas para el bienestar individual, familiar y colectivo.",
+    "evidencias_aprendizaje": [
+      "Identifica las necesidades básicas de todo ser humano (vivienda, alimentación, salud, educación y empleo) y explica si se satisfacen en su comunidad.",
+      "Clasifica en orden de importancia las necesidades básicas que presentan los habitantes del territorio colombiano en la actualidad.",
+      "Reconoce los factores económicos, sociales y políticos que influyen en la satisfacción de las necesidades básicas de las personas en la sociedad colombiana.",
+      "Expresa la responsabilidad que conlleva ser parte de una comunidad y sugiere posibles actuaciones en la búsqueda de la satisfacción de las necesidades básicas."
+    ],
+    "ejemplo": "A partir del diálogo con sus padres, realiza un listado de las necesidades básicas de la familia, las jerarquiza, diferencia los costos de los servicios básicos que requieren y elabora conclusiones de lo estudiado.",
+    "etiquetas": ["necesidades básicas", "bienestar", "economía familiar"]
+  },
+  {
+    "areaCodigo": "CS-HGD",
+    "gradoNumero": 5,
+    "numero_dba": 1,
+    "organizador": "Relaciones espaciales y ambientales",
+    "enunciado": "Comprende la organización territorial existente en Colombia y las particularidades geográficas de las regiones.",
+    "evidencias_aprendizaje": [
+      "Explica las formas de división territorial en Colombia: corregimiento, municipio, área metropolitana, departamento, región y territorio indígena.",
+      "Caracteriza los territorios colombianos denominados distritos (capital, especial, industrial, portuario, turístico, histórico y biodiverso) y los diferencia de los municipios y de las ciudades capitales.",
+      "Diferencia las regiones geográficas en las que está dividido el territorio colombiano y las reconoce a partir de la lectura de mapas temáticos.",
+      "Relaciona la existencia de los pisos térmicos con los recursos naturales de cada región e identifica su incidencia en la diversidad de cultivos y actividades humanas."
+    ],
+    "etiquetas": ["organización territorial", "regiones", "pisos térmicos", "grado quinto"]
+  },
+  {
+    "areaCodigo": "CS-HGD",
+    "gradoNumero": 5,
+    "numero_dba": 2,
+    "organizador": "Relaciones espaciales y ambientales",
+    "enunciado": "Comprende las ventajas que tiene para Colombia su posición geográfica y astronómica en relación con la economía nacional.",
+    "evidencias_aprendizaje": [
+      "Identifica la posición geográfica y astronómica del país, sus límites y extensión de sus fronteras terrestres y marítimas, mediante la lectura de mapas temáticos.",
+      "Establece relaciones entre latitud, longitud, altitud y la proximidad al mar, con la diversidad de climas en Colombia.",
+      "Explica la presencia de la órbita geoestacionaria y su importancia para las telecomunicaciones del país.",
+      "Plantea preguntas que le permiten reconocer la importancia que tiene para el territorio colombiano y la economía nacional, el hecho de contar con dos océanos."
+    ],
+    "etiquetas": ["posición geográfica", "posición astronómica", "economía nacional"]
+  },
+  {
+    "areaCodigo": "CS-HGD",
+    "gradoNumero": 5,
+    "numero_dba": 3,
+    "organizador": "Relaciones con la historia y las culturas",
+    "enunciado": "Comprende que los cambios en la comunicación originados por los avances tecnológicos han generado transformaciones en la forma como se relacionan las personas en la sociedad actual.",
+    "evidencias_aprendizaje": [
+      "Explica la importancia que ha tenido la comunicación para la sociedad colombiana en el siglo XX y XXI.",
+      "Compara las características de los medios de comunicación que emplearon sus padres (cuando eran niños), con los que él emplea en la actualidad.",
+      "Argumenta a partir de evidencias cómo el uso de diferentes medios de comunicación hace más fácil el acceso a la información y el aprendizaje.",
+      "Participa en discusiones sobre el uso adecuado y respetuoso de los medios de comunicación en la construcción de las relaciones con otras personas, grupos sociales o instituciones."
+    ],
+    "etiquetas": ["avances tecnológicos", "comunicación", "relaciones sociales"]
+  },
+  {
+    "areaCodigo": "CS-HGD",
+    "gradoNumero": 5,
+    "numero_dba": 4,
+    "organizador": "Relaciones con la historia y las culturas",
+    "enunciado": "Analiza el periodo colonial en la Nueva Granada a partir de sus organizaciones políticas, económicas y sociales.",
+    "evidencias_aprendizaje": [
+      "Compara el papel de las organizaciones políticas y administrativas como el Consejo Supremo de Indias, la Casa de Contratación de Sevilla, la Real Audiencia, los Cabildos, la Real Hacienda y el Virreinato con las actuales instituciones en Colombia.",
+      "Diferencia las formas organizativas del trabajo en la Colonia (la encomienda, la mita y el resguardo) y sus transformaciones en el sistema económico actual en Colombia.",
+      "Explica las diferencias entre los grupos sociales existentes en la Nueva Granada durante el periodo colonial y las implicaciones que tuvo en la estratificación de la población colombiana.",
+      "Examina el papel de la religión católica y su impacto en la vida cotidiana de las personas durante la época colonial a través del uso de diversas fuentes de información."
+    ],
+    "etiquetas": ["periodo colonial", "Nueva Granada", "virreinato"]
+  },
+  {
+    "areaCodigo": "CS-HGD",
+    "gradoNumero": 5,
+    "numero_dba": 5,
+    "organizador": "Relaciones con la historia y las culturas",
+    "enunciado": "Analiza el origen y consolidación de Colombia como república y sus cambios políticos, económicos y sociales.",
+    "evidencias_aprendizaje": [
+      "Plantea preguntas sobre los antecedentes que influenciaron el proceso de independencia de Colombia (revolución de los comuneros, invasiones napoleónicas, entre otras).",
+      "Explica los acontecimientos que permitieron el nacimiento de la República y cómo estos incidieron en la vida económica y social de Colombia.",
+      "Reconoce los cambios de fronteras que ha experimentado Colombia desde comienzos del siglo XIX hasta la actualidad (la Gran Colombia, la República de la Nueva Granada, la Confederación Granadina, los Estados Unidos de Colombia y la República de Colombia) a partir de la lectura de mapas temáticos.",
+      "Relaciona la aparición de los partidos políticos en Colombia con las luchas ideológicas que se dieron a lo largo del siglo XIX."
+    ],
+    "etiquetas": ["independencia", "república", "siglo XIX"]
+  },
+  {
+    "areaCodigo": "CS-HGD",
+    "gradoNumero": 5,
+    "numero_dba": 6,
+    "organizador": "Relaciones con la historia y las culturas",
+    "enunciado": "Analiza los cambios ocurridos en la sociedad colombiana en la primera mitad del siglo XX, asociados a la expansión de la industria y el establecimiento de nuevas redes de comunicación.",
+    "evidencias_aprendizaje": [
+      "Explica los cambios sociales y tecnológicos (radio, prensa escrita, telares y ferrocarriles) que se dieron en Colombia en la primera mitad del siglo XX y su incidencia en la reconfiguración de actividades económicas y sociales en el país.",
+      "Reconoce la influencia de los partidos políticos (liberal y conservador) en las dinámicas económicas y sociales de Colombia en la primera mitad del siglo XX a partir del uso de diferentes fuentes de información.",
+      "Identifica las consecuencias de los conflictos que afectaron la convivencia armónica de los ciudadanos colombianos en la primera mitad del siglo XX (Guerra de los Mil Días, masacre de las bananeras y la violencia partidista).",
+      "Participa en debates y propone acciones para vivir en una sociedad pacífica y constructora de una cultura de paz."
+    ],
+    "etiquetas": ["siglo XX", "industrialización", "partidos políticos"]
+  },
+  {
+    "areaCodigo": "CS-HGD",
+    "gradoNumero": 5,
+    "numero_dba": 7,
+    "organizador": "Relaciones ético-políticas",
+    "enunciado": "Comprende que en la sociedad colombiana existen derechos, deberes, principios y acciones para orientar y regular la convivencia de las personas.",
+    "evidencias_aprendizaje": [
+      "Describe los beneficios o ventajas que conlleva vivir en un Estado democrático a través del estudio de la Constitución de 1991.",
+      "Identifica los derechos fundamentales contemplados en la Constitución (Título II, capítulo 1), y su aplicabilidad en la vida cotidiana a partir del análisis de casos.",
+      "Compara los derechos y deberes planteados en la Constitución Política del país con los derechos y deberes contemplados en el manual de convivencia de su institución educativa.",
+      "Explica el valor que tiene conocer los derechos y los mecanismos constitucionales para reclamar su debido cumplimiento."
+    ],
+    "etiquetas": ["derechos y deberes", "Constitución de 1991", "convivencia"]
+  },
+  {
+    "areaCodigo": "CS-HGD",
+    "gradoNumero": 5,
+    "numero_dba": 8,
+    "organizador": "Relaciones ético-políticas",
+    "enunciado": "Analiza el papel de las organizaciones sociales en la preservación y el reconocimiento de los Derechos Humanos.",
+    "evidencias_aprendizaje": [
+      "Explica las instituciones que defienden los Derechos Humanos y organizan proyectos en la comunidad (cabildos, juntas de acción comunal y juntas administradoras locales).",
+      "Reconoce la importancia de proteger la organización social y los derechos de las colectividades a través de los mecanismos estipulados en la Constitución nacional.",
+      "Describe el funcionamiento de las instituciones que protegen los Derechos Humanos en Colombia (Personería y Defensoría del Pueblo).",
+      "Participa en proyectos colectivos (Gobierno Escolar, ambientales, convivencia y paz entre otros) orientados a alcanzar el bien común y a promover la solidaridad en su comunidad."
+    ],
+    "etiquetas": ["Derechos Humanos", "organizaciones sociales", "participación"]
+  },
+  {
+    "areaCodigo": "CS-HGD",
+    "gradoNumero": 6,
+    "numero_dba": 1,
+    "organizador": "Relaciones espaciales y ambientales",
+    "enunciado": "Comprende que existen diversas explicaciones y teorías sobre el origen del universo en nuestra búsqueda por entender que hacemos parte de un mundo más amplio.",
+    "evidencias_aprendizaje": [
+      "Interpreta diferentes teorías científicas sobre el origen del universo (Big Bang, inflacionaria, multiuniversos), que le permiten reconocer cómo surgimos, cuándo y por qué.",
+      "Explica los elementos que componen nuestro sistema solar: planetas, estrellas, asteroides, cometas y su relación con la vida en la Tierra.",
+      "Compara teorías científicas, religiosas y mitos de culturas ancestrales sobre el origen del universo.",
+      "Expresa la importancia de explorar el universo como una posibilidad para entender el origen y el cambio de las formas de vida en la Tierra."
+    ],
+    "ejemplo": "A partir de la lectura de tres textos cortos sobre el origen del universo (un pasaje bíblico del Génesis, un fragmento de La historia jamás contada de Carl Sagan sobre la teoría del Big Bang, y el mito muisca de Chiminigagua), compara argumentos, similitudes, diferencias y expresa su opinión en un cuadro comparativo.",
+    "etiquetas": ["origen del universo", "teorías científicas", "sistema solar", "grado sexto"]
+  },
+  {
+    "areaCodigo": "CS-HGD",
+    "gradoNumero": 6,
+    "numero_dba": 2,
+    "organizador": "Relaciones espaciales y ambientales",
+    "enunciado": "Comprende que la Tierra es un planeta en constante transformación cuyos cambios influyen en las formas del relieve terrestre y en la vida de las comunidades que la habitan.",
+    "evidencias_aprendizaje": [
+      "Describe las interacciones que se dan entre el relieve, el clima, las zonas bioclimáticas (cambios en las temperaturas, mareas, vientos, corrientes marinas, nubes, radiación solar) y las acciones humanas.",
+      "Explica la teoría de la deriva continental y la dinámica interna de la Tierra reconociendo los efectos que esta genera: sismos, tsunamis, erupciones volcánicas y cambios en el paisaje.",
+      "Diferencia las repercusiones de algunos fenómenos climáticos (huracanes, tornados, fenómeno del niño y de la niña, lluvias tropicales) en la vida de las personas.",
+      "Argumenta a partir de evidencias los efectos de un sismo en la población (tomando como ejemplo uno sucedido en Colombia) y conoce las recomendaciones a seguir, en caso de un sismo."
+    ],
+    "etiquetas": ["dinámica terrestre", "relieve", "fenómenos climáticos"]
+  },
+  {
+    "areaCodigo": "CS-HGD",
+    "gradoNumero": 6,
+    "numero_dba": 3,
+    "organizador": "Relaciones con la historia y las culturas",
+    "enunciado": "Analiza los aspectos centrales del proceso de hominización y del desarrollo tecnológico dados durante la prehistoria, para explicar las transformaciones del entorno.",
+    "evidencias_aprendizaje": [
+      "Diferencia las características fisiológicas y anatómicas presentes en los australopithecus, homo habilis, homo erectus, homo neanderthalensis y homo sapiens sapiens, reconociendo los factores que incidieron en estos cambios.",
+      "Identifica los cambios tecnológicos que tuvieron los homínidos (piedras talladas, huesos, conchas…) así como las repercusiones en su vida y en el entorno.",
+      "Explica el papel del trabajo de los homínidos (caza, pesca, recolección) y la importancia de estas actividades en la organización social y en el proceso de humanización.",
+      "Discute teorías sobre las posibles formas de poblamiento en los diferentes continentes."
+    ],
+    "etiquetas": ["hominización", "prehistoria", "homínidos"]
+  },
+  {
+    "areaCodigo": "CS-HGD",
+    "gradoNumero": 6,
+    "numero_dba": 4,
+    "organizador": "Relaciones con la historia y las culturas",
+    "enunciado": "Analiza cómo en las sociedades antiguas surgieron las primeras ciudades y el papel de la agricultura y el comercio para la expansión de estas.",
+    "evidencias_aprendizaje": [
+      "Relaciona el origen de la agricultura con el desarrollo de las sociedades antiguas y la aparición de elementos que permanecen en la actualidad (canales de riego, la escritura, el ladrillo).",
+      "Explica el papel de los ríos Nilo, Tigris, Éufrates, Indo, Ganges, Huang He y Yangtsé Kiang, en la construcción de las primeras ciudades y el origen de las civilizaciones antiguas y los ubica en un mapa actual de África y Asia.",
+      "Establece las implicaciones del proceso de sedentarización, la domesticación de animales y el empleo de mano de obra esclavizada, en la revolución agrícola para la humanidad.",
+      "Expresa opiniones sobre la influencia de la agricultura, el surgimiento de las ciudades, las primeras obras de ingeniería en la antigüedad y, su desarrollo en las sociedades actuales."
+    ],
+    "etiquetas": ["civilizaciones antiguas", "agricultura", "primeras ciudades"]
+  },
+  {
+    "areaCodigo": "CS-HGD",
+    "gradoNumero": 6,
+    "numero_dba": 5,
+    "organizador": "Relaciones con la historia y las culturas",
+    "enunciado": "Analiza los legados que las sociedades americanas prehispánicas dejaron en diversos campos.",
+    "evidencias_aprendizaje": [
+      "Representa y sitúa en un mapa los espacios geográficos en que se desarrollaron sociedades prehispánicas como mayas, aztecas, incas, chibchas u otros grupos ancestrales.",
+      "Describe los aportes tecnológicos y culturales de las sociedades prehispánicas como el calendario maya, la arquitectura, los aspectos religiosos, la astronomía y las técnicas de cultivo.",
+      "Compara la estructura social, política y económica de las sociedades prehispánicas, con las sociedades actuales del continente americano, y establece similitudes y diferencias en sus procesos históricos.",
+      "Explica la importancia de alimentos domesticados en América como el maíz, el tomate y la papa, en la gastronomía del mundo contemporáneo."
+    ],
+    "etiquetas": ["sociedades prehispánicas", "legado americano", "civilizaciones precolombinas"]
+  },
+  {
+    "areaCodigo": "CS-HGD",
+    "gradoNumero": 6,
+    "numero_dba": 6,
+    "organizador": "Relaciones ético-políticas",
+    "enunciado": "Analiza las distintas formas de gobierno ejercidas en la antigüedad y las compara con el ejercicio del poder político en el mundo contemporáneo.",
+    "evidencias_aprendizaje": [
+      "Reconoce algunas formas de gobierno que se desarrollaron en las sociedades antiguas (tiranía, aristocracia, monarquía, teocracia, democracia ateniense) e identifica aquellas que permanecen en la actualidad.",
+      "Compara las características de la democracia ateniense, del poder feudal, del absolutismo y de la democracia parlamentaria.",
+      "Explica cómo en la antigüedad se accedía al poder, cómo se justificaba (origen divino), cómo se mantenía (uso de la fuerza y creación de ejércitos) y cuál era el protagonismo de las personas en la elección de sus gobernantes.",
+      "Describe semejanzas y diferencias que se observan entre la democracia ateniense y las democracias actuales, en especial la colombiana, para señalar fortalezas, debilidades y alternativas que conduzcan a una mayor democratización."
+    ],
+    "etiquetas": ["formas de gobierno", "democracia ateniense", "poder político"]
+  },
+  {
+    "areaCodigo": "CS-HGD",
+    "gradoNumero": 6,
+    "numero_dba": 7,
+    "organizador": "Relaciones ético-políticas",
+    "enunciado": "Analiza cómo en el escenario político democrático entran en juego intereses desde diferentes sectores sociales, políticos y económicos, los cuales deben ser dirimidos por los ciudadanos.",
+    "evidencias_aprendizaje": [
+      "Describe el origen de la ciudadanía, los cambios que ha tenido en el tiempo y su significado actual.",
+      "Argumenta la importancia de participar activamente en la toma de decisiones para el bienestar colectivo en la sociedad, en el contexto de una democracia.",
+      "Explica, a partir de ejemplos, las consecuencias que pueden tener, sobre sí mismo y sobre los demás, la no participación activa en las decisiones de una comunidad.",
+      "Plantea razones que permitan comprender la importancia de respetar las opiniones ajenas y aportar constructivamente a las discusiones en el grupo."
+    ],
+    "etiquetas": ["ciudadanía", "participación democrática", "toma de decisiones"]
+  },
+  {
+    "areaCodigo": "CS-HGD",
+    "gradoNumero": 6,
+    "numero_dba": 8,
+    "organizador": "Relaciones ético-políticas",
+    "enunciado": "Comprende que en una sociedad democrática no es aceptable ninguna forma de discriminación por origen étnico, creencias religiosas, género, discapacidad y/o apariencia física.",
+    "evidencias_aprendizaje": [
+      "Reconoce que las personas tenemos derecho a no ser discriminadas, a la luz de la Declaración Universal de los Derechos Humanos y de la Constitución Nacional de Colombia de 1991.",
+      "Argumenta cómo los derechos de las personas se basan en el principio de la igualdad ante la ley, aunque cada uno viva y se exprese de manera diferente.",
+      "Explica que pertenece a una sociedad multicultural y cómo ésta, ha contribuido a la construcción de su identidad (familia, colegio, barrio, región, país).",
+      "Reconoce a partir de situaciones de la vida cotidiana que el respeto hacia el otro es inherente a la condición humana."
+    ],
+    "etiquetas": ["no discriminación", "sociedad multicultural", "Derechos Humanos"]
+  },
+  {
+    "areaCodigo": "CS-HGD",
+    "gradoNumero": 7,
+    "numero_dba": 1,
+    "organizador": "Relaciones espaciales y ambientales",
+    "enunciado": "Comprende que las representaciones del mundo han cambiado a partir de las visiones de quienes las elaboran y de los avances de la tecnología.",
+    "evidencias_aprendizaje": [
+      "Explica la importancia de los viajes de los exploradores del medioevo en la expansión del conocimiento del mundo.",
+      "Relaciona la concepción y representación del mundo que se tenía en la Edad Media influenciada por la Biblia con la cultura espacial europea y señala los cambios y las continuidades más relevantes.",
+      "Compara las representaciones del mundo conocido en la Edad Media y el representado hoy desde los mapas e imágenes satelitales y, describe el uso de la cartografía en la vida cotidiana de las personas.",
+      "Argumenta que las representaciones del espacio son producto de las imágenes que se tienen del mundo y que se modifican con el tiempo (fotografías aéreas, imágenes de satélite)."
+    ],
+    "ejemplo": "Mediante la lectura de planisferios de diferentes épocas (Eratóstenes, Marco Polo, imágenes satelitales actuales), explica las diversas visiones del mundo que los pueblos han construido con base en el desarrollo de acciones como los viajes de los exploradores, el uso de instrumentos como la brújula y el desarrollo del telescopio y de las imágenes de satélite, entre otros.",
+    "etiquetas": ["representaciones del mundo", "cartografía", "grado séptimo"]
+  },
+  {
+    "areaCodigo": "CS-HGD",
+    "gradoNumero": 7,
+    "numero_dba": 2,
+    "organizador": "Relaciones espaciales y ambientales",
+    "enunciado": "Interpreta las relaciones entre el crecimiento de la población, el desarrollo de los centros urbanos y las problemáticas sociales.",
+    "evidencias_aprendizaje": [
+      "Reconoce y utiliza conceptos propios de la geografía urbana (desarrollo, crecimiento, conurbación, área metropolitana y planificación urbana) a partir de la observación directa de estos fenómenos en su contexto.",
+      "Localiza en zonas de la ciudad o del municipio la concentración de fenómenos sociales como la pobreza, la violencia, los asentamientos informales y explica las posibles causas y consecuencias de estos.",
+      "Relaciona la industrialización y la migración del campo a la ciudad con los procesos de organización de las ciudades en Colombia en las últimas décadas.",
+      "Compara las problemáticas urbanas más recurrentes de las ciudades actuales (contaminación, movilidad, sobrepoblación, falta de viviendas dignas, desempleo, inseguridad y migraciones internas) con algunas similares en otros períodos históricos."
+    ],
+    "etiquetas": ["crecimiento urbano", "problemáticas sociales", "geografía urbana"]
+  },
+  {
+    "areaCodigo": "CS-HGD",
+    "gradoNumero": 7,
+    "numero_dba": 3,
+    "organizador": "Relaciones con la historia y las culturas",
+    "enunciado": "Analiza la influencia del imperio romano en la cultura de occidente y los aportes en diversos campos como la literatura, las leyes, la ingeniería y la vida cotidiana.",
+    "evidencias_aprendizaje": [
+      "Reconoce el imperio romano como un sistema político, militar y económico que ejerció control territorial sobre gran parte de Europa y que influyó en la cultura latinoamericana.",
+      "Describe el legado cultural del imperio romano en aspectos tales como el sistema político, el desarrollo de la infraestructura (vial, acueductos y puertos) y el comercio en diferentes lugares de Europa, norte de África y América Latina.",
+      "Argumenta las razones que llevaron a la crisis del imperio romano, para identificar los factores que pueden incidir en la decadencia de un Estado hoy en día.",
+      "Explica algunas actividades de la vida contemporánea que se inventaron en la antigua Roma (práctica de juegos públicos, el matrimonio, los gimnasios, uso de baños públicos...) y cómo estas se han transformado con el paso de los siglos."
+    ],
+    "ejemplo": "A partir de la lectura comprensiva de un mapa del imperio romano, localiza las áreas de influencia y los legados que dejaron en estos territorios.",
+    "etiquetas": ["imperio romano", "legado cultural", "antigüedad"]
+  },
+  {
+    "areaCodigo": "CS-HGD",
+    "gradoNumero": 7,
+    "numero_dba": 4,
+    "organizador": "Relaciones con la historia y las culturas",
+    "enunciado": "Analiza la Edad Media como un periodo histórico que dio origen a instituciones sociales, económicas y políticas en relación con el mismo período de las sociedades precolombinas.",
+    "evidencias_aprendizaje": [
+      "Describe los principales eventos que identificaron las sociedades europeas en la Edad Media (lucha entre imperios, modelo económico feudal, poder económico y político de la iglesia, desigualdad social).",
+      "Reconoce la organización social de las culturas precolombinas en los períodos clásico y posclásico y señala similitudes y diferencias con las sociedades medievales de Europa.",
+      "Compara características sociales, culturales y económicas de ciudades del año 1000 en el mundo como: París (Europa), Teotihuacán y Tikal (Centroamérica), Damasco (Asia) y El Cairo (África).",
+      "Argumenta las continuidades del ordenamiento político y social instaurado durante la Edad Media y las discontinuidades en el desarrollo de las culturas precolombinas con la llegada de los europeos a América."
+    ],
+    "etiquetas": ["Edad Media", "sociedades precolombinas", "feudalismo"]
+  },
+  {
+    "areaCodigo": "CS-HGD",
+    "gradoNumero": 7,
+    "numero_dba": 5,
+    "organizador": "Relaciones con la historia y las culturas",
+    "enunciado": "Analiza el Renacimiento como una época que dio paso en Europa a una nueva configuración cultural en campos como las ciencias, la política, las artes y la literatura.",
+    "evidencias_aprendizaje": [
+      "Describe algunos acontecimientos que dieron paso a la Modernidad e incidieron en un nuevo pensamiento político, social, económico e intelectual.",
+      "Interpreta mapas temáticos en los que reconoce ciudades estratégicas de Europa en el contexto del Renacimiento, por su importancia económica y cultural.",
+      "Explica las implicaciones políticas y económicas que tuvo la Reforma protestante para Europa y América.",
+      "Reconoce en las expresiones artísticas del Renacimiento (pintura, escultura y literatura) la vida cotidiana y la organización social de los pueblos."
+    ],
+    "etiquetas": ["Renacimiento", "Modernidad", "Reforma protestante"]
+  },
+  {
+    "areaCodigo": "CS-HGD",
+    "gradoNumero": 7,
+    "numero_dba": 6,
+    "organizador": "Relaciones con la historia y las culturas",
+    "enunciado": "Evalúa las causas y consecuencias de los procesos de Conquista y colonización europea dados en América.",
+    "evidencias_aprendizaje": [
+      "Describe los procesos de Conquista y colonización en América, llevados a cabo por españoles, portugueses, ingleses, franceses y holandeses.",
+      "Explica los cambios y continuidades de las organizaciones sociales, políticas y económicas instauradas durante la época colonial en América.",
+      "Interpreta las consecuencias demográficas, políticas y culturales que tuvo para los pueblos ancestrales la llegada de los europeos al continente americano.",
+      "Argumenta la importancia de la diversidad étnica y cultural del país como elemento constitutivo de la identidad de América Latina."
+    ],
+    "ejemplo": "A partir de la reconstrucción de un contexto histórico, como el de la llegada de los europeos a América, compara diferentes hechos que se dieron durante este período y explica el rol que tuvieron los distintos actores.",
+    "etiquetas": ["conquista de América", "colonización europea", "pueblos ancestrales"]
+  },
+  {
+    "areaCodigo": "CS-HGD",
+    "gradoNumero": 7,
+    "numero_dba": 7,
+    "organizador": "Relaciones ético-políticas",
+    "enunciado": "Comprende la responsabilidad que tiene una sociedad democrática para evitar la violación de los derechos fundamentales de sus ciudadanos.",
+    "evidencias_aprendizaje": [
+      "Compara la Declaración Universal de los Derechos Humanos con los derechos fundamentales enunciados en la Constitución.",
+      "Plantea soluciones alternativas a las problemáticas de discriminación que se evidencian en Colombia.",
+      "Expresa una posición argumentada, a partir del estudio de casos y la norma constitucional frente a hechos o situaciones en los que se vulneran los derechos fundamentales.",
+      "Identifica en qué situaciones puede usar la tutela como mecanismo para la protección y defensa de los derechos."
+    ],
+    "etiquetas": ["derechos fundamentales", "responsabilidad democrática", "tutela"]
+  },
+  {
+    "areaCodigo": "CS-HGD",
+    "gradoNumero": 7,
+    "numero_dba": 8,
+    "organizador": "Relaciones ético-políticas",
+    "enunciado": "Aplica procesos y técnicas de mediación de conflictos en pro del establecimiento de una cultura de la paz.",
+    "evidencias_aprendizaje": [
+      "Identifica las consecuencias de los conflictos en la vida cotidiana de las personas y plantea acciones para resolverlos de manera negociada.",
+      "Reconoce los distintos puntos de vista de personas o grupos en una situación de conflicto, para plantear posibles alternativas de solución.",
+      "Compara diferentes estrategias para la solución de conflictos, como la negociación, el arbitraje, la conciliación, la mediación escolar y el diálogo, para la construcción de escenarios de paz y el fortalecimiento de la dignidad de las personas.",
+      "Explica situaciones donde el conflicto se ha convertido en una oportunidad para aprender y fortalecer las relaciones interpersonales y sociales."
+    ],
+    "ejemplo": "A partir de la identificación de una situación de índole económica, ambiental o social de su comunidad, diseña una estrategia que permita generar escenarios de paz, que contenga: diagnóstico, identificación de causas, actores, plan de acción y evaluación.",
+    "etiquetas": ["mediación de conflictos", "cultura de paz", "resolución de conflictos"]
+  },
+  {
+    "areaCodigo": "CS-HGD",
+    "gradoNumero": 8,
+    "numero_dba": 1,
+    "organizador": "Relaciones ético-políticas",
+    "enunciado": "Evalúa la influencia de los procesos de cooperación económica y política entre los Estados Nacionales en la actualidad.",
+    "evidencias_aprendizaje": [
+      "Reconoce la constitución de la Unión Europea como un ejemplo de cooperación entre países, sus objetivos, integrantes y su influencia en el orden mundial.",
+      "Describe diversas alianzas de cooperación dadas entre países: MERCOSUR (Suramérica), OTAN (Europa-América), NEPAD (Nueva Alianza para el desarrollo de África) y APEC (Foro de Cooperación Económica Asia-Pacífico).",
+      "Formula preguntas sobre cómo lograr el bienestar colectivo desde la cooperación y las alianzas internacionales.",
+      "Explica las relaciones económicas y políticas que Colombia sostiene hoy con otros países de la región y el resto del mundo."
+    ],
+    "etiquetas": ["cooperación internacional", "alianzas económicas", "grado octavo"]
+  },
+  {
+    "areaCodigo": "CS-HGD",
+    "gradoNumero": 8,
+    "numero_dba": 2,
+    "organizador": "Relaciones espaciales y ambientales",
+    "enunciado": "Comprende el fenómeno de las migraciones en distintas partes del mundo y cómo afectan a las dinámicas de los países receptores y a países de origen.",
+    "evidencias_aprendizaje": [
+      "Describe el fenómeno de las migraciones humanas que tienen lugar en la actualidad hacia Europa y hacia América del norte y los países de procedencia.",
+      "Reconoce los niveles en el Índice de Desarrollo Humano obtenidos por los diferentes países que reciben migrantes en campos como la educación, la salud y la seguridad.",
+      "Explica las principales diferencias entre los países que atraen emigrantes y aquellos de donde salen, así como las consecuencias del fenómeno de las migraciones en las relaciones entre los países.",
+      "Argumenta los aportes que han realizado los migrantes a los países que los reciben y a la humanidad en general, casos de algunos artistas, políticos, economistas y científicos naturales y sociales procedentes de otros países."
+    ],
+    "etiquetas": ["migraciones", "países receptores", "desarrollo humano"]
+  },
+  {
+    "areaCodigo": "CS-HGD",
+    "gradoNumero": 8,
+    "numero_dba": 3,
+    "organizador": "Relaciones con la historia y las culturas",
+    "enunciado": "Analiza los cambios sociales, económicos, políticos y culturales generados por el surgimiento y consolidación del capitalismo en Europa y las razones por las cuales este sigue siendo un sistema económico vigente.",
+    "evidencias_aprendizaje": [
+      "Describe las transformaciones que se produjeron en Europa a finales del siglo XVIII y durante el siglo XIX a partir del desarrollo del comercio y la industria dando paso al surgimiento y consolidación del capitalismo.",
+      "Explica las características del sistema económico capitalista (propiedad privada, libre competencia, capital, consumo,...) y las ventajas o desventajas que trae para las sociedades que lo han asumido.",
+      "Compara los sistemas económicos actuales (capitalista, socialista y el de economía mixta) desde ámbitos como: la propiedad, el consumo de los recursos, la planificación y el control del Estado.",
+      "Reconoce las diferencias en el nivel de desarrollo económico, político y cultural entre los países de América Latina y de Europa, en la actualidad."
+    ],
+    "etiquetas": ["capitalismo", "sistemas económicos", "revolución industrial"]
+  },
+  {
+    "areaCodigo": "CS-HGD",
+    "gradoNumero": 8,
+    "numero_dba": 4,
+    "organizador": "Relaciones con la historia y las culturas",
+    "enunciado": "Analiza los procesos de expansión territorial desarrollados por Europa durante el siglo XIX y las nuevas manifestaciones imperialistas observadas en las sociedades contemporáneas.",
+    "evidencias_aprendizaje": [
+      "Describe la expansión y distribución territorial de los imperios europeos en Asia y África durante el siglo XIX e interpreta mapas temáticos.",
+      "Relaciona el crecimiento económico Europeo con la explotación de Asia y África durante el siglo XIX.",
+      "Compara la influencia de los países colonialistas en el siglo XIX en ámbitos como el comercio y la industria manufacturera, con la que ejercen las actuales potencias mundiales en el sector financiero, las telecomunicaciones, y las nuevas tecnologías de la información.",
+      "Explica la influencia actual de países como Estados Unidos en la dinámica económica, social y política de Colombia (Tratado del Libre Comercio, lucha contra las drogas, éxodo de colombianos,...)."
+    ],
+    "ejemplo": "A partir de la lectura de caricaturas, analiza características del proceso imperialista.",
+    "etiquetas": ["imperialismo", "expansión territorial", "potencias mundiales"]
+  },
+  {
+    "areaCodigo": "CS-HGD",
+    "gradoNumero": 8,
+    "numero_dba": 5,
+    "organizador": "Relaciones con la historia y las culturas",
+    "enunciado": "Comprende cómo se produjeron los procesos de independencia de las colonias americanas durante los siglos XVIII y XIX y sus implicaciones para las sociedades contemporáneas.",
+    "evidencias_aprendizaje": [
+      "Describe la influencia política y económica de las revoluciones Francesa e Industrial en los procesos de independencia de las colonias americanas.",
+      "Reconoce los aportes de la Revolución Francesa en el campo político (Derechos del Hombre y del Ciudadano, soberanía popular, Constitución, división de poderes y estados nacionales).",
+      "Compara la organización político-administrativa entre las colonias americanas que estuvieron bajo el dominio europeo: inglesas, españolas, francesas, holandesas y portuguesas.",
+      "Argumenta acerca de las consecuencias que trae para los pueblos, en la actualidad, la intervención de algunos Estados más desarrollados en países con economías en desarrollo."
+    ],
+    "etiquetas": ["independencias americanas", "revolución francesa", "siglo XVIII"]
+  },
+  {
+    "areaCodigo": "CS-HGD",
+    "gradoNumero": 8,
+    "numero_dba": 6,
+    "organizador": "Relaciones con la historia y las culturas",
+    "enunciado": "Evalúa el impacto producido por los avances tecnológicos en el desarrollo social y económico de Colombia en el siglo XIX.",
+    "evidencias_aprendizaje": [
+      "Describe el papel del telégrafo, el correo, el ferrocarril, el barco de vapor, la industria textil y la electricidad en el desarrollo económico de Colombia.",
+      "Relaciona los procesos de industrialización dados en el país con los cambios sociales como el crecimiento de las ciudades y la diversificación de la economía.",
+      "Reconoce el papel de la Comisión Corográfica de Agustín Codazzi como un aporte a la planeación y gestión del territorio colombiano desde su representación cartográfica.",
+      "Explica algunos problemas ambientales provocados por procesos de industrialización en Colombia y realiza conjeturas acerca de sus consecuencias a corto, mediano y largo plazo."
+    ],
+    "etiquetas": ["avances tecnológicos", "industrialización en Colombia", "siglo XIX"]
+  },
+  {
+    "areaCodigo": "CS-HGD",
+    "gradoNumero": 8,
+    "numero_dba": 7,
+    "organizador": "Relaciones ético-políticas",
+    "enunciado": "Evalúa hechos trascendentales para la dignidad humana (abolición de la esclavitud, reconocimiento de los derechos de las mujeres, derechos de las minorías) y describe las discriminaciones que aún se presentan.",
+    "evidencias_aprendizaje": [
+      "Reconoce que la discriminación y la exclusión social son factores generadores de situaciones negativas como el deterioro de las relaciones entre personas o grupos, el incremento de la pobreza y la violencia, entre otras.",
+      "Describe la situación actual, desde casos concretos, de la vulneración de los derechos fundamentales de las personas en Colombia.",
+      "Explica algunas situaciones que develan prejuicios y estereotipos relacionados con la exclusión, la discriminación y la intolerancia a la diferencia, que han sufrido históricamente grupos como: mujeres, grupos étnicos minoritarios, homosexuales, personas con alguna condición de discapacidad.",
+      "Propone acciones para mejorar el cumplimiento de los Derechos Humanos y constitucionales en Colombia y en el mundo."
+    ],
+    "ejemplo": "A partir de la observación directa en su institución educativa y en el entorno donde vive, documenta cómo el diseño arquitectónico y urbanístico condiciona la movilidad de las personas en situación de discapacidad.",
+    "etiquetas": ["dignidad humana", "discriminación", "derechos de las minorías"]
+  },
+  {
+    "areaCodigo": "CS-HGD",
+    "gradoNumero": 8,
+    "numero_dba": 8,
+    "organizador": "Relaciones ético-políticas",
+    "enunciado": "Comprende la importancia de las asociaciones, los gremios, los movimientos y organizaciones sindicales en la defensa de los derechos colectivos.",
+    "evidencias_aprendizaje": [
+      "Describe el surgimiento de los movimientos sociales (campesinos, estudiantiles y obreros) acaecidos durante el siglo XX en Colombia.",
+      "Explica algunas herramientas y procedimientos alternativos (diálogo, conciliación, arbitraje, mediación,..) con los que se cuenta para resolver un conflicto social o laboral.",
+      "Interpreta a partir de evidencias sobre casos concretos (negociaciones Gobierno Colombiano-FARC, huelgas del magisterio,...), que todo conflicto social o laboral, puede resolverse mediante la concertación entre las partes.",
+      "Argumenta la importancia de un desarrollo social, económico y tecnológico, fundamentado en una lógica orientada al bienestar colectivo."
+    ],
+    "ejemplo": "A partir de la conmemoración del 1 de mayo en Colombia, realiza un ejercicio de revisión de fuentes (prensa, textos de consulta, Internet, entrevistas con personas afiliadas a sindicatos) en donde se indague la forma como se alcanzaron las reivindicaciones sociales y laborales de los trabajadores en Colombia, qué tipo de movimientos fueron necesarios para que los trabajadores obtuvieran sus derechos y las dificultades que ha tenido el sindicalismo en el país en los últimos 50 años.",
+    "etiquetas": ["movimientos sindicales", "derechos colectivos", "conflicto social"]
+  },
+  {
+    "areaCodigo": "CS-HGD",
+    "gradoNumero": 9,
+    "numero_dba": 1,
+    "organizador": "Relaciones espaciales y ambientales",
+    "enunciado": "Analiza la situación ambiental de los geosistemas más biodiversos de Colombia (selvas, páramos, arrecifes coralinos) y las problemáticas que enfrentan actualmente debido a la explotación a que han sido sometidos.",
+    "evidencias_aprendizaje": [
+      "Reconoce la importancia que tienen para la sociedad colombiana los geosistemas biodiversos existentes en el territorio colombiano y los ubica geográficamente.",
+      "Explica las consecuencias para la biodiversidad colombiana acciones como la ampliación de la frontera agrícola, el turismo desmedido y la explotación minera.",
+      "Describe los niveles de deforestación observados en las selvas colombianas y la disminución de las áreas de páramo en nuestro país, así como su incidencia en el deterioro de las fuentes hídricas en Colombia.",
+      "Argumenta acerca de las condiciones de otros geosistemas colombianos como los manglares, las sabanas, los ríos, las ciénagas, los humedales, los bosques secos, los embalses y los estuarios."
+    ],
+    "etiquetas": ["geosistemas", "biodiversidad", "explotación ambiental", "grado noveno"]
+  },
+  {
+    "areaCodigo": "CS-HGD",
+    "gradoNumero": 9,
+    "numero_dba": 2,
+    "organizador": "Relaciones con la historia y las culturas",
+    "enunciado": "Comprende las consecuencias que han traído los procesos migratorios en la organización social y económica de Colombia en el siglo XX y en la actualidad.",
+    "evidencias_aprendizaje": [
+      "Identifica en la historia de Colombia las causas de los movimientos migratorios y su influencia en las condiciones de vida de la población actual del país.",
+      "Diferencia procesos de emigración e inmigración dados en Colombia en la actualidad.",
+      "Relaciona los movimientos de la población (del campo a la ciudad, entre ciudades y al interior de la ciudad) con los cambios políticos, ambientales, laborales y sociales dados en el territorio colombiano en las últimas décadas.",
+      "Explica desde situaciones de la vida cotidiana, las consecuencias económicas y sociales que tiene para el país el desplazamiento de las personas del campo a los centros urbanos."
+    ],
+    "ejemplo": "A partir del uso de datos estadísticos explica el comportamiento poblacional de algunas ciudades y departamentos del país en los últimos cincuenta años.",
+    "etiquetas": ["procesos migratorios", "desplazamiento", "urbanización"]
+  },
+  {
+    "areaCodigo": "CS-HGD",
+    "gradoNumero": 9,
+    "numero_dba": 3,
+    "organizador": "Relaciones con la historia y las culturas",
+    "enunciado": "Analiza las crisis económicas dadas en la Colombia contemporánea y sus repercusiones en la vida cotidiana de las personas.",
+    "evidencias_aprendizaje": [
+      "Caracteriza a través de estudios de caso algunas crisis económicas en Colombia (sustitución de importaciones, financiera e hipotecaria [UPAC], ruptura del pacto internacional del café, crisis internacional del petróleo).",
+      "Establece algunas causas que han generado crisis económicas en Colombia, América Latina y el mundo, y sus efectos en la economía del hogar.",
+      "Explica las consecuencias sociales de las crisis económicas en la vida diaria de las personas (desempleo, impuestos, canasta familiar, poder adquisitivo).",
+      "Plantea hipótesis de un futuro económico posible en que las personas vivan en mejores condiciones de vida."
+    ],
+    "ejemplo": "A partir de diferentes fuentes documentales (videos, revistas, periódicos, Internet, televisión) explica, narra y analiza las repercusiones de las crisis económicas en la vida cotidiana de las personas como el aumento de la tasa de desempleo, el alza de impuestos, entre otros.",
+    "etiquetas": ["crisis económicas", "Colombia contemporánea", "vida cotidiana"]
+  },
+  {
+    "areaCodigo": "CS-HGD",
+    "gradoNumero": 9,
+    "numero_dba": 4,
+    "organizador": "Relaciones con la historia y las culturas",
+    "enunciado": "Analiza los cambios sociales, políticos, económicos y culturales en Colombia en el siglo XX y su impacto en la vida de los habitantes del país.",
+    "evidencias_aprendizaje": [
+      "Explica los cambios del proceso de modernización en Colombia en la primera mitad del siglo XX: construcción de vías de comunicación, urbanización y desarrollo industrial.",
+      "Relaciona el proceso de industrialización del país con el surgimiento de los sindicatos en la primera mitad del siglo XX, para el alcance de derechos de la clase trabajadora.",
+      "Compara los hábitos de vida de las personas antes y después de la llegada al país del cine, la radio, la aviación comercial y los automóviles.",
+      "Establece posibles relaciones entre los hechos sociales y políticos de la segunda mitad del siglo XX en Colombia y los que tienen lugar en la actualidad (partidos políticos, violencia política, conflicto armado, desplazamiento, narcotráfico, reformas constitucionales, apertura económica, corrupción, entre otros)."
+    ],
+    "etiquetas": ["siglo XX en Colombia", "modernización", "conflicto armado"]
+  },
+  {
+    "areaCodigo": "CS-HGD",
+    "gradoNumero": 9,
+    "numero_dba": 5,
+    "organizador": "Relaciones ético-políticas",
+    "enunciado": "Evalúa cómo las sociedades democráticas en un Estado social de Derecho tienen el deber de proteger y promover los derechos fundamentales de los ciudadanos.",
+    "evidencias_aprendizaje": [
+      "Identifica los derechos constitucionales fundamentales, los derechos sociales, económicos y culturales y los derechos colectivos y del ambiente.",
+      "Examina las implicaciones que tiene para la democracia y la ciudadanía la vulneración de los Derechos Humanos (DD. HH.) y sugiere para su protección mecanismos constitucionales.",
+      "Justifica el uso de los mecanismos de participación ciudadana: el voto, el plebiscito, el referendo, la consulta popular, el cabildo abierto, la iniciativa popular, la revocatoria del mandato.",
+      "Explica mediante estudios de caso el papel que cumplen las autoridades que protegen los DD. HH. en Colombia (Procuraduría General de la Nación, Defensoría del Pueblo y personerías)."
+    ],
+    "etiquetas": ["Estado social de Derecho", "derechos fundamentales", "mecanismos de participación"]
+  },
+  {
+    "areaCodigo": "CS-HGD",
+    "gradoNumero": 9,
+    "numero_dba": 6,
+    "organizador": "Relaciones ético-políticas",
+    "enunciado": "Comprende el papel de las mujeres en los cambios sociales, políticos, económicos y culturales en el mundo y la igualdad de derechos que han adquirido en los últimos años.",
+    "evidencias_aprendizaje": [
+      "Identifica la participación de las mujeres en la historia de Colombia en el ámbito político, académico, cultural, industrial y financiero.",
+      "Caracteriza formas de violencia contra las mujeres en el país y en el mundo (psicológica, sexual, económica, doméstica, laboral, mediática y física) y propone alternativas para cambiarlas.",
+      "Explica las contribuciones de las mujeres en la construcción de una sociedad justa y creadora de una cultura de paz.",
+      "Propone acciones para que las diversas formas de identidad de género sean respetadas en el contexto del desarrollo de todas las potencialidades humanas."
+    ],
+    "ejemplo": "A partir del análisis de casos en que se refleje la vulneración de los DD. HH. y del DIH, propone acciones para su protección o su defensa.",
+    "etiquetas": ["igualdad de género", "participación de la mujer", "violencia de género"]
+  },
+  {
+    "areaCodigo": "CS-HGD",
+    "gradoNumero": 9,
+    "numero_dba": 7,
+    "organizador": "Relaciones ético-políticas",
+    "enunciado": "Evalúa cómo todo conflicto puede solucionarse mediante acuerdos en que las personas ponen de su parte para superar las diferencias.",
+    "evidencias_aprendizaje": [
+      "Explica las consecuencias de aquellas acciones que pueden causar sufrimiento a otras personas.",
+      "Analiza los conflictos entre grupos con el fin de proponer alternativas de solución.",
+      "Plantea argumentos sobre los discursos que legitiman la violencia con el fin de rechazarlos como alternativa a la solución de los conflictos.",
+      "Propone alternativas para la solución de conflictos que ocurren en las relaciones, incluyendo las de pareja, y que se pueden resolver a partir de la escucha y comprensión de los diferentes puntos de vista."
+    ],
+    "etiquetas": ["resolución de conflictos", "acuerdos", "no violencia"]
+  },
+  {
+    "areaCodigo": "CS-HGD",
+    "gradoNumero": 9,
+    "numero_dba": 8,
+    "organizador": "Relaciones espaciales y ambientales",
+    "enunciado": "Comprende el impacto social del crecimiento económico desigual que se da en las diferentes regiones del país.",
+    "evidencias_aprendizaje": [
+      "Reconoce cómo las condiciones geográficas regionales pueden influir en la construcción o no de infraestructuras y por ende en el crecimiento económico.",
+      "Compara las características que tienen las zonas con mejores índices de crecimiento económico respecto a aquellas con menor desarrollo.",
+      "Relaciona la inversión social, la presencia de los gremios económicos y del Estado en aquellas regiones de menor índice de desarrollo humano en Colombia.",
+      "Explica posibles acciones a considerar en el mejoramiento del crecimiento de las regiones con menor índice de desarrollo humano."
+    ],
+    "etiquetas": ["crecimiento económico desigual", "regiones", "desarrollo humano"]
+  },
+  {
+    "areaCodigo": "CS-HGD",
+    "gradoNumero": 10,
+    "numero_dba": 1,
+    "organizador": "Relaciones espaciales y ambientales",
+    "enunciado": "Analiza conflictos que se presentan en el territorio colombiano originados por la degradación ambiental, el escaso desarrollo económico y la inestabilidad política.",
+    "evidencias_aprendizaje": [
+      "Explica la disponibilidad y el uso del recurso hídrico en las diferentes regiones colombianas y los conflictos que se presentan en torno a este.",
+      "Diferencia los diversos tipos de contaminación que se presentan en el mundo y sugiere acciones orientadas hacia la sostenibilidad ambiental y la conciencia ecológica en la ciudadanía.",
+      "Describe el impacto ambiental, económico, social y político que ha tenido la minería legal e ilegal, a partir del estudio de casos provenientes de distintas fuentes de información.",
+      "Argumenta la pérdida de biodiversidad en el país a partir de la revisión de los informes del Ministerio del Medio Ambiente, las corporaciones autónomas regionales y/o las ONG dedicadas al tema.",
+      "Propone estrategias para utilizar el diálogo como recurso mediador en la solución de conflictos."
+    ],
+    "ejemplo": "A partir de la recolección, registro, clasificación, procesamiento e interpretación de fuentes primarias y secundarias, como prensa, documentales de audio y video e Internet, analiza las causas, consecuencias y posibilidades de resolución pacífica de los conflictos que se viven en el país.",
+    "etiquetas": ["degradación ambiental", "conflictos territoriales", "grado décimo"]
+  },
+  {
+    "areaCodigo": "CS-HGD",
+    "gradoNumero": 10,
+    "numero_dba": 2,
+    "organizador": "Relaciones con la historia y las culturas",
+    "enunciado": "Evalúa las causas y consecuencias de la violencia en la segunda mitad del siglo XX en Colombia y su incidencia en los ámbitos social, político, económico y cultural.",
+    "evidencias_aprendizaje": [
+      "Establece semejanzas y diferencias entre los conflictos asociados a la convivencia social, a escala regional y nacional.",
+      "Compara los diferentes tipos de violencia (directa, estructural y cultural) que generan los actores armados y sus repercusiones en la vida nacional.",
+      "Explica las características de la violencia ejercida en el contexto del conflicto armado en Colombia y cómo afecta la vida social y cultural."
+    ],
+    "etiquetas": ["violencia en Colombia", "conflicto armado", "siglo XX"]
+  },
+  {
+    "areaCodigo": "CS-HGD",
+    "gradoNumero": 10,
+    "numero_dba": 3,
+    "organizador": "Relaciones ético-políticas",
+    "enunciado": "Comprende que existen multitud de culturas y una sola humanidad en el mundo y que entre ellas se presenta la discriminación y exclusión de algunos grupos, lo cual dificulta el bienestar de todos.",
+    "evidencias_aprendizaje": [
+      "Identifica formas de discriminación social, su origen y las consecuencias que generan en las sociedades actuales.",
+      "Explica la diversidad cultural y étnica como una característica de las sociedades actuales lo cual se constituye en una riqueza para la vida en comunidad.",
+      "Compara los mecanismos de protección de DDHH (conciliación, acción de tutela, acciones populares, acción de cumplimiento).",
+      "Argumenta por qué es necesario rechazar las formas de discriminación, exclusión social o violencia que se observan en el mundo hoy."
+    ],
+    "etiquetas": ["diversidad cultural", "discriminación", "mecanismos de protección de derechos"]
+  },
+  {
+    "areaCodigo": "CS-HGD",
+    "gradoNumero": 10,
+    "numero_dba": 4,
+    "organizador": "Relaciones ético-políticas",
+    "enunciado": "Interpreta el papel que cumplen los organismos internacionales como formas de alianza y organización entre los Estados y que responden a los intereses entre los países.",
+    "evidencias_aprendizaje": [
+      "Describe las características demográficas, económicas, sociales, políticas y culturales de las sociedades actuales, en el marco de una sociedad de la información y bajo el paradigma de la globalización.",
+      "Reconoce el papel de los organismos multilaterales en la formulación de políticas económicas, jurídicas, ambientales y educativas para los países que hacen parte de estas organizaciones.",
+      "Explica cómo los organismos multilaterales de los que hace parte Colombia, inciden en sus políticas internas, desde el reconocimiento de las ventajas y desventajas que tiene el pertenecer a estos.",
+      "Argumenta el papel desempeñado por los organismos e instituciones nacionales e internacionales, en el mantenimiento del bienestar, la paz de los Estados y los Derechos Humanos."
+    ],
+    "etiquetas": ["organismos internacionales", "globalización", "alianzas entre Estados"]
+  },
+  {
+    "areaCodigo": "CS-HGD",
+    "gradoNumero": 10,
+    "numero_dba": 5,
+    "organizador": "Relaciones con la historia y las culturas",
+    "enunciado": "Analiza los conflictos bélicos presentes en las sociedades contemporáneas, sus causas y consecuencias así como su incidencia en la vida cotidiana de los pueblos.",
+    "evidencias_aprendizaje": [
+      "Reconoce los avances militares, tecnológicos y científicos que las potencias utilizaron durante las dos Guerras Mundiales y otros conflictos acaecidos en el siglo XX y asume una posición crítica frente a estos.",
+      "Describe el desarrollo histórico de las guerras mundiales y las consecuencias sociales que estos enfrentamientos provocaron para la humanidad.",
+      "Explica y representa las transformaciones geopolíticas que se dieron en el mundo después de las guerras mundiales desde la interpretación de mapas temáticos.",
+      "Argumenta acerca de las causas directas e indirectas que determinaron el inicio de los conflictos bélicos mundiales."
+    ],
+    "etiquetas": ["guerras mundiales", "conflictos bélicos", "geopolítica"]
+  },
+  {
+    "areaCodigo": "CS-HGD",
+    "gradoNumero": 11,
+    "numero_dba": 1,
+    "organizador": "Relaciones espaciales y ambientales",
+    "enunciado": "Analiza cómo el bienestar y la supervivencia de la humanidad dependen de la protección que hagan del ambiente los diferentes actores (políticos, económicos y sociales).",
+    "evidencias_aprendizaje": [
+      "Describe las razones económicas y políticas que sustentan aquellos países que más influyen en el problema del calentamiento global para no cambiar sus prácticas.",
+      "Reconoce acciones y propuestas que ha creado la Organización de Naciones Unidas -ONU- (Protocolos ambientales y Cumbres de la Tierra), para evitar los efectos del calentamiento global en el mundo.",
+      "Explica las acciones que se sugieren desde las instituciones y organizaciones ambientales en Colombia para disminuir los efectos del calentamiento global.",
+      "Propone acciones a seguir para disminuir las causas y los efectos actuales del calentamiento global y el futuro en la vida del planeta."
+    ],
+    "etiquetas": ["calentamiento global", "protección ambiental", "grado once"]
+  },
+  {
+    "areaCodigo": "CS-HGD",
+    "gradoNumero": 11,
+    "numero_dba": 2,
+    "organizador": "Relaciones ético-políticas",
+    "enunciado": "Evalúa la importancia de la solución negociada de los conflictos armados para la búsqueda de la paz.",
+    "evidencias_aprendizaje": [
+      "Reconoce los principales conflictos sociales y políticos vividos en Colombia en las últimas décadas, a partir de la memoria histórica.",
+      "Explica la importancia que tiene para una sociedad la resolución pacífica de sus conflictos y el respeto por las diferencias políticas, ideológicas, de género, religiosas, étnicas o intereses económicos.",
+      "Describe las implicaciones que tiene para las sociedades democráticas considerar la justicia, la verdad, el perdón y la reparación de las víctimas en los procesos de paz.",
+      "Argumenta razones para defender la búsqueda de la paz como un deber ético, moral y constitucional en el que se requiere el compromiso de todos los ciudadanos."
+    ],
+    "ejemplo": "A partir de la lectura de diferentes fuentes de información, caracteriza los procesos de paz que se desarrollaron en distintos países del mundo como El Salvador, Sudáfrica, Irlanda del Norte, Nepal y Colombia, entre otros, señalando los acuerdos básicos, la transición a la vida civil y política de los actores involucrados.",
+    "etiquetas": ["solución negociada", "procesos de paz", "conflicto armado"]
+  },
+  {
+    "areaCodigo": "CS-HGD",
+    "gradoNumero": 11,
+    "numero_dba": 3,
+    "organizador": "Relaciones con la historia y las culturas",
+    "enunciado": "Analiza las consecuencias políticas, económicas y sociales de algunos conflictos geopolíticos desde finales del siglo XX hasta la actualidad a nivel mundial.",
+    "evidencias_aprendizaje": [
+      "Caracteriza algunos conflictos geopolíticos contemporáneos ocurridos en distintos continentes por la disputa de recursos naturales, intereses económicos, ideológicos y religiosos.",
+      "Reconoce que en las relaciones internacionales existen dinámicas geopolíticas que tienen implicaciones en las poblaciones fronterizas mediante el análisis de casos recientes.",
+      "Describe los intereses políticos, económicos e ideológicos de las grandes potencias que afectan las relaciones internacionales en la actualidad.",
+      "Argumenta las consecuencias sociales que generan los conflictos internacionales como el desplazamiento forzado, los refugiados y el genocidio de naciones."
+    ],
+    "etiquetas": ["conflictos geopolíticos", "relaciones internacionales", "siglo XXI"]
+  },
+  {
+    "areaCodigo": "CS-HGD",
+    "gradoNumero": 11,
+    "numero_dba": 4,
+    "organizador": "Relaciones con la historia y las culturas",
+    "enunciado": "Comprende las implicaciones sociales, económicas y políticas que tuvo la Guerra Fría en el mundo y las relaciona con las vividas en América Latina.",
+    "evidencias_aprendizaje": [
+      "Reconoce las características fundamentales de los dos bloques hegemónicos (Capitalista-Comunista), como sistemas políticos y económicos que se consolidaron en el marco de la Guerra Fría.",
+      "Explica las implicaciones que trajo a la vida cotidiana de los pueblos el que sus países hicieran parte de uno u otro bloque.",
+      "Interpreta las repercusiones sociales, políticas y económicas que la Guerra Fría tuvo para Latinoamérica en casos como la revolución cubana, el surgimiento de las dictaduras, las guerrillas y el intervencionismo.",
+      "Plantea argumentos acerca de las amenazas constantes con armas de destrucción masiva por parte de las potencias vencedoras en la segunda Guerra Mundial y establece relaciones con las tensiones mundiales en la actualidad."
+    ],
+    "etiquetas": ["Guerra Fría", "América Latina", "bloques hegemónicos"]
+  },
+  {
+    "areaCodigo": "CS-HGD",
+    "gradoNumero": 11,
+    "numero_dba": 5,
+    "organizador": "Relaciones espaciales y ambientales",
+    "enunciado": "Analiza la globalización como un proceso que redefine el concepto de territorio, las dinámicas de los mercados, las gobernanzas nacionales y las identidades locales.",
+    "evidencias_aprendizaje": [
+      "Reconoce las características de la globalización económica y política en el mundo contemporáneo y las tensiones que ha generado en las comunidades nacionales.",
+      "Explica y sitúa los bloques económicos y los tratados de integración que se han configurado en los últimos años, así como las consecuencias que estos han traído para Colombia y América Latina.",
+      "Describe las ventajas y desventajas económicas, políticas y sociales que tiene el proceso de globalización en las sociedades actuales.",
+      "Argumenta acerca del papel de las organizaciones políticas y económicas en la integración de los países latinoamericanos (Mercosur, El Alba, Alianza del Pacífico y Unasur, entre otros)."
+    ],
+    "etiquetas": ["globalización", "territorio", "identidades locales"]
+  }
+]

@@ -1,6 +1,10 @@
 import { ParamsDictionary } from 'express-serve-static-core';
 import * as cdService from '../services/curricularDevelopment.service';
-import { ReviewInput, UpsertDraftInput } from '../services/curricularDevelopment.service';
+import {
+  ListDevelopmentsQuery,
+  ReviewInput,
+  UpsertDraftInput,
+} from '../services/curricularDevelopment.service';
 import ApiError from '../utils/ApiError';
 import catchAsync from '../utils/catchAsync';
 
@@ -28,3 +32,25 @@ export const review = catchAsync<IdParams, unknown, ReviewInput>(async (req, res
   const doc = await cdService.reviewDevelopment(req.params.id, req.body, req.user);
   res.status(200).json({ success: true, data: doc });
 });
+
+interface GetOneParams extends ParamsDictionary {
+  assignmentId: string;
+  periodoNumero: string;
+}
+
+export const getByAssignmentAndPeriod = catchAsync<GetOneParams>(async (req, res) => {
+  const doc = await cdService.getDevelopmentByAssignmentAndPeriod(
+    req.params.assignmentId,
+    Number(req.params.periodoNumero)
+  );
+  res.status(200).json({ success: true, data: doc });
+});
+
+export const listDevelopments = catchAsync<unknown, unknown, unknown, ListDevelopmentsQuery>(
+  async (req, res) => {
+    if (!req.user) throw new ApiError(401, 'No autenticado.');
+
+    const docs = await cdService.listDevelopments(req.query, req.user);
+    res.status(200).json({ success: true, count: docs.length, data: docs });
+  }
+);

@@ -1,0 +1,842 @@
+import { type FormEvent, useMemo, useState } from 'react';
+import { Alert, errorMessage } from '../../components/ui/Alert';
+import { Chip } from '../../components/ui/Badge';
+import { Button } from '../../components/ui/Button';
+import { Card, CardHeader } from '../../components/ui/Card';
+import { Drawer } from '../../components/ui/Drawer';
+import { Input, Select } from '../../components/ui/Field';
+import { IconButton } from '../../components/ui/IconButton';
+import { PageHeader } from '../../components/ui/PageHeader';
+import { Spinner } from '../../components/ui/Spinner';
+import { EmptyRow, Table, TableBody, TableHead, Td, Th } from '../../components/ui/Table';
+import { Tabs } from '../../components/ui/Tabs';
+import {
+  AlertTriangleIcon,
+  CheckCircleIcon,
+  PlusIcon,
+  SlidersIcon,
+  TrashIcon,
+  UsersIcon,
+} from '../../components/ui/icons';
+import { useAnioDeTrabajo } from '../../hooks/useAniosLectivos';
+import { useSubjects } from '../../hooks/useCatalogoAcademico';
+import { useGrades } from '../../hooks/useCatalogs';
+import { useGroups } from '../../hooks/useGroups';
+import { useInstitution } from '../../hooks/useInstitution';
+import { useStudyPlan } from '../../hooks/useStudyPlan';
+import {
+  type CrearTeacherAssignmentInput,
+  type LimitesCargaDocente,
+  useActualizarLimitesCarga,
+  useCrearTeacherAssignment,
+  useDocentesCargaResumen,
+  useEliminarTeacherAssignment,
+  useLimitesCarga,
+  useTeacherAssignments,
+} from '../../hooks/useTeacherAssignments';
+import { useUsers } from '../../hooks/useUsers';
+import type { TeacherAssignment, TipoAsignacionDocente } from '../../types/domain';
+
+const TIPO_LABELS: Record<TipoAsignacionDocente, string> = {
+  CLASE: 'Clase Regular',
+  DIRECCION_GRUPO: 'Dirección de Grupo',
+  PROYECTO_TRANSVERSAL: 'Proyecto Pedagógico',
+  OTRO: 'Otra Asignación',
+};
+
+const FORM_VACIO = {
+  docente_id: '',
+  tipo_asignacion: 'CLASE' as TipoAsignacionDocente,
+  group_id: '',
+  subject_id: '',
+  horas_semanales: 0,
+  proyecto_nombre: '',
+  observaciones: '',
+};
+
+export function TeacherAssignmentsPage() {
+  const { anio, anios } = useAnioDeTrabajo();
+  const [selectedAnioId, setSelectedAnioId] = useState<string>('');
+  const anioActivoId = selectedAnioId || anio?._id || '';
+
+  const { data: institucion } = useInstitution();
+  const [tabActiva, setTabActiva] = useState<string>('resumen');
+  const [filtroDocente, setFiltroDocente] = useState<string>('');
+  const [filtroTipo, setFiltroTipo] = useState<string>('');
+
+  // Modales y formularios
+  const [drawerAbierto, setDrawerAbierto] = useState(false);
+  const [modalLimitesAbierto, setModalLimitesAbierto] = useState(false);
+  const [selectedGradoId, setSelectedGradoId] = useState<string>('');
+  const [form, setForm] = useState(FORM_VACIO);
+  const [formError, setFormError] = useState<string | null>(null);
+
+  // Queries
+  const { data: docentesResumen = [], isLoading: cargandoResumen } = useDocentesCargaResumen(anioActivoId);
+  const { data: asignaciones = [], isLoading: cargandoAsignaciones } = useTeacherAssignments({
+    academic_year_id: anioActivoId,
+    docente_id: filtroDocente || undefined,
+    tipo_asignacion: (filtroTipo as TipoAsignacionDocente) || undefined,
+  });
+
+  const { data: docentes = [] } = useUsers({ rol: 'DOCENTE', estado: 'activo' });
+  const { data: grupos = [] } = useGroups({ academic_year_id: anioActivoId });
+  const { data: asignaturas = [] } = useSubjects({ estado: 'activo' });
+  const { data: grades = [] } = useGrades('activo');
+  const { data: studyPlan } = useStudyPlan(institucion?._id, anioActivoId);
+  const { data: limitesCarga } = useLimitesCarga();
+
+  // Mutaciones
+  const crearMutation = useCrearTeacherAssignment();
+  const eliminarMutation = useEliminarTeacherAssignment();
+  const actualizarLimitesMutation = useActualizarLimitesCarga();
+
+  // Estado local para edición de límites
+  const [limitesForm, setLimitesForm] = useState<LimitesCargaDocente>({
+    PREESCOLAR: 20,
+    PRIMARIA: 25,
+    SECUNDARIA: 22,
+    MEDIA: 22,
+  });
+
+  // Métricas de diagnóstico
+  const totalDocentes = docentesResumen.length;
+  const horasTotales = docentesResumen.reduce((acc, d) => acc + d.horas_totales, 0);
+  const sobrecargaCount = docentesResumen.filter((d) => d.estado_carga === 'SOBRE_CARGA').length;
+  const subcargaCount = docentesResumen.filter((d) => d.estado_carga === 'SUB_CARGA' && d.horas_totales > 0).length;
+
+  // Filtrar grupos por grado seleccionado
+  const gruposDelGrado = useMemo(() => {
+    if (!selectedGradoId) return [];
+    return grupos.filter((g) => {
+      const gId = typeof g.grade_id === 'object' && g.grade_id ? g.grade_id._id : g.grade_id;
+      return String(gId) === String(selectedGradoId);
+    });
+  }, [grupos, selectedGradoId]);
+
+  // Asignaturas e intensidades según el Plan de Estudios (M06) para el grupo seleccionado
+  const { asignaturasDisponibles, horasPorAsignaturaMap } = useMemo(() => {
+    if (!selectedGradoId || !studyPlan) {
+      return { asignaturasDisponibles: [], horasPorAsignaturaMap: new Map<string, number>() };
+    }
+
+    const gradoConfig = studyPlan.grades.find((g) => String(g.grade_id) === String(selectedGradoId));
+    if (!gradoConfig) {
+      return { asignaturasDisponibles: [], horasPorAsignaturaMap: new Map<string, number>() };
+    }
+
+    const map = new Map<string, number>();
+    for (const a of gradoConfig.asignaturas) {
+      map.set(String(a.subject_id), a.intensidad_horaria_semanal);
+    }
+
+    if (form.group_id) {
+      const personalizacion = gradoConfig.personalizaciones_grupo.find(
+        (p) => String(p.group_id) === String(form.group_id)
+      );
+      if (personalizacion) {
+        for (const ov of personalizacion.intensidades_personalizadas) {
+          map.set(String(ov.subject_id), ov.intensidad_horaria_semanal);
+        }
+        for (const ag of personalizacion.asignaturas_agregadas) {
+          map.set(String(ag.subject_id), ag.intensidad_horaria_semanal);
+        }
+      }
+    }
+
+    // Identificar asignaturas ya asignadas a algún docente en este grupo
+    const asignadasEnGrupo = new Set<string>();
+    if (form.group_id) {
+      for (const asg of asignaciones) {
+        if (asg.tipo_asignacion === 'CLASE') {
+          const asgGroupId = typeof asg.group_id === 'object' && asg.group_id ? asg.group_id._id : asg.group_id;
+          if (String(asgGroupId) === String(form.group_id)) {
+            const asgSubId = typeof asg.subject_id === 'object' && asg.subject_id ? asg.subject_id._id : asg.subject_id;
+            if (asgSubId) asignadasEnGrupo.add(String(asgSubId));
+          }
+        }
+      }
+    }
+
+    // Filtrar catálogo de asignaturas
+    const disponibles = asignaturas
+      .filter((s) => map.has(s._id) && !asignadasEnGrupo.has(s._id))
+      .sort((a, b) => a.nombre.localeCompare(b.nombre));
+
+    return { asignaturasDisponibles: disponibles, horasPorAsignaturaMap: map };
+  }, [selectedGradoId, form.group_id, studyPlan, asignaciones, asignaturas]);
+
+  const handleOpenDrawer = () => {
+    setSelectedGradoId('');
+    setForm(FORM_VACIO);
+    setFormError(null);
+    setDrawerAbierto(true);
+  };
+
+  const handleOpenLimitesModal = () => {
+    if (limitesCarga) {
+      setLimitesForm(limitesCarga);
+    }
+    setModalLimitesAbierto(true);
+  };
+
+  const handleSaveLimites = async (e: FormEvent) => {
+    e.preventDefault();
+    try {
+      await actualizarLimitesMutation.mutateAsync(limitesForm);
+      setModalLimitesAbierto(false);
+    } catch (err) {
+      setFormError(errorMessage(err));
+    }
+  };
+
+  const handleSubmit = async (e: FormEvent) => {
+    e.preventDefault();
+    setFormError(null);
+
+    if (!form.docente_id) {
+      setFormError('Debe seleccionar un docente.');
+      return;
+    }
+
+    if (form.tipo_asignacion === 'CLASE') {
+      if (!selectedGradoId) {
+        setFormError('Debe seleccionar un grado.');
+        return;
+      }
+      if (!form.group_id) {
+        setFormError('Debe seleccionar un grupo.');
+        return;
+      }
+      if (!form.subject_id) {
+        setFormError('Debe seleccionar una asignatura.');
+        return;
+      }
+      if (!form.horas_semanales || form.horas_semanales <= 0) {
+        setFormError('La asignatura seleccionada no tiene intensidad horaria configurada en el Plan de Estudios.');
+        return;
+      }
+    }
+
+    if (form.tipo_asignacion === 'DIRECCION_GRUPO') {
+      if (!form.group_id) {
+        setFormError('Debe seleccionar el grupo para la dirección de curso.');
+        return;
+      }
+    }
+
+    if (form.tipo_asignacion === 'PROYECTO_TRANSVERSAL') {
+      if (!form.proyecto_nombre.trim()) {
+        setFormError('Debe ingresar el nombre del proyecto o comité pedagógico.');
+        return;
+      }
+      if (form.horas_semanales <= 0) {
+        setFormError('Debe asignar al menos 1 hora semanal al proyecto.');
+        return;
+      }
+    }
+
+    try {
+      const payload: CrearTeacherAssignmentInput = {
+        docente_id: form.docente_id,
+        academic_year_id: anioActivoId,
+        tipo_asignacion: form.tipo_asignacion,
+        group_id: form.tipo_asignacion === 'PROYECTO_TRANSVERSAL' ? null : form.group_id,
+        subject_id: form.tipo_asignacion === 'CLASE' ? form.subject_id : null,
+        horas_semanales: form.tipo_asignacion === 'DIRECCION_GRUPO' ? 0 : form.horas_semanales,
+        proyecto_nombre: form.tipo_asignacion === 'PROYECTO_TRANSVERSAL' ? form.proyecto_nombre : undefined,
+        observaciones: form.observaciones.trim() || undefined,
+      };
+
+      await crearMutation.mutateAsync(payload);
+      setDrawerAbierto(false);
+    } catch (err) {
+      setFormError(errorMessage(err));
+    }
+  };
+
+  const handleEliminar = async (asg: TeacherAssignment) => {
+    const msg =
+      asg.tipo_asignacion === 'CLASE'
+        ? '¿Está seguro de revocar esta asignación de clase? Si tiene desarrollo curricular aprobado, no se podrá eliminar.'
+        : '¿Está seguro de eliminar esta responsabilidad docente?';
+    if (!window.confirm(msg)) return;
+
+    try {
+      await eliminarMutation.mutateAsync(asg._id);
+    } catch (err) {
+      alert(errorMessage(err));
+    }
+  };
+
+  return (
+    <div className="space-y-4">
+      <PageHeader
+        title="Gestión de Carga Académica y Docentes"
+        subtitle="Asignación oficial de cursos, asignaturas y responsabilidades académicas por Coordinación (M08)."
+        action={
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={handleOpenLimitesModal}>
+              <SlidersIcon className="h-4 w-4 mr-2" />
+              Topes Decreto 1850
+            </Button>
+            <Button variant="primary" onClick={handleOpenDrawer}>
+              <PlusIcon className="h-4 w-4 mr-2" />
+              Nueva Asignación
+            </Button>
+          </div>
+        }
+      />
+
+      {/* Selector de vigencia lectiva y filtros */}
+      <Card>
+        <div className="p-4 flex flex-col sm:flex-row items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <span className="text-sm font-semibold text-ink">Año Lectivo:</span>
+            <Select
+              label="Año Lectivo"
+              value={anioActivoId}
+              onChange={(e) => setSelectedAnioId(e.target.value)}
+              className="w-48"
+            >
+              {anios.map((a) => (
+                <option key={a._id} value={a._id}>
+                  {a.nombre} {a.estado === 'EN_CURSO' ? '(Activo)' : ''}
+                </option>
+              ))}
+            </Select>
+          </div>
+
+          <div className="w-full sm:w-auto">
+            <Tabs
+              items={[
+                { key: 'resumen', label: 'Diagnóstico y Carga Docente' },
+                { key: 'asignaciones', label: `Detalle de Asignaciones (${asignaciones.length})` },
+              ]}
+              active={tabActiva}
+              onChange={setTabActiva}
+            />
+          </div>
+        </div>
+      </Card>
+
+      {/* Diagnóstico rápido de horas */}
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-4">
+        <Card>
+          <div className="p-4">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-medium text-muted uppercase">Docentes</span>
+              <UsersIcon className="h-4 w-4 text-primary" />
+            </div>
+            <p className="mt-2 text-h2 text-ink">{totalDocentes}</p>
+            <span className="text-xs text-muted">Planta activa en el año</span>
+          </div>
+        </Card>
+
+        <Card>
+          <div className="p-4">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-medium text-muted uppercase">Horas Asignadas</span>
+              <CheckCircleIcon className="h-4 w-4 text-success" />
+            </div>
+            <p className="mt-2 text-h2 text-ink">{horasTotales} h</p>
+            <span className="text-xs text-muted">Carga total semanal</span>
+          </div>
+        </Card>
+
+        <Card>
+          <div className="p-4">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-medium text-muted uppercase">Sobrecarga</span>
+              <AlertTriangleIcon className="h-4 w-4 text-danger" />
+            </div>
+            <p className="mt-2 text-h2 text-danger">{sobrecargaCount}</p>
+            <span className="text-xs text-muted">Exceden el tope por nivel</span>
+          </div>
+        </Card>
+
+        <Card>
+          <div className="p-4">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-medium text-muted uppercase">Subcarga</span>
+              <AlertTriangleIcon className="h-4 w-4 text-warning" />
+            </div>
+            <p className="mt-2 text-h2 text-warning">{subcargaCount}</p>
+            <span className="text-xs text-muted">Disponibilidad de horas</span>
+          </div>
+        </Card>
+      </div>
+
+      {/* Pestaña 1: Resumen por Docente */}
+      {tabActiva === 'resumen' && (
+        <Card>
+          <CardHeader
+            title="Semáforo de Carga y Horas Semanales"
+            subtitle="Regulado por Decreto 1850 de 2002: 20h Preescolar, 25h Primaria, 22h Secundaria y Media."
+          />
+          {cargandoResumen ? (
+            <div className="flex justify-center p-8">
+              <Spinner />
+            </div>
+          ) : (
+            <Table>
+              <TableHead>
+                <Th>Docente</Th>
+                <Th>Identificación</Th>
+                <Th>Nivel</Th>
+                <Th className="text-center">Clases</Th>
+                <Th className="text-center">Dirección</Th>
+                <Th className="text-center">Proyectos</Th>
+                <Th className="text-center">Total Horas</Th>
+                <Th className="text-center">Tope Nivel</Th>
+                <Th>Diagnóstico</Th>
+                <Th className="text-center">Cursos</Th>
+              </TableHead>
+              <TableBody>
+                {docentesResumen.length === 0 ? (
+                  <EmptyRow colSpan={10}>No hay docentes registrados en la institución.</EmptyRow>
+                ) : (
+                  docentesResumen.map((item) => (
+                    <tr key={item.docente._id} className="hover:bg-soft/40 transition-colors">
+                      <Td className="font-semibold text-ink">
+                        {item.docente.apellido}, {item.docente.nombre}
+                      </Td>
+                      <Td className="text-body text-xs">{item.docente.numero_documento}</Td>
+                      <Td>
+                        <Chip tone="neutral">
+                          {item.nivel_predominante ?? 'SECUNDARIA'}
+                        </Chip>
+                      </Td>
+                      <Td className="text-center font-medium text-body">{item.horas_clase} h</Td>
+                      <Td className="text-center font-medium text-body">
+                        {item.horas_direccion > 0 ? `${item.horas_direccion} h` : 'Titular'}
+                      </Td>
+                      <Td className="text-center font-medium text-body">{item.horas_proyectos} h</Td>
+                      <Td className="text-center font-bold text-ink">{item.horas_totales} h</Td>
+                      <Td className="text-center font-semibold text-muted">
+                        {item.tope_horas ?? 22} h
+                      </Td>
+                      <Td>
+                        {item.estado_carga === 'NORMAL' && (
+                          <Chip tone="green">
+                            Normal ({item.horas_totales}h / {item.tope_horas ?? 22}h)
+                          </Chip>
+                        )}
+                        {item.estado_carga === 'SOBRE_CARGA' && (
+                          <Chip tone="red">
+                            Sobrecarga ({item.horas_totales}h &gt; {item.tope_horas ?? 22}h)
+                          </Chip>
+                        )}
+                        {item.estado_carga === 'SUB_CARGA' && (
+                          <Chip tone="orange">
+                            Subcarga ({item.horas_totales}h / {item.tope_horas ?? 22}h)
+                          </Chip>
+                        )}
+                      </Td>
+                      <Td className="text-center text-body">{item.total_asignaciones}</Td>
+                    </tr>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          )}
+        </Card>
+      )}
+
+      {/* Pestaña 2: Detalle de Asignaciones */}
+      {tabActiva === 'asignaciones' && (
+        <Card>
+          <div className="p-4 border-b border-border flex flex-col sm:flex-row gap-3">
+            <Select
+              label="Filtrar por docente"
+              value={filtroDocente}
+              onChange={(e) => setFiltroDocente(e.target.value)}
+              className="max-w-xs"
+            >
+              <option value="">Todos los docentes</option>
+              {docentes.map((d) => (
+                <option key={d._id} value={d._id}>
+                  {d.apellido}, {d.nombre}
+                </option>
+              ))}
+            </Select>
+
+            <Select
+              label="Filtrar por tipo"
+              value={filtroTipo}
+              onChange={(e) => setFiltroTipo(e.target.value)}
+              className="max-w-xs"
+            >
+              <option value="">Todos los tipos</option>
+              <option value="CLASE">Clase regular</option>
+              <option value="DIRECCION_GRUPO">Dirección de grupo</option>
+              <option value="PROYECTO_TRANSVERSAL">Proyecto pedagógico</option>
+            </Select>
+          </div>
+
+          {cargandoAsignaciones ? (
+            <div className="flex justify-center p-8">
+              <Spinner />
+            </div>
+          ) : (
+            <Table>
+              <TableHead>
+                <Th>Tipo</Th>
+                <Th>Docente</Th>
+                <Th>Grupo / Curso</Th>
+                <Th>Asignatura / Proyecto</Th>
+                <Th className="text-center">Horas/Sem</Th>
+                <Th>Observaciones</Th>
+                <Th className="text-right">Acciones</Th>
+              </TableHead>
+              <TableBody>
+                {asignaciones.length === 0 ? (
+                  <EmptyRow colSpan={7}>No hay asignaciones académicas registradas con estos filtros.</EmptyRow>
+                ) : (
+                  asignaciones.map((asg) => {
+                    const doc = typeof asg.docente_id === 'object' ? asg.docente_id : null;
+                    const grp = typeof asg.group_id === 'object' ? asg.group_id : null;
+                    const sub = typeof asg.subject_id === 'object' ? asg.subject_id : null;
+                    const grado = grp && typeof grp.grade_id === 'object' ? grp.grade_id : null;
+
+                    return (
+                      <tr key={asg._id} className="hover:bg-soft/40 transition-colors">
+                        <Td>
+                          <Chip
+                            tone={
+                              asg.tipo_asignacion === 'CLASE'
+                                ? 'blue'
+                                : asg.tipo_asignacion === 'DIRECCION_GRUPO'
+                                ? 'green'
+                                : 'orange'
+                            }
+                          >
+                            {TIPO_LABELS[asg.tipo_asignacion]}
+                          </Chip>
+                        </Td>
+                        <Td className="font-semibold text-ink">
+                          {doc ? `${doc.apellido}, ${doc.nombre}` : '—'}
+                        </Td>
+                        <Td className="text-body">
+                          {grp ? (
+                            <span>
+                              <strong>{grp.nomenclatura}</strong>
+                              {grado ? ` (${grado.nombre})` : ''}
+                            </span>
+                          ) : (
+                            <span className="text-muted italic">Institucional</span>
+                          )}
+                        </Td>
+                        <Td className="text-body font-medium">
+                          {asg.tipo_asignacion === 'CLASE'
+                            ? sub
+                              ? `${sub.nombre} (${sub.abreviatura})`
+                              : '—'
+                            : asg.proyecto_nombre || 'Dirección de curso'}
+                        </Td>
+                        <Td className="text-center font-bold text-ink">
+                          {asg.tipo_asignacion === 'DIRECCION_GRUPO' ? '—' : `${asg.horas_semanales} h`}
+                        </Td>
+                        <Td className="text-xs text-muted max-w-xs truncate">{asg.observaciones || '—'}</Td>
+                        <Td className="text-right">
+                          <IconButton
+                            tone="danger"
+                            label="Eliminar asignación"
+                            icon={<TrashIcon />}
+                            onClick={() => handleEliminar(asg)}
+                          />
+                        </Td>
+                      </tr>
+                    );
+                  })
+                )}
+              </TableBody>
+            </Table>
+          )}
+        </Card>
+      )}
+
+      {/* Drawer: Formulario de Nueva Asignación en Cascada */}
+      <Drawer
+        open={drawerAbierto}
+        onClose={() => setDrawerAbierto(false)}
+        title="Nueva Asignación Académica"
+        size="lg"
+      >
+        <form onSubmit={handleSubmit} className="space-y-4">
+          {formError && <Alert tone="error">{formError}</Alert>}
+
+          <Select
+            label="Docente Titular *"
+            value={form.docente_id}
+            onChange={(e) => setForm({ ...form, docente_id: e.target.value })}
+            required
+          >
+            <option value="">Seleccione un docente...</option>
+            {docentes.map((d) => (
+              <option key={d._id} value={d._id}>
+                {d.apellido}, {d.nombre} ({d.numero_documento})
+              </option>
+            ))}
+          </Select>
+
+          <Select
+            label="Tipo de Asignación *"
+            value={form.tipo_asignacion}
+            onChange={(e) => {
+              const tipo = e.target.value as TipoAsignacionDocente;
+              setForm({
+                ...form,
+                tipo_asignacion: tipo,
+                horas_semanales: tipo === 'DIRECCION_GRUPO' ? 0 : 4,
+                group_id: '',
+                subject_id: '',
+              });
+              setSelectedGradoId('');
+            }}
+          >
+            <option value="CLASE">Clase Regular (Asignatura en Grupo)</option>
+            <option value="DIRECCION_GRUPO">Dirección de Grupo (Titularidad formativa)</option>
+            <option value="PROYECTO_TRANSVERSAL">Proyecto Pedagógico Transversal / Comité</option>
+          </Select>
+
+          {/* Campos en Cascada para Clase Regular */}
+          {form.tipo_asignacion === 'CLASE' && (
+            <div className="space-y-3 rounded-lg border border-border p-3 bg-soft/20">
+              <h4 className="text-xs font-semibold text-primary uppercase tracking-wide">
+                Selección Curricular en Cascada
+              </h4>
+
+              {/* Paso 1: Seleccionar Grado */}
+              <Select
+                label="1. Grado Académico *"
+                value={selectedGradoId}
+                onChange={(e) => {
+                  setSelectedGradoId(e.target.value);
+                  setForm({ ...form, group_id: '', subject_id: '', horas_semanales: 0 });
+                }}
+                required
+              >
+                <option value="">Seleccione el grado...</option>
+                {grades.map((g) => (
+                  <option key={g._id} value={g._id}>
+                    {g.nombre} ({g.nivel})
+                  </option>
+                ))}
+              </Select>
+
+              {/* Paso 2: Seleccionar Grupo filtrado */}
+              <Select
+                label="2. Grupo del Grado *"
+                value={form.group_id}
+                disabled={!selectedGradoId}
+                onChange={(e) => {
+                  setForm({ ...form, group_id: e.target.value, subject_id: '', horas_semanales: 0 });
+                }}
+                required
+              >
+                <option value="">
+                  {selectedGradoId ? 'Seleccione el grupo...' : 'Primero seleccione un grado'}
+                </option>
+                {gruposDelGrado.map((g) => (
+                  <option key={g._id} value={g._id}>
+                    Grupo {g.nomenclatura}
+                  </option>
+                ))}
+              </Select>
+
+              {/* Paso 3: Asignaturas registradas en M06 para ese grupo */}
+              <Select
+                label="3. Asignatura (del Plan de Estudios M06) *"
+                value={form.subject_id}
+                disabled={!form.group_id}
+                onChange={(e) => {
+                  const subId = e.target.value;
+                  const intensidad = horasPorAsignaturaMap.get(subId) ?? 0;
+                  setForm({ ...form, subject_id: subId, horas_semanales: intensidad });
+                }}
+                required
+              >
+                <option value="">
+                  {form.group_id
+                    ? asignaturasDisponibles.length > 0
+                      ? 'Seleccione la asignatura...'
+                      : 'No hay asignaturas pendientes en este grupo'
+                    : 'Primero seleccione un grupo'}
+                </option>
+                {asignaturasDisponibles.map((s) => (
+                  <option key={s._id} value={s._id}>
+                    {s.nombre} ({s.abreviatura}) — {horasPorAsignaturaMap.get(s._id) ?? 0}h/sem
+                  </option>
+                ))}
+              </Select>
+
+              {/* Paso 4: Horas Semanales obtenidas de M06 */}
+              <Input
+                label="Horas Semanales (M06)"
+                type="number"
+                value={form.horas_semanales}
+                disabled
+                hint={
+                  form.subject_id
+                    ? `Fijado automáticamente en ${form.horas_semanales} h/semana según el Plan de Estudios de este grupo.`
+                    : 'Se completará al seleccionar la asignatura.'
+                }
+              />
+            </div>
+          )}
+
+          {/* Campos para Dirección de Grupo */}
+          {form.tipo_asignacion === 'DIRECCION_GRUPO' && (
+            <div className="space-y-3 rounded-lg border border-border p-3 bg-soft/20">
+              <Select
+                label="Grado del Grupo *"
+                value={selectedGradoId}
+                onChange={(e) => {
+                  setSelectedGradoId(e.target.value);
+                  setForm({ ...form, group_id: '', horas_semanales: 0 });
+                }}
+                required
+              >
+                <option value="">Seleccione el grado...</option>
+                {grades.map((g) => (
+                  <option key={g._id} value={g._id}>
+                    {g.nombre} ({g.nivel})
+                  </option>
+                ))}
+              </Select>
+
+              <Select
+                label="Grupo a Dirigir *"
+                value={form.group_id}
+                disabled={!selectedGradoId}
+                onChange={(e) => setForm({ ...form, group_id: e.target.value, horas_semanales: 0 })}
+                required
+              >
+                <option value="">
+                  {selectedGradoId ? 'Seleccione el grupo...' : 'Primero seleccione un grado'}
+                </option>
+                {gruposDelGrado.map((g) => (
+                  <option key={g._id} value={g._id}>
+                    Grupo {g.nomenclatura}
+                  </option>
+                ))}
+              </Select>
+              <p className="text-xs text-muted">
+                La titularidad de grupo es un acompañamiento tutorial y no computa horas lectivas de aula.
+              </p>
+            </div>
+          )}
+
+          {/* Campos para Proyectos Transversales */}
+          {form.tipo_asignacion === 'PROYECTO_TRANSVERSAL' && (
+            <div className="space-y-3 rounded-lg border border-border p-3 bg-soft/20">
+              <Input
+                label="Nombre del Proyecto / Comité *"
+                type="text"
+                placeholder="Ej. Líder PRAE, Comité de Convivencia, PESCC"
+                value={form.proyecto_nombre}
+                onChange={(e) => setForm({ ...form, proyecto_nombre: e.target.value })}
+                required
+              />
+
+              <Input
+                label="Horas Semanales Asignadas *"
+                type="number"
+                min={1}
+                max={40}
+                value={form.horas_semanales}
+                onChange={(e) => setForm({ ...form, horas_semanales: Number(e.target.value) })}
+                hint="Horas dedicadas semanalmente al proyecto pedagógico transversal."
+                required
+              />
+            </div>
+          )}
+
+          <Input
+            label="Observaciones (opcional)"
+            type="text"
+            placeholder="Detalles adicionales sobre la asignación"
+            value={form.observaciones}
+            onChange={(e) => setForm({ ...form, observaciones: e.target.value })}
+          />
+
+          <div className="pt-4 flex justify-end gap-3 border-t border-border">
+            <Button variant="secondary" type="button" onClick={() => setDrawerAbierto(false)}>
+              Cancelar
+            </Button>
+            <Button variant="primary" type="submit" disabled={crearMutation.isPending}>
+              {crearMutation.isPending ? 'Guardando...' : 'Asignar Carga'}
+            </Button>
+          </div>
+        </form>
+      </Drawer>
+
+      {/* Modal / Drawer para Topes de Carga (Decreto 1850) */}
+      <Drawer
+        open={modalLimitesAbierto}
+        onClose={() => setModalLimitesAbierto(false)}
+        title="Topes Semanales de Carga Docente (Decreto 1850)"
+      >
+        <form onSubmit={handleSaveLimites} className="space-y-4">
+          <p className="text-sm text-muted">
+            Configure las horas lectivas semanales estándar según la normativa colombiana o la política de la institución:
+          </p>
+
+          <Input
+            label="Preescolar (Horas Semanales)"
+            type="number"
+            min={1}
+            max={40}
+            value={limitesForm.PREESCOLAR}
+            onChange={(e) => setLimitesForm({ ...limitesForm, PREESCOLAR: Number(e.target.value) })}
+            hint="Estándar nacional: 20 horas efectivas."
+            required
+          />
+
+          <Input
+            label="Básica Primaria (Horas Semanales)"
+            type="number"
+            min={1}
+            max={40}
+            value={limitesForm.PRIMARIA}
+            onChange={(e) => setLimitesForm({ ...limitesForm, PRIMARIA: Number(e.target.value) })}
+            hint="Estándar nacional: 25 horas efectivas."
+            required
+          />
+
+          <Input
+            label="Básica Secundaria (Horas Semanales)"
+            type="number"
+            min={1}
+            max={40}
+            value={limitesForm.SECUNDARIA}
+            onChange={(e) => setLimitesForm({ ...limitesForm, SECUNDARIA: Number(e.target.value) })}
+            hint="Estándar nacional: 22 horas efectivas."
+            required
+          />
+
+          <Input
+            label="Educación Media (Horas Semanales)"
+            type="number"
+            min={1}
+            max={40}
+            value={limitesForm.MEDIA}
+            onChange={(e) => setLimitesForm({ ...limitesForm, MEDIA: Number(e.target.value) })}
+            hint="Estándar nacional: 22 horas efectivas."
+            required
+          />
+
+          <div className="pt-4 flex justify-end gap-3 border-t border-border">
+            <Button variant="secondary" type="button" onClick={() => setModalLimitesAbierto(false)}>
+              Cerrar
+            </Button>
+            <Button variant="primary" type="submit" disabled={actualizarLimitesMutation.isPending}>
+              {actualizarLimitesMutation.isPending ? 'Guardando...' : 'Guardar Topes'}
+            </Button>
+          </div>
+        </form>
+      </Drawer>
+    </div>
+  );
+}

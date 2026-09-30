@@ -1,0 +1,1748 @@
+[
+  {
+    "areaCodigo": "MAT-BAS",
+    "gradoNumero": 1,
+    "numero_dba": 1,
+    "organizador": "Pensamiento numérico",
+    "enunciado": "Identifica los usos de los números (como código, cardinal, medida, ordinal) y las operaciones (suma y resta) en contextos de juego, familiares, económicos, entre otros.",
+    "evidencias_aprendizaje": [
+      "Construye e interpreta representaciones pictóricas y diagramas para representar relaciones entre cantidades que se presentan en situaciones o fenómenos.",
+      "Explica cómo y por qué es posible hacer una operación (suma o resta) en relación con los usos de los números y el contexto en el cual se presentan.",
+      "Reconoce en sus actuaciones cotidianas posibilidades de uso de los números y las operaciones.",
+      "Interpreta y resuelve problemas de juntar, quitar y completar, que involucren la cantidad de elementos de una colección o la medida de magnitudes como longitud, peso, capacidad y duración.",
+      "Utiliza las operaciones (suma y resta) para representar el cambio en una cantidad."
+    ],
+    "ejemplo": "A partir de diversos materiales (recortes de periódico, revistas, facturas, placas de vehículos, documentos de identidad, entre otros) reconoce los números que aparecen allí e identifica cuáles sirven para conocer la cantidad de objetos, ordenar eventos u objetos, o hacer operaciones. Propone preguntas que requieren calcular una suma o una resta, como si se pueden sumar los números de la placa de un carro.",
+    "etiquetas": ["números", "conteo", "suma", "resta", "cardinal", "ordinal"]
+  },
+  {
+    "areaCodigo": "MAT-BAS",
+    "gradoNumero": 1,
+    "numero_dba": 2,
+    "organizador": "Pensamiento numérico",
+    "enunciado": "Utiliza diferentes estrategias para contar, realizar operaciones (suma y resta) y resolver problemas aditivos.",
+    "evidencias_aprendizaje": [
+      "Realiza conteos (de uno en uno, de dos en dos, etc.) iniciando en cualquier número.",
+      "Determina la cantidad de elementos de una colección agrupándolos de 1 en 1, de 2 en 2, de 5 en 5.",
+      "Describe y resuelve situaciones variadas con las operaciones de suma y resta en problemas cuya estructura puede ser a + b = ?, a + ? = c, o ? + b = c.",
+      "Establece y argumenta conjeturas de los posibles resultados en una secuencia numérica.",
+      "Utiliza las características del sistema decimal de numeración para crear estrategias de cálculo y estimación de sumas y restas."
+    ],
+    "ejemplo": "Emplea una calculadora simple (o una aplicación que la simule) y explora el efecto del signo = al presionarlo varias veces después de digitar una suma o resta, describiendo las acciones que hace la calculadora.",
+    "etiquetas": ["conteo", "suma", "resta", "problemas aditivos", "cálculo mental"]
+  },
+  {
+    "areaCodigo": "MAT-BAS",
+    "gradoNumero": 1,
+    "numero_dba": 3,
+    "organizador": "Pensamiento numérico",
+    "enunciado": "Utiliza las características posicionales del Sistema de Numeración Decimal (SND) para establecer relaciones entre cantidades y comparar números.",
+    "evidencias_aprendizaje": [
+      "Realiza composiciones y descomposiciones de números de dos dígitos en términos de la cantidad de \"dieces\" y de \"unos\" que los conforman.",
+      "Encuentra parejas de números que al adicionarse dan como resultado otro número dado.",
+      "Halla los números correspondientes a tener \"diez más\" o \"diez menos\" que una cantidad determinada.",
+      "Emplea estrategias de cálculo como \"el paso por el diez\" para realizar adiciones o sustracciones."
+    ],
+    "ejemplo": "Con billetes de $1 y $10 juega con un compañero a formar una cantidad pensada usando el menor número de billetes posible, y explica por qué el mismo número se puede obtener con distinta cantidad de billetes.",
+    "etiquetas": ["sistema de numeración decimal", "composición", "descomposición", "valor posicional"]
+  },
+  {
+    "areaCodigo": "MAT-BAS",
+    "gradoNumero": 1,
+    "numero_dba": 4,
+    "organizador": "Pensamiento métrico",
+    "enunciado": "Reconoce y compara atributos que pueden ser medidos en objetos y eventos (longitud, duración, rapidez, masa, peso, capacidad, cantidad de elementos de una colección, entre otros).",
+    "evidencias_aprendizaje": [
+      "Identifica atributos que se pueden medir en los objetos.",
+      "Diferencia atributos medibles (longitud, masa, capacidad, duración, cantidad de elementos de una colección), en términos de los instrumentos y las unidades utilizadas para medirlos.",
+      "Compara y ordena objetos de acuerdo con atributos como altura, peso, intensidades de color, entre otros, y recorridos según la distancia de cada trayecto.",
+      "Compara y ordena colecciones según la cantidad de elementos."
+    ],
+    "ejemplo": "A partir de una colección de objetos cotidianos de diferentes tamaños y pesos (una piña, un carro de juguete, una uva, un lápiz, entre otros), los ordena respecto a su tamaño y su peso y discute sobre las condiciones de ubicación entre ellos.",
+    "etiquetas": ["magnitudes", "medición", "comparación", "atributos medibles"]
+  },
+  {
+    "areaCodigo": "MAT-BAS",
+    "gradoNumero": 1,
+    "numero_dba": 5,
+    "organizador": "Pensamiento métrico",
+    "enunciado": "Realiza medición de longitudes, capacidades, peso, masa, entre otros, para ello utiliza instrumentos y unidades no estandarizadas y estandarizadas.",
+    "evidencias_aprendizaje": [
+      "Mide longitudes con diferentes instrumentos y expresa el resultado en unidades estandarizadas o no estandarizadas comunes.",
+      "Compara objetos a partir de su longitud, masa, capacidad y duración de eventos.",
+      "Toma decisiones a partir de las mediciones realizadas y de acuerdo con los requerimientos del problema."
+    ],
+    "ejemplo": "Con tiras o cuerdas de diferentes tamaños y colores, identifica cuántas tiras de un color caben en otra, cuántas se necesitan para medir el largo de un lápiz, y anticipa cuántas tiras amarillas se requieren para medir un objeto conociendo cuántas tiras naranjas hacen falta.",
+    "etiquetas": ["medición", "longitud", "instrumentos de medida", "unidades no estandarizadas"]
+  },
+  {
+    "areaCodigo": "MAT-BAS",
+    "gradoNumero": 1,
+    "numero_dba": 6,
+    "organizador": "Pensamiento espacial",
+    "enunciado": "Compara objetos del entorno y establece semejanzas y diferencias empleando características geométricas de las formas bidimensionales y tridimensionales (curvo o recto, abierto o cerrado, plano o sólido, número de lados, número de caras, entre otros).",
+    "evidencias_aprendizaje": [
+      "Crea, compone y descompone formas bidimensionales y tridimensionales, para ello utiliza plastilina, papel, palitos, cajas, etc.",
+      "Describe de forma verbal las cualidades y propiedades de un objeto relativas a su forma.",
+      "Agrupa objetos de su entorno de acuerdo con las semejanzas y las diferencias en la forma y en el tamaño y explica el criterio que utiliza.",
+      "Identifica objetos a partir de las descripciones verbales que hacen de sus características geométricas."
+    ],
+    "ejemplo": "A partir de la construcción de títeres con material reciclable (mariposa, pingüino, gato, sapo, entre otros), relaciona las formas y cuerpos geométricos y encuentra semejanzas y diferencias entre las figuras y los sólidos que los componen.",
+    "etiquetas": ["figuras geométricas", "formas bidimensionales", "formas tridimensionales", "semejanzas y diferencias"]
+  },
+  {
+    "areaCodigo": "MAT-BAS",
+    "gradoNumero": 1,
+    "numero_dba": 7,
+    "organizador": "Pensamiento espacial",
+    "enunciado": "Describe y representa trayectorias y posiciones de objetos y personas para orientar a otros o a sí mismo en el espacio circundante.",
+    "evidencias_aprendizaje": [
+      "Utiliza representaciones como planos para ubicarse en el espacio.",
+      "Toma decisiones a partir de la ubicación espacial.",
+      "Dibuja recorridos, para ello considera los ángulos y la lateralidad.",
+      "Compara distancias a partir de la observación del plano al estimar con pasos, baldosas, etc."
+    ],
+    "ejemplo": "En un plano que representa el salón de clases hay una marca que indica dónde se ocultó un objeto; escribe instrucciones para que alguien ubicado en la puerta del salón lo encuentre, y determina si se pueden dar otras instrucciones para llegar al mismo sitio.",
+    "etiquetas": ["orientación espacial", "planos", "trayectorias", "lateralidad"]
+  },
+  {
+    "areaCodigo": "MAT-BAS",
+    "gradoNumero": 1,
+    "numero_dba": 8,
+    "organizador": "Pensamiento variacional",
+    "enunciado": "Describe cualitativamente situaciones para identificar el cambio y la variación usando gestos, dibujos, diagramas, medios gráficos y simbólicos.",
+    "evidencias_aprendizaje": [
+      "Identifica y nombra diferencias entre objetos o grupos de objetos.",
+      "Comunica las características identificadas y justifica las diferencias que encuentra.",
+      "Establece relaciones de dependencia entre magnitudes."
+    ],
+    "ejemplo": "Con un dispensador que pasa agua de un recipiente a un vaso, describe cómo cambia el volumen de ambos recipientes al servir y explica la relación entre ambas magnitudes, elaborando dibujos en distintos momentos del llenado.",
+    "etiquetas": ["cambio", "variación", "relaciones de dependencia", "representación gráfica"]
+  },
+  {
+    "areaCodigo": "MAT-BAS",
+    "gradoNumero": 1,
+    "numero_dba": 9,
+    "organizador": "Pensamiento variacional",
+    "enunciado": "Reconoce el signo igual como una equivalencia entre expresiones con sumas y restas.",
+    "evidencias_aprendizaje": [
+      "Propone números que satisfacen una igualdad con sumas y restas.",
+      "Describe las características de los números que deben ubicarse en una ecuación de tal manera que satisfaga la igualdad.",
+      "Argumenta sobre el uso de la propiedad transitiva en un conjunto de igualdades."
+    ],
+    "ejemplo": "Llena los espacios vacíos para que el resultado de una cadena de sumas azul y una verde sean iguales e indaga otras posibles soluciones; luego llena los espacios para que una cadena roja sea mayor que la azul.",
+    "etiquetas": ["signo igual", "equivalencia", "ecuaciones", "propiedad transitiva"]
+  },
+  {
+    "areaCodigo": "MAT-BAS",
+    "gradoNumero": 1,
+    "numero_dba": 10,
+    "organizador": "Pensamiento aleatorio",
+    "enunciado": "Clasifica y organiza datos, los representa utilizando tablas de conteo y pictogramas sin escalas, y comunica los resultados obtenidos para responder preguntas sencillas.",
+    "evidencias_aprendizaje": [
+      "Identifica en fichas u objetos reales los valores de la variable en estudio.",
+      "Organiza los datos en tablas de conteo y/o en pictogramas sin escala.",
+      "Lee la información presentada en tablas de conteo y/o pictogramas sin escala (1 a 1).",
+      "Comunica los resultados respondiendo preguntas tales como: ¿cuántos hay en total?, ¿cuántos hay de cada dato?, ¿cuál es el dato que más se repite?, ¿cuál es el dato que menos aparece?"
+    ],
+    "ejemplo": "Como bienvenida al año escolar se consulta a los estudiantes de 1A su sabor de helado preferido (fresa, uva, vainilla, chocolate, maracuyá) y se presenta un gráfico con los resultados; escribe una frase respondiendo cuántos prefieren cada sabor y cuántos helados comprar en total.",
+    "etiquetas": ["estadística", "tablas de conteo", "pictogramas", "recolección de datos"]
+  },
+  {
+    "areaCodigo": "MAT-BAS",
+    "gradoNumero": 2,
+    "numero_dba": 1,
+    "organizador": "Pensamiento numérico",
+    "enunciado": "Interpreta, propone y resuelve problemas aditivos (de composición, transformación y relación) que involucren la cantidad en una colección, la medida de magnitudes (longitud, peso, capacidad y duración de eventos) y problemas multiplicativos sencillos.",
+    "evidencias_aprendizaje": [
+      "Interpreta y construye diagramas para representar relaciones aditivas y multiplicativas entre cantidades que se presentan en situaciones o fenómenos.",
+      "Describe y resuelve situaciones variadas con las operaciones de suma y resta en problemas cuya estructura puede ser a + b = ?, a + ? = c, o ? + b = c.",
+      "Reconoce en diferentes situaciones relaciones aditivas y multiplicativas y formula problemas a partir de ellas."
+    ],
+    "ejemplo": "En una sala de videojuegos se paga cierto valor por hora; propone una pregunta que se responda con una multiplicación y otra que se responda con una división, y analiza si aplicaría reiteradamente la multiplicación si hay descuento cada dos horas de uso.",
+    "etiquetas": ["problemas aditivos", "problemas multiplicativos", "composición", "transformación"]
+  },
+  {
+    "areaCodigo": "MAT-BAS",
+    "gradoNumero": 2,
+    "numero_dba": 2,
+    "organizador": "Pensamiento numérico",
+    "enunciado": "Utiliza diferentes estrategias para calcular (agrupar, representar elementos en colecciones, etc.) o estimar el resultado de una suma y resta, multiplicación o reparto equitativo.",
+    "evidencias_aprendizaje": [
+      "Construye representaciones pictóricas y establece relaciones entre las cantidades involucradas en diferentes fenómenos o situaciones.",
+      "Usa algoritmos no convencionales para calcular o estimar el resultado de sumas, restas, multiplicaciones y divisiones entre números naturales, los describe y los justifica."
+    ],
+    "ejemplo": "Cuatro estudiantes juegan parqués con una sola ficha y reglas de movimiento distintas según el turno (con uno o dos dados); registran en una tabla cada lanzamiento y determinan quién lidera el juego en cada momento.",
+    "etiquetas": ["estrategias de cálculo", "algoritmos no convencionales", "reparto equitativo"]
+  },
+  {
+    "areaCodigo": "MAT-BAS",
+    "gradoNumero": 2,
+    "numero_dba": 3,
+    "organizador": "Pensamiento numérico",
+    "enunciado": "Utiliza el Sistema de Numeración Decimal para comparar, ordenar y establecer diferentes relaciones entre dos o más secuencias de números con ayuda de diferentes recursos.",
+    "evidencias_aprendizaje": [
+      "Compara y ordena números de menor a mayor y viceversa a través de recursos como la calculadora, aplicación, material gráfico que represente billetes, diagramas de colecciones, etc.",
+      "Propone ejemplos y comunica de forma oral y escrita las condiciones que puede establecer para conservar una relación (mayor que, menor que) cuando se aplican algunas operaciones a ellos.",
+      "Reconoce y establece relaciones entre expresiones numéricas (hay más, hay menos, hay la misma cantidad) y describe el tipo de operaciones que debe realizarse para que a pesar de cambiar los valores numéricos, la relación se conserve."
+    ],
+    "ejemplo": "Analiza un tablero con números borrados y determina, con distintos compañeros, qué número faltante es válido y cuántas posibilidades existen para que se cumpla una relación de igualdad u orden.",
+    "etiquetas": ["sistema de numeración decimal", "comparación de números", "orden numérico"]
+  },
+  {
+    "areaCodigo": "MAT-BAS",
+    "gradoNumero": 2,
+    "numero_dba": 4,
+    "organizador": "Pensamiento métrico",
+    "enunciado": "Compara y explica características que se pueden medir, en el proceso de resolución de problemas relativos a longitud, superficie, velocidad, peso o duración de los eventos, entre otros.",
+    "evidencias_aprendizaje": [
+      "Utiliza instrumentos y unidades de medición apropiados para medir magnitudes diferentes.",
+      "Describe los procedimientos necesarios para medir longitudes, superficies, capacidades, pesos de los objetos y la duración de los eventos.",
+      "Mide magnitudes con unidades arbitrarias y estandarizadas.",
+      "Estima la medida de diferentes magnitudes en situaciones prácticas."
+    ],
+    "ejemplo": "Calcula la distancia recorrida por un auto que se mueve a velocidad constante durante un intervalo de tiempo, o estima la cantidad de tela para un vestido y busca objetos con longitudes o pesos cercanos a un metro o un kilogramo.",
+    "etiquetas": ["magnitudes", "unidades de medida", "estimación", "longitud y peso"]
+  },
+  {
+    "areaCodigo": "MAT-BAS",
+    "gradoNumero": 2,
+    "numero_dba": 5,
+    "organizador": "Pensamiento métrico",
+    "enunciado": "Utiliza patrones, unidades e instrumentos convencionales y no convencionales en procesos de medición, cálculo y estimación de magnitudes como longitud, peso, capacidad y tiempo.",
+    "evidencias_aprendizaje": [
+      "Describe objetos y eventos de acuerdo con atributos medibles: superficie, tiempo, longitud, peso, ángulos.",
+      "Realiza mediciones con instrumentos y unidades no convencionales, como pasos, cuadrados o rectángulos, cuartas, metros, entre otros.",
+      "Compara eventos según su duración, para ello utiliza relojes convencionales."
+    ],
+    "ejemplo": "Dos personajes salen al mismo tiempo desde lugares distintos y llegan a un mismo punto en 30 y 35 minutos respectivamente; señala la pareja de relojes correspondiente a la hora de llegada de cada uno y explica la respuesta.",
+    "etiquetas": ["medición del tiempo", "instrumentos no convencionales", "relojes"]
+  },
+  {
+    "areaCodigo": "MAT-BAS",
+    "gradoNumero": 2,
+    "numero_dba": 6,
+    "organizador": "Pensamiento espacial",
+    "enunciado": "Clasifica, describe y representa objetos del entorno a partir de sus propiedades geométricas para establecer relaciones entre las formas bidimensionales y tridimensionales.",
+    "evidencias_aprendizaje": [
+      "Reconoce las figuras geométricas según el número de lados.",
+      "Diferencia los cuerpos geométricos.",
+      "Compara figuras y cuerpos geométricos y establece relaciones y diferencias entre ambos."
+    ],
+    "ejemplo": "A partir de una carta descriptiva de una habitación (con una cama rectangular, una ventana cuadrada, una pintura triangular, balones esféricos, entre otros), estudia si la descripción escrita es correcta y propone afirmaciones que la completan.",
+    "etiquetas": ["cuerpos geométricos", "figuras geométricas", "propiedades geométricas"]
+  },
+  {
+    "areaCodigo": "MAT-BAS",
+    "gradoNumero": 2,
+    "numero_dba": 7,
+    "organizador": "Pensamiento espacial",
+    "enunciado": "Describe desplazamientos y referencia la posición de un objeto mediante nociones de horizontalidad, verticalidad, paralelismo y perpendicularidad en la solución de problemas.",
+    "evidencias_aprendizaje": [
+      "Describe desplazamientos a partir de las posiciones de las líneas.",
+      "Representa líneas y reconoce las diferentes posiciones y la relación entre ellas.",
+      "En dibujos, objetos o espacios reales, identifica posiciones de objetos, de aristas o líneas que son paralelas, verticales o perpendiculares.",
+      "Argumenta las diferencias entre las posiciones de las líneas."
+    ],
+    "ejemplo": "A partir del mapa de un lugar, indica de manera verbal, escrita o gráfica cómo llegar de la casa a la iglesia sin perderse, usando las palabras vertical, horizontal, paralelo y perpendicular.",
+    "etiquetas": ["horizontalidad", "verticalidad", "paralelismo", "perpendicularidad"]
+  },
+  {
+    "areaCodigo": "MAT-BAS",
+    "gradoNumero": 2,
+    "numero_dba": 8,
+    "organizador": "Pensamiento variacional",
+    "enunciado": "Propone e identifica patrones y utiliza propiedades de los números y de las operaciones para calcular valores desconocidos en expresiones aritméticas.",
+    "evidencias_aprendizaje": [
+      "Establece relaciones de reversibilidad entre la suma y la resta.",
+      "Utiliza diferentes procedimientos para calcular un valor desconocido."
+    ],
+    "ejemplo": "Ubica un número de entrada en una cadena numérica con operaciones sucesivas (- 2, + 5, + 3) y encuentra los valores de salida; luego encuentra los valores de entrada para que los números de salida sean 18 y 36, verbalizando las propiedades usadas al recorrer la cadena en ambos sentidos.",
+    "etiquetas": ["patrones numéricos", "reversibilidad", "cadenas numéricas"]
+  },
+  {
+    "areaCodigo": "MAT-BAS",
+    "gradoNumero": 2,
+    "numero_dba": 9,
+    "organizador": "Pensamiento variacional",
+    "enunciado": "Opera sobre secuencias numéricas para encontrar números u operaciones faltantes y utiliza las propiedades de las operaciones en contextos escolares o extraescolares.",
+    "evidencias_aprendizaje": [
+      "Utiliza las propiedades de las operaciones para encontrar números desconocidos en igualdades numéricas.",
+      "Utiliza las propiedades de las operaciones para encontrar operaciones faltantes en un proceso de cálculo numérico.",
+      "Reconoce que un número puede escribirse de varias maneras equivalentes.",
+      "Utiliza ensayo y error para encontrar valores u operaciones desconocidas."
+    ],
+    "ejemplo": "Encuentra todas las parejas de números cuya suma es 12 y todos los resultados de multiplicar los números de cada pareja, organiza los resultados en una tabla y construye una regla para saber cuántas parejas se pueden formar según el resultado de la suma.",
+    "etiquetas": ["secuencias numéricas", "igualdades", "equivalencia numérica"]
+  },
+  {
+    "areaCodigo": "MAT-BAS",
+    "gradoNumero": 2,
+    "numero_dba": 10,
+    "organizador": "Pensamiento aleatorio",
+    "enunciado": "Clasifica y organiza datos, los representa utilizando tablas de conteo, pictogramas con escalas y gráficos de puntos, comunica los resultados obtenidos para responder preguntas sencillas.",
+    "evidencias_aprendizaje": [
+      "Identifica la equivalencia de fichas u objetos con el valor de la variable.",
+      "Organiza los datos en tablas de conteo y en pictogramas con escala (uno a muchos).",
+      "Lee la información presentada en tablas de conteo, pictogramas con escala y gráficos de puntos.",
+      "Comunica los resultados respondiendo preguntas tales como: ¿cuántos hay en total?, ¿cuántos hay de cada dato?, ¿cuál es el dato que más se repite?, ¿cuál es el dato que menos se repite?"
+    ],
+    "ejemplo": "En una elección a personero, un pictograma muestra los votos de cada candidato (cada símbolo equivale a 5 votos); analiza afirmaciones sobre el ganador, el total de votos y las relaciones entre candidatos, y escribe un informe comparando el texto con la gráfica.",
+    "etiquetas": ["pictogramas con escala", "gráficos de puntos", "estadística"]
+  },
+  {
+    "areaCodigo": "MAT-BAS",
+    "gradoNumero": 2,
+    "numero_dba": 11,
+    "organizador": "Pensamiento aleatorio",
+    "enunciado": "Explica, a partir de la experiencia, la posibilidad de ocurrencia o no de un evento cotidiano y el resultado lo utiliza para predecir la ocurrencia de otros eventos.",
+    "evidencias_aprendizaje": [
+      "Diferencia situaciones cotidianas cuyo resultado puede ser incierto de aquellas cuyo resultado es conocido o seguro.",
+      "Identifica resultados posibles o imposibles, según corresponda, en una situación cotidiana.",
+      "Predice la ocurrencia o no de eventos cotidianos basado en sus observaciones."
+    ],
+    "ejemplo": "En un juego de lanzamiento de aviones de papel, un estudiante afirma que siempre ganará porque ya sabe lanzar aviones; determina si esa afirmación es verdadera o falsa y justifica la respuesta.",
+    "etiquetas": ["probabilidad", "azar", "predicción", "eventos ciertos e inciertos"]
+  },
+  {
+    "areaCodigo": "MAT-BAS",
+    "gradoNumero": 3,
+    "numero_dba": 1,
+    "organizador": "Pensamiento numérico",
+    "enunciado": "Interpreta, formula y resuelve problemas aditivos de composición, transformación y comparación en diferentes contextos; y multiplicativos, directos e inversos, en diferentes contextos.",
+    "evidencias_aprendizaje": [
+      "Construye diagramas para representar las relaciones observadas entre las cantidades presentes en una situación.",
+      "Resuelve problemas aditivos (suma o resta) y multiplicativos (multiplicación o división) de composición, de medida y de conteo.",
+      "Propone estrategias para calcular el número de combinaciones posibles de un conjunto de atributos.",
+      "Analiza los resultados ofrecidos por el cálculo matemático e identifica las condiciones bajo las cuales ese resultado es o no plausible."
+    ],
+    "ejemplo": "En un partido de baloncesto con cestas de tres, dos y un punto, y un marcador final empatado en 80 puntos, propone cuántas cestas de cada valor pudo hacer cada equipo, considerando además los tiros libres de cada uno.",
+    "etiquetas": ["problemas aditivos", "problemas multiplicativos", "composición", "combinaciones"]
+  },
+  {
+    "areaCodigo": "MAT-BAS",
+    "gradoNumero": 3,
+    "numero_dba": 2,
+    "organizador": "Pensamiento numérico",
+    "enunciado": "Propone, desarrolla y justifica estrategias para hacer estimaciones y cálculos con operaciones básicas en la solución de problemas.",
+    "evidencias_aprendizaje": [
+      "Utiliza las propiedades de las operaciones y del Sistema de Numeración Decimal para justificar acciones como: descomposición de números, completar hasta la decena más cercana, duplicar, cambiar la posición, multiplicar abreviadamente por múltiplos de 10, entre otros.",
+      "Reconoce el uso de las operaciones para calcular la medida (compuesta) de diferentes objetos de su entorno.",
+      "Argumenta cuáles atributos de los objetos pueden ser medidos mediante la comparación directa con una unidad y cuáles pueden ser calculados con algunas operaciones entre números."
+    ],
+    "ejemplo": "Analiza el reparto en partes iguales de cierta cantidad de dinero entre tres hijos, revisa el procedimiento que uno de ellos usó para hacer el cálculo, explica si es válido y propone cambios si no lo es.",
+    "etiquetas": ["estrategias de cálculo", "sistema de numeración decimal", "estimación"]
+  },
+  {
+    "areaCodigo": "MAT-BAS",
+    "gradoNumero": 3,
+    "numero_dba": 3,
+    "organizador": "Pensamiento numérico",
+    "enunciado": "Establece comparaciones entre cantidades y expresiones que involucran operaciones y relaciones aditivas y multiplicativas y sus representaciones numéricas.",
+    "evidencias_aprendizaje": [
+      "Realiza mediciones de un mismo objeto con otros de diferente tamaño y establece equivalencias entre ellas.",
+      "Utiliza las razones y fracciones como una manera de establecer comparaciones entre dos cantidades.",
+      "Propone ejemplos de cantidades que se relacionan entre sí según correspondan a una fracción dada.",
+      "Utiliza fracciones para expresar la relación de \"el todo\" con algunas de sus \"partes\", asimismo diferencia este tipo de relación de otras como las relaciones de equivalencia (igualdad) y de orden (mayor que y menor que)."
+    ],
+    "ejemplo": "A partir de monedas que representan fracciones de una unidad monetaria (como medio dólar o un cuarto de dólar, o antiguas monedas colombianas en centavos), construye equivalencias entre la denominación en centavos y en fracciones, y representa distintas combinaciones de monedas usando ambas notaciones.",
+    "etiquetas": ["fracciones", "razones", "comparación de cantidades", "equivalencias"]
+  },
+  {
+    "areaCodigo": "MAT-BAS",
+    "gradoNumero": 3,
+    "numero_dba": 4,
+    "organizador": "Pensamiento métrico",
+    "enunciado": "Describe y argumenta posibles relaciones entre los valores del área y el perímetro de figuras planas (especialmente cuadriláteros).",
+    "evidencias_aprendizaje": [
+      "Toma decisiones sobre la magnitud a medir (área o longitud) según la necesidad de una situación.",
+      "Realiza recubrimientos de superficies con diferentes figuras planas.",
+      "Mide y calcula el área y el perímetro de un rectángulo y expresa el resultado en unidades apropiadas según el caso.",
+      "Explica cómo figuras de igual perímetro pueden tener diferente área."
+    ],
+    "ejemplo": "Con 12 palillos determina cuántos rectángulos distintos se pueden formar, cuántos cuadrados de lado un palillo caben en cada uno, y cuánta cinta (perímetro) se necesitaría para bordear cada rectángulo, identificando cuál usa más y cuál menos.",
+    "etiquetas": ["área", "perímetro", "figuras planas", "cuadriláteros"]
+  },
+  {
+    "areaCodigo": "MAT-BAS",
+    "gradoNumero": 3,
+    "numero_dba": 5,
+    "organizador": "Pensamiento métrico",
+    "enunciado": "Realiza estimaciones y mediciones de volumen, capacidad, longitud, área, peso de objetos o la duración de eventos como parte del proceso para resolver diferentes problemas.",
+    "evidencias_aprendizaje": [
+      "Compara objetos según su longitud, área, capacidad, volumen, etc.",
+      "Hace estimaciones de longitud, área, volumen, peso y tiempo según su necesidad en la situación.",
+      "Hace estimaciones de volumen, área y longitud en presencia de los objetos y los instrumentos de medida y en ausencia de ellos.",
+      "Empaca objetos en cajas y recipientes variados y calcula la cantidad que podría caber; para ello tiene en cuenta la forma y volumen de los objetos a empacar y la capacidad del recipiente en el que se empaca."
+    ],
+    "ejemplo": "Un empacador debe decidir, entre cajas de base rectangular de diferentes tamaños, cuál es la más adecuada para empacar frascos de 8 cm de diámetro y 15 cm de alto, sabiendo que en cada caja deben caber 50 frascos.",
+    "etiquetas": ["volumen", "capacidad", "estimación", "empaque"]
+  },
+  {
+    "areaCodigo": "MAT-BAS",
+    "gradoNumero": 3,
+    "numero_dba": 6,
+    "organizador": "Pensamiento espacial",
+    "enunciado": "Describe y representa formas bidimensionales y tridimensionales de acuerdo con las propiedades geométricas.",
+    "evidencias_aprendizaje": [
+      "Relaciona objetos de su entorno con formas bidimensionales y tridimensionales, nombra y describe sus elementos.",
+      "Clasifica y representa formas bidimensionales y tridimensionales tomando en cuenta sus características geométricas comunes y describe el criterio utilizado.",
+      "Interpreta, compara y justifica propiedades de formas bidimensionales y tridimensionales."
+    ],
+    "ejemplo": "Dos estudiantes que no vieron unos cuerpos geométricos deben construirlos con cartulina siguiendo solo un mensaje escrito (sin dibujos); revisa mensajes propuestos por otros compañeros y determina si permiten construir los mismos cuerpos, mejorándolos si es necesario.",
+    "etiquetas": ["formas bidimensionales", "formas tridimensionales", "cuerpos geométricos", "descripción geométrica"]
+  },
+  {
+    "areaCodigo": "MAT-BAS",
+    "gradoNumero": 3,
+    "numero_dba": 7,
+    "organizador": "Pensamiento espacial",
+    "enunciado": "Formula y resuelve problemas que se relacionan con la posición, la dirección y el movimiento de objetos en el entorno.",
+    "evidencias_aprendizaje": [
+      "Localiza objetos o personas a partir de la descripción o representación de una trayectoria y construye representaciones pictóricas para describir sus relaciones.",
+      "Identifica y describe patrones de movimiento de figuras bidimensionales que se asocian con transformaciones como: reflexiones, traslaciones y rotaciones de figuras.",
+      "Identifica las propiedades de los objetos que se conservan y las que varían cuando se realizan este tipo de transformaciones.",
+      "Plantea y resuelve situaciones en las que se requiere analizar las transformaciones de diferentes figuras en el plano."
+    ],
+    "ejemplo": "En un mosaico de fotografías con mariposas dispuestas en columnas, propone condiciones para agregar una tercera y una cuarta columna que conserven el patrón de disposición de las dos primeras.",
+    "etiquetas": ["transformaciones geométricas", "traslaciones", "rotaciones", "reflexiones"]
+  },
+  {
+    "areaCodigo": "MAT-BAS",
+    "gradoNumero": 3,
+    "numero_dba": 8,
+    "organizador": "Pensamiento variacional",
+    "enunciado": "Describe y representa los aspectos que cambian y permanecen constantes en secuencias y en otras situaciones de variación.",
+    "evidencias_aprendizaje": [
+      "Describe de manera cualitativa situaciones de cambio y variación utilizando lenguaje natural, gestos, dibujos y gráficas.",
+      "Construye secuencias numéricas y geométricas utilizando propiedades de los números y de las figuras geométricas.",
+      "Encuentra y representa generalidades y valida sus hallazgos de acuerdo al contexto."
+    ],
+    "ejemplo": "A partir de arreglos triangulares de puntos (1, 3, 6, 10, 15, 28…) registra el número de puntos en cada posición, explica cómo encontrar el número de puntos en una posición cualquiera y justifica si existe un arreglo con 35 o 38 puntos.",
+    "etiquetas": ["secuencias numéricas", "secuencias geométricas", "patrones", "generalización"]
+  },
+  {
+    "areaCodigo": "MAT-BAS",
+    "gradoNumero": 3,
+    "numero_dba": 9,
+    "organizador": "Pensamiento variacional",
+    "enunciado": "Argumenta sobre situaciones numéricas, geométricas y enunciados verbales en los que aparecen datos desconocidos para definir sus posibles valores según el contexto.",
+    "evidencias_aprendizaje": [
+      "Propone soluciones con base en los datos a pesar de no conocer el número.",
+      "Toma decisiones sobre cantidades aunque no conozca exactamente los valores.",
+      "Trabaja sobre números desconocidos y con esos números para dar respuestas a los problemas."
+    ],
+    "ejemplo": "José y Patricia tienen cada uno una caja con la misma cantidad desconocida de dulces; José tiene un dulce extra encima y Patricia tres. Representa cuántos dulces tienen entre los dos, quién tiene más, y cuántos dulces habría que dar para igualar las cantidades.",
+    "etiquetas": ["incógnitas", "datos desconocidos", "razonamiento algebraico temprano"]
+  },
+  {
+    "areaCodigo": "MAT-BAS",
+    "gradoNumero": 3,
+    "numero_dba": 10,
+    "organizador": "Pensamiento aleatorio",
+    "enunciado": "Lee e interpreta información contenida en tablas de frecuencia, gráficos de barras y/o pictogramas con escala, para formular y resolver preguntas de situaciones de su entorno.",
+    "evidencias_aprendizaje": [
+      "Identifica las características de la población y halla su tamaño a partir de diferentes representaciones estadísticas.",
+      "Construye tablas y gráficos que representan los datos a partir de la información dada.",
+      "Analiza e interpreta información que ofrecen las tablas y los gráficos de acuerdo con el contexto.",
+      "Identifica la moda a partir de datos que se presentan en gráficos y tablas.",
+      "Compara la información representada en diferentes tablas y gráficos para formular y responder preguntas."
+    ],
+    "ejemplo": "A partir de una encuesta sobre el medio de transporte usado por los estudiantes (caminando, bicicleta, bus, taxi, carro particular) con sus respectivos totales, propone un título coherente para la tabla y el gráfico y escribe un informe corto con el análisis de los resultados.",
+    "etiquetas": ["tablas de frecuencia", "gráficos de barras", "moda", "estadística"]
+  },
+  {
+    "areaCodigo": "MAT-BAS",
+    "gradoNumero": 3,
+    "numero_dba": 11,
+    "organizador": "Pensamiento aleatorio",
+    "enunciado": "Plantea y resuelve preguntas sobre la posibilidad de ocurrencia de situaciones aleatorias cotidianas y cuantifica la posibilidad de ocurrencia de eventos simples en una escala cualitativa (mayor, menor e igual).",
+    "evidencias_aprendizaje": [
+      "Formula y resuelve preguntas que involucran expresiones que jerarquizan la posibilidad de ocurrencia de un evento, por ejemplo: imposible, menos posible, igualmente posible, más posible, seguro.",
+      "Representa los posibles resultados de una situación aleatoria simple por enumeración o usando diagramas.",
+      "Asigna la posibilidad de ocurrencia de un evento de acuerdo con la escala definida.",
+      "Predice la posibilidad de ocurrencia de un evento al utilizar los resultados de una situación aleatoria."
+    ],
+    "ejemplo": "Para decidir si es necesario llevar impermeable a una salida pedagógica, se registra durante varios días si llovió o no en un calendario, y con base en esa información se plantean ideas sobre la posibilidad de lluvia el día de la salida.",
+    "etiquetas": ["probabilidad cualitativa", "eventos aleatorios", "predicción"]
+  },
+  {
+    "areaCodigo": "MAT-BAS",
+    "gradoNumero": 4,
+    "numero_dba": 1,
+    "organizador": "Pensamiento numérico",
+    "enunciado": "Interpreta las fracciones como razón, relación parte todo, cociente y operador en diferentes contextos.",
+    "evidencias_aprendizaje": [
+      "Describe situaciones en las cuales puede usar fracciones y decimales.",
+      "Reconoce situaciones en las que dos cantidades covarían y cuantifica el efecto que los cambios en una de ellas tienen en los cambios de la otra y a partir de este comportamiento determina la razón entre ellas."
+    ],
+    "ejemplo": "Sabiendo que una receta de limonada usa un litro de agua, seis limones y tres cucharadas de azúcar, justifica si otra preparación con proporciones distintas de agua, limones y azúcar conserva el mismo sabor, y calcula las cantidades necesarias para preparar la receta con 18 limones.",
+    "etiquetas": ["fracciones", "razón", "cociente", "operador", "proporcionalidad"]
+  },
+  {
+    "areaCodigo": "MAT-BAS",
+    "gradoNumero": 4,
+    "numero_dba": 2,
+    "organizador": "Pensamiento numérico",
+    "enunciado": "Describe y justifica diferentes estrategias para representar, operar y hacer estimaciones con números naturales y números racionales (fraccionarios), expresados como fracción o como decimal.",
+    "evidencias_aprendizaje": [
+      "Utiliza el sistema de numeración decimal para representar, comparar y operar con números mayores o iguales a 10.000.",
+      "Describe y desarrolla estrategias para calcular sumas y restas basadas en descomposiciones aditivas y multiplicativas.",
+      "Utiliza y justifica algoritmos estandarizados y no estandarizados para realizar operaciones aditivas con representaciones decimales provenientes de fraccionarios cuyas expresiones tengan denominador 10, 100, etc.",
+      "Identifica y construye fracciones equivalentes a una fracción dada.",
+      "Propone estrategias para calcular sumas y restas de algunos fraccionarios."
+    ],
+    "ejemplo": "En un juego de mesa donde ciertos billetes representan fracciones del valor de una ficha circular (canjeable por $10.000), calcula el dinero acumulado con una combinación de billetes y fichas, y determina si alcanza para comprar un artículo de precio conocido.",
+    "etiquetas": ["números racionales", "fracciones equivalentes", "decimales", "algoritmos"]
+  },
+  {
+    "areaCodigo": "MAT-BAS",
+    "gradoNumero": 4,
+    "numero_dba": 3,
+    "organizador": "Pensamiento numérico",
+    "enunciado": "Establece relaciones mayor que, menor que, igual que y relaciones multiplicativas entre números racionales en sus formas de fracción o decimal.",
+    "evidencias_aprendizaje": [
+      "Construye y utiliza representaciones pictóricas para comparar números racionales (como fracción o decimales).",
+      "Establece, justifica y utiliza criterios para comparar fracciones y decimales.",
+      "Construye y compara expresiones numéricas que contienen decimales y fracciones."
+    ],
+    "ejemplo": "Con una balanza equilibrada donde a un lado hay tres objetos esféricos y al otro un objeto de caras cuadradas, indica cuál objeto es más pesado, describe la relación entre los pesos y evalúa si otras balanzas mostradas son consistentes con esa relación.",
+    "etiquetas": ["comparación de racionales", "fracciones", "decimales", "relaciones multiplicativas"]
+  },
+  {
+    "areaCodigo": "MAT-BAS",
+    "gradoNumero": 4,
+    "numero_dba": 4,
+    "organizador": "Pensamiento métrico",
+    "enunciado": "Caracteriza y compara atributos medibles de los objetos (densidad, dureza, viscosidad, masa, capacidad de los recipientes, temperatura) con respecto a procedimientos, instrumentos y unidades de medición; y con respecto a las necesidades a las que responden.",
+    "evidencias_aprendizaje": [
+      "Reconoce que para medir la capacidad y la masa se hacen comparaciones con la capacidad de recipientes de diferentes tamaños y con paquetes de diferentes masas (litros, centilitros, galón, botella; gramos, kilogramos, libras, arrobas).",
+      "Diferencia los atributos medibles como capacidad, masa, volumen, entre otros, a partir de los procedimientos e instrumentos empleados para medirlos y los usos de cada uno en la solución de problemas.",
+      "Identifica unidades y los instrumentos para medir masa y capacidad, y establece relaciones entre ellos.",
+      "Describe procesos para medir capacidades de un recipiente o el peso de un objeto o producto.",
+      "Argumenta sobre la importancia y necesidad de medir algunas magnitudes como densidad, dureza, viscosidad, masa, capacidad, etc."
+    ],
+    "ejemplo": "Al seleccionar entre varias marcas de un producto por economía y posibilidades de reciclaje según el material del empaque, compara la información de los empaques de dos o más productos y propone procedimientos de medida cuando la información no es suficiente.",
+    "etiquetas": ["atributos medibles", "densidad", "masa", "capacidad"]
+  },
+  {
+    "areaCodigo": "MAT-BAS",
+    "gradoNumero": 4,
+    "numero_dba": 5,
+    "organizador": "Pensamiento métrico",
+    "enunciado": "Elige instrumentos y unidades estandarizadas y no estandarizadas para estimar y medir longitud, área, volumen, capacidad, peso y masa, duración, rapidez, temperatura, y a partir de ellos hace los cálculos necesarios para resolver problemas.",
+    "evidencias_aprendizaje": [
+      "Expresa una misma medida en diferentes unidades, establece equivalencias entre ellas y toma decisiones de la unidad más conveniente según las necesidades de la situación.",
+      "Propone diferentes procedimientos para realizar cálculos (suma y resta de medidas, multiplicación y división de una medida y un número) que aparecen al resolver problemas en diferentes contextos.",
+      "Emplea las relaciones de proporcionalidad directa e inversa para resolver diversas situaciones.",
+      "Propone y explica procedimientos para lograr mayor precisión en la medición de cantidades de líquidos, masa, etc."
+    ],
+    "ejemplo": "A partir de una receta de torta para 20 personas cuyos ingredientes se venden por libras, calcula las cantidades de azúcar y mantequilla necesarias en libras, propone formas más precisas de medir la esencia de vainilla, y ajusta todas las cantidades e incluso la temperatura del horno para preparar la receta para 30 personas.",
+    "etiquetas": ["unidades de medida", "proporcionalidad", "conversión de unidades"]
+  },
+  {
+    "areaCodigo": "MAT-BAS",
+    "gradoNumero": 4,
+    "numero_dba": 6,
+    "organizador": "Pensamiento espacial",
+    "enunciado": "Identifica, describe y representa figuras bidimensionales y tridimensionales, y establece relaciones entre ellas.",
+    "evidencias_aprendizaje": [
+      "Arma, desarma y crea formas bidimensionales y tridimensionales.",
+      "Reconoce entre un conjunto de desarrollos planos, los que corresponden a determinados sólidos atendiendo a las relaciones entre la posición de las diferentes caras y aristas."
+    ],
+    "ejemplo": "Construye esculturas geométricas con cubos y prismas triangulares (medios cubos) y elabora su representación bidimensional correspondiente.",
+    "etiquetas": ["figuras tridimensionales", "desarrollos planos", "sólidos geométricos"]
+  },
+  {
+    "areaCodigo": "MAT-BAS",
+    "gradoNumero": 4,
+    "numero_dba": 7,
+    "organizador": "Pensamiento espacial",
+    "enunciado": "Identifica los movimientos realizados a una figura en el plano respecto a una posición o eje (rotación, traslación y simetría) y las modificaciones que pueden sufrir las formas (ampliación-reducción).",
+    "evidencias_aprendizaje": [
+      "Aplica movimientos a figuras en el plano.",
+      "Diferencia los efectos de la ampliación y la reducción.",
+      "Elabora argumentos referente a las modificaciones que sufre una imagen al ampliarla o reducirla.",
+      "Representa elementos del entorno que sufren modificaciones en su forma."
+    ],
+    "ejemplo": "A partir de una fotografía de la finca de sus abuelos, selecciona entre varias opciones cuál representa correctamente una reducción de la imagen, justificando el procedimiento, y dibuja la finca al doble de su tamaño original.",
+    "etiquetas": ["rotación", "traslación", "simetría", "ampliación y reducción"]
+  },
+  {
+    "areaCodigo": "MAT-BAS",
+    "gradoNumero": 4,
+    "numero_dba": 8,
+    "organizador": "Pensamiento variacional",
+    "enunciado": "Identifica, documenta e interpreta variaciones de dependencia entre cantidades en diferentes fenómenos (en las matemáticas y en otras ciencias) y los representa por medio de gráficas.",
+    "evidencias_aprendizaje": [
+      "Realiza cálculos numéricos, organiza la información en tablas, elabora representaciones gráficas y las interpreta.",
+      "Propone patrones de comportamiento numérico.",
+      "Trabaja sobre números desconocidos y con esos números para dar respuestas a los problemas."
+    ],
+    "ejemplo": "Deja caer una pelota desde distintas alturas H sobre una superficie dura y mide la altura h hasta la que rebota; registra los datos, representa la relación entre H y h de distintas formas y escribe conclusiones sobre esa relación.",
+    "etiquetas": ["variación", "dependencia entre cantidades", "gráficas", "covariación"]
+  },
+  {
+    "areaCodigo": "MAT-BAS",
+    "gradoNumero": 4,
+    "numero_dba": 9,
+    "organizador": "Pensamiento variacional",
+    "enunciado": "Identifica patrones en secuencias (aditivas o multiplicativas) y los utiliza para establecer generalizaciones aritméticas o algebraicas.",
+    "evidencias_aprendizaje": [
+      "Comunica en forma verbal y pictórica las regularidades observadas en una secuencia.",
+      "Establece diferentes estrategias para calcular los siguientes elementos en una secuencia.",
+      "Conjetura y argumenta un valor futuro en una secuencia aritmética o geométrica (por ejemplo, en una secuencia de figuras predecir la posición 10, 20 o 100)."
+    ],
+    "ejemplo": "Explora el efecto de presionar repetidamente el signo = en una calculadora tras digitar una multiplicación o división (por ejemplo 4 x 2 = = = = = =), estima cuántas veces hay que presionarlo para acercarse a 1.000, y determina el mínimo número de veces para que 2048÷2 deje de dar un número natural.",
+    "etiquetas": ["patrones en secuencias", "generalización algebraica", "secuencias aritméticas y geométricas"]
+  },
+  {
+    "areaCodigo": "MAT-BAS",
+    "gradoNumero": 4,
+    "numero_dba": 10,
+    "organizador": "Pensamiento aleatorio",
+    "enunciado": "Recopila y organiza datos en tablas de doble entrada y los representa en gráficos de barras agrupadas o gráficos de líneas, para dar respuesta a una pregunta planteada. Interpreta la información y comunica sus conclusiones.",
+    "evidencias_aprendizaje": [
+      "Elabora encuestas sencillas para obtener la información pertinente para responder la pregunta.",
+      "Construye tablas de doble entrada y gráficos de barras agrupadas, gráficos de líneas o pictogramas con escala.",
+      "Lee e interpreta los datos representados en tablas de doble entrada, gráficos de barras agrupados, gráficos de línea o pictogramas con escala.",
+      "Encuentra e interpreta la moda y el rango del conjunto de datos y describe el comportamiento de los datos para responder las preguntas planteadas."
+    ],
+    "ejemplo": "Con información recolectada en un hato lechero sobre la producción de leche en la mañana y en la tarde, y su variación por vaca, elabora un informe comparativo para el dueño del hato.",
+    "etiquetas": ["tablas de doble entrada", "gráficos de barras agrupadas", "moda", "rango"]
+  },
+  {
+    "areaCodigo": "MAT-BAS",
+    "gradoNumero": 4,
+    "numero_dba": 11,
+    "organizador": "Pensamiento aleatorio",
+    "enunciado": "Comprende y explica, usando vocabulario adecuado, la diferencia entre una situación aleatoria y una determinística y predice, en una situación de la vida cotidiana, la presencia o no del azar.",
+    "evidencias_aprendizaje": [
+      "Reconoce situaciones aleatorias en contextos cotidianos.",
+      "Enuncia diferencias entre situaciones aleatorias y deterministas.",
+      "Usa adecuadamente expresiones como azar o posibilidad, aleatoriedad, determinístico.",
+      "Anticipa los posibles resultados de una situación aleatoria."
+    ],
+    "ejemplo": "Analiza situaciones como la selección de cancha en un partido de fútbol, el nombre del próximo mes, el menú del refrigerio o la conformación de equipos, y expone en cuáles hay presencia de azar y en cuáles no.",
+    "etiquetas": ["azar", "determinístico", "situaciones aleatorias"]
+  },
+  {
+    "areaCodigo": "MAT-BAS",
+    "gradoNumero": 5,
+    "numero_dba": 1,
+    "organizador": "Pensamiento numérico",
+    "enunciado": "Interpreta y utiliza los números naturales y racionales en su representación fraccionaria para formular y resolver problemas aditivos, multiplicativos y que involucren operaciones de potenciación.",
+    "evidencias_aprendizaje": [
+      "Interpreta la relación parte - todo y la representa por medio de fracciones, razones o cocientes.",
+      "Interpreta y utiliza números naturales y racionales (fraccionarios) asociados con un contexto para solucionar problemas.",
+      "Determina las operaciones suficientes y necesarias para solucionar diferentes tipos de problemas.",
+      "Resuelve problemas que requieran reconocer un patrón de medida asociado a un número natural o a un racional (fraccionario)."
+    ],
+    "ejemplo": "Don Marcos distribuye el lote de su finca entre varios cultivos; expresa como fracción del total la porción destinada a la casa, a los bananos, a la siembra en general y la que no se utilizará, justificando los procedimientos.",
+    "etiquetas": ["fracciones", "razones", "cocientes", "problemas multiplicativos"]
+  },
+  {
+    "areaCodigo": "MAT-BAS",
+    "gradoNumero": 5,
+    "numero_dba": 2,
+    "organizador": "Pensamiento numérico",
+    "enunciado": "Describe y desarrolla estrategias (algoritmos, propiedades de las operaciones básicas y sus relaciones) para hacer estimaciones y cálculos al solucionar problemas de potenciación.",
+    "evidencias_aprendizaje": [
+      "Utiliza las propiedades de las operaciones con números naturales y racionales (fraccionarios) para justificar algunas estrategias de cálculo o estimación relacionados con áreas de cuadrados y volúmenes de cubos.",
+      "Descompone un número en sus factores primos.",
+      "Identifica y utiliza las propiedades de la potenciación para resolver problemas aritméticos.",
+      "Determina y argumenta acerca de la validez o no de estrategias para calcular potencias."
+    ],
+    "ejemplo": "Un profesor representa el producto (3² x 2) x (2² x 3) en una hoja cuadriculada dividiéndola de cierta forma; explora si es posible representar el mismo producto dividiendo la cuadrícula de otra manera.",
+    "etiquetas": ["potenciación", "factores primos", "propiedades de las operaciones"]
+  },
+  {
+    "areaCodigo": "MAT-BAS",
+    "gradoNumero": 5,
+    "numero_dba": 3,
+    "organizador": "Pensamiento numérico",
+    "enunciado": "Compara y ordena números fraccionarios a través de diversas interpretaciones, recursos y representaciones.",
+    "evidencias_aprendizaje": [
+      "Representa fracciones con la ayuda de la recta numérica.",
+      "Determina criterios para ordenar fracciones y expresiones decimales de mayor a menor o viceversa."
+    ],
+    "ejemplo": "Con tres cintas métricas de igual longitud pero divididas en diferente número de partes, cada una con una fracción representada, identifica si 9/5 es igual, mayor o menor que 11/6 usando las cintas como apoyo.",
+    "etiquetas": ["comparación de fracciones", "orden de fracciones", "recta numérica"]
+  },
+  {
+    "areaCodigo": "MAT-BAS",
+    "gradoNumero": 5,
+    "numero_dba": 4,
+    "organizador": "Pensamiento métrico",
+    "enunciado": "Justifica relaciones entre superficie y volumen, respecto a dimensiones de figuras y sólidos, y elige las unidades apropiadas según el tipo de medición (directa e indirecta), los instrumentos y los procedimientos.",
+    "evidencias_aprendizaje": [
+      "Determina las medidas reales de una figura a partir de un registro gráfico (un plano).",
+      "Mide superficies y longitudes utilizando diferentes estrategias (composición, recubrimiento, bordeado, cálculo).",
+      "Construye y descompone figuras planas y sólidos a partir de medidas establecidas.",
+      "Realiza estimaciones y mediciones con unidades apropiadas según sea longitud, área o volumen."
+    ],
+    "ejemplo": "Con una piola de 50 cm se construyen rectángulos distintos de igual perímetro; determina si sus áreas también son iguales, y analiza si es posible construir cajas de volúmenes diferentes que requieran la misma cantidad de cartón para su molde.",
+    "etiquetas": ["superficie", "volumen", "medición directa e indirecta"]
+  },
+  {
+    "areaCodigo": "MAT-BAS",
+    "gradoNumero": 5,
+    "numero_dba": 5,
+    "organizador": "Pensamiento métrico",
+    "enunciado": "Explica las relaciones entre el perímetro y el área de diferentes figuras (variaciones en el perímetro no implican variaciones en el área y viceversa) a partir de mediciones, superposición de figuras, cálculo, entre otras.",
+    "evidencias_aprendizaje": [
+      "Compara diferentes figuras a partir de las medidas de sus lados.",
+      "Calcula las medidas de los lados de una figura a partir de su área.",
+      "Dibuja figuras planas cuando se dan las medidas de los lados.",
+      "Propone estrategias para la solución de problemas relativos a la medida de la superficie de figuras planas.",
+      "Reconoce que figuras con áreas diferentes pueden tener el mismo perímetro.",
+      "Mide superficies y longitudes utilizando diferentes estrategias (composición, recubrimiento, bordeado, cálculo)."
+    ],
+    "ejemplo": "Para empacar tarjetas de distintas formas (triángulos y cuadriláteros) con áreas conocidas (126, 144 o 120 cm²) en sobres rectangulares con hilo decorativo en el borde, determina posibles dimensiones de los lados y la cantidad de hilo necesaria, discutiendo si puede haber tarjetas de igual área y diferente perímetro.",
+    "etiquetas": ["perímetro", "área", "figuras planas"]
+  },
+  {
+    "areaCodigo": "MAT-BAS",
+    "gradoNumero": 5,
+    "numero_dba": 6,
+    "organizador": "Pensamiento espacial",
+    "enunciado": "Identifica y describe propiedades que caracterizan un cuerpo en términos de la bidimensionalidad y la tridimensionalidad y resuelve problemas en relación con la composición y descomposición de las formas.",
+    "evidencias_aprendizaje": [
+      "Relaciona objetos tridimensionales y sus propiedades con sus respectivos desarrollos planos.",
+      "Reconoce relaciones intra e interfigurales.",
+      "Determina las mediciones reales de una figura a partir de un registro gráfico (un plano).",
+      "Construye y descompone figuras planas y sólidos a partir de medidas establecidas.",
+      "Utiliza transformaciones a figuras en el plano para describirlas y calcular sus medidas.",
+      "Reconoce diferentes distribuciones de plantillas de un cuerpo en una superficie, las formas en que pueden acoplarse o encajar, lee la información que presenta la plantilla del cuerpo o su representación en un plano."
+    ],
+    "ejemplo": "Una empresa necesita elaborar en cartón industrial el molde de un empaque, a partir de pliegos de 100 cm x 70 cm; determina la cantidad de moldes que se pueden obtener por pliego para aprovechar al máximo el material.",
+    "etiquetas": ["desarrollos planos", "composición y descomposición", "sólidos geométricos"]
+  },
+  {
+    "areaCodigo": "MAT-BAS",
+    "gradoNumero": 5,
+    "numero_dba": 7,
+    "organizador": "Pensamiento espacial",
+    "enunciado": "Resuelve y propone situaciones en las que es necesario describir y localizar la posición y la trayectoria de un objeto con referencia al plano cartesiano.",
+    "evidencias_aprendizaje": [
+      "Localiza puntos en un mapa a partir de coordenadas cartesianas.",
+      "Interpreta los elementos de un sistema de referencia (ejes, cuadrantes, coordenadas).",
+      "Grafica en el plano cartesiano la posición de un objeto usando direcciones cardinales (norte, sur, oriente y occidente).",
+      "Emplea el plano cartesiano al plantear y resolver situaciones de localización.",
+      "Representa en forma gráfica y simbólica la localización y trayectoria de un objeto."
+    ],
+    "ejemplo": "Para ayudar a una turista a ubicarse en el barrio, realiza un mapa a escala en papel cuadriculado, crea un sistema de referencia con los puntos cardinales y escribe instrucciones para seguir una trayectoria de un sitio a otro, proponiendo rutas alternativas.",
+    "etiquetas": ["plano cartesiano", "coordenadas", "localización", "puntos cardinales"]
+  },
+  {
+    "areaCodigo": "MAT-BAS",
+    "gradoNumero": 5,
+    "numero_dba": 8,
+    "organizador": "Pensamiento variacional",
+    "enunciado": "Describe e interpreta variaciones de dependencia entre cantidades y las representa por medio de gráficas.",
+    "evidencias_aprendizaje": [
+      "Propone patrones de comportamiento numéricos y patrones de comportamiento gráficos.",
+      "Realiza cálculos numéricos, organiza la información en tablas, elabora representaciones gráficas y las interpreta.",
+      "Trabaja sobre números desconocidos para dar respuestas a los problemas."
+    ],
+    "ejemplo": "Un recipiente cilíndrico de 28 litros se llena con una llave que vierte 4 litros cada 2 minutos; determina cuánto tiempo tarda en llenarse, cuántos litros hay a los cinco minutos y qué ocurre con el nivel del agua a los 16 minutos.",
+    "etiquetas": ["variación", "dependencia entre cantidades", "gráficas de comportamiento"]
+  },
+  {
+    "areaCodigo": "MAT-BAS",
+    "gradoNumero": 5,
+    "numero_dba": 9,
+    "organizador": "Pensamiento variacional",
+    "enunciado": "Utiliza operaciones no convencionales, encuentra propiedades y resuelve ecuaciones en donde están involucradas.",
+    "evidencias_aprendizaje": [
+      "Interpreta y opera con operaciones no convencionales.",
+      "Explora y busca propiedades de tales operaciones.",
+      "Compara las propiedades de las operaciones convencionales de suma, resta, producto y división con las propiedades de las operaciones no convencionales.",
+      "Resuelve ecuaciones numéricas cuando se involucran operaciones no convencionales."
+    ],
+    "ejemplo": "Representa mediante expresiones numéricas frases como \"el doble de un número aumentado en 5\" o \"la tercera parte de un número\", y resuelve la ecuación: el doble de un número más 3 es igual a 9.",
+    "etiquetas": ["operaciones no convencionales", "ecuaciones", "propiedades de operaciones"]
+  },
+  {
+    "areaCodigo": "MAT-BAS",
+    "gradoNumero": 5,
+    "numero_dba": 10,
+    "organizador": "Pensamiento aleatorio",
+    "enunciado": "Formula preguntas que requieren comparar dos grupos de datos, para lo cual recolecta, organiza y usa tablas de frecuencia, gráficos de barras, circulares, de línea, entre otros. Analiza la información presentada y comunica los resultados.",
+    "evidencias_aprendizaje": [
+      "Formula preguntas y elabora encuestas para obtener los datos requeridos e identifica quiénes deben responder.",
+      "Registra, organiza y presenta la información recolectada usando tablas, gráficos de barras, gráficos de línea, y gráficos circulares.",
+      "Selecciona los gráficos teniendo en cuenta el tipo de datos que se va a representar.",
+      "Interpreta la información obtenida y produce conclusiones que le permiten comparar dos grupos de datos de una misma población.",
+      "Escribe informes sencillos en los que compara la distribución de dos grupos de datos."
+    ],
+    "ejemplo": "Ante la solicitud de un informe sobre las tallas de zapatos y uniformes de los estudiantes de cuarto y quinto, elabora una encuesta, recolecta la información y redacta un informe con tablas y gráficos, analizando los resultados por curso y por género.",
+    "etiquetas": ["tablas de frecuencia", "gráficos circulares", "comparación de grupos de datos"]
+  },
+  {
+    "areaCodigo": "MAT-BAS",
+    "gradoNumero": 5,
+    "numero_dba": 11,
+    "organizador": "Pensamiento aleatorio",
+    "enunciado": "Utiliza la media y la mediana para resolver problemas en los que se requiere presentar o resumir el comportamiento de un conjunto de datos.",
+    "evidencias_aprendizaje": [
+      "Interpreta y encuentra la media y la mediana en un conjunto de datos usando estrategias gráficas y numéricas.",
+      "Explica la información que brinda cada medida en relación con el conjunto de datos.",
+      "Selecciona una de las medidas como la más representativa del comportamiento del conjunto de datos estudiado.",
+      "Argumenta la selección realizada empleando semejanzas y diferencias entre lo que cada una de las medidas indica."
+    ],
+    "ejemplo": "Ante la recomendación de realizar en promedio 30 minutos diarios de actividad física para prevenir la obesidad infantil, argumenta si es válido afirmar que cada persona debe hacer exactamente 30 minutos de ejercicio todos los días.",
+    "etiquetas": ["media", "mediana", "medidas de tendencia central"]
+  },
+  {
+    "areaCodigo": "MAT-BAS",
+    "gradoNumero": 5,
+    "numero_dba": 12,
+    "organizador": "Pensamiento aleatorio",
+    "enunciado": "Predice la posibilidad de ocurrencia de un evento simple a partir de la relación entre los elementos del espacio muestral y los elementos del evento definido.",
+    "evidencias_aprendizaje": [
+      "Reconoce situaciones aleatorias en contextos cotidianos.",
+      "Enumera todos los posibles resultados de un experimento aleatorio simple.",
+      "Identifica y enumera los resultados favorables de ocurrencia de un evento simple.",
+      "Anticipa la ocurrencia de un evento simple."
+    ],
+    "ejemplo": "En un juego de ruletas donde uno gana si sale número par y el otro si sale impar, reconoce que es una situación aleatoria, identifica los eventos posibles, asigna la probabilidad de ocurrencia y argumenta si el juego es justo estadísticamente.",
+    "etiquetas": ["probabilidad", "espacio muestral", "evento simple"]
+  },
+  {
+    "areaCodigo": "MAT-BAS",
+    "gradoNumero": 6,
+    "numero_dba": 1,
+    "organizador": "Pensamiento numérico",
+    "enunciado": "Interpreta los números enteros y racionales (en sus representaciones de fracción y de decimal) con sus operaciones, en diferentes contextos, al resolver problemas de variación, repartos, particiones, estimaciones, etc. Reconoce y establece diferentes relaciones (de orden y equivalencia y las utiliza para argumentar procedimientos).",
+    "evidencias_aprendizaje": [
+      "Resuelve problemas en los que intervienen cantidades positivas y negativas en procesos de comparación, transformación y representación.",
+      "Propone y justifica diferentes estrategias para resolver problemas con números enteros, racionales (en sus representaciones de fracción y de decimal) en contextos escolares y extraescolares.",
+      "Representa en la recta numérica la posición de un número utilizando diferentes estrategias.",
+      "Interpreta y justifica cálculos numéricos al solucionar problemas."
+    ],
+    "ejemplo": "En una carrera de autos a tres vueltas, con tiempos registrados en minutos y reglas de bonificación por posición, determina la distribución de puntos y compara diferencias de tiempo entre competidores expresadas con decimales.",
+    "etiquetas": ["números enteros", "números racionales", "orden y equivalencia", "recta numérica"]
+  },
+  {
+    "areaCodigo": "MAT-BAS",
+    "gradoNumero": 6,
+    "numero_dba": 2,
+    "organizador": "Pensamiento numérico",
+    "enunciado": "Utiliza las propiedades de los números enteros y racionales y las propiedades de sus operaciones para proponer estrategias y procedimientos de cálculo en la solución de problemas.",
+    "evidencias_aprendizaje": [
+      "Propone y utiliza diferentes procedimientos para realizar operaciones con números enteros y racionales.",
+      "Argumenta de diversas maneras la necesidad de establecer relaciones y características en conjuntos de números (ser par, ser impar, ser primo, ser el doble de, el triple de, la mitad de, etc.)."
+    ],
+    "ejemplo": "Un obrero controla el nivel de vapor de una caldera mediante un corcho cuya posición se representa con números positivos o negativos según esté por encima o debajo del punto cero; calcula desplazamientos sucesivos del corcho y determina qué expresión numérica corresponde al resultado final.",
+    "etiquetas": ["números enteros", "propiedades numéricas", "positivos y negativos"]
+  },
+  {
+    "areaCodigo": "MAT-BAS",
+    "gradoNumero": 6,
+    "numero_dba": 3,
+    "organizador": "Pensamiento numérico",
+    "enunciado": "Reconoce y establece diferentes relaciones (orden y equivalencia) entre elementos de diversos dominios numéricos y los utiliza para argumentar procedimientos sencillos.",
+    "evidencias_aprendizaje": [
+      "Determina criterios de comparación para establecer relaciones de orden entre dos o más números.",
+      "Representa en la recta numérica la posición de un número utilizando diferentes estrategias.",
+      "Describe procedimientos para resolver ecuaciones lineales."
+    ],
+    "ejemplo": "A partir de una secuencia de imágenes que ilustra distintas formas de encontrar el valor de una incógnita x, describe y pone a prueba diferentes procedimientos para hallar su valor.",
+    "etiquetas": ["relaciones de orden", "equivalencia numérica", "ecuaciones lineales"]
+  },
+  {
+    "areaCodigo": "MAT-BAS",
+    "gradoNumero": 6,
+    "numero_dba": 4,
+    "organizador": "Pensamiento espacial",
+    "enunciado": "Utiliza y explica diferentes estrategias (desarrollo de la forma o plantillas) e instrumentos (regla, compás o software) para la construcción de figuras planas y cuerpos.",
+    "evidencias_aprendizaje": [
+      "Construye plantillas para cuerpos geométricos dadas sus medidas.",
+      "Selecciona las plantillas que genera cada cuerpo a partir del análisis de su forma, sus caras y sus vértices.",
+      "Utiliza la regla no graduada y el compás para dibujar las plantillas de cuerpos geométricos cuando se tienen sus medidas."
+    ],
+    "ejemplo": "Para forrar con papel de colores varios cuerpos geométricos, selecciona los moldes adecuados, calcula la cantidad de papel necesaria según las medidas de las aristas, y determina cuál de tres cuerpos con aristas de igual medida tiene mayor volumen.",
+    "etiquetas": ["construcción geométrica", "plantillas", "regla y compás"]
+  },
+  {
+    "areaCodigo": "MAT-BAS",
+    "gradoNumero": 6,
+    "numero_dba": 5,
+    "organizador": "Pensamiento métrico",
+    "enunciado": "Propone y desarrolla estrategias de estimación, medición y cálculo de diferentes cantidades (ángulos, longitudes, áreas, volúmenes, etc.) para resolver problemas.",
+    "evidencias_aprendizaje": [
+      "Decide acerca de las estrategias para determinar qué tan pertinente es la estimación y analiza las causas de error en procesos de medición y estimación.",
+      "Estima el resultado de una medición sin realizarla, de acuerdo con un referente previo y aplica el proceso de estimación elegido y valora el resultado de acuerdo con los datos y contexto de un problema.",
+      "Estima la medida de longitudes, áreas, volúmenes, masas, pesos y ángulos en presencia o no de los objetos y decide sobre la conveniencia de los instrumentos a utilizar, según las necesidades de la situación."
+    ],
+    "ejemplo": "A partir de imágenes de jugadores en distintas posiciones frente a un arco de fútbol, estima los ángulos que forman con los palos, argumenta en qué posición hay mayor posibilidad de gol y luego verifica la estimación midiendo con transportador.",
+    "etiquetas": ["estimación", "medición de ángulos", "áreas y volúmenes"]
+  },
+  {
+    "areaCodigo": "MAT-BAS",
+    "gradoNumero": 6,
+    "numero_dba": 6,
+    "organizador": "Pensamiento espacial",
+    "enunciado": "Representa y construye formas bidimensionales y tridimensionales con el apoyo en instrumentos de medida apropiados.",
+    "evidencias_aprendizaje": [
+      "Diferencia las propiedades geométricas de las figuras y cuerpos geométricos.",
+      "Identifica los elementos que componen las figuras y cuerpos geométricos.",
+      "Describe las congruencias y semejanzas en figuras bidimensionales y tridimensionales.",
+      "Estima áreas y volúmenes de figuras y cuerpos geométricos.",
+      "Construye cuerpos geométricos con el apoyo de instrumentos de medida adecuados."
+    ],
+    "ejemplo": "A partir de envases industriales de diferentes materiales y formas, identifica las formas volumétricas que los constituyen, construye sus desarrollos geométricos, estima el material necesario para fabricarlos y compara la información de volumen y peso de los empaques reales.",
+    "etiquetas": ["formas bidimensionales", "formas tridimensionales", "congruencia y semejanza"]
+  },
+  {
+    "areaCodigo": "MAT-BAS",
+    "gradoNumero": 6,
+    "numero_dba": 7,
+    "organizador": "Pensamiento espacial",
+    "enunciado": "Reconoce el plano cartesiano como un sistema bidimensional que permite ubicar puntos como sistema de referencia gráfico o geográfico.",
+    "evidencias_aprendizaje": [
+      "Localiza, describe y representa la posición y la trayectoria de un objeto en un plano cartesiano.",
+      "Identifica e interpreta la semejanza de dos figuras al realizar rotaciones, ampliaciones y reducciones de formas bidimensionales en el plano cartesiano."
+    ],
+    "ejemplo": "Diseña bisutería artesanal utilizando el plano cartesiano para identificar patrones geométricos, expresarlos como parejas ordenadas y modificarlos para crear nuevos modelos de pulseras.",
+    "etiquetas": ["plano cartesiano", "parejas ordenadas", "rotaciones y ampliaciones"]
+  },
+  {
+    "areaCodigo": "MAT-BAS",
+    "gradoNumero": 6,
+    "numero_dba": 8,
+    "organizador": "Pensamiento variacional",
+    "enunciado": "Identifica y analiza propiedades de covariación directa e inversa entre variables, en contextos numéricos, geométricos y cotidianos y las representa mediante gráficas (cartesianas de puntos, continuas, formadas por segmentos, etc.).",
+    "evidencias_aprendizaje": [
+      "Propone patrones de comportamiento numéricos y expresa verbalmente o por escrito los procedimientos matemáticos.",
+      "Realiza cálculos numéricos, organiza la información en tablas, elabora representaciones gráficas y las interpreta.",
+      "Trabaja sobre números desconocidos y con esos números para dar respuestas a los problemas."
+    ],
+    "ejemplo": "Ante tres cotizaciones de empresas de transporte con distintas tarifas por peso, representa en el plano cartesiano el costo total según el peso transportado, determina en cuál la razón peso/costo es mayor, y decide qué empresa conviene según distintas cantidades a transportar.",
+    "etiquetas": ["covariación", "proporcionalidad directa e inversa", "gráficas cartesianas"]
+  },
+  {
+    "areaCodigo": "MAT-BAS",
+    "gradoNumero": 6,
+    "numero_dba": 9,
+    "organizador": "Pensamiento variacional",
+    "enunciado": "Opera sobre números desconocidos y encuentra las operaciones apropiadas al contexto para resolver problemas.",
+    "evidencias_aprendizaje": [
+      "Utiliza las operaciones y sus inversas en problemas de cálculo numérico.",
+      "Realiza cálculos numéricos, organiza la información en tablas, elabora representaciones gráficas y las interpreta.",
+      "Realiza combinaciones de operaciones, encuentra propiedades y resuelve ecuaciones en donde están involucradas."
+    ],
+    "ejemplo": "Una compañía paga $8.000 por hora en jornada normal y $9.000 por hora extra; calcula el pago diario según las horas trabajadas y los aportes a seguridad social, y determina cuántas horas trabajó una persona conociendo su pago total.",
+    "etiquetas": ["números desconocidos", "ecuaciones", "operaciones inversas"]
+  },
+  {
+    "areaCodigo": "MAT-BAS",
+    "gradoNumero": 6,
+    "numero_dba": 10,
+    "organizador": "Pensamiento aleatorio",
+    "enunciado": "Interpreta información estadística presentada en diversas fuentes de información, la analiza y la usa para plantear y resolver preguntas que sean de su interés.",
+    "evidencias_aprendizaje": [
+      "Lee y extrae la información estadística publicada en diversas fuentes.",
+      "Plantea una pregunta que le facilite recolectar información que le permita contrastar la información estadística publicada.",
+      "Organiza la información recolectada en tablas y la representa mediante gráficas adecuadas.",
+      "Calcula las medidas requeridas de acuerdo a los datos recolectados y usa, cuando sea posible, calculadoras o software adecuado.",
+      "Escribe un informe en el que analiza la información presentada en el medio de comunicación y la contrasta con la obtenida en su estudio."
+    ],
+    "ejemplo": "A partir de una noticia oficial sobre el crecimiento de la telefonía móvil en Colombia, contrasta esos datos con una encuesta propia sobre el uso de celulares en el salón de clase y analiza las posibles razones de las diferencias encontradas.",
+    "etiquetas": ["información estadística", "fuentes de información", "contraste de datos"]
+  },
+  {
+    "areaCodigo": "MAT-BAS",
+    "gradoNumero": 6,
+    "numero_dba": 11,
+    "organizador": "Pensamiento aleatorio",
+    "enunciado": "Compara características compartidas por dos o más poblaciones o características diferentes dentro de una misma población para lo cual selecciona muestras, utiliza representaciones gráficas adecuadas y analiza los resultados obtenidos usando conjuntamente las medidas de tendencia central y el rango.",
+    "evidencias_aprendizaje": [
+      "Comprende la diferencia entre la muestra y la población.",
+      "Selecciona y produce representaciones gráficas apropiadas al conjunto de datos, usando, cuando sea posible, calculadoras o software adecuado.",
+      "Interpreta la información que se presenta en los gráficos usando las medidas de tendencia central y el rango.",
+      "Compara las características de dos o más poblaciones o de dos o más grupos, haciendo uso conjunto de las respectivas medidas de tendencia central y el rango.",
+      "Describe el comportamiento de las características de dos o más poblaciones o de dos o más grupos de una población, a partir de las respectivas medidas de tendencia central y el rango."
+    ],
+    "ejemplo": "Ante un estudio sobre la velocidad de descarga de dos marcas de celulares probadas con 10 unidades cada una durante una hora, interpreta los gráficos, compara las medidas de tendencia central y el rango, y justifica cuál marca recomendaría.",
+    "etiquetas": ["muestra y población", "medidas de tendencia central", "rango"]
+  },
+  {
+    "areaCodigo": "MAT-BAS",
+    "gradoNumero": 6,
+    "numero_dba": 12,
+    "organizador": "Pensamiento aleatorio",
+    "enunciado": "A partir de la información previamente obtenida en repeticiones de experimentos aleatorios sencillos, compara las frecuencias esperadas con las frecuencias observadas.",
+    "evidencias_aprendizaje": [
+      "Enumera los posibles resultados de un experimento aleatorio sencillo.",
+      "Realiza repeticiones del experimento aleatorio sencillo y registra los resultados en tablas y gráficos de frecuencia.",
+      "Interpreta y asigna la probabilidad de ocurrencia de un evento dado, teniendo en cuenta el número de veces que ocurre el evento en relación con el número total de veces que realiza el experimento.",
+      "Compara los resultados obtenidos experimentalmente con las predicciones anticipadas."
+    ],
+    "ejemplo": "En un juego con un dado cúbico (6 caras) y un dado tetraédrico (4 caras) donde gana quien saque más veces el número 1 en 100 lanzamientos, justifica cuál dado conviene elegir, realiza el experimento y compara los resultados con la predicción inicial.",
+    "etiquetas": ["frecuencia esperada", "frecuencia observada", "experimentos aleatorios"]
+  },
+  {
+    "areaCodigo": "MAT-BAS",
+    "gradoNumero": 7,
+    "numero_dba": 1,
+    "organizador": "Pensamiento numérico",
+    "enunciado": "Comprende y resuelve problemas, que involucran los números racionales con las operaciones (suma, resta, multiplicación, división, potenciación, radicación) en contextos escolares y extraescolares.",
+    "evidencias_aprendizaje": [
+      "Describe situaciones en las que los números enteros y racionales con sus operaciones están presentes.",
+      "Utiliza los signos \"positivo\" y \"negativo\" para describir cantidades relativas con números enteros y racionales.",
+      "Resuelve problemas en los que se involucran variaciones porcentuales."
+    ],
+    "ejemplo": "Consulta los incrementos del salario mínimo en Colombia durante los últimos 10 años y el costo de vida en el mismo período, elabora una tabla y una gráfica comparando el poder adquisitivo y analiza cómo ha variado.",
+    "etiquetas": ["números racionales", "variaciones porcentuales", "operaciones combinadas"]
+  },
+  {
+    "areaCodigo": "MAT-BAS",
+    "gradoNumero": 7,
+    "numero_dba": 2,
+    "organizador": "Pensamiento numérico",
+    "enunciado": "Describe y utiliza diferentes algoritmos, convencionales y no convencionales, al realizar operaciones entre números racionales en sus diferentes representaciones (fracciones y decimales) y los emplea con sentido en la solución de problemas.",
+    "evidencias_aprendizaje": [
+      "Representa los números enteros y racionales en una recta numérica.",
+      "Estima el valor de una raíz cuadrada y de una potencia.",
+      "Construye representaciones geométricas y pictóricas para ilustrar relaciones entre cantidades.",
+      "Calcula e interpreta el máximo común divisor y el mínimo común múltiplo entre números enteros.",
+      "Describe procedimientos para calcular el resultado de una operación (suma, resta, multiplicación y división) entre números enteros y racionales."
+    ],
+    "ejemplo": "En un software de geometría dinámica, calcula el área de un rectángulo cuyos lados varían entre 0 y 5 con un dígito decimal, y determina la relación entre el área de un cuadrado de lado 0,1 y uno de lado 1, expresando los resultados como fracción y como decimal.",
+    "etiquetas": ["algoritmos", "máximo común divisor", "mínimo común múltiplo", "raíces y potencias"]
+  },
+  {
+    "areaCodigo": "MAT-BAS",
+    "gradoNumero": 7,
+    "numero_dba": 3,
+    "organizador": "Pensamiento numérico",
+    "enunciado": "Utiliza diferentes relaciones, operaciones y representaciones en los números racionales para argumentar y solucionar problemas en los que aparecen cantidades desconocidas.",
+    "evidencias_aprendizaje": [
+      "Realiza operaciones para calcular el número decimal que representa una fracción y viceversa.",
+      "Usa las propiedades distributiva, asociativa, modulativa, del inverso y conmutativa de la suma y la multiplicación en los racionales para proponer diferentes caminos al realizar un cálculo.",
+      "Determina el valor desconocido de una cantidad a partir de las transformaciones de una expresión algebraica."
+    ],
+    "ejemplo": "Encuentra el resultado de una operación decimal (como 0,457 + 2,56 - 3,4) usando una calculadora con algunas teclas averiadas, describiendo al menos dos procedimientos alternativos válidos.",
+    "etiquetas": ["propiedades de las operaciones", "fracción a decimal", "cantidades desconocidas"]
+  },
+  {
+    "areaCodigo": "MAT-BAS",
+    "gradoNumero": 7,
+    "numero_dba": 4,
+    "organizador": "Pensamiento métrico",
+    "enunciado": "Utiliza escalas apropiadas para representar e interpretar planos, mapas y maquetas con diferentes unidades.",
+    "evidencias_aprendizaje": [
+      "Identifica los tipos de escalas y selecciona la adecuada para la elaboración de planos de acuerdo al formato o espacio disponible para dibujar.",
+      "Expresa la misma medida con diferentes unidades según el contexto.",
+      "Representa e interpreta situaciones de ampliación y reducción en contextos diversos."
+    ],
+    "ejemplo": "Para el plano de una institución rural con varias aulas y espacios nuevos (restaurante, salón de música, biblioteca, cancha) en un terreno de área conocida, determina si una escala de 1:100 es adecuada para dibujarlo en una hoja tamaño oficio y, si no lo es, propone la escala correcta.",
+    "etiquetas": ["escalas", "planos", "mapas", "ampliación y reducción"]
+  },
+  {
+    "areaCodigo": "MAT-BAS",
+    "gradoNumero": 7,
+    "numero_dba": 5,
+    "organizador": "Pensamiento espacial",
+    "enunciado": "Observa objetos tridimensionales desde diferentes puntos de vista, los representa según su ubicación y los reconoce cuando se transforman mediante rotaciones, traslaciones y reflexiones.",
+    "evidencias_aprendizaje": [
+      "Establece relaciones entre la posición y las vistas de un objeto.",
+      "Reconoce e interpreta la representación de un objeto.",
+      "Representa objetos tridimensionales cuando se transforman."
+    ],
+    "ejemplo": "Observa un envase desde vista frontal, superior e inferior, describe cómo cambia su forma en cada vista, representa gráficamente el objeto desde esas tres perspectivas y compara las representaciones con fotografías reales.",
+    "etiquetas": ["vistas de un objeto", "rotaciones", "traslaciones", "reflexiones"]
+  },
+  {
+    "areaCodigo": "MAT-BAS",
+    "gradoNumero": 7,
+    "numero_dba": 6,
+    "organizador": "Pensamiento variacional",
+    "enunciado": "Representa en el plano cartesiano la variación de magnitudes (áreas y perímetro) y con base en la variación explica el comportamiento de situaciones y fenómenos de la vida diaria.",
+    "evidencias_aprendizaje": [
+      "Interpreta las modificaciones entre el perímetro y el área con un factor de variación respectivo.",
+      "Establece diferencias entre los gráficos del perímetro y del área.",
+      "Coordina los cambios de la variación entre el perímetro y la longitud de los lados o el área de una figura.",
+      "Organiza la información (registros tabulares y gráficos) para comprender la relación entre el perímetro y el área."
+    ],
+    "ejemplo": "Manipulando las longitudes de los lados de un rectángulo en un software de geometría dinámica, establece el factor de escala que relaciona las longitudes, los perímetros y las áreas de dos rectángulos, y organiza los resultados en una tabla si no cuenta con el software.",
+    "etiquetas": ["variación de magnitudes", "plano cartesiano", "área y perímetro"]
+  },
+  {
+    "areaCodigo": "MAT-BAS",
+    "gradoNumero": 7,
+    "numero_dba": 7,
+    "organizador": "Pensamiento variacional",
+    "enunciado": "Plantea y resuelve ecuaciones, las describe verbalmente y representa situaciones de variación de manera numérica, simbólica o gráfica.",
+    "evidencias_aprendizaje": [
+      "Plantea modelos algebraicos, gráficos o numéricos en los que identifica variables y rangos de variación de las variables.",
+      "Toma decisiones informadas en exploraciones numéricas, algebraicas o gráficas de los modelos matemáticos usados.",
+      "Utiliza métodos informales exploratorios para resolver ecuaciones."
+    ],
+    "ejemplo": "A partir de información gráfica sobre el peso combinado de varias gallinas expresado en libras, plantea ecuaciones para encontrar el peso individual de cada una.",
+    "etiquetas": ["ecuaciones", "modelos algebraicos", "variación"]
+  },
+  {
+    "areaCodigo": "MAT-BAS",
+    "gradoNumero": 7,
+    "numero_dba": 8,
+    "organizador": "Pensamiento aleatorio",
+    "enunciado": "Plantea preguntas para realizar estudios estadísticos en los que representa información mediante histogramas, polígonos de frecuencia, gráficos de línea entre otros; identifica variaciones, relaciones o tendencias para dar respuesta a las preguntas planteadas.",
+    "evidencias_aprendizaje": [
+      "Plantea preguntas, diseña y realiza un plan para recolectar la información pertinente.",
+      "Construye tablas de frecuencia y gráficos (histogramas, polígonos de frecuencia, gráficos de línea, entre otros), para datos agrupados usando calculadoras o software adecuado.",
+      "Encuentra e interpreta las medidas de tendencia central y el rango en datos agrupados, empleando herramientas tecnológicas cuando sea posible.",
+      "Analiza la información presentada identificando variaciones, relaciones o tendencias y elabora conclusiones que permiten responder la pregunta planteada."
+    ],
+    "ejemplo": "Un piscicultor pesa 50 truchas al azar de cada uno de tres estanques y organiza los pesos en tablas de frecuencia agrupada; con esa información compara el crecimiento de las truchas en cada estanque.",
+    "etiquetas": ["histogramas", "polígonos de frecuencia", "datos agrupados"]
+  },
+  {
+    "areaCodigo": "MAT-BAS",
+    "gradoNumero": 7,
+    "numero_dba": 9,
+    "organizador": "Pensamiento aleatorio",
+    "enunciado": "Usa el principio multiplicativo en situaciones aleatorias sencillas y lo representa con tablas o diagramas de árbol. Asigna probabilidades a eventos compuestos y los interpreta a partir de propiedades básicas de la probabilidad.",
+    "evidencias_aprendizaje": [
+      "Elabora tablas o diagramas de árbol para representar las distintas maneras en que un experimento aleatorio puede suceder.",
+      "Usa el principio multiplicativo para calcular el número de resultados posibles.",
+      "Interpreta el número de resultados considerando que cuando se cambia de orden no se altera el resultado."
+    ],
+    "ejemplo": "Con un menú de cafetería que ofrece opciones de entrada, plato fuerte y acompañante, elabora un diagrama de árbol para representar todas las combinaciones posibles y verifica si el número anunciado de \"diferentes formas de seleccionar el almuerzo\" es correcto.",
+    "etiquetas": ["principio multiplicativo", "diagrama de árbol", "eventos compuestos"]
+  },
+  {
+    "areaCodigo": "MAT-BAS",
+    "gradoNumero": 8,
+    "numero_dba": 1,
+    "organizador": "Pensamiento numérico",
+    "enunciado": "Reconoce la existencia de los números irracionales como números no racionales y los describe de acuerdo con sus características y propiedades.",
+    "evidencias_aprendizaje": [
+      "Utiliza procedimientos geométricos para representar números racionales e irracionales.",
+      "Identifica las diferentes representaciones (decimales y no decimales) para argumentar por qué un número es o no racional."
+    ],
+    "ejemplo": "Analiza cuatro formas distintas en que estudiantes construyeron números decimales (usando dados, concatenando naturales, dividiendo 1 entre 3, o generando infinitos dígitos) y argumenta cuáles de esos números son racionales y cuáles no.",
+    "etiquetas": ["números irracionales", "números racionales", "propiedades numéricas"]
+  },
+  {
+    "areaCodigo": "MAT-BAS",
+    "gradoNumero": 8,
+    "numero_dba": 2,
+    "organizador": "Pensamiento numérico",
+    "enunciado": "Construye representaciones, argumentos y ejemplos de propiedades de los números racionales y no racionales.",
+    "evidencias_aprendizaje": [
+      "Utiliza procedimientos geométricos o aritméticos para construir algunos números irracionales y los ubica en la recta numérica.",
+      "Justifica procedimientos con los cuales se representa geométricamente números racionales y números reales.",
+      "Construye varias representaciones (geométrica, decimales o no decimales) de un mismo número racional o irracional."
+    ],
+    "ejemplo": "Dada una igualdad con raíces cuadradas de expresiones desconocidas, asigna valores y usa la calculadora para determinar si existen números que la hagan verdadera, explorando también productos, cocientes y potencias.",
+    "etiquetas": ["números irracionales", "recta numérica", "representación geométrica"]
+  },
+  {
+    "areaCodigo": "MAT-BAS",
+    "gradoNumero": 8,
+    "numero_dba": 3,
+    "organizador": "Pensamiento variacional",
+    "enunciado": "Reconoce los diferentes usos y significados de las operaciones (convencionales y no convencionales) y del signo igual (relación de equivalencia e igualdad condicionada) y los utiliza para argumentar equivalencias entre expresiones algebraicas y resolver sistemas de ecuaciones.",
+    "evidencias_aprendizaje": [
+      "Reconoce el uso del signo igual como relación de equivalencia de expresiones algebraicas en los números reales.",
+      "Propone y ejecuta procedimientos para resolver una ecuación lineal y sistemas de ecuaciones lineales y argumenta la validez o no de un procedimiento.",
+      "Usa el conjunto solución de una relación (de equivalencia y de orden) para argumentar la validez o no de un procedimiento."
+    ],
+    "ejemplo": "A partir de tres expresiones algebraicas (x - 1, 4x + 1, 5) analizadas por dos estudiantes, evalúa sus argumentos sobre las relaciones entre ellas y determina en qué condiciones se puede aplicar la propiedad transitiva.",
+    "etiquetas": ["sistemas de ecuaciones", "signo igual", "equivalencia algebraica"]
+  },
+  {
+    "areaCodigo": "MAT-BAS",
+    "gradoNumero": 8,
+    "numero_dba": 4,
+    "organizador": "Pensamiento métrico",
+    "enunciado": "Describe atributos medibles de diferentes sólidos y explica relaciones entre ellos por medio del lenguaje algebraico.",
+    "evidencias_aprendizaje": [
+      "Utiliza lenguaje algebraico para representar el volumen de un prisma en términos de sus aristas.",
+      "Realiza la representación gráfica del desarrollo plano de un prisma.",
+      "Estima, calcula y compara volúmenes a partir de las relaciones entre las aristas de un prisma o de otros sólidos.",
+      "Interpreta las expresiones algebraicas que representan el volumen y el área cuando sus dimensiones varían."
+    ],
+    "ejemplo": "A partir de las dimensiones de cinco cajas distintas, completa una tabla, encuentra las razones aritméticas entre sus volúmenes y expresa de forma general el volumen y el área exterior total de cada una.",
+    "etiquetas": ["volumen de prismas", "lenguaje algebraico", "desarrollos planos"]
+  },
+  {
+    "areaCodigo": "MAT-BAS",
+    "gradoNumero": 8,
+    "numero_dba": 5,
+    "organizador": "Pensamiento métrico",
+    "enunciado": "Utiliza y explica diferentes estrategias para encontrar el volumen de objetos regulares e irregulares en la solución de problemas en las matemáticas y en otras ciencias.",
+    "evidencias_aprendizaje": [
+      "Estima medidas de volumen con unidades estandarizadas y no estandarizadas.",
+      "Utiliza la relación de las unidades de capacidad con las unidades de volumen (litros, dm³, etc.) en la solución de un problema.",
+      "Identifica la posibilidad del error en la medición del volumen haciendo aproximaciones pertinentes al respecto.",
+      "Explora y crea estrategias para calcular el volumen de cuerpos regulares e irregulares."
+    ],
+    "ejemplo": "Al sumergir un objeto de forma irregular en un recipiente cilíndrico lleno de agua, compara el volumen calculado por desplazamiento de agua con una aproximación usando la composición de figuras regulares que forman el objeto.",
+    "etiquetas": ["volumen de cuerpos irregulares", "desplazamiento de agua", "estimación de volumen"]
+  },
+  {
+    "areaCodigo": "MAT-BAS",
+    "gradoNumero": 8,
+    "numero_dba": 6,
+    "organizador": "Pensamiento espacial",
+    "enunciado": "Identifica relaciones de congruencia y semejanza entre las formas geométricas que configuran el diseño de un objeto.",
+    "evidencias_aprendizaje": [
+      "Utiliza criterios para argumentar la congruencia de dos triángulos.",
+      "Discrimina casos de semejanza de triángulos en situaciones diversas.",
+      "Resuelve problemas que implican aplicación de los criterios de semejanza.",
+      "Compara figuras y argumenta la posibilidad de ser congruentes o semejantes entre sí."
+    ],
+    "ejemplo": "En logotipos de marcas reconocidas que usan regularidades geométricas, identifica las figuras congruentes presentes en cada diseño y argumenta las congruencias encontradas.",
+    "etiquetas": ["congruencia", "semejanza de triángulos", "diseño geométrico"]
+  },
+  {
+    "areaCodigo": "MAT-BAS",
+    "gradoNumero": 8,
+    "numero_dba": 7,
+    "organizador": "Pensamiento espacial",
+    "enunciado": "Identifica regularidades y argumenta propiedades de figuras geométricas a partir de teoremas y las aplica en situaciones reales.",
+    "evidencias_aprendizaje": [
+      "Describe teoremas y argumenta su validez a través de diferentes recursos (software, tangram, papel, entre otros).",
+      "Argumenta la relación pitagórica por medio de construcción al utilizar material concreto.",
+      "Reconoce relaciones geométricas al utilizar el teorema de Pitágoras y Thales, entre otros.",
+      "Aplica el teorema de Pitágoras para calcular la medida de cualquier lado de un triángulo rectángulo.",
+      "Resuelve problemas utilizando teoremas básicos."
+    ],
+    "ejemplo": "A partir de un rompecabezas geométrico, explora y generaliza el teorema de Pitágoras con triángulos y cuadrados de diferentes tamaños, verificando la generalidad con apoyo de software.",
+    "etiquetas": ["teorema de Pitágoras", "teorema de Thales", "demostración geométrica"]
+  },
+  {
+    "areaCodigo": "MAT-BAS",
+    "gradoNumero": 8,
+    "numero_dba": 8,
+    "organizador": "Pensamiento variacional",
+    "enunciado": "Identifica y analiza relaciones entre propiedades de las gráficas y propiedades de expresiones algebraicas y relaciona la variación y covariación con los comportamientos gráficos, numéricos y características de las expresiones algebraicas en situaciones de modelación.",
+    "evidencias_aprendizaje": [
+      "Opera con formas simbólicas y las interpreta.",
+      "Relaciona un cambio en la variable independiente con el cambio correspondiente en la variable dependiente.",
+      "Encuentra valores desconocidos en ecuaciones algebraicas.",
+      "Reconoce y representa relaciones numéricas mediante expresiones algebraicas y encuentra el conjunto de variación de una variable en función del contexto."
+    ],
+    "ejemplo": "Escribe una expresión que relacione el cambio en el volumen de un cono cuando su radio aumenta en una cantidad ∆r manteniendo la altura constante, calcula el cambio para distintos incrementos y grafica la relación para hallar el radio que da un volumen de 20 u³.",
+    "etiquetas": ["covariación", "expresiones algebraicas", "modelación"]
+  },
+  {
+    "areaCodigo": "MAT-BAS",
+    "gradoNumero": 8,
+    "numero_dba": 9,
+    "organizador": "Pensamiento variacional",
+    "enunciado": "Propone, compara y usa procedimientos inductivos y lenguaje algebraico para formular y poner a prueba conjeturas en diversas situaciones o contextos.",
+    "evidencias_aprendizaje": [
+      "Opera con formas simbólicas que representan números y encuentra valores desconocidos en ecuaciones numéricas.",
+      "Reconoce patrones numéricos y los describe verbalmente.",
+      "Representa relaciones numéricas mediante expresiones algebraicas y opera con y sobre variables.",
+      "Describe diferentes usos del signo igual (equivalencia, igualdad condicionada) en las expresiones algebraicas.",
+      "Utiliza las propiedades de los conjuntos numéricos para resolver ecuaciones."
+    ],
+    "ejemplo": "Dada una secuencia de ecuaciones acumulativas (a=4, a+2b=10, a+2b+3c=28, …), encuentra los valores de las incógnitas y argumenta cómo cambian las respuestas si el valor inicial de \"a\" cambia.",
+    "etiquetas": ["procedimientos inductivos", "conjeturas", "lenguaje algebraico"]
+  },
+  {
+    "areaCodigo": "MAT-BAS",
+    "gradoNumero": 8,
+    "numero_dba": 10,
+    "organizador": "Pensamiento variacional",
+    "enunciado": "Propone relaciones o modelos funcionales entre variables e identifica y analiza propiedades de covariación entre variables, en contextos numéricos, geométricos y cotidianos y las representa mediante gráficas (cartesianas de puntos, continuas, formadas por segmentos, etc.).",
+    "evidencias_aprendizaje": [
+      "Toma decisiones informadas en exploraciones numéricas, algebraicas o gráficas de los modelos matemáticos usados.",
+      "Relaciona características algebraicas de las funciones, sus gráficas y procesos de aproximación sucesiva."
+    ],
+    "ejemplo": "Una araña debe recorrer el camino más corto por dos caras de una caja cúbica para atrapar una mosca ubicada en el vértice opuesto; usando el teorema de Pitágoras, determina el punto óptimo de cruce y modela algebraicamente las longitudes de las rutas posibles.",
+    "etiquetas": ["modelos funcionales", "covariación", "gráficas cartesianas"]
+  },
+  {
+    "areaCodigo": "MAT-BAS",
+    "gradoNumero": 8,
+    "numero_dba": 11,
+    "organizador": "Pensamiento aleatorio",
+    "enunciado": "Interpreta información presentada en tablas de frecuencia y gráficos cuyos datos están agrupados en intervalos y decide cuál es la medida de tendencia central que mejor representa el comportamiento de dicho conjunto.",
+    "evidencias_aprendizaje": [
+      "Interpreta los datos representados en diferentes tablas y gráficos.",
+      "Usa estrategias gráficas o numéricas para encontrar las medidas de tendencia central de un conjunto de datos agrupados.",
+      "Describe el comportamiento de los datos empleando las medidas de tendencia central y el rango.",
+      "Reconoce cómo varían las medidas de tendencia central y el rango cuando varían los datos."
+    ],
+    "ejemplo": "Un estudio sobre producción de café por hectárea en 510 fincas omitió por error los datos de 60 fincas adicionales; analiza si al incorporar esos datos faltantes cambian o no las medidas de tendencia central calculadas.",
+    "etiquetas": ["datos agrupados", "medidas de tendencia central", "intervalos de clase"]
+  },
+  {
+    "areaCodigo": "MAT-BAS",
+    "gradoNumero": 8,
+    "numero_dba": 12,
+    "organizador": "Pensamiento aleatorio",
+    "enunciado": "Hace predicciones sobre la posibilidad de ocurrencia de un evento compuesto e interpreta la predicción a partir del uso de propiedades básicas de la probabilidad.",
+    "evidencias_aprendizaje": [
+      "Identifica y enumera el espacio muestral de un experimento aleatorio.",
+      "Identifica y enumera los resultados favorables de ocurrencia de un evento indicado.",
+      "Asigna la probabilidad de la ocurrencia de un evento usando valores entre 0 y 1.",
+      "Reconoce cuando dos eventos son o no mutuamente excluyentes y les asigna la probabilidad usando la regla de la adición."
+    ],
+    "ejemplo": "Con una tabla de frecuencias sobre número de hermanos y edades de estudiantes de octavo, calcula la probabilidad de que un estudiante tenga 1 o 2 hermanos usando al menos dos procedimientos distintos y justifica que ambos dan el mismo resultado.",
+    "etiquetas": ["probabilidad", "espacio muestral", "eventos mutuamente excluyentes"]
+  },
+  {
+    "areaCodigo": "MAT-BAS",
+    "gradoNumero": 9,
+    "numero_dba": 1,
+    "organizador": "Pensamiento numérico",
+    "enunciado": "Utiliza los números reales (sus operaciones, relaciones y propiedades) para resolver problemas con expresiones polinómicas.",
+    "evidencias_aprendizaje": [
+      "Considera el error que genera la aproximación de un número real a partir de números racionales.",
+      "Identifica la diferencia entre exactitud y aproximación en las diferentes representaciones de los números reales.",
+      "Construye representaciones geométricas y numéricas de los números reales (con decimales, raíces, razones, y otros símbolos) y realiza conversiones entre ellas."
+    ],
+    "ejemplo": "Un grupo de estudiantes infla globos para representar una razón √5 entre los diámetros de dos esferas; analiza distintos planteamientos y aproximaciones propuestos por compañeros y discute los errores cometidos al usar aproximaciones de √5 con distinta precisión.",
+    "etiquetas": ["números reales", "aproximación", "expresiones polinómicas"]
+  },
+  {
+    "areaCodigo": "MAT-BAS",
+    "gradoNumero": 9,
+    "numero_dba": 2,
+    "organizador": "Pensamiento variacional",
+    "enunciado": "Propone y desarrolla expresiones algebraicas en el conjunto de los números reales y utiliza las propiedades de la igualdad y de orden para determinar el conjunto solución de relaciones entre tales expresiones.",
+    "evidencias_aprendizaje": [
+      "Identifica y utiliza múltiples representaciones de números reales para realizar transformaciones y comparaciones entre expresiones algebraicas.",
+      "Establece conjeturas al resolver una situación problema, apoyado en propiedades y relaciones entre números reales.",
+      "Determina y describe relaciones al comparar características de gráficas y expresiones algebraicas o funciones."
+    ],
+    "ejemplo": "Dadas las gráficas de tres funciones distintas, encuentra los valores de x para los que la gráfica de f(x) está entre las de g(x) y h(x), expresando la respuesta con intervalos.",
+    "etiquetas": ["expresiones algebraicas", "conjunto solución", "funciones"]
+  },
+  {
+    "areaCodigo": "MAT-BAS",
+    "gradoNumero": 9,
+    "numero_dba": 3,
+    "organizador": "Pensamiento numérico",
+    "enunciado": "Utiliza los números reales, sus operaciones, relaciones y representaciones para analizar procesos infinitos y resolver problemas.",
+    "evidencias_aprendizaje": [
+      "Encuentra las relaciones y propiedades que determinan la formación de secuencias numéricas.",
+      "Determina y utiliza la expresión general de una sucesión para calcular cualquier valor de la misma y para compararla con otras sucesiones."
+    ],
+    "ejemplo": "A partir de una espiral construida con cuadrados cuyos lados siguen la sucesión de Fibonacci (1, 1, 2, 3, 5…), completa una tabla de lado, perímetro y área de cada cuadrado y describe los patrones y regularidades que se presentan.",
+    "etiquetas": ["sucesión de Fibonacci", "procesos infinitos", "secuencias numéricas"]
+  },
+  {
+    "areaCodigo": "MAT-BAS",
+    "gradoNumero": 9,
+    "numero_dba": 4,
+    "organizador": "Pensamiento métrico",
+    "enunciado": "Identifica y utiliza relaciones entre el volumen y la capacidad de algunos cuerpos redondos (cilindro, cono y esfera) con referencia a las situaciones escolares y extraescolares.",
+    "evidencias_aprendizaje": [
+      "Estima la capacidad de objetos con superficies redondas.",
+      "Construye cuerpos redondos usando diferentes estrategias.",
+      "Compara y representa las relaciones que encuentra de manera experimental entre el volumen y la capacidad de objetos con superficies redondas.",
+      "Explica la pertinencia o no de la solución de un problema de cálculo de área o de volumen, de acuerdo con las condiciones de la situación."
+    ],
+    "ejemplo": "Comprueba experimentalmente cuántas veces cabe el contenido de un recipiente cónico en uno cilíndrico de igual base y altura, llenándolos con distintos materiales, y expresa el volumen del cono en términos del volumen del cilindro.",
+    "etiquetas": ["volumen de cuerpos redondos", "cilindro", "cono", "esfera"]
+  },
+  {
+    "areaCodigo": "MAT-BAS",
+    "gradoNumero": 9,
+    "numero_dba": 5,
+    "organizador": "Pensamiento métrico",
+    "enunciado": "Utiliza teoremas, propiedades y relaciones geométricas (teorema de Thales y el teorema de Pitágoras) para proponer y justificar estrategias de medición y cálculo de longitudes.",
+    "evidencias_aprendizaje": [
+      "Describe y justifica procesos de medición de longitudes.",
+      "Explica propiedades de figuras geométricas que se involucran en los procesos de medición.",
+      "Justifica procedimientos de medición a partir del Teorema de Thales, Teorema de Pitágoras y relaciones intra e interfigurales.",
+      "Valida la precisión de instrumentos para medir longitudes.",
+      "Propone alternativas para estimar y medir con precisión diferentes magnitudes."
+    ],
+    "ejemplo": "Con un instrumento artesanal (escuadra isósceles, pitillo y plomada), mide la altura a la que se encuentra un ave en un árbol identificando las figuras geométricas involucradas y justificando el procedimiento con semejanza de triángulos.",
+    "etiquetas": ["teorema de Thales", "teorema de Pitágoras", "medición de longitudes"]
+  },
+  {
+    "areaCodigo": "MAT-BAS",
+    "gradoNumero": 9,
+    "numero_dba": 6,
+    "organizador": "Pensamiento espacial",
+    "enunciado": "Conjetura acerca de las regularidades de las formas bidimensionales y tridimensionales y realiza inferencias a partir de los criterios de semejanza, congruencia y teoremas básicos.",
+    "evidencias_aprendizaje": [
+      "Reconoce regularidades en formas bidimensionales y tridimensionales.",
+      "Explica criterios de semejanza y congruencia a partir del teorema de Thales.",
+      "Compara figuras geométricas y conjetura sobre posibles regularidades.",
+      "Redacta y argumenta procesos llevados a cabo para resolver situaciones de semejanza y congruencia de figuras."
+    ],
+    "ejemplo": "Describe situaciones reales que puedan representarse con figuras geométricas dadas, problematiza esas situaciones y las resuelve aplicando el teorema de Thales.",
+    "etiquetas": ["semejanza", "congruencia", "teorema de Thales"]
+  },
+  {
+    "areaCodigo": "MAT-BAS",
+    "gradoNumero": 9,
+    "numero_dba": 7,
+    "organizador": "Pensamiento espacial",
+    "enunciado": "Interpreta el espacio de manera analítica a partir de relaciones geométricas que se establecen en las trayectorias y desplazamientos de los cuerpos en diferentes situaciones.",
+    "evidencias_aprendizaje": [
+      "Describe verbalmente procesos de trayectorias y de desplazamiento.",
+      "Explica y representa gráficamente la variación del movimiento de diferentes objetos."
+    ],
+    "ejemplo": "A partir de un video de pruebas de velocidad de una motocicleta, dibuja una gráfica de la velocidad registrada cada tres segundos y explica el significado de la razón entre la variación de la velocidad y la variación del tiempo.",
+    "etiquetas": ["trayectorias", "desplazamiento", "variación del movimiento"]
+  },
+  {
+    "areaCodigo": "MAT-BAS",
+    "gradoNumero": 9,
+    "numero_dba": 8,
+    "organizador": "Pensamiento variacional",
+    "enunciado": "Utiliza expresiones numéricas, algebraicas o gráficas para hacer descripciones de situaciones concretas y tomar decisiones con base en su interpretación.",
+    "evidencias_aprendizaje": [
+      "Opera con formas simbólicas que representan cantidades.",
+      "Reconoce que las letras pueden representar números y cantidades, y que se pueden operar con ellas y sobre ellas.",
+      "Interpreta expresiones numéricas, algebraicas o gráficas y toma decisiones con base en su interpretación."
+    ],
+    "ejemplo": "Con varios terrenos cuyos lados desconocidos se representan con letras y ciertas relaciones entre ellas (a=b, c=e, d<a, d<c), encuentra una expresión para el costo total de cercar cada terreno y determina cuál es más costoso.",
+    "etiquetas": ["expresiones algebraicas", "toma de decisiones", "modelación"]
+  },
+  {
+    "areaCodigo": "MAT-BAS",
+    "gradoNumero": 9,
+    "numero_dba": 9,
+    "organizador": "Pensamiento variacional",
+    "enunciado": "Utiliza procesos inductivos y lenguaje simbólico o algebraico para formular, proponer y resolver conjeturas en la solución de problemas numéricos, geométricos, métricos, en situaciones cotidianas y no cotidianas.",
+    "evidencias_aprendizaje": [
+      "Efectúa exploraciones, organiza los resultados de las mismas y propone patrones de comportamiento.",
+      "Propone conjeturas sobre configuraciones geométricas o numéricas y las expresa verbal o simbólicamente.",
+      "Valida las conjeturas y explica sus conclusiones.",
+      "Interpreta expresiones numéricas y toma decisiones con base en su interpretación."
+    ],
+    "ejemplo": "Encuentra de manera sistemática el número total de rectángulos que se pueden formar en un tablero de 8x8, apoyándose en el conteo de una tabla de 3x3 más pequeña, y generaliza una expresión para un tablero de n x n.",
+    "etiquetas": ["procesos inductivos", "conjeturas", "generalización algebraica"]
+  },
+  {
+    "areaCodigo": "MAT-BAS",
+    "gradoNumero": 9,
+    "numero_dba": 10,
+    "organizador": "Pensamiento aleatorio",
+    "enunciado": "Propone un diseño estadístico adecuado para resolver una pregunta que indaga por la comparación sobre las distribuciones de dos grupos de datos, para lo cual usa comprensivamente diagramas de caja, medidas de tendencia central, de variación y de localización.",
+    "evidencias_aprendizaje": [
+      "Define el método para recolectar los datos (encuestas, observación o experimento simple) e identifica la población y el tamaño de la muestra del estudio.",
+      "Construye diagramas de caja y a partir de los resultados representados en ellos describe y compara la distribución de un conjunto de datos.",
+      "Compara las distribuciones de los conjuntos de datos a partir de las medidas de tendencia central, las de variación y las de localización.",
+      "Elabora conclusiones para responder el problema planteado."
+    ],
+    "ejemplo": "Un preparador físico compara, con dos grupos de 30 jugadores seleccionados al azar, los tiempos de una prueba de resistencia antes y después de dos métodos de entrenamiento distintos, y determina mediante diagramas de caja cuál método es más efectivo.",
+    "etiquetas": ["diagramas de caja", "diseño estadístico", "comparación de distribuciones"]
+  },
+  {
+    "areaCodigo": "MAT-BAS",
+    "gradoNumero": 9,
+    "numero_dba": 11,
+    "organizador": "Pensamiento aleatorio",
+    "enunciado": "Encuentra el número de posibles resultados de experimentos aleatorios, con reemplazo y sin reemplazo, usando técnicas de conteo adecuadas, y argumenta la selección realizada en el contexto de la situación abordada. Encuentra la probabilidad de eventos aleatorios compuestos.",
+    "evidencias_aprendizaje": [
+      "Diferencia experimentos aleatorios realizados con reemplazo, de experimentos aleatorios realizados sin reemplazo.",
+      "Encuentra el número de posibles resultados de un experimento aleatorio, usando métodos adecuados (diagramas de árbol, combinaciones, permutaciones, regla de la multiplicación, etc.).",
+      "Justifica la elección de un método particular de acuerdo al tipo de situación.",
+      "Encuentra la probabilidad de eventos dados usando razón entre frecuencias."
+    ],
+    "ejemplo": "Para clasificar en las pruebas de atletismo del colegio, un participante debe elegir 3 de 5 pruebas distribuidas en 3 horarios; calcula el número total de opciones posibles usando un método de conteo sistemático y justifica su elección.",
+    "etiquetas": ["técnicas de conteo", "con y sin reemplazo", "eventos compuestos"]
+  },
+  {
+    "areaCodigo": "MAT-BAS",
+    "gradoNumero": 10,
+    "numero_dba": 1,
+    "organizador": "Pensamiento numérico",
+    "enunciado": "Utiliza las propiedades de los números reales para justificar procedimientos y diferentes representaciones de subconjuntos de ellos.",
+    "evidencias_aprendizaje": [
+      "Argumenta la existencia de los números irracionales.",
+      "Utiliza representaciones geométricas de los números irracionales y los ubica en una recta numérica.",
+      "Describe la propiedad de densidad de los números reales y utiliza estrategias para calcular un número entre otros dos."
+    ],
+    "ejemplo": "A partir de una construcción geométrica con triángulos rectángulos isósceles de catetos enteros, elabora argumentos para mostrar que la raíz cuadrada de 2 no puede representarse como la división de dos números enteros.",
+    "etiquetas": ["números irracionales", "densidad de los reales", "recta numérica"]
+  },
+  {
+    "areaCodigo": "MAT-BAS",
+    "gradoNumero": 10,
+    "numero_dba": 2,
+    "organizador": "Pensamiento numérico",
+    "enunciado": "Utiliza las propiedades algebraicas de equivalencia y de orden de los números reales para comprender y crear estrategias que permitan compararlos y comparar subconjuntos de ellos (por ejemplo, intervalos).",
+    "evidencias_aprendizaje": [
+      "Ordena de menor a mayor o viceversa números reales.",
+      "Describe el \"efecto\" que tendría realizar operaciones con números reales (positivos, negativos, mayores y menores que 1) sobre la cantidad.",
+      "Utiliza las propiedades de la equivalencia para realizar cálculos con números reales."
+    ],
+    "ejemplo": "Con una \"máquina\" que procesa números de entrada según reglas dadas (dividir entre 0,25; multiplicar por 5; sacar raíz cuadrada), determina los conjuntos de salida para distintos conjuntos de entrada y analiza si dividir siempre da un resultado más pequeño.",
+    "etiquetas": ["orden en los reales", "intervalos", "propiedades algebraicas"]
+  },
+  {
+    "areaCodigo": "MAT-BAS",
+    "gradoNumero": 10,
+    "numero_dba": 3,
+    "organizador": "Pensamiento variacional",
+    "enunciado": "Resuelve problemas que involucran el significado de medidas de magnitudes relacionales (velocidad media, aceleración media) a partir de tablas, gráficas y expresiones algebraicas.",
+    "evidencias_aprendizaje": [
+      "Reconoce la relación funcional entre variables asociadas a problemas.",
+      "Interpreta y expresa magnitudes definidas como razones entre magnitudes (velocidad, aceleración, etc.), con las unidades respectivas y las relaciones entre ellas.",
+      "Utiliza e interpreta la razón de cambio para resolver problemas relacionados con magnitudes como velocidad, aceleración.",
+      "Explica las respuestas y resultados en un problema usando las expresiones algebraicas y la pertinencia de las unidades utilizadas en los cálculos."
+    ],
+    "ejemplo": "Al arrojar una piedra a un lago se forman ondas circulares cuyo radio crece a razón de 0,3 m/s; calcula la rapidez con la que aumenta el área de la onda para distintos tiempos y compara gráficamente el cambio del radio con el cambio del área.",
+    "etiquetas": ["velocidad media", "razón de cambio", "magnitudes relacionales"]
+  },
+  {
+    "areaCodigo": "MAT-BAS",
+    "gradoNumero": 10,
+    "numero_dba": 4,
+    "organizador": "Pensamiento variacional",
+    "enunciado": "Comprende y utiliza funciones para modelar fenómenos periódicos y justifica las soluciones.",
+    "evidencias_aprendizaje": [
+      "Reconoce el significado de las razones trigonométricas en un triángulo rectángulo para ángulos agudos, en particular, seno, coseno y tangente.",
+      "Explora, en una situación o fenómeno de variación periódica, valores, condiciones, relaciones o comportamientos, a través de diferentes representaciones.",
+      "Calcula algunos valores de las razones seno y coseno para ángulos no agudos, auxiliándose de ángulos de referencia inscritos en el círculo unitario.",
+      "Reconoce algunas aplicaciones de las funciones trigonométricas en el estudio de fenómenos diversos de variación periódica, por ejemplo: movimiento circular, movimiento del péndulo, del pistón, ciclo de la respiración, entre otros.",
+      "Modela fenómenos periódicos a través de funciones trigonométricas."
+    ],
+    "ejemplo": "Con un disco de colores que gira sobre su centro, representa en el plano cartesiano el movimiento de una marca ubicada en una de las franjas, determinando los tiempos en los que gira 30° más hasta completar una vuelta.",
+    "etiquetas": ["funciones trigonométricas", "fenómenos periódicos", "movimiento circular"]
+  },
+  {
+    "areaCodigo": "MAT-BAS",
+    "gradoNumero": 10,
+    "numero_dba": 5,
+    "organizador": "Pensamiento espacial",
+    "enunciado": "Explora y describe las propiedades de los lugares geométricos y de sus transformaciones a partir de diferentes representaciones.",
+    "evidencias_aprendizaje": [
+      "Localiza objetos geométricos en el plano cartesiano.",
+      "Identifica las propiedades de lugares geométricos a través de sus representación en un sistema de referencia.",
+      "Utiliza las expresiones simbólicas de las cónicas y propone los rangos de variación para obtener una gráfica requerida.",
+      "Representa lugares geométricos en el plano cartesiano, a partir de su expresión algebraica."
+    ],
+    "ejemplo": "Con un software de geometría dinámica, diseña una figura a partir de ecuaciones de cónicas y documenta en video el paso a paso del diseño, o lo realiza en papel milimetrado si no cuenta con el software.",
+    "etiquetas": ["lugares geométricos", "cónicas", "plano cartesiano"]
+  },
+  {
+    "areaCodigo": "MAT-BAS",
+    "gradoNumero": 10,
+    "numero_dba": 6,
+    "organizador": "Pensamiento variacional",
+    "enunciado": "Comprende y usa el concepto de razón de cambio para estudiar el cambio promedio y el cambio alrededor de un punto y lo reconoce en representaciones gráficas, numéricas y algebraicas.",
+    "evidencias_aprendizaje": [
+      "Utiliza representaciones gráficas o numéricas para tomar decisiones, frente a la solución de problemas prácticos.",
+      "Determina la tendencia numérica en relación con problemas prácticos como predicción del comportamiento futuro.",
+      "Relaciona características algebraicas de las funciones, sus gráficas y procesos de aproximación sucesiva."
+    ],
+    "ejemplo": "Con la expresión que modela la difusión del sarampión en una escuela en función de los días transcurridos, estima el número inicial de contagiados, el número final esperado y determina cuándo se presenta la máxima tasa de difusión.",
+    "etiquetas": ["razón de cambio", "cambio promedio", "modelación de fenómenos"]
+  },
+  {
+    "areaCodigo": "MAT-BAS",
+    "gradoNumero": 10,
+    "numero_dba": 7,
+    "organizador": "Pensamiento variacional",
+    "enunciado": "Resuelve problemas mediante el uso de las propiedades de las funciones y usa representaciones tabulares, gráficas y algebraicas para estudiar la variación, la tendencia numérica y las razones de cambio entre magnitudes.",
+    "evidencias_aprendizaje": [
+      "Utiliza representaciones gráficas o numéricas para tomar decisiones en problemas prácticos.",
+      "Usa la pendiente de la recta tangente como razón de cambio, la reconoce y verbaliza en representaciones gráficas, numéricas y algebraicas.",
+      "Utiliza la razón entre magnitudes para tomar decisiones sobre el cambio.",
+      "Relaciona características algebraicas de las funciones, sus gráficas y procesos de aproximación sucesiva."
+    ],
+    "ejemplo": "A partir de la gráfica de velocidad durante el vuelo de un cohete con paracaídas, determina la velocidad al apagarse el motor, el tiempo hasta el punto más alto, la velocidad de caída al abrirse el paracaídas y la aceleración máxima.",
+    "etiquetas": ["propiedades de funciones", "pendiente", "recta tangente"]
+  },
+  {
+    "areaCodigo": "MAT-BAS",
+    "gradoNumero": 10,
+    "numero_dba": 8,
+    "organizador": "Pensamiento aleatorio",
+    "enunciado": "Selecciona muestras aleatorias en poblaciones grandes para inferir el comportamiento de las variables en estudio. Interpreta, valora y analiza críticamente los resultados y las inferencias presentadas en estudios estadísticos.",
+    "evidencias_aprendizaje": [
+      "Define la población de la cual va a extraer las muestras.",
+      "Define el tamaño y el método de selección de la muestra.",
+      "Construye gráficas para representar las distribuciones de los datos muestrales y encuentra los estadígrafos adecuados. Usa software cuando sea posible.",
+      "Hace inferencias sobre los parámetros basadas en los estadígrafos calculados.",
+      "Hace análisis críticos de las conclusiones de los estudios presentados en medios de comunicación o en artículos científicos."
+    ],
+    "ejemplo": "Con la información de una encuesta de expectativas económicas del Banco de la República y su ficha técnica, elabora un informe crítico sobre la metodología del muestreo y las conclusiones del estudio.",
+    "etiquetas": ["muestreo aleatorio", "inferencia estadística", "análisis crítico"]
+  },
+  {
+    "areaCodigo": "MAT-BAS",
+    "gradoNumero": 10,
+    "numero_dba": 9,
+    "organizador": "Pensamiento aleatorio",
+    "enunciado": "Comprende y explica el carácter relativo de las medidas de tendencia central y de dispersión, junto con algunas de sus propiedades, y la necesidad de complementar una medida con otra para obtener mejores lecturas de los datos.",
+    "evidencias_aprendizaje": [
+      "Encuentra las medidas de tendencia central y de dispersión, usando, cuando sea posible, herramientas tecnológicas.",
+      "Interpreta y compara lo que representan cada una de las medidas de tendencia central en un conjunto de datos.",
+      "Interpreta y compara lo que representan cada una de las medidas de dispersión en un conjunto de datos.",
+      "Usa algunas de las propiedades de las medidas de tendencia central y de dispersión para caracterizar un conjunto de datos.",
+      "Formula conclusiones sobre la distribución de un conjunto de datos, empleando más de una medida."
+    ],
+    "ejemplo": "Con los datos de durabilidad de 20 llantas de dos marcas distintas, encuentra la medida que mejor representa cada conjunto, justifica su elección y decide cuál marca tiene mayor durabilidad.",
+    "etiquetas": ["medidas de dispersión", "medidas de tendencia central", "análisis de datos"]
+  },
+  {
+    "areaCodigo": "MAT-BAS",
+    "gradoNumero": 10,
+    "numero_dba": 10,
+    "organizador": "Pensamiento aleatorio",
+    "enunciado": "Propone y realiza experimentos aleatorios en contextos de las ciencias naturales o sociales y predice la ocurrencia de eventos, en casos para los cuales el espacio muestral es indeterminado.",
+    "evidencias_aprendizaje": [
+      "Plantea o identifica una pregunta cuya solución requiera de la realización de un experimento aleatorio.",
+      "Identifica la población y las variables en estudio.",
+      "Encuentra muestras aleatorias para hacer predicciones sobre el comportamiento de las variables en estudio.",
+      "Usa la probabilidad frecuencial para interpretar la posibilidad de ocurrencia de un evento dado.",
+      "Infiere o valida la probabilidad de ocurrencia del evento en estudio."
+    ],
+    "ejemplo": "Ante la afirmación de que la probabilidad de que una persona fumadora muera de una enfermedad asociada al cigarrillo es de aproximadamente 1/2, describe un método posible mediante el cual se pudo haber llegado a ese resultado con una muestra aleatoria.",
+    "etiquetas": ["experimentos aleatorios", "espacio muestral indeterminado", "probabilidad frecuencial"]
+  },
+  {
+    "areaCodigo": "MAT-BAS",
+    "gradoNumero": 11,
+    "numero_dba": 1,
+    "organizador": "Pensamiento numérico",
+    "enunciado": "Utiliza las propiedades de los números (naturales, enteros, racionales y reales) y sus relaciones y operaciones para construir y comparar los distintos sistemas numéricos.",
+    "evidencias_aprendizaje": [
+      "Describe propiedades de los números y las operaciones que son comunes y diferentes en los distintos sistemas numéricos.",
+      "Utiliza la propiedad de densidad para justificar la necesidad de otras notaciones para subconjuntos de los números reales.",
+      "Construye representaciones de los conjuntos numéricos y establece relaciones acorde con sus propiedades."
+    ],
+    "ejemplo": "Ante tres representaciones distintas de conjuntos numéricos mayores que 5 (recta numérica, notación de intervalo y desigualdad), discute con compañeros en qué se diferencian esos conjuntos y por qué no es válido afirmar que después de 5 sigue 5,1 o 5,01.",
+    "etiquetas": ["sistemas numéricos", "densidad de los reales", "conjuntos numéricos"]
+  },
+  {
+    "areaCodigo": "MAT-BAS",
+    "gradoNumero": 11,
+    "numero_dba": 2,
+    "organizador": "Pensamiento numérico",
+    "enunciado": "Justifica la validez de las propiedades de orden de los números reales y las utiliza para resolver problemas analíticos que se modelen con inecuaciones.",
+    "evidencias_aprendizaje": [
+      "Utiliza propiedades del producto de números reales para resolver ecuaciones e inecuaciones.",
+      "Interpreta las operaciones en diversos dominios numéricos para validar propiedades de ecuaciones e inecuaciones."
+    ],
+    "ejemplo": "Revisa el procedimiento que una estudiante usó para resolver una inecuación (despejando términos y multiplicando ambos lados por un coeficiente) y valida si su solución es correcta, corrigiéndola si es necesario.",
+    "etiquetas": ["inecuaciones", "propiedades de orden", "números reales"]
+  },
+  {
+    "areaCodigo": "MAT-BAS",
+    "gradoNumero": 11,
+    "numero_dba": 3,
+    "organizador": "Pensamiento métrico",
+    "enunciado": "Utiliza instrumentos, unidades de medida, sus relaciones y la noción de derivada como razón de cambio, para resolver problemas, estimar cantidades y juzgar la pertinencia de las soluciones de acuerdo al contexto.",
+    "evidencias_aprendizaje": [
+      "Reconoce magnitudes definidas como razones entre otras magnitudes.",
+      "Interpreta y expresa magnitudes como velocidad y aceleración, con las unidades respectivas y las relaciones entre ellas.",
+      "Utiliza e interpreta la derivada para resolver problemas relacionados con la variación y la razón de cambio de funciones que involucran magnitudes como velocidad, aceleración, longitud, tiempo.",
+      "Explica las respuestas y resultados en un problema usando las expresiones algebraicas y la pertinencia de las unidades utilizadas en los cálculos."
+    ],
+    "ejemplo": "Con la expresión H = -4,9t² + V₀t + h₀ que modela la altura de un balón lanzado desde un edificio, discute el significado y las unidades de cada término y explica por qué la velocidad se expresa en m/s y la aceleración en m/s².",
+    "etiquetas": ["unidades de medida", "derivada", "razón de cambio"]
+  },
+  {
+    "areaCodigo": "MAT-BAS",
+    "gradoNumero": 11,
+    "numero_dba": 4,
+    "organizador": "Pensamiento métrico",
+    "enunciado": "Interpreta y diseña técnicas para hacer mediciones con niveles crecientes de precisión (uso de diferentes instrumentos para la misma medición, revisión de escalas y rangos de medida, estimaciones, verificaciones a través de mediciones indirectas).",
+    "evidencias_aprendizaje": [
+      "Interpreta la rapidez como una razón de cambio entre dos cantidades.",
+      "Justifica la precisión de una medición directa o indirecta de acuerdo con información suministrada en gráficas y tablas.",
+      "Establece conclusiones pertinentes con respecto a la precisión de mediciones en contextos específicos (científicos, industriales).",
+      "Determina las unidades e instrumentos adecuados para mejorar la precisión en las mediciones.",
+      "Reconoce la diferencia entre la precisión y la exactitud en procesos de medición."
+    ],
+    "ejemplo": "Con datos reales de longitud cortada y tiempo empleado por un mecánico industrial con distintos discos de corte, determina la rapidez media de corte, su precisión, y propone técnicas para mejorar la precisión de la medición.",
+    "etiquetas": ["precisión y exactitud", "mediciones indirectas", "instrumentos de medición"]
+  },
+  {
+    "areaCodigo": "MAT-BAS",
+    "gradoNumero": 11,
+    "numero_dba": 5,
+    "organizador": "Pensamiento variacional",
+    "enunciado": "Interpreta la noción de derivada como razón de cambio y como valor de la pendiente de la tangente a una curva y desarrolla métodos para hallar las derivadas de algunas funciones básicas en contextos matemáticos y no matemáticos.",
+    "evidencias_aprendizaje": [
+      "Relaciona la noción derivada con características numéricas, geométricas y métricas.",
+      "Utiliza la derivada para estudiar la covariación entre dos magnitudes y relaciona características de la derivada con características de la función.",
+      "Halla la derivada de algunas funciones empleando métodos gráficos y numéricos."
+    ],
+    "ejemplo": "Con la ecuación que modela la distancia recorrida por un atleta en función del tiempo, usa la derivada para determinar en qué momento alcanza su mayor velocidad y qué distancia ha recorrido en ese instante.",
+    "etiquetas": ["derivada", "pendiente de la tangente", "razón de cambio"]
+  },
+  {
+    "areaCodigo": "MAT-BAS",
+    "gradoNumero": 11,
+    "numero_dba": 6,
+    "organizador": "Pensamiento espacial",
+    "enunciado": "Modela objetos geométricos en diversos sistemas de coordenadas (cartesiano, polar, esférico) y realiza comparaciones y toma decisiones con respecto a los modelos.",
+    "evidencias_aprendizaje": [
+      "Reconoce y utiliza distintos sistemas de coordenadas para modelar.",
+      "Compara objetos geométricos, a partir de puntos de referencia diferentes.",
+      "Explora el entorno y lo representa mediante diversos sistemas de coordenadas."
+    ],
+    "ejemplo": "Con apoyo de software matemático o papel milimetrado, representa formas curvas presentes en la naturaleza (flores, caracoles, mariposas) en distintos sistemas de coordenadas.",
+    "etiquetas": ["coordenadas polares", "coordenadas cartesianas", "modelación geométrica"]
+  },
+  {
+    "areaCodigo": "MAT-BAS",
+    "gradoNumero": 11,
+    "numero_dba": 7,
+    "organizador": "Pensamiento variacional",
+    "enunciado": "Usa propiedades y modelos funcionales para analizar situaciones y para establecer relaciones funcionales entre variables que permiten estudiar la variación en situaciones intraescolares y extraescolares.",
+    "evidencias_aprendizaje": [
+      "Plantea modelos funcionales en los que identifica variables y rangos de variación de las variables.",
+      "Relaciona el signo de la derivada con características numéricas, geométricas y métricas.",
+      "Utiliza la derivada para estudiar la variación y relaciona características de la derivada con características de la función.",
+      "Relaciona características algebraicas de las funciones, sus gráficas y procesos de aproximación sucesiva."
+    ],
+    "ejemplo": "Una araña debe recorrer el camino más corto por dos caras de una caja cúbica para atrapar una mosca ubicada en el vértice opuesto; encuentra el camino más corto posible modelando la situación funcionalmente.",
+    "etiquetas": ["modelos funcionales", "relaciones funcionales", "signo de la derivada"]
+  },
+  {
+    "areaCodigo": "MAT-BAS",
+    "gradoNumero": 11,
+    "numero_dba": 8,
+    "organizador": "Pensamiento variacional",
+    "enunciado": "Encuentra derivadas de funciones, reconoce sus propiedades y las utiliza para resolver problemas.",
+    "evidencias_aprendizaje": [
+      "Utiliza la derivada para estudiar la variación y relaciona características de la derivada con características de la función.",
+      "Relaciona características algebraicas de las funciones, sus gráficas y procesos de aproximación sucesiva.",
+      "Calcula derivadas de funciones."
+    ],
+    "ejemplo": "Un avión desciende hacia la pista siguiendo una trayectoria modelada por una función polinomial cúbica; usando condiciones de altura y pendiente en los extremos de la trayectoria, encuentra los coeficientes de la función que describe el descenso.",
+    "etiquetas": ["cálculo de derivadas", "funciones polinomiales", "modelación de trayectorias"]
+  },
+  {
+    "areaCodigo": "MAT-BAS",
+    "gradoNumero": 11,
+    "numero_dba": 9,
+    "organizador": "Pensamiento aleatorio",
+    "enunciado": "Plantea y resuelve situaciones problemáticas del contexto real y/o matemático que implican la exploración de posibles asociaciones o correlaciones entre las variables estudiadas.",
+    "evidencias_aprendizaje": [
+      "En situaciones matemáticas plantea preguntas que indagan por la correlación o la asociación entre variables.",
+      "Define el plan de recolección de la información, en el que se incluye: definición de población y muestra, método para recolectar la información (encuestas, observaciones o experimentos simples), variables a estudiar.",
+      "Elabora gráficos de dispersión usando software adecuado como Excel y analiza las relaciones que se visibilizan en el gráfico.",
+      "Expresa cualitativamente las relaciones entre las variables, para lo cual utiliza su conocimiento de los modelos lineales.",
+      "Usa adecuadamente la desviación estándar, la media, el coeficiente de variación y el de correlación para dar respuesta a la pregunta planteada."
+    ],
+    "ejemplo": "Ante la afirmación de que la longitud de huesos largos (fémur, húmero) permite calcular la estatura de una persona, diseña y realiza un estudio estadístico con gráficos de dispersión y coeficiente de correlación para comprobar esa relación.",
+    "etiquetas": ["correlación", "gráficos de dispersión", "coeficiente de correlación"]
+  },
+  {
+    "areaCodigo": "MAT-BAS",
+    "gradoNumero": 11,
+    "numero_dba": 10,
+    "organizador": "Pensamiento aleatorio",
+    "enunciado": "Plantea y resuelve problemas en los que se reconoce cuando dos eventos son o no independientes y usa la probabilidad condicional para comprobarlo.",
+    "evidencias_aprendizaje": [
+      "Propone problemas a estudiar en variedad de situaciones aleatorias.",
+      "Reconoce los diferentes eventos que se proponen en una situación o problema.",
+      "Interpreta y asigna la probabilidad de cada evento.",
+      "Usa la probabilidad condicional de cada evento para decidir si son o no independientes."
+    ],
+    "ejemplo": "Con los resultados de una encuesta sobre preferencia (deportes o música) cruzada con género en una tabla de contingencia, determina usando probabilidad condicional si las variables género y preferencia son independientes.",
+    "etiquetas": ["probabilidad condicional", "independencia de eventos", "tablas de contingencia"]
+  }
+]

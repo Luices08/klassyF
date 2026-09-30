@@ -28,7 +28,7 @@ const activitySchema = new Schema<IActivity, ActivityModel>(
     peso_en_componente: { type: Number, required: true, min: 0 },
     fecha_apertura: { type: Date, required: true },
     fecha_entrega: { type: Date, required: true },
-    dba_id: { type: Schema.Types.ObjectId, ref: 'DBABank', default: null },
+    dba_id: { type: Schema.Types.ObjectId, ref: 'ReferenteCurricular', default: null },
   },
   { timestamps: true }
 );

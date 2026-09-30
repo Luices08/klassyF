@@ -1,4 +1,4 @@
-import type { ReactNode, TdHTMLAttributes, ThHTMLAttributes } from 'react';
+import { isValidElement, type ReactNode, type TdHTMLAttributes, type ThHTMLAttributes } from 'react';
 
 /** Contenedor blanco con borde y tabla con encabezado azul suave (Klassy UI Spec). */
 export function Table({ children }: { children: ReactNode }) {
@@ -12,9 +12,10 @@ export function Table({ children }: { children: ReactNode }) {
 }
 
 export function TableHead({ children }: { children: ReactNode }) {
+  const isTr = isValidElement(children) && children.type === 'tr';
   return (
     <thead className="bg-primary-soft">
-      <tr>{children}</tr>
+      {isTr ? children : <tr>{children}</tr>}
     </thead>
   );
 }

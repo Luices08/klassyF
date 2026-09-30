@@ -1,0 +1,2201 @@
+[
+  {
+    "areaCodigo": "MAT-BAS",
+    "grupo_grados": "1-3",
+    "organizador": "Pensamiento numérico",
+    "competencia": "Pensamiento matemático",
+    "enunciado": "Reconozco significados del número en diferentes contextos (medición, conteo, comparación, codificación, localización entre otros).",
+    "evidencias_aprendizaje": [],
+    "etiquetas": ["números", "conteo", "contextos numéricos"]
+  },
+  {
+    "areaCodigo": "MAT-BAS",
+    "grupo_grados": "1-3",
+    "organizador": "Pensamiento numérico",
+    "competencia": "Pensamiento matemático",
+    "enunciado": "Describo, comparo y cuantifico situaciones con números, en diferentes contextos y con diversas representaciones.",
+    "evidencias_aprendizaje": [],
+    "etiquetas": ["cuantificación", "representaciones numéricas"]
+  },
+  {
+    "areaCodigo": "MAT-BAS",
+    "grupo_grados": "1-3",
+    "organizador": "Pensamiento numérico",
+    "competencia": "Pensamiento matemático",
+    "enunciado": "Describo situaciones que requieren el uso de medidas relativas.",
+    "evidencias_aprendizaje": [],
+    "etiquetas": ["medidas relativas"]
+  },
+  {
+    "areaCodigo": "MAT-BAS",
+    "grupo_grados": "1-3",
+    "organizador": "Pensamiento numérico",
+    "competencia": "Pensamiento matemático",
+    "enunciado": "Describo situaciones de medición utilizando fracciones comunes.",
+    "evidencias_aprendizaje": [],
+    "etiquetas": ["fracciones", "medición"]
+  },
+  {
+    "areaCodigo": "MAT-BAS",
+    "grupo_grados": "1-3",
+    "organizador": "Pensamiento numérico",
+    "competencia": "Pensamiento matemático",
+    "enunciado": "Uso representaciones —principalmente concretas y pictóricas— para explicar el valor de posición en el sistema de numeración decimal.",
+    "evidencias_aprendizaje": [],
+    "etiquetas": ["valor posicional", "sistema decimal"]
+  },
+  {
+    "areaCodigo": "MAT-BAS",
+    "grupo_grados": "1-3",
+    "organizador": "Pensamiento numérico",
+    "competencia": "Pensamiento matemático",
+    "enunciado": "Reconozco propiedades de los números (ser par, ser impar, etc.) y relaciones entre ellos (ser mayor que, ser menor que, ser múltiplo de, ser divisible por, etc.) en diferentes contextos.",
+    "evidencias_aprendizaje": [],
+    "etiquetas": ["propiedades numéricas", "relaciones entre números"]
+  },
+  {
+    "areaCodigo": "MAT-BAS",
+    "grupo_grados": "1-3",
+    "organizador": "Pensamiento numérico",
+    "competencia": "Pensamiento matemático",
+    "enunciado": "Resuelvo y formulo problemas en situaciones aditivas de composición y de transformación.",
+    "evidencias_aprendizaje": [],
+    "etiquetas": ["problemas aditivos", "composición", "transformación"]
+  },
+  {
+    "areaCodigo": "MAT-BAS",
+    "grupo_grados": "1-3",
+    "organizador": "Pensamiento numérico",
+    "competencia": "Pensamiento matemático",
+    "enunciado": "Uso diversas estrategias de cálculo (especialmente cálculo mental) y de estimación para resolver problemas en situaciones aditivas y multiplicativas.",
+    "evidencias_aprendizaje": [],
+    "etiquetas": ["cálculo mental", "estimación"]
+  },
+  {
+    "areaCodigo": "MAT-BAS",
+    "grupo_grados": "1-3",
+    "organizador": "Pensamiento numérico",
+    "competencia": "Pensamiento matemático",
+    "enunciado": "Identifico regularidades y propiedades de los números utilizando diferentes instrumentos de cálculo (calculadoras, ábacos, bloques multibase, etc.).",
+    "evidencias_aprendizaje": [],
+    "etiquetas": ["regularidades", "instrumentos de cálculo"]
+  },
+  {
+    "areaCodigo": "MAT-BAS",
+    "grupo_grados": "1-3",
+    "organizador": "Pensamiento espacial",
+    "competencia": "Pensamiento matemático",
+    "enunciado": "Diferencio atributos y propiedades de objetos tridimensionales.",
+    "evidencias_aprendizaje": [],
+    "etiquetas": ["figuras tridimensionales"]
+  },
+  {
+    "areaCodigo": "MAT-BAS",
+    "grupo_grados": "1-3",
+    "organizador": "Pensamiento espacial",
+    "competencia": "Pensamiento matemático",
+    "enunciado": "Dibujo y describo cuerpos o figuras tridimensionales en distintas posiciones y tamaños.",
+    "evidencias_aprendizaje": [],
+    "etiquetas": ["dibujo geométrico"]
+  },
+  {
+    "areaCodigo": "MAT-BAS",
+    "grupo_grados": "1-3",
+    "organizador": "Pensamiento espacial",
+    "competencia": "Pensamiento matemático",
+    "enunciado": "Reconozco nociones de horizontalidad, verticalidad, paralelismo y perpendicularidad en distintos contextos y su condición relativa con respecto a diferentes sistemas de referencia.",
+    "evidencias_aprendizaje": [],
+    "etiquetas": ["horizontalidad", "paralelismo", "perpendicularidad"]
+  },
+  {
+    "areaCodigo": "MAT-BAS",
+    "grupo_grados": "1-3",
+    "organizador": "Pensamiento espacial",
+    "competencia": "Pensamiento matemático",
+    "enunciado": "Reconozco y aplico traslaciones y giros sobre una figura.",
+    "evidencias_aprendizaje": [],
+    "etiquetas": ["traslaciones", "giros"]
+  },
+  {
+    "areaCodigo": "MAT-BAS",
+    "grupo_grados": "1-3",
+    "organizador": "Pensamiento espacial",
+    "competencia": "Pensamiento matemático",
+    "enunciado": "Reconozco congruencia y semejanza entre figuras (ampliar, reducir).",
+    "evidencias_aprendizaje": [],
+    "etiquetas": ["congruencia", "semejanza"]
+  },
+  {
+    "areaCodigo": "MAT-BAS",
+    "grupo_grados": "1-3",
+    "organizador": "Pensamiento espacial",
+    "competencia": "Pensamiento matemático",
+    "enunciado": "Realizo construcciones y diseños utilizando cuerpos y figuras geométricas tridimensionales y dibujos o figuras geométricas bidimensionales.",
+    "evidencias_aprendizaje": [],
+    "etiquetas": ["construcciones geométricas"]
+  },
+  {
+    "areaCodigo": "MAT-BAS",
+    "grupo_grados": "1-3",
+    "organizador": "Pensamiento métrico",
+    "competencia": "Pensamiento matemático",
+    "enunciado": "Reconozco en los objetos propiedades o atributos que se puedan medir (longitud, área, volumen, capacidad, peso y masa) y, en los eventos, su duración.",
+    "evidencias_aprendizaje": [],
+    "etiquetas": ["atributos medibles"]
+  },
+  {
+    "areaCodigo": "MAT-BAS",
+    "grupo_grados": "1-3",
+    "organizador": "Pensamiento métrico",
+    "competencia": "Pensamiento matemático",
+    "enunciado": "Comparo y ordeno objetos respecto a atributos medibles.",
+    "evidencias_aprendizaje": [],
+    "etiquetas": ["comparación", "orden"]
+  },
+  {
+    "areaCodigo": "MAT-BAS",
+    "grupo_grados": "1-3",
+    "organizador": "Pensamiento métrico",
+    "competencia": "Pensamiento matemático",
+    "enunciado": "Realizo y describo procesos de medición con patrones arbitrarios y algunos estandarizados, de acuerdo al contexto.",
+    "evidencias_aprendizaje": [],
+    "etiquetas": ["medición", "patrones"]
+  },
+  {
+    "areaCodigo": "MAT-BAS",
+    "grupo_grados": "1-3",
+    "organizador": "Pensamiento métrico",
+    "competencia": "Pensamiento matemático",
+    "enunciado": "Realizo estimaciones de medidas requeridas en la resolución de problemas relativos particularmente a la vida social, económica y de las ciencias.",
+    "evidencias_aprendizaje": [],
+    "etiquetas": ["estimación"]
+  },
+  {
+    "areaCodigo": "MAT-BAS",
+    "grupo_grados": "1-3",
+    "organizador": "Pensamiento aleatorio",
+    "competencia": "Pensamiento matemático",
+    "enunciado": "Clasifico y organizo datos de acuerdo a cualidades y atributos y los presento en tablas.",
+    "evidencias_aprendizaje": [],
+    "etiquetas": ["clasificación de datos", "tablas"]
+  },
+  {
+    "areaCodigo": "MAT-BAS",
+    "grupo_grados": "1-3",
+    "organizador": "Pensamiento aleatorio",
+    "competencia": "Pensamiento matemático",
+    "enunciado": "Represento datos relativos a mi entorno usando objetos concretos, pictogramas y diagramas de barras.",
+    "evidencias_aprendizaje": [],
+    "etiquetas": ["pictogramas", "diagramas de barras"]
+  },
+  {
+    "areaCodigo": "MAT-BAS",
+    "grupo_grados": "1-3",
+    "organizador": "Pensamiento aleatorio",
+    "competencia": "Pensamiento matemático",
+    "enunciado": "Explico —desde mi experiencia— la posibilidad o imposibilidad de ocurrencia de eventos cotidianos.",
+    "evidencias_aprendizaje": [],
+    "etiquetas": ["probabilidad", "azar"]
+  },
+  {
+    "areaCodigo": "MAT-BAS",
+    "grupo_grados": "1-3",
+    "organizador": "Pensamiento aleatorio",
+    "competencia": "Pensamiento matemático",
+    "enunciado": "Resuelvo y formulo preguntas que requieran para su solución coleccionar y analizar datos del entorno próximo.",
+    "evidencias_aprendizaje": [],
+    "etiquetas": ["recolección de datos"]
+  },
+  {
+    "areaCodigo": "MAT-BAS",
+    "grupo_grados": "1-3",
+    "organizador": "Pensamiento variacional",
+    "competencia": "Pensamiento matemático",
+    "enunciado": "Reconozco y describo regularidades y patrones en distintos contextos (numérico, geométrico, musical, entre otros).",
+    "evidencias_aprendizaje": [],
+    "etiquetas": ["regularidades", "patrones"]
+  },
+  {
+    "areaCodigo": "MAT-BAS",
+    "grupo_grados": "1-3",
+    "organizador": "Pensamiento variacional",
+    "competencia": "Pensamiento matemático",
+    "enunciado": "Describo cualitativamente situaciones de cambio y variación utilizando el lenguaje natural, dibujos y gráficas.",
+    "evidencias_aprendizaje": [],
+    "etiquetas": ["variación", "cambio"]
+  },
+  {
+    "areaCodigo": "MAT-BAS",
+    "grupo_grados": "1-3",
+    "organizador": "Pensamiento variacional",
+    "competencia": "Pensamiento matemático",
+    "enunciado": "Construyo secuencias numéricas y geométricas utilizando propiedades de los números y de las figuras geométricas.",
+    "evidencias_aprendizaje": [],
+    "etiquetas": ["secuencias numéricas", "secuencias geométricas"]
+  },
+  {
+    "areaCodigo": "MAT-BAS",
+    "grupo_grados": "4-5",
+    "organizador": "Pensamiento numérico",
+    "competencia": "Pensamiento matemático",
+    "enunciado": "Interpreto las fracciones en diferentes contextos: situaciones de medición, relaciones parte todo, cociente, razones y proporciones.",
+    "evidencias_aprendizaje": [],
+    "etiquetas": ["fracciones", "razones", "proporciones"]
+  },
+  {
+    "areaCodigo": "MAT-BAS",
+    "grupo_grados": "4-5",
+    "organizador": "Pensamiento numérico",
+    "competencia": "Pensamiento matemático",
+    "enunciado": "Utilizo la notación decimal para expresar fracciones en diferentes contextos y relaciono estas dos notaciones con la de los porcentajes.",
+    "evidencias_aprendizaje": [],
+    "etiquetas": ["decimales", "porcentajes"]
+  },
+  {
+    "areaCodigo": "MAT-BAS",
+    "grupo_grados": "4-5",
+    "organizador": "Pensamiento numérico",
+    "competencia": "Pensamiento matemático",
+    "enunciado": "Justifico el valor de posición en el sistema de numeración decimal en relación con el conteo recurrente de unidades.",
+    "evidencias_aprendizaje": [],
+    "etiquetas": ["valor posicional"]
+  },
+  {
+    "areaCodigo": "MAT-BAS",
+    "grupo_grados": "4-5",
+    "organizador": "Pensamiento numérico",
+    "competencia": "Pensamiento matemático",
+    "enunciado": "Resuelvo y formulo problemas cuya estrategia de solución requiera de las relaciones y propiedades de los números naturales y sus operaciones.",
+    "evidencias_aprendizaje": [],
+    "etiquetas": ["números naturales", "operaciones"]
+  },
+  {
+    "areaCodigo": "MAT-BAS",
+    "grupo_grados": "4-5",
+    "organizador": "Pensamiento numérico",
+    "competencia": "Pensamiento matemático",
+    "enunciado": "Resuelvo y formulo problemas en situaciones aditivas de composición, transformación, comparación e igualación.",
+    "evidencias_aprendizaje": [],
+    "etiquetas": ["problemas aditivos"]
+  },
+  {
+    "areaCodigo": "MAT-BAS",
+    "grupo_grados": "4-5",
+    "organizador": "Pensamiento numérico",
+    "competencia": "Pensamiento matemático",
+    "enunciado": "Resuelvo y formulo problemas en situaciones de proporcionalidad directa, inversa y producto de medidas.",
+    "evidencias_aprendizaje": [],
+    "etiquetas": ["proporcionalidad directa", "proporcionalidad inversa"]
+  },
+  {
+    "areaCodigo": "MAT-BAS",
+    "grupo_grados": "4-5",
+    "organizador": "Pensamiento numérico",
+    "competencia": "Pensamiento matemático",
+    "enunciado": "Identifico la potenciación y la radicación en contextos matemáticos y no matemáticos.",
+    "evidencias_aprendizaje": [],
+    "etiquetas": ["potenciación", "radicación"]
+  },
+  {
+    "areaCodigo": "MAT-BAS",
+    "grupo_grados": "4-5",
+    "organizador": "Pensamiento numérico",
+    "competencia": "Pensamiento matemático",
+    "enunciado": "Modelo situaciones de dependencia mediante la proporcionalidad directa e inversa.",
+    "evidencias_aprendizaje": [],
+    "etiquetas": ["modelación", "proporcionalidad"]
+  },
+  {
+    "areaCodigo": "MAT-BAS",
+    "grupo_grados": "4-5",
+    "organizador": "Pensamiento numérico",
+    "competencia": "Pensamiento matemático",
+    "enunciado": "Justifico regularidades y propiedades de los números, sus relaciones y operaciones.",
+    "evidencias_aprendizaje": [],
+    "etiquetas": ["regularidades numéricas"]
+  },
+  {
+    "areaCodigo": "MAT-BAS",
+    "grupo_grados": "4-5",
+    "organizador": "Pensamiento espacial",
+    "competencia": "Pensamiento matemático",
+    "enunciado": "Comparo y clasifico objetos tridimensionales de acuerdo con componentes (caras, lados) y propiedades.",
+    "evidencias_aprendizaje": [],
+    "etiquetas": ["clasificación", "sólidos"]
+  },
+  {
+    "areaCodigo": "MAT-BAS",
+    "grupo_grados": "4-5",
+    "organizador": "Pensamiento espacial",
+    "competencia": "Pensamiento matemático",
+    "enunciado": "Comparo y clasifico figuras bidimensionales de acuerdo con sus componentes (ángulos, vértices) y características.",
+    "evidencias_aprendizaje": [],
+    "etiquetas": ["figuras bidimensionales", "ángulos"]
+  },
+  {
+    "areaCodigo": "MAT-BAS",
+    "grupo_grados": "4-5",
+    "organizador": "Pensamiento espacial",
+    "competencia": "Pensamiento matemático",
+    "enunciado": "Identifico, represento y utilizo ángulos en giros, aberturas, inclinaciones, figuras, puntas y esquinas en situaciones estáticas y dinámicas.",
+    "evidencias_aprendizaje": [],
+    "etiquetas": ["ángulos"]
+  },
+  {
+    "areaCodigo": "MAT-BAS",
+    "grupo_grados": "4-5",
+    "organizador": "Pensamiento espacial",
+    "competencia": "Pensamiento matemático",
+    "enunciado": "Utilizo sistemas de coordenadas para especificar localizaciones y describir relaciones espaciales.",
+    "evidencias_aprendizaje": [],
+    "etiquetas": ["sistemas de coordenadas"]
+  },
+  {
+    "areaCodigo": "MAT-BAS",
+    "grupo_grados": "4-5",
+    "organizador": "Pensamiento espacial",
+    "competencia": "Pensamiento matemático",
+    "enunciado": "Identifico y justifico relaciones de congruencia y semejanza entre figuras.",
+    "evidencias_aprendizaje": [],
+    "etiquetas": ["congruencia", "semejanza"]
+  },
+  {
+    "areaCodigo": "MAT-BAS",
+    "grupo_grados": "4-5",
+    "organizador": "Pensamiento espacial",
+    "competencia": "Pensamiento matemático",
+    "enunciado": "Construyo y descompongo figuras y sólidos a partir de condiciones dadas.",
+    "evidencias_aprendizaje": [],
+    "etiquetas": ["construcción geométrica"]
+  },
+  {
+    "areaCodigo": "MAT-BAS",
+    "grupo_grados": "4-5",
+    "organizador": "Pensamiento espacial",
+    "competencia": "Pensamiento matemático",
+    "enunciado": "Conjeturo y verifico los resultados de aplicar transformaciones a figuras en el plano para construir diseños.",
+    "evidencias_aprendizaje": [],
+    "etiquetas": ["transformaciones geométricas"]
+  },
+  {
+    "areaCodigo": "MAT-BAS",
+    "grupo_grados": "4-5",
+    "organizador": "Pensamiento espacial",
+    "competencia": "Pensamiento matemático",
+    "enunciado": "Construyo objetos tridimensionales a partir de representaciones bidimensionales y puedo realizar el proceso contrario en contextos de arte, diseño y arquitectura.",
+    "evidencias_aprendizaje": [],
+    "etiquetas": ["representaciones bidimensionales", "sólidos"]
+  },
+  {
+    "areaCodigo": "MAT-BAS",
+    "grupo_grados": "4-5",
+    "organizador": "Pensamiento métrico",
+    "competencia": "Pensamiento matemático",
+    "enunciado": "Diferencio y ordeno, en objetos y eventos, propiedades o atributos que se puedan medir (longitudes, distancias, áreas de superficies, volúmenes de cuerpos sólidos, volúmenes de líquidos y capacidades de recipientes; pesos y masa de cuerpos sólidos; duración de eventos o procesos; amplitud de ángulos).",
+    "evidencias_aprendizaje": [],
+    "etiquetas": ["magnitudes", "medición"]
+  },
+  {
+    "areaCodigo": "MAT-BAS",
+    "grupo_grados": "4-5",
+    "organizador": "Pensamiento métrico",
+    "competencia": "Pensamiento matemático",
+    "enunciado": "Selecciono unidades, tanto convencionales como estandarizadas, apropiadas para diferentes mediciones.",
+    "evidencias_aprendizaje": [],
+    "etiquetas": ["unidades de medida"]
+  },
+  {
+    "areaCodigo": "MAT-BAS",
+    "grupo_grados": "4-5",
+    "organizador": "Pensamiento métrico",
+    "competencia": "Pensamiento matemático",
+    "enunciado": "Utilizo diferentes procedimientos de cálculo para hallar el área de la superficie exterior y el volumen de algunos cuerpos sólidos.",
+    "evidencias_aprendizaje": [],
+    "etiquetas": ["área", "volumen"]
+  },
+  {
+    "areaCodigo": "MAT-BAS",
+    "grupo_grados": "4-5",
+    "organizador": "Pensamiento métrico",
+    "competencia": "Pensamiento matemático",
+    "enunciado": "Describo y argumento relaciones entre el perímetro y el área de figuras diferentes, cuando se fija una de estas medidas.",
+    "evidencias_aprendizaje": [],
+    "etiquetas": ["perímetro", "área"]
+  },
+  {
+    "areaCodigo": "MAT-BAS",
+    "grupo_grados": "4-5",
+    "organizador": "Pensamiento aleatorio",
+    "competencia": "Pensamiento matemático",
+    "enunciado": "Represento datos usando tablas y gráficas (pictogramas, gráficas de barras, diagramas de líneas, diagramas circulares).",
+    "evidencias_aprendizaje": [],
+    "etiquetas": ["tablas", "gráficas"]
+  },
+  {
+    "areaCodigo": "MAT-BAS",
+    "grupo_grados": "4-5",
+    "organizador": "Pensamiento aleatorio",
+    "competencia": "Pensamiento matemático",
+    "enunciado": "Interpreto información presentada en tablas y gráficas (pictogramas, gráficas de barras, diagramas de líneas, diagramas circulares).",
+    "evidencias_aprendizaje": [],
+    "etiquetas": ["interpretación de datos"]
+  },
+  {
+    "areaCodigo": "MAT-BAS",
+    "grupo_grados": "4-5",
+    "organizador": "Pensamiento aleatorio",
+    "competencia": "Pensamiento matemático",
+    "enunciado": "Uso e interpreto la media (o promedio) y la mediana y comparo lo que indican.",
+    "evidencias_aprendizaje": [],
+    "etiquetas": ["media", "mediana"]
+  },
+  {
+    "areaCodigo": "MAT-BAS",
+    "grupo_grados": "4-5",
+    "organizador": "Pensamiento aleatorio",
+    "competencia": "Pensamiento matemático",
+    "enunciado": "Resuelvo y formulo problemas a partir de un conjunto de datos provenientes de observaciones, consultas o experimentos.",
+    "evidencias_aprendizaje": [],
+    "etiquetas": ["problemas con datos"]
+  },
+  {
+    "areaCodigo": "MAT-BAS",
+    "grupo_grados": "4-5",
+    "organizador": "Pensamiento variacional",
+    "competencia": "Pensamiento matemático",
+    "enunciado": "Describo e interpreto variaciones representadas en gráficos.",
+    "evidencias_aprendizaje": [],
+    "etiquetas": ["variación", "gráficos"]
+  },
+  {
+    "areaCodigo": "MAT-BAS",
+    "grupo_grados": "4-5",
+    "organizador": "Pensamiento variacional",
+    "competencia": "Pensamiento matemático",
+    "enunciado": "Predigo patrones de variación en una secuencia numérica, geométrica o gráfica.",
+    "evidencias_aprendizaje": [],
+    "etiquetas": ["patrones de variación"]
+  },
+  {
+    "areaCodigo": "MAT-BAS",
+    "grupo_grados": "4-5",
+    "organizador": "Pensamiento variacional",
+    "competencia": "Pensamiento matemático",
+    "enunciado": "Analizo y explico relaciones de dependencia entre cantidades que varían en el tiempo con cierta regularidad en situaciones económicas, sociales y de las ciencias naturales.",
+    "evidencias_aprendizaje": [],
+    "etiquetas": ["dependencia entre variables"]
+  },
+  {
+    "areaCodigo": "MAT-BAS",
+    "grupo_grados": "4-5",
+    "organizador": "Pensamiento variacional",
+    "competencia": "Pensamiento matemático",
+    "enunciado": "Construyo igualdades y desigualdades numéricas como representación de relaciones entre distintos datos.",
+    "evidencias_aprendizaje": [],
+    "etiquetas": ["igualdades", "desigualdades"]
+  },
+  {
+    "areaCodigo": "MAT-BAS",
+    "grupo_grados": "6-7",
+    "organizador": "Pensamiento numérico",
+    "competencia": "Pensamiento matemático",
+    "enunciado": "Resuelvo y formulo problemas en contextos de medidas relativas y de variaciones en las medidas.",
+    "evidencias_aprendizaje": [],
+    "etiquetas": ["medidas relativas"]
+  },
+  {
+    "areaCodigo": "MAT-BAS",
+    "grupo_grados": "6-7",
+    "organizador": "Pensamiento numérico",
+    "competencia": "Pensamiento matemático",
+    "enunciado": "Utilizo números racionales, en sus distintas expresiones (fracciones, razones, decimales o porcentajes) para resolver problemas en contextos de medida.",
+    "evidencias_aprendizaje": [],
+    "etiquetas": ["números racionales"]
+  },
+  {
+    "areaCodigo": "MAT-BAS",
+    "grupo_grados": "6-7",
+    "organizador": "Pensamiento numérico",
+    "competencia": "Pensamiento matemático",
+    "enunciado": "Reconozco y generalizo propiedades de las relaciones entre números racionales (simétrica, transitiva, etc.) y de las operaciones entre ellos (conmutativa, asociativa, etc.) en diferentes contextos.",
+    "evidencias_aprendizaje": [],
+    "etiquetas": ["propiedades de las operaciones"]
+  },
+  {
+    "areaCodigo": "MAT-BAS",
+    "grupo_grados": "6-7",
+    "organizador": "Pensamiento numérico",
+    "competencia": "Pensamiento matemático",
+    "enunciado": "Formulo y resuelvo problemas en situaciones aditivas y multiplicativas, en diferentes contextos y dominios numéricos.",
+    "evidencias_aprendizaje": [],
+    "etiquetas": ["problemas aditivos y multiplicativos"]
+  },
+  {
+    "areaCodigo": "MAT-BAS",
+    "grupo_grados": "6-7",
+    "organizador": "Pensamiento numérico",
+    "competencia": "Pensamiento matemático",
+    "enunciado": "Justifico el uso de representaciones y procedimientos en situaciones de proporcionalidad directa e inversa.",
+    "evidencias_aprendizaje": [],
+    "etiquetas": ["proporcionalidad"]
+  },
+  {
+    "areaCodigo": "MAT-BAS",
+    "grupo_grados": "6-7",
+    "organizador": "Pensamiento numérico",
+    "competencia": "Pensamiento matemático",
+    "enunciado": "Establezco conjeturas sobre propiedades y relaciones de los números, utilizando calculadoras o computadores.",
+    "evidencias_aprendizaje": [],
+    "etiquetas": ["conjeturas", "tecnología"]
+  },
+  {
+    "areaCodigo": "MAT-BAS",
+    "grupo_grados": "6-7",
+    "organizador": "Pensamiento numérico",
+    "competencia": "Pensamiento matemático",
+    "enunciado": "Reconozco argumentos combinatorios como herramienta para interpretación de situaciones diversas de conteo.",
+    "evidencias_aprendizaje": [],
+    "etiquetas": ["combinatoria"]
+  },
+  {
+    "areaCodigo": "MAT-BAS",
+    "grupo_grados": "6-7",
+    "organizador": "Pensamiento espacial",
+    "competencia": "Pensamiento matemático",
+    "enunciado": "Represento objetos tridimensionales desde diferentes posiciones y vistas.",
+    "evidencias_aprendizaje": [],
+    "etiquetas": ["vistas", "representación tridimensional"]
+  },
+  {
+    "areaCodigo": "MAT-BAS",
+    "grupo_grados": "6-7",
+    "organizador": "Pensamiento espacial",
+    "competencia": "Pensamiento matemático",
+    "enunciado": "Identifico y describo figuras y cuerpos generados por cortes rectos y transversales de objetos tridimensionales.",
+    "evidencias_aprendizaje": [],
+    "etiquetas": ["cortes", "secciones"]
+  },
+  {
+    "areaCodigo": "MAT-BAS",
+    "grupo_grados": "6-7",
+    "organizador": "Pensamiento espacial",
+    "competencia": "Pensamiento matemático",
+    "enunciado": "Clasifico polígonos en relación con sus propiedades.",
+    "evidencias_aprendizaje": [],
+    "etiquetas": ["polígonos"]
+  },
+  {
+    "areaCodigo": "MAT-BAS",
+    "grupo_grados": "6-7",
+    "organizador": "Pensamiento espacial",
+    "competencia": "Pensamiento matemático",
+    "enunciado": "Predigo y comparo los resultados de aplicar transformaciones rígidas (traslaciones, rotaciones, reflexiones) y homotecias (ampliaciones y reducciones) sobre figuras bidimensionales en situaciones matemáticas y en el arte.",
+    "evidencias_aprendizaje": [],
+    "etiquetas": ["transformaciones rígidas", "homotecias"]
+  },
+  {
+    "areaCodigo": "MAT-BAS",
+    "grupo_grados": "6-7",
+    "organizador": "Pensamiento espacial",
+    "competencia": "Pensamiento matemático",
+    "enunciado": "Resuelvo y formulo problemas que involucren relaciones y propiedades de semejanza y congruencia usando representaciones visuales.",
+    "evidencias_aprendizaje": [],
+    "etiquetas": ["semejanza", "congruencia"]
+  },
+  {
+    "areaCodigo": "MAT-BAS",
+    "grupo_grados": "6-7",
+    "organizador": "Pensamiento métrico",
+    "competencia": "Pensamiento matemático",
+    "enunciado": "Utilizo técnicas y herramientas para la construcción de figuras planas y cuerpos con medidas dadas.",
+    "evidencias_aprendizaje": [],
+    "etiquetas": ["construcción de figuras"]
+  },
+  {
+    "areaCodigo": "MAT-BAS",
+    "grupo_grados": "6-7",
+    "organizador": "Pensamiento métrico",
+    "competencia": "Pensamiento matemático",
+    "enunciado": "Calculo áreas y volúmenes a través de composición y descomposición de figuras y cuerpos.",
+    "evidencias_aprendizaje": [],
+    "etiquetas": ["área", "volumen"]
+  },
+  {
+    "areaCodigo": "MAT-BAS",
+    "grupo_grados": "6-7",
+    "organizador": "Pensamiento métrico",
+    "competencia": "Pensamiento matemático",
+    "enunciado": "Identifico relaciones entre distintas unidades utilizadas para medir cantidades de la misma magnitud.",
+    "evidencias_aprendizaje": [],
+    "etiquetas": ["unidades de medida"]
+  },
+  {
+    "areaCodigo": "MAT-BAS",
+    "grupo_grados": "6-7",
+    "organizador": "Pensamiento aleatorio",
+    "competencia": "Pensamiento matemático",
+    "enunciado": "Comparo e interpreto datos provenientes de diversas fuentes (prensa, revistas, televisión, experimentos, consultas, entrevistas).",
+    "evidencias_aprendizaje": [],
+    "etiquetas": ["interpretación de datos", "fuentes de información"]
+  },
+  {
+    "areaCodigo": "MAT-BAS",
+    "grupo_grados": "6-7",
+    "organizador": "Pensamiento aleatorio",
+    "competencia": "Pensamiento matemático",
+    "enunciado": "Uso medidas de tendencia central (media, mediana, moda) para interpretar comportamiento de un conjunto de datos.",
+    "evidencias_aprendizaje": [],
+    "etiquetas": ["media", "mediana", "moda"]
+  },
+  {
+    "areaCodigo": "MAT-BAS",
+    "grupo_grados": "6-7",
+    "organizador": "Pensamiento aleatorio",
+    "competencia": "Pensamiento matemático",
+    "enunciado": "Conjeturo acerca del resultado de un experimento aleatorio usando proporcionalidad y nociones básicas de probabilidad.",
+    "evidencias_aprendizaje": [],
+    "etiquetas": ["probabilidad", "experimento aleatorio"]
+  },
+  {
+    "areaCodigo": "MAT-BAS",
+    "grupo_grados": "6-7",
+    "organizador": "Pensamiento variacional",
+    "competencia": "Pensamiento matemático",
+    "enunciado": "Describo y represento situaciones de variación relacionando diferentes representaciones (diagramas, expresiones verbales generalizadas y tablas).",
+    "evidencias_aprendizaje": [],
+    "etiquetas": ["variación", "representaciones"]
+  },
+  {
+    "areaCodigo": "MAT-BAS",
+    "grupo_grados": "6-7",
+    "organizador": "Pensamiento variacional",
+    "competencia": "Pensamiento matemático",
+    "enunciado": "Analizo las propiedades de correlación positiva y negativa entre variables, de variación lineal o de proporcionalidad directa y de proporcionalidad inversa en contextos aritméticos y geométricos.",
+    "evidencias_aprendizaje": [],
+    "etiquetas": ["correlación", "variación lineal"]
+  },
+  {
+    "areaCodigo": "MAT-BAS",
+    "grupo_grados": "6-7",
+    "organizador": "Pensamiento variacional",
+    "competencia": "Pensamiento matemático",
+    "enunciado": "Utilizo métodos informales (ensayo y error, complementación) en la solución de ecuaciones.",
+    "evidencias_aprendizaje": [],
+    "etiquetas": ["ecuaciones"]
+  },
+  {
+    "areaCodigo": "MAT-BAS",
+    "grupo_grados": "8-9",
+    "organizador": "Pensamiento numérico",
+    "competencia": "Pensamiento matemático",
+    "enunciado": "Utilizo números reales en sus diferentes representaciones y en diversos contextos.",
+    "evidencias_aprendizaje": [],
+    "etiquetas": ["números reales"]
+  },
+  {
+    "areaCodigo": "MAT-BAS",
+    "grupo_grados": "8-9",
+    "organizador": "Pensamiento numérico",
+    "competencia": "Pensamiento matemático",
+    "enunciado": "Resuelvo problemas y simplifico cálculos usando propiedades y relaciones de los números reales y de las relaciones y operaciones entre ellos.",
+    "evidencias_aprendizaje": [],
+    "etiquetas": ["números reales", "simplificación"]
+  },
+  {
+    "areaCodigo": "MAT-BAS",
+    "grupo_grados": "8-9",
+    "organizador": "Pensamiento numérico",
+    "competencia": "Pensamiento matemático",
+    "enunciado": "Utilizo la notación científica para representar medidas de cantidades de diferentes magnitudes.",
+    "evidencias_aprendizaje": [],
+    "etiquetas": ["notación científica"]
+  },
+  {
+    "areaCodigo": "MAT-BAS",
+    "grupo_grados": "8-9",
+    "organizador": "Pensamiento numérico",
+    "competencia": "Pensamiento matemático",
+    "enunciado": "Identifico y utilizo la potenciación, la radicación y la logaritmación para representar situaciones matemáticas y no matemáticas y para resolver problemas.",
+    "evidencias_aprendizaje": [],
+    "etiquetas": ["potenciación", "radicación", "logaritmación"]
+  },
+  {
+    "areaCodigo": "MAT-BAS",
+    "grupo_grados": "8-9",
+    "organizador": "Pensamiento espacial",
+    "competencia": "Pensamiento matemático",
+    "enunciado": "Conjeturo y verifico propiedades de congruencias y semejanzas entre figuras bidimensionales y entre objetos tridimensionales en la solución de problemas.",
+    "evidencias_aprendizaje": [],
+    "etiquetas": ["congruencia", "semejanza"]
+  },
+  {
+    "areaCodigo": "MAT-BAS",
+    "grupo_grados": "8-9",
+    "organizador": "Pensamiento espacial",
+    "competencia": "Pensamiento matemático",
+    "enunciado": "Reconozco y contrasto propiedades y relaciones geométricas utilizadas en demostración de teoremas básicos (Pitágoras y Tales).",
+    "evidencias_aprendizaje": [],
+    "etiquetas": ["teorema de Pitágoras", "teorema de Tales"]
+  },
+  {
+    "areaCodigo": "MAT-BAS",
+    "grupo_grados": "8-9",
+    "organizador": "Pensamiento espacial",
+    "competencia": "Pensamiento matemático",
+    "enunciado": "Aplico y justifico criterios de congruencias y semejanza entre triángulos en la resolución y formulación de problemas.",
+    "evidencias_aprendizaje": [],
+    "etiquetas": ["triángulos", "congruencia"]
+  },
+  {
+    "areaCodigo": "MAT-BAS",
+    "grupo_grados": "8-9",
+    "organizador": "Pensamiento espacial",
+    "competencia": "Pensamiento matemático",
+    "enunciado": "Uso representaciones geométricas para resolver y formular problemas en las matemáticas y en otras disciplinas.",
+    "evidencias_aprendizaje": [],
+    "etiquetas": ["representaciones geométricas"]
+  },
+  {
+    "areaCodigo": "MAT-BAS",
+    "grupo_grados": "8-9",
+    "organizador": "Pensamiento métrico",
+    "competencia": "Pensamiento matemático",
+    "enunciado": "Generalizo procedimientos de cálculo válidos para encontrar el área de regiones planas y el volumen de sólidos.",
+    "evidencias_aprendizaje": [],
+    "etiquetas": ["área", "volumen"]
+  },
+  {
+    "areaCodigo": "MAT-BAS",
+    "grupo_grados": "8-9",
+    "organizador": "Pensamiento métrico",
+    "competencia": "Pensamiento matemático",
+    "enunciado": "Selecciono y uso técnicas e instrumentos para medir longitudes, áreas de superficies, volúmenes y ángulos con niveles de precisión apropiados.",
+    "evidencias_aprendizaje": [],
+    "etiquetas": ["instrumentos de medición", "precisión"]
+  },
+  {
+    "areaCodigo": "MAT-BAS",
+    "grupo_grados": "8-9",
+    "organizador": "Pensamiento métrico",
+    "competencia": "Pensamiento matemático",
+    "enunciado": "Justifico la pertinencia de utilizar unidades de medida estandarizadas en situaciones tomadas de distintas ciencias.",
+    "evidencias_aprendizaje": [],
+    "etiquetas": ["unidades estandarizadas"]
+  },
+  {
+    "areaCodigo": "MAT-BAS",
+    "grupo_grados": "8-9",
+    "organizador": "Pensamiento aleatorio",
+    "competencia": "Pensamiento matemático",
+    "enunciado": "Interpreto analítica y críticamente información estadística proveniente de diversas fuentes (prensa, revistas, televisión, experimentos, consultas, entrevistas).",
+    "evidencias_aprendizaje": [],
+    "etiquetas": ["información estadística", "análisis crítico"]
+  },
+  {
+    "areaCodigo": "MAT-BAS",
+    "grupo_grados": "8-9",
+    "organizador": "Pensamiento aleatorio",
+    "competencia": "Pensamiento matemático",
+    "enunciado": "Interpreto y utilizo conceptos de media, mediana y moda y explicito sus diferencias en distribuciones de distinta dispersión y asimetría.",
+    "evidencias_aprendizaje": [],
+    "etiquetas": ["media", "mediana", "moda", "dispersión"]
+  },
+  {
+    "areaCodigo": "MAT-BAS",
+    "grupo_grados": "8-9",
+    "organizador": "Pensamiento aleatorio",
+    "competencia": "Pensamiento matemático",
+    "enunciado": "Selecciono y uso algunos métodos estadísticos adecuados al tipo de problema, de información y al nivel de la escala en la que esta se representa (nominal, ordinal, de intervalo o de razón).",
+    "evidencias_aprendizaje": [],
+    "etiquetas": ["métodos estadísticos", "escalas de medición"]
+  },
+  {
+    "areaCodigo": "MAT-BAS",
+    "grupo_grados": "8-9",
+    "organizador": "Pensamiento aleatorio",
+    "competencia": "Pensamiento matemático",
+    "enunciado": "Calculo probabilidad de eventos simples usando métodos diversos (listados, diagramas de árbol, técnicas de conteo).",
+    "evidencias_aprendizaje": [],
+    "etiquetas": ["probabilidad", "diagramas de árbol"]
+  },
+  {
+    "areaCodigo": "MAT-BAS",
+    "grupo_grados": "8-9",
+    "organizador": "Pensamiento variacional",
+    "competencia": "Pensamiento matemático",
+    "enunciado": "Identifico relaciones entre propiedades de las gráficas y propiedades de las ecuaciones algebraicas.",
+    "evidencias_aprendizaje": [],
+    "etiquetas": ["gráficas", "ecuaciones algebraicas"]
+  },
+  {
+    "areaCodigo": "MAT-BAS",
+    "grupo_grados": "8-9",
+    "organizador": "Pensamiento variacional",
+    "competencia": "Pensamiento matemático",
+    "enunciado": "Modelo situaciones de variación con funciones polinómicas.",
+    "evidencias_aprendizaje": [],
+    "etiquetas": ["funciones polinómicas", "modelación"]
+  },
+  {
+    "areaCodigo": "MAT-BAS",
+    "grupo_grados": "8-9",
+    "organizador": "Pensamiento variacional",
+    "competencia": "Pensamiento matemático",
+    "enunciado": "Identifico diferentes métodos para solucionar sistemas de ecuaciones lineales.",
+    "evidencias_aprendizaje": [],
+    "etiquetas": ["sistemas de ecuaciones lineales"]
+  },
+  {
+    "areaCodigo": "MAT-BAS",
+    "grupo_grados": "8-9",
+    "organizador": "Pensamiento variacional",
+    "competencia": "Pensamiento matemático",
+    "enunciado": "Identifico la relación entre los cambios en los parámetros de la representación algebraica de una familia de funciones y los cambios en las gráficas que las representan.",
+    "evidencias_aprendizaje": [],
+    "etiquetas": ["familias de funciones", "parámetros"]
+  },
+  {
+    "areaCodigo": "MAT-BAS",
+    "grupo_grados": "10-11",
+    "organizador": "Pensamiento numérico",
+    "competencia": "Pensamiento matemático",
+    "enunciado": "Analizo representaciones decimales de los números reales para diferenciar entre racionales e irracionales.",
+    "evidencias_aprendizaje": [],
+    "etiquetas": ["números reales", "racionales e irracionales"]
+  },
+  {
+    "areaCodigo": "MAT-BAS",
+    "grupo_grados": "10-11",
+    "organizador": "Pensamiento numérico",
+    "competencia": "Pensamiento matemático",
+    "enunciado": "Comparo y contrasto las propiedades de los números (naturales, enteros, racionales y reales) y las de sus relaciones y operaciones para construir, manejar y utilizar apropiadamente los distintos sistemas numéricos.",
+    "evidencias_aprendizaje": [],
+    "etiquetas": ["sistemas numéricos"]
+  },
+  {
+    "areaCodigo": "MAT-BAS",
+    "grupo_grados": "10-11",
+    "organizador": "Pensamiento numérico",
+    "competencia": "Pensamiento matemático",
+    "enunciado": "Utilizo argumentos de la teoría de números para justificar relaciones que involucran números naturales.",
+    "evidencias_aprendizaje": [],
+    "etiquetas": ["teoría de números"]
+  },
+  {
+    "areaCodigo": "MAT-BAS",
+    "grupo_grados": "10-11",
+    "organizador": "Pensamiento espacial",
+    "competencia": "Pensamiento matemático",
+    "enunciado": "Identifico en forma visual, gráfica y algebraica algunas propiedades de las curvas que se observan en los bordes obtenidos por cortes longitudinales, diagonales y transversales en un cilindro y en un cono.",
+    "evidencias_aprendizaje": [],
+    "etiquetas": ["figuras cónicas", "cortes"]
+  },
+  {
+    "areaCodigo": "MAT-BAS",
+    "grupo_grados": "10-11",
+    "organizador": "Pensamiento espacial",
+    "competencia": "Pensamiento matemático",
+    "enunciado": "Identifico características de localización de objetos geométricos en sistemas de representación cartesiana y otros (polares, cilíndricos y esféricos) y en particular de las curvas y figuras cónicas.",
+    "evidencias_aprendizaje": [],
+    "etiquetas": ["sistemas de coordenadas", "figuras cónicas"]
+  },
+  {
+    "areaCodigo": "MAT-BAS",
+    "grupo_grados": "10-11",
+    "organizador": "Pensamiento espacial",
+    "competencia": "Pensamiento matemático",
+    "enunciado": "Describo y modelo fenómenos periódicos del mundo real usando relaciones y funciones trigonométricas.",
+    "evidencias_aprendizaje": [],
+    "etiquetas": ["funciones trigonométricas", "fenómenos periódicos"]
+  },
+  {
+    "areaCodigo": "MAT-BAS",
+    "grupo_grados": "10-11",
+    "organizador": "Pensamiento métrico",
+    "competencia": "Pensamiento matemático",
+    "enunciado": "Diseño estrategias para abordar situaciones de medición que requieran grados de precisión específicos.",
+    "evidencias_aprendizaje": [],
+    "etiquetas": ["medición", "precisión"]
+  },
+  {
+    "areaCodigo": "MAT-BAS",
+    "grupo_grados": "10-11",
+    "organizador": "Pensamiento métrico",
+    "competencia": "Pensamiento matemático",
+    "enunciado": "Justifico resultados obtenidos mediante procesos de aproximación sucesiva, rangos de variación y límites en situaciones de medición.",
+    "evidencias_aprendizaje": [],
+    "etiquetas": ["aproximación", "límites"]
+  },
+  {
+    "areaCodigo": "MAT-BAS",
+    "grupo_grados": "10-11",
+    "organizador": "Pensamiento aleatorio",
+    "competencia": "Pensamiento matemático",
+    "enunciado": "Interpreto nociones básicas relacionadas con el manejo de información como población, muestra, variable aleatoria, distribución de frecuencias, parámetros y estadígrafos.",
+    "evidencias_aprendizaje": [],
+    "etiquetas": ["población", "muestra", "distribución de frecuencias"]
+  },
+  {
+    "areaCodigo": "MAT-BAS",
+    "grupo_grados": "10-11",
+    "organizador": "Pensamiento aleatorio",
+    "competencia": "Pensamiento matemático",
+    "enunciado": "Uso comprensivamente algunas medidas de centralización, localización, dispersión y correlación (percentiles, cuartiles, centralidad, distancia, rango, varianza, covarianza y normalidad).",
+    "evidencias_aprendizaje": [],
+    "etiquetas": ["dispersión", "correlación"]
+  },
+  {
+    "areaCodigo": "MAT-BAS",
+    "grupo_grados": "10-11",
+    "organizador": "Pensamiento aleatorio",
+    "competencia": "Pensamiento matemático",
+    "enunciado": "Interpreto conceptos de probabilidad condicional e independencia de eventos.",
+    "evidencias_aprendizaje": [],
+    "etiquetas": ["probabilidad condicional", "independencia"]
+  },
+  {
+    "areaCodigo": "MAT-BAS",
+    "grupo_grados": "10-11",
+    "organizador": "Pensamiento variacional",
+    "competencia": "Pensamiento matemático",
+    "enunciado": "Interpreto la noción de derivada como razón de cambio y como valor de la pendiente de la tangente a una curva y desarrollo métodos para hallar las derivadas de algunas funciones básicas en contextos matemáticos y no matemáticos.",
+    "evidencias_aprendizaje": [],
+    "etiquetas": ["derivada", "cálculo diferencial"]
+  },
+  {
+    "areaCodigo": "MAT-BAS",
+    "grupo_grados": "10-11",
+    "organizador": "Pensamiento variacional",
+    "competencia": "Pensamiento matemático",
+    "enunciado": "Utilizo las técnicas de aproximación en procesos infinitos numéricos.",
+    "evidencias_aprendizaje": [],
+    "etiquetas": ["procesos infinitos", "límites"]
+  },
+  {
+    "areaCodigo": "MAT-BAS",
+    "grupo_grados": "10-11",
+    "organizador": "Pensamiento variacional",
+    "competencia": "Pensamiento matemático",
+    "enunciado": "Modelo situaciones de variación periódica con funciones trigonométricas e interpreto y utilizo sus derivadas.",
+    "evidencias_aprendizaje": [],
+    "etiquetas": ["funciones trigonométricas", "derivadas"]
+  },
+  {
+    "areaCodigo": "LEN-CAS",
+    "grupo_grados": "1-3",
+    "organizador": "Producción textual",
+    "competencia": "Producción textual",
+    "enunciado": "Produzco textos orales que responden a distintos propósitos comunicativos.",
+    "evidencias_aprendizaje": [
+      "Utilizo, de acuerdo con el contexto, un vocabulario adecuado para expresar mis ideas.",
+      "Expreso en forma clara mis ideas y sentimientos, según lo amerite la situación comunicativa.",
+      "Utilizo la entonación y los matices afectivos de voz para alcanzar mi propósito en diferentes situaciones comunicativas.",
+      "Describo personas, objetos, lugares, etc., en forma detallada.",
+      "Elaboro instrucciones que evidencian secuencias lógicas en la realización de acciones.",
+      "Expongo y defiendo mis ideas en función de la situación comunicativa."
+    ],
+    "etiquetas": ["producción oral", "propósito comunicativo"]
+  },
+  {
+    "areaCodigo": "LEN-CAS",
+    "grupo_grados": "1-3",
+    "organizador": "Producción textual",
+    "competencia": "Producción textual",
+    "enunciado": "Produzco textos escritos que responden a diversas necesidades comunicativas.",
+    "evidencias_aprendizaje": [
+      "Determino el tema, el posible lector de mi texto y el propósito comunicativo que me lleva a producirlo.",
+      "Elijo el tipo de texto que requiere mi propósito comunicativo.",
+      "Busco información en distintas fuentes: personas, medios de comunicación y libros, entre otras.",
+      "Elaboro un plan para organizar mis ideas.",
+      "Reviso, socializo y corrijo mis escritos, teniendo en cuenta las propuestas de mis compañeros y profesor, y atendiendo aspectos gramaticales y ortográficos."
+    ],
+    "etiquetas": ["producción escrita", "plan textual"]
+  },
+  {
+    "areaCodigo": "LEN-CAS",
+    "grupo_grados": "1-3",
+    "organizador": "Comprensión e interpretación textual",
+    "competencia": "Comprensión e interpretación textual",
+    "enunciado": "Comprendo textos que tienen diferentes formatos y finalidades.",
+    "evidencias_aprendizaje": [
+      "Leo diferentes clases de textos: manuales, tarjetas, afiches, cartas, periódicos, etc.",
+      "Reconozco la función social de los diversos tipos de textos que leo.",
+      "Identifico la silueta o el formato de los textos que leo.",
+      "Elaboro hipótesis acerca del sentido global de los textos, antes y durante el proceso de lectura, apoyándome en mis conocimientos previos, las imágenes y los títulos.",
+      "Identifico el propósito comunicativo y la idea global de un texto.",
+      "Elaboro resúmenes y esquemas que dan cuenta del sentido de un texto.",
+      "Comparo textos de acuerdo con sus formatos, temáticas y funciones."
+    ],
+    "etiquetas": ["comprensión lectora", "tipología textual"]
+  },
+  {
+    "areaCodigo": "LEN-CAS",
+    "grupo_grados": "1-3",
+    "organizador": "Literatura",
+    "competencia": "Literatura",
+    "enunciado": "Comprendo textos literarios para propiciar el desarrollo de mi capacidad creativa y lúdica.",
+    "evidencias_aprendizaje": [
+      "Leo fábulas, cuentos, poemas, relatos mitológicos, leyendas, o cualquier otro texto literario.",
+      "Elaboro y socializo hipótesis predictivas acerca del contenido de los textos.",
+      "Identifico maneras de cómo se formula el inicio y el final de algunas narraciones.",
+      "Diferencio poemas, cuentos y obras de teatro.",
+      "Recreo relatos y cuentos cambiando personajes, ambientes, hechos y épocas.",
+      "Participo en la elaboración de guiones para teatro de títeres."
+    ],
+    "etiquetas": ["literatura infantil", "narrativa", "creatividad"]
+  },
+  {
+    "areaCodigo": "LEN-CAS",
+    "grupo_grados": "1-3",
+    "organizador": "Medios de comunicación y otros sistemas simbólicos",
+    "competencia": "Medios de comunicación y otros sistemas simbólicos",
+    "enunciado": "Comprendo la información que circula a través de algunos sistemas de comunicación no verbal.",
+    "evidencias_aprendizaje": [
+      "Entiendo el lenguaje empleado en historietas y otros tipos de textos con imágenes fijas.",
+      "Expongo oralmente lo que me dicen mensajes cifrados en pictogramas, jeroglíficos, etc.",
+      "Reconozco la temática de caricaturas, tiras cómicas, historietas, anuncios publicitarios y otros medios de expresión gráfica.",
+      "Ordeno y completo la secuencia de viñetas que conforman una historieta.",
+      "Relaciono gráficas con texto escrito, ya sea completándolas o explicándolas."
+    ],
+    "etiquetas": ["medios no verbales", "historietas", "pictogramas"]
+  },
+  {
+    "areaCodigo": "LEN-CAS",
+    "grupo_grados": "1-3",
+    "organizador": "Ética de la comunicación",
+    "competencia": "Ética de la comunicación",
+    "enunciado": "Identifico los principales elementos y roles de la comunicación para enriquecer procesos comunicativos auténticos.",
+    "evidencias_aprendizaje": [
+      "Reconozco los principales elementos constitutivos de un proceso de comunicación: interlocutores, código, canal, texto y situación comunicativa.",
+      "Establezco semejanzas y diferencias entre quien produce el texto y quien lo interpreta.",
+      "Identifico en situaciones comunicativas reales los roles de quien produce y de quien interpreta un texto.",
+      "Identifico la intención de quien produce un texto."
+    ],
+    "etiquetas": ["ética de la comunicación", "interlocutores"]
+  },
+  {
+    "areaCodigo": "LEN-CAS",
+    "grupo_grados": "4-5",
+    "organizador": "Producción textual",
+    "competencia": "Producción textual",
+    "enunciado": "Produzco textos orales, en situaciones comunicativas que permiten evidenciar el uso significativo de la entonación y la pertinencia articulatoria.",
+    "evidencias_aprendizaje": [
+      "Organizo mis ideas para producir un texto oral, teniendo en cuenta mi realidad y mis propias experiencias.",
+      "Elaboro un plan para la exposición de mis ideas.",
+      "Selecciono el léxico apropiado y acomodo mi estilo al plan de exposición así como al contexto comunicativo.",
+      "Adecuo la entonación y la pronunciación a las exigencias de las situaciones comunicativas en que participo."
+    ],
+    "etiquetas": ["producción oral", "entonación"]
+  },
+  {
+    "areaCodigo": "LEN-CAS",
+    "grupo_grados": "4-5",
+    "organizador": "Producción textual",
+    "competencia": "Producción textual",
+    "enunciado": "Produzco textos escritos que responden a diversas necesidades comunicativas y que siguen un procedimiento estratégico para su elaboración.",
+    "evidencias_aprendizaje": [
+      "Elijo un tema para producir un texto escrito, teniendo en cuenta un propósito, las características del interlocutor y las exigencias del contexto.",
+      "Diseño un plan para elaborar un texto informativo.",
+      "Produzco la primera versión de un texto informativo, atendiendo a requerimientos formales y conceptuales de la producción escrita en lengua castellana.",
+      "Reescribo el texto a partir de las propuestas de corrección formuladas por mis compañeros y por mí."
+    ],
+    "etiquetas": ["producción escrita", "texto informativo"]
+  },
+  {
+    "areaCodigo": "LEN-CAS",
+    "grupo_grados": "4-5",
+    "organizador": "Comprensión e interpretación textual",
+    "competencia": "Comprensión e interpretación textual",
+    "enunciado": "Comprendo diversos tipos de texto, utilizando algunas estrategias de búsqueda, organización y almacenamiento de la información.",
+    "evidencias_aprendizaje": [
+      "Leo diversos tipos de texto: descriptivo, informativo, narrativo, explicativo y argumentativo.",
+      "Comprendo los aspectos formales y conceptuales (en especial características de las oraciones y formas de relación entre ellas) al interior de cada texto leído.",
+      "Identifico la intención comunicativa de cada uno de los textos leídos.",
+      "Determino algunas estrategias para buscar, seleccionar y almacenar información: resúmenes, cuadros sinópticos, mapas conceptuales y fichas."
+    ],
+    "etiquetas": ["comprensión lectora", "estrategias de lectura"]
+  },
+  {
+    "areaCodigo": "LEN-CAS",
+    "grupo_grados": "4-5",
+    "organizador": "Literatura",
+    "competencia": "Literatura",
+    "enunciado": "Elaboro hipótesis de lectura acerca de las relaciones entre los elementos constitutivos de un texto literario, y entre éste y el contexto.",
+    "evidencias_aprendizaje": [
+      "Leo diversos tipos de texto literario: relatos mitológicos, leyendas, cuentos, fábulas, poemas y obras teatrales.",
+      "Reconozco, en los textos literarios que leo, elementos tales como tiempo, espacio, acción, personajes.",
+      "Propongo hipótesis predictivas acerca de un texto literario, partiendo de aspectos como título, tipo de texto, época de la producción, etc.",
+      "Comparo textos narrativos, líricos y dramáticos, teniendo en cuenta algunos de sus elementos constitutivos."
+    ],
+    "etiquetas": ["literatura", "hipótesis de lectura"]
+  },
+  {
+    "areaCodigo": "LEN-CAS",
+    "grupo_grados": "4-5",
+    "organizador": "Medios de comunicación y otros sistemas simbólicos",
+    "competencia": "Medios de comunicación y otros sistemas simbólicos",
+    "enunciado": "Caracterizo los medios de comunicación masiva y selecciono la información que emiten, para utilizarla en la creación de nuevos textos.",
+    "evidencias_aprendizaje": [
+      "Reconozco las características de los diferentes medios de comunicación masiva.",
+      "Selecciono y clasifico la información emitida por los diferentes medios de comunicación.",
+      "Elaboro planes textuales con la información seleccionada de los medios de comunicación.",
+      "Produzco textos orales y escritos con base en planes en los que utilizo la información recogida de los medios."
+    ],
+    "etiquetas": ["medios de comunicación masiva"]
+  },
+  {
+    "areaCodigo": "LEN-CAS",
+    "grupo_grados": "4-5",
+    "organizador": "Ética de la comunicación",
+    "competencia": "Ética de la comunicación",
+    "enunciado": "Conozco y analizo los elementos, roles, relaciones y reglas básicas de la comunicación, para inferir las intenciones y expectativas de mis interlocutores y hacer más eficaces mis procesos comunicativos.",
+    "evidencias_aprendizaje": [
+      "Identifico los elementos constitutivos de la comunicación: interlocutores, código, canal, mensaje y contextos.",
+      "Caracterizo los roles desempeñados por los sujetos que participan del proceso comunicativo.",
+      "Tengo en cuenta, en mis interacciones comunicativas, principios básicos de la comunicación: reconocimiento del otro en tanto interlocutor válido y respeto por los turnos conversacionales."
+    ],
+    "etiquetas": ["ética de la comunicación", "interlocutores"]
+  },
+  {
+    "areaCodigo": "LEN-CAS",
+    "grupo_grados": "6-7",
+    "organizador": "Producción textual",
+    "competencia": "Producción textual",
+    "enunciado": "Conozco y utilizo algunas estrategias argumentativas que posibilitan la construcción de textos orales en situaciones comunicativas auténticas.",
+    "evidencias_aprendizaje": [
+      "Defino una temática para la elaboración de un texto oral con fines argumentativos.",
+      "Formulo una hipótesis para demostrarla en un texto oral con fines argumentativos.",
+      "Elaboro un plan textual, jerarquizando la información que he obtenido de fuentes diversas.",
+      "Caracterizo estrategias argumentativas de tipo descriptivo.",
+      "Utilizo estrategias descriptivas para producir un texto oral con fines argumentativos."
+    ],
+    "etiquetas": ["producción oral", "argumentación"]
+  },
+  {
+    "areaCodigo": "LEN-CAS",
+    "grupo_grados": "6-7",
+    "organizador": "Producción textual",
+    "competencia": "Producción textual",
+    "enunciado": "Produzco textos escritos que responden a necesidades específicas de comunicación, a procedimientos sistemáticos de elaboración y establezco nexos intertextuales y extratextuales.",
+    "evidencias_aprendizaje": [
+      "Defino una temática para la producción de un texto narrativo.",
+      "Llevo a cabo procedimientos de búsqueda, selección y almacenamiento de información acerca de la temática que voy a tratar en mi texto narrativo.",
+      "Elaboro un plan textual, organizando la información en secuencias lógicas.",
+      "Reescribo un texto, teniendo en cuenta aspectos de coherencia (unidad temática, relaciones lógicas, consecutividad temporal...) y cohesión (conectores, pronombres, manejo de modos verbales, puntuación...)."
+    ],
+    "etiquetas": ["producción escrita", "texto narrativo"]
+  },
+  {
+    "areaCodigo": "LEN-CAS",
+    "grupo_grados": "6-7",
+    "organizador": "Comprensión e interpretación textual",
+    "competencia": "Comprensión e interpretación textual",
+    "enunciado": "Comprendo e interpreto diversos tipos de texto, para establecer sus relaciones internas y su clasificación en una tipología textual.",
+    "evidencias_aprendizaje": [
+      "Reconozco las características de los diversos tipos de texto que leo.",
+      "Propongo hipótesis de interpretación para cada uno de los tipos de texto que he leído.",
+      "Identifico las principales características formales del texto: formato de presentación, títulos, graficación, capítulos, organización, etc.",
+      "Establezco relaciones de semejanza y diferencia entre los diversos tipos de texto que he leído."
+    ],
+    "etiquetas": ["comprensión lectora", "tipología textual"]
+  },
+  {
+    "areaCodigo": "LEN-CAS",
+    "grupo_grados": "6-7",
+    "organizador": "Literatura",
+    "competencia": "Literatura",
+    "enunciado": "Reconozco la tradición oral como fuente de la conformación y desarrollo de la literatura.",
+    "evidencias_aprendizaje": [
+      "Interpreto y clasifico textos provenientes de la tradición oral tales como coplas, leyendas, relatos mitológicos, canciones, proverbios, refranes, parábolas, entre otros.",
+      "Caracterizo rasgos específicos que consolidan la tradición oral, como origen, autoría colectiva, función social, uso del lenguaje, evolución, recurrencias temáticas, etc.",
+      "Identifico en la tradición oral el origen de los géneros literarios fundamentales: lírico, narrativo y dramático.",
+      "Establezco relaciones entre los textos provenientes de la tradición oral y otros textos en cuanto a temas, personajes, lenguaje, entre otros aspectos."
+    ],
+    "etiquetas": ["tradición oral", "géneros literarios"]
+  },
+  {
+    "areaCodigo": "LEN-CAS",
+    "grupo_grados": "6-7",
+    "organizador": "Medios de comunicación y otros sistemas simbólicos",
+    "competencia": "Medios de comunicación y otros sistemas simbólicos",
+    "enunciado": "Caracterizo los medios de comunicación masiva y selecciono la información que emiten para clasificarla y almacenarla.",
+    "evidencias_aprendizaje": [
+      "Reconozco las características de los principales medios de comunicación masiva.",
+      "Selecciono y clasifico la información emitida por los medios de comunicación masiva.",
+      "Recopilo en fichas, mapas, gráficos y cuadros la información que he obtenido de los medios de comunicación masiva."
+    ],
+    "etiquetas": ["medios de comunicación masiva"]
+  },
+  {
+    "areaCodigo": "LEN-CAS",
+    "grupo_grados": "6-7",
+    "organizador": "Ética de la comunicación",
+    "competencia": "Ética de la comunicación",
+    "enunciado": "Reconozco, en situaciones comunicativas auténticas, la diversidad y el encuentro de culturas, con el fin de afianzar mis actitudes de respeto y tolerancia.",
+    "evidencias_aprendizaje": [
+      "Caracterizo el contexto cultural del otro y lo comparo con el mío.",
+      "Identifico en situaciones comunicativas auténticas algunas variantes lingüísticas de mi entorno, generadas por ubicación geográfica, diferencia social o generacional, profesión, oficio, entre otras.",
+      "Evidencio que las variantes lingüísticas encierran una visión particular del mundo.",
+      "Reconozco que las variantes lingüísticas y culturales no impiden respetar al otro como interlocutor válido."
+    ],
+    "etiquetas": ["diversidad cultural", "variantes lingüísticas"]
+  },
+  {
+    "areaCodigo": "LEN-CAS",
+    "grupo_grados": "8-9",
+    "organizador": "Producción textual",
+    "competencia": "Producción textual",
+    "enunciado": "Produzco textos orales de tipo argumentativo para exponer mis ideas y llegar a acuerdos en los que prime el respeto por mi interlocutor y la valoración de los contextos comunicativos.",
+    "evidencias_aprendizaje": [
+      "Organizo previamente las ideas que deseo exponer y me documento para sustentarlas.",
+      "Identifico y valoro los aportes de mi interlocutor y del contexto en el que expongo mis ideas.",
+      "Caracterizo y utilizo estrategias descriptivas y explicativas para argumentar mis ideas, valorando y respetando las normas básicas de la comunicación.",
+      "Utilizo el discurso oral para establecer acuerdos a partir del reconocimiento de los argumentos de mis interlocutores y la fuerza de mis propios argumentos."
+    ],
+    "etiquetas": ["producción oral", "argumentación"]
+  },
+  {
+    "areaCodigo": "LEN-CAS",
+    "grupo_grados": "8-9",
+    "organizador": "Producción textual",
+    "competencia": "Producción textual",
+    "enunciado": "Produzco textos escritos que evidencian el conocimiento que he alcanzado acerca del funcionamiento de la lengua en situaciones de comunicación y el uso de las estrategias de producción textual.",
+    "evidencias_aprendizaje": [
+      "Diseño un plan textual para la presentación de mis ideas, pensamientos y saberes en los contextos en que así lo requiera.",
+      "Utilizo un texto explicativo para la presentación de mis ideas, pensamientos y saberes, de acuerdo con las características de mi interlocutor y con la intención que persigo al producir el texto.",
+      "Identifico estrategias que garantizan coherencia, cohesión y pertinencia del texto.",
+      "Elaboro una primera versión de un texto explicativo atendiendo a los requerimientos estructurales, conceptuales y lingüísticos."
+    ],
+    "etiquetas": ["producción escrita", "texto explicativo"]
+  },
+  {
+    "areaCodigo": "LEN-CAS",
+    "grupo_grados": "8-9",
+    "organizador": "Comprensión e interpretación textual",
+    "competencia": "Comprensión e interpretación textual",
+    "enunciado": "Comprendo e interpreto textos, teniendo en cuenta el funcionamiento de la lengua en situaciones de comunicación, el uso de estrategias de lectura y el papel del interlocutor y del contexto.",
+    "evidencias_aprendizaje": [
+      "Elaboro hipótesis de lectura de diferentes textos, a partir de la revisión de sus características: forma de presentación, títulos, graficación y manejo de la lengua.",
+      "Comprendo el sentido global de cada uno de los textos que leo, la intención de quien lo produce y las características del contexto en el que se produce.",
+      "Caracterizo los textos de acuerdo con la intención comunicativa de quien los produce.",
+      "Infiero otros sentidos en cada uno de los textos que leo, relacionándolos con su sentido global y con el contexto en el cual se han producido."
+    ],
+    "etiquetas": ["comprensión lectora", "interpretación"]
+  },
+  {
+    "areaCodigo": "LEN-CAS",
+    "grupo_grados": "8-9",
+    "organizador": "Literatura",
+    "competencia": "Literatura",
+    "enunciado": "Determino en las obras literarias latinoamericanas, elementos textuales que dan cuenta de sus características estéticas, históricas y sociológicas, cuando sea pertinente.",
+    "evidencias_aprendizaje": [
+      "Conozco y caracterizo producciones literarias de la tradición oral latinoamericana.",
+      "Leo con sentido crítico obras literarias de autores latinoamericanos.",
+      "Establezco relaciones entre obras literarias latinoamericanas, procedentes de fuentes escritas y orales.",
+      "Caracterizo los principales momentos de la literatura latinoamericana, atendiendo a particularidades temporales, geográficas, de género, de autor, etc."
+    ],
+    "etiquetas": ["literatura latinoamericana"]
+  },
+  {
+    "areaCodigo": "LEN-CAS",
+    "grupo_grados": "8-9",
+    "organizador": "Medios de comunicación y otros sistemas simbólicos",
+    "competencia": "Medios de comunicación y otros sistemas simbólicos",
+    "enunciado": "Retomo crítica y selectivamente la información que circula a través de los medios de comunicación masiva, para confrontarla con la que proviene de otras fuentes.",
+    "evidencias_aprendizaje": [
+      "Caracterizo los medios de comunicación masiva a partir de aspectos como de qué manera difunden la información, cuál es su cobertura y alcance, y a qué tipo de audiencia se dirigen, entre otros.",
+      "Diferencio los medios de comunicación masiva de acuerdo con sus características formales y conceptuales, haciendo énfasis en el código, los recursos técnicos y el manejo de la información.",
+      "Selecciono la información obtenida a través de los medios masivos, para satisfacer mis necesidades comunicativas.",
+      "Determino características, funciones e intenciones de los discursos que circulan a través de los medios de comunicación masiva."
+    ],
+    "etiquetas": ["medios de comunicación masiva", "análisis crítico"]
+  },
+  {
+    "areaCodigo": "LEN-CAS",
+    "grupo_grados": "8-9",
+    "organizador": "Ética de la comunicación",
+    "competencia": "Ética de la comunicación",
+    "enunciado": "Reflexiono en forma crítica acerca de los actos comunicativos y explico los componentes del proceso de comunicación, con énfasis en los agentes, los discursos, los contextos y el funcionamiento de la lengua, en tanto sistema de signos, símbolos y reglas de uso.",
+    "evidencias_aprendizaje": [
+      "Reconozco el lenguaje como capacidad humana que configura múltiples sistemas simbólicos y posibilita los procesos de significar y comunicar.",
+      "Entiendo la lengua como uno de los sistemas simbólicos producto del lenguaje y la caracterizo en sus aspectos convencionales y arbitrarios.",
+      "Explico el proceso de comunicación y doy cuenta de los aspectos e individuos que intervienen en su dinámica.",
+      "Comprendo el concepto de coherencia y distingo entre coherencia local y global, en textos míos o de mis compañeros."
+    ],
+    "etiquetas": ["ética de la comunicación", "sistemas simbólicos"]
+  },
+  {
+    "areaCodigo": "LEN-CAS",
+    "grupo_grados": "10-11",
+    "organizador": "Producción textual",
+    "competencia": "Producción textual",
+    "enunciado": "Produzco textos argumentativos que evidencian mi conocimiento de la lengua y el control sobre el uso que hago de ella en contextos comunicativos orales y escritos.",
+    "evidencias_aprendizaje": [
+      "Comprendo el valor del lenguaje en los procesos de construcción del conocimiento.",
+      "Desarrollo procesos de autocontrol y corrección lingüística en mi producción de textos orales y escritos.",
+      "Caracterizo y utilizo estrategias descriptivas, explicativas y analógicas en mi producción de textos orales y escritos.",
+      "Produzco ensayos de carácter argumentativo en los que desarrollo mis ideas con rigor y atendiendo a las características propias del género."
+    ],
+    "etiquetas": ["producción textual", "ensayo argumentativo"]
+  },
+  {
+    "areaCodigo": "LEN-CAS",
+    "grupo_grados": "10-11",
+    "organizador": "Comprensión e interpretación textual",
+    "competencia": "Comprensión e interpretación textual",
+    "enunciado": "Comprendo e interpreto textos con actitud crítica y capacidad argumentativa.",
+    "evidencias_aprendizaje": [
+      "Elaboro hipótesis de interpretación atendiendo a la intención comunicativa y al sentido global del texto que leo.",
+      "Relaciono el significado de los textos que leo con los contextos sociales, culturales y políticos en los cuales se han producido.",
+      "Diseño un esquema de interpretación, teniendo en cuenta el tipo de texto, tema, interlocutor e intención comunicativa.",
+      "Construyo reseñas críticas acerca de los textos que leo."
+    ],
+    "etiquetas": ["comprensión lectora", "capacidad argumentativa"]
+  },
+  {
+    "areaCodigo": "LEN-CAS",
+    "grupo_grados": "10-11",
+    "organizador": "Literatura",
+    "competencia": "Literatura",
+    "enunciado": "Analizo crítica y creativamente diferentes manifestaciones literarias del contexto universal.",
+    "evidencias_aprendizaje": [
+      "Leo textos literarios de diversa índole, género, temática y origen.",
+      "Identifico en obras de la literatura universal el lenguaje, las características formales, las épocas y escuelas, estilos, tendencias, temáticas, géneros y autores, entre otros aspectos.",
+      "Comprendo en los textos que leo las dimensiones éticas, estéticas, filosóficas, entre otras, que se evidencian en ellos.",
+      "Comparo textos de diversos autores, temas, épocas y culturas, y utilizo recursos de la teoría literaria para enriquecer su interpretación."
+    ],
+    "etiquetas": ["literatura universal"]
+  },
+  {
+    "areaCodigo": "LEN-CAS",
+    "grupo_grados": "10-11",
+    "organizador": "Medios de comunicación y otros sistemas simbólicos",
+    "competencia": "Medios de comunicación y otros sistemas simbólicos",
+    "enunciado": "Interpreto en forma crítica la información difundida por los medios de comunicación masiva.",
+    "evidencias_aprendizaje": [
+      "Comprendo el papel que cumplen los medios de comunicación masiva en el contexto social, cultural, económico y político de las sociedades contemporáneas.",
+      "Infiero las implicaciones de los medios de comunicación masiva en la conformación de los contextos sociales, culturales, políticos, etc., del país.",
+      "Analizo los mecanismos ideológicos que subyacen a la estructura de los medios de información masiva.",
+      "Asumo una posición crítica frente a los elementos ideológicos presentes en dichos medios, y analizo su incidencia en la sociedad actual."
+    ],
+    "etiquetas": ["medios de comunicación masiva", "posición crítica"]
+  },
+  {
+    "areaCodigo": "LEN-CAS",
+    "grupo_grados": "10-11",
+    "organizador": "Ética de la comunicación",
+    "competencia": "Ética de la comunicación",
+    "enunciado": "Expreso respeto por la diversidad cultural y social del mundo contemporáneo, en las situaciones comunicativas en las que intervengo.",
+    "evidencias_aprendizaje": [
+      "Identifico, caracterizo y valoro diferentes grupos humanos teniendo en cuenta aspectos étnicos, lingüísticos, sociales y culturales, entre otros, del mundo contemporáneo.",
+      "Respeto la diversidad de criterios y posiciones ideológicas que surgen en los grupos humanos.",
+      "Utilizo el diálogo y la argumentación para superar enfrentamientos y posiciones antagónicas.",
+      "Argumento, en forma oral y escrita, acerca de temas y problemáticas que puedan ser objeto de intolerancia, segregación, señalamientos, etc."
+    ],
+    "etiquetas": ["diversidad cultural", "ética de la comunicación"]
+  },
+  {
+    "areaCodigo": "CS-HGD",
+    "grupo_grados": "1-3",
+    "organizador": "Indagación y pensamiento científico",
+    "competencia": "Me aproximo al conocimiento como científico(a) social",
+    "enunciado": "Hago preguntas sobre mí y sobre las organizaciones sociales a las que pertenezco (familia, curso, colegio, barrio…).",
+    "evidencias_aprendizaje": [
+      "Reconozco diversos aspectos míos y de las organizaciones sociales a las que pertenezco, así como los cambios que han ocurrido a través del tiempo.",
+      "Uso diversas fuentes para obtener la información que necesito (entrevistas a mis familiares y profesores, fotografías, textos escolares y otros).",
+      "Organizo la información, utilizando cuadros, gráficas…",
+      "Establezco relaciones entre la información obtenida en diferentes fuentes y propongo respuestas a mis preguntas.",
+      "Utilizo diversas formas de expresión (oral, escrita, gráfica) para comunicar los resultados de mi investigación.",
+      "Doy crédito a las diferentes fuentes de la información obtenida."
+    ],
+    "etiquetas": ["indagación social", "fuentes de información"]
+  },
+  {
+    "areaCodigo": "CS-HGD",
+    "grupo_grados": "1-3",
+    "organizador": "Relaciones con la historia y las culturas",
+    "competencia": "Manejo conocimientos propios de las ciencias sociales",
+    "enunciado": "Me reconozco como ser social e histórico, miembro de un país con diversas etnias y culturas, con un legado que genera identidad nacional.",
+    "evidencias_aprendizaje": [
+      "Identifico algunas características físicas, sociales, culturales y emocionales que hacen de mí un ser único.",
+      "Identifico y describo algunas características socioculturales de comunidades a las que pertenezco y de otras diferentes a las mías.",
+      "Identifico y describo cambios y aspectos que se mantienen en mí y en las organizaciones de mi entorno.",
+      "Reconozco en mi entorno cercano las huellas que dejaron las comunidades que lo ocuparon en el pasado (monumentos, museos, sitios de conservación histórica…).",
+      "Identifico y describo algunos elementos que permiten reconocerme como miembro de un grupo regional y de una nación (territorio, lenguas, costumbres, símbolos patrios…).",
+      "Reconozco características básicas de la diversidad étnica y cultural en Colombia.",
+      "Identifico los aportes culturales que mi comunidad y otras diferentes a la mía han hecho a lo que somos hoy."
+    ],
+    "etiquetas": ["identidad nacional", "diversidad étnica"]
+  },
+  {
+    "areaCodigo": "CS-HGD",
+    "grupo_grados": "1-3",
+    "organizador": "Relaciones espaciales y ambientales",
+    "competencia": "Manejo conocimientos propios de las ciencias sociales",
+    "enunciado": "Reconozco la interacción entre el ser humano y el paisaje en diferentes contextos e identifico las acciones económicas y las consecuencias que resultan de esta relación.",
+    "evidencias_aprendizaje": [
+      "Me ubico en el entorno físico y de representación (en mapas y planos) utilizando referentes espaciales como arriba, abajo, dentro, fuera, derecha, izquierda.",
+      "Establezco relaciones entre los espacios físicos que ocupo (salón de clase, colegio, municipio…) y sus representaciones (mapas, planos, maquetas...).",
+      "Reconozco y describo las características físicas de las principales formas del paisaje.",
+      "Identifico y describo las características de un paisaje natural y de un paisaje cultural.",
+      "Comparo actividades económicas que se llevan a cabo en diferentes entornos.",
+      "Identifico los principales recursos naturales (renovables y no renovables).",
+      "Reconozco que los recursos naturales son finitos y exigen un uso responsable."
+    ],
+    "etiquetas": ["paisaje", "recursos naturales", "cartografía"]
+  },
+  {
+    "areaCodigo": "CS-HGD",
+    "grupo_grados": "1-3",
+    "organizador": "Relaciones ético-políticas",
+    "competencia": "Manejo conocimientos propios de las ciencias sociales",
+    "enunciado": "Me identifico como un ser humano único, miembro de diversas organizaciones sociales y políticas necesarias para el bienestar y el desarrollo personal y comunitario; reconozco que las normas son acuerdos básicos que buscan la convivencia pacífica en la diversidad.",
+    "evidencias_aprendizaje": [
+      "Identifico y describo características y funciones básicas de organizaciones sociales y políticas de mi entorno (familia, colegio, barrio, vereda, corregimiento, resguardo, territorios afrocolombianos, municipio…).",
+      "Identifico situaciones cotidianas que indican cumplimiento o incumplimiento en las funciones de algunas organizaciones sociales y políticas de mi entorno.",
+      "Comparo las formas de organización propias de los grupos pequeños (familia, salón de clase, colegio…) con las de los grupos más grandes (resguardo, territorios afrocolombianos, municipio…).",
+      "Identifico mis derechos y deberes y los de otras personas en las comunidades a las que pertenezco.",
+      "Identifico normas que rigen algunas comunidades a las que pertenezco y explico su utilidad.",
+      "Conozco los Derechos de los Niños e identifico algunas instituciones locales, nacionales e internacionales que velan por su cumplimiento."
+    ],
+    "etiquetas": ["organizaciones políticas", "normas", "derechos de los niños"]
+  },
+  {
+    "areaCodigo": "CS-HGD",
+    "grupo_grados": "1-3",
+    "organizador": "Desarrollo de compromisos personales y sociales",
+    "competencia": "Desarrollo compromisos personales y sociales",
+    "enunciado": "Reconozco y respeto diferentes puntos de vista.",
+    "evidencias_aprendizaje": [
+      "Comparo mis aportes con los de mis compañeros y compañeras e incorporo en mis conocimientos y juicios elementos valiosos aportados por otros.",
+      "Respeto mis rasgos individuales y los de otras personas (género, etnia, religión…).",
+      "Reconozco situaciones de discriminación y abuso por irrespeto a los rasgos individuales de las personas y propongo formas de cambiarlas.",
+      "Participo en la construcción de normas para la convivencia en los grupos sociales y políticos a los que pertenezco.",
+      "Cuido mi cuerpo y mis relaciones con los demás.",
+      "Uso responsablemente los recursos (papel, agua, alimentos…)."
+    ],
+    "etiquetas": ["compromiso social", "convivencia"]
+  },
+  {
+    "areaCodigo": "CS-HGD",
+    "grupo_grados": "4-5",
+    "organizador": "Indagación y pensamiento científico",
+    "competencia": "Me aproximo al conocimiento como científico(a) social",
+    "enunciado": "Hago preguntas acerca de los fenómenos políticos, económicos sociales y culturales estudiados (Prehistoria, pueblos prehispánicos colombianos…).",
+    "evidencias_aprendizaje": [
+      "Planteo conjeturas que respondan provisionalmente a estas preguntas.",
+      "Utilizo diferentes tipos de fuentes para obtener la información que necesito (textos escolares, cuentos y relatos, entrevistas a profesores y familiares, dibujos, fotografías y recursos virtuales…).",
+      "Organizo la información obtenida utilizando cuadros, gráficas… y la archivo en orden.",
+      "Establezco relaciones entre información localizada en diferentes fuentes y propongo respuestas a las preguntas que planteo.",
+      "Utilizo diversas formas de expresión (exposición oral, dibujos, carteleras, textos cortos…) para comunicar los resultados de mi investigación."
+    ],
+    "etiquetas": ["indagación social", "prehistoria"]
+  },
+  {
+    "areaCodigo": "CS-HGD",
+    "grupo_grados": "4-5",
+    "organizador": "Relaciones con la historia y las culturas",
+    "competencia": "Manejo conocimientos propios de las ciencias sociales",
+    "enunciado": "Reconozco algunas características físicas y culturales de mi entorno, su interacción y las consecuencias sociales, políticas y económicas que resultan de ellas.",
+    "evidencias_aprendizaje": [
+      "Identifico y explico fenómenos sociales y económicos que permitieron el paso del nomadismo al sedentarismo (agricultura, división del trabajo...).",
+      "Identifico y describo características sociales, políticas, económicas y culturales de las primeras organizaciones humanas (banda, clan, tribu...).",
+      "Identifico, describo y comparo algunas características sociales, políticas, económicas y culturales de las comunidades prehispánicas de Colombia y América.",
+      "Identifico los propósitos de las organizaciones coloniales españolas y describo aspectos básicos de su funcionamiento.",
+      "Identifico y comparo algunas causas que dieron lugar a los diferentes períodos históricos en Colombia (Descubrimiento, Colonia, Independencia...)."
+    ],
+    "etiquetas": ["organizaciones prehispánicas", "colonia"]
+  },
+  {
+    "areaCodigo": "CS-HGD",
+    "grupo_grados": "4-5",
+    "organizador": "Relaciones espaciales y ambientales",
+    "competencia": "Manejo conocimientos propios de las ciencias sociales",
+    "enunciado": "Reconozco la utilidad de las organizaciones político-administrativas y sus cambios a través del tiempo como resultado de acuerdos y conflictos.",
+    "evidencias_aprendizaje": [
+      "Me ubico en el entorno físico utilizando referentes espaciales (izquierda, derecha, puntos cardinales).",
+      "Utilizo coordenadas, escalas y convenciones para ubicar los fenómenos históricos y culturales en mapas y planos de representación.",
+      "Identifico y describo características de las diferentes regiones naturales del mundo (desiertos, polos, selva húmeda tropical, océanos…).",
+      "Clasifico y describo diferentes actividades económicas (producción, distribución, consumo…) en diferentes sectores económicos (agrícola, ganadero, minero, industrial...) y reconozco su impacto en las comunidades.",
+      "Reconozco los diferentes usos que se le dan a la tierra y a los recursos naturales en mi entorno y en otros."
+    ],
+    "etiquetas": ["organización político-administrativa", "regiones naturales"]
+  },
+  {
+    "areaCodigo": "CS-HGD",
+    "grupo_grados": "4-5",
+    "organizador": "Relaciones ético-políticas",
+    "competencia": "Manejo conocimientos propios de las ciencias sociales",
+    "enunciado": "Reconozco la utilidad de las organizaciones político-administrativas y sus cambios a través del tiempo como resultado de acuerdos y conflictos.",
+    "evidencias_aprendizaje": [
+      "Identifico y describo algunas características de las organizaciones político-administrativas colombianas en diferentes épocas (Real Audiencia, Congreso, Concejo Municipal…).",
+      "Comparo características del sistema político-administrativo de Colombia –ramas del poder público– en las diferentes épocas.",
+      "Explico semejanzas y diferencias entre organizaciones político-administrativas.",
+      "Explico el impacto de algunos hechos históricos en la formación limítrofe del territorio colombiano (Virreinato de la Nueva Granada, Gran Colombia, separación de Panamá…).",
+      "Reconozco las responsabilidades que tienen las personas elegidas por voto popular y algunas características de sus cargos (personeros estudiantiles, concejales, congresistas, presidente…)."
+    ],
+    "etiquetas": ["ramas del poder público", "organización territorial"]
+  },
+  {
+    "areaCodigo": "CS-HGD",
+    "grupo_grados": "4-5",
+    "organizador": "Desarrollo de compromisos personales y sociales",
+    "competencia": "Desarrollo compromisos personales y sociales",
+    "enunciado": "Reconozco y respeto diferentes puntos de vista acerca de un fenómeno social.",
+    "evidencias_aprendizaje": [
+      "Participo en debates y discusiones: asumo una posición, la confronto con la de otros, la defiendo y soy capaz de modificar mis posturas si lo considero pertinente.",
+      "Respeto mis rasgos individuales y culturales y los de otras personas (género, etnia…).",
+      "Asumo una posición crítica frente a situaciones de discriminación y abuso por irrespeto a los rasgos individuales de las personas (etnia, género…) y propongo formas de cambiarlas.",
+      "Reconozco la importancia de los aportes de algunos legados culturales, científicos, tecnológicos, artísticos, religiosos… en diversas épocas y entornos.",
+      "Participo en la construcción de normas para la convivencia en los grupos a los que pertenezco (familia, colegio, barrio...)."
+    ],
+    "etiquetas": ["compromiso social", "debate"]
+  },
+  {
+    "areaCodigo": "CS-HGD",
+    "grupo_grados": "6-7",
+    "organizador": "Indagación y pensamiento científico",
+    "competencia": "Me aproximo al conocimiento como científico(a) social",
+    "enunciado": "Formulo preguntas acerca de hechos políticos, económicos sociales y culturales.",
+    "evidencias_aprendizaje": [
+      "Planteo conjeturas que respondan provisionalmente estas preguntas.",
+      "Recolecto y registro sistemáticamente información que obtengo de diferentes fuentes (orales, escritas, iconográficas, virtuales…).",
+      "Identifico las características básicas de los documentos que utilizo (qué tipo de documento es, quién es el autor, a quién está dirigido, de qué habla...).",
+      "Clasifico correctamente las fuentes que utilizo (primarias, secundarias, orales, escritas, iconográficas…).",
+      "Establezco relaciones entre información localizada en diferentes fuentes y propongo respuestas a las preguntas que planteo.",
+      "Utilizo diversas formas de expresión (escritos, exposiciones orales, carteleras…), para comunicar los resultados de mi investigación."
+    ],
+    "etiquetas": ["indagación social", "fuentes documentales"]
+  },
+  {
+    "areaCodigo": "CS-HGD",
+    "grupo_grados": "6-7",
+    "organizador": "Relaciones con la historia y las culturas",
+    "competencia": "Manejo conocimientos propios de las ciencias sociales",
+    "enunciado": "Reconozco y valoro la presencia de diversos legados culturales –de diferentes épocas y regiones– para el desarrollo de la humanidad.",
+    "evidencias_aprendizaje": [
+      "Describo características de la organización social, política o económica en algunas culturas y épocas (la democracia en los griegos, los sistemas de producción de la civilización inca, el feudalismo en el medioevo, el surgimiento del Estado en el Renacimiento...).",
+      "Establezco relaciones entre estas culturas y sus épocas.",
+      "Comparo diferentes culturas con la sociedad colombiana actual y propongo explicaciones para las semejanzas y diferencias que encuentro.",
+      "Comparo legados culturales (científicos, tecnológicos, artísticos, religiosos…) de diferentes grupos culturales y reconozco su impacto en la actualidad.",
+      "Identifico y comparo las características de la organización social en las colonias españolas, portuguesas e inglesas en América.",
+      "Identifico y comparo el legado de cada una de las culturas involucradas en el encuentro Europa-América-África."
+    ],
+    "etiquetas": ["legado cultural", "colonización"]
+  },
+  {
+    "areaCodigo": "CS-HGD",
+    "grupo_grados": "6-7",
+    "organizador": "Relaciones espaciales y ambientales",
+    "competencia": "Manejo conocimientos propios de las ciencias sociales",
+    "enunciado": "Analizo cómo diferentes culturas producen, transforman y distribuyen recursos, bienes y servicios de acuerdo con las características físicas de su entorno.",
+    "evidencias_aprendizaje": [
+      "Reconozco características de la Tierra que la hacen un planeta vivo.",
+      "Utilizo coordenadas, convenciones y escalas para trabajar con mapas y planos de representación.",
+      "Localizo diversas culturas en el espacio geográfico y reconozco las principales características físicas de su entorno.",
+      "Identifico sistemas de producción en diferentes culturas y períodos históricos y establezco relaciones entre ellos.",
+      "Comparo las organizaciones económicas de diferentes culturas con las de la actualidad en Colombia y propongo explicaciones para las semejanzas y diferencias que encuentro.",
+      "Describo las características que permiten dividir a Colombia en regiones naturales.",
+      "Identifico factores económicos, sociales, políticos y geográficos que han generado procesos de movilidad poblacional en las diferentes culturas y períodos históricos."
+    ],
+    "etiquetas": ["sistemas de producción", "regiones naturales de Colombia"]
+  },
+  {
+    "areaCodigo": "CS-HGD",
+    "grupo_grados": "6-7",
+    "organizador": "Relaciones ético-políticas",
+    "competencia": "Manejo conocimientos propios de las ciencias sociales",
+    "enunciado": "Reconozco algunos de los sistemas políticos que se establecieron en diferentes épocas y culturas y las principales ideas que buscan legitimarlos.",
+    "evidencias_aprendizaje": [
+      "Identifico normas en algunas de las culturas y épocas estudiadas y las comparo con algunas normas vigentes en Colombia.",
+      "Identifico las ideas que legitimaban el sistema político y el sistema jurídico en algunas de las culturas estudiadas.",
+      "Reconozco y describo diferentes formas que ha asumido la democracia a través de la historia.",
+      "Comparo entre sí algunos sistemas políticos estudiados y a su vez con el sistema político colombiano.",
+      "Identifico criterios que permiten establecer la división política de un territorio.",
+      "Comparo y explico cambios en la división política de Colombia y América en diferentes épocas."
+    ],
+    "etiquetas": ["sistemas políticos", "democracia"]
+  },
+  {
+    "areaCodigo": "CS-HGD",
+    "grupo_grados": "6-7",
+    "organizador": "Desarrollo de compromisos personales y sociales",
+    "competencia": "Desarrollo compromisos personales y sociales",
+    "enunciado": "Reconozco y respeto las diferentes posturas frente a los fenómenos sociales.",
+    "evidencias_aprendizaje": [
+      "Participo en debates y discusiones: asumo una posición, la confronto, la defiendo y soy capaz de modificar mis posturas cuando reconozco mayor peso en los argumentos de otras personas.",
+      "Asumo una posición crítica frente a situaciones de discriminación (etnia, género...) y propongo formas de cambiarlas.",
+      "Participo en la construcción de normas para la convivencia en los grupos a los que pertenezco (familia, colegio, organización juvenil, equipos deportivos...).",
+      "Comparto y acato las normas que ayudan a regular la convivencia en los grupos sociales a los que pertenezco.",
+      "Participo activamente en la conformación del gobierno escolar.",
+      "Asumo una posición crítica frente al deterioro del medio ambiente y participo en su protección."
+    ],
+    "etiquetas": ["debate", "gobierno escolar"]
+  },
+  {
+    "areaCodigo": "CS-HGD",
+    "grupo_grados": "8-9",
+    "organizador": "Indagación y pensamiento científico",
+    "competencia": "Me aproximo al conocimiento como científico(a) social",
+    "enunciado": "Formulo preguntas acerca de hechos políticos, económicos sociales y culturales.",
+    "evidencias_aprendizaje": [
+      "Planteo hipótesis que respondan provisionalmente estas preguntas.",
+      "Hago planes de búsqueda que incluyan posibles fuentes primarias y secundarias (orales, escritas, iconográficas, virtuales…) y diferentes términos para encontrar información que conteste mis preguntas.",
+      "Clasifico las fuentes que utilizo (en primarias o secundarias, y en orales, escritas, iconográficas, estadísticas…).",
+      "Analizo críticamente los documentos que utilizo e identifico sus tesis.",
+      "Utilizo mapas, cuadros, tablas, gráficas y cálculos estadísticos para analizar información.",
+      "Promuevo debates para discutir los resultados de mis observaciones."
+    ],
+    "etiquetas": ["indagación social", "análisis de fuentes"]
+  },
+  {
+    "areaCodigo": "CS-HGD",
+    "grupo_grados": "8-9",
+    "organizador": "Relaciones con la historia y las culturas",
+    "competencia": "Manejo conocimientos propios de las ciencias sociales",
+    "enunciado": "Identifico el potencial de diversos legados sociales, políticos, económicos y culturales como fuentes de identidad, promotores del desarrollo y fuentes de cooperación y conflicto en Colombia.",
+    "evidencias_aprendizaje": [
+      "Explico las principales características de algunas revoluciones de los siglos XVIII y XIX (Revolución Francesa, Revolución Industrial...).",
+      "Explico la influencia de estas revoluciones en algunos procesos sociales, políticos y económicos posteriores en Colombia y América Latina.",
+      "Analizo algunas de las condiciones sociales, económicas, políticas y culturales que dieron origen a los procesos de independencia de los pueblos americanos.",
+      "Explico algunos de los grandes cambios sociales que se dieron en Colombia entre los siglos XIX y primera mitad del XX (abolición de la esclavitud, surgimiento de movimientos obreros...).",
+      "Describo el impacto del proceso de modernización (desarrollo de los medios de comunicación, industrialización, urbanización...) en la organización social, política, económica y cultural de Colombia en el siglo XIX y en la primera mitad del XX."
+    ],
+    "etiquetas": ["independencia americana", "modernización"]
+  },
+  {
+    "areaCodigo": "CS-HGD",
+    "grupo_grados": "8-9",
+    "organizador": "Relaciones espaciales y ambientales",
+    "competencia": "Manejo conocimientos propios de las ciencias sociales",
+    "enunciado": "Reconozco y analizo la interacción permanente entre el espacio geográfico y el ser humano y evalúo críticamente los avances y limitaciones de esta relación.",
+    "evidencias_aprendizaje": [
+      "Describo las principales características físicas de los diversos ecosistemas.",
+      "Explico la manera como el medio ambiente influye en el tipo de organización social y económica que se da en las regiones de Colombia.",
+      "Comparo las maneras como distintas comunidades, etnias y culturas se han relacionado económicamente con el medio ambiente en Colombia a lo largo de la historia (pesca de subienda, cultivo en terrazas...).",
+      "Comparo las causas de algunas olas de migración y desplazamiento humano en nuestro territorio a lo largo del siglo XIX y la primera mitad del siglo XX (colonización antioqueña, urbanización del país...).",
+      "Explico las políticas que orientaron la economía colombiana a lo largo del siglo XIX y primera mitad del XX (proteccionismo, liberalismo económico...)."
+    ],
+    "etiquetas": ["ecosistemas", "migración", "economía colombiana"]
+  },
+  {
+    "areaCodigo": "CS-HGD",
+    "grupo_grados": "8-9",
+    "organizador": "Relaciones ético-políticas",
+    "competencia": "Manejo conocimientos propios de las ciencias sociales",
+    "enunciado": "Analizo críticamente los elementos constituyentes de la democracia, los derechos de las personas y la identidad en Colombia.",
+    "evidencias_aprendizaje": [
+      "Comparo los mecanismos de participación ciudadana contemplados en las constituciones políticas de 1886 y 1991 y evalúo su aplicabilidad.",
+      "Identifico algunas formas en las que organizaciones estudiantiles, movimientos sociales, partidos políticos, sindicatos... participaron en la actividad política colombiana a lo largo del siglo XIX y la primera mitad del siglo XX.",
+      "Identifico y explico algunos de los principales procesos políticos del siglo XIX en Colombia (federalismo, centralismo, radicalismo liberal, Regeneración...).",
+      "Comparo algunos de los procesos políticos que tuvieron lugar en Colombia en los siglos XIX y XX (por ejemplo, radicalismo liberal y Revolución en Marcha; Regeneración y Frente Nacional; constituciones políticas de 1886 y 1991...)."
+    ],
+    "etiquetas": ["constitución política", "participación ciudadana"]
+  },
+  {
+    "areaCodigo": "CS-HGD",
+    "grupo_grados": "8-9",
+    "organizador": "Desarrollo de compromisos personales y sociales",
+    "competencia": "Desarrollo compromisos personales y sociales",
+    "enunciado": "Respeto diferentes posturas frente a los fenómenos sociales.",
+    "evidencias_aprendizaje": [
+      "Participo en discusiones y debates académicos.",
+      "Asumo una posición crítica frente a situaciones de discriminación y abuso por irrespeto a las posiciones ideológicas y propongo formas de cambiarlas.",
+      "Reconozco que los derechos fundamentales de las personas están por encima de su género, su filiación política, religión, etnia…",
+      "Reconozco la importancia del patrimonio cultural y contribuyo con su preservación.",
+      "Reconozco en el pago de los impuestos una forma importante de solidaridad ciudadana.",
+      "Utilizo mecanismos de participación establecidos en la Constitución y en organizaciones a las que pertenezco."
+    ],
+    "etiquetas": ["patrimonio cultural", "participación política"]
+  },
+  {
+    "areaCodigo": "CS-HGD",
+    "grupo_grados": "10-11",
+    "organizador": "Indagación y pensamiento científico",
+    "competencia": "Me aproximo al conocimiento como científico(a) social",
+    "enunciado": "Realizo investigaciones como lo hacen los científicos sociales: diseño proyectos, desarrollo investigaciones y presento resultados.",
+    "evidencias_aprendizaje": [
+      "Planteo un tema o problema de investigación, lo delimito espacial y temporalmente y justifico su importancia.",
+      "Defino los objetivos y la hipótesis del trabajo y describo la metodología que seguiré, incluyendo un plan de búsqueda de información pertinente.",
+      "Hago una revisión bibliográfica siguiendo mi plan y analizo críticamente los documentos que encuentro.",
+      "Recojo, registro, clasifico, comparo e interpreto la información obtenida en las diversas fuentes.",
+      "Utilizo herramientas de las diferentes disciplinas de las ciencias sociales para analizar la información y saco conclusiones.",
+      "Utilizo diversas formas de expresión para dar a conocer los resultados de mi investigación y promuevo debates para discutirlos."
+    ],
+    "etiquetas": ["investigación social", "proyecto de investigación"]
+  },
+  {
+    "areaCodigo": "CS-HGD",
+    "grupo_grados": "10-11",
+    "organizador": "Relaciones con la historia y las culturas",
+    "competencia": "Manejo conocimientos propios de las ciencias sociales",
+    "enunciado": "Identifico algunas características culturales y sociales de los procesos de transformación que se generaron a partir del desarrollo político y económico de Colombia y el mundo a lo largo del siglo XX.",
+    "evidencias_aprendizaje": [
+      "Explico el origen del régimen bipartidista en Colombia.",
+      "Analizo el periodo conocido como «la Violencia» y establezco relaciones con las formas actuales de violencia.",
+      "Identifico las causas, características y consecuencias del Frente Nacional.",
+      "Explico el surgimiento de la guerrilla, el paramilitarismo y el narcotráfico en Colombia.",
+      "Identifico y analizo las diferentes formas del orden mundial en el siglo XX (Guerra Fría, globalización, enfrentamiento Oriente-Occidente...).",
+      "Reconozco el cambio en la posición de la mujer en el mundo y en Colombia a lo largo del siglo XX y su incidencia en el desarrollo político, económico, social, cultural, familiar y personal."
+    ],
+    "etiquetas": ["siglo XX en Colombia", "conflicto armado"]
+  },
+  {
+    "areaCodigo": "CS-HGD",
+    "grupo_grados": "10-11",
+    "organizador": "Relaciones espaciales y ambientales",
+    "competencia": "Manejo conocimientos propios de las ciencias sociales",
+    "enunciado": "Comprendo diferentes teorías y modelos económicos en el siglo XX y formulo hipótesis que me permitan explicar la situación de Colombia en este contexto.",
+    "evidencias_aprendizaje": [
+      "Identifico los principales postulados del liberalismo clásico, el socialismo, el marxismo-leninismo… y analizo la vigencia actual de algunos de ellos.",
+      "Establezco algunas relaciones entre los diferentes modelos de desarrollo económico utilizados en Colombia y América Latina y las ideologías que los sustentan.",
+      "Explico y evalúo el impacto del desarrollo industrial y tecnológico sobre el medio ambiente y el ser humano.",
+      "Identifico algunos factores que han dado origen a las nuevas formas de organización de la economía mundial (bloques económicos, tratados de libre comercio, áreas de libre comercio...).",
+      "Reconozco el impacto de la globalización sobre las distintas economías y reconozco diferentes reacciones ante este fenómeno."
+    ],
+    "etiquetas": ["modelos económicos", "globalización"]
+  },
+  {
+    "areaCodigo": "CS-HGD",
+    "grupo_grados": "10-11",
+    "organizador": "Relaciones ético-políticas",
+    "competencia": "Manejo conocimientos propios de las ciencias sociales",
+    "enunciado": "Comprendo que el ejercicio político es el resultado de esfuerzos por resolver conflictos y tensiones que surgen en las relaciones de poder entre los Estados y en el interior de ellos mismos.",
+    "evidencias_aprendizaje": [
+      "Describo el impacto de hechos políticos de mediados del siglo XX (9 de abril, Frente Nacional…) en las organizaciones sociales, políticas y económicas del país.",
+      "Analizo el paso de un sistema democrático representativo a un sistema democrático participativo en Colombia.",
+      "Reconozco y explico los cambios y continuidades en los movimientos guerrilleros en Colombia desde su surgimiento hasta la actualidad.",
+      "Identifico causas y consecuencias de los procesos de desplazamiento forzado de poblaciones y reconozco los derechos que protegen a estas personas.",
+      "Identifico las organizaciones internacionales que surgieron a lo largo del siglo XX (ONU, OEA…) y evalúo el impacto de su gestión en el ámbito nacional e internacional."
+    ],
+    "etiquetas": ["democracia participativa", "desplazamiento forzado"]
+  },
+  {
+    "areaCodigo": "CS-HGD",
+    "grupo_grados": "10-11",
+    "organizador": "Desarrollo de compromisos personales y sociales",
+    "competencia": "Desarrollo compromisos personales y sociales",
+    "enunciado": "Respeto diferentes posturas frente a los fenómenos sociales.",
+    "evidencias_aprendizaje": [
+      "Participo en debates y discusiones académicas.",
+      "Propongo la realización de eventos académicos (foros, mesas redondas, paneles…).",
+      "Asumo una posición crítica frente a situaciones de discriminación ante posiciones ideológicas y propongo mecanismos para cambiar estas situaciones.",
+      "Analizo críticamente la influencia de los medios de comunicación en la vida de las personas y de las comunidades.",
+      "Promuevo campañas para fomentar la cultura del pago de impuestos y ejerzo vigilancia sobre el gasto público en mi comunidad.",
+      "Asumo una posición crítica frente a los procesos de paz que se han llevado a cabo en Colombia, teniendo en cuenta las posturas de las partes involucradas."
+    ],
+    "etiquetas": ["procesos de paz", "vigilancia ciudadana"]
+  },
+  {
+    "areaCodigo": "CNAT-BAS",
+    "grupo_grados": "1-3",
+    "organizador": "Indagación y pensamiento científico",
+    "competencia": "Me aproximo al conocimiento como científico(a) natural",
+    "enunciado": "Observo mi entorno.",
+    "evidencias_aprendizaje": [
+      "Formulo preguntas sobre objetos, organismos y fenómenos de mi entorno y exploro posibles respuestas.",
+      "Hago conjeturas para responder mis preguntas.",
+      "Diseño y realizo experiencias para poner a prueba mis conjeturas.",
+      "Realizo mediciones con instrumentos convencionales (regla, metro, termómetro, reloj, balanza...) y no convencionales (vasos, tazas, cuartas, pies, pasos...).",
+      "Registro mis observaciones en forma organizada y rigurosa (sin alteraciones), utilizando dibujos, palabras y números.",
+      "Busco información en diversas fuentes (libros, Internet, experiencias propias y de otros...) y doy el crédito correspondiente.",
+      "Comunico de diferentes maneras el proceso de indagación y los resultados obtenidos."
+    ],
+    "etiquetas": ["indagación científica", "observación"]
+  },
+  {
+    "areaCodigo": "CNAT-BAS",
+    "grupo_grados": "1-3",
+    "organizador": "Entorno vivo",
+    "competencia": "Manejo conocimientos propios de las ciencias naturales",
+    "enunciado": "Me identifico como un ser vivo que comparte algunas características con otros seres vivos y que se relaciona con ellos en un entorno en el que todos nos desarrollamos.",
+    "evidencias_aprendizaje": [
+      "Establezco relaciones entre las funciones de los cinco sentidos.",
+      "Describo mi cuerpo y el de mis compañeros y compañeras.",
+      "Describo características de seres vivos y objetos inertes, establezco semejanzas y diferencias entre ellos y los clasifico.",
+      "Observo y describo cambios en mi desarrollo y en el de otros seres vivos.",
+      "Describo y verifico ciclos de vida de seres vivos.",
+      "Reconozco que los hijos y las hijas se parecen a sus padres y describo algunas características que se heredan.",
+      "Identifico y describo la flora, la fauna, el agua y el suelo de mi entorno.",
+      "Explico adaptaciones de los seres vivos al ambiente."
+    ],
+    "etiquetas": ["seres vivos", "ciclo de vida", "herencia"]
+  },
+  {
+    "areaCodigo": "CNAT-BAS",
+    "grupo_grados": "1-3",
+    "organizador": "Entorno físico",
+    "competencia": "Manejo conocimientos propios de las ciencias naturales",
+    "enunciado": "Reconozco en el entorno fenómenos físicos que me afectan y desarrollo habilidades para aproximarme a ellos.",
+    "evidencias_aprendizaje": [
+      "Describo y clasifico objetos según características que percibo con los cinco sentidos.",
+      "Propongo y verifico diversas formas de medir sólidos y líquidos.",
+      "Identifico diferentes estados físicos de la materia (el agua, por ejemplo) y verifico causas para cambios de estado.",
+      "Identifico y comparo fuentes de luz, calor y sonido y su efecto sobre diferentes seres vivos.",
+      "Identifico tipos de movimiento en seres vivos y objetos, y las fuerzas que los producen.",
+      "Verifico las fuerzas a distancia generadas por imanes sobre diferentes objetos.",
+      "Construyo circuitos eléctricos simples con pilas.",
+      "Registro el movimiento del Sol, la Luna y las estrellas en el cielo, en un periodo de tiempo."
+    ],
+    "etiquetas": ["materia", "energía", "circuitos eléctricos"]
+  },
+  {
+    "areaCodigo": "CNAT-BAS",
+    "grupo_grados": "1-3",
+    "organizador": "Ciencia, tecnología y sociedad",
+    "competencia": "Manejo conocimientos propios de las ciencias naturales",
+    "enunciado": "Valoro la utilidad de algunos objetos y técnicas desarrollados por el ser humano y reconozco que somos agentes de cambio en el entorno y en la sociedad.",
+    "evidencias_aprendizaje": [
+      "Clasifico y comparo objetos según sus usos.",
+      "Diferencio objetos naturales de objetos creados por el ser humano.",
+      "Identifico objetos que emitan luz o sonido y circuitos eléctricos en mi entorno.",
+      "Analizo la utilidad de algunos aparatos eléctricos a mi alrededor.",
+      "Identifico aparatos que utilizamos hoy y que no se utilizaban en épocas pasadas.",
+      "Asocio el clima con la forma de vida de diferentes comunidades.",
+      "Identifico necesidades de cuidado de mi cuerpo y el de otras personas."
+    ],
+    "etiquetas": ["ciencia y tecnología", "objetos cotidianos"]
+  },
+  {
+    "areaCodigo": "CNAT-BAS",
+    "grupo_grados": "1-3",
+    "organizador": "Desarrollo de compromisos personales y sociales",
+    "competencia": "Desarrollo compromisos personales y sociales",
+    "enunciado": "Escucho activamente a mis compañeros y compañeras y reconozco puntos de vista diferentes.",
+    "evidencias_aprendizaje": [
+      "Valoro y utilizo el conocimiento de diversas personas de mi entorno.",
+      "Cumplo mi función y respeto la de otras personas en el trabajo en grupo.",
+      "Reconozco la importancia de animales, plantas, agua y suelo de mi entorno y propongo estrategias para cuidarlos.",
+      "Respeto y cuido los seres vivos y los objetos de mi entorno."
+    ],
+    "etiquetas": ["trabajo en grupo", "cuidado del entorno"]
+  },
+  {
+    "areaCodigo": "CNAT-BAS",
+    "grupo_grados": "4-5",
+    "organizador": "Indagación y pensamiento científico",
+    "competencia": "Me aproximo al conocimiento como científico(a) natural",
+    "enunciado": "Observo el mundo en el que vivo.",
+    "evidencias_aprendizaje": [
+      "Formulo preguntas a partir de una observación o experiencia y escojo algunas de ellas para buscar posibles respuestas.",
+      "Propongo explicaciones provisionales para responder mis preguntas.",
+      "Identifico condiciones que influyen en los resultados de una experiencia y que pueden permanecer constantes o cambiar (variables).",
+      "Diseño y realizo experimentos modificando una sola variable para dar respuesta a preguntas.",
+      "Realizo mediciones con instrumentos convencionales (balanza, báscula, cronómetro, termómetro...) y no convencionales.",
+      "Registro mis observaciones, datos y resultados de manera organizada y rigurosa, en forma escrita y utilizando esquemas, gráficos y tablas.",
+      "Saco conclusiones de mis experimentos, aunque no obtenga los resultados esperados."
+    ],
+    "etiquetas": ["experimentación", "variables"]
+  },
+  {
+    "areaCodigo": "CNAT-BAS",
+    "grupo_grados": "4-5",
+    "organizador": "Entorno vivo",
+    "competencia": "Manejo conocimientos propios de las ciencias naturales",
+    "enunciado": "Identifico estructuras de los seres vivos que les permiten desarrollarse en un entorno y que puedo utilizar como criterios de clasificación.",
+    "evidencias_aprendizaje": [
+      "Explico la importancia de la célula como unidad básica de los seres vivos.",
+      "Identifico los niveles de organización celular de los seres vivos.",
+      "Represento los diversos sistemas de órganos del ser humano y explico su función.",
+      "Clasifico seres vivos en diversos grupos taxonómicos (plantas, animales, microorganismos…).",
+      "Analizo el ecosistema que me rodea y lo comparo con otros.",
+      "Explico la dinámica de un ecosistema, teniendo en cuenta las necesidades de energía y nutrientes de los seres vivos (cadena alimentaria).",
+      "Identifico fenómenos de camuflaje en el entorno y los relaciono con las necesidades de los seres vivos."
+    ],
+    "etiquetas": ["célula", "ecosistema", "taxonomía"]
+  },
+  {
+    "areaCodigo": "CNAT-BAS",
+    "grupo_grados": "4-5",
+    "organizador": "Entorno físico",
+    "competencia": "Manejo conocimientos propios de las ciencias naturales",
+    "enunciado": "Identifico transformaciones en mi entorno a partir de la aplicación de algunos principios físicos, químicos y biológicos que permiten el desarrollo de tecnologías.",
+    "evidencias_aprendizaje": [
+      "Describo y verifico el efecto de la transferencia de energía térmica en los cambios de estado de algunas sustancias.",
+      "Verifico la posibilidad de mezclar diversos líquidos, sólidos y gases y propongo métodos de separación de mezclas.",
+      "Relaciono el estado de reposo o movimiento de un objeto con las fuerzas aplicadas sobre éste.",
+      "Verifico la conducción de electricidad o calor en materiales e identifico las funciones de los componentes de un circuito eléctrico.",
+      "Describo los principales elementos del sistema solar y establezco relaciones de tamaño, movimiento y posición.",
+      "Describo las características físicas de la Tierra y su atmósfera.",
+      "Establezco relaciones entre mareas, corrientes marinas, movimiento de placas tectónicas, formas del paisaje y relieve, y las fuerzas que los generan."
+    ],
+    "etiquetas": ["cambios de estado", "sistema solar", "circuitos eléctricos"]
+  },
+  {
+    "areaCodigo": "CNAT-BAS",
+    "grupo_grados": "4-5",
+    "organizador": "Ciencia, tecnología y sociedad",
+    "competencia": "Manejo conocimientos propios de las ciencias naturales",
+    "enunciado": "Identifico aplicaciones comerciales e industriales del transporte de energía y de las interacciones de la materia.",
+    "evidencias_aprendizaje": [
+      "Identifico máquinas simples en objetos cotidianos y describo su utilidad; construyo máquinas simples para solucionar problemas cotidianos.",
+      "Analizo características ambientales de mi entorno y peligros que lo amenazan.",
+      "Establezco relaciones entre el efecto invernadero, la lluvia ácida y el debilitamiento de la capa de ozono con la contaminación atmosférica.",
+      "Asocio el clima y otras características del entorno con los materiales de construcción, los aparatos eléctricos más utilizados, los recursos naturales y las costumbres de diferentes comunidades.",
+      "Identifico y describo aparatos que generan energía luminosa, térmica y mecánica.",
+      "Reconozco los efectos nocivos del exceso en el consumo de cafeína, tabaco, drogas y licores."
+    ],
+    "etiquetas": ["máquinas simples", "contaminación", "tecnología"]
+  },
+  {
+    "areaCodigo": "CNAT-BAS",
+    "grupo_grados": "4-5",
+    "organizador": "Desarrollo de compromisos personales y sociales",
+    "competencia": "Desarrollo compromisos personales y sociales",
+    "enunciado": "Escucho activamente a mis compañeros y compañeras, reconozco puntos de vista diferentes y los comparo con los míos.",
+    "evidencias_aprendizaje": [
+      "Reconozco y acepto el escepticismo de mis compañeros y compañeras ante la información que presento.",
+      "Valoro y utilizo el conocimiento de diferentes personas de mi entorno.",
+      "Cumplo mi función cuando trabajo en grupo, respeto las funciones de otros y contribuyo a lograr productos comunes.",
+      "Propongo alternativas para cuidar mi entorno y evitar peligros que lo amenazan.",
+      "Cuido, respeto y exijo respeto por mi cuerpo y el de las demás personas."
+    ],
+    "etiquetas": ["trabajo en grupo", "cuidado del entorno"]
+  },
+  {
+    "areaCodigo": "CNAT-BAS",
+    "grupo_grados": "6-7",
+    "organizador": "Indagación y pensamiento científico",
+    "competencia": "Me aproximo al conocimiento como científico(a) natural",
+    "enunciado": "Observo fenómenos específicos.",
+    "evidencias_aprendizaje": [
+      "Formulo preguntas específicas sobre una observación o experiencia y escojo una para indagar y encontrar posibles respuestas.",
+      "Formulo explicaciones posibles, con base en el conocimiento cotidiano, teorías y modelos científicos, para contestar preguntas.",
+      "Diseño y realizo experimentos y verifico el efecto de modificar diversas variables para dar respuesta a preguntas.",
+      "Realizo mediciones con instrumentos y equipos adecuados a las características y magnitudes de los objetos y las expreso en las unidades correspondientes.",
+      "Establezco diferencias entre descripción, explicación y evidencia.",
+      "Utilizo las matemáticas como una herramienta para organizar, analizar y presentar datos.",
+      "Comunico oralmente y por escrito el proceso de indagación y los resultados que obtengo, utilizando gráficas, tablas y ecuaciones aritméticas."
+    ],
+    "etiquetas": ["indagación científica", "diseño experimental"]
+  },
+  {
+    "areaCodigo": "CNAT-BAS",
+    "grupo_grados": "6-7",
+    "organizador": "Entorno vivo",
+    "competencia": "Manejo conocimientos propios de las ciencias naturales",
+    "enunciado": "Identifico condiciones de cambio y de equilibrio en los seres vivos y en los ecosistemas.",
+    "evidencias_aprendizaje": [
+      "Explico la estructura de la célula y las funciones básicas de sus componentes.",
+      "Verifico y explico los procesos de ósmosis y difusión.",
+      "Clasifico organismos en grupos taxonómicos de acuerdo con las características de sus células.",
+      "Comparo sistemas de división celular y argumento su importancia en la generación de nuevos organismos y tejidos.",
+      "Explico las funciones de los seres vivos a partir de las relaciones entre diferentes sistemas de órganos.",
+      "Caracterizo ecosistemas y analizo el equilibrio dinámico entre sus poblaciones.",
+      "Describo y relaciono los ciclos del agua, de algunos elementos y de la energía en los ecosistemas.",
+      "Explico la función del suelo como depósito de nutrientes."
+    ],
+    "etiquetas": ["célula", "ecosistemas", "ciclos biogeoquímicos"]
+  },
+  {
+    "areaCodigo": "CNAT-BAS",
+    "grupo_grados": "6-7",
+    "organizador": "Entorno físico",
+    "competencia": "Manejo conocimientos propios de las ciencias naturales",
+    "enunciado": "Evalúo el potencial de los recursos naturales, la forma como se han utilizado en desarrollos tecnológicos y las consecuencias de la acción del ser humano sobre ellos.",
+    "evidencias_aprendizaje": [
+      "Clasifico y verifico las propiedades de la materia y clasifico materiales en sustancias puras o mezclas.",
+      "Verifico la acción de fuerzas electrostáticas y magnéticas y explico su relación con la carga eléctrica.",
+      "Explico cómo un número limitado de elementos hace posible la diversidad de la materia conocida y explico y utilizo la tabla periódica como herramienta para predecir procesos químicos.",
+      "Relaciono energía y movimiento; verifico relaciones entre distancia recorrida, velocidad y fuerza involucrada en diversos tipos de movimiento.",
+      "Comparo masa, peso y densidad de diferentes materiales mediante experimentos.",
+      "Explico el modelo planetario desde las fuerzas gravitacionales y describo el proceso de formación y extinción de estrellas.",
+      "Explico las consecuencias del movimiento de las placas tectónicas sobre la corteza de la Tierra."
+    ],
+    "etiquetas": ["tabla periódica", "fuerzas", "placas tectónicas"]
+  },
+  {
+    "areaCodigo": "CNAT-BAS",
+    "grupo_grados": "6-7",
+    "organizador": "Ciencia, tecnología y sociedad",
+    "competencia": "Manejo conocimientos propios de las ciencias naturales",
+    "enunciado": "Identifico aplicaciones de algunos conocimientos sobre la herencia y la reproducción al mejoramiento de la calidad de vida de las poblaciones.",
+    "evidencias_aprendizaje": [
+      "Analizo el potencial de los recursos naturales de mi entorno para la obtención de energía e indico sus posibles usos.",
+      "Identifico recursos renovables y no renovables y los peligros a los que están expuestos debido al desarrollo de los grupos humanos.",
+      "Identifico factores de contaminación en mi entorno y sus implicaciones para la salud.",
+      "Analizo las implicaciones y responsabilidades de la sexualidad y la reproducción para el individuo y para su comunidad.",
+      "Establezco relaciones entre transmisión de enfermedades y medidas de prevención y control.",
+      "Reconozco los efectos nocivos del exceso en el consumo de cafeína, tabaco, drogas y licores."
+    ],
+    "etiquetas": ["recursos naturales", "salud", "sexualidad"]
+  },
+  {
+    "areaCodigo": "CNAT-BAS",
+    "grupo_grados": "6-7",
+    "organizador": "Desarrollo de compromisos personales y sociales",
+    "competencia": "Desarrollo compromisos personales y sociales",
+    "enunciado": "Escucho activamente a mis compañeros y compañeras, reconozco otros puntos de vista, los comparo con los míos y puedo modificar lo que pienso ante argumentos más sólidos.",
+    "evidencias_aprendizaje": [
+      "Reconozco y acepto el escepticismo de mis compañeros y compañeras ante la información que presento.",
+      "Reconozco los aportes de conocimientos diferentes al científico.",
+      "Cumplo mi función cuando trabajo en grupo y respeto las funciones de las demás personas.",
+      "Identifico y acepto diferencias en las formas de vivir, pensar, solucionar problemas o aplicar conocimientos.",
+      "Diseño y aplico estrategias para el manejo de basuras en mi colegio.",
+      "Cuido, respeto y exijo respeto por mi cuerpo y por los cambios corporales que estoy viviendo y que viven las demás personas."
+    ],
+    "etiquetas": ["trabajo en grupo", "manejo de basuras"]
+  },
+  {
+    "areaCodigo": "CNAT-BAS",
+    "grupo_grados": "8-9",
+    "organizador": "Indagación y pensamiento científico",
+    "competencia": "Me aproximo al conocimiento como científico(a) natural",
+    "enunciado": "Observo fenómenos específicos.",
+    "evidencias_aprendizaje": [
+      "Formulo preguntas específicas sobre una observación, sobre una experiencia o sobre las aplicaciones de teorías científicas.",
+      "Formulo hipótesis, con base en el conocimiento cotidiano, teorías y modelos científicos.",
+      "Identifico y verifico condiciones que influyen en los resultados de un experimento y que pueden permanecer constantes o cambiar (variables).",
+      "Propongo modelos para predecir los resultados de mis experimentos.",
+      "Establezco relaciones causales y multicausales entre los datos recopilados.",
+      "Interpreto los resultados teniendo en cuenta el orden de magnitud del error experimental.",
+      "Comunico el proceso de indagación y los resultados, utilizando gráficas, tablas, ecuaciones aritméticas y algebraicas."
+    ],
+    "etiquetas": ["hipótesis", "modelos científicos"]
+  },
+  {
+    "areaCodigo": "CNAT-BAS",
+    "grupo_grados": "8-9",
+    "organizador": "Entorno vivo",
+    "competencia": "Manejo conocimientos propios de las ciencias naturales",
+    "enunciado": "Explico la variabilidad en las poblaciones y la diversidad biológica como consecuencia de estrategias de reproducción, cambios genéticos y selección natural.",
+    "evidencias_aprendizaje": [
+      "Reconozco la importancia del modelo de la doble hélice para la explicación del almacenamiento y transmisión del material hereditario.",
+      "Establezco relaciones entre los genes, las proteínas y las funciones celulares.",
+      "Comparo diferentes sistemas de reproducción y justifico la importancia de la reproducción sexual en el mantenimiento de la variabilidad.",
+      "Clasifico organismos en grupos taxonómicos de acuerdo con sus características celulares.",
+      "Comparo sistemas de órganos de diferentes grupos taxonómicos y explico la importancia de las hormonas en la regulación de las funciones en el ser humano.",
+      "Formulo hipótesis acerca del origen y evolución de un grupo de organismos.",
+      "Comparo diferentes teorías sobre el origen de las especies."
+    ],
+    "etiquetas": ["genética", "selección natural", "evolución"]
+  },
+  {
+    "areaCodigo": "CNAT-BAS",
+    "grupo_grados": "8-9",
+    "organizador": "Entorno físico",
+    "competencia": "Manejo conocimientos propios de las ciencias naturales",
+    "enunciado": "Explico condiciones de cambio y conservación en diversos sistemas, teniendo en cuenta transferencia y transporte de energía y su interacción con la materia.",
+    "evidencias_aprendizaje": [
+      "Comparo masa, peso, cantidad de sustancia y densidad de diferentes materiales.",
+      "Comparo sólidos, líquidos y gases teniendo en cuenta el movimiento de sus moléculas y las fuerzas electroestáticas.",
+      "Verifico las diferencias entre cambios químicos y mezclas y comparo los modelos que sustentan la definición ácido-base.",
+      "Establezco relaciones entre las variables de estado en un sistema termodinámico para predecir cambios físicos y químicos y las expreso matemáticamente.",
+      "Relaciono las diversas formas de transferencia de energía térmica con la formación de vientos.",
+      "Reconozco y diferencio modelos para explicar la naturaleza y el comportamiento de la luz."
+    ],
+    "etiquetas": ["termodinámica", "modelos ácido-base"]
+  },
+  {
+    "areaCodigo": "CNAT-BAS",
+    "grupo_grados": "8-9",
+    "organizador": "Ciencia, tecnología y sociedad",
+    "competencia": "Manejo conocimientos propios de las ciencias naturales",
+    "enunciado": "Identifico aplicaciones comerciales e industriales del transporte de energía y de las interacciones de la materia.",
+    "evidencias_aprendizaje": [
+      "Identifico la utilidad del ADN como herramienta de análisis genético y argumento las ventajas y desventajas de la manipulación genética.",
+      "Establezco la importancia de mantener la biodiversidad para estimular el desarrollo del país.",
+      "Indago sobre aplicaciones de la microbiología en la industria y comparo información química de las etiquetas de productos manufacturados.",
+      "Explico la relación entre ciclos termodinámicos y el funcionamiento de motores.",
+      "Explico factores culturales y tecnológicos que inciden en la sexualidad y reproducción humanas.",
+      "Identifico y explico medidas de prevención del embarazo y de las enfermedades de transmisión sexual.",
+      "Reconozco los efectos nocivos del exceso en el consumo de cafeína, tabaco, drogas y licores."
+    ],
+    "etiquetas": ["biotecnología", "salud sexual y reproductiva"]
+  },
+  {
+    "areaCodigo": "CNAT-BAS",
+    "grupo_grados": "8-9",
+    "organizador": "Desarrollo de compromisos personales y sociales",
+    "competencia": "Desarrollo compromisos personales y sociales",
+    "enunciado": "Escucho activamente a mis compañeros y compañeras, reconozco otros puntos de vista, los comparo con los míos y puedo modificar lo que pienso ante argumentos más sólidos.",
+    "evidencias_aprendizaje": [
+      "Reconozco y acepto el escepticismo de mis compañeros y compañeras ante la información que presento.",
+      "Reconozco los aportes de conocimientos diferentes al científico y reconozco que los modelos de la ciencia cambian con el tiempo y que varios pueden ser válidos simultáneamente.",
+      "Me informo para participar en debates sobre temas de interés general en ciencias.",
+      "Diseño y aplico estrategias para el manejo de basuras en mi colegio.",
+      "Tomo decisiones responsables y compartidas sobre mi sexualidad.",
+      "Analizo críticamente los papeles tradicionales de género en nuestra cultura con respecto a la sexualidad y la reproducción."
+    ],
+    "etiquetas": ["ética científica", "debates científicos"]
+  },
+  {
+    "areaCodigo": "CNAT-BAS",
+    "grupo_grados": "10-11",
+    "organizador": "Indagación y pensamiento científico",
+    "competencia": "Me aproximo al conocimiento como científico(a) natural",
+    "enunciado": "Observo y formulo preguntas específicas sobre aplicaciones de teorías científicas.",
+    "evidencias_aprendizaje": [
+      "Formulo hipótesis con base en el conocimiento cotidiano, teorías y modelos científicos.",
+      "Identifico variables que influyen en los resultados de un experimento y propongo modelos para predecir los resultados de mis experimentos y simulaciones.",
+      "Establezco diferencias entre descripción, explicación y evidencia, y entre modelos, teorías, leyes e hipótesis.",
+      "Utilizo las matemáticas para modelar, analizar y presentar datos y modelos en forma de ecuaciones, funciones y conversiones.",
+      "Establezco relaciones causales y multicausales entre los datos recopilados y relaciono la información con los datos de mis experimentos y simulaciones.",
+      "Comunico el proceso de indagación y los resultados, utilizando gráficas, tablas, ecuaciones aritméticas y algebraicas."
+    ],
+    "etiquetas": ["modelos científicos", "simulación"]
+  },
+  {
+    "areaCodigo": "CNAT-BAS",
+    "grupo_grados": "10-11",
+    "organizador": "Entorno vivo",
+    "competencia": "Procesos biológicos",
+    "enunciado": "Explico la diversidad biológica como consecuencia de cambios ambientales, genéticos y de relaciones dinámicas dentro de los ecosistemas.",
+    "evidencias_aprendizaje": [
+      "Explico la relación entre el ADN, el ambiente y la diversidad de los seres vivos.",
+      "Establezco relaciones entre mutación, selección natural y herencia.",
+      "Comparo casos en especies actuales que ilustren diferentes acciones de la selección natural.",
+      "Explico las relaciones entre materia y energía en las cadenas alimentarias y argumento la importancia de la fotosíntesis como proceso de conversión de energía.",
+      "Explico diversos tipos de relaciones entre especies en los ecosistemas y establezco relaciones entre individuo, población, comunidad y ecosistema.",
+      "Explico y comparo algunas adaptaciones de seres vivos en ecosistemas del mundo y de Colombia."
+    ],
+    "etiquetas": ["diversidad biológica", "selección natural", "ecosistemas"]
+  },
+  {
+    "areaCodigo": "CNAT-BAS",
+    "grupo_grados": "10-11",
+    "organizador": "Entorno físico",
+    "competencia": "Procesos químicos",
+    "enunciado": "Relaciono la estructura de las moléculas orgánicas e inorgánicas con sus propiedades físicas y químicas y su capacidad de cambio químico.",
+    "evidencias_aprendizaje": [
+      "Explico la estructura de los átomos a partir de diferentes teorías y explico la obtención de energía nuclear a partir de la alteración de la estructura del átomo.",
+      "Identifico cambios químicos en la vida cotidiana y en el ambiente y los explico desde diferentes modelos.",
+      "Explico la relación entre la estructura de los átomos y los enlaces que realiza, y verifico el efecto de presión y temperatura en los cambios químicos.",
+      "Uso la tabla periódica para determinar propiedades físicas y químicas de los elementos y realizo cálculos cuantitativos en cambios químicos.",
+      "Relaciono la estructura del carbono con la formación de moléculas orgánicas y relaciono grupos funcionales con las propiedades físicas y químicas de las sustancias."
+    ],
+    "etiquetas": ["química orgánica", "estructura atómica"]
+  },
+  {
+    "areaCodigo": "CNAT-BAS",
+    "grupo_grados": "10-11",
+    "organizador": "Ciencia, tecnología y sociedad",
+    "competencia": "Manejo conocimientos propios de las ciencias naturales",
+    "enunciado": "Identifico aplicaciones de diferentes modelos biológicos, químicos y físicos en procesos industriales y en el desarrollo tecnológico; analizo críticamente las implicaciones de sus usos.",
+    "evidencias_aprendizaje": [
+      "Explico aplicaciones tecnológicas del modelo de mecánica de fluidos y analizo el desarrollo de los componentes de los circuitos eléctricos y su impacto en la vida diaria.",
+      "Analizo el potencial de los recursos naturales en la obtención de energía para diferentes usos.",
+      "Explico el funcionamiento de algún antibiótico y reconozco la importancia de su uso correcto.",
+      "Verifico la utilidad de microorganismos en la industria alimenticia y explico cambios químicos en la cocina, la industria y el ambiente.",
+      "Argumento la importancia de las medidas de prevención del embarazo y de las enfermedades de transmisión sexual en el mantenimiento de la salud individual y colectiva.",
+      "Identifico tecnologías desarrolladas en Colombia."
+    ],
+    "etiquetas": ["desarrollo tecnológico", "aplicaciones industriales"]
+  },
+  {
+    "areaCodigo": "CNAT-BAS",
+    "grupo_grados": "10-11",
+    "organizador": "Desarrollo de compromisos personales y sociales",
+    "competencia": "Desarrollo compromisos personales y sociales",
+    "enunciado": "Escucho activamente a mis compañeros y compañeras, reconozco otros puntos de vista, los comparo con los míos y puedo modificar lo que pienso ante argumentos más sólidos.",
+    "evidencias_aprendizaje": [
+      "Reconozco y acepto el escepticismo de mis compañeros y compañeras ante la información que presento.",
+      "Reconozco los aportes de conocimientos diferentes al científico y reconozco que los modelos de la ciencia cambian con el tiempo.",
+      "Cumplo mi función cuando trabajo en grupo y respeto las funciones de otras personas.",
+      "Me informo para participar en debates sobre temas de interés general en ciencias y diseño y aplico estrategias para el manejo de basuras en mi colegio.",
+      "Tomo decisiones responsables y compartidas sobre mi sexualidad.",
+      "Me informo sobre avances tecnológicos para discutir y asumir posturas fundamentadas sobre sus implicaciones éticas."
+    ],
+    "etiquetas": ["ética científica", "implicaciones tecnológicas"]
+  }
+]

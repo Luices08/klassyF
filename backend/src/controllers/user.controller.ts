@@ -231,7 +231,7 @@ async function tieneHistorial(userId: string): Promise<boolean> {
     TeacherAssignment.countDocuments({ docente_id: userId }),
     StudentProfile.countDocuments({ user_id: userId }),
     Group.countDocuments({ director_grupo_id: userId }),
-    CurricularDevelopment.countDocuments({ coordinador_id: userId }),
+    CurricularDevelopment.countDocuments({ 'historial_revisiones.coordinador_id': userId }),
     Institution.countDocuments({ administrador_id: userId }),
   ]);
   return vinculosComoAcudiente > 0 || conteos.some((c) => c > 0);

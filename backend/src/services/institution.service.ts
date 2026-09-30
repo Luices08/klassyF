@@ -182,3 +182,35 @@ export async function updateInstitution(
 
   return institucion;
 }
+
+export async function getLimitesCarga(): Promise<InstitutionDocument['limites_carga_docente']> {
+  const institucion = await Institution.findOne();
+  if (!institucion || !institucion.limites_carga_docente) {
+    return { PREESCOLAR: 20, PRIMARIA: 25, SECUNDARIA: 22, MEDIA: 22 };
+  }
+  return institucion.limites_carga_docente;
+}
+
+export async function updateLimitesCarga(
+  limites: { PREESCOLAR?: number; PRIMARIA?: number; SECUNDARIA?: number; MEDIA?: number }
+): Promise<InstitutionDocument['limites_carga_docente']> {
+  const institucion = await Institution.findOne();
+  if (!institucion) throw new ApiError(404, 'No hay una institución configurada todavía.');
+
+  const actual = institucion.limites_carga_docente || {
+    PREESCOLAR: 20,
+    PRIMARIA: 25,
+    SECUNDARIA: 22,
+    MEDIA: 22,
+  };
+
+  institucion.limites_carga_docente = {
+    PREESCOLAR: limites.PREESCOLAR ?? actual.PREESCOLAR,
+    PRIMARIA: limites.PRIMARIA ?? actual.PRIMARIA,
+    SECUNDARIA: limites.SECUNDARIA ?? actual.SECUNDARIA,
+    MEDIA: limites.MEDIA ?? actual.MEDIA,
+  };
+
+  await institucion.save();
+  return institucion.limites_carga_docente;
+}

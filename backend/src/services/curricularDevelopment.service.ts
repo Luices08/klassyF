@@ -1,14 +1,15 @@
 import CurricularDevelopment, { CurricularDevelopmentDocument } from '../models/curricularDevelopment.model';
-import DBABank from '../models/dbaBank.model';
+import { Dba } from '../models/referenteCurricular.model';
 import Group from '../models/group.model';
 import Subject from '../models/subject.model';
 import TeacherAssignment, { TeacherAssignmentDocument } from '../models/teacherAssignment.model';
 import { UserDocument } from '../models/user.model';
 import { EstadoDesarrolloCurricular } from '../constants/enums';
+import { ROLES } from '../constants/roles';
 import ApiError from '../utils/ApiError';
 
 // Estados desde los que el docente puede crear/editar contenido: un borrador
-// nuevo, o uno que la coordinacion devolvio con observaciones.
+// nuevo, o uno que la coordinación devolvió con observaciones.
 const ESTADOS_EDITABLES: EstadoDesarrolloCurricular[] = ['BORRADOR', 'DEVUELTO_OBSERVACIONES'];
 
 export interface UpsertDraftInput {
@@ -16,14 +17,25 @@ export interface UpsertDraftInput {
   periodo_numero: number;
   dba_seleccionados?: string[];
   competencias: string;
+  contenidos_tematicos?: string[];
   ejes_tematicos?: string[];
+  actividades_propuestas?: string;
   metodologia_y_recursos: string;
   criterios_evaluacion: string;
+  semanas_estimadas?: number;
 }
 
 export interface ReviewInput {
   decision: Extract<EstadoDesarrolloCurricular, 'APROBADO' | 'DEVUELTO_OBSERVACIONES'>;
   observacion?: string;
+}
+
+export interface ListDevelopmentsQuery {
+  academic_year_id?: string;
+  estado?: string;
+  periodo_numero?: number;
+  teacher_assignment_id?: string;
+  docente_id?: string;
 }
 
 async function assertTeacherOwnsAssignment(
@@ -32,10 +44,10 @@ async function assertTeacherOwnsAssignment(
 ): Promise<TeacherAssignmentDocument> {
   const assignment = await TeacherAssignment.findById(teacherAssignmentId);
   if (!assignment) {
-    throw new ApiError(404, 'Asignacion academica (TeacherAssignment) no encontrada.');
+    throw new ApiError(404, 'Asignación académica (TeacherAssignment) no encontrada.');
   }
   if (String(assignment.docente_id) !== String(requestingUser._id)) {
-    throw new ApiError(403, 'Solo el docente titular de esta asignacion puede crear o editar esta planeacion.');
+    throw new ApiError(403, 'Solo el docente titular de esta asignación puede crear o editar esta planeación.');
   }
   return assignment;
 }
@@ -50,12 +62,12 @@ async function validateDbaSeleccionados(
     Group.findById(assignment.group_id),
     Subject.findById(assignment.subject_id),
   ]);
-  if (!group) throw new ApiError(404, 'Grupo de la asignacion academica no encontrado.');
-  if (!subject) throw new ApiError(404, 'Asignatura de la asignacion academica no encontrada.');
+  if (!group) throw new ApiError(404, 'Grupo de la asignación académica no encontrado.');
+  if (!subject) throw new ApiError(404, 'Asignatura de la asignación académica no encontrada.');
 
-  const dbas = await DBABank.find({ _id: { $in: dbaIds } });
+  const dbas = await Dba.find({ _id: { $in: dbaIds } });
   if (dbas.length !== new Set(dbaIds).size) {
-    throw new ApiError(400, 'Uno o mas dba_seleccionados no existen en el banco de DBA.');
+    throw new ApiError(400, 'Uno o más dba_seleccionados no existen en el banco de DBA.');
   }
 
   const inconsistente = dbas.some(
@@ -64,15 +76,14 @@ async function validateDbaSeleccionados(
   if (inconsistente) {
     throw new ApiError(
       400,
-      'Uno o mas DBA seleccionados no corresponden al grado/area de esta asignacion academica.'
+      'Uno o más DBA seleccionados no corresponden al grado/área de esta asignación académica.'
     );
   }
 }
 
 /**
- * Crea el borrador de desarrollo curricular para (teacher_assignment_id, periodo_numero)
- * si no existe, o lo edita si ya existe y su estado es editable (BORRADOR o
- * DEVUELTO_OBSERVACIONES). Solo el docente titular de la asignacion puede hacerlo.
+ * Crea o edita el borrador de desarrollo curricular para (teacher_assignment_id, periodo_numero).
+ * Solo el docente titular puede guardar mientras esté en BORRADOR o DEVUELTO_OBSERVACIONES.
  */
 export async function upsertDraft(
   input: UpsertDraftInput,
@@ -92,9 +103,12 @@ export async function upsertDraft(
 
   const fields = {
     competencias: input.competencias,
+    contenidos_tematicos: input.contenidos_tematicos ?? [],
     ejes_tematicos: input.ejes_tematicos ?? [],
+    actividades_propuestas: input.actividades_propuestas ?? '',
     metodologia_y_recursos: input.metodologia_y_recursos,
     criterios_evaluacion: input.criterios_evaluacion,
+    semanas_estimadas: input.semanas_estimadas ?? 10,
     dba_seleccionados: input.dba_seleccionados ?? [],
   };
 
@@ -108,37 +122,54 @@ export async function upsertDraft(
     teacher_assignment_id: input.teacher_assignment_id,
     periodo_numero: input.periodo_numero,
     estado: 'BORRADOR',
+    version: 1,
     ...fields,
   });
 }
 
 /**
- * El docente titular envia su borrador/devuelto a revision. Queda bloqueado
- * para edicion hasta que la coordinacion lo apruebe o lo devuelva.
+ * El docente titular envía su borrador a revisión.
+ * Conserva una copia snapshot en historial_versiones para trazabilidad (RN-CUR-04).
  */
-export async function submitForReview(id: string, requestingUser: UserDocument): Promise<CurricularDevelopmentDocument> {
+export async function submitForReview(
+  id: string,
+  requestingUser: UserDocument
+): Promise<CurricularDevelopmentDocument> {
   const doc = await CurricularDevelopment.findById(id);
   if (!doc) throw new ApiError(404, 'Desarrollo curricular no encontrado.');
 
   const assignment = await TeacherAssignment.findById(doc.teacher_assignment_id);
-  if (!assignment) throw new ApiError(404, 'Asignacion academica asociada no encontrada.');
+  if (!assignment) throw new ApiError(404, 'Asignación académica asociada no encontrada.');
   if (String(assignment.docente_id) !== String(requestingUser._id)) {
-    throw new ApiError(403, 'Solo el docente titular puede enviar esta planeacion a revision.');
+    throw new ApiError(403, 'Solo el docente titular puede enviar esta planeación a revisión.');
   }
 
   if (!ESTADOS_EDITABLES.includes(doc.estado)) {
-    throw new ApiError(409, `No se puede enviar a revision un desarrollo curricular en estado ${doc.estado}.`);
+    throw new ApiError(409, `No se puede enviar a revisión un desarrollo curricular en estado ${doc.estado}.`);
   }
 
+  // Guardar snapshot de versión histórica antes de la transición
+  doc.historial_versiones.push({
+    version: doc.version,
+    fecha: new Date(),
+    modificado_por: requestingUser._id,
+    dba_seleccionados: doc.dba_seleccionados,
+    competencias: doc.competencias,
+    contenidos_tematicos: doc.contenidos_tematicos,
+    actividades_propuestas: doc.actividades_propuestas,
+    criterios_evaluacion: doc.criterios_evaluacion,
+    estado: doc.estado,
+  });
+
+  doc.version += 1;
   doc.estado = 'ENVIADO_REVISION';
   await doc.save();
   return doc;
 }
 
 /**
- * Coordinador/Admin/Superadmin aprueban o devuelven con observaciones un
- * desarrollo que este en ENVIADO_REVISION. Cada decision queda registrada en
- * historial_revisiones para trazabilidad.
+ * Coordinación o Administración revisan la planeación.
+ * Emiten concepto: APROBADO o DEVUELTO_OBSERVACIONES.
  */
 export async function reviewDevelopment(
   id: string,
@@ -165,4 +196,74 @@ export async function reviewDevelopment(
 
   await doc.save();
   return doc;
+}
+
+/**
+ * Consulta un desarrollo curricular por asignación y periodo.
+ */
+export async function getDevelopmentByAssignmentAndPeriod(
+  teacherAssignmentId: string,
+  periodoNumero: number
+): Promise<CurricularDevelopmentDocument | null> {
+  return CurricularDevelopment.findOne({
+    teacher_assignment_id: teacherAssignmentId,
+    periodo_numero: periodoNumero,
+  })
+    .populate('dba_seleccionados')
+    .populate('historial_revisiones.coordinador_id', 'nombre apellido email')
+    .populate('historial_versiones.modificado_por', 'nombre apellido');
+}
+
+/**
+ * Listado de desarrollos curriculares para la bandeja de coordinación o seguimiento docente.
+ */
+export async function listDevelopments(
+  query: ListDevelopmentsQuery,
+  requestingUser: UserDocument
+) {
+  const filter: Record<string, unknown> = {};
+
+  if (query.estado) filter.estado = query.estado;
+  if (query.periodo_numero) filter.periodo_numero = query.periodo_numero;
+  if (query.teacher_assignment_id) filter.teacher_assignment_id = query.teacher_assignment_id;
+
+  // Si el usuario es DOCENTE, restringir solo a sus asignaciones
+  if (requestingUser.rol === ROLES.DOCENTE) {
+    const misAsignaciones = await TeacherAssignment.find({ docente_id: requestingUser._id }).select('_id');
+    const assignmentIds = misAsignaciones.map((a) => a._id);
+    filter.teacher_assignment_id = { $in: assignmentIds };
+  } else if (query.academic_year_id || query.docente_id) {
+    // Si Coordinador/Admin filtra por año lectivo o docente
+    const assignmentFilter: Record<string, unknown> = {};
+    if (query.academic_year_id) assignmentFilter.academic_year_id = query.academic_year_id;
+    if (query.docente_id) assignmentFilter.docente_id = query.docente_id;
+
+    const asignaciones = await TeacherAssignment.find(assignmentFilter).select('_id');
+    const assignmentIds = asignaciones.map((a) => a._id);
+    filter.teacher_assignment_id = { $in: assignmentIds };
+  }
+
+  return CurricularDevelopment.find(filter)
+    .populate({
+      path: 'teacher_assignment_id',
+      select: 'docente_id group_id subject_id academic_year_id horas_semanales',
+      populate: [
+        { path: 'docente_id', select: 'nombre apellido email numero_documento' },
+        {
+          path: 'group_id',
+          select: 'nomenclatura grade_id sede_id jornada_id',
+          populate: [
+            { path: 'grade_id', select: 'nombre numero' },
+            { path: 'sede_id', select: 'nombre' },
+          ],
+        },
+        {
+          path: 'subject_id',
+          select: 'nombre abreviatura area_id',
+          populate: { path: 'area_id', select: 'nombre codigo' },
+        },
+      ],
+    })
+    .populate('dba_seleccionados')
+    .sort({ updatedAt: -1 });
 }

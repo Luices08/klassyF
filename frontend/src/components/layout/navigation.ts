@@ -46,6 +46,10 @@ export const NAV_ITEMS: NavItem[] = [
   { to: '/admin/espacios', label: 'Espacios y aulas', icon: DoorIcon, roles: GROUP_MANAGERS, soloPresencial: true },
   { to: '/admin/academic-catalog', label: 'Catálogo académico', icon: BookIcon, roles: CURRICULUM_MANAGERS },
   { to: '/admin/study-plan', label: 'Plan de estudios', icon: ClipboardListIcon, roles: CURRICULUM_MANAGERS },
+  { to: '/admin/teacher-assignments', label: 'Carga académica', icon: UsersIcon, roles: CURRICULUM_MANAGERS },
+  { to: '/admin/revision-curricular', label: 'Revisión curricular', icon: FileTextIcon, roles: CURRICULUM_MANAGERS },
+  { to: '/docente/mi-carga', label: 'Mi asignación', icon: ClipboardListIcon, roles: ['DOCENTE'] },
+  { to: '/docente/planeacion-curricular', label: 'Planeación curricular', icon: BookIcon, roles: ['DOCENTE'] },
   { to: '/admin/enrollments', label: 'Matrículas', icon: ClipboardListIcon, roles: STAFF },
   { to: '/admin/admisiones', label: 'Admisiones', icon: InboxIcon, roles: STAFF },
 ];

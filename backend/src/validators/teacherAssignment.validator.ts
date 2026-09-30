@@ -12,7 +12,7 @@ export const createTeacherAssignment: ValidationSchema = {
       .default('CLASE'),
     group_id: objectId.allow(null).optional(),
     subject_id: objectId.allow(null).optional(),
-    horas_semanales: Joi.number().integer().min(1).max(50).required(),
+    horas_semanales: Joi.number().integer().min(0).max(50).default(0),
     proyecto_nombre: Joi.string().allow('', null).optional(),
     observaciones: Joi.string().allow('', null).optional(),
   }),

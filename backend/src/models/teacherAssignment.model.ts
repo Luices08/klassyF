@@ -34,7 +34,7 @@ const teacherAssignmentSchema = new Schema<ITeacherAssignment, TeacherAssignment
     },
     group_id: { type: Schema.Types.ObjectId, ref: 'Group', default: null },
     subject_id: { type: Schema.Types.ObjectId, ref: 'Subject', default: null },
-    horas_semanales: { type: Number, required: true, min: 1 },
+    horas_semanales: { type: Number, required: true, min: 0, default: 0 },
     proyecto_nombre: { type: String, trim: true, default: '' },
     observaciones: { type: String, trim: true, default: '' },
     estado: { type: String, enum: ESTADOS_USUARIO, default: 'activo' },

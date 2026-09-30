@@ -718,6 +718,8 @@ export interface DocenteCargaResumen {
   horas_proyectos: number;
   horas_totales: number;
   estado_carga: 'SUB_CARGA' | 'NORMAL' | 'SOBRE_CARGA';
+  tope_horas?: number;
+  nivel_predominante?: NivelEducativo;
   total_asignaciones: number;
   asignaciones: TeacherAssignment[];
 }

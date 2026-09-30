@@ -33,3 +33,15 @@ export const updateInstitution = catchAsync<unknown, unknown, UpdateInstitutionB
 
   res.status(200).json({ success: true, data: institution });
 });
+
+export const getLimitesCarga = catchAsync(async (_req, res) => {
+  const limites = await institutionService.getLimitesCarga();
+  res.status(200).json({ success: true, data: limites });
+});
+
+export const updateLimitesCarga = catchAsync<unknown, unknown, { PREESCOLAR?: number; PRIMARIA?: number; SECUNDARIA?: number; MEDIA?: number }>(
+  async (req, res) => {
+    const limites = await institutionService.updateLimitesCarga(req.body);
+    res.status(200).json({ success: true, data: limites });
+  }
+);

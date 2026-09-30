@@ -79,3 +79,31 @@ export function useEliminarTeacherAssignment() {
     },
   });
 }
+
+export interface LimitesCargaDocente {
+  PREESCOLAR: number;
+  PRIMARIA: number;
+  SECUNDARIA: number;
+  MEDIA: number;
+}
+
+export function useLimitesCarga() {
+  return useQuery({
+    queryKey: ['limites-carga'],
+    queryFn: () => api.get<LimitesCargaDocente>('/institution/limites-carga'),
+    staleTime: 5 * 60_000,
+  });
+}
+
+export function useActualizarLimitesCarga() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: Partial<LimitesCargaDocente>) =>
+      api.patch<LimitesCargaDocente>('/institution/limites-carga', input),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['limites-carga'] });
+      void queryClient.invalidateQueries({ queryKey: ['teacher-assignments-resumen'] });
+    },
+  });
+}
+

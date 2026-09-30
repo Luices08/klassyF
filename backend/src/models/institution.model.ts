@@ -10,6 +10,13 @@ import {
   PoliticaAforoAula,
 } from '../constants/enums';
 
+export interface ILimitesCargaDocente {
+  PREESCOLAR: number;
+  PRIMARIA: number;
+  SECUNDARIA: number;
+  MEDIA: number;
+}
+
 export interface IInstitution {
   nombre: string;
   codigo_dane: string;
@@ -28,6 +35,8 @@ export interface IInstitution {
   modalidad: ModalidadInstitucion;
   /** M10: que pasa si el cupo de un grupo excede el aforo de su aula (bloquear o solo advertir). */
   politica_aforo_aula: PoliticaAforoAula;
+  /** M08: Topes maximos de carga horaria semanal por nivel segun Decreto 1850 / PEI institucional */
+  limites_carga_docente?: ILimitesCargaDocente;
   estado: EstadoUsuario;
   createdAt: Date;
   updatedAt: Date;
@@ -63,6 +72,18 @@ const institutionSchema = new Schema<IInstitution, InstitutionModel>(
     plantilla_franjas: { type: [franjaPlantillaSchema], default: [] },
     modalidad: { type: String, enum: MODALIDADES_INSTITUCION, default: 'PRESENCIAL' },
     politica_aforo_aula: { type: String, enum: POLITICAS_AFORO_AULA, default: 'BLOQUEAR' },
+    limites_carga_docente: {
+      type: new Schema<ILimitesCargaDocente>(
+        {
+          PREESCOLAR: { type: Number, default: 20, min: 1, max: 40 },
+          PRIMARIA: { type: Number, default: 25, min: 1, max: 40 },
+          SECUNDARIA: { type: Number, default: 22, min: 1, max: 40 },
+          MEDIA: { type: Number, default: 22, min: 1, max: 40 },
+        },
+        { _id: false }
+      ),
+      default: () => ({ PREESCOLAR: 20, PRIMARIA: 25, SECUNDARIA: 22, MEDIA: 22 }),
+    },
     estado: { type: String, enum: ESTADOS_USUARIO, default: 'activo' },
   },
   { timestamps: true }

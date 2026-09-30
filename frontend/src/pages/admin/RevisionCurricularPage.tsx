@@ -123,16 +123,14 @@ export function RevisionCurricularPage() {
         ) : (
           <Table>
             <TableHead>
-              <tr>
-                <Th>Docente</Th>
-                <Th>Asignatura / Curso</Th>
-                <Th>Grupo / Sede</Th>
-                <Th className="text-center">Periodo</Th>
-                <Th className="text-center">DBA Seleccionados</Th>
-                <Th>Estado</Th>
-                <Th className="text-center">Versión</Th>
-                <Th className="text-right">Acción</Th>
-              </tr>
+              <Th>Docente</Th>
+              <Th>Asignatura / Curso</Th>
+              <Th>Grupo / Sede</Th>
+              <Th className="text-center">Periodo</Th>
+              <Th className="text-center">DBA Seleccionados</Th>
+              <Th>Estado</Th>
+              <Th className="text-center">Versión</Th>
+              <Th className="text-right">Acción</Th>
             </TableHead>
             <TableBody>
               {desarrollos.length === 0 ? (

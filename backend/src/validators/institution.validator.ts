@@ -81,3 +81,12 @@ export const updateInstitution: ValidationSchema = {
     confirm_password: Joi.string().required(),
   }),
 };
+
+export const updateLimitesCarga: ValidationSchema = {
+  body: Joi.object({
+    PREESCOLAR: Joi.number().integer().min(1).max(40).optional(),
+    PRIMARIA: Joi.number().integer().min(1).max(40).optional(),
+    SECUNDARIA: Joi.number().integer().min(1).max(40).optional(),
+    MEDIA: Joi.number().integer().min(1).max(40).optional(),
+  }).min(1),
+};

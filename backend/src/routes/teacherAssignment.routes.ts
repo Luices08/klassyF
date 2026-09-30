@@ -18,7 +18,7 @@ router.use(authenticate);
 // 1. Asignar carga académica a un docente
 router.post(
   '/',
-  checkRole(ROLES.ADMIN, ROLES.COORDINADOR),
+  checkRole(ROLES.COORDINADOR),
   validate(teacherAssignmentValidator.createTeacherAssignment),
   createTeacherAssignment
 );
@@ -44,7 +44,7 @@ router.get('/my-load', checkRole(ROLES.DOCENTE), myLoad);
 // 5. Eliminar / desasignar carga
 router.delete(
   '/:id',
-  checkRole(ROLES.ADMIN, ROLES.COORDINADOR),
+  checkRole(ROLES.COORDINADOR),
   validate(teacherAssignmentValidator.idParam),
   deleteTeacherAssignment
 );

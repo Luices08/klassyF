@@ -81,14 +81,12 @@ export function MyTeacherLoadPage() {
         ) : (
           <Table>
             <TableHead>
-              <tr>
-                <Th>Tipo</Th>
-                <Th>Asignatura / Proyecto</Th>
-                <Th>Grupo / Grado</Th>
-                <Th>Sede / Jornada</Th>
-                <Th className="text-center">Horas Semanales</Th>
-                <Th>Observaciones</Th>
-              </tr>
+              <Th>Tipo</Th>
+              <Th>Asignatura / Proyecto</Th>
+              <Th>Grupo / Grado</Th>
+              <Th>Sede / Jornada</Th>
+              <Th className="text-center">Horas Semanales</Th>
+              <Th>Observaciones</Th>
             </TableHead>
             <TableBody>
               {asignaciones.length === 0 ? (

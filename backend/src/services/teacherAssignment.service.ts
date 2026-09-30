@@ -1,11 +1,12 @@
 import AcademicYear from '../models/academicYear.model';
 import CurricularDevelopment from '../models/curricularDevelopment.model';
 import Group from '../models/group.model';
+import Institution, { ILimitesCargaDocente } from '../models/institution.model';
 import StudyPlan from '../models/studyPlan.model';
 import Subject from '../models/subject.model';
 import TeacherAssignment, { TeacherAssignmentDocument } from '../models/teacherAssignment.model';
 import User from '../models/user.model';
-import { TipoAsignacionDocente } from '../constants/enums';
+import { NivelEducativo, TipoAsignacionDocente } from '../constants/enums';
 import { ROLES } from '../constants/roles';
 import ApiError from '../utils/ApiError';
 import { ESTADO_ACTIVO } from '../utils/filtroEstado';
@@ -62,6 +63,8 @@ export async function createTeacherAssignment(
     const subject = await Subject.findById(input.subject_id);
     if (!subject) throw new ApiError(404, 'Asignatura no encontrada.');
 
+    let horasAsignadas = input.horas_semanales;
+
     // Validar concordancia con el Plan de Estudios de M06 si existe
     const studyPlan = await StudyPlan.findOne({ academic_year_id: input.academic_year_id });
     if (studyPlan) {
@@ -71,24 +74,38 @@ export async function createTeacherAssignment(
 
       if (gradoConfig) {
         // Verificar si la asignatura está en la configuración general del grado o personalizada para el grupo
-        const enGrado = gradoConfig.asignaturas.some(
+        const asgGrado = gradoConfig.asignaturas.find(
           (a) => String(a.subject_id) === String(input.subject_id)
         );
         const personalizacionGrupo = gradoConfig.personalizaciones_grupo.find(
           (p) => String(p.group_id) === String(group._id)
         );
-        const agregadaEnGrupo = personalizacionGrupo?.asignaturas_agregadas.some(
+        const asgAgregada = personalizacionGrupo?.asignaturas_agregadas.find(
+          (a) => String(a.subject_id) === String(input.subject_id)
+        );
+        const overrideHoras = personalizacionGrupo?.intensidades_personalizadas.find(
           (a) => String(a.subject_id) === String(input.subject_id)
         );
 
-        if (!enGrado && !agregadaEnGrupo) {
+        if (!asgGrado && !asgAgregada) {
           throw new ApiError(
             400,
             `La asignatura "${subject.nombre}" no hace parte del plan de estudios aprobado para este grado/grupo.`
           );
         }
+
+        // Fijar exactamente la intensidad horaria semanal configurada en M06
+        if (overrideHoras) {
+          horasAsignadas = overrideHoras.intensidad_horaria_semanal;
+        } else if (asgAgregada) {
+          horasAsignadas = asgAgregada.intensidad_horaria_semanal;
+        } else if (asgGrado) {
+          horasAsignadas = asgGrado.intensidad_horaria_semanal;
+        }
       }
     }
+
+    input.horas_semanales = horasAsignadas;
 
     // Verificar si ya existe otro docente asignado a esta materia en este grupo
     const existing = await TeacherAssignment.findOne({
@@ -111,6 +128,9 @@ export async function createTeacherAssignment(
     }
     const group = await Group.findById(input.group_id);
     if (!group) throw new ApiError(404, 'Grupo no encontrado.');
+
+    // Dirección de grupo no computa horas lectivas
+    input.horas_semanales = 0;
 
     // Asignar en el modelo del grupo
     group.director_grupo_id = docente._id;
@@ -159,6 +179,15 @@ export async function listTeacherAssignments(query: ListAssignmentsQuery) {
 }
 
 export async function getDocentesCargaResumen(academicYearId: string) {
+  // 0. Obtener topes institucionales configurados (Decreto 1850)
+  const institucion = await Institution.findOne().select('limites_carga_docente');
+  const limites = institucion?.limites_carga_docente || {
+    PREESCOLAR: 20,
+    PRIMARIA: 25,
+    SECUNDARIA: 22,
+    MEDIA: 22,
+  };
+
   // 1. Obtener todos los docentes activos
   const docentes = await User.find({ rol: ROLES.DOCENTE, estado: ESTADO_ACTIVO })
     .select('nombre apellido numero_documento email')
@@ -172,7 +201,7 @@ export async function getDocentesCargaResumen(academicYearId: string) {
     .populate({
       path: 'group_id',
       select: 'nomenclatura grade_id',
-      populate: { path: 'grade_id', select: 'nombre numero' },
+      populate: { path: 'grade_id', select: 'nombre numero nivel' },
     })
     .populate('subject_id', 'nombre abreviatura');
 
@@ -193,20 +222,45 @@ export async function getDocentesCargaResumen(academicYearId: string) {
     let horasDireccion = 0;
     let horasProyectos = 0;
 
+    const nivelesCount: Record<string, number> = {};
+
     for (const a of docAssignments) {
-      if (a.tipo_asignacion === 'CLASE') horasClase += a.horas_semanales;
-      else if (a.tipo_asignacion === 'DIRECCION_GRUPO') horasDireccion += a.horas_semanales;
-      else horasProyectos += a.horas_semanales;
+      if (a.tipo_asignacion === 'CLASE') {
+        horasClase += a.horas_semanales;
+        if (a.group_id) {
+          const grp = a.group_id as unknown as { grade_id?: { nivel?: NivelEducativo } };
+          const nivel = grp.grade_id?.nivel;
+          if (nivel) {
+            nivelesCount[nivel] = (nivelesCount[nivel] ?? 0) + 1;
+          }
+        }
+      } else if (a.tipo_asignacion === 'DIRECCION_GRUPO') {
+        horasDireccion += a.horas_semanales;
+      } else {
+        horasProyectos += a.horas_semanales;
+      }
     }
 
     const horasTotales = horasClase + horasDireccion + horasProyectos;
 
-    // Diagnóstico según normativa colombiana (Decreto 1850 de 2002)
-    // Carga de aula sugerida: 22h regular, tope máximo institucional semanal: 25h
+    // Determinar nivel predominante del docente
+    let nivelPredominante: NivelEducativo = 'SECUNDARIA';
+    let maxOcurrencias = 0;
+    for (const [lvl, count] of Object.entries(nivelesCount)) {
+      if (count > maxOcurrencias) {
+        maxOcurrencias = count;
+        nivelPredominante = lvl as NivelEducativo;
+      }
+    }
+
+    // Tope de horas según nivel educativo
+    const topeHoras = (limites as ILimitesCargaDocente)[nivelPredominante as keyof ILimitesCargaDocente] ?? 22;
+
+    // Diagnóstico según normativa colombiana (Decreto 1850 de 2002) y configuración institucional
     let estadoCarga: 'SUB_CARGA' | 'NORMAL' | 'SOBRE_CARGA' = 'NORMAL';
     if (horasTotales === 0) estadoCarga = 'SUB_CARGA';
-    else if (horasTotales < 20) estadoCarga = 'SUB_CARGA';
-    else if (horasTotales > 24) estadoCarga = 'SOBRE_CARGA';
+    else if (horasTotales > topeHoras) estadoCarga = 'SOBRE_CARGA';
+    else if (horasTotales < topeHoras - 2) estadoCarga = 'SUB_CARGA';
 
     return {
       docente: {
@@ -221,6 +275,8 @@ export async function getDocentesCargaResumen(academicYearId: string) {
       horas_proyectos: horasProyectos,
       horas_totales: horasTotales,
       estado_carga: estadoCarga,
+      nivel_predominante: nivelPredominante,
+      tope_horas: topeHoras,
       total_asignaciones: docAssignments.length,
       asignaciones: docAssignments,
     };

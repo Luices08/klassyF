@@ -20,6 +20,10 @@ import { SedesPage } from './pages/admin/SedesPage';
 import { StudentDetailPage } from './pages/admin/StudentDetailPage';
 import { StudentsPage } from './pages/admin/StudentsPage';
 import { StudyPlanPage } from './pages/admin/StudyPlanPage';
+import { TeacherAssignmentsPage } from './pages/admin/TeacherAssignmentsPage';
+import { MyTeacherLoadPage } from './pages/MyTeacherLoadPage';
+import { DesarrolloCurricularPage } from './pages/DesarrolloCurricularPage';
+import { RevisionCurricularPage } from './pages/admin/RevisionCurricularPage';
 import { UsersPage } from './pages/admin/UsersPage';
 
 export default function App() {
@@ -53,11 +57,18 @@ export default function App() {
           <Route element={<ProtectedRoute allowedRoles={['ADMIN', 'COORDINADOR']} />}>
             <Route path="/admin/groups" element={<GroupsPage />} />
             <Route path="/admin/espacios" element={<EspaciosPage />} />
+            <Route path="/admin/teacher-assignments" element={<TeacherAssignmentsPage />} />
           </Route>
 
           <Route element={<ProtectedRoute allowedRoles={['COORDINADOR']} />}>
             <Route path="/admin/academic-catalog" element={<AcademicCatalogPage />} />
             <Route path="/admin/study-plan" element={<StudyPlanPage />} />
+            <Route path="/admin/revision-curricular" element={<RevisionCurricularPage />} />
+          </Route>
+
+          <Route element={<ProtectedRoute allowedRoles={['DOCENTE']} />}>
+            <Route path="/docente/mi-carga" element={<MyTeacherLoadPage />} />
+            <Route path="/docente/planeacion-curricular" element={<DesarrolloCurricularPage />} />
           </Route>
         </Route>
       </Route>

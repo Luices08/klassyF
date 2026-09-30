@@ -629,3 +629,147 @@ export interface AdmissionRequest {
   enrollment_id: string | null;
   createdAt: string;
 }
+
+// --- M07: Banco de Referentes Curriculares Oficiales (MEN / ICFES) ---
+
+export const TIPOS_REFERENTE = ['DBA', 'EBC', 'MATRIZ_ICFES', 'LINEAMIENTO'] as const;
+export type TipoReferente = (typeof TIPOS_REFERENTE)[number];
+
+export interface DBABankItem {
+  _id: string;
+  tipo_referente: TipoReferente;
+  grade_id?: { _id: string; nombre: string; numero: number; nivel: string } | string | null;
+  area_id: { _id: string; nombre: string; codigo: string } | string;
+  numero_dba?: number | null;
+  enunciado: string;
+  evidencias_aprendizaje: string[];
+  eje_tematico?: string;
+  organizador: string;
+  ejemplo?: string;
+  grupo_grados?: string;
+  competencia?: string;
+  componente?: string;
+  etiquetas: string[];
+  version: string;
+  fuente: string;
+  estado: EstadoActivo;
+  createdAt: string;
+}
+
+// --- M08: Gestor de Docentes y Carga Académica ---
+
+export const TIPOS_ASIGNACION_DOCENTE = [
+  'CLASE',
+  'DIRECCION_GRUPO',
+  'PROYECTO_TRANSVERSAL',
+  'OTRO',
+] as const;
+export type TipoAsignacionDocente = (typeof TIPOS_ASIGNACION_DOCENTE)[number];
+
+export interface TeacherAssignment {
+  _id: string;
+  docente_id: {
+    _id: string;
+    nombre: string;
+    apellido: string;
+    numero_documento: string;
+    email: string;
+    estado?: EstadoActivo;
+  } | string;
+  academic_year_id: {
+    _id: string;
+    year: number;
+    calendario?: Calendario;
+    estado?: string;
+  } | string;
+  tipo_asignacion: TipoAsignacionDocente;
+  group_id?: {
+    _id: string;
+    nomenclatura: string;
+    sede_id?: { _id: string; nombre: string } | string;
+    grade_id?: { _id: string; nombre: string; numero: number; nivel?: string } | string;
+    jornada_id?: { _id: string; nombre: string } | string;
+    max_capacity?: number;
+  } | string | null;
+  subject_id?: {
+    _id: string;
+    nombre: string;
+    abreviatura: string;
+    area_id?: { _id: string; nombre: string; codigo: string } | string;
+    tipo?: string;
+  } | string | null;
+  horas_semanales: number;
+  proyecto_nombre?: string;
+  observaciones?: string;
+  estado: EstadoActivo;
+  createdAt: string;
+}
+
+export interface DocenteCargaResumen {
+  docente: {
+    _id: string;
+    nombre: string;
+    apellido: string;
+    numero_documento: string;
+    email: string;
+  };
+  horas_clase: number;
+  horas_direccion: number;
+  horas_proyectos: number;
+  horas_totales: number;
+  estado_carga: 'SUB_CARGA' | 'NORMAL' | 'SOBRE_CARGA';
+  total_asignaciones: number;
+  asignaciones: TeacherAssignment[];
+}
+
+// --- M07: Desarrollo Curricular y Workflow ---
+
+export const ESTADOS_DESARROLLO_CURRICULAR = [
+  'BORRADOR',
+  'ENVIADO_REVISION',
+  'DEVUELTO_OBSERVACIONES',
+  'APROBADO',
+] as const;
+export type EstadoDesarrolloCurricular = (typeof ESTADOS_DESARROLLO_CURRICULAR)[number];
+
+export interface RevisionHistorial {
+  _id?: string;
+  observacion: string;
+  coordinador_id: { _id: string; nombre: string; apellido: string; email?: string } | string;
+  fecha: string;
+  estado_resultante: EstadoDesarrolloCurricular;
+}
+
+export interface VersionSnapshot {
+  _id?: string;
+  version: number;
+  fecha: string;
+  modificado_por: { _id: string; nombre: string; apellido: string } | string;
+  dba_seleccionados: string[];
+  competencias: string;
+  contenidos_tematicos: string[];
+  actividades_propuestas: string;
+  criterios_evaluacion: string;
+  estado: EstadoDesarrolloCurricular;
+}
+
+export interface CurricularDevelopment {
+  _id: string;
+  teacher_assignment_id: TeacherAssignment | string;
+  periodo_numero: number;
+  dba_seleccionados: DBABankItem[] | string[];
+  competencias: string;
+  contenidos_tematicos: string[];
+  ejes_tematicos: string[];
+  actividades_propuestas: string;
+  metodologia_y_recursos: string;
+  criterios_evaluacion: string;
+  semanas_estimadas: number;
+  estado: EstadoDesarrolloCurricular;
+  version: number;
+  historial_revisiones: RevisionHistorial[];
+  historial_versiones: VersionSnapshot[];
+  createdAt: string;
+  updatedAt: string;
+}
+

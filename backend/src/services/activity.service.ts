@@ -124,6 +124,9 @@ export async function gradeActivity(
   if (String(assignment.docente_id) !== String(requestingUser._id)) {
     throw new ApiError(403, 'Solo el docente titular puede calificar esta actividad.');
   }
+  if (!assignment.group_id) {
+    throw new ApiError(400, 'La asignación académica no tiene un grupo asociado.');
+  }
 
   await assertPeriodNotLocked(
     assignment.academic_year_id,

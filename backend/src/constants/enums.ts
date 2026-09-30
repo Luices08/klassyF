@@ -135,6 +135,19 @@ export const ESTADOS_DESARROLLO_CURRICULAR = [
 ] as const;
 export type EstadoDesarrolloCurricular = (typeof ESTADOS_DESARROLLO_CURRICULAR)[number];
 
+// M07: Banco de Referentes Curriculares Oficiales (MEN / ICFES)
+export const TIPOS_REFERENTE = ['DBA', 'EBC', 'MATRIZ_ICFES', 'LINEAMIENTO'] as const;
+export type TipoReferente = (typeof TIPOS_REFERENTE)[number];
+
+// M08: Tipos de asignación y carga docente (Decreto 1850 / Ley 115)
+export const TIPOS_ASIGNACION_DOCENTE = [
+  'CLASE',
+  'DIRECCION_GRUPO',
+  'PROYECTO_TRANSVERSAL',
+  'OTRO',
+] as const;
+export type TipoAsignacionDocente = (typeof TIPOS_ASIGNACION_DOCENTE)[number];
+
 export const COMPONENTES_SIEE = ['COGNITIVO_SABER', 'PROCEDIMENTAL_HACER', 'ACTITUDINAL_SER'] as const;
 export type ComponenteSiee = (typeof COMPONENTES_SIEE)[number];
 

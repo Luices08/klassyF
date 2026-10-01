@@ -80,7 +80,8 @@ export function TeacherAssignmentsPage() {
   });
 
   const { data: docentes = [] } = useUsers({ rol: 'DOCENTE', estado: 'activo' });
-  const { data: grupos = [] } = useGroups({ academic_year_id: anioActivoId });
+  // Solo grupos activos: uno CLOSED ya no esta operativo para el año lectivo.
+  const { data: grupos = [] } = useGroups({ academic_year_id: anioActivoId, estado: 'ACTIVE' });
   const { data: asignaturas = [] } = useSubjects({ estado: 'activo' });
   const { data: grades = [] } = useGrades('activo');
   const { data: studyPlan } = useStudyPlan(institucion?._id, anioActivoId);
@@ -165,6 +166,16 @@ export function TeacherAssignmentsPage() {
 
     return { asignaturasDisponibles: disponibles, horasPorAsignaturaMap: map };
   }, [selectedGradoId, form.group_id, studyPlan, asignaciones, asignaturas]);
+
+  // Director actual del grupo seleccionado para DIRECCION_GRUPO (si lo hay): guardar reemplaza
+  // al titular anterior (categoria 2, se permite reasignar — ver M04/M05/M08), asi que se avisa
+  // antes de guardar en vez de hacerlo en silencio.
+  const directorActualDelGrupo = useMemo(() => {
+    if (form.tipo_asignacion !== 'DIRECCION_GRUPO' || !form.group_id) return null;
+    const grupo = grupos.find((g) => g._id === form.group_id);
+    const director = grupo?.director_grupo_id;
+    return director && typeof director === 'object' ? director : null;
+  }, [form.tipo_asignacion, form.group_id, grupos]);
 
   const handleOpenDrawer = () => {
     setSelectedGradoId('');
@@ -725,6 +736,12 @@ export function TeacherAssignmentsPage() {
               <p className="text-xs text-muted">
                 La titularidad de grupo es un acompañamiento tutorial y no computa horas lectivas de aula.
               </p>
+              {directorActualDelGrupo && (
+                <Alert tone="warning">
+                  Este grupo ya tiene director: {directorActualDelGrupo.apellido}, {directorActualDelGrupo.nombre}.
+                  Al guardar, lo reemplazará.
+                </Alert>
+              )}
             </div>
           )}
 

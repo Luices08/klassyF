@@ -10,7 +10,11 @@ import catchAsync from '../utils/catchAsync';
 
 export const createTeacherAssignment = catchAsync<unknown, unknown, CreateTeacherAssignmentInput>(
   async (req, res) => {
-    const assignment = await teacherAssignmentService.createTeacherAssignment(req.body);
+    if (!req.user) throw new ApiError(401, 'No autenticado.');
+    const assignment = await teacherAssignmentService.createTeacherAssignment(req.body, {
+      id: req.user._id,
+      ip: req.ip,
+    });
     res.status(201).json({ success: true, data: assignment });
   }
 );
@@ -65,6 +69,7 @@ interface IdParams extends ParamsDictionary {
 }
 
 export const deleteTeacherAssignment = catchAsync<IdParams>(async (req, res) => {
-  await teacherAssignmentService.deleteTeacherAssignment(req.params.id);
+  if (!req.user) throw new ApiError(401, 'No autenticado.');
+  await teacherAssignmentService.deleteTeacherAssignment(req.params.id, { id: req.user._id, ip: req.ip });
   res.status(200).json({ success: true, message: 'Asignación académica eliminada correctamente.' });
 });

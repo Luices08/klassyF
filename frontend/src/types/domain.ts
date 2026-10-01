@@ -301,7 +301,7 @@ export interface Group {
   cupos_ocupados: number;
   cupos_disponibles?: number;
   estado: EstadoGrupo;
-  director_grupo_id: string | null;
+  director_grupo_id: string | { _id: string; nombre: string; apellido: string } | null;
 }
 
 // --- M10: Espacios físicos ---

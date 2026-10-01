@@ -1,4 +1,4 @@
-import AcademicYear from '../models/academicYear.model';
+import { Types } from 'mongoose';
 import CurricularDevelopment from '../models/curricularDevelopment.model';
 import Group from '../models/group.model';
 import Institution, { ILimitesCargaDocente } from '../models/institution.model';
@@ -8,8 +8,16 @@ import TeacherAssignment, { TeacherAssignmentDocument } from '../models/teacherA
 import User from '../models/user.model';
 import { NivelEducativo, TipoAsignacionDocente } from '../constants/enums';
 import { ROLES } from '../constants/roles';
+import { asegurarAnioNoCerrado } from './academicYear.service';
+import { registrarEvento } from './audit.service';
 import ApiError from '../utils/ApiError';
 import { ESTADO_ACTIVO } from '../utils/filtroEstado';
+import { runTransaction } from '../utils/runTransaction';
+
+export interface ActorAsignacion {
+  id: string | Types.ObjectId;
+  ip?: string | null;
+}
 
 export interface CreateTeacherAssignmentInput {
   docente_id: string;
@@ -31,7 +39,8 @@ export interface ListAssignmentsQuery {
 }
 
 export async function createTeacherAssignment(
-  input: CreateTeacherAssignmentInput
+  input: CreateTeacherAssignmentInput,
+  actor: ActorAsignacion
 ): Promise<TeacherAssignmentDocument> {
   const tipo = input.tipo_asignacion || 'CLASE';
 
@@ -44,108 +53,151 @@ export async function createTeacherAssignment(
     throw new ApiError(409, 'El docente se encuentra inactivo.');
   }
 
-  // 2. Validar año lectivo
-  const academicYear = await AcademicYear.findById(input.academic_year_id);
-  if (!academicYear) throw new ApiError(404, 'Año lectivo no encontrado.');
+  // 2. Validar año lectivo: un año CERRADO es historico de solo lectura, igual que en M01/M04/M05/M10.
+  await asegurarAnioNoCerrado(input.academic_year_id);
 
-  // 3. Validaciones según el tipo de asignación
-  if (tipo === 'CLASE') {
-    if (!input.group_id) {
-      throw new ApiError(400, 'Se requiere el grupo para una asignación de clase.');
-    }
-    if (!input.subject_id) {
-      throw new ApiError(400, 'Se requiere la asignatura para una asignación de clase.');
-    }
+  // DIRECCION_GRUPO escribe dos documentos relacionados (desactiva la asignacion anterior y
+  // mueve Group.director_grupo_id): en transaccion, igual que las demas escrituras de 2+
+  // documentos del sistema (ver enrollment.service/admissionRequest.service), para que una
+  // falla a mitad de camino no deje al grupo sin director o con dos asignaciones activas.
+  const assignment = await runTransaction(async (session) => {
+    let detalleAuditoria = '';
 
-    const group = await Group.findById(input.group_id);
-    if (!group) throw new ApiError(404, 'Grupo no encontrado.');
+    // 3. Validaciones según el tipo de asignación
+    if (tipo === 'CLASE') {
+      if (!input.group_id) {
+        throw new ApiError(400, 'Se requiere el grupo para una asignación de clase.');
+      }
+      if (!input.subject_id) {
+        throw new ApiError(400, 'Se requiere la asignatura para una asignación de clase.');
+      }
 
-    const subject = await Subject.findById(input.subject_id);
-    if (!subject) throw new ApiError(404, 'Asignatura no encontrada.');
+      const group = await Group.findById(input.group_id).session(session);
+      if (!group) throw new ApiError(404, 'Grupo no encontrado.');
+      if (String(group.academic_year_id) !== String(input.academic_year_id)) {
+        throw new ApiError(400, 'El grupo no pertenece al año lectivo indicado.');
+      }
 
-    let horasAsignadas = input.horas_semanales;
+      const subject = await Subject.findById(input.subject_id).session(session);
+      if (!subject) throw new ApiError(404, 'Asignatura no encontrada.');
 
-    // Validar concordancia con el Plan de Estudios de M06 si existe
-    const studyPlan = await StudyPlan.findOne({ academic_year_id: input.academic_year_id });
-    if (studyPlan) {
-      const gradoConfig = studyPlan.grades.find(
-        (g) => String(g.grade_id) === String(group.grade_id)
-      );
+      let horasAsignadas = input.horas_semanales;
 
-      if (gradoConfig) {
-        // Verificar si la asignatura está en la configuración general del grado o personalizada para el grupo
-        const asgGrado = gradoConfig.asignaturas.find(
-          (a) => String(a.subject_id) === String(input.subject_id)
-        );
-        const personalizacionGrupo = gradoConfig.personalizaciones_grupo.find(
-          (p) => String(p.group_id) === String(group._id)
-        );
-        const asgAgregada = personalizacionGrupo?.asignaturas_agregadas.find(
-          (a) => String(a.subject_id) === String(input.subject_id)
-        );
-        const overrideHoras = personalizacionGrupo?.intensidades_personalizadas.find(
-          (a) => String(a.subject_id) === String(input.subject_id)
-        );
+      // Validar concordancia con el Plan de Estudios de M06 si existe
+      const studyPlan = await StudyPlan.findOne({ academic_year_id: input.academic_year_id }).session(session);
+      if (studyPlan) {
+        const gradoConfig = studyPlan.grades.find((g) => String(g.grade_id) === String(group.grade_id));
 
-        if (!asgGrado && !asgAgregada) {
-          throw new ApiError(
-            400,
-            `La asignatura "${subject.nombre}" no hace parte del plan de estudios aprobado para este grado/grupo.`
+        if (gradoConfig) {
+          // Verificar si la asignatura está en la configuración general del grado o personalizada para el grupo
+          const asgGrado = gradoConfig.asignaturas.find((a) => String(a.subject_id) === String(input.subject_id));
+          const personalizacionGrupo = gradoConfig.personalizaciones_grupo.find(
+            (p) => String(p.group_id) === String(group._id)
           );
-        }
+          const asgAgregada = personalizacionGrupo?.asignaturas_agregadas.find(
+            (a) => String(a.subject_id) === String(input.subject_id)
+          );
+          const overrideHoras = personalizacionGrupo?.intensidades_personalizadas.find(
+            (a) => String(a.subject_id) === String(input.subject_id)
+          );
 
-        // Fijar exactamente la intensidad horaria semanal configurada en M06
-        if (overrideHoras) {
-          horasAsignadas = overrideHoras.intensidad_horaria_semanal;
-        } else if (asgAgregada) {
-          horasAsignadas = asgAgregada.intensidad_horaria_semanal;
-        } else if (asgGrado) {
-          horasAsignadas = asgGrado.intensidad_horaria_semanal;
+          if (!asgGrado && !asgAgregada) {
+            throw new ApiError(
+              400,
+              `La asignatura "${subject.nombre}" no hace parte del plan de estudios aprobado para este grado/grupo.`
+            );
+          }
+
+          // Fijar exactamente la intensidad horaria semanal configurada en M06
+          if (overrideHoras) {
+            horasAsignadas = overrideHoras.intensidad_horaria_semanal;
+          } else if (asgAgregada) {
+            horasAsignadas = asgAgregada.intensidad_horaria_semanal;
+          } else if (asgGrado) {
+            horasAsignadas = asgGrado.intensidad_horaria_semanal;
+          }
         }
       }
-    }
 
-    input.horas_semanales = horasAsignadas;
+      input.horas_semanales = horasAsignadas;
 
-    // Verificar si ya existe otro docente asignado a esta materia en este grupo
-    const existing = await TeacherAssignment.findOne({
-      academic_year_id: input.academic_year_id,
-      group_id: input.group_id,
-      subject_id: input.subject_id,
-      tipo_asignacion: 'CLASE',
-      estado: ESTADO_ACTIVO,
-    });
+      // Verificar si ya existe otro docente asignado a esta materia en este grupo
+      const existing = await TeacherAssignment.findOne({
+        academic_year_id: input.academic_year_id,
+        group_id: input.group_id,
+        subject_id: input.subject_id,
+        tipo_asignacion: 'CLASE',
+        estado: ESTADO_ACTIVO,
+      }).session(session);
 
-    if (existing) {
-      if (String(existing.docente_id) === String(input.docente_id)) {
-        throw new ApiError(409, 'El docente ya tiene asignada esta materia en este grupo.');
+      if (existing) {
+        if (String(existing.docente_id) === String(input.docente_id)) {
+          throw new ApiError(409, 'El docente ya tiene asignada esta materia en este grupo.');
+        }
+        throw new ApiError(409, 'Esta asignatura ya está asignada a otro docente en este grupo.');
       }
-      throw new ApiError(409, 'Esta asignatura ya está asignada a otro docente en este grupo.');
-    }
-  } else if (tipo === 'DIRECCION_GRUPO') {
-    if (!input.group_id) {
-      throw new ApiError(400, 'Se requiere especificar el grupo para la dirección de grupo.');
-    }
-    const group = await Group.findById(input.group_id);
-    if (!group) throw new ApiError(404, 'Grupo no encontrado.');
 
-    // Dirección de grupo no computa horas lectivas
-    input.horas_semanales = 0;
+      detalleAuditoria = `Clase: ${subject.nombre} en grupo ${group.nomenclatura} (${input.horas_semanales}h/sem)`;
+    } else if (tipo === 'DIRECCION_GRUPO') {
+      if (!input.group_id) {
+        throw new ApiError(400, 'Se requiere especificar el grupo para la dirección de grupo.');
+      }
+      const group = await Group.findById(input.group_id).session(session);
+      if (!group) throw new ApiError(404, 'Grupo no encontrado.');
+      if (String(group.academic_year_id) !== String(input.academic_year_id)) {
+        throw new ApiError(400, 'El grupo no pertenece al año lectivo indicado.');
+      }
 
-    // Asignar en el modelo del grupo
-    group.director_grupo_id = docente._id;
-    await group.save();
-  } else if (tipo === 'PROYECTO_TRANSVERSAL' || tipo === 'OTRO') {
-    if (!input.proyecto_nombre || input.proyecto_nombre.trim() === '') {
-      throw new ApiError(400, 'Se requiere el nombre del proyecto pedagógico o comisión asignada.');
+      if (group.director_grupo_id && String(group.director_grupo_id) === String(docente._id)) {
+        throw new ApiError(409, 'Este docente ya es el director de este grupo.');
+      }
+
+      // Dirección de grupo no computa horas lectivas
+      input.horas_semanales = 0;
+
+      // Reemplazar al director anterior (si lo hay): su asignacion queda inactiva, no se borra
+      // (preserva el historial, igual que CLASE conserva una asignacion revocada via estado).
+      const directorAnterior = group.director_grupo_id
+        ? await TeacherAssignment.findOneAndUpdate(
+            { group_id: group._id, tipo_asignacion: 'DIRECCION_GRUPO', estado: ESTADO_ACTIVO },
+            { $set: { estado: 'inactivo' } },
+            { session }
+          )
+        : null;
+
+      // Asignar en el modelo del grupo
+      group.director_grupo_id = docente._id;
+      await group.save({ session });
+
+      detalleAuditoria = `Dirección de grupo ${group.nomenclatura}${
+        directorAnterior ? ` (reemplaza a docente ${directorAnterior.docente_id})` : ''
+      }`;
+    } else if (tipo === 'PROYECTO_TRANSVERSAL' || tipo === 'OTRO') {
+      if (!input.proyecto_nombre || input.proyecto_nombre.trim() === '') {
+        throw new ApiError(400, 'Se requiere el nombre del proyecto pedagógico o comisión asignada.');
+      }
+      detalleAuditoria = `${tipo === 'PROYECTO_TRANSVERSAL' ? 'Proyecto transversal' : 'Otra asignación'}: ${input.proyecto_nombre}`;
     }
-  }
 
-  return TeacherAssignment.create({
-    ...input,
-    tipo_asignacion: tipo,
-    estado: 'activo',
+    const [creada] = await TeacherAssignment.create(
+      [{ ...input, tipo_asignacion: tipo, estado: 'activo' }],
+      { session }
+    );
+    if (!creada) throw new ApiError(500, 'No se pudo crear la asignación académica.');
+
+    return { creada, detalleAuditoria };
   });
+
+  await registrarEvento({
+    usuario_id: actor.id,
+    accion: 'ASIGNACION_DOCENTE_CREADA',
+    entidad: 'TeacherAssignment',
+    entidad_id: assignment.creada._id,
+    detalle: `Docente ${docente._id} — ${assignment.detalleAuditoria}`,
+    ip: actor.ip,
+  });
+
+  return assignment.creada;
 }
 
 export async function listTeacherAssignments(query: ListAssignmentsQuery) {
@@ -283,32 +335,50 @@ export async function getDocentesCargaResumen(academicYearId: string) {
   });
 }
 
-export async function deleteTeacherAssignment(id: string): Promise<void> {
+export async function deleteTeacherAssignment(id: string, actor: ActorAsignacion): Promise<void> {
   const assignment = await TeacherAssignment.findById(id);
   if (!assignment) {
     throw new ApiError(404, 'Asignación docente no encontrada.');
   }
 
-  // Verificar si tiene desarrollo curricular asociado
-  const dev = await CurricularDevelopment.findOne({ teacher_assignment_id: id });
-  if (dev && dev.estado === 'APROBADO') {
-    throw new ApiError(
-      409,
-      'No se puede eliminar la asignación académica porque ya cuenta con una planeación curricular aprobada.'
-    );
-  }
+  // Un año CERRADO es historico de solo lectura, igual que en M01/M04/M05/M10.
+  await asegurarAnioNoCerrado(String(assignment.academic_year_id));
 
-  // Si era dirección de grupo, limpiar el campo en el grupo
-  if (assignment.tipo_asignacion === 'DIRECCION_GRUPO' && assignment.group_id) {
-    await Group.findByIdAndUpdate(assignment.group_id, {
-      $unset: { director_grupo_id: 1 },
-    });
-  }
+  await runTransaction(async (session) => {
+    // Verificar si tiene desarrollo curricular asociado
+    const dev = await CurricularDevelopment.findOne({ teacher_assignment_id: id }).session(session);
+    if (dev && dev.estado === 'APROBADO') {
+      throw new ApiError(
+        409,
+        'No se puede eliminar la asignación académica porque ya cuenta con una planeación curricular aprobada.'
+      );
+    }
 
-  // Si tenía borrador de desarrollo curricular no aprobado, eliminarlo
-  if (dev) {
-    await CurricularDevelopment.findByIdAndDelete(dev._id);
-  }
+    // Si era dirección de grupo y sigue siendo el director vigente del grupo, limpiar el campo
+    // (si ya fue reemplazado por otro docente, esta asignacion esta inactiva y no debe tocar al
+    // director actual — ver createTeacherAssignment).
+    if (assignment.tipo_asignacion === 'DIRECCION_GRUPO' && assignment.group_id) {
+      await Group.updateOne(
+        { _id: assignment.group_id, director_grupo_id: assignment.docente_id },
+        { $unset: { director_grupo_id: 1 } },
+        { session }
+      );
+    }
 
-  await TeacherAssignment.findByIdAndDelete(id);
+    // Si tenía borrador de desarrollo curricular no aprobado, eliminarlo
+    if (dev) {
+      await CurricularDevelopment.findByIdAndDelete(dev._id).session(session);
+    }
+
+    await TeacherAssignment.findByIdAndDelete(id).session(session);
+  });
+
+  await registrarEvento({
+    usuario_id: actor.id,
+    accion: 'ASIGNACION_DOCENTE_ELIMINADA',
+    entidad: 'TeacherAssignment',
+    entidad_id: id,
+    detalle: `Docente ${assignment.docente_id} — tipo ${assignment.tipo_asignacion}`,
+    ip: actor.ip,
+  });
 }

@@ -41,6 +41,9 @@ export const ACCIONES_AUDITORIA = [
   // M01/M05: estructura de tiempo de las jornadas
   'JORNADA_HORARIO_ACTUALIZADO',
   'PLANTILLA_FRANJAS_ACTUALIZADA',
+  // M08: Asignacion docente
+  'ASIGNACION_DOCENTE_CREADA',
+  'ASIGNACION_DOCENTE_ELIMINADA',
 ] as const;
 export type AccionAuditoria = (typeof ACCIONES_AUDITORIA)[number];
 

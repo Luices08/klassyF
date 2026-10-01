@@ -3,6 +3,7 @@ import { FilterQuery, Types } from 'mongoose';
 import { EstadoUsuario, Rol, TIPOS_DOCUMENTO, TipoDocumento } from '../constants/enums';
 import { ROLES, ROLES_LIST, puedeGestionarRol } from '../constants/roles';
 import ActivitySubmission from '../models/activitySubmission.model';
+import AdmissionRequest from '../models/admissionRequest.model';
 import Attendance from '../models/attendance.model';
 import Campus from '../models/campus.model';
 import CurricularDevelopment from '../models/curricularDevelopment.model';
@@ -10,6 +11,7 @@ import Enrollment from '../models/enrollment.model';
 import Group from '../models/group.model';
 import Guardian from '../models/guardian.model';
 import Institution from '../models/institution.model';
+import PeriodoProrroga from '../models/periodoProrroga.model';
 import StudentGuardian from '../models/studentGuardian.model';
 import StudentProfile from '../models/studentProfile.model';
 import TeacherAssignment from '../models/teacherAssignment.model';
@@ -24,6 +26,12 @@ import catchAsync from '../utils/catchAsync';
 // La jerarquía institucional (puedeGestionarRol de ../constants/roles)
 // rige todas las acciones: ningún rol puede crear, editar, cambiar estado,
 // resetear clave ni eliminar a roles de rango igual o superior.
+
+async function exigirSedesExistentes(ids: string[] | undefined): Promise<void> {
+  if (!ids || ids.length === 0) return;
+  const existentes = await Campus.countDocuments({ _id: { $in: ids } });
+  if (existentes !== new Set(ids).size) throw new ApiError(400, 'Una o más sedes indicadas no existen.');
+}
 
 interface CreateUserBody {
   nombre: string;
@@ -42,6 +50,7 @@ export const createUser = catchAsync<unknown, unknown, CreateUserBody>(async (re
   if (!req.user || !puedeGestionarRol(req.user.rol, req.body.rol)) {
     throw new ApiError(403, `Tu rol (${req.user?.rol}) no tiene permisos para crear usuarios con rol ${req.body.rol}.`);
   }
+  await exigirSedesExistentes(req.body.sedes_ids);
 
   const { password, ...rest } = req.body;
   const user = new User({ ...rest, debe_cambiar_password: true });
@@ -143,6 +152,9 @@ export const updateUser = catchAsync<UserParams, unknown, UpdateUserBody>(async 
   const user = await User.findById(req.params.id);
   if (!user) throw new ApiError(404, 'Usuario no encontrado.');
 
+  if (String(user._id) === String(req.user?._id)) {
+    throw new ApiError(400, 'Para editar tus propios datos o tu contraseña, usa la opción en Mi cuenta.');
+  }
   if (!req.user || !puedeGestionarRol(req.user.rol, user.rol)) {
     throw new ApiError(403, `Tu rol (${req.user?.rol}) no tiene permisos para editar un usuario con rol ${user.rol}.`);
   }
@@ -150,6 +162,7 @@ export const updateUser = catchAsync<UserParams, unknown, UpdateUserBody>(async 
   if (req.body.rol && !puedeGestionarRol(req.user.rol, req.body.rol)) {
     throw new ApiError(403, `Tu rol (${req.user?.rol}) no tiene permisos para asignar el rol ${req.body.rol}.`);
   }
+  await exigirSedesExistentes(req.body.sedes_ids);
 
   const { password, ...rest } = req.body;
   Object.assign(user, rest);
@@ -226,13 +239,18 @@ async function tieneHistorial(userId: string): Promise<boolean> {
 
   const conteos = await Promise.all([
     Enrollment.countDocuments({ student_id: userId }),
+    Enrollment.countDocuments({ 'checklist.revisado_por': userId }),
     Attendance.countDocuments({ student_id: userId }),
     ActivitySubmission.countDocuments({ $or: [{ student_id: userId }, { docente_id: userId }] }),
     TeacherAssignment.countDocuments({ docente_id: userId }),
-    StudentProfile.countDocuments({ user_id: userId }),
+    StudentProfile.countDocuments({ $or: [{ user_id: userId }, { registrado_por_id: userId }] }),
     Group.countDocuments({ director_grupo_id: userId }),
-    CurricularDevelopment.countDocuments({ 'historial_revisiones.coordinador_id': userId }),
+    CurricularDevelopment.countDocuments({
+      $or: [{ 'historial_revisiones.coordinador_id': userId }, { 'historial_versiones.modificado_por': userId }],
+    }),
     Institution.countDocuments({ administrador_id: userId }),
+    PeriodoProrroga.countDocuments({ $or: [{ docente_id: userId }, { otorgada_por_id: userId }, { revocada_por_id: userId }] }),
+    AdmissionRequest.countDocuments({ revisado_por: userId }),
   ]);
   return vinculosComoAcudiente > 0 || conteos.some((c) => c > 0);
 }
@@ -313,6 +331,9 @@ export const cerrarSesiones = catchAsync<UserParams>(async (req, res) => {
   const user = await User.findById(req.params.id);
   if (!user) throw new ApiError(404, 'Usuario no encontrado.');
 
+  if (String(user._id) === String(req.user?._id)) {
+    throw new ApiError(400, 'No puedes cerrar tus propias sesiones desde aquí.');
+  }
   if (!req.user || !puedeGestionarRol(req.user.rol, user.rol)) {
     throw new ApiError(403, `Tu rol (${req.user?.rol}) no tiene permisos para cerrar las sesiones de un usuario con rol ${user.rol}.`);
   }

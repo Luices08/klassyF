@@ -212,6 +212,27 @@ export interface ResumenSemanas {
   semanas_por_periodo: Array<{ numero: number; semanas: number }>;
 }
 
+// M32/CU-ADM-04: niveles cualitativos nacionales de desempeño (Decreto 1290, art. 5). Los 4 son
+// obligatorios por ley; la institución ajusta etiqueta y cortes numéricos, no la lista de niveles.
+export const NIVELES_DESEMPENO = ['BAJO', 'BASICO', 'ALTO', 'SUPERIOR'] as const;
+export type NivelDesempeno = (typeof NIVELES_DESEMPENO)[number];
+
+export interface RangoCualitativo {
+  nivel: NivelDesempeno;
+  etiqueta: string;
+  valor_minimo: number;
+  valor_maximo: number;
+  es_aprobatorio: boolean;
+}
+
+export interface EscalaEvaluacion {
+  nota_minima: number;
+  nota_maxima: number;
+  nota_aprobatoria: number;
+  precision_decimales: number;
+  rangos: RangoCualitativo[];
+}
+
 export interface AcademicYear {
   _id: string;
   institucion_id: string;
@@ -224,6 +245,8 @@ export interface AcademicYear {
   periodos: Periodo[];
   eventos: EventoCalendario[];
   calendarios_sede: CalendarioSede[];
+  /** SIEE (CU-ADM-04): null hasta que el ADMIN la configure. */
+  escala_evaluacion: EscalaEvaluacion | null;
   cerrado_at: string | null;
   resumen_semanas: ResumenSemanas;
 }

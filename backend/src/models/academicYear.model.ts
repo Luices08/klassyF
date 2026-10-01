@@ -6,10 +6,13 @@ import {
   ESTADOS_PERIODO_ACADEMICO,
   EstadoAnioLectivo,
   EstadoPeriodoAcademico,
+  NIVELES_DESEMPENO,
+  NivelDesempeno,
   TIPOS_EVENTO_CALENDARIO,
   TipoEventoCalendario,
 } from '../constants/enums';
 import { validarCalendario } from '../utils/calendarioAcademico';
+import { validarEscalaEvaluacion } from '../utils/escalaEvaluacion';
 
 export interface IPeriodo {
   numero: number;
@@ -49,6 +52,26 @@ export interface ICalendarioSede {
   periodos: IPeriodoSede[];
 }
 
+// M32/CU-ADM-04: rango numerico de un nivel cualitativo nacional (Decreto 1290, art. 5).
+export interface IRangoCualitativo {
+  nivel: NivelDesempeno;
+  /** Texto a mostrar (editable); el nivel en si (BAJO/BASICO/ALTO/SUPERIOR) no lo es. */
+  etiqueta: string;
+  valor_minimo: number;
+  valor_maximo: number;
+  es_aprobatorio: boolean;
+}
+
+// Escala de evaluacion institucional (SIEE) ligada al año lectivo: la escala numerica y sus
+// 4 rangos cualitativos no quedan quemados en el codigo (regla de oro de datos, sección 3).
+export interface IEscalaEvaluacion {
+  nota_minima: number;
+  nota_maxima: number;
+  nota_aprobatoria: number;
+  precision_decimales: number;
+  rangos: IRangoCualitativo[];
+}
+
 export interface IAcademicYear {
   institucion_id: Types.ObjectId;
   year: number;
@@ -60,6 +83,8 @@ export interface IAcademicYear {
   periodos: Types.DocumentArray<IPeriodo>;
   eventos: Types.DocumentArray<IEventoCalendario>;
   calendarios_sede: Types.DocumentArray<ICalendarioSede>;
+  // null hasta que el ADMIN la configure (CU-ADM-04); M12/M17 la usaran via resolverDesempeno.
+  escala_evaluacion: IEscalaEvaluacion | null;
   cerrado_at: Date | null;
   createdAt: Date;
   updatedAt: Date;
@@ -128,6 +153,28 @@ const calendarioSedeSchema = new Schema<ICalendarioSede>(
   { _id: false }
 );
 
+const rangoCualitativoSchema = new Schema<IRangoCualitativo>(
+  {
+    nivel: { type: String, enum: NIVELES_DESEMPENO, required: true },
+    etiqueta: { type: String, required: true, trim: true },
+    valor_minimo: { type: Number, required: true },
+    valor_maximo: { type: Number, required: true },
+    es_aprobatorio: { type: Boolean, required: true },
+  },
+  { _id: false }
+);
+
+const escalaEvaluacionSchema = new Schema<IEscalaEvaluacion>(
+  {
+    nota_minima: { type: Number, required: true },
+    nota_maxima: { type: Number, required: true },
+    nota_aprobatoria: { type: Number, required: true },
+    precision_decimales: { type: Number, required: true, default: 1, min: 0, max: 4 },
+    rangos: { type: [rangoCualitativoSchema], required: true },
+  },
+  { _id: false }
+);
+
 const academicYearSchema = new Schema<IAcademicYear, AcademicYearModel>(
   {
     institucion_id: { type: Schema.Types.ObjectId, ref: 'Institution', required: true },
@@ -148,6 +195,7 @@ const academicYearSchema = new Schema<IAcademicYear, AcademicYearModel>(
     },
     eventos: { type: [eventoCalendarioSchema], default: [] },
     calendarios_sede: { type: [calendarioSedeSchema], default: [] },
+    escala_evaluacion: { type: escalaEvaluacionSchema, default: null },
     cerrado_at: { type: Date, default: null },
   },
   { timestamps: true }
@@ -201,6 +249,16 @@ academicYearSchema.pre('validate', function validarCronologia(this: IAcademicYea
   if (!this.periodos || this.periodos.length === 0 || !this.fecha_inicio || !this.fecha_fin) return next();
 
   const problema = validarCalendario(this);
+  if (problema) return next(errorDeNegocio(problema));
+  next();
+});
+
+// Escala de evaluacion (CU-ADM-04): 4 niveles exactos, dentro de los limites de la escala y sin
+// traslapes entre rangos. Sin esto configurado, escala_evaluacion se queda en null (M12/M17
+// todavia no la usan).
+academicYearSchema.pre('validate', function validarEscala(this: IAcademicYear, next) {
+  if (!this.escala_evaluacion) return next();
+  const problema = validarEscalaEvaluacion(this.escala_evaluacion);
   if (problema) return next(errorDeNegocio(problema));
   next();
 });

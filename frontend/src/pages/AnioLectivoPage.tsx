@@ -2,6 +2,7 @@ import { type FormEvent, type ReactNode, useState } from 'react';
 import { AnioLectivoFormDrawer } from '../components/anioLectivo/AnioLectivoFormDrawer';
 import { CalendarioSedeDrawer } from '../components/anioLectivo/CalendarioSedeDrawer';
 import { CierreAnioDrawer } from '../components/anioLectivo/CierreAnioDrawer';
+import { EscalaEvaluacionDrawer } from '../components/anioLectivo/EscalaEvaluacionDrawer';
 import { EventoDrawer } from '../components/anioLectivo/EventoDrawer';
 import { PeriodoCard } from '../components/anioLectivo/PeriodoCard';
 import { ProrrogaDrawer } from '../components/anioLectivo/ProrrogaDrawer';
@@ -197,6 +198,8 @@ export function AnioLectivoPage() {
   const [sedeCalendario, setSedeCalendario] = useState<Campus | null>(null);
   const [sedeHeredando, setSedeHeredando] = useState<Campus | null>(null);
   const quitarCalendarioSede = useQuitarCalendarioSede();
+
+  const [escalaAbierta, setEscalaAbierta] = useState(false);
 
   async function handleActivar() {
     if (!anio) return;
@@ -569,6 +572,58 @@ export function AnioLectivoPage() {
               )}
             </Card>
           )}
+
+          {esAdmin && (
+            <Card>
+              <CardHeader
+                title="Escala de evaluación institucional (SIEE)"
+                subtitle="Decreto 1290 de 2009: escala numérica, nota aprobatoria y cortes de los 4 niveles cualitativos (CU-ADM-04)."
+                action={
+                  <Button type="button" variant="outline" onClick={() => setEscalaAbierta(true)}>
+                    <PencilIcon className="h-4 w-4" />
+                    {anio.escala_evaluacion ? 'Editar' : 'Configurar'}
+                  </Button>
+                }
+              />
+              {!anio.escala_evaluacion && (
+                <Alert tone="warning">
+                  Aún no se ha configurado la escala de evaluación de este año. M12 (notas) y M17 (boletines) la
+                  necesitarán para calcular desempeños.
+                </Alert>
+              )}
+              {anio.escala_evaluacion && (
+                <div className="space-y-3">
+                  <div className="flex flex-wrap gap-2">
+                    <Chip tone="blue">
+                      Escala {anio.escala_evaluacion.nota_minima}–{anio.escala_evaluacion.nota_maxima}
+                    </Chip>
+                    <Chip tone="green">Aprueba desde {anio.escala_evaluacion.nota_aprobatoria}</Chip>
+                    <Chip tone="neutral">{anio.escala_evaluacion.precision_decimales} decimal(es)</Chip>
+                  </div>
+                  <Table>
+                    <TableHead>
+                      <Th>Nivel</Th>
+                      <Th>Rango</Th>
+                      <Th>Aprueba</Th>
+                    </TableHead>
+                    <TableBody>
+                      {anio.escala_evaluacion.rangos.map((r) => (
+                        <tr key={r.nivel}>
+                          <Td className="font-medium text-ink">{r.etiqueta}</Td>
+                          <Td>
+                            {r.valor_minimo}–{r.valor_maximo}
+                          </Td>
+                          <Td>
+                            <Chip tone={r.es_aprobatorio ? 'green' : 'red'}>{r.es_aprobatorio ? 'Sí' : 'No'}</Chip>
+                          </Td>
+                        </tr>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+            </Card>
+          )}
         </>
       )}
 
@@ -603,6 +658,7 @@ export function AnioLectivoPage() {
             onClose={() => setEventoDrawer(null)}
           />
           <CalendarioSedeDrawer open={sedeCalendario !== null} anio={anio} sede={sedeCalendario} onClose={() => setSedeCalendario(null)} />
+          <EscalaEvaluacionDrawer open={escalaAbierta} anio={anio} onClose={() => setEscalaAbierta(false)} />
 
           <ConfirmacionDrawer
             open={activando}

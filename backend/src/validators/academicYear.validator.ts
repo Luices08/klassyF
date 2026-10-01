@@ -1,5 +1,5 @@
 import Joi from 'joi';
-import { CALENDARIOS, ESTADOS_PERIODO_ACADEMICO, TIPOS_EVENTO_CALENDARIO } from '../constants/enums';
+import { CALENDARIOS, ESTADOS_PERIODO_ACADEMICO, NIVELES_DESEMPENO, TIPOS_EVENTO_CALENDARIO } from '../constants/enums';
 import { ValidationSchema } from '../middlewares/validate.middleware';
 import { objectId } from './common.validator';
 
@@ -128,4 +128,39 @@ export const guardarCalendarioSede: ValidationSchema = {
 
 export const quitarCalendarioSede: ValidationSchema = {
   params: Joi.object({ ...idAnio, sedeId: objectId.required() }),
+};
+
+export const sugerirEscalaEvaluacion: ValidationSchema = {
+  params: Joi.object(idAnio),
+  query: Joi.object({
+    nota_minima: Joi.number().required(),
+    nota_maxima: Joi.number().required(),
+    nota_aprobatoria: Joi.number().required(),
+    precision_decimales: Joi.number().integer().min(0).max(4),
+  }),
+};
+
+const rangoCualitativoBody = Joi.object({
+  nivel: Joi.string()
+    .valid(...NIVELES_DESEMPENO)
+    .required(),
+  etiqueta: Joi.string().trim().required(),
+  valor_minimo: Joi.number().required(),
+  valor_maximo: Joi.number().required(),
+  es_aprobatorio: Joi.boolean().required(),
+});
+
+export const actualizarEscalaEvaluacion: ValidationSchema = {
+  params: Joi.object(idAnio),
+  body: Joi.object({
+    nota_minima: Joi.number().required(),
+    nota_maxima: Joi.number().required(),
+    nota_aprobatoria: Joi.number().required(),
+    precision_decimales: Joi.number().integer().min(0).max(4),
+    rangos: Joi.array()
+      .items(rangoCualitativoBody)
+      .length(NIVELES_DESEMPENO.length)
+      .unique('nivel')
+      .required(),
+  }),
 };

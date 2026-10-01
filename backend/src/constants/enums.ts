@@ -168,6 +168,12 @@ export type TipoAsignacionDocente = (typeof TIPOS_ASIGNACION_DOCENTE)[number];
 export const COMPONENTES_SIEE = ['COGNITIVO_SABER', 'PROCEDIMENTAL_HACER', 'ACTITUDINAL_SER'] as const;
 export type ComponenteSiee = (typeof COMPONENTES_SIEE)[number];
 
+// M32/M05: niveles cualitativos nacionales de desempeño (Decreto 1290 de 2009, art. 5). Los 4
+// son obligatorios por ley; la institución ajusta su etiqueta y los cortes numéricos que cada
+// uno cubre (CU-ADM-04), pero no agrega ni quita niveles — ver AcademicYear.escala_evaluacion.
+export const NIVELES_DESEMPENO = ['BAJO', 'BASICO', 'ALTO', 'SUPERIOR'] as const;
+export type NivelDesempeno = (typeof NIVELES_DESEMPENO)[number];
+
 export const ESTADOS_ASISTENCIA = [
   'PRESENTE',
   'FALTA_JUSTIFICADA',

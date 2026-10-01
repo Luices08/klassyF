@@ -581,16 +581,23 @@ export function AnioLectivoPage() {
                 title="Escala de evaluación institucional (SIEE)"
                 subtitle="Decreto 1290 de 2009: escala numérica, nota aprobatoria y cortes de los 4 niveles cualitativos (CU-ADM-04)."
                 action={
-                  <Button type="button" variant="outline" onClick={() => setEscalaAbierta(true)}>
-                    <PencilIcon className="h-4 w-4" />
-                    {anio.escala_evaluacion ? 'Editar' : 'Configurar'}
-                  </Button>
+                  anio.estado === 'PLANIFICACION' ? (
+                    <Button type="button" variant="outline" onClick={() => setEscalaAbierta(true)}>
+                      <PencilIcon className="h-4 w-4" />
+                      {anio.escala_evaluacion ? 'Editar' : 'Configurar'}
+                    </Button>
+                  ) : undefined
                 }
               />
-              {!anio.escala_evaluacion && (
+              {!anio.escala_evaluacion && anio.estado === 'PLANIFICACION' && (
                 <Alert tone="warning">
-                  Aún no se ha configurado la escala de evaluación de este año. M12 (notas) y M17 (boletines) la
-                  necesitarán para calcular desempeños.
+                  Aún no se ha configurado la escala de evaluación de este año. Una vez actives el año quedará
+                  congelada para no alterar boletines ya emitidos.
+                </Alert>
+              )}
+              {anio.estado !== 'PLANIFICACION' && (
+                <Alert tone="info">
+                  El año ya fue activado: la escala de evaluación queda congelada y solo se puede consultar.
                 </Alert>
               )}
               {anio.escala_evaluacion && (
@@ -633,12 +640,19 @@ export function AnioLectivoPage() {
                 title="Ponderación de componentes del SIEE"
                 subtitle="Decreto 1290 de 2009: peso de Saber, Hacer y Ser en la nota de asignatura (CU-ADM-04)."
                 action={
-                  <Button type="button" variant="outline" onClick={() => setPonderacionAbierta(true)}>
-                    <PencilIcon className="h-4 w-4" />
-                    {anio.ponderacion_componentes ? 'Editar' : 'Configurar'}
-                  </Button>
+                  anio.estado === 'PLANIFICACION' ? (
+                    <Button type="button" variant="outline" onClick={() => setPonderacionAbierta(true)}>
+                      <PencilIcon className="h-4 w-4" />
+                      {anio.ponderacion_componentes ? 'Editar' : 'Configurar'}
+                    </Button>
+                  ) : undefined
                 }
               />
+              {anio.estado !== 'PLANIFICACION' && (
+                <Alert tone="info">
+                  El año ya fue activado: la ponderación de componentes queda congelada y solo se puede consultar.
+                </Alert>
+              )}
               <div className="flex flex-wrap gap-2">
                 <Chip tone="blue">
                   Saber {(anio.ponderacion_componentes?.COGNITIVO_SABER ?? 0.4) * 100}%

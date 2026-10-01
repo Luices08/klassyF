@@ -238,6 +238,16 @@ export function StudyPlanPage() {
         )}
       </div>
 
+      {/* El plan de estudios se congela al activar el año: generateReportCard lo lee en vivo al
+          armar cada boletin, asi que cambiar asignaturas/ponderaciones con el año EN_CURSO
+          recalcularia retroactivamente boletines ya emitidos (ver studyPlan.service). */}
+      {anioActual && anioActual.estado !== 'PLANIFICACION' && (
+        <Alert tone="info">
+          El año {anioActual.year} ya fue activado: el plan de estudios (asignaturas, ponderación de áreas y
+          distribución por grupos) quedó congelado y solo se puede consultar.
+        </Alert>
+      )}
+
       {/* Banner condicional: Copiar plan de año anterior (Solo si está en PLANIFICACION y sin plan) */}
       {puedeCopiarPlan && (
         <Card>

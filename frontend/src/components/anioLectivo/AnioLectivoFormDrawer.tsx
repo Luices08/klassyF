@@ -74,6 +74,10 @@ function FormularioAnio({ onClose, anio, anios, onGuardado }: AnioLectivoFormDra
   const editando = anio !== null;
   // Con el año en curso la cantidad de periodos ya no cambia y los cerrados quedan intactos.
   const estructuraBloqueada = anio?.estado === 'EN_CURSO';
+  // Una vez abierto el Periodo 1 la ponderación anual queda congelada para todo el año: cambiar
+  // un porcentaje recalcularía retroactivamente el peso de notas que ya se vienen promediando.
+  const periodo1 = anio?.periodos.find((p) => p.numero === 1);
+  const ponderacionBloqueada = periodo1 ? periodo1.estado !== 'PROGRAMADO' : false;
 
   const crear = useCrearAnio();
   const actualizar = useActualizarAnio();
@@ -225,6 +229,13 @@ function FormularioAnio({ onClose, anio, anios, onGuardado }: AnioLectivoFormDra
         )}
       </div>
 
+      {ponderacionBloqueada && (
+        <Alert tone="info">
+          El Periodo 1 ya está abierto: el peso (%) de los periodos quedó congelado para todo el año. Las fechas de
+          los periodos que sigan sin cerrar aún se pueden ajustar.
+        </Alert>
+      )}
+
       <div className="space-y-3">
         {periodos.map((p, i) => (
           <div key={p._key} className="rounded-xl border border-border p-4">
@@ -256,7 +267,7 @@ function FormularioAnio({ onClose, anio, anios, onGuardado }: AnioLectivoFormDra
                 max={100}
                 step="any"
                 required
-                disabled={p.cerrado}
+                disabled={p.cerrado || ponderacionBloqueada}
                 value={p.porcentaje}
                 onChange={(e) => actualizarPeriodo(i, { porcentaje: Number(e.target.value) })}
               />

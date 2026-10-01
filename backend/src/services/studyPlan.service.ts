@@ -21,12 +21,27 @@ import ApiError from '../utils/ApiError';
 // los castea igual al guardar — este helper solo satisface a TypeScript.
 const oid = (id: string): Types.ObjectId => id as unknown as Types.ObjectId;
 
+// El plan de estudios (Configuracion General, Configuracion de Evaluacion y Distribucion por
+// Grupos) solo se edita con el año en PLANIFICACION: una vez activado queda congelado, porque
+// generateReportCard (M12) lo lee en vivo al armar cada boletin, y cambiar la composicion o la
+// ponderacion de un area con el año EN_CURSO recalcularia retroactivamente boletines ya emitidos.
+function asegurarAnioEnPlanificacion(academicYear: { year: number; estado: string }): void {
+  if (academicYear.estado !== 'PLANIFICACION') {
+    throw new ApiError(
+      409,
+      `El año lectivo ${academicYear.year} ya fue activado: el plan de estudios (asignaturas, ` +
+        'ponderación de áreas y distribución por grupos) queda congelado para no alterar boletines ya emitidos.'
+    );
+  }
+}
+
 async function obtenerOCrearStudyPlan(institucion_id: string, academic_year_id: string): Promise<StudyPlanDocument> {
   const academicYear = await AcademicYear.findById(academic_year_id);
   if (!academicYear) throw new ApiError(404, 'Año lectivo no encontrado.');
   if (String(academicYear.institucion_id) !== String(institucion_id)) {
     throw new ApiError(400, 'institucion_id no coincide con la institucion del año lectivo seleccionado.');
   }
+  asegurarAnioEnPlanificacion(academicYear);
 
   const existente = await StudyPlan.findOne({ institucion_id, academic_year_id });
   return existente ?? new StudyPlan({ institucion_id, academic_year_id, grades: [] });
@@ -359,6 +374,7 @@ export async function crearPlanDesdeAnioAnterior(input: CrearPlanDesdeAnioAnteri
   if (String(academicYearNuevo.institucion_id) !== input.institucion_id) {
     throw new ApiError(400, 'institucion_id no coincide con la institucion del año lectivo seleccionado.');
   }
+  asegurarAnioEnPlanificacion(academicYearNuevo);
 
   const yaExiste = await StudyPlan.findOne({
     institucion_id: input.institucion_id,

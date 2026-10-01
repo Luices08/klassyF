@@ -121,6 +121,20 @@ export async function asegurarAnioNoCerrado(id: string): Promise<void> {
   await cargarAnioEditable(id);
 }
 
+// Las bases juridicas/matematicas del SIEE (escala de evaluacion, ponderacion de componentes) se
+// congelan al activar el año: cambiarlas con el año EN_CURSO (o ya CERRADO) recalcularia
+// retroactivamente boletines ya emitidos. Solo se editan mientras el año sigue en PLANIFICACION.
+async function cargarAnioEnPlanificacion(id: string): Promise<AcademicYearDocument> {
+  const anio = await cargarAnio(id);
+  if (anio.estado !== 'PLANIFICACION') {
+    throw new ApiError(
+      409,
+      `El año lectivo ${anio.year} ya fue activado: esta configuración queda congelada para no alterar boletines ya emitidos.`
+    );
+  }
+  return anio;
+}
+
 export async function listarAnios(): Promise<AnioLectivoDto[]> {
   const institucion = await Institution.findOne();
   if (!institucion) return [];
@@ -234,8 +248,12 @@ function periodoModificado(actual: IPeriodo, nuevo: PeriodoInput): boolean {
 /**
  * Edita la parametrizacion del año (nombre, regimen, fechas, periodos). En
  * PLANIFICACION se puede rehacer entera; con el año EN_CURSO la cantidad de
- * periodos ya no cambia y un periodo CERRADO queda intacto (sus notas ya se
- * consolidaron con ese porcentaje).
+ * periodos ya no cambia, un periodo CERRADO queda intacto (sus notas ya se
+ * consolidaron con ese porcentaje) y, una vez abierto el Periodo 1, la
+ * ponderacion anual (el porcentaje de cada periodo) tambien queda congelada
+ * para todo el año: cambiarla recalcularia retroactivamente el peso de notas
+ * que ya se vienen promediando. Las fechas de un periodo no cerrado (incluidas
+ * las ventanas de digitacion) se siguen pudiendo ajustar.
  */
 export async function actualizarAnio(
   id: string,
@@ -258,10 +276,20 @@ export async function actualizarAnio(
       throw new ApiError(409, 'Con el año en curso no se puede cambiar la cantidad de periodos.');
     }
 
+    const periodo1 = anio.periodos.find((p) => p.numero === 1);
+    const periodo1Abierto = periodo1 ? periodo1.estado !== 'PROGRAMADO' : false;
+
     for (const actual of anio.periodos) {
       const nuevo = input.periodos.find((n) => n.numero === actual.numero) as PeriodoInput;
       if (actual.estado === 'CERRADO' && periodoModificado(actual, nuevo)) {
         throw new ApiError(409, `El periodo ${actual.numero} está cerrado y no se puede modificar.`);
+      }
+      if (periodo1Abierto && actual.porcentaje !== nuevo.porcentaje) {
+        throw new ApiError(
+          409,
+          'La ponderación anual de los periodos quedó congelada al abrir el Periodo 1: cambiar un porcentaje ' +
+            'recalcularía retroactivamente el peso de notas que ya se vienen promediando.'
+        );
       }
     }
 
@@ -604,12 +632,13 @@ export async function sugerirEscalaEvaluacion(id: string, input: SugerenciaRango
   return sugerirRangos(input);
 }
 
+/** Solo editable con el año en PLANIFICACION: una vez activado queda congelada (ver cargarAnioEnPlanificacion). */
 export async function actualizarEscalaEvaluacion(
   id: string,
   input: EscalaEvaluacionInput,
   { usuarioId, ip }: ContextoUsuario
 ): Promise<AnioLectivoDto> {
-  const anio = await cargarAnioEditable(id);
+  const anio = await cargarAnioEnPlanificacion(id);
 
   anio.escala_evaluacion = {
     nota_minima: input.nota_minima,
@@ -634,14 +663,15 @@ export async function actualizarEscalaEvaluacion(
 
 /**
  * Pesos de Saber/Hacer/Ser para la nota de asignatura (CU-ADM-04): la suma debe ser 1 (100%),
- * validado en el modelo (pre-validate), no aquí.
+ * validado en el modelo (pre-validate), no aquí. Solo editable con el año en PLANIFICACION:
+ * una vez activado queda congelada (ver cargarAnioEnPlanificacion).
  */
 export async function actualizarPonderacionComponentes(
   id: string,
   input: PonderacionComponentesInput,
   { usuarioId, ip }: ContextoUsuario
 ): Promise<AnioLectivoDto> {
-  const anio = await cargarAnioEditable(id);
+  const anio = await cargarAnioEnPlanificacion(id);
 
   anio.ponderacion_componentes = { ...input };
   await anio.save();

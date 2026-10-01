@@ -1,5 +1,6 @@
 import { ComponenteSiee, ESTADOS_MATRICULA_ACTIVOS } from '../constants/enums';
 import Activity, { ActivityDocument } from '../models/activity.model';
+import AcademicYear from '../models/academicYear.model';
 import ActivitySubmission, { ActivitySubmissionDocument } from '../models/activitySubmission.model';
 import { Dba } from '../models/referenteCurricular.model';
 import Enrollment from '../models/enrollment.model';
@@ -8,6 +9,7 @@ import Subject from '../models/subject.model';
 import TeacherAssignment from '../models/teacherAssignment.model';
 import { UserDocument } from '../models/user.model';
 import ApiError from '../utils/ApiError';
+import { validarNotaDentroDeEscala } from '../utils/escalaEvaluacion';
 import { runTransaction } from '../utils/runTransaction';
 import { assertPeriodNotLocked } from './periodLock.service';
 
@@ -134,6 +136,13 @@ export async function gradeActivity(
     activity.periodo_numero,
     requestingUser._id
   );
+
+  // Validacion cruzada con la escala de evaluacion del año (CU-ADM-04): no es forma propia de
+  // ActivitySubmission, por eso vive aqui y no en el schema (ver modelo y validador).
+  const anio = await AcademicYear.findById(assignment.academic_year_id).select('escala_evaluacion');
+  for (const entry of entries) {
+    validarNotaDentroDeEscala(entry.calificacion_numerica, anio?.escala_evaluacion ?? null);
+  }
 
   const studentIds = entries.map((e) => e.student_id);
   if (new Set(studentIds).size !== studentIds.length) {

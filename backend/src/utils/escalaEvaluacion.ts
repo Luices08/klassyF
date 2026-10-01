@@ -158,3 +158,26 @@ export function resolverDesempeno(nota: number, configEscala: IEscalaEvaluacion)
 
   return { nota, nivel: rango.nivel, aprobado: rango.es_aprobatorio };
 }
+
+// Respaldo mientras un año lectivo no tiene escala_evaluacion configurada (CU-ADM-04): el mismo
+// límite 1.0–5.0 que usaba el sistema antes de que la escala fuera configurable, para no dejar
+// la digitación de notas sin validar ni romper instituciones que aún no la han configurado.
+const ESCALA_POR_DEFECTO = { nota_minima: 1.0, nota_maxima: 5.0 };
+
+/**
+ * Valida que una nota esté dentro de los límites de la escala institucional del año (o, si
+ * ese año todavía no tiene `escala_evaluacion` configurada, dentro del respaldo 1.0–5.0). Es
+ * una validación de límites simple (no resuelve nivel cualitativo); para eso ver
+ * `resolverDesempeno`. La usa cualquier módulo que reciba una calificación numérica — hoy M11
+ * (`activity.service#gradeActivity`), lista para M12.
+ */
+export function validarNotaDentroDeEscala(nota: number, escala: IEscalaEvaluacion | null): void {
+  const limites = escala ?? ESCALA_POR_DEFECTO;
+  if (nota < limites.nota_minima || nota > limites.nota_maxima) {
+    throw new ApiError(
+      400,
+      `La nota ${nota} está fuera de la escala institucional ${escala ? 'configurada' : 'por defecto'} ` +
+        `[${limites.nota_minima}, ${limites.nota_maxima}].`
+    );
+  }
+}

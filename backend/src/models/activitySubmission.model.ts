@@ -24,7 +24,10 @@ const activitySubmissionSchema = new Schema<IActivitySubmission, ActivitySubmiss
     texto_entrega: { type: String, default: '' },
     archivo_url: { type: String, default: null },
     fecha_entrega: { type: Date, default: Date.now },
-    calificacion_numerica: { type: Number, min: 1.0, max: 5.0, default: null },
+    // Sin tope fijo aqui: los limites reales (nota_minima/nota_maxima) salen de
+    // AcademicYear.escala_evaluacion y se validan en el servicio (validacion
+    // cruzada entre documentos, no forma propia del modelo — ver activity.service#gradeActivity).
+    calificacion_numerica: { type: Number, min: 0, default: null },
     retroalimentacion: { type: String, default: '' },
     fecha_calificacion: { type: Date, default: null },
     docente_id: { type: Schema.Types.ObjectId, ref: 'User', default: null },

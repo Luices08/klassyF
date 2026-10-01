@@ -44,7 +44,10 @@ export const createSubmission: ValidationSchema = {
 
 const gradeEntrySchema = Joi.object({
   student_id: objectId.required(),
-  calificacion_numerica: Joi.number().min(1.0).max(5.0).required(),
+  // Sin tope fijo: la forma solo exige un numero no negativo. El rango real
+  // (nota_minima/nota_maxima de la escala institucional del año) se valida en
+  // el servicio, que sí conoce el año lectivo de la asignacion.
+  calificacion_numerica: Joi.number().min(0).required(),
   retroalimentacion: Joi.string().allow(''),
 });
 

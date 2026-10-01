@@ -15,7 +15,6 @@ interface CreateGroupBody {
   jornada_id: string;
   nomenclatura: string;
   max_capacity: number;
-  director_grupo_id?: string | null;
   /** Salon titular (M10), opcional. */
   aula_id?: string | null;
 }

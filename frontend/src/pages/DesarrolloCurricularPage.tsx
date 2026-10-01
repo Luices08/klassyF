@@ -7,7 +7,7 @@ import { Input, Select, Textarea } from '../components/ui/Field';
 import { PageHeader } from '../components/ui/PageHeader';
 import { Spinner } from '../components/ui/Spinner';
 import { TabPanel, Tabs } from '../components/ui/Tabs';
-import { useAniosLectivos } from '../hooks/useAniosLectivos';
+import { useAnioDeTrabajo, useAniosLectivos } from '../hooks/useAniosLectivos';
 import {
   type GuardarBorradorInput,
   useCurricularDevelopment,
@@ -20,7 +20,8 @@ import { formatoFechaHora } from '../lib/fechas';
 import type { DbaReferente } from '../types/domain';
 
 export function DesarrolloCurricularPage() {
-  const { data: misAsignaciones = [], isLoading: cargandoCarga } = useMyTeacherLoad();
+  const { anio: anioTrabajo } = useAnioDeTrabajo();
+  const { data: misAsignaciones = [], isLoading: cargandoCarga } = useMyTeacherLoad(anioTrabajo?._id);
   const clases = misAsignaciones.filter((a) => a.tipo_asignacion === 'CLASE');
 
   const [assignmentId, setAssignmentId] = useState<string>('');

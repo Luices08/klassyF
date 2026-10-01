@@ -56,6 +56,21 @@ teacherAssignmentSchema.index(
   }
 );
 
+// Un solo director de grupo activo a la vez (el índice de CLASE de arriba no lo cubre: exige
+// subject_id, que una DIRECCION_GRUPO nunca tiene). Antes este invariante vivía solo en el
+// servicio (createTeacherAssignment reemplaza al anterior); ahora la base de datos lo garantiza.
+teacherAssignmentSchema.index(
+  { group_id: 1 },
+  {
+    unique: true,
+    partialFilterExpression: {
+      tipo_asignacion: 'DIRECCION_GRUPO',
+      estado: 'activo',
+      group_id: { $type: 'objectId' },
+    },
+  }
+);
+
 // Índice de consulta rápida por docente y año
 teacherAssignmentSchema.index({ docente_id: 1, academic_year_id: 1, estado: 1 });
 teacherAssignmentSchema.index({ group_id: 1, academic_year_id: 1 });

@@ -58,6 +58,8 @@ export function TeacherAssignmentsPage() {
   const { anio, anios } = useAnioDeTrabajo();
   const [selectedAnioId, setSelectedAnioId] = useState<string>('');
   const anioActivoId = selectedAnioId || anio?._id || '';
+  const anioActivo = anios.find((a) => a._id === anioActivoId);
+  const soloLectura = anioActivo?.estado === 'CERRADO';
 
   const { data: institucion } = useInstitution();
   const [tabActiva, setTabActiva] = useState<string>('resumen');
@@ -70,6 +72,8 @@ export function TeacherAssignmentsPage() {
   const [selectedGradoId, setSelectedGradoId] = useState<string>('');
   const [form, setForm] = useState(FORM_VACIO);
   const [formError, setFormError] = useState<string | null>(null);
+  const [limitesError, setLimitesError] = useState<string | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   // Queries
   const { data: docentesResumen = [], isLoading: cargandoResumen } = useDocentesCargaResumen(anioActivoId);
@@ -78,6 +82,9 @@ export function TeacherAssignmentsPage() {
     docente_id: filtroDocente || undefined,
     tipo_asignacion: (filtroTipo as TipoAsignacionDocente) || undefined,
   });
+  // Sin los filtros de pantalla (docente/tipo): sirve para saber que materias de un grupo ya
+  // estan tomadas sin importar quien las consulte, no solo las que el filtro actual deja ver.
+  const { data: todasLasAsignaciones = [] } = useTeacherAssignments({ academic_year_id: anioActivoId });
 
   const { data: docentes = [] } = useUsers({ rol: 'DOCENTE', estado: 'activo' });
   // Solo grupos activos: uno CLOSED ya no esta operativo para el año lectivo.
@@ -145,10 +152,13 @@ export function TeacherAssignmentsPage() {
       }
     }
 
-    // Identificar asignaturas ya asignadas a algún docente en este grupo
+    // Identificar asignaturas ya asignadas a algún docente en este grupo (de TODAS las
+    // asignaciones del año, no solo las que el filtro de la pestaña de detalle deja ver — si no,
+    // con un filtro de docente activo esto mostraba como "disponible" una materia que ya tiene
+    // otro docente, y el backend la rechazaba después con 409).
     const asignadasEnGrupo = new Set<string>();
     if (form.group_id) {
-      for (const asg of asignaciones) {
+      for (const asg of todasLasAsignaciones) {
         if (asg.tipo_asignacion === 'CLASE') {
           const asgGroupId = typeof asg.group_id === 'object' && asg.group_id ? asg.group_id._id : asg.group_id;
           if (String(asgGroupId) === String(form.group_id)) {
@@ -165,7 +175,7 @@ export function TeacherAssignmentsPage() {
       .sort((a, b) => a.nombre.localeCompare(b.nombre));
 
     return { asignaturasDisponibles: disponibles, horasPorAsignaturaMap: map };
-  }, [selectedGradoId, form.group_id, studyPlan, asignaciones, asignaturas]);
+  }, [selectedGradoId, form.group_id, studyPlan, todasLasAsignaciones, asignaturas]);
 
   // Director actual del grupo seleccionado para DIRECCION_GRUPO (si lo hay): guardar reemplaza
   // al titular anterior (categoria 2, se permite reasignar — ver M04/M05/M08), asi que se avisa
@@ -188,16 +198,18 @@ export function TeacherAssignmentsPage() {
     if (limitesCarga) {
       setLimitesForm(limitesCarga);
     }
+    setLimitesError(null);
     setModalLimitesAbierto(true);
   };
 
   const handleSaveLimites = async (e: FormEvent) => {
     e.preventDefault();
+    setLimitesError(null);
     try {
       await actualizarLimitesMutation.mutateAsync(limitesForm);
       setModalLimitesAbierto(false);
     } catch (err) {
-      setFormError(errorMessage(err));
+      setLimitesError(errorMessage(err));
     }
   };
 
@@ -236,26 +248,27 @@ export function TeacherAssignmentsPage() {
       }
     }
 
-    if (form.tipo_asignacion === 'PROYECTO_TRANSVERSAL') {
+    if (form.tipo_asignacion === 'PROYECTO_TRANSVERSAL' || form.tipo_asignacion === 'OTRO') {
       if (!form.proyecto_nombre.trim()) {
-        setFormError('Debe ingresar el nombre del proyecto o comité pedagógico.');
+        setFormError('Debe ingresar el nombre del proyecto, comité o responsabilidad asignada.');
         return;
       }
       if (form.horas_semanales <= 0) {
-        setFormError('Debe asignar al menos 1 hora semanal al proyecto.');
+        setFormError('Debe asignar al menos 1 hora semanal.');
         return;
       }
     }
 
     try {
+      const esProyectoUOtro = form.tipo_asignacion === 'PROYECTO_TRANSVERSAL' || form.tipo_asignacion === 'OTRO';
       const payload: CrearTeacherAssignmentInput = {
         docente_id: form.docente_id,
         academic_year_id: anioActivoId,
         tipo_asignacion: form.tipo_asignacion,
-        group_id: form.tipo_asignacion === 'PROYECTO_TRANSVERSAL' ? null : form.group_id,
+        group_id: esProyectoUOtro ? null : form.group_id,
         subject_id: form.tipo_asignacion === 'CLASE' ? form.subject_id : null,
         horas_semanales: form.tipo_asignacion === 'DIRECCION_GRUPO' ? 0 : form.horas_semanales,
-        proyecto_nombre: form.tipo_asignacion === 'PROYECTO_TRANSVERSAL' ? form.proyecto_nombre : undefined,
+        proyecto_nombre: esProyectoUOtro ? form.proyecto_nombre : undefined,
         observaciones: form.observaciones.trim() || undefined,
       };
 
@@ -269,14 +282,15 @@ export function TeacherAssignmentsPage() {
   const handleEliminar = async (asg: TeacherAssignment) => {
     const msg =
       asg.tipo_asignacion === 'CLASE'
-        ? '¿Está seguro de revocar esta asignación de clase? Si tiene desarrollo curricular aprobado, no se podrá eliminar.'
+        ? '¿Está seguro de revocar esta asignación de clase? No se puede si ya tiene actividades/notas registradas o una planeación curricular aprobada; si tiene borradores de planeación (M07) sin aprobar, se eliminarán también.'
         : '¿Está seguro de eliminar esta responsabilidad docente?';
     if (!window.confirm(msg)) return;
 
+    setDeleteError(null);
     try {
       await eliminarMutation.mutateAsync(asg._id);
     } catch (err) {
-      alert(errorMessage(err));
+      setDeleteError(errorMessage(err));
     }
   };
 
@@ -291,13 +305,20 @@ export function TeacherAssignmentsPage() {
               <SlidersIcon className="h-4 w-4 mr-2" />
               Topes Decreto 1850
             </Button>
-            <Button variant="primary" onClick={handleOpenDrawer}>
+            <Button variant="primary" onClick={handleOpenDrawer} disabled={soloLectura}>
               <PlusIcon className="h-4 w-4 mr-2" />
               Nueva Asignación
             </Button>
           </div>
         }
       />
+
+      {soloLectura && (
+        <Alert tone="info">
+          El año lectivo {anioActivo?.nombre} está cerrado: la carga académica queda como histórico de solo
+          consulta, no se pueden crear ni eliminar asignaciones.
+        </Alert>
+      )}
 
       {/* Selector de vigencia lectiva y filtros */}
       <Card>
@@ -312,7 +333,7 @@ export function TeacherAssignmentsPage() {
             >
               {anios.map((a) => (
                 <option key={a._id} value={a._id}>
-                  {a.nombre} {a.estado === 'EN_CURSO' ? '(Activo)' : ''}
+                  {a.nombre} {a.estado === 'EN_CURSO' ? '(Activo)' : a.estado === 'CERRADO' ? '(Histórico)' : ''}
                 </option>
               ))}
             </Select>
@@ -383,7 +404,11 @@ export function TeacherAssignmentsPage() {
         <Card>
           <CardHeader
             title="Semáforo de Carga y Horas Semanales"
-            subtitle="Regulado por Decreto 1850 de 2002: 20h Preescolar, 25h Primaria, 22h Secundaria y Media."
+            subtitle={
+              limitesCarga
+                ? `Regulado por Decreto 1850 de 2002. Topes configurados: ${limitesCarga.PREESCOLAR}h Preescolar, ${limitesCarga.PRIMARIA}h Primaria, ${limitesCarga.SECUNDARIA}h Secundaria, ${limitesCarga.MEDIA}h Media.`
+                : 'Regulado por Decreto 1850 de 2002. Editable desde "Topes Decreto 1850".'
+            }
           />
           {cargandoResumen ? (
             <div className="flex justify-center p-8">
@@ -420,7 +445,7 @@ export function TeacherAssignmentsPage() {
                       </Td>
                       <Td className="text-center font-medium text-body">{item.horas_clase} h</Td>
                       <Td className="text-center font-medium text-body">
-                        {item.horas_direccion > 0 ? `${item.horas_direccion} h` : 'Titular'}
+                        {item.tiene_direccion_grupo ? 'Titular' : '—'}
                       </Td>
                       <Td className="text-center font-medium text-body">{item.horas_proyectos} h</Td>
                       <Td className="text-center font-bold text-ink">{item.horas_totales} h</Td>
@@ -482,8 +507,15 @@ export function TeacherAssignmentsPage() {
               <option value="CLASE">Clase regular</option>
               <option value="DIRECCION_GRUPO">Dirección de grupo</option>
               <option value="PROYECTO_TRANSVERSAL">Proyecto pedagógico</option>
+              <option value="OTRO">Otra asignación</option>
             </Select>
           </div>
+
+          {deleteError && (
+            <div className="px-4 pt-4">
+              <Alert tone="error">{deleteError}</Alert>
+            </div>
+          )}
 
           {cargandoAsignaciones ? (
             <div className="flex justify-center p-8">
@@ -554,6 +586,7 @@ export function TeacherAssignmentsPage() {
                             tone="danger"
                             label="Eliminar asignación"
                             icon={<TrashIcon />}
+                            disabled={soloLectura}
                             onClick={() => handleEliminar(asg)}
                           />
                         </Td>
@@ -609,6 +642,7 @@ export function TeacherAssignmentsPage() {
             <option value="CLASE">Clase Regular (Asignatura en Grupo)</option>
             <option value="DIRECCION_GRUPO">Dirección de Grupo (Titularidad formativa)</option>
             <option value="PROYECTO_TRANSVERSAL">Proyecto Pedagógico Transversal / Comité</option>
+            <option value="OTRO">Otra Responsabilidad Académica</option>
           </Select>
 
           {/* Campos en Cascada para Clase Regular */}
@@ -745,11 +779,15 @@ export function TeacherAssignmentsPage() {
             </div>
           )}
 
-          {/* Campos para Proyectos Transversales */}
-          {form.tipo_asignacion === 'PROYECTO_TRANSVERSAL' && (
+          {/* Campos para Proyectos Transversales u Otra Responsabilidad */}
+          {(form.tipo_asignacion === 'PROYECTO_TRANSVERSAL' || form.tipo_asignacion === 'OTRO') && (
             <div className="space-y-3 rounded-lg border border-border p-3 bg-soft/20">
               <Input
-                label="Nombre del Proyecto / Comité *"
+                label={
+                  form.tipo_asignacion === 'OTRO'
+                    ? 'Descripción de la Responsabilidad *'
+                    : 'Nombre del Proyecto / Comité *'
+                }
                 type="text"
                 placeholder="Ej. Líder PRAE, Comité de Convivencia, PESCC"
                 value={form.proyecto_nombre}
@@ -764,7 +802,7 @@ export function TeacherAssignmentsPage() {
                 max={40}
                 value={form.horas_semanales}
                 onChange={(e) => setForm({ ...form, horas_semanales: Number(e.target.value) })}
-                hint="Horas dedicadas semanalmente al proyecto pedagógico transversal."
+                hint="Horas dedicadas semanalmente a esta responsabilidad."
                 required
               />
             </div>
@@ -799,6 +837,8 @@ export function TeacherAssignmentsPage() {
           <p className="text-sm text-muted">
             Configure las horas lectivas semanales estándar según la normativa colombiana o la política de la institución:
           </p>
+
+          {limitesError && <Alert tone="error">{limitesError}</Alert>}
 
           <Input
             label="Preescolar (Horas Semanales)"

@@ -784,6 +784,7 @@ export interface DocenteCargaResumen {
   horas_clase: number;
   horas_direccion: number;
   horas_proyectos: number;
+  tiene_direccion_grupo: boolean;
   horas_totales: number;
   estado_carga: 'SUB_CARGA' | 'NORMAL' | 'SOBRE_CARGA';
   tope_horas?: number;

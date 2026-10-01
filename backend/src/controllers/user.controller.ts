@@ -18,6 +18,7 @@ import TeacherAssignment from '../models/teacherAssignment.model';
 import User, { IUser } from '../models/user.model';
 import { registrarEvento } from '../services/audit.service';
 import { generateToken } from '../services/token.service';
+import { filtroPorEstado } from '../utils/filtroEstado';
 import { leerCsv } from '../utils/csv';
 import { generarPasswordTemporal } from '../utils/generarPasswordTemporal';
 import ApiError from '../utils/ApiError';
@@ -99,7 +100,7 @@ export const listUsers = catchAsync<unknown, unknown, unknown, ListUsersQuery>(a
       filter.rol = { $in: rolesList };
     }
   }
-  if (req.query.estado) filter.estado = req.query.estado;
+  if (req.query.estado) filter.estado = filtroPorEstado(req.query.estado);
   if (req.query.sede_id) filter.sedes_ids = req.query.sede_id;
   if (req.query.search) {
     const regex = new RegExp(req.query.search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');

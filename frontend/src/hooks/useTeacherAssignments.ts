@@ -26,7 +26,7 @@ export function useTeacherAssignments(filters: TeacherAssignmentFilters, enabled
 
 export function useDocentesCargaResumen(academicYearId: string | undefined) {
   return useQuery({
-    queryKey: ['teacher-assignments-resumen', academicYearId],
+    queryKey: ['teacher-assignments', 'resumen', academicYearId],
     queryFn: () =>
       api.get<DocenteCargaResumen[]>('/teacher-assignments/docentes-resumen', {
         academic_year_id: academicYearId,
@@ -36,10 +36,14 @@ export function useDocentesCargaResumen(academicYearId: string | undefined) {
   });
 }
 
-export function useMyTeacherLoad() {
+/** Sin academicYearId: solo las activas de años que no esten CERRADOS (nunca mezcla historia). */
+export function useMyTeacherLoad(academicYearId?: string) {
   return useQuery({
-    queryKey: ['my-teacher-load'],
-    queryFn: () => api.get<TeacherAssignment[]>('/teacher-assignments/my-load'),
+    queryKey: ['teacher-assignments', 'mi-carga', academicYearId ?? null],
+    queryFn: () =>
+      api.get<TeacherAssignment[]>('/teacher-assignments/my-load', {
+        academic_year_id: academicYearId || undefined,
+      }),
     staleTime: 5 * 60_000,
   });
 }
@@ -61,8 +65,8 @@ export function useCrearTeacherAssignment() {
     mutationFn: (input: CrearTeacherAssignmentInput) =>
       api.post<TeacherAssignment>('/teacher-assignments', input),
     onSuccess: () => {
+      // Un solo prefijo ['teacher-assignments'] ya cubre el listado, el resumen y "mi carga".
       void queryClient.invalidateQueries({ queryKey: ['teacher-assignments'] });
-      void queryClient.invalidateQueries({ queryKey: ['teacher-assignments-resumen'] });
       void queryClient.invalidateQueries({ queryKey: ['groups'] });
     },
   });
@@ -74,8 +78,10 @@ export function useEliminarTeacherAssignment() {
     mutationFn: (id: string) => api.delete<{ success: true; message: string }>(`/teacher-assignments/${id}`),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['teacher-assignments'] });
-      void queryClient.invalidateQueries({ queryKey: ['teacher-assignments-resumen'] });
       void queryClient.invalidateQueries({ queryKey: ['groups'] });
+      // Eliminar una asignación cascada borra sus planeaciones no aprobadas (M07): sin esto, una
+      // pantalla de M07 ya abierta seguía mostrándolas hasta que venciera el staleTime.
+      void queryClient.invalidateQueries({ queryKey: ['curricular-developments'] });
     },
   });
 }
@@ -102,7 +108,7 @@ export function useActualizarLimitesCarga() {
       api.patch<LimitesCargaDocente>('/institution/limites-carga', input),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['limites-carga'] });
-      void queryClient.invalidateQueries({ queryKey: ['teacher-assignments-resumen'] });
+      void queryClient.invalidateQueries({ queryKey: ['teacher-assignments', 'resumen'] });
     },
   });
 }

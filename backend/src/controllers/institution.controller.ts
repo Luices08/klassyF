@@ -41,7 +41,10 @@ export const getLimitesCarga = catchAsync(async (_req, res) => {
 
 export const updateLimitesCarga = catchAsync<unknown, unknown, { PREESCOLAR?: number; PRIMARIA?: number; SECUNDARIA?: number; MEDIA?: number }>(
   async (req, res) => {
-    const limites = await institutionService.updateLimitesCarga(req.body);
+    const limites = await institutionService.updateLimitesCarga(req.body, {
+      usuarioId: req.user!._id,
+      ip: req.ip ?? null,
+    });
     res.status(200).json({ success: true, data: limites });
   }
 );

@@ -4,6 +4,7 @@ import { PageHeader } from '../components/ui/PageHeader';
 import { Spinner } from '../components/ui/Spinner';
 import { EmptyRow, Table, TableBody, TableHead, Td, Th } from '../components/ui/Table';
 import { BookIcon, CheckCircleIcon, UsersIcon } from '../components/ui/icons';
+import { useAnioDeTrabajo } from '../hooks/useAniosLectivos';
 import { useMyTeacherLoad } from '../hooks/useTeacherAssignments';
 import type { TeacherAssignment, TipoAsignacionDocente } from '../types/domain';
 
@@ -15,7 +16,8 @@ const TIPO_LABELS: Record<TipoAsignacionDocente, string> = {
 };
 
 export function MyTeacherLoadPage() {
-  const { data: asignaciones = [], isLoading } = useMyTeacherLoad();
+  const { anio: anioTrabajo } = useAnioDeTrabajo();
+  const { data: asignaciones = [], isLoading } = useMyTeacherLoad(anioTrabajo?._id);
 
   const totalHoras = asignaciones.reduce((acc, a) => acc + (a.horas_semanales || 0), 0);
   const clasesCount = asignaciones.filter((a) => a.tipo_asignacion === 'CLASE').length;

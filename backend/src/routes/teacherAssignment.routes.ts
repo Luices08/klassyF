@@ -35,11 +35,17 @@ router.get(
 router.get(
   '/docentes-resumen',
   checkRole(ROLES.ADMIN, ROLES.COORDINADOR),
+  validate(teacherAssignmentValidator.docentesResumen),
   getDocentesResumen
 );
 
 // 4. Consulta de carga para el docente autenticado
-router.get('/my-load', checkRole(ROLES.DOCENTE), myLoad);
+router.get(
+  '/my-load',
+  checkRole(ROLES.DOCENTE),
+  validate(teacherAssignmentValidator.myLoad),
+  myLoad
+);
 
 // 5. Eliminar / desasignar carga
 router.delete(

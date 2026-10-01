@@ -11,7 +11,9 @@ export const createGroup: ValidationSchema = {
     jornada_id: objectId.required(),
     nomenclatura: Joi.string().required(),
     max_capacity: Joi.number().integer().min(1).required(),
-    director_grupo_id: objectId.allow(null),
+    // director_grupo_id NO se recibe aqui: se asigna unicamente via M08
+    // (POST /teacher-assignments, tipo DIRECCION_GRUPO), que valida rol docente
+    // y mantiene TeacherAssignment como la unica fuente de verdad.
     aula_id: objectId.allow(null),
   }),
 };

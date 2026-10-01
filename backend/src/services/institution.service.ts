@@ -192,7 +192,8 @@ export async function getLimitesCarga(): Promise<InstitutionDocument['limites_ca
 }
 
 export async function updateLimitesCarga(
-  limites: { PREESCOLAR?: number; PRIMARIA?: number; SECUNDARIA?: number; MEDIA?: number }
+  limites: { PREESCOLAR?: number; PRIMARIA?: number; SECUNDARIA?: number; MEDIA?: number },
+  { usuarioId, ip }: { usuarioId: Types.ObjectId | string; ip?: string | null }
 ): Promise<InstitutionDocument['limites_carga_docente']> {
   const institucion = await Institution.findOne();
   if (!institucion) throw new ApiError(404, 'No hay una institución configurada todavía.');
@@ -212,6 +213,15 @@ export async function updateLimitesCarga(
   };
 
   await institucion.save();
+
+  await registrarEvento({
+    usuario_id: usuarioId,
+    accion: 'LIMITES_CARGA_DOCENTE_ACTUALIZADOS',
+    entidad: 'Institution',
+    entidad_id: institucion._id,
+    detalle: `PREESCOLAR ${institucion.limites_carga_docente.PREESCOLAR}h, PRIMARIA ${institucion.limites_carga_docente.PRIMARIA}h, SECUNDARIA ${institucion.limites_carga_docente.SECUNDARIA}h, MEDIA ${institucion.limites_carga_docente.MEDIA}h`,
+    ip,
+  });
   return institucion.limites_carga_docente;
 }
 

@@ -28,7 +28,7 @@ export interface NavItem {
 
 const STAFF: Rol[] = ['ADMIN', 'COORDINADOR', 'SECRETARIA'];
 const GROUP_MANAGERS: Rol[] = ['ADMIN', 'COORDINADOR'];
-const CURRICULUM_MANAGERS: Rol[] = ['COORDINADOR'];
+const CURRICULUM_MANAGERS: Rol[] = ['ADMIN', 'COORDINADOR'];
 const STRUCTURAL_ADMINS: Rol[] = ['ADMIN'];
 
 export const NAV_ITEMS: NavItem[] = [

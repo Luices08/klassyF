@@ -11,7 +11,7 @@ router.use(authenticate);
 
 router.post(
   '/',
-  checkRole(ROLES.COORDINADOR),
+  checkRole(ROLES.ADMIN, ROLES.COORDINADOR),
   validate(areaValidator.createArea),
   createArea
 );
@@ -22,7 +22,7 @@ router.get('/', validate(areaValidator.listAreas), listAreas);
 
 router.patch(
   '/:id',
-  checkRole(ROLES.COORDINADOR),
+  checkRole(ROLES.ADMIN, ROLES.COORDINADOR),
   validate(areaValidator.actualizarArea),
   actualizarArea
 );
@@ -30,7 +30,7 @@ router.patch(
 // No hay DELETE: un area nunca se elimina, solo se inactiva (trazabilidad).
 router.patch(
   '/:id/estado',
-  checkRole(ROLES.COORDINADOR),
+  checkRole(ROLES.ADMIN, ROLES.COORDINADOR),
   validate(areaValidator.actualizarEstadoArea),
   actualizarEstadoArea
 );

@@ -488,12 +488,21 @@ export const PARENTESCOS = [
 ] as const;
 export type Parentesco = (typeof PARENTESCOS)[number];
 
+/** Ley 1581 de 2012, art. 6: autorizacion explicita para tratar datos sensibles de salud. */
+export interface AutorizacionDatosSensibles {
+  otorgada: boolean;
+  otorgado_por_nombre?: string | null;
+  fecha?: string | null;
+  registrado_por_id?: string | null;
+}
+
 export interface StudentProfile {
   _id: string;
   user_id: string;
   lugar_expedicion?: string | null;
   fecha_nacimiento: string;
   genero?: Genero;
+  // eps/regimen_salud/rh: puede llegar undefined (un DOCENTE no las ve, ver backend ocultarSaludAdministrativa).
   eps?: string | null;
   regimen_salud?: RegimenSalud;
   rh?: GrupoSanguineo;
@@ -509,6 +518,7 @@ export interface StudentProfile {
   descripcion_inclusion?: string | null;
   institucion_procedencia?: string | null;
   estado: EstadoEstudiante;
+  autorizacion_datos_sensibles?: AutorizacionDatosSensibles;
 }
 
 export interface Guardian {

@@ -21,6 +21,7 @@ import {
 } from '../../hooks/useGuardians';
 import { useReportCard } from '../../hooks/useReportCard';
 import { useActualizarEstadoPerfil, useStudentFicha360, useUpsertStudentProfile } from '../../hooks/useStudents';
+import { formatoFechaHora } from '../../lib/fechas';
 import {
   ESTADOS_ESTUDIANTE,
   GENEROS,
@@ -58,7 +59,15 @@ function formPerfilVacio(perfil: StudentProfile | null) {
     tiene_talento_excepcional: perfil?.tiene_talento_excepcional ?? false,
     descripcion_inclusion: perfil?.descripcion_inclusion ?? '',
     institucion_procedencia: perfil?.institucion_procedencia ?? '',
+    autorizacion_otorgada: perfil?.autorizacion_datos_sensibles?.otorgada ?? false,
+    autorizacion_otorgado_por_nombre: perfil?.autorizacion_datos_sensibles?.otorgado_por_nombre ?? '',
   };
+}
+
+/** eps/rh/regimen_salud/alergias_condiciones son datos sensibles de salud (Ley 1581 de 2012, art. 6):
+ * guardarlos exige marcar la autorización explícita del acudiente/responsable legal. */
+function tieneDatoSaludSensible(form: ReturnType<typeof formPerfilVacio>): boolean {
+  return Boolean(form.eps || form.rh || form.regimen_salud || form.alergias_condiciones);
 }
 
 const ACUDIENTE_VACIO = {
@@ -161,8 +170,12 @@ function DatosGeneralesTab({ studentId, perfil }: { studentId: string; perfil: S
   const upsertProfile = useUpsertStudentProfile();
   const [form, setForm] = useState(formPerfilVacio(perfil));
 
+  const requiereAutorizacion = tieneDatoSaludSensible(form);
+  const faltaAutorizacion = requiereAutorizacion && !form.autorizacion_otorgada;
+
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
+    if (faltaAutorizacion) return;
     upsertProfile.reset();
     await upsertProfile.mutateAsync({
       userId: studentId,
@@ -183,6 +196,10 @@ function DatosGeneralesTab({ studentId, perfil }: { studentId: string; perfil: S
       tiene_talento_excepcional: form.tiene_talento_excepcional,
       descripcion_inclusion: form.descripcion_inclusion || undefined,
       institucion_procedencia: form.institucion_procedencia || undefined,
+      autorizacion_datos_sensibles: {
+        otorgada: form.autorizacion_otorgada,
+        otorgado_por_nombre: form.autorizacion_otorgado_por_nombre || null,
+      },
     });
   }
 
@@ -242,6 +259,40 @@ function DatosGeneralesTab({ studentId, perfil }: { studentId: string; perfil: S
           value={form.alergias_condiciones}
           onChange={(e) => setForm((f) => ({ ...f, alergias_condiciones: e.target.value }))}
         />
+      </div>
+
+      {requiereAutorizacion && (
+        <div className="space-y-2 rounded-lg border border-border bg-soft p-3">
+          <label className="flex items-center gap-2 text-sm font-medium text-ink">
+            <input
+              type="checkbox"
+              checked={form.autorizacion_otorgada}
+              onChange={(e) => setForm((f) => ({ ...f, autorizacion_otorgada: e.target.checked }))}
+              className="h-4 w-4 rounded border-border text-primary focus:ring-primary"
+            />
+            El acudiente o responsable legal autorizó explícitamente el tratamiento de estos datos de salud
+          </label>
+          <p className="text-xs text-muted">
+            EPS, régimen de salud, RH y alergias/condiciones son datos sensibles (Ley 1581 de 2012, art. 6): no se
+            pueden guardar sin esta autorización.
+          </p>
+          {form.autorizacion_otorgada && (
+            <Input
+              label="Nombre de quien autoriza"
+              value={form.autorizacion_otorgado_por_nombre}
+              onChange={(e) => setForm((f) => ({ ...f, autorizacion_otorgado_por_nombre: e.target.value }))}
+              hint="Acudiente o responsable legal, según el formulario físico de matrícula."
+            />
+          )}
+          {perfil?.autorizacion_datos_sensibles?.fecha && (
+            <p className="text-xs text-muted">
+              Última autorización registrada: {formatoFechaHora(perfil.autorizacion_datos_sensibles.fecha)}.
+            </p>
+          )}
+        </div>
+      )}
+
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <Input
           label="Dirección de residencia"
           value={form.direccion_residencia}
@@ -317,7 +368,13 @@ function DatosGeneralesTab({ studentId, perfil }: { studentId: string; perfil: S
         />
       )}
 
-      <Button type="submit" isLoading={upsertProfile.isPending}>
+      {faltaAutorizacion && (
+        <Alert tone="warning">
+          Marca la autorización del acudiente para poder guardar los datos de salud registrados arriba.
+        </Alert>
+      )}
+
+      <Button type="submit" isLoading={upsertProfile.isPending} disabled={faltaAutorizacion}>
         Guardar hoja de vida
       </Button>
     </form>

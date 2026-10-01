@@ -5,6 +5,7 @@ import { CierreAnioDrawer } from '../components/anioLectivo/CierreAnioDrawer';
 import { EscalaEvaluacionDrawer } from '../components/anioLectivo/EscalaEvaluacionDrawer';
 import { EventoDrawer } from '../components/anioLectivo/EventoDrawer';
 import { PeriodoCard } from '../components/anioLectivo/PeriodoCard';
+import { PonderacionComponentesDrawer } from '../components/anioLectivo/PonderacionComponentesDrawer';
 import { ProrrogaDrawer } from '../components/anioLectivo/ProrrogaDrawer';
 import { Alert, errorMessage } from '../components/ui/Alert';
 import { Chip, EstadoAnioLectivoBadge, type Tone } from '../components/ui/Badge';
@@ -200,6 +201,7 @@ export function AnioLectivoPage() {
   const quitarCalendarioSede = useQuitarCalendarioSede();
 
   const [escalaAbierta, setEscalaAbierta] = useState(false);
+  const [ponderacionAbierta, setPonderacionAbierta] = useState(false);
 
   async function handleActivar() {
     if (!anio) return;
@@ -624,6 +626,33 @@ export function AnioLectivoPage() {
               )}
             </Card>
           )}
+
+          {esAdmin && (
+            <Card>
+              <CardHeader
+                title="Ponderación de componentes del SIEE"
+                subtitle="Decreto 1290 de 2009: peso de Saber, Hacer y Ser en la nota de asignatura (CU-ADM-04)."
+                action={
+                  <Button type="button" variant="outline" onClick={() => setPonderacionAbierta(true)}>
+                    <PencilIcon className="h-4 w-4" />
+                    {anio.ponderacion_componentes ? 'Editar' : 'Configurar'}
+                  </Button>
+                }
+              />
+              <div className="flex flex-wrap gap-2">
+                <Chip tone="blue">
+                  Saber {(anio.ponderacion_componentes?.COGNITIVO_SABER ?? 0.4) * 100}%
+                </Chip>
+                <Chip tone="blue">
+                  Hacer {(anio.ponderacion_componentes?.PROCEDIMENTAL_HACER ?? 0.4) * 100}%
+                </Chip>
+                <Chip tone="blue">
+                  Ser {(anio.ponderacion_componentes?.ACTITUDINAL_SER ?? 0.2) * 100}%
+                </Chip>
+                {!anio.ponderacion_componentes && <Chip tone="neutral">Respaldo por defecto (sin personalizar)</Chip>}
+              </div>
+            </Card>
+          )}
         </>
       )}
 
@@ -659,6 +688,11 @@ export function AnioLectivoPage() {
           />
           <CalendarioSedeDrawer open={sedeCalendario !== null} anio={anio} sede={sedeCalendario} onClose={() => setSedeCalendario(null)} />
           <EscalaEvaluacionDrawer open={escalaAbierta} anio={anio} onClose={() => setEscalaAbierta(false)} />
+          <PonderacionComponentesDrawer
+            open={ponderacionAbierta}
+            anio={anio}
+            onClose={() => setPonderacionAbierta(false)}
+          />
 
           <ConfirmacionDrawer
             open={activando}

@@ -135,13 +135,15 @@ export function validarEscalaEvaluacion(escala: IEscalaEvaluacion): string | nul
 export interface ResultadoDesempeno {
   nota: number;
   nivel: NivelDesempeno;
+  /** Etiqueta del rango (editable por la institución, ej. "Bajo" o un nombre propio). */
+  etiqueta: string;
   aprobado: boolean;
 }
 
 /**
  * Resuelve el nivel cualitativo (Decreto 1290) de una nota según la escala institucional
- * configurada para el año lectivo. Lista para cuando M12 (notas) y M17 (boletines) la
- * necesiten — hoy ningún motor de calificación la invoca todavía.
+ * configurada para el año lectivo. La usan M11 (`utils/siee#desempenoCualitativo`, boletines)
+ * y M12/M17 a futuro.
  */
 export function resolverDesempeno(nota: number, configEscala: IEscalaEvaluacion): ResultadoDesempeno {
   if (nota < configEscala.nota_minima || nota > configEscala.nota_maxima) {
@@ -156,23 +158,40 @@ export function resolverDesempeno(nota: number, configEscala: IEscalaEvaluacion)
     throw new ApiError(400, `La nota ${nota} no cae en ningún rango configurado de la escala de evaluación institucional.`);
   }
 
-  return { nota, nivel: rango.nivel, aprobado: rango.es_aprobatorio };
+  return { nota, nivel: rango.nivel, etiqueta: rango.etiqueta, aprobado: rango.es_aprobatorio };
 }
 
-// Respaldo mientras un año lectivo no tiene escala_evaluacion configurada (CU-ADM-04): el mismo
-// límite 1.0–5.0 que usaba el sistema antes de que la escala fuera configurable, para no dejar
-// la digitación de notas sin validar ni romper instituciones que aún no la han configurado.
-const ESCALA_POR_DEFECTO = { nota_minima: 1.0, nota_maxima: 5.0 };
+// Respaldo mientras un año lectivo no tiene escala_evaluacion configurada (CU-ADM-04): los
+// mismos cortes (1.0-2.9 Bajo | 3.0-3.9 Básico | 4.0-4.5 Alto | 4.6-5.0 Superior) que el sistema
+// usaba quemados en código antes de que la escala fuera configurable, para no dejar la
+// digitación de notas ni los boletines sin validar, ni romper instituciones que aún no la han
+// configurado.
+const ESCALA_POR_DEFECTO: IEscalaEvaluacion = {
+  nota_minima: 1.0,
+  nota_maxima: 5.0,
+  nota_aprobatoria: 3.0,
+  precision_decimales: 1,
+  rangos: [
+    { nivel: 'BAJO', etiqueta: ETIQUETAS_POR_DEFECTO.BAJO, valor_minimo: 1.0, valor_maximo: 2.9, es_aprobatorio: false },
+    { nivel: 'BASICO', etiqueta: ETIQUETAS_POR_DEFECTO.BASICO, valor_minimo: 3.0, valor_maximo: 3.9, es_aprobatorio: true },
+    { nivel: 'ALTO', etiqueta: ETIQUETAS_POR_DEFECTO.ALTO, valor_minimo: 4.0, valor_maximo: 4.5, es_aprobatorio: true },
+    { nivel: 'SUPERIOR', etiqueta: ETIQUETAS_POR_DEFECTO.SUPERIOR, valor_minimo: 4.6, valor_maximo: 5.0, es_aprobatorio: true },
+  ],
+};
+
+/** La escala del año lectivo, o el respaldo 1.0–5.0 mientras no se haya configurado una. */
+export function escalaEfectiva(escala: IEscalaEvaluacion | null): IEscalaEvaluacion {
+  return escala ?? ESCALA_POR_DEFECTO;
+}
 
 /**
- * Valida que una nota esté dentro de los límites de la escala institucional del año (o, si
- * ese año todavía no tiene `escala_evaluacion` configurada, dentro del respaldo 1.0–5.0). Es
- * una validación de límites simple (no resuelve nivel cualitativo); para eso ver
+ * Valida que una nota esté dentro de los límites de la escala institucional del año (o del
+ * respaldo). Es una validación de límites simple (no resuelve nivel cualitativo); para eso ver
  * `resolverDesempeno`. La usa cualquier módulo que reciba una calificación numérica — hoy M11
  * (`activity.service#gradeActivity`), lista para M12.
  */
 export function validarNotaDentroDeEscala(nota: number, escala: IEscalaEvaluacion | null): void {
-  const limites = escala ?? ESCALA_POR_DEFECTO;
+  const limites = escalaEfectiva(escala);
   if (nota < limites.nota_minima || nota > limites.nota_maxima) {
     throw new ApiError(
       400,

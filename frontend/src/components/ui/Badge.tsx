@@ -10,6 +10,7 @@ import type {
   EstadoGrupo,
   EstadoMatricula,
   EstadoPeriodoAcademico,
+  NivelDesempeno,
 } from '../../types/domain';
 import { NOMBRES_ESTADO_ESPACIO } from '../../types/domain';
 import type { Desempeno } from '../../types/reportCard';
@@ -36,15 +37,16 @@ export function Chip({ children, tone = 'neutral' }: { children: ReactNode; tone
 /** @deprecated usar Chip — se conserva como alias mientras se migran los usos existentes. */
 export const Badge = Chip;
 
-const DESEMPENO_TONE: Record<Desempeno, Tone> = {
-  Superior: 'green',
-  Alto: 'blue',
-  Básico: 'orange',
-  Bajo: 'red',
+// Color por nivel (fijo, Decreto 1290), nunca por etiqueta (esa sí la personaliza la institución).
+const DESEMPENO_TONE: Record<NivelDesempeno, Tone> = {
+  SUPERIOR: 'green',
+  ALTO: 'blue',
+  BASICO: 'orange',
+  BAJO: 'red',
 };
 
 export function DesempenoBadge({ value }: { value: Desempeno }) {
-  return <Chip tone={DESEMPENO_TONE[value]}>{value}</Chip>;
+  return <Chip tone={DESEMPENO_TONE[value.nivel]}>{value.etiqueta}</Chip>;
 }
 
 export const ROL_LABELS: Record<Rol, string> = {

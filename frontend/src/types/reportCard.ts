@@ -1,7 +1,16 @@
 // Mismo contrato que backend/src/services/reportCard.service.ts (ReportCardResult).
 
-export const DESEMPENOS = ['Bajo', 'Básico', 'Alto', 'Superior'] as const;
-export type Desempeno = (typeof DESEMPENOS)[number];
+import type { NivelDesempeno } from './domain';
+
+// SIEE (CU-ADM-04): resultado de resolverDesempeno contra la escala institucional del año (o su
+// respaldo). `etiqueta` es el texto que la institución configuró para ese nivel (editable); el
+// color del badge se define por `nivel`, que es fijo (ver components/ui/Badge#DESEMPENO_TONE).
+export interface Desempeno {
+  nota: number;
+  nivel: NivelDesempeno;
+  etiqueta: string;
+  aprobado: boolean;
+}
 
 export interface ReportCardComponentes {
   saber: number;

@@ -48,5 +48,11 @@ router.get(
   ctrl.sugerirEscalaEvaluacion
 );
 router.patch('/:id/escala-evaluacion', ...soloAdmin, validate(v.actualizarEscalaEvaluacion), ctrl.actualizarEscalaEvaluacion);
+router.patch(
+  '/:id/ponderacion-componentes',
+  ...soloAdmin,
+  validate(v.actualizarPonderacionComponentes),
+  ctrl.actualizarPonderacionComponentes
+);
 
 export default router;

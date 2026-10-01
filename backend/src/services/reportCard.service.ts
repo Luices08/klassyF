@@ -1,7 +1,6 @@
 import { Types } from 'mongoose';
 import { ESTADOS_MATRICULA_ACTIVOS, MetodoCalculoEvaluacion } from '../constants/enums';
 import { ROLES } from '../constants/roles';
-import { SIEE_WEIGHTS, DesempenoCualitativo } from '../constants/siee';
 import AcademicYear from '../models/academicYear.model';
 import Activity, { ActivityDocument } from '../models/activity.model';
 import ActivitySubmission from '../models/activitySubmission.model';
@@ -18,7 +17,8 @@ import Subject, { SubjectDocument } from '../models/subject.model';
 import TeacherAssignment from '../models/teacherAssignment.model';
 import User, { UserDocument } from '../models/user.model';
 import ApiError from '../utils/ApiError';
-import { desempenoCualitativo, round2 } from '../utils/siee';
+import type { ResultadoDesempeno } from '../utils/escalaEvaluacion';
+import { desempenoCualitativo, ponderacionEfectiva, round2 } from '../utils/siee';
 
 export interface ReportCardParams {
   student_id: string;
@@ -37,7 +37,7 @@ export interface ReportCardAsignatura {
   nombre: string;
   porcentaje_en_area: number;
   nota_asignatura: number;
-  desempeno: DesempenoCualitativo;
+  desempeno: ResultadoDesempeno;
   fallas_asignatura: number;
   componentes: ReportCardComponentes;
 }
@@ -46,7 +46,7 @@ export interface ReportCardArea {
   area_id: string;
   nombre: string;
   nota_area: number;
-  desempeno_area: DesempenoCualitativo;
+  desempeno_area: ResultadoDesempeno;
   asignaturas: ReportCardAsignatura[];
 }
 
@@ -64,7 +64,7 @@ export interface ReportCardResult {
   puesto_grupo: number;
   total_estudiantes_grupo: number;
   promedio_general_periodo: number;
-  desempeno_general: DesempenoCualitativo;
+  desempeno_general: ResultadoDesempeno;
   asistencia_periodo: {
     total_fallas_justificadas: number;
     total_fallas_injustificadas: number;
@@ -117,7 +117,8 @@ interface StudentComputed {
  * lectivo, aplicando las reglas del Decreto 1290:
  *  - Nota de componente = promedio ponderado (peso_en_componente) de las
  *    actividades calificadas de ese componente. Sin actividades calificadas -> 0.
- *  - Nota de asignatura = Saber*0.4 + Hacer*0.4 + Ser*0.2 (SIEE_WEIGHTS).
+ *  - Nota de asignatura = Saber*peso + Hacer*peso + Ser*peso, según
+ *    AcademicYear.ponderacion_componentes (o el respaldo 40/40/20 — CU-ADM-04).
  *  - Nota de area = segun el metodo_calculo configurado en M06 para el area
  *    dentro del grado del estudiante (StudyPlan.grades[].evaluaciones_area):
  *    PONDERADO usa el porcentaje de cada asignatura, ARITMETICO promedia las
@@ -145,6 +146,13 @@ export async function generateReportCard(
 
   const academicYear = await AcademicYear.findById(params.academic_year_id);
   if (!academicYear) throw new ApiError(404, 'Año lectivo no encontrado.');
+
+  // Configuracion institucional del SIEE para este año (CU-ADM-04): ponderacion de componentes
+  // y escala de evaluacion, con sus respaldos mientras la institucion no las personalice. Se
+  // capturan en variables propias (no "academicYear.x") porque TS no reduce el tipo del objeto
+  // a traves de las funciones anidadas de mas abajo (computeStudent/subjectGrade).
+  const ponderacionComponentes = ponderacionEfectiva(academicYear.ponderacion_componentes);
+  const escalaEvaluacion = academicYear.escala_evaluacion;
 
   const enrollment = await Enrollment.findOne({
     student_id: student._id,
@@ -308,7 +316,9 @@ export async function generateReportCard(
     const ser = componentScore(aid, 'ACTITUDINAL_SER', studentId);
 
     const nota =
-      saber * SIEE_WEIGHTS.COGNITIVO_SABER + hacer * SIEE_WEIGHTS.PROCEDIMENTAL_HACER + ser * SIEE_WEIGHTS.ACTITUDINAL_SER;
+      saber * ponderacionComponentes.COGNITIVO_SABER +
+      hacer * ponderacionComponentes.PROCEDIMENTAL_HACER +
+      ser * ponderacionComponentes.ACTITUDINAL_SER;
 
     return {
       nota: round2(nota),
@@ -332,7 +342,7 @@ export async function generateReportCard(
           nombre: subject.nombre,
           porcentaje_en_area: metodo === 'PONDERADO' ? porcentaje ?? 0 : pesoEquivalente,
           nota_asignatura: nota,
-          desempeno: desempenoCualitativo(nota),
+          desempeno: desempenoCualitativo(nota, escalaEvaluacion),
           fallas_asignatura: fallas,
           componentes,
         };
@@ -349,7 +359,7 @@ export async function generateReportCard(
         area_id: String(area._id),
         nombre: area.nombre,
         nota_area: notaArea,
-        desempeno_area: desempenoCualitativo(notaArea),
+        desempeno_area: desempenoCualitativo(notaArea, escalaEvaluacion),
         asignaturas,
       });
     }
@@ -397,7 +407,7 @@ export async function generateReportCard(
     puesto_grupo: rankByStudent.get(String(student._id)) ?? sorted.length,
     total_estudiantes_grupo: sorted.length,
     promedio_general_periodo: targetComputed.promedio,
-    desempeno_general: desempenoCualitativo(targetComputed.promedio),
+    desempeno_general: desempenoCualitativo(targetComputed.promedio, escalaEvaluacion),
     asistencia_periodo: {
       total_fallas_justificadas: asistenciaTarget.justificadas,
       total_fallas_injustificadas: asistenciaTarget.injustificadas,

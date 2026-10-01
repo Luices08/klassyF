@@ -1,18 +1,13 @@
 import { ComponenteSiee } from './enums';
 
 /**
- * Ponderacion institucional del SIEE (Decreto 1290) usada para calcular la nota
- * final de una asignatura a partir de sus 3 componentes evaluativos. Es un valor
- * institucional fijo hoy (no configurable por institucion todavia — ver README,
- * seccion "Reglas que NO deberian quedar quemadas en codigo" del documento base);
- * vive aqui, nombrado, en vez de como numeros magicos dispersos en el motor de
- * calificacion.
+ * Ponderacion por defecto del SIEE (Decreto 1290) usada para calcular la nota final de una
+ * asignatura a partir de sus 3 componentes evaluativos: se aplica mientras la institucion no
+ * personalice `AcademicYear.ponderacion_componentes` (CU-ADM-04) — ver
+ * `utils/siee#ponderacionEfectiva`. Ya no es un valor institucional fijo, solo el respaldo.
  */
-export const SIEE_WEIGHTS: Record<ComponenteSiee, number> = {
+export const PONDERACION_COMPONENTES_POR_DEFECTO: Record<ComponenteSiee, number> = {
   COGNITIVO_SABER: 0.4,
   PROCEDIMENTAL_HACER: 0.4,
   ACTITUDINAL_SER: 0.2,
 };
-
-export const DESEMPENOS_CUALITATIVOS = ['Bajo', 'Básico', 'Alto', 'Superior'] as const;
-export type DesempenoCualitativo = (typeof DESEMPENOS_CUALITATIVOS)[number];

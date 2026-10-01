@@ -5,6 +5,7 @@ import type {
   Calendario,
   EstadoPeriodoAcademico,
   PeriodoSede,
+  PonderacionComponentes,
   Prorroga,
   RangoCualitativo,
   TipoEventoCalendario,
@@ -256,6 +257,20 @@ export function useActualizarEscalaEvaluacion() {
   return useMutation({
     mutationFn: ({ anioId, ...input }: ActualizarEscalaEvaluacionInput) =>
       api.patch<AcademicYear>(`/academic-years/${anioId}/escala-evaluacion`, input),
+    onSuccess: invalidar,
+  });
+}
+
+export interface ActualizarPonderacionComponentesInput extends PonderacionComponentes {
+  anioId: string;
+}
+
+/** Pesos de Saber/Hacer/Ser para la nota de asignatura (CU-ADM-04); la suma debe ser 1 (100%). */
+export function useActualizarPonderacionComponentes() {
+  const invalidar = useInvalidarAnios();
+  return useMutation({
+    mutationFn: ({ anioId, ...input }: ActualizarPonderacionComponentesInput) =>
+      api.patch<AcademicYear>(`/academic-years/${anioId}/ponderacion-componentes`, input),
     onSuccess: invalidar,
   });
 }

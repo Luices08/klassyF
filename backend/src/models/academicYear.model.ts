@@ -2,6 +2,7 @@ import { HydratedDocument, Model, Schema, Types, model } from 'mongoose';
 import {
   CALENDARIOS,
   Calendario,
+  ComponenteSiee,
   ESTADOS_ANIO_LECTIVO,
   ESTADOS_PERIODO_ACADEMICO,
   EstadoAnioLectivo,
@@ -13,6 +14,7 @@ import {
 } from '../constants/enums';
 import { validarCalendario } from '../utils/calendarioAcademico';
 import { validarEscalaEvaluacion } from '../utils/escalaEvaluacion';
+import { validarPonderacionComponentes } from '../utils/siee';
 
 export interface IPeriodo {
   numero: number;
@@ -72,6 +74,10 @@ export interface IEscalaEvaluacion {
   rangos: IRangoCualitativo[];
 }
 
+// M32/CU-ADM-04: pesos de Saber/Hacer/Ser para la nota de asignatura (Decreto 1290), no quemados
+// en el motor de boletines (regla de oro de datos, sección 3) — ver utils/siee#ponderacionEfectiva.
+export type IPonderacionComponentes = Record<ComponenteSiee, number>;
+
 export interface IAcademicYear {
   institucion_id: Types.ObjectId;
   year: number;
@@ -85,6 +91,9 @@ export interface IAcademicYear {
   calendarios_sede: Types.DocumentArray<ICalendarioSede>;
   // null hasta que el ADMIN la configure (CU-ADM-04); M12/M17 la usaran via resolverDesempeno.
   escala_evaluacion: IEscalaEvaluacion | null;
+  // null hasta que el ADMIN la personalice (CU-ADM-04); el respaldo 40/40/20 lo aplica
+  // utils/siee#ponderacionEfectiva mientras tanto.
+  ponderacion_componentes: IPonderacionComponentes | null;
   cerrado_at: Date | null;
   createdAt: Date;
   updatedAt: Date;
@@ -175,6 +184,15 @@ const escalaEvaluacionSchema = new Schema<IEscalaEvaluacion>(
   { _id: false }
 );
 
+const ponderacionComponentesSchema = new Schema<IPonderacionComponentes>(
+  {
+    COGNITIVO_SABER: { type: Number, required: true, min: 0, max: 1 },
+    PROCEDIMENTAL_HACER: { type: Number, required: true, min: 0, max: 1 },
+    ACTITUDINAL_SER: { type: Number, required: true, min: 0, max: 1 },
+  },
+  { _id: false }
+);
+
 const academicYearSchema = new Schema<IAcademicYear, AcademicYearModel>(
   {
     institucion_id: { type: Schema.Types.ObjectId, ref: 'Institution', required: true },
@@ -196,6 +214,7 @@ const academicYearSchema = new Schema<IAcademicYear, AcademicYearModel>(
     eventos: { type: [eventoCalendarioSchema], default: [] },
     calendarios_sede: { type: [calendarioSedeSchema], default: [] },
     escala_evaluacion: { type: escalaEvaluacionSchema, default: null },
+    ponderacion_componentes: { type: ponderacionComponentesSchema, default: null },
     cerrado_at: { type: Date, default: null },
   },
   { timestamps: true }
@@ -259,6 +278,15 @@ academicYearSchema.pre('validate', function validarCronologia(this: IAcademicYea
 academicYearSchema.pre('validate', function validarEscala(this: IAcademicYear, next) {
   if (!this.escala_evaluacion) return next();
   const problema = validarEscalaEvaluacion(this.escala_evaluacion);
+  if (problema) return next(errorDeNegocio(problema));
+  next();
+});
+
+// Ponderacion de componentes (CU-ADM-04): los 3 pesos deben sumar 1 (100%). Sin configurar,
+// se queda en null (utils/siee#ponderacionEfectiva aplica el respaldo 40/40/20).
+academicYearSchema.pre('validate', function validarPonderacion(this: IAcademicYear, next) {
+  if (!this.ponderacion_componentes) return next();
+  const problema = validarPonderacionComponentes(this.ponderacion_componentes);
   if (problema) return next(errorDeNegocio(problema));
   next();
 });

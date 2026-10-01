@@ -233,6 +233,12 @@ export interface EscalaEvaluacion {
   rangos: RangoCualitativo[];
 }
 
+// M32/CU-ADM-04: componentes evaluativos del SIEE (Decreto 1290) para la nota de asignatura.
+export const COMPONENTES_SIEE = ['COGNITIVO_SABER', 'PROCEDIMENTAL_HACER', 'ACTITUDINAL_SER'] as const;
+export type ComponenteSiee = (typeof COMPONENTES_SIEE)[number];
+
+export type PonderacionComponentes = Record<ComponenteSiee, number>;
+
 export interface AcademicYear {
   _id: string;
   institucion_id: string;
@@ -247,6 +253,8 @@ export interface AcademicYear {
   calendarios_sede: CalendarioSede[];
   /** SIEE (CU-ADM-04): null hasta que el ADMIN la configure. */
   escala_evaluacion: EscalaEvaluacion | null;
+  /** SIEE (CU-ADM-04): null hasta que el ADMIN la personalice (respaldo 40/40/20). */
+  ponderacion_componentes: PonderacionComponentes | null;
   cerrado_at: string | null;
   resumen_semanas: ResumenSemanas;
 }

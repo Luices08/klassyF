@@ -1,5 +1,11 @@
 import Joi from 'joi';
-import { CALENDARIOS, ESTADOS_PERIODO_ACADEMICO, NIVELES_DESEMPENO, TIPOS_EVENTO_CALENDARIO } from '../constants/enums';
+import {
+  CALENDARIOS,
+  COMPONENTES_SIEE,
+  ESTADOS_PERIODO_ACADEMICO,
+  NIVELES_DESEMPENO,
+  TIPOS_EVENTO_CALENDARIO,
+} from '../constants/enums';
 import { ValidationSchema } from '../middlewares/validate.middleware';
 import { objectId } from './common.validator';
 
@@ -163,4 +169,12 @@ export const actualizarEscalaEvaluacion: ValidationSchema = {
       .unique('nivel')
       .required(),
   }),
+};
+
+// La suma exacta a 1 (100%) es regla de negocio y se valida en el modelo (pre-validate), no aquí.
+export const actualizarPonderacionComponentes: ValidationSchema = {
+  params: Joi.object(idAnio),
+  body: Joi.object(
+    Object.fromEntries(COMPONENTES_SIEE.map((componente) => [componente, Joi.number().min(0).max(1).required()]))
+  ),
 };

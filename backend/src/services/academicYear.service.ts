@@ -1,7 +1,12 @@
 import { Types } from 'mongoose';
 import { TRANSICIONES_PERIODO } from '../constants/anioLectivo';
 import { Calendario, EstadoPeriodoAcademico, NivelDesempeno, Rol, TipoEventoCalendario } from '../constants/enums';
-import AcademicYear, { AcademicYearDocument, IPeriodo, IRangoCualitativo } from '../models/academicYear.model';
+import AcademicYear, {
+  AcademicYearDocument,
+  IPeriodo,
+  IPonderacionComponentes,
+  IRangoCualitativo,
+} from '../models/academicYear.model';
 import Campus from '../models/campus.model';
 import Group from '../models/group.model';
 import Institution, { InstitutionDocument } from '../models/institution.model';
@@ -76,6 +81,8 @@ export interface EscalaEvaluacionInput {
   precision_decimales?: number;
   rangos: RangoCualitativoInput[];
 }
+
+export type PonderacionComponentesInput = IPonderacionComponentes;
 
 const aFecha = (valor: FechaEntrada | null | undefined): Date | null => (valor ? new Date(valor) : null);
 
@@ -619,6 +626,32 @@ export async function actualizarEscalaEvaluacion(
     entidad: 'AcademicYear',
     entidad_id: anio._id,
     detalle: `Año ${anio.year}: escala de evaluación ${input.nota_minima}–${input.nota_maxima}, aprobatoria ${input.nota_aprobatoria}.`,
+    ip,
+  });
+
+  return aDto(anio);
+}
+
+/**
+ * Pesos de Saber/Hacer/Ser para la nota de asignatura (CU-ADM-04): la suma debe ser 1 (100%),
+ * validado en el modelo (pre-validate), no aquí.
+ */
+export async function actualizarPonderacionComponentes(
+  id: string,
+  input: PonderacionComponentesInput,
+  { usuarioId, ip }: ContextoUsuario
+): Promise<AnioLectivoDto> {
+  const anio = await cargarAnioEditable(id);
+
+  anio.ponderacion_componentes = { ...input };
+  await anio.save();
+
+  await registrarEvento({
+    usuario_id: usuarioId,
+    accion: 'PONDERACION_COMPONENTES_ACTUALIZADA',
+    entidad: 'AcademicYear',
+    entidad_id: anio._id,
+    detalle: `Año ${anio.year}: ponderación Saber ${input.COGNITIVO_SABER}, Hacer ${input.PROCEDIMENTAL_HACER}, Ser ${input.ACTITUDINAL_SER}.`,
     ip,
   });
 

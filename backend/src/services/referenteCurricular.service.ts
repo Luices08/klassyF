@@ -1,3 +1,4 @@
+import { Types } from 'mongoose';
 import { grupoGradosDeNumero, TipoReferente } from '../constants/enums';
 import Area from '../models/area.model';
 import Grade from '../models/grade.model';
@@ -5,8 +6,14 @@ import { Dba, Ebc, IEbc, ILineamiento, Lineamiento, ReferenteCurricular } from '
 import ApiError from '../utils/ApiError';
 import { ESTADO_ACTIVO, filtroPorEstado } from '../utils/filtroEstado';
 import { runTransaction } from '../utils/runTransaction';
+import { registrarEvento } from './audit.service';
 
 export type ReferenteItemInput = Record<string, unknown> & { tipo_referente: TipoReferente };
+
+interface ContextoActor {
+  usuarioId: Types.ObjectId | string;
+  ip?: string | null;
+}
 
 function escapeRegex(texto: string): string {
   return texto.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -36,32 +43,51 @@ async function validarForaneos(item: ReferenteItemInput): Promise<void> {
 }
 
 /** Crea un solo referente o una carga masiva; cada item se enruta a su discriminador (DBA/EBC/LINEAMIENTO). */
-export async function createReferentes(rawItems: ReferenteItemInput | ReferenteItemInput[]) {
+export async function createReferentes(
+  rawItems: ReferenteItemInput | ReferenteItemInput[],
+  { usuarioId, ip }: ContextoActor
+) {
   const items = Array.isArray(rawItems) ? rawItems : [rawItems];
   for (const item of items) {
     await validarForaneos(item);
   }
 
   // Transaccion: una carga masiva no debe dejar los primeros N items creados si el N+1 falla.
-  return runTransaction(async (session) => {
-    const creados: unknown[] = [];
+  const creados = await runTransaction(async (session) => {
+    const resultado: unknown[] = [];
     for (const item of items) {
       switch (item.tipo_referente) {
         case 'DBA':
-          creados.push((await Dba.create([item], { session }))[0]);
+          resultado.push((await Dba.create([item], { session }))[0]);
           break;
         case 'EBC':
-          creados.push((await Ebc.create([item], { session }))[0]);
+          resultado.push((await Ebc.create([item], { session }))[0]);
           break;
         case 'LINEAMIENTO':
-          creados.push((await Lineamiento.create([item], { session }))[0]);
+          resultado.push((await Lineamiento.create([item], { session }))[0]);
           break;
         default:
           throw new ApiError(400, `tipo_referente '${item.tipo_referente}' no admite carga directa (aun sin fuente).`);
       }
     }
-    return creados;
+    return resultado;
   });
+
+  const porTipo = items.reduce<Record<string, number>>((acc, item) => {
+    acc[item.tipo_referente] = (acc[item.tipo_referente] ?? 0) + 1;
+    return acc;
+  }, {});
+  await registrarEvento({
+    usuario_id: usuarioId,
+    accion: 'REFERENTE_CURRICULAR_CREADO',
+    entidad: 'ReferenteCurricular',
+    entidad_id: null,
+    detalle: Object.entries(porTipo)
+      .map(([tipo, cantidad]) => `${cantidad} ${tipo}`)
+      .join(', '),
+    ip,
+  });
+  return creados;
 }
 
 export interface ListReferentesQuery {

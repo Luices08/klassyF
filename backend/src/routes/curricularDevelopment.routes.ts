@@ -3,6 +3,7 @@ import { ROLES } from '../constants/roles';
 import {
   getByAssignmentAndPeriod,
   listDevelopments,
+  reabrir,
   review,
   submit,
   upsertDraft,
@@ -54,6 +55,15 @@ router.patch(
   checkRole(ROLES.ADMIN, ROLES.COORDINADOR),
   validate(curricularDevelopmentValidator.review),
   review
+);
+
+// 6. Reabrir una planeación ya APROBADO (vuelve a DEVUELTO_OBSERVACIONES) — solo ADMIN, con
+// motivo obligatorio, mismo criterio que reabrir un periodo CERRADO en M05.
+router.patch(
+  '/:id/reabrir',
+  checkRole(ROLES.ADMIN),
+  validate(curricularDevelopmentValidator.reabrir),
+  reabrir
 );
 
 export default router;

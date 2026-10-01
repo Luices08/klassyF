@@ -40,6 +40,15 @@ export const review: ValidationSchema = {
   }),
 };
 
+export const reabrir: ValidationSchema = {
+  params: Joi.object({
+    id: objectId.required(),
+  }),
+  body: Joi.object({
+    motivo: Joi.string().min(1).required(),
+  }),
+};
+
 export const listDevelopments: ValidationSchema = {
   query: Joi.object({
     academic_year_id: objectId.optional(),

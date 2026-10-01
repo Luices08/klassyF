@@ -26,9 +26,11 @@ export function useCurricularDevelopments(filters: CurricularDevelopmentsFilter 
   });
 }
 
+// Mismo prefijo plural 'curricular-developments' que el listado: invalidar ese prefijo basta
+// para refrescar ambas cachés sin necesitar una segunda invalidación explícita por separado.
 export function useCurricularDevelopment(assignmentId: string | undefined, periodoNumero: number | undefined) {
   return useQuery({
-    queryKey: ['curricular-development', assignmentId, periodoNumero],
+    queryKey: ['curricular-developments', 'por-asignacion', assignmentId, periodoNumero],
     queryFn: () =>
       api.get<CurricularDevelopment | null>(
         `/curricular-developments/assignment/${assignmentId}/periodo/${periodoNumero}`
@@ -56,11 +58,8 @@ export function useGuardarBorradorCurricular() {
   return useMutation({
     mutationFn: (input: GuardarBorradorInput) =>
       api.post<CurricularDevelopment>('/curricular-developments', input),
-    onSuccess: (data) => {
+    onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['curricular-developments'] });
-      void queryClient.invalidateQueries({
-        queryKey: ['curricular-development', data.teacher_assignment_id, data.periodo_numero],
-      });
     },
   });
 }
@@ -72,7 +71,6 @@ export function useEnviarRevisionCurricular() {
       api.patch<CurricularDevelopment>(`/curricular-developments/${id}/submit`, {}),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['curricular-developments'] });
-      void queryClient.invalidateQueries({ queryKey: ['curricular-development'] });
     },
   });
 }
@@ -90,7 +88,23 @@ export function useRevisarCurricular() {
       api.patch<CurricularDevelopment>(`/curricular-developments/${id}/review`, body),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['curricular-developments'] });
-      void queryClient.invalidateQueries({ queryKey: ['curricular-development'] });
+    },
+  });
+}
+
+export interface ReabrirCurricularInput {
+  id: string;
+  motivo: string;
+}
+
+/** ADMIN reabre una planeación ya APROBADO (vuelve a DEVUELTO_OBSERVACIONES) con motivo obligatorio. */
+export function useReabrirCurricular() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, motivo }: ReabrirCurricularInput) =>
+      api.patch<CurricularDevelopment>(`/curricular-developments/${id}/reabrir`, { motivo }),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['curricular-developments'] });
     },
   });
 }

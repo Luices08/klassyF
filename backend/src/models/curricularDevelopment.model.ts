@@ -15,8 +15,11 @@ export interface IVersionSnapshot {
   dba_seleccionados: Types.ObjectId[];
   competencias: string;
   contenidos_tematicos: string[];
+  ejes_tematicos: string[];
   actividades_propuestas: string;
+  metodologia_y_recursos: string;
   criterios_evaluacion: string;
+  semanas_estimadas: number;
   estado: EstadoDesarrolloCurricular;
 }
 
@@ -60,8 +63,11 @@ const versionSnapshotSchema = new Schema<IVersionSnapshot>(
     dba_seleccionados: { type: [Schema.Types.ObjectId], ref: 'ReferenteCurricular', default: [] },
     competencias: { type: String, default: '' },
     contenidos_tematicos: { type: [String], default: [] },
+    ejes_tematicos: { type: [String], default: [] },
     actividades_propuestas: { type: String, default: '' },
+    metodologia_y_recursos: { type: String, default: '' },
     criterios_evaluacion: { type: String, default: '' },
+    semanas_estimadas: { type: Number, default: 10 },
     estado: { type: String, enum: ESTADOS_DESARROLLO_CURRICULAR, required: true },
   },
   { _id: true }

@@ -1,4 +1,4 @@
-import { type InputHTMLAttributes, type ReactNode, type SelectHTMLAttributes, forwardRef } from 'react';
+import { type InputHTMLAttributes, type ReactNode, type SelectHTMLAttributes, type TextareaHTMLAttributes, forwardRef } from 'react';
 
 const baseFieldClasses =
   'block w-full rounded-lg border-0 py-2 px-3 text-sm text-ink ring-1 ring-inset ring-border placeholder:text-muted focus:ring-2 focus:ring-inset focus:ring-primary disabled:bg-soft disabled:text-muted';
@@ -65,3 +65,22 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
   }
 );
 Select.displayName = 'Select';
+
+interface TextareaProps extends TextareaHTMLAttributes<HTMLTextAreaElement> {
+  label: string;
+  hideLabel?: boolean;
+  error?: string;
+  hint?: string;
+}
+
+export const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(
+  ({ label, hideLabel, error, hint, id, className = '', rows = 3, ...rest }, ref) => {
+    const fieldId = id ?? rest.name ?? label;
+    return (
+      <FieldWrapper label={label} hideLabel={hideLabel} htmlFor={fieldId} error={error} hint={hint}>
+        <textarea ref={ref} id={fieldId} rows={rows} className={`${baseFieldClasses} ${className}`} {...rest} />
+      </FieldWrapper>
+    );
+  }
+);
+Textarea.displayName = 'Textarea';

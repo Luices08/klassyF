@@ -2,11 +2,17 @@ import { ParamsDictionary } from 'express-serve-static-core';
 import { ParsedQs } from 'qs';
 import * as referenteCurricularService from '../services/referenteCurricular.service';
 import { ReferenteItemInput } from '../services/referenteCurricular.service';
+import ApiError from '../utils/ApiError';
 import catchAsync from '../utils/catchAsync';
 
 export const createReferentes = catchAsync<unknown, unknown, ReferenteItemInput | ReferenteItemInput[]>(
   async (req, res) => {
-    const creados = await referenteCurricularService.createReferentes(req.body);
+    if (!req.user) throw new ApiError(401, 'No autenticado.');
+
+    const creados = await referenteCurricularService.createReferentes(req.body, {
+      usuarioId: req.user._id,
+      ip: req.ip ?? null,
+    });
     res.status(201).json({ success: true, count: creados.length, data: creados });
   }
 );

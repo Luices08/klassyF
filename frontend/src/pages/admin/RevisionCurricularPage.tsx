@@ -4,35 +4,51 @@ import { EstadoDesarrolloCurricularBadge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import { Card, CardHeader } from '../../components/ui/Card';
 import { Drawer } from '../../components/ui/Drawer';
-import { Select } from '../../components/ui/Field';
+import { Select, Textarea } from '../../components/ui/Field';
 import { PageHeader } from '../../components/ui/PageHeader';
 import { Spinner } from '../../components/ui/Spinner';
 import { EmptyRow, Table, TableBody, TableHead, Td, Th } from '../../components/ui/Table';
 import { CheckCircleIcon, EyeIcon } from '../../components/ui/icons';
+import { useAnioDeTrabajo } from '../../hooks/useAniosLectivos';
 import {
   useCurricularDevelopments,
+  useReabrirCurricular,
   useRevisarCurricular,
 } from '../../hooks/useCurricularDevelopments';
+import { useAuth } from '../../context/AuthContext';
+import { formatoFechaHora } from '../../lib/fechas';
 import type { CurricularDevelopment, DbaReferente, EstadoDesarrolloCurricular } from '../../types/domain';
 
 export function RevisionCurricularPage() {
+  const { user } = useAuth();
+  const esAdmin = user?.rol === 'ADMIN';
+
+  // Acotado al año de trabajo (vigencia activa, o el más reciente sin cerrar): mismo criterio
+  // que el resto del sistema (useAnioDeTrabajo), no "todos los años mezclados".
+  const { anio: anioTrabajo } = useAnioDeTrabajo();
+  const periodosDelAnio = anioTrabajo?.periodos ?? [];
+
   const [filtroEstado, setFiltroEstado] = useState<string>('ENVIADO_REVISION');
   const [filtroPeriodo, setFiltroPeriodo] = useState<string>('');
 
   const { data: desarrollos = [], isLoading } = useCurricularDevelopments({
+    academic_year_id: anioTrabajo?._id,
     estado: (filtroEstado as EstadoDesarrolloCurricular) || undefined,
     periodo_numero: filtroPeriodo ? Number(filtroPeriodo) : undefined,
   });
 
   const [desarrolloSeleccionado, setDesarrolloSeleccionado] = useState<CurricularDevelopment | null>(null);
   const [observacion, setObservacion] = useState<string>('');
+  const [motivoReapertura, setMotivoReapertura] = useState<string>('');
   const [reviewError, setReviewError] = useState<string | null>(null);
 
   const revisarMutation = useRevisarCurricular();
+  const reabrirMutation = useReabrirCurricular();
 
   const handleOpenReview = (dev: CurricularDevelopment) => {
     setDesarrolloSeleccionado(dev);
     setObservacion('');
+    setMotivoReapertura('');
     setReviewError(null);
   };
 
@@ -43,6 +59,12 @@ export function RevisionCurricularPage() {
     if (decision === 'DEVUELTO_OBSERVACIONES' && !observacion.trim()) {
       setReviewError('Debe ingresar las observaciones pedagógicas para que el docente pueda realizar las correcciones.');
       return;
+    }
+    if (decision === 'APROBADO') {
+      const confirmado = window.confirm(
+        'Una vez aprobada, la planeación solo puede corregirse si un administrador la reabre con un motivo. ¿Aprobar de todas formas?'
+      );
+      if (!confirmado) return;
     }
 
     try {
@@ -57,11 +79,28 @@ export function RevisionCurricularPage() {
     }
   };
 
+  const handleReabrir = async () => {
+    if (!desarrolloSeleccionado) return;
+    setReviewError(null);
+
+    if (!motivoReapertura.trim()) {
+      setReviewError('Debe ingresar el motivo de la reapertura.');
+      return;
+    }
+
+    try {
+      await reabrirMutation.mutateAsync({ id: desarrolloSeleccionado._id, motivo: motivoReapertura.trim() });
+      setDesarrolloSeleccionado(null);
+    } catch (err) {
+      setReviewError(errorMessage(err));
+    }
+  };
+
   return (
     <div className="space-y-4">
       <PageHeader
         title="Revisión y Aprobación Curricular"
-        subtitle="Supervisión pedagógica de planeaciones docentes, control de DBA del MEN y concepto evaluativo."
+        subtitle={`Supervisión pedagógica de planeaciones docentes del año lectivo ${anioTrabajo?.year ?? '—'}, control de DBA del MEN y concepto evaluativo.`}
       />
 
       {/* Filtros */}
@@ -87,10 +126,11 @@ export function RevisionCurricularPage() {
             className="min-w-[160px]"
           >
             <option value="">Todos los periodos</option>
-            <option value="1">Periodo 1</option>
-            <option value="2">Periodo 2</option>
-            <option value="3">Periodo 3</option>
-            <option value="4">Periodo 4</option>
+            {periodosDelAnio.map((p) => (
+              <option key={p.numero} value={p.numero}>
+                {p.nombre || `Periodo ${p.numero}`}
+              </option>
+            ))}
           </Select>
         </div>
       </Card>
@@ -278,7 +318,7 @@ export function RevisionCurricularPage() {
                       <div key={idx} className="p-2 rounded-lg bg-soft text-xs space-y-0.5 border border-border">
                         <div className="flex justify-between font-semibold text-ink">
                           <span>{coord ? `${coord.nombre} ${coord.apellido}` : 'Coordinador'}</span>
-                          <span>{new Date(rev.fecha).toLocaleDateString()}</span>
+                          <span>{formatoFechaHora(rev.fecha)}</span>
                         </div>
                         <p className="text-body italic">"{rev.observacion || 'Sin comentario'}"</p>
                       </div>
@@ -288,47 +328,88 @@ export function RevisionCurricularPage() {
               </div>
             )}
 
-            {/* Área de Concepto y Decisión */}
-            <div className="pt-4 border-t border-border space-y-3">
-              <label className="text-sm font-semibold text-ink block">
-                Observaciones Pedagógicas del Coordinador
-              </label>
-              <textarea
-                rows={3}
-                placeholder="Retroalimentación, observaciones o justificación para el docente..."
-                value={observacion}
-                onChange={(e) => setObservacion(e.target.value)}
-                className="block w-full rounded-lg border-0 py-2 px-3 text-sm text-ink ring-1 ring-inset ring-border placeholder:text-muted focus:ring-2 focus:ring-inset focus:ring-primary"
-              />
+            {/* Área de Concepto y Decisión: solo tiene sentido mientras está pendiente de revisión */}
+            {desarrolloSeleccionado.estado === 'ENVIADO_REVISION' && (
+              <div className="pt-4 border-t border-border space-y-3">
+                <Textarea
+                  label="Observaciones Pedagógicas del Coordinador"
+                  rows={3}
+                  placeholder="Retroalimentación, observaciones o justificación para el docente..."
+                  value={observacion}
+                  onChange={(e) => setObservacion(e.target.value)}
+                />
 
-              <div className="flex flex-wrap items-center justify-end gap-3 pt-2">
-                <Button
-                  variant="secondary"
-                  onClick={() => setDesarrolloSeleccionado(null)}
-                  disabled={revisarMutation.isPending}
-                >
+                <div className="flex flex-wrap items-center justify-end gap-3 pt-2">
+                  <Button
+                    variant="secondary"
+                    onClick={() => setDesarrolloSeleccionado(null)}
+                    disabled={revisarMutation.isPending}
+                  >
+                    Cerrar
+                  </Button>
+
+                  <Button
+                    variant="soft-danger"
+                    onClick={() => handleDecision('DEVUELTO_OBSERVACIONES')}
+                    disabled={revisarMutation.isPending}
+                  >
+                    Devolver con Observaciones
+                  </Button>
+
+                  <Button
+                    variant="primary"
+                    onClick={() => handleDecision('APROBADO')}
+                    disabled={revisarMutation.isPending}
+                  >
+                    <CheckCircleIcon className="h-4 w-4 mr-1.5" />
+                    Aprobar Planeación
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            {/* Reapertura de una ya aprobada: solo ADMIN, con motivo obligatorio (igual que
+                reabrir un periodo CERRADO en M05) — vuelve a DEVUELTO_OBSERVACIONES. */}
+            {desarrolloSeleccionado.estado === 'APROBADO' && esAdmin && (
+              <div className="pt-4 border-t border-border space-y-3">
+                <Alert tone="warning">
+                  Esta planeación ya fue aprobada. Reabrirla la devuelve al docente con observaciones para que la
+                  corrija; el docente deberá volver a enviarla a revisión.
+                </Alert>
+                <Textarea
+                  label="Motivo de la reapertura"
+                  rows={2}
+                  placeholder="Por qué se reabre esta planeación ya aprobada..."
+                  value={motivoReapertura}
+                  onChange={(e) => setMotivoReapertura(e.target.value)}
+                  required
+                />
+                <div className="flex flex-wrap items-center justify-end gap-3 pt-2">
+                  <Button
+                    variant="secondary"
+                    onClick={() => setDesarrolloSeleccionado(null)}
+                    disabled={reabrirMutation.isPending}
+                  >
+                    Cerrar
+                  </Button>
+                  <Button
+                    variant="soft-danger"
+                    onClick={handleReabrir}
+                    disabled={reabrirMutation.isPending || !motivoReapertura.trim()}
+                  >
+                    Reabrir Planeación
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            {desarrolloSeleccionado.estado !== 'ENVIADO_REVISION' && desarrolloSeleccionado.estado !== 'APROBADO' && (
+              <div className="pt-4 border-t border-border flex justify-end">
+                <Button variant="secondary" onClick={() => setDesarrolloSeleccionado(null)}>
                   Cerrar
                 </Button>
-
-                <Button
-                  variant="outline"
-                  onClick={() => handleDecision('DEVUELTO_OBSERVACIONES')}
-                  disabled={revisarMutation.isPending}
-                  className="text-danger border-danger/40 hover:bg-danger-soft"
-                >
-                  Devolver con Observaciones
-                </Button>
-
-                <Button
-                  variant="primary"
-                  onClick={() => handleDecision('APROBADO')}
-                  disabled={revisarMutation.isPending}
-                >
-                  <CheckCircleIcon className="h-4 w-4 mr-1.5" />
-                  Aprobar Planeación
-                </Button>
               </div>
-            </div>
+            )}
           </div>
         )}
       </Drawer>

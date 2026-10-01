@@ -45,3 +45,15 @@ export const updateLimitesCarga = catchAsync<unknown, unknown, { PREESCOLAR?: nu
     res.status(200).json({ success: true, data: limites });
   }
 );
+
+export const getLimitesHorasPlan = catchAsync(async (_req, res) => {
+  const limites = await institutionService.getLimitesHorasPlan();
+  res.status(200).json({ success: true, data: limites });
+});
+
+export const updateLimitesHorasPlan = catchAsync<unknown, unknown, { PREESCOLAR?: number; PRIMARIA?: number; SECUNDARIA?: number; MEDIA?: number }>(
+  async (req, res) => {
+    const limites = await institutionService.updateLimitesHorasPlan(req.body);
+    res.status(200).json({ success: true, data: limites });
+  }
+);

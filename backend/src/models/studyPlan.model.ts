@@ -190,7 +190,7 @@ gradoPlanSchema.pre('validate', function validarIntegridadGrado(this: IGradoPlan
     );
     if (asignaturaFueraDelGrado) {
       return next(
-        new Error(
+        errorDeValidacion(
           'La Configuracion de Evaluacion solo puede ponderar asignaturas que ya esten en la Configuracion General del grado.'
         )
       );
@@ -210,7 +210,7 @@ gradoPlanSchema.pre('validate', function validarIntegridadGrado(this: IGradoPlan
     const noPerteneceAlGrado = idsPersonalizados.find((id) => !subjectIdsDelGrado.has(String(id)));
     if (noPerteneceAlGrado) {
       return next(
-        new Error(
+        errorDeValidacion(
           'Solo se puede personalizar la intensidad horaria de una asignatura que ya este en la Configuracion General del grado.'
         )
       );
@@ -223,7 +223,7 @@ gradoPlanSchema.pre('validate', function validarIntegridadGrado(this: IGradoPlan
     const yaEstaEnElGrado = idsAgregados.find((id) => subjectIdsDelGrado.has(String(id)));
     if (yaEstaEnElGrado) {
       return next(
-        new Error(
+        errorDeValidacion(
           'Una asignatura especifica agregada a un grupo no puede ser una que el grado ya tenga en su Configuracion General (usar intensidades_personalizadas para ajustarla).'
         )
       );

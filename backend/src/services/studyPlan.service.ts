@@ -196,6 +196,11 @@ export async function configurarAsignaturasMultiplesGrados(
   input: ConfigurarAsignaturasMultiplesGradosInput,
   { usuarioId, ip }: ContextoActor
 ): Promise<StudyPlanDocument> {
+  const gradeIdsSolicitados = input.grados.map((g) => g.grade_id);
+  if (new Set(gradeIdsSolicitados).size !== gradeIdsSolicitados.length) {
+    throw new ApiError(400, 'No se puede repetir el mismo grado en una misma solicitud de configuración masiva.');
+  }
+
   for (const item of input.grados) {
     const grade = await Grade.findById(item.grade_id);
     if (!grade) throw new ApiError(404, `Grado no encontrado: ${item.grade_id}.`);
@@ -372,9 +377,13 @@ export async function configurarDistribucionGrupo(
   if (String(group.academic_year_id) !== input.academic_year_id) {
     throw new ApiError(400, 'El grupo no pertenece al año lectivo seleccionado.');
   }
+  if (group.estado !== 'ACTIVE') {
+    throw new ApiError(400, `El grupo ${group.nomenclatura} está cerrado: no admite cambios en su distribución.`);
+  }
 
   const grade = await Grade.findById(input.grade_id);
   if (!grade) throw new ApiError(404, 'Grado no encontrado.');
+  if (grade.estado !== 'activo') throw new ApiError(400, 'El grado está inactivo.');
 
   const plan = await obtenerOCrearStudyPlan(input.institucion_id, input.academic_year_id);
   const grado = plan.grades.find((g) => String(g.grade_id) === input.grade_id);
@@ -501,6 +510,15 @@ export async function crearPlanDesdeAnioAnterior(
   }
   asegurarAnioEnPlanificacion(academicYearNuevo);
 
+  const academicYearAnterior = await AcademicYear.findById(input.academic_year_id_anterior);
+  if (!academicYearAnterior) throw new ApiError(404, 'El año lectivo anterior seleccionado no existe.');
+  if (academicYearAnterior.year >= academicYearNuevo.year) {
+    throw new ApiError(
+      400,
+      `El año lectivo ${academicYearAnterior.year} no es anterior a ${academicYearNuevo.year}: elige un año lectivo previo del cual copiar.`
+    );
+  }
+
   const yaExiste = await StudyPlan.findOne({
     institucion_id: input.institucion_id,
     academic_year_id: input.academic_year_id,
@@ -517,24 +535,52 @@ export async function crearPlanDesdeAnioAnterior(
     throw new ApiError(404, 'No hay un plan de estudios configurado para el año lectivo anterior seleccionado.');
   }
 
+  // El plan anterior puede referenciar grados que ya se inactivaron o asignaturas que ya no
+  // existen, quedaron inactivas o dejaron de ofrecerse en ese nivel: se revalidan igual que
+  // cualquier otra escritura del plan (validarSubjectsDelNivel) en vez de arrastrarlas sin mas.
+  const todosLosSubjectIds = [...new Set(planAnterior.grades.flatMap((g) => g.asignaturas.map((a) => String(a.subject_id))))];
+  const subjects = await Subject.find({ _id: { $in: todosLosSubjectIds } });
+  const subjectPorId = new Map(subjects.map((s) => [String(s._id), s]));
+  const gradeIds = [...new Set(planAnterior.grades.map((g) => String(g.grade_id)))];
+  const grades = await Grade.find({ _id: { $in: gradeIds } });
+  const gradePorId = new Map(grades.map((g) => [String(g._id), g]));
+
+  const gradosCopiados: IGradoPlan[] = [];
+  for (const grado of planAnterior.grades) {
+    const grade = gradePorId.get(String(grado.grade_id));
+    if (!grade || grade.estado !== 'activo') continue;
+
+    const subjectIdsValidos = new Set(
+      grado.asignaturas
+        .map((a) => String(a.subject_id))
+        .filter((id) => {
+          const subject = subjectPorId.get(id);
+          return Boolean(subject) && subject!.estado === 'activo' && subject!.niveles_educativos.includes(grade.nivel);
+        })
+    );
+
+    const asignaturas = grado.asignaturas
+      .filter((a) => subjectIdsValidos.has(String(a.subject_id)))
+      .map((a) => ({ subject_id: a.subject_id, intensidad_horaria_semanal: a.intensidad_horaria_semanal }));
+
+    // Una ponderacion solo sobrevive la copia si TODAS sus asignaturas siguen vigentes (si alguna
+    // se filtro, la ponderacion ya no es valida: ni su suma ni su cobertura del area se sostienen).
+    // El grado queda igual como punto de partida editable; se reconfigura desde Evaluacion.
+    const evaluaciones_area = grado.evaluaciones_area
+      .filter((e) => e.asignaturas.every((a) => subjectIdsValidos.has(String(a.subject_id))))
+      .map((e) => ({
+        area_id: e.area_id,
+        metodo_calculo: e.metodo_calculo,
+        asignaturas: e.asignaturas.map((a) => ({ subject_id: a.subject_id, porcentaje: a.porcentaje })),
+      }));
+
+    gradosCopiados.push({ grade_id: grado.grade_id, asignaturas, evaluaciones_area, personalizaciones_grupo: [] });
+  }
+
   const nuevoPlan = new StudyPlan({
     institucion_id: input.institucion_id,
     academic_year_id: input.academic_year_id,
-    grades: planAnterior.grades.map(
-      (grado): IGradoPlan => ({
-        grade_id: grado.grade_id,
-        asignaturas: grado.asignaturas.map((a) => ({
-          subject_id: a.subject_id,
-          intensidad_horaria_semanal: a.intensidad_horaria_semanal,
-        })),
-        evaluaciones_area: grado.evaluaciones_area.map((e) => ({
-          area_id: e.area_id,
-          metodo_calculo: e.metodo_calculo,
-          asignaturas: e.asignaturas.map((a) => ({ subject_id: a.subject_id, porcentaje: a.porcentaje })),
-        })),
-        personalizaciones_grupo: [],
-      })
-    ),
+    grades: gradosCopiados,
   });
 
   await nuevoPlan.save();

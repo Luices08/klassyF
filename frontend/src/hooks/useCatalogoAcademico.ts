@@ -2,11 +2,11 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../lib/apiClient';
 import type { Area, EstadoActivo, NivelEducativo, Subject, TipoAsignatura } from '../types/domain';
 
-export function useAreas(institucionId: string | undefined) {
+/** Áreas académicas (M06): una sola institución por instalación, no hace falta filtrar por institucion_id. */
+export function useAreas() {
   return useQuery({
-    queryKey: ['areas', institucionId],
-    queryFn: () => api.get<Area[]>('/curriculum/areas', { institucion_id: institucionId }),
-    enabled: Boolean(institucionId),
+    queryKey: ['areas'],
+    queryFn: () => api.get<Area[]>('/curriculum/areas'),
     staleTime: 5 * 60_000,
   });
 }

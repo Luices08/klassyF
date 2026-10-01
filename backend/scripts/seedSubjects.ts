@@ -177,7 +177,7 @@ async function seedSubjects(): Promise<void> {
   console.log(`[seed:subjects] Buscando áreas... Encontradas ${areas.length} áreas registradas.`);
 
   let creadas = 0;
-  let actualizadas = 0;
+  let omitidas = 0;
 
   for (const item of ASIGNATURAS_CATALOGO) {
     const areaId = areaMap.get(item.areaCodigo);
@@ -186,32 +186,30 @@ async function seedSubjects(): Promise<void> {
       continue;
     }
 
-    const payload = {
+    // Idempotente de verdad: si la asignatura ya existe, no se toca. Reemplazar sus campos en
+    // cada corrida pisaria ediciones que la institucion ya le hizo desde el Catalogo Academico
+    // (reactivarla, cambiarle el tipo o los niveles educativos).
+    const yaExiste = await Subject.exists({ area_id: areaId, nombre: item.nombre });
+    if (yaExiste) {
+      omitidas++;
+      console.log(` = Ya existe, se omite: ${item.nombre} (${item.abreviatura}) -> Área [${item.areaCodigo}]`);
+      continue;
+    }
+
+    await Subject.create({
       area_id: areaId,
       nombre: item.nombre,
       abreviatura: item.abreviatura,
       tipo: item.tipo,
       niveles_educativos: item.niveles_educativos,
       descripcion: item.descripcion,
-      estado: 'activo' as const,
-    };
-
-    const res = await Subject.findOneAndUpdate(
-      { area_id: areaId, nombre: item.nombre },
-      { $set: payload },
-      { upsert: true, new: false }
-    );
-
-    if (!res) {
-      creadas++;
-      console.log(` + Creada: ${item.nombre} (${item.abreviatura}) -> Área [${item.areaCodigo}]`);
-    } else {
-      actualizadas++;
-      console.log(` ~ Actualizada: ${item.nombre} (${item.abreviatura}) -> Área [${item.areaCodigo}]`);
-    }
+      estado: 'activo',
+    });
+    creadas++;
+    console.log(` + Creada: ${item.nombre} (${item.abreviatura}) -> Área [${item.areaCodigo}]`);
   }
 
-  console.log(`\n[seed:subjects] Proceso completado: ${creadas} creadas, ${actualizadas} actualizadas.`);
+  console.log(`\n[seed:subjects] Proceso completado: ${creadas} creadas, ${omitidas} ya existían (sin cambios).`);
 }
 
 async function run(): Promise<void> {

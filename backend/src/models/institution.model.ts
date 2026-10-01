@@ -17,6 +17,13 @@ export interface ILimitesCargaDocente {
   MEDIA: number;
 }
 
+export interface ILimitesHorasPlanEstudios {
+  PREESCOLAR: number;
+  PRIMARIA: number;
+  SECUNDARIA: number;
+  MEDIA: number;
+}
+
 export interface IInstitution {
   nombre: string;
   codigo_dane: string;
@@ -37,6 +44,8 @@ export interface IInstitution {
   politica_aforo_aula: PoliticaAforoAula;
   /** M08: Topes maximos de carga horaria semanal por nivel segun Decreto 1850 / PEI institucional */
   limites_carga_docente?: ILimitesCargaDocente;
+  /** M06: Tope maximo de horas semanales del Plan de Estudios por nivel (antes quemado en el frontend). */
+  limites_horas_plan_estudios?: ILimitesHorasPlanEstudios;
   estado: EstadoUsuario;
   createdAt: Date;
   updatedAt: Date;
@@ -83,6 +92,18 @@ const institutionSchema = new Schema<IInstitution, InstitutionModel>(
         { _id: false }
       ),
       default: () => ({ PREESCOLAR: 20, PRIMARIA: 25, SECUNDARIA: 22, MEDIA: 22 }),
+    },
+    limites_horas_plan_estudios: {
+      type: new Schema<ILimitesHorasPlanEstudios>(
+        {
+          PREESCOLAR: { type: Number, default: 30, min: 1, max: 50 },
+          PRIMARIA: { type: Number, default: 30, min: 1, max: 50 },
+          SECUNDARIA: { type: Number, default: 30, min: 1, max: 50 },
+          MEDIA: { type: Number, default: 30, min: 1, max: 50 },
+        },
+        { _id: false }
+      ),
+      default: () => ({ PREESCOLAR: 30, PRIMARIA: 30, SECUNDARIA: 30, MEDIA: 30 }),
     },
     estado: { type: String, enum: ESTADOS_USUARIO, default: 'activo' },
   },

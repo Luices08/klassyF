@@ -9,7 +9,7 @@ import { IconButton } from '../../components/ui/IconButton';
 import { PageHeader } from '../../components/ui/PageHeader';
 import { Spinner } from '../../components/ui/Spinner';
 import { EmptyRow, Table, TableBody, TableHead, Td, Th } from '../../components/ui/Table';
-import { PencilIcon, PlusIcon, RefreshIcon, TrashIcon } from '../../components/ui/icons';
+import { BanIcon, PencilIcon, PlusIcon, RefreshIcon } from '../../components/ui/icons';
 import {
   useActualizarArea,
   useActualizarEstadoArea,
@@ -64,7 +64,7 @@ export function AcademicCatalogPage() {
   const institucionId = institutionQuery.data?._id ?? '';
 
   // ---- Áreas ----
-  const areasQuery = useAreas(institucionId || undefined);
+  const areasQuery = useAreas();
   const crearArea = useCrearArea();
   const actualizarArea = useActualizarArea();
   const actualizarEstadoArea = useActualizarEstadoArea();
@@ -155,6 +155,9 @@ export function AcademicCatalogPage() {
   }
 
   const areaById = new Map((areasQuery.data ?? []).map((a) => [a._id, a]));
+  // Una asignatura nueva o reubicada no puede quedar apuntando a un área inactiva (el backend lo
+  // rechaza igual, pero no tiene sentido ofrecerla en el selector).
+  const areasActivas = (areasQuery.data ?? []).filter((a) => a.estado === 'activo');
   const todosLosNiveles = formSubject.niveles_educativos.length === NIVELES_EDUCATIVOS.length;
   const todosLosNivelesEditar = formEditarSubject.niveles_educativos.length === NIVELES_EDUCATIVOS.length;
 
@@ -202,9 +205,9 @@ export function AcademicCatalogPage() {
                     <div className="flex justify-end gap-2">
                       <IconButton tone="edit" label="Editar área" icon={<PencilIcon />} onClick={() => abrirEditarArea(a)} />
                       <IconButton
-                        tone={a.estado === 'activo' ? 'danger' : 'success'}
+                        tone={a.estado === 'activo' ? 'neutral' : 'success'}
                         label={a.estado === 'activo' ? 'Inactivar área' : 'Activar área'}
-                        icon={a.estado === 'activo' ? <TrashIcon /> : <RefreshIcon />}
+                        icon={a.estado === 'activo' ? <BanIcon /> : <RefreshIcon />}
                         disabled={actualizarEstadoArea.isPending}
                         onClick={() => handleToggleEstadoArea(a)}
                       />
@@ -287,9 +290,9 @@ export function AcademicCatalogPage() {
                         onClick={() => abrirEditarSubject(s)}
                       />
                       <IconButton
-                        tone={s.estado === 'activo' ? 'danger' : 'success'}
+                        tone={s.estado === 'activo' ? 'neutral' : 'success'}
                         label={s.estado === 'activo' ? 'Inactivar asignatura' : 'Activar asignatura'}
-                        icon={s.estado === 'activo' ? <TrashIcon /> : <RefreshIcon />}
+                        icon={s.estado === 'activo' ? <BanIcon /> : <RefreshIcon />}
                         disabled={actualizarEstadoSubject.isPending}
                         onClick={() => handleToggleEstadoSubject(s)}
                       />
@@ -371,7 +374,7 @@ export function AcademicCatalogPage() {
           onChange={(e) => setFormSubject((f) => ({ ...f, area_id: e.target.value }))}
         >
           <option value="">Selecciona un área...</option>
-          {areasQuery.data?.map((a) => (
+          {areasActivas.map((a) => (
             <option key={a._id} value={a._id}>
               {a.nombre}
             </option>
@@ -445,7 +448,11 @@ export function AcademicCatalogPage() {
           value={formEditarSubject.area_id}
           onChange={(e) => setFormEditarSubject((f) => ({ ...f, area_id: e.target.value }))}
         >
-          {areasQuery.data?.map((a) => (
+          {/* El área actual se conserva en la lista aunque ya esté inactiva, para no perderla de vista al editar. */}
+          {(areaById.get(formEditarSubject.area_id)?.estado === 'activo' || !formEditarSubject.area_id
+            ? areasActivas
+            : [...areasActivas, areaById.get(formEditarSubject.area_id)!]
+          ).map((a) => (
             <option key={a._id} value={a._id}>
               {a.nombre}
             </option>

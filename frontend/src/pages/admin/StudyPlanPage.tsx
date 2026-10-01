@@ -22,17 +22,21 @@ import { PageHeader } from '../../components/ui/PageHeader';
 import { Spinner } from '../../components/ui/Spinner';
 import { EmptyRow, Table, TableBody, TableHead, Td, Th } from '../../components/ui/Table';
 import { Tabs } from '../../components/ui/Tabs';
-import { useAcademicYears, useGrades } from '../../hooks/useCatalogs';
+import { useAnioDeTrabajo } from '../../hooks/useAniosLectivos';
+import { useGrades } from '../../hooks/useCatalogs';
 import { useAreas, useSubjects } from '../../hooks/useCatalogoAcademico';
 import { useGroups } from '../../hooks/useGroups';
 import { useInstitution } from '../../hooks/useInstitution';
 import {
+  useActualizarLimitesHorasPlan,
   useConfigurarAsignaturasGrado,
   useConfigurarAsignaturasMultiplesGrados,
   useConfigurarDistribucionGrupo,
   useConfigurarEvaluacionArea,
   useCrearPlanDesdeAnioAnterior,
+  useLimitesHorasPlan,
   useStudyPlan,
+  type LimitesHorasPlanEstudios,
 } from '../../hooks/useStudyPlan';
 import {
   METODOS_CALCULO_EVALUACION,
@@ -55,8 +59,6 @@ const METODO_LABELS: Record<MetodoCalculoEvaluacion, string> = {
   ARITMETICO: 'Promedio aritmético',
 };
 
-const MAX_HORAS_SEMANALES = 30;
-
 function getGradeId(gradeIdField: string | { _id: string } | undefined): string {
   if (!gradeIdField) return '';
   return typeof gradeIdField === 'object' ? gradeIdField._id : gradeIdField;
@@ -72,29 +74,19 @@ export function StudyPlanPage() {
   const institutionQuery = useInstitution();
   const institucionId = institutionQuery.data?._id ?? '';
 
-  const academicYearsQuery = useAcademicYears(institucionId || undefined);
+  // 1. Año lectivo por defecto: sale del servidor (vigencia activa, o el más reciente sin
+  // cerrar) vía useAnioDeTrabajo(), no de una selección reconstruida a mano en esta página.
+  const { anio: anioDeTrabajo, anios: academicYears } = useAnioDeTrabajo();
   const [academicYearId, setAcademicYearId] = useState('');
-  const academicYears = academicYearsQuery.data ?? [];
   const anioActual = academicYears.find((a) => a._id === academicYearId);
 
-  // 1. Carga automática del año lectivo en curso / más reciente
   useEffect(() => {
-    if (!academicYearId && academicYears.length > 0) {
-      const enCurso = academicYears.find((a) => a.estado === 'EN_CURSO');
-      if (enCurso) {
-        setAcademicYearId(enCurso._id);
-        return;
-      }
-      const anioCalendario = new Date().getFullYear();
-      const coincideAnio = academicYears.find((a) => a.year === anioCalendario);
-      if (coincideAnio) {
-        setAcademicYearId(coincideAnio._id);
-        return;
-      }
-      const ordenados = [...academicYears].sort((a, b) => b.year - a.year);
-      setAcademicYearId(ordenados[0]._id);
+    if (!academicYearId && anioDeTrabajo) {
+      setAcademicYearId(anioDeTrabajo._id);
     }
-  }, [academicYears, academicYearId]);
+  }, [anioDeTrabajo, academicYearId]);
+
+  const soloLectura = Boolean(anioActual && anioActual.estado !== 'PLANIFICACION');
 
   const studyPlanQuery = useStudyPlan(institucionId || undefined, academicYearId || undefined);
   const crearDesdeAnioAnterior = useCrearPlanDesdeAnioAnterior();
@@ -123,14 +115,17 @@ export function StudyPlanPage() {
     [todosLosGrados, nivel]
   );
 
-  const subjectsQuery = useSubjects({ estado: 'activo' });
+  // Sin filtro de estado: una asignatura ya configurada en el plan no debe desaparecer de la
+  // grilla (ni perderse al guardar) solo porque se inactivó o le cambiaron el nivel educativo
+  // después en el Catálogo Académico — cada pestaña decide por separado qué ofrece para agregar.
+  const subjectsQuery = useSubjects({});
   const todosLosSubjects = useMemo(() => subjectsQuery.data ?? [], [subjectsQuery.data]);
   const subjectById = useMemo(
     () => new Map(todosLosSubjects.map((s) => [s._id, s])),
     [todosLosSubjects]
   );
 
-  const areasQuery = useAreas(institucionId || undefined);
+  const areasQuery = useAreas();
   const todasLasAreas = useMemo(() => areasQuery.data ?? [], [areasQuery.data]);
   const areaById = useMemo(
     () => new Map(todasLasAreas.map((a) => [a._id, a])),
@@ -139,6 +134,8 @@ export function StudyPlanPage() {
 
   const groupsQuery = useGroups({ academic_year_id: academicYearId || undefined });
   const todosLosGrupos = useMemo(() => groupsQuery.data ?? [], [groupsQuery.data]);
+
+  const limitesHorasQuery = useLimitesHorasPlan();
 
   const [tab, setTab] = useState('general');
   const [ultimoGuardado, setUltimoGuardado] = useState<Date | null>(null);
@@ -316,6 +313,8 @@ export function StudyPlanPage() {
               subjects={todosLosSubjects}
               areaById={areaById}
               studyPlan={studyPlanQuery.data}
+              soloLectura={soloLectura}
+              maxHorasPorNivel={limitesHorasQuery.data}
               onPlanUpdated={() => setUltimoGuardado(new Date())}
             />
           )}
@@ -330,6 +329,8 @@ export function StudyPlanPage() {
               subjectById={subjectById}
               studyPlan={studyPlanQuery.data}
               gruposDelAnio={todosLosGrupos}
+              soloLectura={soloLectura}
+              maxHoras={limitesHorasQuery.data?.[nivel] ?? 30}
               onPlanUpdated={() => setUltimoGuardado(new Date())}
             />
           )}
@@ -343,6 +344,7 @@ export function StudyPlanPage() {
               subjectById={subjectById}
               areas={todasLasAreas}
               studyPlan={studyPlanQuery.data}
+              soloLectura={soloLectura}
               onPlanUpdated={() => setUltimoGuardado(new Date())}
             />
           )}
@@ -369,6 +371,8 @@ interface ConfiguracionGeneralNivelTabProps {
   subjects: Subject[];
   areaById: Map<string, { nombre: string }>;
   studyPlan: ReturnType<typeof useStudyPlan>['data'];
+  soloLectura: boolean;
+  maxHorasPorNivel: LimitesHorasPlanEstudios | undefined;
   onPlanUpdated: () => void;
 }
 
@@ -381,10 +385,15 @@ function ConfiguracionGeneralNivelTab({
   subjects,
   areaById,
   studyPlan,
+  soloLectura,
+  maxHorasPorNivel,
   onPlanUpdated,
 }: ConfiguracionGeneralNivelTabProps) {
   const configurarMultiples = useConfigurarAsignaturasMultiplesGrados();
   const configurarGrado = useConfigurarAsignaturasGrado();
+  const actualizarLimites = useActualizarLimitesHorasPlan();
+
+  const MAX_HORAS_SEMANALES = maxHorasPorNivel?.[nivel] ?? 30;
 
   const [filtroArea, setFiltroArea] = useState('');
 
@@ -397,12 +406,45 @@ function ConfiguracionGeneralNivelTab({
   const [desvinculandoGrado, setDesvinculandoGrado] = useState<{ subject: Subject; grade: Grade } | null>(null);
   const [desvinculandoNivel, setDesvinculandoNivel] = useState<Subject | null>(null);
 
-  // 1. CARGA DIRECTA: Todas las asignaturas activas del catálogo para este nivel
+  // Drawer de límites de horas (M06, configurable por nivel en vez de quemado)
+  const [drawerLimitesOpen, setDrawerLimitesOpen] = useState(false);
+  const [formLimites, setFormLimites] = useState<LimitesHorasPlanEstudios>({
+    PREESCOLAR: 30,
+    PRIMARIA: 30,
+    SECUNDARIA: 30,
+    MEDIA: 30,
+  });
+
+  function abrirDrawerLimites() {
+    if (maxHorasPorNivel) setFormLimites(maxHorasPorNivel);
+    actualizarLimites.reset();
+    setDrawerLimitesOpen(true);
+  }
+
+  async function handleGuardarLimites(e: FormEvent) {
+    e.preventDefault();
+    await actualizarLimites.mutateAsync(formLimites);
+    setDrawerLimitesOpen(false);
+  }
+
+  // 1. CARGA DIRECTA: asignaturas activas del catálogo para este nivel, más cualquiera que ya
+  // tenga horas configuradas en algún grado de este nivel aunque se haya inactivado o le hayan
+  // quitado el nivel después en el Catálogo Académico — si no, el guardado masivo la borraría
+  // del plan en silencio por el simple hecho de no aparecer en esta lista.
+  const idsConHorasEnNivel = useMemo(() => {
+    const ids = new Set<string>();
+    for (const grado of gradosDelNivel) {
+      const gradoPlan = studyPlan?.grades.find((g) => g.grade_id === grado._id);
+      for (const a of gradoPlan?.asignaturas ?? []) ids.add(a.subject_id);
+    }
+    return ids;
+  }, [gradosDelNivel, studyPlan]);
+
   const asignaturasDelNivel = useMemo(() => {
     return subjects
-      .filter((s) => s.estado === 'activo' && s.niveles_educativos.includes(nivel))
+      .filter((s) => (s.estado === 'activo' && s.niveles_educativos.includes(nivel)) || idsConHorasEnNivel.has(s._id))
       .sort((a, b) => a.nombre.localeCompare(b.nombre));
-  }, [subjects, nivel]);
+  }, [subjects, nivel, idsConHorasEnNivel]);
 
   const asignaturasFiltradas = useMemo(() => {
     if (!filtroArea) return asignaturasDelNivel;
@@ -503,10 +545,10 @@ function ConfiguracionGeneralNivelTab({
     return totales;
   }, [gradosDelNivel, modoEdicion, asignaturasDelNivel, horasEdicion, studyPlan]);
 
-  // 3. Grados que exceden el límite de 30 horas semanales
+  // 3. Grados que exceden el límite de horas semanales configurado para este nivel
   const gradosExcedidos = useMemo(() => {
     return gradosDelNivel.filter((g) => (totalHorasPorGrado[g._id] || 0) > MAX_HORAS_SEMANALES);
-  }, [gradosDelNivel, totalHorasPorGrado]);
+  }, [gradosDelNivel, totalHorasPorGrado, MAX_HORAS_SEMANALES]);
 
   // 4. Guardar cambios masivos de todo el nivel educativo
   async function handleGuardarEdicionMasiva() {
@@ -587,9 +629,13 @@ function ConfiguracionGeneralNivelTab({
       <Card>
         <CardHeader
           title={`Configuración General: ${NIVEL_LABELS[nivel]}`}
-          subtitle="Define la intensidad horaria semanal de cada asignatura para los grados de este nivel. La carga horaria no debe superar 30 horas semanales por grado."
+          subtitle={`Define la intensidad horaria semanal de cada asignatura para los grados de este nivel. La carga horaria no debe superar ${MAX_HORAS_SEMANALES} horas semanales por grado.`}
           action={
             <div className="flex items-center gap-2">
+              <Button type="button" variant="outline" onClick={abrirDrawerLimites}>
+                <SlidersIcon className="h-4 w-4" />
+                Gestionar límites de horas
+              </Button>
               {modoEdicion ? (
                 <>
                   <Button
@@ -615,7 +661,7 @@ function ConfiguracionGeneralNivelTab({
                 <Button
                   type="button"
                   onClick={iniciarEdicionMasiva}
-                  disabled={gradosDelNivel.length === 0 || asignaturasDelNivel.length === 0}
+                  disabled={soloLectura || gradosDelNivel.length === 0 || asignaturasDelNivel.length === 0}
                 >
                   <PencilIcon className="h-4 w-4" />
                   Editar intensidades del nivel
@@ -702,10 +748,13 @@ function ConfiguracionGeneralNivelTab({
                     <Td className="font-medium text-ink">
                       <div>
                         <span>{subject.nombre}</span>
-                        <div className="mt-0.5">
+                        <div className="mt-0.5 flex flex-wrap gap-1">
                           <Chip tone={subject.tipo === 'OBLIGATORIA' ? 'blue' : 'orange'}>
                             {subject.tipo === 'OBLIGATORIA' ? 'Obligatoria' : 'Optativa'}
                           </Chip>
+                          {subject.estado !== 'activo' && (
+                            <Chip tone="neutral">Inactiva en catálogo</Chip>
+                          )}
                         </div>
                       </div>
                     </Td>
@@ -757,7 +806,7 @@ function ConfiguracionGeneralNivelTab({
                             className="inline-flex items-center gap-1 rounded-full bg-primary-soft px-2 py-0.5 text-xs font-semibold text-primary"
                           >
                             {g.nombre}
-                            {!modoEdicion && (
+                            {!modoEdicion && !soloLectura && (
                               <button
                                 type="button"
                                 onClick={() => setDesvinculandoGrado({ subject, grade: g })}
@@ -778,7 +827,7 @@ function ConfiguracionGeneralNivelTab({
                     {/* Acciones */}
                     {!modoEdicion && (
                       <Td className="text-right">
-                        {gradosConHoras.length > 0 && (
+                        {gradosConHoras.length > 0 && !soloLectura && (
                           <IconButton
                             tone="danger"
                             label="Desvincular de todos los grados de este nivel"
@@ -889,6 +938,57 @@ function ConfiguracionGeneralNivelTab({
           Se desvinculará esta asignatura de todos los grados de este nivel para el plan de estudios del año lectivo {anioYear}. Recuerde configurar el Catálogo Académico si desea inhabilitarla permanentemente en el sistema.
         </Alert>
       </Drawer>
+
+      {/* Drawer: Límites de horas semanales del plan de estudios por nivel (configuración institucional) */}
+      <Drawer
+        open={drawerLimitesOpen}
+        title="Límites de horas semanales del Plan de Estudios"
+        onClose={() => setDrawerLimitesOpen(false)}
+        onSubmit={handleGuardarLimites}
+        submitLabel="Guardar límites"
+        isSubmitting={actualizarLimites.isPending}
+      >
+        <p className="text-sm text-body">
+          Define el tope máximo de horas semanales por grado para cada nivel educativo. Aplica a toda la institución, no solo a {NIVEL_LABELS[nivel]}.
+        </p>
+        {actualizarLimites.isError && <Alert tone="error">{errorMessage(actualizarLimites.error)}</Alert>}
+        <Input
+          label="Preescolar (horas semanales)"
+          type="number"
+          min={1}
+          max={50}
+          value={formLimites.PREESCOLAR}
+          onChange={(e) => setFormLimites((f) => ({ ...f, PREESCOLAR: Number(e.target.value) }))}
+          required
+        />
+        <Input
+          label="Básica primaria (horas semanales)"
+          type="number"
+          min={1}
+          max={50}
+          value={formLimites.PRIMARIA}
+          onChange={(e) => setFormLimites((f) => ({ ...f, PRIMARIA: Number(e.target.value) }))}
+          required
+        />
+        <Input
+          label="Básica secundaria (horas semanales)"
+          type="number"
+          min={1}
+          max={50}
+          value={formLimites.SECUNDARIA}
+          onChange={(e) => setFormLimites((f) => ({ ...f, SECUNDARIA: Number(e.target.value) }))}
+          required
+        />
+        <Input
+          label="Educación media (horas semanales)"
+          type="number"
+          min={1}
+          max={50}
+          value={formLimites.MEDIA}
+          onChange={(e) => setFormLimites((f) => ({ ...f, MEDIA: Number(e.target.value) }))}
+          required
+        />
+      </Drawer>
     </div>
   );
 }
@@ -908,6 +1008,8 @@ interface DistribucionGruposTabProps {
   subjectById: Map<string, Subject>;
   studyPlan: ReturnType<typeof useStudyPlan>['data'];
   gruposDelAnio: ReturnType<typeof useGroups>['data'] & unknown[];
+  soloLectura: boolean;
+  maxHoras: number;
   onPlanUpdated: () => void;
 }
 
@@ -920,6 +1022,8 @@ function DistribucionGruposTab({
   subjectById,
   studyPlan,
   gruposDelAnio,
+  soloLectura,
+  maxHoras,
   onPlanUpdated,
 }: DistribucionGruposTabProps) {
   // Grado seleccionado: limitado estrictamente a los grados de este nivel
@@ -1035,7 +1139,7 @@ function DistribucionGruposTab({
             type="button"
             variant="outline"
             onClick={() => setDrawerAgregarOpen(true)}
-            disabled={!groupId || asignaturasDisponiblesParaGrupo.length === 0}
+            disabled={soloLectura || !groupId || asignaturasDisponiblesParaGrupo.length === 0}
           >
             Agregar asignatura exclusiva
           </Button>
@@ -1108,7 +1212,7 @@ function DistribucionGruposTab({
                       <input
                         type="number"
                         min={1}
-                        max={MAX_HORAS_SEMANALES}
+                        max={maxHoras}
                         placeholder={String(a.intensidad_horaria_semanal)}
                         value={override?.intensidad ?? ''}
                         onChange={(e) =>
@@ -1122,7 +1226,9 @@ function DistribucionGruposTab({
                               : {
                                   [a.subject_id]: {
                                     intensidad: Number(e.target.value),
-                                    observacion: s[a.subject_id]?.observacion ?? '',
+                                    // El backend exige una observación no vacía (justifica el ajuste): se
+                                    // precarga un texto por defecto editable, nunca ''.
+                                    observacion: s[a.subject_id]?.observacion || 'Ajuste de intensidad horaria para este grupo',
                                   },
                                 }),
                           }))
@@ -1186,7 +1292,7 @@ function DistribucionGruposTab({
                       <input
                         type="number"
                         min={1}
-                        max={MAX_HORAS_SEMANALES}
+                        max={maxHoras}
                         value={v.intensidad}
                         onChange={(e) =>
                           setAgregadas((s) => ({
@@ -1234,7 +1340,7 @@ function DistribucionGruposTab({
           </Table>
 
           <div className="flex justify-end pt-2">
-            <Button onClick={handleGuardar} isLoading={mutation.isPending}>
+            <Button onClick={handleGuardar} isLoading={mutation.isPending} disabled={soloLectura}>
               Guardar Distribución por Grupos
             </Button>
           </div>
@@ -1269,7 +1375,7 @@ function DistribucionGruposTab({
           label="Intensidad horaria semanal"
           type="number"
           min={1}
-          max={MAX_HORAS_SEMANALES}
+          max={maxHoras}
           value={nuevaAgregadaIntensidad}
           onChange={(e) => setNuevaAgregadaIntensidad(Number(e.target.value))}
           required
@@ -1301,6 +1407,7 @@ interface ConfiguracionEvaluacionTabProps {
   subjectById: Map<string, Subject>;
   areas: { _id: string; nombre: string }[];
   studyPlan: ReturnType<typeof useStudyPlan>['data'];
+  soloLectura: boolean;
   onPlanUpdated: () => void;
 }
 
@@ -1312,6 +1419,7 @@ function ConfiguracionEvaluacionTab({
   subjectById,
   areas,
   studyPlan,
+  soloLectura,
   onPlanUpdated,
 }: ConfiguracionEvaluacionTabProps) {
   // Grado seleccionado: limitado a los grados del nivel
@@ -1504,7 +1612,7 @@ function ConfiguracionEvaluacionTab({
             <Button
               onClick={handleGuardar}
               isLoading={mutation.isPending}
-              disabled={metodo === 'PONDERADO' && (sumaPorcentajes !== 100 || asignaturasDelArea.length === 0)}
+              disabled={soloLectura || (metodo === 'PONDERADO' && (sumaPorcentajes !== 100 || asignaturasDelArea.length === 0))}
             >
               Guardar Configuración de Evaluación
             </Button>

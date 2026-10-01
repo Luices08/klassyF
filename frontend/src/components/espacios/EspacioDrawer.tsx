@@ -1,6 +1,6 @@
 import { type FormEvent, useState } from 'react';
 import { useCambiarEstadoEspacio, useActualizarEspacio, useCrearEspacio } from '../../hooks/useEspacios';
-import { useAreas } from '../../hooks/useCatalogs';
+import { useAreas } from '../../hooks/useCatalogoAcademico';
 import {
   ESTADOS_ESPACIO,
   NOMBRES_ESTADO_ESPACIO,

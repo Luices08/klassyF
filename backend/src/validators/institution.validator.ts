@@ -90,3 +90,12 @@ export const updateLimitesCarga: ValidationSchema = {
     MEDIA: Joi.number().integer().min(1).max(40).optional(),
   }).min(1),
 };
+
+export const updateLimitesHorasPlan: ValidationSchema = {
+  body: Joi.object({
+    PREESCOLAR: Joi.number().integer().min(1).max(50).optional(),
+    PRIMARIA: Joi.number().integer().min(1).max(50).optional(),
+    SECUNDARIA: Joi.number().integer().min(1).max(50).optional(),
+    MEDIA: Joi.number().integer().min(1).max(50).optional(),
+  }).min(1),
+};

@@ -214,3 +214,36 @@ export async function updateLimitesCarga(
   await institucion.save();
   return institucion.limites_carga_docente;
 }
+
+/** M06: tope de horas semanales del Plan de Estudios por nivel (antes quemado a 30 para todos en el frontend). */
+export async function getLimitesHorasPlan(): Promise<InstitutionDocument['limites_horas_plan_estudios']> {
+  const institucion = await Institution.findOne();
+  if (!institucion || !institucion.limites_horas_plan_estudios) {
+    return { PREESCOLAR: 30, PRIMARIA: 30, SECUNDARIA: 30, MEDIA: 30 };
+  }
+  return institucion.limites_horas_plan_estudios;
+}
+
+export async function updateLimitesHorasPlan(
+  limites: { PREESCOLAR?: number; PRIMARIA?: number; SECUNDARIA?: number; MEDIA?: number }
+): Promise<InstitutionDocument['limites_horas_plan_estudios']> {
+  const institucion = await Institution.findOne();
+  if (!institucion) throw new ApiError(404, 'No hay una institución configurada todavía.');
+
+  const actual = institucion.limites_horas_plan_estudios || {
+    PREESCOLAR: 30,
+    PRIMARIA: 30,
+    SECUNDARIA: 30,
+    MEDIA: 30,
+  };
+
+  institucion.limites_horas_plan_estudios = {
+    PREESCOLAR: limites.PREESCOLAR ?? actual.PREESCOLAR,
+    PRIMARIA: limites.PRIMARIA ?? actual.PRIMARIA,
+    SECUNDARIA: limites.SECUNDARIA ?? actual.SECUNDARIA,
+    MEDIA: limites.MEDIA ?? actual.MEDIA,
+  };
+
+  await institucion.save();
+  return institucion.limites_horas_plan_estudios;
+}

@@ -109,3 +109,30 @@ export function useCrearPlanDesdeAnioAnterior() {
     onSuccess: () => invalidateStudyPlan(queryClient),
   });
 }
+
+export interface LimitesHorasPlanEstudios {
+  PREESCOLAR: number;
+  PRIMARIA: number;
+  SECUNDARIA: number;
+  MEDIA: number;
+}
+
+/** Tope de horas semanales del Plan de Estudios por nivel (configuración institucional, antes quemado a 30). */
+export function useLimitesHorasPlan() {
+  return useQuery({
+    queryKey: ['limites-horas-plan'],
+    queryFn: () => api.get<LimitesHorasPlanEstudios>('/institution/limites-horas-plan'),
+    staleTime: 5 * 60_000,
+  });
+}
+
+export function useActualizarLimitesHorasPlan() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: Partial<LimitesHorasPlanEstudios>) =>
+      api.patch<LimitesHorasPlanEstudios>('/institution/limites-horas-plan', input),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['limites-horas-plan'] });
+    },
+  });
+}

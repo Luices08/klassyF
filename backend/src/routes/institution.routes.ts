@@ -4,9 +4,11 @@ import {
   actualizarPlantillaFranjas,
   getInstitution,
   getLimitesCarga,
+  getLimitesHorasPlan,
   setupInstitution,
   updateInstitution,
   updateLimitesCarga,
+  updateLimitesHorasPlan,
 } from '../controllers/institution.controller';
 import { authenticate, checkRole } from '../middlewares/auth.middleware';
 import validate from '../middlewares/validate.middleware';
@@ -30,6 +32,22 @@ router.patch(
   checkRole(ROLES.ADMIN, ROLES.COORDINADOR),
   validate(institutionValidator.updateLimitesCarga),
   updateLimitesCarga
+);
+
+// M06: Tope de horas semanales del Plan de Estudios por nivel (antes quemado en el frontend)
+router.get(
+  '/limites-horas-plan',
+  authenticate,
+  checkRole(ROLES.ADMIN, ROLES.COORDINADOR),
+  getLimitesHorasPlan
+);
+
+router.patch(
+  '/limites-horas-plan',
+  authenticate,
+  checkRole(ROLES.ADMIN, ROLES.COORDINADOR),
+  validate(institutionValidator.updateLimitesHorasPlan),
+  updateLimitesHorasPlan
 );
 
 router.post(

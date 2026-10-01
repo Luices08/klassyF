@@ -60,3 +60,25 @@ export function useActualizarEstadoGrupo() {
     },
   });
 }
+
+export interface CambiarAulaGrupoInput {
+  groupId: string;
+  /** null = quitar el salón titular del grupo. */
+  aula_id: string | null;
+}
+
+/** Reasigna el salón titular de un grupo ya creado (M10: reparaciones locativas, reorganización de aforos). */
+export function useCambiarAulaGrupo() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ groupId, aula_id }: CambiarAulaGrupoInput) =>
+      api.raw<{ success: true; data: Group; advertencia: string | null }>(`/groups/${groupId}/aula`, {
+        method: 'PATCH',
+        body: { aula_id },
+      }),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['groups'] });
+      void queryClient.invalidateQueries({ queryKey: ['espacios'] });
+    },
+  });
+}

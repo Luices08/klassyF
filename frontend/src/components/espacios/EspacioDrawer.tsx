@@ -57,6 +57,9 @@ function FormularioEspacio({ espacio, sedes, sedeInicialId, onClose }: EspacioDr
   // Aforo mínimo recomendado: el cupo del grupo más grande que ya usa este espacio como salón titular.
   const minimoRecomendado = Math.max(0, ...(espacio?.grupos_asignados ?? []).map((g) => g.max_capacity));
   const porDebajoDelMinimo = editando && minimoRecomendado > 0 && capacidad < minimoRecomendado;
+  // Solo un AULA_REGULAR puede ser salón titular de un grupo (M01<->M10): si ya lo es de alguno,
+  // cambiar el tipo rompería esa regla en silencio — el backend también lo rechaza.
+  const esSalonTitular = editando && (espacio?.grupos_asignados.length ?? 0) > 0;
 
   function alternarRecurso(recurso: RecursoEspacio) {
     setRecursos((prev) => (prev.includes(recurso) ? prev.filter((r) => r !== recurso) : [...prev, recurso]));
@@ -125,7 +128,13 @@ function FormularioEspacio({ espacio, sedes, sedeInicialId, onClose }: EspacioDr
           value={nombre}
           onChange={(e) => setNombre(e.target.value)}
         />
-        <Select label="Tipo de espacio" value={tipo} onChange={(e) => setTipo(e.target.value as TipoEspacio)}>
+        <Select
+          label="Tipo de espacio"
+          value={tipo}
+          disabled={esSalonTitular}
+          onChange={(e) => setTipo(e.target.value as TipoEspacio)}
+          hint={esSalonTitular ? 'Es salón titular de uno o más grupos: reasígnalos a otra aula antes de cambiar el tipo.' : undefined}
+        >
           {TIPOS_ESPACIO.map((t) => (
             <option key={t} value={t}>
               {NOMBRES_TIPO_ESPACIO[t]}

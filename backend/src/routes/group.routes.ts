@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { ROLES } from '../constants/roles';
-import { actualizarEstadoGrupo, createGroup, listGroups } from '../controllers/group.controller';
+import { actualizarEstadoGrupo, cambiarAulaGrupo, createGroup, listGroups } from '../controllers/group.controller';
 import { authenticate, checkRole } from '../middlewares/auth.middleware';
 import validate from '../middlewares/validate.middleware';
 import * as groupValidator from '../validators/group.validator';
@@ -24,6 +24,14 @@ router.patch(
   checkRole(ROLES.ADMIN, ROLES.COORDINADOR),
   validate(groupValidator.actualizarEstado),
   actualizarEstadoGrupo
+);
+
+// M10: reasignar el salón titular de un grupo ya creado (reparaciones locativas, reorganización de aforos).
+router.patch(
+  '/:groupId/aula',
+  checkRole(ROLES.ADMIN, ROLES.COORDINADOR),
+  validate(groupValidator.cambiarAula),
+  cambiarAulaGrupo
 );
 
 export default router;

@@ -9,13 +9,13 @@ import { IconButton } from '../../components/ui/IconButton';
 import { PageHeader } from '../../components/ui/PageHeader';
 import { Spinner } from '../../components/ui/Spinner';
 import { EmptyRow, Table, TableBody, TableHead, Td, Th } from '../../components/ui/Table';
-import { BanIcon, PlusIcon, RefreshIcon } from '../../components/ui/icons';
+import { BanIcon, PencilIcon, PlusIcon, RefreshIcon } from '../../components/ui/icons';
 import { useAnioDeTrabajo } from '../../hooks/useAniosLectivos';
 import { useCampuses, useGrades, useJornadas } from '../../hooks/useCatalogs';
 import { useEspacios } from '../../hooks/useEspacios';
-import { useActualizarEstadoGrupo, useCreateGroup, useGroups } from '../../hooks/useGroups';
+import { useActualizarEstadoGrupo, useCambiarAulaGrupo, useCreateGroup, useGroups } from '../../hooks/useGroups';
 import { useInstitution } from '../../hooks/useInstitution';
-import type { Espacio, EstadoGrupo } from '../../types/domain';
+import type { Espacio, EstadoGrupo, Group } from '../../types/domain';
 
 export function GroupsPage() {
   const institutionQuery = useInstitution();
@@ -65,8 +65,11 @@ export function GroupsPage() {
   const espaciosQuery = useEspacios({ sede_id: sedeId, academic_year_id: academicYearId }, Boolean(usaEspacios && sedeId && academicYearId));
   const aulas = (espaciosQuery.data ?? []).filter((e) => e.tipo_espacio === 'AULA_REGULAR' && e.estado === 'DISPONIBLE');
   // Un aula ya es salón titular de otro grupo en esa jornada (salvo las de uso simultáneo, que admiten varios).
-  const ocupanteDe = (aula: Espacio, jornada: string) =>
-    !jornada || aula.admite_grupos_simultaneos ? undefined : aula.grupos_asignados.find((g) => g.jornada?._id === jornada);
+  // excluirGroupId: al cambiar el aula de un grupo que ya la ocupa, no marcarla como "ocupada por sí mismo".
+  const ocupanteDe = (aula: Espacio, jornada: string, excluirGroupId?: string) =>
+    !jornada || aula.admite_grupos_simultaneos
+      ? undefined
+      : aula.grupos_asignados.find((g) => g.jornada?._id === jornada && g._id !== excluirGroupId);
   const aulaElegida = aulas.find((a) => a._id === aulaId);
   const excedeAforo = aulaElegida !== undefined && maxCapacity > aulaElegida.capacidad;
   const bloqueadoPorAforo = excedeAforo && politicaAforo === 'BLOQUEAR';
@@ -106,6 +109,48 @@ export function GroupsPage() {
     actualizarEstado.reset();
     const siguienteEstado: EstadoGrupo = estadoActual === 'ACTIVE' ? 'CLOSED' : 'ACTIVE';
     await actualizarEstado.mutateAsync({ groupId, estado: siguienteEstado });
+  }
+
+  // Cambiar el aula titular de un grupo ya creado (M10: reparaciones locativas, reorganización de aforos).
+  const [grupoCambiandoAula, setGrupoCambiandoAula] = useState<Group | null>(null);
+  const [nuevaAulaId, setNuevaAulaId] = useState('');
+  const cambiarAula = useCambiarAulaGrupo();
+
+  const sedeIdDelGrupo = grupoCambiandoAula
+    ? typeof grupoCambiandoAula.sede_id === 'object'
+      ? grupoCambiandoAula.sede_id._id
+      : grupoCambiandoAula.sede_id
+    : '';
+  const jornadaIdDelGrupo = grupoCambiandoAula
+    ? typeof grupoCambiandoAula.jornada_id === 'object'
+      ? grupoCambiandoAula.jornada_id._id
+      : grupoCambiandoAula.jornada_id
+    : '';
+  const espaciosCambioAulaQuery = useEspacios(
+    { sede_id: sedeIdDelGrupo, academic_year_id: academicYearId },
+    Boolean(usaEspacios && grupoCambiandoAula)
+  );
+  const aulasParaCambio = (espaciosCambioAulaQuery.data ?? []).filter(
+    (e) => e.tipo_espacio === 'AULA_REGULAR' && e.estado === 'DISPONIBLE'
+  );
+  const nuevaAulaElegida = aulasParaCambio.find((a) => a._id === nuevaAulaId);
+  const excedeAforoCambio =
+    grupoCambiandoAula !== null && nuevaAulaElegida !== undefined && grupoCambiandoAula.max_capacity > nuevaAulaElegida.capacidad;
+  const bloqueadoPorAforoCambio = excedeAforoCambio && politicaAforo === 'BLOQUEAR';
+
+  function handleAbrirCambioAula(g: Group) {
+    cambiarAula.reset();
+    setGrupoCambiandoAula(g);
+    setNuevaAulaId(typeof g.aula_id === 'object' && g.aula_id ? g.aula_id._id : '');
+  }
+
+  async function handleGuardarCambioAula(e: FormEvent) {
+    e.preventDefault();
+    if (!grupoCambiandoAula) return;
+    cambiarAula.reset();
+    await cambiarAula.mutateAsync({ groupId: grupoCambiandoAula._id, aula_id: nuevaAulaId || null });
+    setGrupoCambiandoAula(null);
+    setNuevaAulaId('');
   }
 
   return (
@@ -230,13 +275,23 @@ export function GroupsPage() {
                     <EstadoGrupoBadge value={g.estado} />
                   </Td>
                   <Td>
-                    <IconButton
-                      tone={g.estado === 'ACTIVE' ? 'neutral' : 'success'}
-                      label={g.estado === 'ACTIVE' ? 'Cerrar grupo' : 'Reactivar grupo'}
-                      icon={g.estado === 'ACTIVE' ? <BanIcon /> : <RefreshIcon />}
-                      disabled={actualizarEstado.isPending}
-                      onClick={() => handleToggleEstado(g._id, g.estado)}
-                    />
+                    <div className="flex items-center justify-end gap-1.5">
+                      {usaEspacios && (
+                        <IconButton
+                          tone="edit"
+                          label="Cambiar aula"
+                          icon={<PencilIcon />}
+                          onClick={() => handleAbrirCambioAula(g)}
+                        />
+                      )}
+                      <IconButton
+                        tone={g.estado === 'ACTIVE' ? 'neutral' : 'success'}
+                        label={g.estado === 'ACTIVE' ? 'Cerrar grupo' : 'Reactivar grupo'}
+                        icon={g.estado === 'ACTIVE' ? <BanIcon /> : <RefreshIcon />}
+                        disabled={actualizarEstado.isPending}
+                        onClick={() => handleToggleEstado(g._id, g.estado)}
+                      />
+                    </div>
                   </Td>
                 </tr>
               ))}
@@ -363,6 +418,54 @@ export function GroupsPage() {
               Ajustar el cupo a {aulaElegida.capacidad}
             </Button>
           </>
+        )}
+      </Drawer>
+
+      <Drawer
+        open={grupoCambiandoAula !== null}
+        title={grupoCambiandoAula ? `Cambiar aula de ${grupoCambiandoAula.nomenclatura}` : 'Cambiar aula'}
+        onClose={() => setGrupoCambiandoAula(null)}
+        onSubmit={handleGuardarCambioAula}
+        submitLabel="Guardar"
+        isSubmitting={cambiarAula.isPending}
+        submitDisabled={bloqueadoPorAforoCambio}
+      >
+        {cambiarAula.isError && <Alert tone="error">{errorMessage(cambiarAula.error)}</Alert>}
+
+        <Select
+          id="grupo-nueva-aula"
+          label="Aula / Salón asignado"
+          value={nuevaAulaId}
+          onChange={(e) => setNuevaAulaId(e.target.value)}
+          hint={
+            espaciosCambioAulaQuery.isLoading
+              ? 'Cargando aulas...'
+              : aulasParaCambio.length === 0
+                ? 'Esta sede no tiene aulas disponibles registradas.'
+                : 'Solo aulas regulares disponibles de la sede; su aforo limita el cupo del grupo.'
+          }
+        >
+          <option value="">Sin aula asignada</option>
+          {aulasParaCambio.map((a) => {
+            const ocupante = grupoCambiandoAula ? ocupanteDe(a, jornadaIdDelGrupo, grupoCambiandoAula._id) : undefined;
+            return (
+              <option key={a._id} value={a._id} disabled={Boolean(ocupante)}>
+                {a.nombre} · aforo {a.capacidad}
+                {a.piso_bloque ? ` · ${a.piso_bloque}` : ''}
+                {ocupante ? ` — ocupada por ${ocupante.nomenclatura}` : ''}
+              </option>
+            );
+          })}
+        </Select>
+
+        {nuevaAulaElegida && excedeAforoCambio && grupoCambiandoAula && (
+          <Alert tone={bloqueadoPorAforoCambio ? 'error' : 'warning'}>
+            El cupo máximo ({grupoCambiandoAula.max_capacity}) supera el aforo del aula "{nuevaAulaElegida.nombre}" (
+            {nuevaAulaElegida.capacidad} puestos).{' '}
+            {bloqueadoPorAforoCambio
+              ? 'Elige otra aula o reduce el cupo del grupo para poder guardar.'
+              : 'Puedes guardar igualmente, pero habrá sobrecupo físico y quedará registrado en auditoría.'}
+          </Alert>
         )}
       </Drawer>
     </div>

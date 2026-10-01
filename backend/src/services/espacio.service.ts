@@ -101,6 +101,17 @@ export async function actualizarEspacio(
   if (!espacio) throw new ApiError(404, 'Espacio no encontrado.');
   await exigirAreasExistentes(input.areas_exclusivas);
 
+  // validarAulaParaGrupo solo exige AULA_REGULAR al crear/reactivar el grupo: si el espacio deja
+  // de serlo mientras sigue siendo el salon titular de alguno, esa regla M01<->M10 quedaria rota
+  // en silencio. Igual que eliminarEspacio, se revisa cualquier grupo que lo referencie (no solo
+  // los ACTIVOS): reasigna esos grupos a otra aula antes de cambiar el tipo de este espacio.
+  if (input.tipo_espacio !== 'AULA_REGULAR' && (await Group.countDocuments({ aula_id: espacio._id })) > 0) {
+    throw new ApiError(
+      409,
+      'El espacio es el salón titular de uno o más grupos: solo un aula regular puede serlo. Reasigna esos grupos a otra aula antes de cambiar el tipo.'
+    );
+  }
+
   espacio.set(datosEditables(input));
   try {
     await espacio.save();

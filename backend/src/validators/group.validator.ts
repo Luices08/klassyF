@@ -36,3 +36,12 @@ export const actualizarEstado: ValidationSchema = {
       .required(),
   }),
 };
+
+export const cambiarAula: ValidationSchema = {
+  params: Joi.object({
+    groupId: objectId.required(),
+  }),
+  body: Joi.object({
+    aula_id: objectId.allow(null).required(),
+  }),
+};

@@ -1,4 +1,5 @@
 import { ParamsDictionary } from 'express-serve-static-core';
+import { Types } from 'mongoose';
 import { EstadoGrupo } from '../constants/enums';
 import Group from '../models/group.model';
 import { asegurarAnioNoCerrado } from '../services/academicYear.service';
@@ -114,3 +115,59 @@ export const actualizarEstadoGrupo = catchAsync<ActualizarEstadoParams, unknown,
     res.status(200).json({ success: true, data: group });
   }
 );
+
+interface CambiarAulaParams extends ParamsDictionary {
+  groupId: string;
+}
+
+interface CambiarAulaBody {
+  /** null = quitar el salón titular del grupo (vuelve a operar sin aula). */
+  aula_id: string | null;
+}
+
+// Reasigna el salon titular de un grupo ya creado (M10: reparaciones locativas,
+// reorganizacion de aforos). Las mismas reglas de validarAulaParaGrupo que al crear el grupo.
+export const cambiarAulaGrupo = catchAsync<CambiarAulaParams, unknown, CambiarAulaBody>(async (req, res) => {
+  const group = await Group.findById(req.params.groupId);
+  if (!group) throw new ApiError(404, 'Grupo no encontrado.');
+  await asegurarAnioNoCerrado(String(group.academic_year_id));
+
+  let advertencia: string | null = null;
+  if (req.body.aula_id) {
+    await exigirEspaciosFisicos();
+    advertencia = (
+      await validarAulaParaGrupo({
+        aula_id: req.body.aula_id,
+        sede_id: group.sede_id,
+        jornada_id: group.jornada_id,
+        academic_year_id: group.academic_year_id,
+        max_capacity: group.max_capacity,
+        excluir_group_id: group._id,
+      })
+    ).advertencia;
+  }
+
+  group.aula_id = req.body.aula_id as unknown as Types.ObjectId | null;
+  await group.save();
+
+  await registrarEvento({
+    usuario_id: req.user?._id,
+    accion: 'GRUPO_AULA_ACTUALIZADA',
+    entidad: 'Group',
+    entidad_id: group._id,
+    detalle: req.body.aula_id ? `Nuevo salón titular: ${req.body.aula_id}` : 'Salón titular removido',
+    ip: req.ip,
+  });
+  if (advertencia) {
+    await registrarEvento({
+      usuario_id: req.user?._id,
+      accion: 'GRUPO_EXCEDE_AFORO_AULA',
+      entidad: 'Group',
+      entidad_id: group._id,
+      detalle: advertencia,
+      ip: req.ip,
+    });
+  }
+
+  res.status(200).json({ success: true, data: group, advertencia });
+});

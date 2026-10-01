@@ -7,6 +7,7 @@ import {
   ContextoUsuario,
   CrearAnioInput,
   DatosAnioInput,
+  EscalaEvaluacionInput,
   EventoInput,
   PeriodoSedeInput,
 } from '../services/academicYear.service';
@@ -113,5 +114,30 @@ export const guardarCalendarioSede = catchAsync<SedeParams, unknown, { periodos:
 
 export const quitarCalendarioSede = catchAsync<SedeParams>(async (req, res) => {
   const anio = await anioService.quitarCalendarioSede(req.params.id, req.params.sedeId, contexto(req));
+  res.status(200).json({ success: true, data: anio });
+});
+
+interface SugerenciaEscalaQuery {
+  nota_minima?: string;
+  nota_maxima?: string;
+  nota_aprobatoria?: string;
+  precision_decimales?: string;
+}
+
+export const sugerirEscalaEvaluacion = catchAsync<AnioParams, unknown, unknown, SugerenciaEscalaQuery>(
+  async (req, res) => {
+    const rangos = await anioService.sugerirEscalaEvaluacion(req.params.id, {
+      nota_minima: Number(req.query.nota_minima),
+      nota_maxima: Number(req.query.nota_maxima),
+      nota_aprobatoria: Number(req.query.nota_aprobatoria),
+      precision_decimales:
+        req.query.precision_decimales !== undefined ? Number(req.query.precision_decimales) : undefined,
+    });
+    res.status(200).json({ success: true, data: { rangos } });
+  }
+);
+
+export const actualizarEscalaEvaluacion = catchAsync<AnioParams, unknown, EscalaEvaluacionInput>(async (req, res) => {
+  const anio = await anioService.actualizarEscalaEvaluacion(req.params.id, req.body, contexto(req));
   res.status(200).json({ success: true, data: anio });
 });

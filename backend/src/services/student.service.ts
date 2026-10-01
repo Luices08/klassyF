@@ -1,5 +1,5 @@
 import { PipelineStage, Types } from 'mongoose';
-import { EstadoEstudiante, GENEROS, GRUPOS_ETNICOS, GRUPOS_SANGUINEOS, PARENTESCOS, REGIMENES_SALUD, TIPOS_DOCUMENTO } from '../constants/enums';
+import { EstadoEstudiante, GENEROS, GRUPOS_ETNICOS, GRUPOS_SANGUINEOS, PARENTESCOS, REGIMENES_SALUD, Rol, TIPOS_DOCUMENTO } from '../constants/enums';
 import { ROLES } from '../constants/roles';
 import Enrollment from '../models/enrollment.model';
 import Guardian from '../models/guardian.model';
@@ -8,6 +8,7 @@ import StudentProfile from '../models/studentProfile.model';
 import User from '../models/user.model';
 import ApiError from '../utils/ApiError';
 import { leerCsv } from '../utils/csv';
+import { ocultarSaludAdministrativa } from '../utils/datosSensibles';
 import { generarPasswordTemporal } from '../utils/generarPasswordTemporal';
 
 export interface ListarEstudiantesFilter {
@@ -23,7 +24,7 @@ function escapeRegex(texto: string): string {
   return texto.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
-export async function listarEstudiantes(filter: ListarEstudiantesFilter) {
+export async function listarEstudiantes(filter: ListarEstudiantesFilter, rolSolicitante: Rol) {
   const page = Math.max(1, filter.page ?? 1);
   const limit = Math.min(100, Math.max(1, filter.limit ?? 20));
 
@@ -46,7 +47,11 @@ export async function listarEstudiantes(filter: ListarEstudiantesFilter) {
 
   const matchPerfil: Record<string, unknown> = {};
   if (filter.estado) matchPerfil['perfil.estado'] = filter.estado;
-  if (filter.eps) matchPerfil['perfil.eps'] = new RegExp(escapeRegex(filter.eps), 'i');
+  // Filtrar/buscar por EPS es tratar el dato sensible, no solo mostrarlo: se
+  // reserva a personal administrativo (Ley 1581, minimizacion de datos).
+  if (filter.eps && rolSolicitante !== ROLES.DOCENTE) {
+    matchPerfil['perfil.eps'] = new RegExp(escapeRegex(filter.eps), 'i');
+  }
   if (filter.discapacidad !== undefined) matchPerfil['perfil.tiene_discapacidad'] = filter.discapacidad;
   if (Object.keys(matchPerfil).length > 0) pipeline.push({ $match: matchPerfil });
 
@@ -72,18 +77,18 @@ export async function listarEstudiantes(filter: ListarEstudiantesFilter) {
   const principalPorEstudiante = new Map(principales.map((p) => [String(p.student_id), p.guardian_id]));
 
   const items = data.map((d) => ({
-    ...d,
+    ...(d.perfil ? { ...d, perfil: ocultarSaludAdministrativa(d.perfil as Record<string, unknown>, rolSolicitante) } : d),
     acudiente_principal: principalPorEstudiante.get(String(d._id)) ?? null,
   }));
 
   return { data: items, total, page, pages: Math.max(1, Math.ceil(total / limit)) };
 }
 
-export async function obtenerFicha360(studentId: string) {
+export async function obtenerFicha360(studentId: string, rolSolicitante: Rol) {
   const estudiante = await User.findOne({ _id: studentId, rol: ROLES.ESTUDIANTE });
   if (!estudiante) throw new ApiError(404, 'El usuario no existe o no tiene rol ESTUDIANTE.');
 
-  const [perfil, acudientes, matriculas] = await Promise.all([
+  const [perfilDoc, acudientes, matriculas] = await Promise.all([
     StudentProfile.findOne({ user_id: studentId }),
     StudentGuardian.find({ student_id: studentId }).populate('guardian_id').sort({ es_principal: -1 }),
     Enrollment.find({ student_id: studentId })
@@ -91,6 +96,8 @@ export async function obtenerFicha360(studentId: string) {
       .populate('academic_year_id', 'year calendario')
       .sort({ fecha_matricula: -1 }),
   ]);
+
+  const perfil = perfilDoc ? ocultarSaludAdministrativa(perfilDoc.toObject(), rolSolicitante) : null;
 
   return { estudiante, perfil, acudientes, matriculas };
 }
@@ -153,13 +160,17 @@ const COLUMNAS_ACUDIENTE = [
 /**
  * Carga masiva (M03): CSV con encabezado
  * tipo_documento,numero_documento,nombre,apellido,email,fecha_nacimiento,genero,rh,eps,
- * regimen_salud,estrato,direccion_residencia,barrio_vereda,municipio,grupo_etnico,
- * victima_conflicto,tiene_discapacidad,tiene_talento_excepcional,institucion_procedencia,
- * acudiente_tipo_documento,acudiente_numero_documento,acudiente_nombre,acudiente_apellido,
- * acudiente_telefono,acudiente_parentesco
+ * regimen_salud,autorizacion_datos_sensibles,estrato,direccion_residencia,barrio_vereda,
+ * municipio,grupo_etnico,victima_conflicto,tiene_discapacidad,tiene_talento_excepcional,
+ * institucion_procedencia,acudiente_tipo_documento,acudiente_numero_documento,
+ * acudiente_nombre,acudiente_apellido,acudiente_telefono,acudiente_parentesco
  * Separador coma o punto y coma (se detecta). Toda la fila se valida ANTES de crear el usuario.
+ * `autorizacion_datos_sensibles` (si/no) es obligatoria si la fila trae rh, eps o regimen_salud
+ * (Ley 1581 de 2012, art. 6) — quien autoriza queda registrado como el acudiente de la misma
+ * fila, si se diligencio. `alergias_condiciones` no es columna de este CSV todavia (solo se
+ * edita desde la ficha individual del estudiante).
  */
-export async function importarEstudiantesCsv(buffer: Buffer) {
+export async function importarEstudiantesCsv(buffer: Buffer, registradoPorId: Types.ObjectId | string) {
   const { registros } = leerCsv(buffer, COLUMNAS_OBLIGATORIAS_ESTUDIANTES);
   if (registros.length === 0) throw new ApiError(400, 'El archivo no tiene filas de datos.');
 
@@ -185,6 +196,18 @@ export async function importarEstudiantesCsv(buffer: Buffer) {
       const rh = valorDeLista('rh', r.rh, GRUPOS_SANGUINEOS);
       const regimenSalud = valorDeLista('regimen_salud', r.regimen_salud, REGIMENES_SALUD);
       const grupoEtnico = valorDeLista('grupo_etnico', r.grupo_etnico, GRUPOS_ETNICOS);
+
+      // Ley 1581 de 2012, art. 6: traer datos de salud en la fila exige la
+      // autorizacion explicita del acudiente, igual que en el formulario individual.
+      const hayDatoSalud = Boolean(rh || regimenSalud || r.eps);
+      const autorizacionDatosSensibles = r.autorizacion_datos_sensibles ? esVerdadero(r.autorizacion_datos_sensibles) : false;
+      if (hayDatoSalud && !autorizacionDatosSensibles) {
+        throw new ApiError(
+          400,
+          'Esta fila trae datos de salud (rh, eps o regimen_salud) pero no marca "autorizacion_datos_sensibles" ' +
+            'en si: se requiere la autorizacion explicita del acudiente (Ley 1581 de 2012, art. 6).'
+        );
+      }
 
       let estrato: number | undefined;
       if (r.estrato) {
@@ -236,6 +259,14 @@ export async function importarEstudiantesCsv(buffer: Buffer) {
         tiene_discapacidad: r.tiene_discapacidad ? esVerdadero(r.tiene_discapacidad) : undefined,
         tiene_talento_excepcional: r.tiene_talento_excepcional ? esVerdadero(r.tiene_talento_excepcional) : undefined,
         institucion_procedencia: r.institucion_procedencia || undefined,
+        autorizacion_datos_sensibles: hayDatoSalud
+          ? {
+              otorgada: true,
+              otorgado_por_nombre: parentesco ? `${r.acudiente_nombre} ${r.acudiente_apellido}` : null,
+              fecha: new Date(),
+              registrado_por_id: registradoPorId,
+            }
+          : undefined,
       });
 
       if (parentesco) {

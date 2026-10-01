@@ -15,7 +15,7 @@ interface ListarQuery {
 }
 
 export const listarEstudiantes = catchAsync<unknown, unknown, unknown, ListarQuery>(async (req, res) => {
-  const resultado = await studentService.listarEstudiantes(req.query);
+  const resultado = await studentService.listarEstudiantes(req.query, req.user!.rol);
   res.status(200).json({ success: true, ...resultado });
 });
 
@@ -24,7 +24,7 @@ interface StudentParams extends ParamsDictionary {
 }
 
 export const obtenerFicha360 = catchAsync<StudentParams>(async (req, res) => {
-  const ficha = await studentService.obtenerFicha360(req.params.id);
+  const ficha = await studentService.obtenerFicha360(req.params.id, req.user!.rol);
   res.status(200).json({ success: true, data: ficha });
 });
 
@@ -32,7 +32,7 @@ export const bulkImportStudents = catchAsync(async (req, res) => {
   const file = req.file;
   if (!file) throw new ApiError(400, 'Debes adjuntar un archivo CSV en el campo "file".');
 
-  const resultado = await studentService.importarEstudiantesCsv(file.buffer);
+  const resultado = await studentService.importarEstudiantesCsv(file.buffer, req.user!._id);
 
   await registrarEvento({
     usuario_id: req.user?._id,

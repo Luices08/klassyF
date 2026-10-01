@@ -40,4 +40,13 @@ router.delete('/:id/eventos/:eventoId', ...soloAdmin, validate(v.eliminarEvento)
 router.put('/:id/sedes/:sedeId/calendario', ...soloAdmin, validate(v.guardarCalendarioSede), ctrl.guardarCalendarioSede);
 router.delete('/:id/sedes/:sedeId/calendario', ...soloAdmin, validate(v.quitarCalendarioSede), ctrl.quitarCalendarioSede);
 
+// CU-ADM-04: escala de evaluación institucional (SIEE, Decreto 1290) — solo ADMIN.
+router.get(
+  '/:id/escala-evaluacion/sugerencia',
+  ...soloAdmin,
+  validate(v.sugerirEscalaEvaluacion),
+  ctrl.sugerirEscalaEvaluacion
+);
+router.patch('/:id/escala-evaluacion', ...soloAdmin, validate(v.actualizarEscalaEvaluacion), ctrl.actualizarEscalaEvaluacion);
+
 export default router;

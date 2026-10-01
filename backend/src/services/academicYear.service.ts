@@ -1,7 +1,7 @@
 import { Types } from 'mongoose';
 import { TRANSICIONES_PERIODO } from '../constants/anioLectivo';
-import { Calendario, EstadoPeriodoAcademico, Rol, TipoEventoCalendario } from '../constants/enums';
-import AcademicYear, { AcademicYearDocument, IPeriodo } from '../models/academicYear.model';
+import { Calendario, EstadoPeriodoAcademico, NivelDesempeno, Rol, TipoEventoCalendario } from '../constants/enums';
+import AcademicYear, { AcademicYearDocument, IPeriodo, IRangoCualitativo } from '../models/academicYear.model';
 import Campus from '../models/campus.model';
 import Group from '../models/group.model';
 import Institution, { InstitutionDocument } from '../models/institution.model';
@@ -9,6 +9,7 @@ import PeriodoProrroga from '../models/periodoProrroga.model';
 import User from '../models/user.model';
 import ApiError from '../utils/ApiError';
 import { calcularResumenSemanas, finDelDia } from '../utils/calendarioAcademico';
+import { sugerirRangos, SugerenciaRangosInput } from '../utils/escalaEvaluacion';
 import { runTransaction } from '../utils/runTransaction';
 import { registrarEvento } from './audit.service';
 
@@ -58,6 +59,22 @@ export interface PeriodoSedeInput {
 export interface ContextoUsuario {
   usuarioId: Types.ObjectId | string;
   ip?: string | null;
+}
+
+export interface RangoCualitativoInput {
+  nivel: NivelDesempeno;
+  etiqueta: string;
+  valor_minimo: number;
+  valor_maximo: number;
+  es_aprobatorio: boolean;
+}
+
+export interface EscalaEvaluacionInput {
+  nota_minima: number;
+  nota_maxima: number;
+  nota_aprobatoria: number;
+  precision_decimales?: number;
+  rangos: RangoCualitativoInput[];
 }
 
 const aFecha = (valor: FechaEntrada | null | undefined): Date | null => (valor ? new Date(valor) : null);
@@ -571,5 +588,39 @@ export async function quitarCalendarioSede(id: string, sedeId: string, ctx: Cont
   await anio.save();
 
   await registrarCambioCalendario(anio, `una sede volvió a heredar el calendario institucional.`, ctx);
+  return aDto(anio);
+}
+
+/** Rangos sugeridos (CU-ADM-04) a partir de los 3 valores base: no guarda nada, el ADMIN los revisa antes. */
+export async function sugerirEscalaEvaluacion(id: string, input: SugerenciaRangosInput): Promise<IRangoCualitativo[]> {
+  await cargarAnio(id);
+  return sugerirRangos(input);
+}
+
+export async function actualizarEscalaEvaluacion(
+  id: string,
+  input: EscalaEvaluacionInput,
+  { usuarioId, ip }: ContextoUsuario
+): Promise<AnioLectivoDto> {
+  const anio = await cargarAnioEditable(id);
+
+  anio.escala_evaluacion = {
+    nota_minima: input.nota_minima,
+    nota_maxima: input.nota_maxima,
+    nota_aprobatoria: input.nota_aprobatoria,
+    precision_decimales: input.precision_decimales ?? 1,
+    rangos: input.rangos,
+  };
+  await anio.save();
+
+  await registrarEvento({
+    usuario_id: usuarioId,
+    accion: 'ESCALA_EVALUACION_ACTUALIZADA',
+    entidad: 'AcademicYear',
+    entidad_id: anio._id,
+    detalle: `Año ${anio.year}: escala de evaluación ${input.nota_minima}–${input.nota_maxima}, aprobatoria ${input.nota_aprobatoria}.`,
+    ip,
+  });
+
   return aDto(anio);
 }

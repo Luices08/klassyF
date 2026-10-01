@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../lib/apiClient';
 import type {
+  AutorizacionDatosSensibles,
   EstadoEstudiante,
   Genero,
   GrupoEtnico,
@@ -87,6 +88,7 @@ export interface UpsertStudentProfileInput {
   tiene_talento_excepcional?: boolean;
   descripcion_inclusion?: string;
   institucion_procedencia?: string;
+  autorizacion_datos_sensibles?: Pick<AutorizacionDatosSensibles, 'otorgada' | 'otorgado_por_nombre'>;
 }
 
 export function useUpsertStudentProfile() {

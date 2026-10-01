@@ -1,4 +1,5 @@
 import { ParamsDictionary } from 'express-serve-static-core';
+import { Types } from 'mongoose';
 import {
   EstadoEstudiante,
   Genero,
@@ -11,9 +12,15 @@ import User from '../models/user.model';
 import StudentProfile from '../models/studentProfile.model';
 import ApiError from '../utils/ApiError';
 import catchAsync from '../utils/catchAsync';
+import { ocultarSaludAdministrativa } from '../utils/datosSensibles';
 
 interface UserIdParams extends ParamsDictionary {
   userId: string;
+}
+
+interface AutorizacionDatosSensiblesBody {
+  otorgada: boolean;
+  otorgado_por_nombre?: string | null;
 }
 
 interface UpsertProfileBody {
@@ -34,6 +41,7 @@ interface UpsertProfileBody {
   tiene_talento_excepcional?: boolean;
   descripcion_inclusion?: string;
   institucion_procedencia?: string;
+  autorizacion_datos_sensibles?: AutorizacionDatosSensiblesBody;
 }
 
 async function obtenerEstudiante(userId: string) {
@@ -45,11 +53,29 @@ async function obtenerEstudiante(userId: string) {
 export const upsertProfile = catchAsync<UserIdParams, unknown, UpsertProfileBody>(async (req, res) => {
   await obtenerEstudiante(req.params.userId);
 
-  const profile = await StudentProfile.findOneAndUpdate(
-    { user_id: req.params.userId },
-    { $set: { ...req.body, user_id: req.params.userId } },
-    { new: true, upsert: true, runValidators: true, setDefaultsOnInsert: true }
-  );
+  const { autorizacion_datos_sensibles, ...resto } = req.body;
+
+  let profile = await StudentProfile.findOne({ user_id: req.params.userId });
+  if (!profile) profile = new StudentProfile({ user_id: req.params.userId });
+
+  profile.set(resto);
+
+  // fecha y registrado_por_id son trazabilidad del sistema: nunca se toman del
+  // cliente, para que la autorizacion quede firmada por quien la registra de
+  // verdad (req.user), no por cualquiera que arme el payload.
+  if (autorizacion_datos_sensibles) {
+    const otorgada = Boolean(autorizacion_datos_sensibles.otorgada);
+    profile.autorizacion_datos_sensibles = {
+      otorgada,
+      otorgado_por_nombre: autorizacion_datos_sensibles.otorgado_por_nombre || null,
+      fecha: otorgada ? new Date() : (profile.autorizacion_datos_sensibles?.fecha ?? null),
+      registrado_por_id: otorgada
+        ? (req.user!._id as Types.ObjectId)
+        : (profile.autorizacion_datos_sensibles?.registrado_por_id ?? null),
+    };
+  }
+
+  await profile.save();
 
   res.status(200).json({ success: true, data: profile });
 });
@@ -61,7 +87,8 @@ export const getProfile = catchAsync<UserIdParams>(async (req, res) => {
     throw new ApiError(404, 'El estudiante aun no tiene hoja de vida registrada.');
   }
 
-  res.status(200).json({ success: true, data: profile });
+  const data = ocultarSaludAdministrativa(profile.toObject(), req.user!.rol);
+  res.status(200).json({ success: true, data });
 });
 
 interface ActualizarEstadoBody {

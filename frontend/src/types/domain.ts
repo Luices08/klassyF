@@ -212,6 +212,27 @@ export interface ResumenSemanas {
   semanas_por_periodo: Array<{ numero: number; semanas: number }>;
 }
 
+// M32/CU-ADM-04: niveles cualitativos nacionales de desempeño (Decreto 1290, art. 5). Los 4 son
+// obligatorios por ley; la institución ajusta etiqueta y cortes numéricos, no la lista de niveles.
+export const NIVELES_DESEMPENO = ['BAJO', 'BASICO', 'ALTO', 'SUPERIOR'] as const;
+export type NivelDesempeno = (typeof NIVELES_DESEMPENO)[number];
+
+export interface RangoCualitativo {
+  nivel: NivelDesempeno;
+  etiqueta: string;
+  valor_minimo: number;
+  valor_maximo: number;
+  es_aprobatorio: boolean;
+}
+
+export interface EscalaEvaluacion {
+  nota_minima: number;
+  nota_maxima: number;
+  nota_aprobatoria: number;
+  precision_decimales: number;
+  rangos: RangoCualitativo[];
+}
+
 export interface AcademicYear {
   _id: string;
   institucion_id: string;
@@ -224,6 +245,8 @@ export interface AcademicYear {
   periodos: Periodo[];
   eventos: EventoCalendario[];
   calendarios_sede: CalendarioSede[];
+  /** SIEE (CU-ADM-04): null hasta que el ADMIN la configure. */
+  escala_evaluacion: EscalaEvaluacion | null;
   cerrado_at: string | null;
   resumen_semanas: ResumenSemanas;
 }
@@ -488,12 +511,21 @@ export const PARENTESCOS = [
 ] as const;
 export type Parentesco = (typeof PARENTESCOS)[number];
 
+/** Ley 1581 de 2012, art. 6: autorizacion explicita para tratar datos sensibles de salud. */
+export interface AutorizacionDatosSensibles {
+  otorgada: boolean;
+  otorgado_por_nombre?: string | null;
+  fecha?: string | null;
+  registrado_por_id?: string | null;
+}
+
 export interface StudentProfile {
   _id: string;
   user_id: string;
   lugar_expedicion?: string | null;
   fecha_nacimiento: string;
   genero?: Genero;
+  // eps/regimen_salud/rh: puede llegar undefined (un DOCENTE no las ve, ver backend ocultarSaludAdministrativa).
   eps?: string | null;
   regimen_salud?: RegimenSalud;
   rh?: GrupoSanguineo;
@@ -509,6 +541,7 @@ export interface StudentProfile {
   descripcion_inclusion?: string | null;
   institucion_procedencia?: string | null;
   estado: EstadoEstudiante;
+  autorizacion_datos_sensibles?: AutorizacionDatosSensibles;
 }
 
 export interface Guardian {

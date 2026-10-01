@@ -31,6 +31,10 @@ export const upsertProfile: ValidationSchema = {
     tiene_talento_excepcional: Joi.boolean(),
     descripcion_inclusion: Joi.string().allow('', null),
     institucion_procedencia: Joi.string().allow('', null),
+    autorizacion_datos_sensibles: Joi.object({
+      otorgada: Joi.boolean().required(),
+      otorgado_por_nombre: Joi.string().allow('', null),
+    }),
   }),
 };
 

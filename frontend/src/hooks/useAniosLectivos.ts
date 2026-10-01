@@ -6,6 +6,7 @@ import type {
   EstadoPeriodoAcademico,
   PeriodoSede,
   Prorroga,
+  RangoCualitativo,
   TipoEventoCalendario,
   VerificacionCierre,
 } from '../types/domain';
@@ -218,6 +219,43 @@ export function useRevocarProrroga() {
   return useMutation({
     mutationFn: ({ anioId, prorrogaId }: { anioId: string; prorrogaId: string }) =>
       api.patch<Prorroga>(`/academic-years/${anioId}/prorrogas/${prorrogaId}/revocar`),
+    onSuccess: invalidar,
+  });
+}
+
+export interface SugerenciaEscalaInput {
+  anioId: string;
+  nota_minima: number;
+  nota_maxima: number;
+  nota_aprobatoria: number;
+  precision_decimales?: number;
+}
+
+/** Rangos sugeridos (CU-ADM-04) a partir de los 3 valores base: no guarda nada, el ADMIN los revisa antes. */
+export function useSugerirEscalaEvaluacion() {
+  return useMutation({
+    mutationFn: ({ anioId, ...query }: SugerenciaEscalaInput) =>
+      api.get<{ rangos: RangoCualitativo[] }>(`/academic-years/${anioId}/escala-evaluacion/sugerencia`, {
+        ...query,
+        precision_decimales: query.precision_decimales ?? undefined,
+      }),
+  });
+}
+
+export interface ActualizarEscalaEvaluacionInput {
+  anioId: string;
+  nota_minima: number;
+  nota_maxima: number;
+  nota_aprobatoria: number;
+  precision_decimales: number;
+  rangos: RangoCualitativo[];
+}
+
+export function useActualizarEscalaEvaluacion() {
+  const invalidar = useInvalidarAnios();
+  return useMutation({
+    mutationFn: ({ anioId, ...input }: ActualizarEscalaEvaluacionInput) =>
+      api.patch<AcademicYear>(`/academic-years/${anioId}/escala-evaluacion`, input),
     onSuccess: invalidar,
   });
 }

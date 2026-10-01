@@ -49,7 +49,7 @@ router.patch(
 // 5. Revisar y emitir concepto (Aprobar o Devolver con observaciones)
 router.patch(
   '/:id/review',
-  checkRole(ROLES.COORDINADOR),
+  checkRole(ROLES.ADMIN, ROLES.COORDINADOR),
   validate(curricularDevelopmentValidator.review),
   review
 );

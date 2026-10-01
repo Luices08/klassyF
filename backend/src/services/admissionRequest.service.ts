@@ -1,4 +1,4 @@
-import { Types } from 'mongoose';
+import { ClientSession, Types } from 'mongoose';
 import { Jornada, TipoDocumento } from '../constants/enums';
 import { DIAS_PLAZO_LEGALIZACION, DOCUMENTOS_REQUERIDOS_POR_NIVEL } from '../constants/matriculaChecklist';
 import { ROLES } from '../constants/roles';
@@ -15,7 +15,9 @@ import { generarPasswordTemporal } from '../utils/generarPasswordTemporal';
 import { runTransaction } from '../utils/runTransaction';
 import { buscarMatriculaDePreinscripcion, construirDetalle, PreinscripcionDetalle } from './preinscripcionPublica.service';
 
-const SOLICITUDES_ABIERTAS = ['PENDIENTE', 'EN_REVISION'] as const;
+// Incluye APROBADA para que un aspirante ya admitido no pueda radicar una segunda solicitud
+// paralela (terminaria chocando con el numero_documento unico del User al aprobarla de nuevo).
+const SOLICITUDES_QUE_BLOQUEAN_NUEVA = ['PENDIENTE', 'EN_REVISION', 'APROBADA'] as const;
 
 export interface CrearSolicitudInput {
   nombre_aspirante: string;
@@ -40,10 +42,15 @@ export async function crearSolicitud(input: CrearSolicitudInput): Promise<Admiss
 
   const yaTieneAbierta = await AdmissionRequest.findOne({
     numero_documento: input.numero_documento,
-    estado: { $in: SOLICITUDES_ABIERTAS },
+    estado: { $in: SOLICITUDES_QUE_BLOQUEAN_NUEVA },
   });
   if (yaTieneAbierta) {
-    throw new ApiError(409, 'Ya existe una solicitud en trámite para este documento.');
+    throw new ApiError(
+      409,
+      yaTieneAbierta.estado === 'APROBADA'
+        ? 'Este documento ya tiene una solicitud aprobada. Consulta el estado de tu preinscripción.'
+        : 'Ya existe una solicitud en trámite para este documento.'
+    );
   }
 
   return AdmissionRequest.create({ ...input, estado: 'PENDIENTE' });
@@ -124,6 +131,20 @@ function plazoLegalizacionPorDefecto(): Date {
   return new Date(new Date(hoyColombia + DIAS_PLAZO_LEGALIZACION * 86_400_000).toISOString().slice(0, 10));
 }
 
+/**
+ * El correo del User de un estudiante nuevo es el de su acudiente (el aspirante normalmente no
+ * tiene uno propio), pero User.email es unico — y es comun que un mismo acudiente tenga mas de
+ * un hijo admitido. Si el correo ya esta en uso, se desambigua con un alias "+numero_documento"
+ * (lo soportan todos los proveedores de correo usuales) que sigue entregando al mismo buzon.
+ */
+async function emailUnicoParaEstudiante(emailAcudiente: string, numeroDocumento: string, session: ClientSession): Promise<string> {
+  const yaExiste = await User.exists({ email: emailAcudiente }).session(session);
+  if (!yaExiste) return emailAcudiente;
+
+  const [local, dominio] = emailAcudiente.split('@');
+  return `${local}+${numeroDocumento}@${dominio}`;
+}
+
 export interface AprobarSolicitudInput {
   group_id: string;
   academic_year_id: string;
@@ -154,12 +175,12 @@ export async function aprobarSolicitud(
     if (!academicYear) throw new ApiError(404, 'Año lectivo no encontrado.');
 
     const updatedGroup = await Group.findOneAndUpdate(
-      { _id: group_id, academic_year_id, $expr: { $lt: ['$cupos_ocupados', '$max_capacity'] } },
+      { _id: group_id, academic_year_id, estado: 'ACTIVE', $expr: { $lt: ['$cupos_ocupados', '$max_capacity'] } },
       { $inc: { cupos_ocupados: 1 } },
       { new: true, session }
     );
     if (!updatedGroup) {
-      throw new ApiError(409, 'Sin cupos disponibles en el grupo seleccionado.');
+      throw new ApiError(409, 'El grupo seleccionado no está activo o no tiene cupos disponibles.');
     }
 
     const grade = await Grade.findById(updatedGroup.grade_id).session(session);
@@ -170,7 +191,11 @@ export async function aprobarSolicitud(
       apellido: solicitud.apellido_aspirante,
       tipo_documento: solicitud.tipo_documento,
       numero_documento: solicitud.numero_documento,
-      email: solicitud.acudiente_email,
+      // El aspirante normalmente no tiene correo propio: se usa el del acudiente. Si ya
+      // esta en uso (otro hijo del mismo acudiente ya admitido — caso comun, no un borde
+      // raro), se desambigua con un alias "+numero_documento" que sigue llegando al mismo
+      // buzon (email.unique en el modelo no distingue "es el mismo acudiente").
+      email: await emailUnicoParaEstudiante(solicitud.acudiente_email, solicitud.numero_documento, session),
       rol: ROLES.ESTUDIANTE,
       debe_cambiar_password: true,
     });

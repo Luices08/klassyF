@@ -6,6 +6,7 @@ import AdmissionRequest from '../models/admissionRequest.model';
 import Enrollment, { EnrollmentDocument } from '../models/enrollment.model';
 import ApiError from '../utils/ApiError';
 import { finDelDia } from '../utils/calendarioAcademico';
+import { detectarFirmaArchivo } from '../utils/firmasArchivo';
 import { carpetaMatricula } from '../utils/uploadPaths';
 import { cargarDocumento } from './enrollment.service';
 
@@ -95,18 +96,6 @@ async function exigirMatricula(numeroDocumento: string, fechaNacimiento: string)
   return encontrada;
 }
 
-// El mimetype lo declara el cliente; al recibir archivos sin sesion se confirma con los primeros bytes.
-const FIRMAS: Array<{ ext: string; mimetype: string; coincide: (b: Buffer) => boolean }> = [
-  { ext: '.pdf', mimetype: 'application/pdf', coincide: (b) => b.subarray(0, 4).toString('latin1') === '%PDF' },
-  { ext: '.jpg', mimetype: 'image/jpeg', coincide: (b) => b[0] === 0xff && b[1] === 0xd8 && b[2] === 0xff },
-  { ext: '.png', mimetype: 'image/png', coincide: (b) => b.subarray(0, 8).toString('hex') === '89504e470d0a1a0a' },
-  {
-    ext: '.webp',
-    mimetype: 'image/webp',
-    coincide: (b) => b.subarray(0, 4).toString('latin1') === 'RIFF' && b.subarray(8, 12).toString('latin1') === 'WEBP',
-  },
-];
-
 export async function subirDocumento(
   numeroDocumento: string,
   fechaNacimiento: string,
@@ -122,7 +111,7 @@ export async function subirDocumento(
   if (!item) throw new ApiError(400, 'Ese documento no aplica para el grado del aspirante.');
   if (item.estado === 'APROBADO') throw new ApiError(409, 'Este documento ya fue aprobado por la secretaría.');
 
-  const firma = FIRMAS.find((f) => f.mimetype === archivo.mimetype && f.coincide(archivo.buffer));
+  const firma = detectarFirmaArchivo(archivo.mimetype, archivo.buffer);
   if (!firma) throw new ApiError(400, 'El archivo no es un PDF, JPG, PNG o WEBP válido.');
 
   const carpeta = carpetaMatricula(String(enrollment._id));

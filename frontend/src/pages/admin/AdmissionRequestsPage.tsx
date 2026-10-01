@@ -46,6 +46,7 @@ export function AdmissionRequestsPage() {
   const groupsQuery = useGroups({
     academic_year_id: anioId,
     grade_id: aprobando ? (typeof aprobando.grado_deseado_id === 'string' ? aprobando.grado_deseado_id : aprobando.grado_deseado_id._id) : undefined,
+    estado: 'ACTIVE',
   });
   const aprobar = useAprobarSolicitud();
 

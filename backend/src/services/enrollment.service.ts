@@ -76,14 +76,15 @@ export async function createEnrollment(
     const grade = await Grade.findById(group.grade_id).session(session);
     if (!grade) throw new ApiError(404, 'Grado no encontrado.');
 
-    // Check-and-reserve atomico: solo actualiza si aun hay cupo disponible,
-    // salvo que un ADMIN autorice explicitamente la excepcion de sobrecupo.
-    const filtroReserva: Record<string, unknown> = { _id: group_id, academic_year_id };
+    // Check-and-reserve atomico: solo actualiza si el grupo sigue activo y aun hay cupo
+    // disponible (salvo que un ADMIN autorice explicitamente la excepcion de sobrecupo — eso
+    // nunca extiende a un grupo CLOSED, que es una decision operativa distinta a el aforo).
+    const filtroReserva: Record<string, unknown> = { _id: group_id, academic_year_id, estado: 'ACTIVE' };
     if (!puedeForzar) filtroReserva.$expr = { $lt: ['$cupos_ocupados', '$max_capacity'] };
 
     const updatedGroup = await Group.findOneAndUpdate(filtroReserva, { $inc: { cupos_ocupados: 1 } }, { new: true, session });
     if (!updatedGroup) {
-      throw new ApiError(409, 'Sin cupos disponibles en el grupo seleccionado.');
+      throw new ApiError(409, 'El grupo seleccionado no está activo o no tiene cupos disponibles.');
     }
 
     const { numero_folio, folio_matricula } = await generateFolioMatricula(academicYear.year, numeroLibro, session);
@@ -250,12 +251,20 @@ export async function cambiarGrupo(
     }
 
     const nuevoGrupo = await Group.findOneAndUpdate(
-      { _id: nuevoGroupId, academic_year_id: enrollment.academic_year_id, $expr: { $lt: ['$cupos_ocupados', '$max_capacity'] } },
+      {
+        _id: nuevoGroupId,
+        academic_year_id: enrollment.academic_year_id,
+        estado: 'ACTIVE',
+        $expr: { $lt: ['$cupos_ocupados', '$max_capacity'] },
+      },
       { $inc: { cupos_ocupados: 1 } },
       { new: true, session }
     );
     if (!nuevoGrupo) {
-      throw new ApiError(409, 'Sin cupos disponibles en el grupo destino (o no pertenece al mismo año lectivo).');
+      throw new ApiError(
+        409,
+        'El grupo destino no está activo, no tiene cupos disponibles o no pertenece al mismo año lectivo.'
+      );
     }
 
     const grupoAnteriorId = enrollment.group_id;

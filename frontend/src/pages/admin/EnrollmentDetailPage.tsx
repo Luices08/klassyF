@@ -44,7 +44,8 @@ export function EnrollmentDetailPage() {
   const [cambiarGrupoOpen, setCambiarGrupoOpen] = useState(false);
   const [nuevoGrupo, setNuevoGrupo] = useState('');
   const cambiarGrupo = useCambiarGrupoMatricula();
-  const groupsQuery = useGroups({ academic_year_id: enrollmentQuery.data?.academic_year_id });
+  // Solo grupos activos como destino: uno CLOSED ya no admite matriculas (ver group.controller).
+  const groupsQuery = useGroups({ academic_year_id: enrollmentQuery.data?.academic_year_id, estado: 'ACTIVE' });
 
   const cargarDocumento = useCargarDocumentoMatricula();
   const revisarDocumento = useRevisarDocumentoMatricula();

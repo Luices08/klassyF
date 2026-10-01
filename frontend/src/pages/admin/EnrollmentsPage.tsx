@@ -89,7 +89,8 @@ export function EnrollmentsPage() {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [form, setForm] = useState(FORM_VACIO);
   const studentsQuery = useUsers({ rol: 'ESTUDIANTE' });
-  const groupsQuery = useGroups({ academic_year_id: anioId });
+  // Solo grupos activos: uno CLOSED ya no admite nuevas matriculas (ver group.controller).
+  const groupsQuery = useGroups({ academic_year_id: anioId, estado: 'ACTIVE' });
   const createEnrollment = useCreateEnrollment();
 
   async function handleSubmit(e: FormEvent) {

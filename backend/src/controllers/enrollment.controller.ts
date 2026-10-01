@@ -1,4 +1,5 @@
 import { ParamsDictionary } from 'express-serve-static-core';
+import fs from 'fs/promises';
 import path from 'path';
 import { EstadoMatricula, TipoDocumentoMatricula } from '../constants/enums';
 import * as actaCompromisoService from '../services/actaCompromiso.service';
@@ -6,6 +7,8 @@ import * as enrollmentService from '../services/enrollment.service';
 import { CreateEnrollmentInput, FormalizacionOpciones, RevisarDocumentoInput } from '../services/enrollment.service';
 import ApiError from '../utils/ApiError';
 import catchAsync from '../utils/catchAsync';
+import { detectarFirmaArchivo } from '../utils/firmasArchivo';
+import { carpetaMatricula } from '../utils/uploadPaths';
 
 export const createEnrollment = catchAsync<unknown, unknown, CreateEnrollmentInput>(async (req, res) => {
   const enrollment = await enrollmentService.createEnrollment(req.body, { id: req.user!._id, rol: req.user!.rol });
@@ -70,7 +73,18 @@ export const cargarDocumento = catchAsync<ChecklistParams>(async (req, res) => {
   const file = req.file;
   if (!file) throw new ApiError(400, 'Debes adjuntar un archivo en el campo "file".');
 
-  const archivoPath = path.relative(process.cwd(), file.path);
+  // El mimetype del multipart lo declara el cliente: se confirma con los primeros bytes del
+  // archivo (igual que la carga publica de preinscripcion), y la extension guardada sale de esa
+  // firma, nunca del nombre que mando el cliente.
+  const firma = detectarFirmaArchivo(file.mimetype, file.buffer);
+  if (!firma) throw new ApiError(400, 'El archivo no es un PDF, JPG, PNG o WEBP válido.');
+
+  const carpeta = carpetaMatricula(req.params.id);
+  await fs.mkdir(carpeta, { recursive: true });
+  const destino = path.join(carpeta, `${req.params.tipoDocumento}-${Date.now()}${firma.ext}`);
+  await fs.writeFile(destino, file.buffer);
+
+  const archivoPath = path.relative(process.cwd(), destino);
   const enrollment = await enrollmentService.cargarDocumento(req.params.id, req.params.tipoDocumento, archivoPath, {
     id: req.user!._id,
   });

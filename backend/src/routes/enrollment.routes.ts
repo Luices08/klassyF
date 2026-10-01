@@ -1,7 +1,5 @@
-import fs from 'fs';
 import { Router } from 'express';
 import multer, { FileFilterCallback } from 'multer';
-import path from 'path';
 import { Rol } from '../constants/enums';
 import { ROLES } from '../constants/roles';
 import {
@@ -18,28 +16,16 @@ import {
 import { authenticate, checkRole } from '../middlewares/auth.middleware';
 import validate from '../middlewares/validate.middleware';
 import ApiError from '../utils/ApiError';
-import { carpetaMatricula } from '../utils/uploadPaths';
 import * as enrollmentValidator from '../validators/enrollment.validator';
 
 const router = Router();
 
 const STAFF_MATRICULAS: Rol[] = [ROLES.ADMIN, ROLES.COORDINADOR, ROLES.SECRETARIA];
 
-// Documentos de matricula (cedulas, certificados, fotos) en disco, en el
-// mismo VPS del colegio — nunca como data URI en Mongo (pesan demasiado) ni
-// en un servicio externo (son datos personales de menores, ver M03/habeas data).
-const storage = multer.diskStorage({
-  destination: (req, _file, cb) => {
-    const carpeta = carpetaMatricula(req.params.id as string);
-    fs.mkdirSync(carpeta, { recursive: true });
-    cb(null, carpeta);
-  },
-  filename: (req, file, cb) => {
-    const ext = path.extname(file.originalname).toLowerCase();
-    cb(null, `${req.params.tipoDocumento}-${Date.now()}${ext}`);
-  },
-});
-
+// En memoria, no en disco: el mimetype declarado aqui es solo un filtro rapido (barato de
+// falsificar). El controlador valida el contenido real por firma de bytes — igual que la carga
+// publica de preinscripcion (utils/firmasArchivo) — antes de escribirlo en disco (nunca como
+// data URI en Mongo, ni en un servicio externo: son datos personales de menores, M03/habeas data).
 const TIPOS_PERMITIDOS = new Set(['application/pdf', 'image/jpeg', 'image/png', 'image/webp']);
 
 function soloDocumentosYFotos(_req: Express.Request, file: Express.Multer.File, cb: FileFilterCallback) {
@@ -49,7 +35,11 @@ function soloDocumentosYFotos(_req: Express.Request, file: Express.Multer.File, 
   cb(null, true);
 }
 
-const upload = multer({ storage, fileFilter: soloDocumentosYFotos, limits: { fileSize: 5 * 1024 * 1024 } });
+const upload = multer({
+  storage: multer.memoryStorage(),
+  fileFilter: soloDocumentosYFotos,
+  limits: { fileSize: 5 * 1024 * 1024 },
+});
 
 router.use(authenticate);
 

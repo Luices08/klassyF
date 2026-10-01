@@ -6,6 +6,8 @@ import Group from '../models/group.model';
 import PeriodLock, { PeriodLockDocument } from '../models/periodLock.model';
 import ApiError from '../utils/ApiError';
 import { periodosEfectivos, ventanaNotas } from '../utils/calendarioAcademico';
+import { asegurarAnioNoCerrado } from './academicYear.service';
+import { registrarEvento } from './audit.service';
 import { existeProrrogaVigente } from './periodoProrroga.service';
 
 export interface SetPeriodLockInput {
@@ -15,13 +17,26 @@ export interface SetPeriodLockInput {
   estado: EstadoPeriodo;
 }
 
+export interface ContextoActor {
+  usuarioId: Types.ObjectId | string;
+  ip?: string | null;
+}
+
 /**
  * Abre o cierra formalmente un periodo para un grupo especifico. Upsert: si no
  * existia PeriodLock para esa combinacion, se crea; si existia, se actualiza.
  */
-export async function setPeriodLock(input: SetPeriodLockInput): Promise<PeriodLockDocument> {
+export async function setPeriodLock(
+  input: SetPeriodLockInput,
+  { usuarioId, ip }: ContextoActor
+): Promise<PeriodLockDocument> {
   const academicYear = await AcademicYear.findById(input.academic_year_id);
   if (!academicYear) throw new ApiError(404, 'Año lectivo no encontrado.');
+  // Un año CERRADO es historico de solo lectura, igual que en el resto de M05.
+  await asegurarAnioNoCerrado(input.academic_year_id);
+
+  const periodo = academicYear.periodos.find((p) => p.numero === input.periodo_numero);
+  if (!periodo) throw new ApiError(400, `El año lectivo ${academicYear.year} no tiene periodo ${input.periodo_numero}.`);
 
   const group = await Group.findById(input.group_id);
   if (!group) throw new ApiError(404, 'Grupo no encontrado.');
@@ -38,6 +53,15 @@ export async function setPeriodLock(input: SetPeriodLockInput): Promise<PeriodLo
     { $set: { estado: input.estado } },
     { new: true, upsert: true, runValidators: true, setDefaultsOnInsert: true }
   );
+
+  await registrarEvento({
+    usuario_id: usuarioId,
+    accion: 'BLOQUEO_PERIODO_GRUPO_ACTUALIZADO',
+    entidad: 'PeriodLock',
+    entidad_id: lock._id,
+    detalle: `Año ${academicYear.year}, periodo ${input.periodo_numero}, grupo ${group.nomenclatura}: ${input.estado}`,
+    ip,
+  });
 
   return lock;
 }

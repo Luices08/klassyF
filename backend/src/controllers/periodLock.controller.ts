@@ -1,8 +1,10 @@
 import * as periodLockService from '../services/periodLock.service';
 import { SetPeriodLockInput } from '../services/periodLock.service';
+import ApiError from '../utils/ApiError';
 import catchAsync from '../utils/catchAsync';
 
 export const setPeriodLock = catchAsync<unknown, unknown, SetPeriodLockInput>(async (req, res) => {
-  const lock = await periodLockService.setPeriodLock(req.body);
+  if (!req.user) throw new ApiError(401, 'Usuario no autenticado.');
+  const lock = await periodLockService.setPeriodLock(req.body, { usuarioId: req.user._id, ip: req.ip ?? null });
   res.status(200).json({ success: true, data: lock });
 });

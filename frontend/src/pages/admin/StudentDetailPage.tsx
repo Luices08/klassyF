@@ -406,6 +406,16 @@ function NucleoFamiliarTab({
     vincular.reset();
   }
 
+  function handleDesvincular(rel: import('../../types/domain').StudentGuardianRelation) {
+    desvincular.reset();
+    const nombre = `${rel.guardian_id.nombre} ${rel.guardian_id.apellido}`;
+    const mensaje = rel.es_principal
+      ? `${nombre} es el acudiente principal de este estudiante. ¿Desvincularlo de todas formas?`
+      : `¿Desvincular a ${nombre} de este estudiante?`;
+    if (!window.confirm(mensaje)) return;
+    desvincular.mutate({ studentId, relationId: rel._id });
+  }
+
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     vincular.reset();
@@ -430,6 +440,8 @@ function NucleoFamiliarTab({
 
   return (
     <div className="space-y-4">
+      {desvincular.isError && <Alert tone="error">{errorMessage(desvincular.error)}</Alert>}
+
       <div className="flex justify-end">
         <Button onClick={() => setDrawerOpen(true)}>
           <PlusIcon className="h-4 w-4" />
@@ -476,7 +488,7 @@ function NucleoFamiliarTab({
                     tone="danger"
                     label="Desvincular"
                     icon={<TrashIcon />}
-                    onClick={() => desvincular.mutate({ studentId, relationId: rel._id })}
+                    onClick={() => handleDesvincular(rel)}
                   />
                 </div>
               </Td>

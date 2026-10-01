@@ -5,6 +5,12 @@ import StudentGuardian, { StudentGuardianDocument } from '../models/studentGuard
 import User from '../models/user.model';
 import { ROLES } from '../constants/roles';
 import ApiError from '../utils/ApiError';
+import { registrarEvento } from './audit.service';
+
+export interface ContextoActor {
+  usuarioId: Types.ObjectId | string;
+  ip?: string | null;
+}
 
 export interface DatosNuevoAcudiente {
   tipo_documento: TipoDocumento;
@@ -71,7 +77,8 @@ export async function listarAcudientesDeEstudiante(studentId: string): Promise<S
 
 export async function vincularAcudiente(
   studentId: string,
-  input: VincularAcudienteInput
+  input: VincularAcudienteInput,
+  { usuarioId, ip }: ContextoActor
 ): Promise<StudentGuardianDocument> {
   await obtenerEstudiante(studentId);
 
@@ -104,18 +111,30 @@ export async function vincularAcudiente(
 
   if (input.es_principal) await asegurarUnicoPrincipal(studentId);
 
-  return StudentGuardian.create({
+  const relacion = await StudentGuardian.create({
     student_id: studentId,
     guardian_id: guardian._id,
     parentesco: input.parentesco,
     es_principal: Boolean(input.es_principal),
     autorizado_retiro: input.autorizado_retiro ?? true,
   });
+
+  await registrarEvento({
+    usuario_id: usuarioId,
+    accion: 'ACUDIENTE_VINCULADO',
+    entidad: 'StudentGuardian',
+    entidad_id: relacion._id,
+    detalle: `Acudiente ${guardian.nombre} ${guardian.apellido} (${input.parentesco}) vinculado al estudiante ${studentId}${input.es_principal ? ' como principal' : ''}.`,
+    ip,
+  });
+
+  return relacion;
 }
 
 export async function actualizarVinculo(
   relationId: string,
-  patch: { parentesco?: Parentesco; es_principal?: boolean; autorizado_retiro?: boolean }
+  patch: { parentesco?: Parentesco; es_principal?: boolean; autorizado_retiro?: boolean },
+  { usuarioId, ip }: ContextoActor
 ): Promise<StudentGuardianDocument> {
   const relacion = await StudentGuardian.findById(relationId);
   if (!relacion) throw new ApiError(404, 'Vinculo acudiente-estudiante no encontrado.');
@@ -124,30 +143,94 @@ export async function actualizarVinculo(
 
   Object.assign(relacion, patch);
   await relacion.save();
+
+  await registrarEvento({
+    usuario_id: usuarioId,
+    accion: 'ACUDIENTE_VINCULO_ACTUALIZADO',
+    entidad: 'StudentGuardian',
+    entidad_id: relacion._id,
+    detalle: Object.keys(patch).join(', '),
+    ip,
+  });
+
   return relacion;
 }
 
-export async function desvincularAcudiente(relationId: string): Promise<void> {
-  const relacion = await StudentGuardian.findById(relationId);
+/**
+ * Si el vinculo que se desvincula es el principal (responsable legal: firma matricula, recibe
+ * citaciones, habilita el portal M27), exige reasignar la principalidad a otro acudiente antes
+ * — salvo que sea el unico acudiente del estudiante, caso en que se permite (correccion de datos).
+ */
+export async function desvincularAcudiente(relationId: string, { usuarioId, ip }: ContextoActor): Promise<void> {
+  const relacion = await StudentGuardian.findById(relationId).populate('guardian_id', 'nombre apellido');
   if (!relacion) throw new ApiError(404, 'Vinculo acudiente-estudiante no encontrado.');
+
+  if (relacion.es_principal) {
+    const otrosAcudientes = await StudentGuardian.countDocuments({
+      student_id: relacion.student_id,
+      _id: { $ne: relacion._id },
+    });
+    if (otrosAcudientes > 0) {
+      throw new ApiError(
+        409,
+        'Este acudiente es el principal del estudiante: marca a otro acudiente como principal antes de desvincularlo.'
+      );
+    }
+  }
+
   await StudentGuardian.deleteOne({ _id: relacion._id });
+
+  const guardian = relacion.guardian_id as unknown as { nombre: string; apellido: string } | null;
+  await registrarEvento({
+    usuario_id: usuarioId,
+    accion: 'ACUDIENTE_DESVINCULADO',
+    entidad: 'StudentGuardian',
+    entidad_id: relacion._id,
+    detalle: `Acudiente ${guardian?.nombre ?? ''} ${guardian?.apellido ?? ''} desvinculado del estudiante ${relacion.student_id}.`,
+    ip,
+  });
 }
 
 export async function actualizarAcudiente(
   guardianId: string,
-  patch: Partial<DatosNuevoAcudiente>
+  patch: Partial<DatosNuevoAcudiente>,
+  { usuarioId, ip }: ContextoActor
 ): Promise<GuardianDocument> {
   const guardian = await Guardian.findById(guardianId);
   if (!guardian) throw new ApiError(404, 'Acudiente no encontrado.');
   Object.assign(guardian, patch);
   await guardian.save();
+
+  await registrarEvento({
+    usuario_id: usuarioId,
+    accion: 'ACUDIENTE_ACTUALIZADO',
+    entidad: 'Guardian',
+    entidad_id: guardian._id,
+    detalle: Object.keys(patch).join(', '),
+    ip,
+  });
+
   return guardian;
 }
 
-export async function actualizarEstadoAcudiente(guardianId: string, estado: 'activo' | 'inactivo'): Promise<GuardianDocument> {
+export async function actualizarEstadoAcudiente(
+  guardianId: string,
+  estado: 'activo' | 'inactivo',
+  { usuarioId, ip }: ContextoActor
+): Promise<GuardianDocument> {
   const guardian = await Guardian.findById(guardianId);
   if (!guardian) throw new ApiError(404, 'Acudiente no encontrado.');
   guardian.estado = estado;
   await guardian.save();
+
+  await registrarEvento({
+    usuario_id: usuarioId,
+    accion: 'ACUDIENTE_ESTADO_CAMBIADO',
+    entidad: 'Guardian',
+    entidad_id: guardian._id,
+    detalle: `${guardian.nombre} ${guardian.apellido} → ${estado}`,
+    ip,
+  });
+
   return guardian;
 }

@@ -182,6 +182,8 @@ export async function importarEstudiantesCsv(buffer: Buffer, registradoPorId: Ty
     const r = registros[i]!;
     const numeroDocumento = r.numero_documento;
     let estudianteId: Types.ObjectId | null = null;
+    // Solo se limpia en el catch si ESTA fila lo creo (uno reutilizado de otra fila/import no se toca).
+    let guardianCreadoId: Types.ObjectId | null = null;
 
     try {
       if (!r.tipo_documento || !numeroDocumento || !r.nombre || !r.apellido || !r.email || !r.fecha_nacimiento) {
@@ -279,6 +281,7 @@ export async function importarEstudiantesCsv(buffer: Buffer, registradoPorId: Ty
             apellido: r.acudiente_apellido,
             telefono_principal: r.acudiente_telefono,
           });
+          guardianCreadoId = guardian._id;
         }
         await StudentGuardian.create({
           student_id: student._id,
@@ -297,6 +300,11 @@ export async function importarEstudiantesCsv(buffer: Buffer, registradoPorId: Ty
           StudentProfile.deleteOne({ user_id: estudianteId }),
           User.deleteOne({ _id: estudianteId }),
         ]);
+      }
+      // Si esta fila creo un acudiente nuevo y luego fallo (ej. al vincularlo), no se deja
+      // huerfano en el directorio.
+      if (guardianCreadoId) {
+        await Guardian.deleteOne({ _id: guardianCreadoId });
       }
       const motivo =
         err instanceof ApiError

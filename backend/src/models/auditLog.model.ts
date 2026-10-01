@@ -45,6 +45,12 @@ export const ACCIONES_AUDITORIA = [
   // M08: Asignacion docente
   'ASIGNACION_DOCENTE_CREADA',
   'ASIGNACION_DOCENTE_ELIMINADA',
+  // M03: Estudiantes y acudientes
+  'ACUDIENTE_VINCULADO',
+  'ACUDIENTE_VINCULO_ACTUALIZADO',
+  'ACUDIENTE_DESVINCULADO',
+  'ACUDIENTE_ACTUALIZADO',
+  'ACUDIENTE_ESTADO_CAMBIADO',
 ] as const;
 export type AccionAuditoria = (typeof ACCIONES_AUDITORIA)[number];
 

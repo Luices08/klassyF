@@ -1,7 +1,14 @@
+import { Request } from 'express';
 import { ParamsDictionary } from 'express-serve-static-core';
 import { EstadoUsuario, Parentesco, TipoDocumento } from '../constants/enums';
 import * as guardianService from '../services/guardian.service';
+import ApiError from '../utils/ApiError';
 import catchAsync from '../utils/catchAsync';
+
+function contexto(req: Request<any, any, any, any>) {
+  if (!req.user) throw new ApiError(401, 'Usuario no autenticado.');
+  return { usuarioId: req.user._id, ip: req.ip ?? null };
+}
 
 interface ListarQuery {
   search?: string;
@@ -40,7 +47,7 @@ interface VincularBody {
 }
 
 export const vincularAcudiente = catchAsync<UserIdParams, unknown, VincularBody>(async (req, res) => {
-  const relacion = await guardianService.vincularAcudiente(req.params.userId, req.body);
+  const relacion = await guardianService.vincularAcudiente(req.params.userId, req.body, contexto(req));
   res.status(201).json({ success: true, data: relacion });
 });
 
@@ -56,12 +63,12 @@ interface ActualizarVinculoBody {
 }
 
 export const actualizarVinculo = catchAsync<RelationParams, unknown, ActualizarVinculoBody>(async (req, res) => {
-  const relacion = await guardianService.actualizarVinculo(req.params.relationId, req.body);
+  const relacion = await guardianService.actualizarVinculo(req.params.relationId, req.body, contexto(req));
   res.status(200).json({ success: true, data: relacion });
 });
 
 export const desvincularAcudiente = catchAsync<RelationParams>(async (req, res) => {
-  await guardianService.desvincularAcudiente(req.params.relationId);
+  await guardianService.desvincularAcudiente(req.params.relationId, contexto(req));
   res.status(200).json({ success: true, data: null });
 });
 
@@ -80,7 +87,7 @@ interface ActualizarAcudienteBody {
 }
 
 export const actualizarAcudiente = catchAsync<GuardianParams, unknown, ActualizarAcudienteBody>(async (req, res) => {
-  const guardian = await guardianService.actualizarAcudiente(req.params.id, req.body);
+  const guardian = await guardianService.actualizarAcudiente(req.params.id, req.body, contexto(req));
   res.status(200).json({ success: true, data: guardian });
 });
 
@@ -89,6 +96,6 @@ interface ActualizarEstadoBody {
 }
 
 export const actualizarEstadoAcudiente = catchAsync<GuardianParams, unknown, ActualizarEstadoBody>(async (req, res) => {
-  const guardian = await guardianService.actualizarEstadoAcudiente(req.params.id, req.body.estado);
+  const guardian = await guardianService.actualizarEstadoAcudiente(req.params.id, req.body.estado, contexto(req));
   res.status(200).json({ success: true, data: guardian });
 });

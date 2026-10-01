@@ -80,6 +80,9 @@ export async function createTeacherAssignment(
 
       const subject = await Subject.findById(input.subject_id).session(session);
       if (!subject) throw new ApiError(404, 'Asignatura no encontrada.');
+      if (subject.estado !== 'activo') {
+        throw new ApiError(400, `La asignatura "${subject.nombre}" está inactiva en el Catálogo Académico.`);
+      }
 
       let horasAsignadas = input.horas_semanales;
 

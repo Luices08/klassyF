@@ -77,7 +77,7 @@ export function AcademicCatalogPage() {
   async function handleCrearArea(e: FormEvent) {
     e.preventDefault();
     crearArea.reset();
-    await crearArea.mutateAsync({ institucion_id: institucionId, ...formArea });
+    await crearArea.mutateAsync(formArea);
     setFormArea(AREA_VACIA);
     setDrawerAreaOpen(false);
   }

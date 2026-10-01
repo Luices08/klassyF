@@ -5,11 +5,11 @@ import { objectId } from './common.validator';
 
 export const createArea: ValidationSchema = {
   body: Joi.object({
-    institucion_id: objectId.required(),
+    // institucion_id ya no se exige: una sola institucion por instalacion, se
+    // resuelve en el servidor (area.service.ts) y nunca se toma del cliente.
     nombre: Joi.string().required(),
     descripcion: Joi.string().required(),
     codigo: Joi.string().required(),
-    estado: Joi.string().valid(...ESTADOS_AREA),
   }),
 };
 

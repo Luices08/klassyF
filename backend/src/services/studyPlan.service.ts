@@ -15,11 +15,17 @@ import StudyPlan, {
 import Subject, { SubjectDocument } from '../models/subject.model';
 import { MetodoCalculoEvaluacion, NivelEducativo } from '../constants/enums';
 import ApiError from '../utils/ApiError';
+import { registrarEvento } from './audit.service';
 
 // Los subdocumentos tipan sus *_id como Types.ObjectId; los inputs del
 // servicio llegan como string (ya validados como ObjectId por Joi) y Mongoose
 // los castea igual al guardar — este helper solo satisface a TypeScript.
 const oid = (id: string): Types.ObjectId => id as unknown as Types.ObjectId;
+
+export interface ContextoActor {
+  usuarioId: Types.ObjectId | string;
+  ip?: string | null;
+}
 
 // El plan de estudios (Configuracion General, Configuracion de Evaluacion y Distribucion por
 // Grupos) solo se edita con el año en PLANIFICACION: una vez activado queda congelado, porque
@@ -70,6 +76,38 @@ async function validarSubjectsDelNivel(
   return new Map(subjects.map((s) => [String(s._id), s]));
 }
 
+/**
+ * Cuando el metodo de calculo de un area es PONDERADO, la ponderacion debe cubrir TODAS las
+ * asignaturas de esa area que esten en la Configuracion General del grado: una asignatura del area
+ * que quede fuera de la ponderacion recibe `porcentaje ?? 0` en generateReportCard (M12) y su nota
+ * cuenta 0% en silencio. Se valida tanto al guardar la ponderacion (configurarEvaluacionArea) como
+ * al cambiar las asignaturas del grado (configurarAsignaturasGrado/-MultiplesGrados), porque agregar
+ * una asignatura nueva a un area ya ponderada rompe la cobertura sin que nada lo marque.
+ */
+async function validarCoberturaPonderaciones(grado: IGradoPlan): Promise<void> {
+  const ponderadas = grado.evaluaciones_area.filter((e) => e.metodo_calculo === 'PONDERADO');
+  if (ponderadas.length === 0) return;
+
+  const subjectIds = grado.asignaturas.map((a) => String(a.subject_id));
+  const subjects = await Subject.find({ _id: { $in: subjectIds } }).select('area_id nombre');
+  const areaPorSubject = new Map(subjects.map((s) => [String(s._id), String(s.area_id)]));
+  const nombrePorSubject = new Map(subjects.map((s) => [String(s._id), s.nombre]));
+
+  for (const evaluacion of ponderadas) {
+    const subjectsDelAreaEnGrado = subjectIds.filter((id) => areaPorSubject.get(id) === String(evaluacion.area_id));
+    const subjectsPonderados = new Set(evaluacion.asignaturas.map((a) => String(a.subject_id)));
+    const faltante = subjectsDelAreaEnGrado.find((id) => !subjectsPonderados.has(id));
+    if (faltante) {
+      throw new ApiError(
+        409,
+        `La asignatura "${nombrePorSubject.get(faltante) ?? faltante}" quedaría sin porcentaje en la ponderación ` +
+          'ya configurada para su área en este grado. Ajusta la ponderación del área desde Configuración de ' +
+          'Evaluación antes (o después) de este cambio.'
+      );
+    }
+  }
+}
+
 function obtenerOCrearGrado(plan: StudyPlanDocument, grade_id: string): IGradoPlan {
   let grado = plan.grades.find((g) => String(g.grade_id) === grade_id);
   if (!grado) {
@@ -101,7 +139,10 @@ export interface ConfigurarAsignaturasGradoInput {
  * un "append": la solicitud debe incluir TODAS las asignaturas que se quieran
  * dejar configuradas para ese grado.
  */
-export async function configurarAsignaturasGrado(input: ConfigurarAsignaturasGradoInput): Promise<StudyPlanDocument> {
+export async function configurarAsignaturasGrado(
+  input: ConfigurarAsignaturasGradoInput,
+  { usuarioId, ip }: ContextoActor
+): Promise<StudyPlanDocument> {
   const grade = await Grade.findById(input.grade_id);
   if (!grade) throw new ApiError(404, 'Grado no encontrado.');
   if (grade.estado !== 'activo') throw new ApiError(400, 'El grado esta inactivo.');
@@ -122,8 +163,18 @@ export async function configurarAsignaturasGrado(input: ConfigurarAsignaturasGra
       intensidad_horaria_semanal: a.intensidad_horaria_semanal,
     })
   );
+  await validarCoberturaPonderaciones(grado);
 
   await plan.save();
+
+  await registrarEvento({
+    usuario_id: usuarioId,
+    accion: 'PLAN_ASIGNATURAS_GRADO_ACTUALIZADO',
+    entidad: 'StudyPlan',
+    entidad_id: plan._id,
+    detalle: `Grado "${grade.nombre}": ${grado.asignaturas.length} asignatura(s) configurada(s).`,
+    ip,
+  });
   return plan;
 }
 
@@ -142,7 +193,8 @@ export interface ConfigurarAsignaturasMultiplesGradosInput {
  * Configura las asignaturas e intensidades horarias para múltiples grados en una sola operación atómica.
  */
 export async function configurarAsignaturasMultiplesGrados(
-  input: ConfigurarAsignaturasMultiplesGradosInput
+  input: ConfigurarAsignaturasMultiplesGradosInput,
+  { usuarioId, ip }: ContextoActor
 ): Promise<StudyPlanDocument> {
   for (const item of input.grados) {
     const grade = await Grade.findById(item.grade_id);
@@ -170,9 +222,19 @@ export async function configurarAsignaturasMultiplesGrados(
         intensidad_horaria_semanal: a.intensidad_horaria_semanal,
       })
     );
+    await validarCoberturaPonderaciones(grado);
   }
 
   await plan.save();
+
+  await registrarEvento({
+    usuario_id: usuarioId,
+    accion: 'PLAN_ASIGNATURAS_GRADO_ACTUALIZADO',
+    entidad: 'StudyPlan',
+    entidad_id: plan._id,
+    detalle: `Configuración General actualizada para ${input.grados.length} grado(s).`,
+    ip,
+  });
   return plan;
 }
 
@@ -195,7 +257,10 @@ export interface ConfigurarEvaluacionAreaInput {
   asignaturas: PonderacionAsignaturaInput[];
 }
 
-export async function configurarEvaluacionArea(input: ConfigurarEvaluacionAreaInput): Promise<StudyPlanDocument> {
+export async function configurarEvaluacionArea(
+  input: ConfigurarEvaluacionAreaInput,
+  { usuarioId, ip }: ContextoActor
+): Promise<StudyPlanDocument> {
   const area = await Area.findById(input.area_id);
   if (!area) throw new ApiError(404, 'Area no encontrada.');
 
@@ -230,6 +295,22 @@ export async function configurarEvaluacionArea(input: ConfigurarEvaluacionAreaIn
         );
       }
     }
+
+    // La ponderacion debe cubrir TODAS las asignaturas del area que ya esten en este grado: una
+    // que quede fuera recibiria 0% de forma silenciosa al generar boletines (ver
+    // validarCoberturaPonderaciones).
+    const subjectsDelAreaEnGrado = await Subject.find({
+      _id: { $in: [...subjectIdsDelGrado] },
+      area_id: input.area_id,
+    }).select('_id nombre');
+    const idsPonderados = new Set(input.asignaturas.map((a) => a.subject_id));
+    const faltante = subjectsDelAreaEnGrado.find((s) => !idsPonderados.has(String(s._id)));
+    if (faltante) {
+      throw new ApiError(
+        400,
+        `La ponderación debe incluir todas las asignaturas del área que ya están en este grado; falta "${faltante.nombre}".`
+      );
+    }
   }
 
   const nuevaEvaluacion: IEvaluacionArea = {
@@ -248,6 +329,15 @@ export async function configurarEvaluacionArea(input: ConfigurarEvaluacionAreaIn
   else grado.evaluaciones_area.push(nuevaEvaluacion);
 
   await plan.save();
+
+  await registrarEvento({
+    usuario_id: usuarioId,
+    accion: 'PLAN_EVALUACION_AREA_ACTUALIZADA',
+    entidad: 'StudyPlan',
+    entidad_id: plan._id,
+    detalle: `Área "${area.nombre}": método ${input.metodo_calculo}.`,
+    ip,
+  });
   return plan;
 }
 
@@ -270,7 +360,10 @@ export interface ConfigurarDistribucionGrupoInput {
   asignaturas_agregadas: AsignaturaPersonalizadaInput[];
 }
 
-export async function configurarDistribucionGrupo(input: ConfigurarDistribucionGrupoInput): Promise<StudyPlanDocument> {
+export async function configurarDistribucionGrupo(
+  input: ConfigurarDistribucionGrupoInput,
+  { usuarioId, ip }: ContextoActor
+): Promise<StudyPlanDocument> {
   const group = await Group.findById(input.group_id);
   if (!group) throw new ApiError(404, 'Grupo no encontrado.');
   if (String(group.grade_id) !== input.grade_id) {
@@ -317,7 +410,26 @@ export async function configurarDistribucionGrupo(input: ConfigurarDistribucionG
     );
   }
   // "La asignatura no fue relacionada con el Nivel academico de este grado" (Analisis_M06_Klassy).
-  await validarSubjectsDelNivel(idsAgregados, grade.nivel);
+  const subjectsAgregados = await validarSubjectsDelNivel(idsAgregados, grade.nivel);
+
+  // RN-EVAL-02: una asignatura agregada cuya area ya tiene ponderacion fija en el grado quedaria
+  // sin porcentaje asignado en el boletin de este grupo (evaluaciones_area_personalizadas todavia
+  // no tiene una operacion propia que la complete — ver comentario mas abajo). Se bloquea en vez
+  // de dejarla contar 0% en silencio.
+  const areasPonderadasDelGrado = new Set(
+    grado.evaluaciones_area.filter((e) => e.metodo_calculo === 'PONDERADO').map((e) => String(e.area_id))
+  );
+  for (const id of idsAgregados) {
+    const subject = subjectsAgregados.get(id);
+    if (subject && areasPonderadasDelGrado.has(String(subject.area_id))) {
+      throw new ApiError(
+        409,
+        `La asignatura "${subject.nombre}" pertenece a un área con ponderación fija (%) en este grado: agregarla ` +
+          'a este grupo la dejaría sin porcentaje en el boletín. Ajusta la ponderación del área desde ' +
+          'Configuración de Evaluación antes de agregarla a un grupo específico.'
+      );
+    }
+  }
 
   const mapear = (items: AsignaturaPersonalizadaInput[]): IAsignaturaPersonalizadaGrupo[] =>
     items.map((a) => ({
@@ -343,6 +455,16 @@ export async function configurarDistribucionGrupo(input: ConfigurarDistribucionG
   else grado.personalizaciones_grupo.push(nuevaPersonalizacion);
 
   await plan.save();
+
+  await registrarEvento({
+    usuario_id: usuarioId,
+    accion: 'PLAN_DISTRIBUCION_GRUPO_ACTUALIZADA',
+    entidad: 'StudyPlan',
+    entidad_id: plan._id,
+    detalle: `Grupo ${group.nomenclatura}: ${nuevaPersonalizacion.intensidades_personalizadas.length} intensidad(es) ` +
+      `personalizada(s), ${nuevaPersonalizacion.asignaturas_agregadas.length} asignatura(s) agregada(s).`,
+    ip,
+  });
   return plan;
 }
 
@@ -368,7 +490,10 @@ export interface CrearPlanDesdeAnioAnteriorInput {
  * (regla de oro de herencia del Analisis_M06_Klassy); si alguno necesita su
  * propia distribucion, se configura de nuevo con configurarDistribucionGrupo.
  */
-export async function crearPlanDesdeAnioAnterior(input: CrearPlanDesdeAnioAnteriorInput): Promise<StudyPlanDocument> {
+export async function crearPlanDesdeAnioAnterior(
+  input: CrearPlanDesdeAnioAnteriorInput,
+  { usuarioId, ip }: ContextoActor
+): Promise<StudyPlanDocument> {
   const academicYearNuevo = await AcademicYear.findById(input.academic_year_id);
   if (!academicYearNuevo) throw new ApiError(404, 'Año lectivo no encontrado.');
   if (String(academicYearNuevo.institucion_id) !== input.institucion_id) {
@@ -413,6 +538,15 @@ export async function crearPlanDesdeAnioAnterior(input: CrearPlanDesdeAnioAnteri
   });
 
   await nuevoPlan.save();
+
+  await registrarEvento({
+    usuario_id: usuarioId,
+    accion: 'PLAN_CREADO_DESDE_ANIO_ANTERIOR',
+    entidad: 'StudyPlan',
+    entidad_id: nuevoPlan._id,
+    detalle: `Año ${academicYearNuevo.year} copiado desde el plan del año lectivo ${input.academic_year_id_anterior}.`,
+    ip,
+  });
   return nuevoPlan;
 }
 

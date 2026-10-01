@@ -12,7 +12,6 @@ export function useAreas(institucionId: string | undefined) {
 }
 
 export interface CrearAreaInput {
-  institucion_id: string;
   nombre: string;
   descripcion: string;
   codigo: string;

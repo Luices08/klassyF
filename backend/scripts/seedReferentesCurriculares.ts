@@ -20,7 +20,10 @@
  * del grupo_grados del EBC. Es una construccion razonable, no una copia de
  * un documento oficial.
  *
- * Operacion 100% idempotente (upsert). Uso: npm run seed:referentes
+ * Idempotente de verdad: un referente que ya existe no se toca (mismo
+ * criterio que seedSubjects.ts en M06) — volver a correr el seed no reactiva
+ * uno que un coordinador marco Historico ni pisa una edicion manual.
+ * Uso: npm run seed:referentes
  */
 import dotenv from 'dotenv';
 import mongoose, { Types } from 'mongoose';
@@ -104,7 +107,9 @@ const normaliza = (texto: string): string =>
  */
 async function resolverAreas(): Promise<Map<string, Types.ObjectId>> {
   const areaMap = new Map<string, Types.ObjectId>();
-  const asignaturas = await Subject.find();
+  // Solo asignaturas vigentes, en un orden estable (nombre), para que la coincidencia no dependa
+  // del orden de insercion en Mongo ni pueda recaer en una asignatura que la institucion ya inactivo.
+  const asignaturas = await Subject.find({ estado: 'activo' }).sort({ nombre: 1 });
 
   for (const [areaCodigo, patron] of Object.entries(ASIGNATURA_POR_AREA)) {
     const asignatura = asignaturas.find((s) => patron.test(s.nombre));
@@ -121,7 +126,7 @@ async function resolverAreas(): Promise<Map<string, Types.ObjectId>> {
 }
 
 async function seedDba(areaMap: Map<string, Types.ObjectId>, gradeMap: Map<number, Types.ObjectId>): Promise<number> {
-  let count = 0;
+  let creados = 0;
   for (const item of DBA_DATA) {
     const areaId = areaMap.get(item.areaCodigo);
     const gradeId = gradeMap.get(item.gradoNumero);
@@ -134,32 +139,29 @@ async function seedDba(areaMap: Map<string, Types.ObjectId>, gradeMap: Map<numbe
       continue;
     }
 
-    await Dba.findOneAndUpdate(
-      { area_id: areaId, grade_id: gradeId, numero_dba: item.numero_dba },
-      {
-        $set: {
-          area_id: areaId,
-          grade_id: gradeId,
-          numero_dba: item.numero_dba,
-          organizador: item.organizador,
-          enunciado: item.enunciado,
-          evidencias_aprendizaje: item.evidencias_aprendizaje,
-          ejemplo: item.ejemplo || '',
-          etiquetas: item.etiquetas,
-          version: 'V2',
-          fuente: 'MEN - Derechos Básicos de Aprendizaje',
-          estado: 'activo',
-        },
-      },
-      { upsert: true }
-    );
-    count++;
+    const yaExiste = await Dba.exists({ area_id: areaId, grade_id: gradeId, numero_dba: item.numero_dba });
+    if (yaExiste) continue;
+
+    await Dba.create({
+      area_id: areaId,
+      grade_id: gradeId,
+      numero_dba: item.numero_dba,
+      organizador: item.organizador,
+      enunciado: item.enunciado,
+      evidencias_aprendizaje: item.evidencias_aprendizaje,
+      ejemplo: item.ejemplo || '',
+      etiquetas: item.etiquetas,
+      version: 'V2',
+      fuente: 'MEN - Derechos Básicos de Aprendizaje',
+      estado: 'activo',
+    });
+    creados++;
   }
-  return count;
+  return creados;
 }
 
 async function seedEbc(areaMap: Map<string, Types.ObjectId>): Promise<number> {
-  let count = 0;
+  let creados = 0;
   for (const item of EBC_DATA) {
     const areaId = areaMap.get(item.areaCodigo);
     if (!areaId) {
@@ -167,27 +169,24 @@ async function seedEbc(areaMap: Map<string, Types.ObjectId>): Promise<number> {
       continue;
     }
 
-    await Ebc.findOneAndUpdate(
-      { area_id: areaId, grupo_grados: item.grupo_grados, enunciado: item.enunciado },
-      {
-        $set: {
-          area_id: areaId,
-          grupo_grados: item.grupo_grados,
-          organizador: item.organizador,
-          competencia: item.competencia,
-          enunciado: item.enunciado,
-          evidencias_aprendizaje: item.evidencias_aprendizaje,
-          etiquetas: item.etiquetas,
-          version: 'V1',
-          fuente: 'MEN - Estándares Básicos de Competencias',
-          estado: 'activo',
-        },
-      },
-      { upsert: true }
-    );
-    count++;
+    const yaExiste = await Ebc.exists({ area_id: areaId, grupo_grados: item.grupo_grados, enunciado: item.enunciado });
+    if (yaExiste) continue;
+
+    await Ebc.create({
+      area_id: areaId,
+      grupo_grados: item.grupo_grados,
+      organizador: item.organizador,
+      competencia: item.competencia,
+      enunciado: item.enunciado,
+      evidencias_aprendizaje: item.evidencias_aprendizaje,
+      etiquetas: item.etiquetas,
+      version: 'V1',
+      fuente: 'MEN - Estándares Básicos de Competencias',
+      estado: 'activo',
+    });
+    creados++;
   }
-  return count;
+  return creados;
 }
 
 /**
@@ -198,7 +197,7 @@ async function seedEbc(areaMap: Map<string, Types.ObjectId>): Promise<number> {
 async function vincularEbcConDba(): Promise<number> {
   const [todosEbc, todosDba] = await Promise.all([
     Ebc.find(),
-    Dba.find().populate<{ grade_id: { numero: number } }>('grade_id', 'numero'),
+    Dba.find({ estado: 'activo' }).populate<{ grade_id: { numero: number } }>('grade_id', 'numero'),
   ]);
 
   let vinculados = 0;
@@ -226,7 +225,7 @@ async function vincularEbcConDba(): Promise<number> {
 }
 
 async function seedLineamientos(areaMap: Map<string, Types.ObjectId>): Promise<number> {
-  let count = 0;
+  let creados = 0;
   for (const item of LINEAMIENTOS_DATA) {
     const areaId = item.areaCodigo ? areaMap.get(item.areaCodigo) : null;
     if (item.areaCodigo && !areaId) {
@@ -234,25 +233,22 @@ async function seedLineamientos(areaMap: Map<string, Types.ObjectId>): Promise<n
       continue;
     }
 
-    await Lineamiento.findOneAndUpdate(
-      { titulo: item.titulo },
-      {
-        $set: {
-          area_id: areaId ?? null,
-          titulo: item.titulo,
-          contenido: item.contenido,
-          orden: item.orden,
-          etiquetas: item.etiquetas,
-          version: 'V1',
-          fuente: 'MEN - Lineamientos Curriculares',
-          estado: 'activo',
-        },
-      },
-      { upsert: true }
-    );
-    count++;
+    const yaExiste = await Lineamiento.exists({ titulo: item.titulo });
+    if (yaExiste) continue;
+
+    await Lineamiento.create({
+      area_id: areaId ?? null,
+      titulo: item.titulo,
+      contenido: item.contenido,
+      orden: item.orden,
+      etiquetas: item.etiquetas,
+      version: 'V1',
+      fuente: 'MEN - Lineamientos Curriculares',
+      estado: 'activo',
+    });
+    creados++;
   }
-  return count;
+  return creados;
 }
 
 async function run(): Promise<void> {
@@ -266,17 +262,17 @@ async function run(): Promise<void> {
   const gradeMap = new Map<number, Types.ObjectId>(grades.map((g) => [g.numero, g._id]));
   console.log(`[seed:referentes] Grados detectados en BD: ${gradeMap.size}`);
 
-  const dbaCount = await seedDba(areaMap, gradeMap);
-  console.log(`[seed:referentes] DBA sembrados/actualizados: ${dbaCount}`);
+  const dbaCreados = await seedDba(areaMap, gradeMap);
+  console.log(`[seed:referentes] DBA creados: ${dbaCreados} (los ya existentes no se tocaron)`);
 
-  const ebcCount = await seedEbc(areaMap);
-  console.log(`[seed:referentes] EBC sembrados/actualizados: ${ebcCount}`);
+  const ebcCreados = await seedEbc(areaMap);
+  console.log(`[seed:referentes] EBC creados: ${ebcCreados} (los ya existentes no se tocaron)`);
 
   const vinculados = await vincularEbcConDba();
-  console.log(`[seed:referentes] EBC vinculados a al menos un DBA: ${vinculados}/${ebcCount}`);
+  console.log(`[seed:referentes] EBC con al menos un DBA vinculado: ${vinculados}`);
 
-  const lineamientosCount = await seedLineamientos(areaMap);
-  console.log(`[seed:referentes] Lineamientos sembrados/actualizados: ${lineamientosCount}`);
+  const lineamientosCreados = await seedLineamientos(areaMap);
+  console.log(`[seed:referentes] Lineamientos creados: ${lineamientosCreados} (los ya existentes no se tocaron)`);
 
   await mongoose.disconnect();
   console.log('[seed:referentes] Proceso completado exitosamente.');

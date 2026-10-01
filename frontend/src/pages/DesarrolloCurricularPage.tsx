@@ -1,6 +1,6 @@
 import { type FormEvent, useEffect, useState } from 'react';
 import { Alert, errorMessage } from '../components/ui/Alert';
-import { EstadoDesarrolloCurricularBadge } from '../components/ui/Badge';
+import { EstadoDesarrolloCurricularBadge, EstadoVigenciaReferenteBadge } from '../components/ui/Badge';
 import { Button } from '../components/ui/Button';
 import { Card, CardHeader } from '../components/ui/Card';
 import { Input, Select } from '../components/ui/Field';
@@ -103,29 +103,37 @@ export function DesarrolloCurricularPage() {
 
   const esEditable = !desarrollo || desarrollo.estado === 'BORRADOR' || desarrollo.estado === 'DEVUELTO_OBSERVACIONES';
 
-  const toggleDba = (dbaId: string) => {
+  // El filtro de Estado permite ver DBA Histórico para consulta, pero el backend ya no acepta
+  // seleccionar uno (ver referenteCurricular.model.ts: "ya no se ofrece para seleccion"). Uno que
+  // ya estaba elegido de antes (planeación vieja) se puede seguir viendo y quitando, no agregar.
+  const toggleDba = (dba: DbaReferente) => {
     if (!esEditable) return;
+    const yaSeleccionado = dbaSeleccionados.includes(dba._id);
+    if (!yaSeleccionado && dba.estado !== 'activo') return;
     setDbaSeleccionados((prev) =>
-      prev.includes(dbaId) ? prev.filter((id) => id !== dbaId) : [...prev, dbaId]
+      yaSeleccionado ? prev.filter((id) => id !== dba._id) : [...prev, dba._id]
     );
   };
 
-  const handleGuardar = async (e?: FormEvent) => {
+  // Devuelve el _id recien guardado (o undefined si no se guardo), nunca el de `desarrollo`: ese
+  // closure queda obsoleto hasta el proximo render y llevaba a handleEnviarRevision a enviar la
+  // ultima version persistida en vez de la que el docente acaba de editar (o a no enviar nada).
+  const handleGuardar = async (e?: FormEvent): Promise<string | undefined> => {
     if (e) e.preventDefault();
     setFormMsg(null);
 
-    if (!assignmentId) return;
+    if (!assignmentId) return undefined;
     if (!competencias.trim()) {
       setFormMsg({ tone: 'error', text: 'Debe ingresar las competencias del periodo.' });
-      return;
+      return undefined;
     }
     if (!metodologia.trim()) {
       setFormMsg({ tone: 'error', text: 'Debe ingresar la metodología y recursos.' });
-      return;
+      return undefined;
     }
     if (!criterios.trim()) {
       setFormMsg({ tone: 'error', text: 'Debe ingresar los criterios de evaluación.' });
-      return;
+      return undefined;
     }
 
     const payload: GuardarBorradorInput = {
@@ -144,19 +152,20 @@ export function DesarrolloCurricularPage() {
     };
 
     try {
-      await guardarMutation.mutateAsync(payload);
+      const guardado = await guardarMutation.mutateAsync(payload);
       setFormMsg({ tone: 'success', text: 'Borrador de desarrollo curricular guardado exitosamente.' });
+      return guardado._id;
     } catch (err) {
       setFormMsg({ tone: 'error', text: errorMessage(err) });
+      return undefined;
     }
   };
 
   const handleEnviarRevision = async () => {
-    if (!desarrollo?._id) {
-      // Guardar primero si aún no existe ID
-      await handleGuardar();
-    }
-    if (!desarrollo?._id) return;
+    // Siempre guarda primero lo que hay en el formulario (incluye ediciones sin guardar aun):
+    // enviar debe reflejar lo que el docente ve en pantalla, no la ultima version en el servidor.
+    const id = await handleGuardar();
+    if (!id) return;
 
     const confirmacion = window.confirm(
       '¿Desea enviar esta planeación a Coordinación Académica? Una vez enviada, no podrá editarla hasta que sea revisada.'
@@ -164,7 +173,7 @@ export function DesarrolloCurricularPage() {
     if (!confirmacion) return;
 
     try {
-      await enviarMutation.mutateAsync(desarrollo._id);
+      await enviarMutation.mutateAsync(id);
       setFormMsg({
         tone: 'success',
         text: 'Planeación enviada a Coordinación Académica. El coordinador revisará la propuesta.',
@@ -320,30 +329,36 @@ export function DesarrolloCurricularPage() {
                   ) : (
                     listaDba.map((dba) => {
                       const isChecked = dbaSeleccionados.includes(dba._id);
+                      const seleccionable = isChecked || dba.estado === 'activo';
                       return (
                         <div
                           key={dba._id}
-                          onClick={() => toggleDba(dba._id)}
-                          className={`p-3 rounded-lg border text-sm transition-all cursor-pointer ${
+                          onClick={() => toggleDba(dba)}
+                          className={`p-3 rounded-lg border text-sm transition-all ${
                             isChecked
                               ? 'border-primary bg-primary-soft/40 shadow-xs'
                               : 'border-border bg-surface hover:bg-soft/50'
-                          } ${!esEditable ? 'cursor-default opacity-85' : ''}`}
+                          } ${!esEditable || !seleccionable ? 'cursor-default' : 'cursor-pointer'} ${
+                            !esEditable ? 'opacity-85' : ''
+                          }`}
                         >
                           <div className="flex items-start gap-2.5">
                             <input
                               type="checkbox"
                               checked={isChecked}
                               onChange={() => {}} // Manejado por onClick del contenedor
-                              disabled={!esEditable}
+                              disabled={!esEditable || !seleccionable}
                               className="mt-1 h-4 w-4 rounded text-primary focus:ring-primary border-border"
                             />
                             <div className="flex-1 space-y-1">
                               <div className="flex items-center justify-between gap-2">
                                 <span className="font-bold text-ink">DBA #{dba.numero_dba}</span>
-                                <span className="text-[11px] font-medium text-primary px-2 py-0.5 rounded-full bg-primary-soft">
-                                  {dba.organizador}
-                                </span>
+                                <div className="flex items-center gap-1">
+                                  {dba.estado !== 'activo' && <EstadoVigenciaReferenteBadge value={dba.estado} />}
+                                  <span className="text-[11px] font-medium text-primary px-2 py-0.5 rounded-full bg-primary-soft">
+                                    {dba.organizador}
+                                  </span>
+                                </div>
                               </div>
                               <p className="text-body text-xs leading-relaxed">{dba.enunciado}</p>
 

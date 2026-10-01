@@ -348,9 +348,10 @@ export async function deleteTeacherAssignment(id: string, actor: ActorAsignacion
   await asegurarAnioNoCerrado(String(assignment.academic_year_id));
 
   await runTransaction(async (session) => {
-    // Verificar si tiene desarrollo curricular asociado
-    const dev = await CurricularDevelopment.findOne({ teacher_assignment_id: id }).session(session);
-    if (dev && dev.estado === 'APROBADO') {
+    // Una asignacion puede tener hasta una planeacion por periodo (1-4): revisar todas, no solo
+    // la primera que encuentre, o una ya APROBADA en otro periodo se borraria sin bloquear nada.
+    const devs = await CurricularDevelopment.find({ teacher_assignment_id: id }).session(session);
+    if (devs.some((dev) => dev.estado === 'APROBADO')) {
       throw new ApiError(
         409,
         'No se puede eliminar la asignación académica porque ya cuenta con una planeación curricular aprobada.'
@@ -368,9 +369,9 @@ export async function deleteTeacherAssignment(id: string, actor: ActorAsignacion
       );
     }
 
-    // Si tenía borrador de desarrollo curricular no aprobado, eliminarlo
-    if (dev) {
-      await CurricularDevelopment.findByIdAndDelete(dev._id).session(session);
+    // Ninguna quedó APROBADA (ya se validó arriba): se pueden borrar todos los borradores/envíos.
+    if (devs.length > 0) {
+      await CurricularDevelopment.deleteMany({ teacher_assignment_id: id }).session(session);
     }
 
     await TeacherAssignment.findByIdAndDelete(id).session(session);

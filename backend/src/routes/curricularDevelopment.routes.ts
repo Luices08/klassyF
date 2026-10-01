@@ -23,9 +23,11 @@ router.get(
   listDevelopments
 );
 
-// 2. Consulta de un desarrollo específico por asignación y periodo
+// 2. Consulta de un desarrollo específico por asignación y periodo (un DOCENTE solo ve las
+// suyas; el servicio lo verifica)
 router.get(
   '/assignment/:assignmentId/periodo/:periodoNumero',
+  checkRole(ROLES.DOCENTE, ROLES.COORDINADOR, ROLES.ADMIN),
   validate(curricularDevelopmentValidator.getOneParams),
   getByAssignmentAndPeriod
 );

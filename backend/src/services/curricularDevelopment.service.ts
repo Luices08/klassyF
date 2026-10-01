@@ -6,7 +6,9 @@ import TeacherAssignment, { TeacherAssignmentDocument } from '../models/teacherA
 import { UserDocument } from '../models/user.model';
 import { EstadoDesarrolloCurricular } from '../constants/enums';
 import { ROLES } from '../constants/roles';
+import { asegurarAnioNoCerrado } from './academicYear.service';
 import ApiError from '../utils/ApiError';
+import { ESTADO_ACTIVO } from '../utils/filtroEstado';
 
 // Estados desde los que el docente puede crear/editar contenido: un borrador
 // nuevo, o uno que la coordinación devolvió con observaciones.
@@ -49,6 +51,12 @@ async function assertTeacherOwnsAssignment(
   if (String(assignment.docente_id) !== String(requestingUser._id)) {
     throw new ApiError(403, 'Solo el docente titular de esta asignación puede crear o editar esta planeación.');
   }
+  if (assignment.tipo_asignacion !== 'CLASE') {
+    throw new ApiError(400, 'El desarrollo curricular solo aplica a asignaciones de tipo CLASE.');
+  }
+  if (assignment.estado !== 'activo') {
+    throw new ApiError(400, 'Esta asignación académica ya no está activa.');
+  }
   return assignment;
 }
 
@@ -65,9 +73,11 @@ async function validateDbaSeleccionados(
   if (!group) throw new ApiError(404, 'Grupo de la asignación académica no encontrado.');
   if (!subject) throw new ApiError(404, 'Asignatura de la asignación académica no encontrada.');
 
-  const dbas = await Dba.find({ _id: { $in: dbaIds } });
+  // Solo DBA vigentes (estado activo): uno Histórico ya no se ofrece para seleccion (ver
+  // referenteCurricular.model.ts), aunque siga existiendo por trazabilidad de planeaciones viejas.
+  const dbas = await Dba.find({ _id: { $in: dbaIds }, estado: ESTADO_ACTIVO });
   if (dbas.length !== new Set(dbaIds).size) {
-    throw new ApiError(400, 'Uno o más dba_seleccionados no existen en el banco de DBA.');
+    throw new ApiError(400, 'Uno o más dba_seleccionados no existen en el banco de DBA o ya no están vigentes.');
   }
 
   const inconsistente = dbas.some(
@@ -90,6 +100,8 @@ export async function upsertDraft(
   requestingUser: UserDocument
 ): Promise<CurricularDevelopmentDocument> {
   const assignment = await assertTeacherOwnsAssignment(input.teacher_assignment_id, requestingUser);
+  // Un año CERRADO es historico de solo lectura, igual que en M01/M04/M05/M08/M10.
+  await asegurarAnioNoCerrado(String(assignment.academic_year_id));
   await validateDbaSeleccionados(input.dba_seleccionados, assignment);
 
   const existing = await CurricularDevelopment.findOne({
@@ -143,6 +155,7 @@ export async function submitForReview(
   if (String(assignment.docente_id) !== String(requestingUser._id)) {
     throw new ApiError(403, 'Solo el docente titular puede enviar esta planeación a revisión.');
   }
+  await asegurarAnioNoCerrado(String(assignment.academic_year_id));
 
   if (!ESTADOS_EDITABLES.includes(doc.estado)) {
     throw new ApiError(409, `No se puede enviar a revisión un desarrollo curricular en estado ${doc.estado}.`);
@@ -179,6 +192,10 @@ export async function reviewDevelopment(
   const doc = await CurricularDevelopment.findById(id);
   if (!doc) throw new ApiError(404, 'Desarrollo curricular no encontrado.');
 
+  const assignment = await TeacherAssignment.findById(doc.teacher_assignment_id);
+  if (!assignment) throw new ApiError(404, 'Asignación académica asociada no encontrada.');
+  await asegurarAnioNoCerrado(String(assignment.academic_year_id));
+
   if (doc.estado !== 'ENVIADO_REVISION') {
     throw new ApiError(
       409,
@@ -199,12 +216,21 @@ export async function reviewDevelopment(
 }
 
 /**
- * Consulta un desarrollo curricular por asignación y periodo.
+ * Consulta un desarrollo curricular por asignación y periodo. Un DOCENTE solo puede consultar
+ * sus propias asignaciones (mismo filtro que listDevelopments); ADMIN/COORDINADOR sin restricción.
  */
 export async function getDevelopmentByAssignmentAndPeriod(
   teacherAssignmentId: string,
-  periodoNumero: number
+  periodoNumero: number,
+  requestingUser: UserDocument
 ): Promise<CurricularDevelopmentDocument | null> {
+  if (requestingUser.rol === ROLES.DOCENTE) {
+    const assignment = await TeacherAssignment.findById(teacherAssignmentId).select('docente_id');
+    if (!assignment || String(assignment.docente_id) !== String(requestingUser._id)) {
+      throw new ApiError(403, 'Solo puedes consultar la planeación de tus propias asignaciones académicas.');
+    }
+  }
+
   return CurricularDevelopment.findOne({
     teacher_assignment_id: teacherAssignmentId,
     periodo_numero: periodoNumero,

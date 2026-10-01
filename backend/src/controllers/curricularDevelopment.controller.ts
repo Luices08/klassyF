@@ -39,9 +39,12 @@ interface GetOneParams extends ParamsDictionary {
 }
 
 export const getByAssignmentAndPeriod = catchAsync<GetOneParams>(async (req, res) => {
+  if (!req.user) throw new ApiError(401, 'No autenticado.');
+
   const doc = await cdService.getDevelopmentByAssignmentAndPeriod(
     req.params.assignmentId,
-    Number(req.params.periodoNumero)
+    Number(req.params.periodoNumero),
+    req.user
   );
   res.status(200).json({ success: true, data: doc });
 });

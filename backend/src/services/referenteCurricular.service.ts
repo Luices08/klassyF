@@ -1,31 +1,67 @@
 import { grupoGradosDeNumero, TipoReferente } from '../constants/enums';
+import Area from '../models/area.model';
 import Grade from '../models/grade.model';
 import { Dba, Ebc, IEbc, ILineamiento, Lineamiento, ReferenteCurricular } from '../models/referenteCurricular.model';
 import ApiError from '../utils/ApiError';
-import { ESTADO_ACTIVO } from '../utils/filtroEstado';
+import { ESTADO_ACTIVO, filtroPorEstado } from '../utils/filtroEstado';
+import { runTransaction } from '../utils/runTransaction';
 
 export type ReferenteItemInput = Record<string, unknown> & { tipo_referente: TipoReferente };
+
+function escapeRegex(texto: string): string {
+  return texto.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+/** Valida las llaves foraneas de un item antes de crearlo: area_id, grade_id (DBA) y dba_relacionados (EBC). */
+async function validarForaneos(item: ReferenteItemInput): Promise<void> {
+  if (item.area_id) {
+    const area = await Area.findById(item.area_id as string);
+    if (!area) throw new ApiError(400, `area_id '${item.area_id}' no corresponde a un área existente.`);
+  }
+
+  if (item.tipo_referente === 'DBA') {
+    const grade = await Grade.findById(item.grade_id as string);
+    if (!grade) throw new ApiError(400, `grade_id '${item.grade_id}' no corresponde a un grado existente.`);
+  }
+
+  if (item.tipo_referente === 'EBC') {
+    const dbaRelacionados = (item.dba_relacionados as string[] | undefined) ?? [];
+    if (dbaRelacionados.length > 0) {
+      const existentes = await Dba.countDocuments({ _id: { $in: dbaRelacionados } });
+      if (existentes !== new Set(dbaRelacionados).size) {
+        throw new ApiError(400, 'Uno o más dba_relacionados no existen o no son un DBA.');
+      }
+    }
+  }
+}
 
 /** Crea un solo referente o una carga masiva; cada item se enruta a su discriminador (DBA/EBC/LINEAMIENTO). */
 export async function createReferentes(rawItems: ReferenteItemInput | ReferenteItemInput[]) {
   const items = Array.isArray(rawItems) ? rawItems : [rawItems];
-  const creados: unknown[] = [];
   for (const item of items) {
-    switch (item.tipo_referente) {
-      case 'DBA':
-        creados.push(await Dba.create(item));
-        break;
-      case 'EBC':
-        creados.push(await Ebc.create(item));
-        break;
-      case 'LINEAMIENTO':
-        creados.push(await Lineamiento.create(item));
-        break;
-      default:
-        throw new ApiError(400, `tipo_referente '${item.tipo_referente}' no admite carga directa (aun sin fuente).`);
-    }
+    await validarForaneos(item);
   }
-  return creados;
+
+  // Transaccion: una carga masiva no debe dejar los primeros N items creados si el N+1 falla.
+  return runTransaction(async (session) => {
+    const creados: unknown[] = [];
+    for (const item of items) {
+      switch (item.tipo_referente) {
+        case 'DBA':
+          creados.push((await Dba.create([item], { session }))[0]);
+          break;
+        case 'EBC':
+          creados.push((await Ebc.create([item], { session }))[0]);
+          break;
+        case 'LINEAMIENTO':
+          creados.push((await Lineamiento.create([item], { session }))[0]);
+          break;
+        default:
+          throw new ApiError(400, `tipo_referente '${item.tipo_referente}' no admite carga directa (aun sin fuente).`);
+      }
+    }
+    return creados;
+  });
 }
 
 export interface ListReferentesQuery {
@@ -44,14 +80,14 @@ export async function listReferentes(query: ListReferentesQuery) {
   if (query.area_id) filter.area_id = query.area_id;
   if (query.tipo_referente) filter.tipo_referente = query.tipo_referente;
   if (query.grupo_grados) filter.grupo_grados = query.grupo_grados;
-  filter.estado = query.estado || ESTADO_ACTIVO;
+  filter.estado = filtroPorEstado(query.estado || 'activo');
 
   const condiciones: Record<string, unknown>[] = [];
   if (query.organizador) {
     condiciones.push({ organizador: query.organizador });
   }
   if (query.q) {
-    const regex = new RegExp(query.q.trim(), 'i');
+    const regex = new RegExp(escapeRegex(query.q.trim()), 'i');
     condiciones.push({
       $or: [
         { enunciado: regex },

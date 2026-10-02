@@ -1,5 +1,11 @@
 import { HydratedDocument, Types } from 'mongoose';
-import { ContextoObservacion, MAX_COMENTARIO_OBSERVACION } from '../constants/convivencia';
+import {
+  ContextoObservacion,
+  EstadoCompromiso,
+  MAX_COMENTARIO_OBSERVACION,
+  MedioCitacion,
+  ResponsableCompromiso,
+} from '../constants/convivencia';
 import { ESTADOS_MATRICULA_ACTIVOS } from '../constants/enums';
 import { ROLES } from '../constants/roles';
 import AcademicYear from '../models/academicYear.model';
@@ -40,6 +46,9 @@ const NO_ENCONTRADO = 'Estudiante no encontrado.';
 
 // "No existe" y "no autorizado" responden igual, para no revelar qué estudiantes existen (IDOR).
 const estudianteNoEncontrado = () => new ApiError(404, NO_ENCONTRADO);
+
+const vista = (obs: Parameters<typeof vistaObservacion>[0], modo: ModoVistaObservacion) =>
+  vistaObservacion(obs, modo, hoyColombia());
 
 const comoUsuarioConvivencia = (u: UserDocument): UsuarioConvivencia => ({
   id: String(u._id),
@@ -330,6 +339,19 @@ export async function registrarObservacion(input: RegistrarObservacionInput, usu
       registrado_por: usuario._id,
       autor_id: autorId,
       contexto: contextoDeRegistro(usuario, contexto.datos),
+      // RN-14-07: una situación II/III no puede quedarse solo como observación; coordinación de convivencia la atiende.
+      solicitud_caso: esSituacionGrave(situacionMaxima)
+        ? {
+            estado: 'PENDIENTE',
+            origen: 'AUTOMATICA',
+            motivo: `El manual tipifica la falta como situación tipo ${situacionMaxima}.`,
+            solicitada_por: usuario._id,
+            fecha: new Date(),
+            resuelta_por: null,
+            fecha_resolucion: null,
+            motivo_resolucion: '',
+          }
+        : null,
     });
   }
 
@@ -343,7 +365,7 @@ export async function registrarObservacion(input: RegistrarObservacionInput, usu
     detalle: `${creadas.length} estudiante(s)${eventoId ? `; evento ${eventoId}` : ''}`,
     ip,
   });
-  return creadas.map((o) => vistaObservacion(o, 'COMPLETA'));
+  return creadas.map((o) => vista(o, 'COMPLETA'));
 }
 
 // --- Consulta ---
@@ -410,7 +432,7 @@ export async function historialDeEstudiante(
     detalle: `${datos.length} registro(s)`,
     ip,
   });
-  const vistas = await conNombres(datos.map((o) => vistaObservacion(o, modoParaConsultante(usuario, o))));
+  const vistas = await conNombres(datos.map((o) => vista(o, modoParaConsultante(usuario, o))));
   return { total, ...paginacion, data: vistas };
 }
 
@@ -434,8 +456,8 @@ export async function obtenerObservacion(id: string, usuario: UserDocument, ip?:
     entidad_id: obs._id,
     ip,
   });
-  const [vista] = await conNombres([vistaObservacion(obs, modoParaConsultante(usuario, obs))]);
-  return vista;
+  const [detalle] = await conNombres([vista(obs, modoParaConsultante(usuario, obs))]);
+  return detalle;
 }
 
 /** Lo que el propio usuario registró (el docente no consulta el Observador: solo ve lo suyo). */
@@ -444,7 +466,7 @@ export async function misObservaciones(usuario: UserDocument, paginacion: Pagina
   const estudiantes = await User.find({ _id: { $in: datos.map((o) => o.student_id) } }).select('nombre apellido');
   const nombre = new Map(estudiantes.map((u) => [String(u._id), `${u.apellido} ${u.nombre}`]));
   const data = datos.map((o) => ({
-    ...vistaObservacion(o, 'COMPLETA'),
+    ...vista(o, 'COMPLETA'),
     estudiante: nombre.get(String(o.student_id)) ?? '',
   }));
   return { total, ...paginacion, data };
@@ -478,7 +500,7 @@ export async function miObservador(usuario: UserDocument, ip?: string | null) {
     detalle: `${datos.length} registro(s)`,
     ip,
   });
-  return datos.map((o) => vistaObservacion(o, 'ESTUDIANTE'));
+  return datos.map((o) => vista(o, 'ESTUDIANTE'));
 }
 
 // --- Enmienda y anulación ---
@@ -487,7 +509,12 @@ export async function miObservador(usuario: UserDocument, ip?: string | null) {
  * Quién puede corregir una observación: el autor dentro del plazo configurable; coordinación (de sus sedes) y ADMIN
  * sin plazo. El coordinador académico solo las no disciplinarias. Nunca en un año cerrado.
  */
-async function cargarModificable(id: string, usuario: UserDocument, plazoHoras: (c: { plazo_enmienda_horas: number; plazo_anulacion_horas: number }) => number) {
+async function cargarModificable(
+  id: string,
+  usuario: UserDocument,
+  /** Sin función: el autor no tiene plazo (seguimiento: compromisos, citaciones, solicitud de caso). */
+  plazoHoras?: (c: { plazo_enmienda_horas: number; plazo_anulacion_horas: number }) => number
+) {
   const obs = Types.ObjectId.isValid(id) ? await Observacion.findById(id) : null;
   if (!obs) throw new ApiError(404, 'Observación no encontrada.');
 
@@ -503,7 +530,7 @@ async function cargarModificable(id: string, usuario: UserDocument, plazoHoras: 
   const anio = await AcademicYear.findById(obs.academic_year_id);
   if (anio?.estado === 'CERRADO') throw new ApiError(409, 'El año lectivo está cerrado: la observación es solo de lectura.');
 
-  if (!coordinacion) {
+  if (!coordinacion && plazoHoras) {
     const configuracion = await obtenerConfiguracion();
     if (!dentroDelPlazo(obs.createdAt, plazoHoras(configuracion))) {
       throw new ApiError(403, 'Venció el plazo para modificar tu observación; solicítalo a coordinación.');
@@ -545,7 +572,7 @@ export async function enmendarObservacion(
   await obs.save();
 
   await registrarEvento({ usuario_id: usuario._id, accion: 'OBSERVACION_ENMENDADA', entidad: 'Observacion', entidad_id: obs._id, ip });
-  return vistaObservacion(obs, 'COMPLETA');
+  return vista(obs, 'COMPLETA');
 }
 
 export async function anularObservacion(id: string, motivo: string, usuario: UserDocument, ip?: string | null) {
@@ -556,5 +583,156 @@ export async function anularObservacion(id: string, motivo: string, usuario: Use
 
   // El motivo es texto libre: queda en la observación, no en la auditoría.
   await registrarEvento({ usuario_id: usuario._id, accion: 'OBSERVACION_ANULADA', entidad: 'Observacion', entidad_id: obs._id, ip });
-  return vistaObservacion(obs, 'COMPLETA');
+  return vista(obs, 'COMPLETA');
+}
+
+// --- Seguimiento: compromisos, citaciones y solicitud de caso ---
+
+export interface CompromisoInput {
+  descripcion: string;
+  responsable: ResponsableCompromiso;
+  /** YYYY-MM-DD */
+  fecha_limite: string;
+}
+
+export async function agregarCompromiso(id: string, input: CompromisoInput, usuario: UserDocument, ip?: string | null) {
+  const obs = await cargarModificable(id, usuario);
+  const limite = fechaDeClase(input.fecha_limite);
+  if (limite < hoyColombia()) throw new ApiError(400, 'La fecha límite del compromiso no puede estar en el pasado.');
+
+  obs.compromisos.push({
+    descripcion: input.descripcion.trim(),
+    responsable: input.responsable,
+    fecha_limite: limite,
+    estado: 'PENDIENTE',
+    registrado_por: usuario._id,
+    fecha_cierre: null,
+    cerrado_por: null,
+    nota_cierre: '',
+  });
+  await obs.save();
+  await registrarEvento({ usuario_id: usuario._id, accion: 'COMPROMISO_OBSERVACION_REGISTRADO', entidad: 'Observacion', entidad_id: obs._id, ip });
+  return vista(obs, 'COMPLETA');
+}
+
+export async function cerrarCompromiso(
+  id: string,
+  compromisoId: string,
+  estado: Exclude<EstadoCompromiso, 'PENDIENTE'>,
+  nota: string | undefined,
+  usuario: UserDocument,
+  ip?: string | null
+) {
+  const obs = await cargarModificable(id, usuario);
+  const compromiso = obs.compromisos.id(compromisoId);
+  if (!compromiso) throw new ApiError(404, 'Compromiso no encontrado.');
+  if (compromiso.estado !== 'PENDIENTE') throw new ApiError(409, 'El compromiso ya fue cerrado.');
+
+  compromiso.estado = estado;
+  compromiso.fecha_cierre = new Date();
+  compromiso.cerrado_por = usuario._id;
+  compromiso.nota_cierre = (nota ?? '').trim();
+  await obs.save();
+  await registrarEvento({ usuario_id: usuario._id, accion: 'COMPROMISO_OBSERVACION_CERRADO', entidad: 'Observacion', entidad_id: obs._id, detalle: estado, ip });
+  return vista(obs, 'COMPLETA');
+}
+
+export interface CitacionInput {
+  /** YYYY-MM-DD */
+  fecha: string;
+  medio: MedioCitacion;
+  dirigida_a?: string;
+  resultado?: string;
+}
+
+/** Solo se registra que se citó (cuándo, cómo, a quién, con qué resultado): el envío de avisos es de M28. */
+export async function agregarCitacion(id: string, input: CitacionInput, usuario: UserDocument, ip?: string | null) {
+  const obs = await cargarModificable(id, usuario);
+  const fecha = fechaDeClase(input.fecha);
+  if (fecha > hoyColombia()) throw new ApiError(400, 'La fecha de la citación no puede ser futura.');
+
+  obs.citaciones.push({
+    fecha,
+    medio: input.medio,
+    dirigida_a: (input.dirigida_a ?? '').trim(),
+    resultado: (input.resultado ?? '').trim(),
+    registrado_por: usuario._id,
+  });
+  await obs.save();
+  await registrarEvento({ usuario_id: usuario._id, accion: 'CITACION_OBSERVACION_REGISTRADA', entidad: 'Observacion', entidad_id: obs._id, ip });
+  return vista(obs, 'COMPLETA');
+}
+
+/** El autor (o coordinación) pide que convivencia atienda una disciplinaria que él considera grave. */
+export async function solicitarCaso(id: string, motivo: string, usuario: UserDocument, ip?: string | null) {
+  const obs = await cargarModificable(id, usuario);
+  if (obs.familia !== 'DISCIPLINARIA') throw new ApiError(409, 'Solo una observación disciplinaria se puede escalar a caso.');
+  if (obs.solicitud_caso) throw new ApiError(409, 'Esta observación ya tiene una solicitud de caso.');
+
+  obs.solicitud_caso = {
+    estado: 'PENDIENTE',
+    origen: 'MANUAL',
+    motivo: motivo.trim(),
+    solicitada_por: usuario._id,
+    fecha: new Date(),
+    resuelta_por: null,
+    fecha_resolucion: null,
+    motivo_resolucion: '',
+  };
+  await obs.save();
+  await registrarEvento({ usuario_id: usuario._id, accion: 'SOLICITUD_CASO_REGISTRADA', entidad: 'Observacion', entidad_id: obs._id, ip });
+  return vista(obs, 'COMPLETA');
+}
+
+const ROLES_CONVIVENCIA: string[] = [ROLES.ADMIN, ROLES.COORDINADOR_CONVIVENCIA];
+
+/** Solicitudes pendientes de las sedes del usuario: lo que coordinación de convivencia tiene por atender. */
+export async function bandejaDeCasos(usuario: UserDocument, paginacion: Paginacion, ip?: string | null) {
+  if (!ROLES_CONVIVENCIA.includes(usuario.rol)) throw new ApiError(403, 'Solo convivencia atiende las solicitudes de caso.');
+  const alcance = alcanceDeSedes(comoUsuarioConvivencia(usuario));
+  const filtro: Record<string, unknown> = {
+    'solicitud_caso.estado': 'PENDIENTE',
+    estado: 'ACTIVA',
+    ...(alcance === 'TODAS' ? {} : { sede_id: { $in: alcance } }),
+  };
+  const { total, datos } = await paginar(filtro, paginacion);
+
+  const [estudiantes, grupos] = await Promise.all([
+    User.find({ _id: { $in: datos.map((o) => o.student_id) } }).select('nombre apellido numero_documento'),
+    Group.find({ _id: { $in: datos.map((o) => o.group_id) } }).select('nomenclatura'),
+  ]);
+  const estudiante = new Map(estudiantes.map((u) => [String(u._id), u]));
+  const grupo = new Map(grupos.map((g) => [String(g._id), g.nomenclatura]));
+
+  await registrarEvento({ usuario_id: usuario._id, accion: 'CONVIVENCIA_BANDEJA_CONSULTADA', entidad: 'Observacion', detalle: `${datos.length} solicitud(es)`, ip });
+  const data = await conNombres(datos.map((o) => vista(o, 'COMPLETA')));
+  return {
+    total,
+    ...paginacion,
+    data: data.map((v, i) => {
+      const u = estudiante.get(String(datos[i]?.student_id));
+      return {
+        ...v,
+        estudiante: u ? `${u.apellido} ${u.nombre}` : '',
+        numero_documento: u?.numero_documento ?? '',
+        grupo: grupo.get(String(datos[i]?.group_id)) ?? '',
+      };
+    }),
+  };
+}
+
+/** Coordinación de convivencia decide que lo solicitado no amerita caso (queda el motivo). M15 agrega "abrir caso". */
+export async function descartarSolicitudCaso(id: string, motivo: string, usuario: UserDocument, ip?: string | null) {
+  const obs = Types.ObjectId.isValid(id) ? await Observacion.findById(id) : null;
+  const permitido = obs && ROLES_CONVIVENCIA.includes(usuario.rol) && enAlcanceDeSede(comoUsuarioConvivencia(usuario), String(obs.sede_id));
+  if (!obs || !permitido) throw new ApiError(404, 'Observación no encontrada.');
+  if (obs.solicitud_caso?.estado !== 'PENDIENTE') throw new ApiError(409, 'No hay una solicitud de caso pendiente.');
+
+  obs.solicitud_caso.estado = 'DESCARTADA';
+  obs.solicitud_caso.resuelta_por = usuario._id;
+  obs.solicitud_caso.fecha_resolucion = new Date();
+  obs.solicitud_caso.motivo_resolucion = motivo.trim();
+  await obs.save();
+  await registrarEvento({ usuario_id: usuario._id, accion: 'SOLICITUD_CASO_DESCARTADA', entidad: 'Observacion', entidad_id: obs._id, ip });
+  return vista(obs, 'COMPLETA');
 }

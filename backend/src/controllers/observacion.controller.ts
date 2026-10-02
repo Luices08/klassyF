@@ -140,3 +140,37 @@ export const enmendarObservacion = catchAsync<IdParams, unknown, observacionServ
 export const anularObservacion = catchAsync<IdParams, unknown, { motivo: string }>(async (req, res) => {
   res.status(200).json({ success: true, data: await observacionService.anularObservacion(req.params.id, req.body.motivo, req.user!, req.ip) });
 });
+
+// --- Seguimiento ---
+
+export const agregarCompromiso = catchAsync<IdParams, unknown, observacionService.CompromisoInput>(async (req, res) => {
+  res.status(201).json({ success: true, data: await observacionService.agregarCompromiso(req.params.id, req.body, req.user!, req.ip) });
+});
+
+interface CompromisoParams extends IdParams {
+  compromisoId: string;
+}
+
+export const cerrarCompromiso = catchAsync<CompromisoParams, unknown, { estado: 'CUMPLIDO' | 'INCUMPLIDO'; nota?: string }>(
+  async (req, res) => {
+    const { estado, nota } = req.body;
+    res.status(200).json({ success: true, data: await observacionService.cerrarCompromiso(req.params.id, req.params.compromisoId, estado, nota, req.user!, req.ip) });
+  }
+);
+
+export const agregarCitacion = catchAsync<IdParams, unknown, observacionService.CitacionInput>(async (req, res) => {
+  res.status(201).json({ success: true, data: await observacionService.agregarCitacion(req.params.id, req.body, req.user!, req.ip) });
+});
+
+export const solicitarCaso = catchAsync<IdParams, unknown, { motivo: string }>(async (req, res) => {
+  res.status(201).json({ success: true, data: await observacionService.solicitarCaso(req.params.id, req.body.motivo, req.user!, req.ip) });
+});
+
+export const descartarSolicitudCaso = catchAsync<IdParams, unknown, { motivo: string }>(async (req, res) => {
+  res.status(200).json({ success: true, data: await observacionService.descartarSolicitudCaso(req.params.id, req.body.motivo, req.user!, req.ip) });
+});
+
+export const bandejaDeCasos = catchAsync<unknown, unknown, unknown, ParsedQs & { pagina?: number; limite?: number }>(async (req, res) => {
+  const paginacion = { pagina: Number(req.query.pagina ?? 1), limite: Number(req.query.limite ?? 20) };
+  res.status(200).json({ success: true, ...(await observacionService.bandejaDeCasos(req.user!, paginacion, req.ip)) });
+});

@@ -1,5 +1,12 @@
 import Joi from 'joi';
-import { FAMILIAS_OBSERVACION, MAX_COMENTARIO_OBSERVACION, MAX_ESTUDIANTES_POR_EVENTO, TIPOS_SITUACION } from '../constants/convivencia';
+import {
+  FAMILIAS_OBSERVACION,
+  MAX_COMENTARIO_OBSERVACION,
+  MAX_ESTUDIANTES_POR_EVENTO,
+  MEDIOS_CITACION,
+  RESPONSABLES_COMPROMISO,
+  TIPOS_SITUACION,
+} from '../constants/convivencia';
 import { ESTADOS_USUARIO } from '../constants/enums';
 import { ValidationSchema } from '../middlewares/validate.middleware';
 import { objectId } from './common.validator';
@@ -133,3 +140,40 @@ export const anularObservacion: ValidationSchema = {
   params: Joi.object({ id: objectId.required() }),
   body: Joi.object({ motivo: Joi.string().trim().min(5).max(500).required() }),
 };
+
+// --- Seguimiento ---
+
+export const agregarCompromiso: ValidationSchema = {
+  params: Joi.object({ id: objectId.required() }),
+  body: Joi.object({
+    descripcion: Joi.string().trim().min(5).max(500).required(),
+    responsable: Joi.string().valid(...RESPONSABLES_COMPROMISO).required(),
+    fecha_limite: fechaDeCalendario.required(),
+  }),
+};
+
+export const cerrarCompromiso: ValidationSchema = {
+  params: Joi.object({ id: objectId.required(), compromisoId: objectId.required() }),
+  body: Joi.object({
+    estado: Joi.string().valid('CUMPLIDO', 'INCUMPLIDO').required(),
+    nota: Joi.string().trim().max(500).allow(''),
+  }),
+};
+
+export const agregarCitacion: ValidationSchema = {
+  params: Joi.object({ id: objectId.required() }),
+  body: Joi.object({
+    fecha: fechaDeCalendario.required(),
+    medio: Joi.string().valid(...MEDIOS_CITACION).required(),
+    dirigida_a: Joi.string().trim().max(120).allow(''),
+    resultado: Joi.string().trim().max(500).allow(''),
+  }),
+};
+
+export const solicitarCaso: ValidationSchema = {
+  params: Joi.object({ id: objectId.required() }),
+  body: Joi.object({ motivo: Joi.string().trim().min(5).max(500).required() }),
+};
+
+export const descartarSolicitudCaso = solicitarCaso;
+export const bandejaDeCasos: ValidationSchema = { query: Joi.object(paginacion) };

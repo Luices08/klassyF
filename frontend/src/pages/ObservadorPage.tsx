@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { AnularObservacionDrawer } from '../components/convivencia/AnularObservacionDrawer';
+import { AccionesObservacion } from '../components/convivencia/AccionesObservacion';
 import { HistorialObservaciones } from '../components/convivencia/HistorialObservaciones';
 import { ChipsObservacion } from '../components/convivencia/ObservacionesTimeline';
 import { ObservacionDrawer } from '../components/convivencia/ObservacionDrawer';
@@ -15,7 +15,6 @@ import { TabPanel, Tabs } from '../components/ui/Tabs';
 import { useAuth } from '../context/AuthContext';
 import {
   type EstudianteObservable,
-  type ObservacionVista,
   useCatalogoConvivencia,
   useEstudiantesObservables,
   useGruposObservables,
@@ -196,8 +195,6 @@ function MisRegistrosTab() {
   const [pagina, setPagina] = useState(1);
   const mias = useMisObservaciones(pagina);
   const catalogo = useCatalogoConvivencia();
-  const [enmendando, setEnmendando] = useState<ObservacionVista | null>(null);
-  const [anulando, setAnulando] = useState<ObservacionVista | null>(null);
 
   if (mias.isLoading) return <Spinner />;
   if (mias.isError) return <Alert tone="error">{errorMessage(mias.error)}</Alert>;
@@ -229,16 +226,7 @@ function MisRegistrosTab() {
               </Td>
               <Td className="max-w-md whitespace-pre-line">{o.texto_generado}</Td>
               <Td className="text-right">
-                {o.estado === 'ACTIVA' && (
-                  <span className="flex justify-end gap-2">
-                    <Button variant="soft-edit" className="px-3 py-1 text-xs" onClick={() => setEnmendando(o)}>
-                      Enmendar
-                    </Button>
-                    <Button variant="soft-danger" className="px-3 py-1 text-xs" onClick={() => setAnulando(o)}>
-                      Anular
-                    </Button>
-                  </span>
-                )}
+                <AccionesObservacion observacion={o} catalogo={catalogo.data} />
               </Td>
             </tr>
           ))}
@@ -260,15 +248,6 @@ function MisRegistrosTab() {
           </span>
         </div>
       )}
-      {catalogo.data && (
-        <ObservacionDrawer
-          open={Boolean(enmendando)}
-          onClose={() => setEnmendando(null)}
-          catalogo={catalogo.data}
-          observacion={enmendando ?? undefined}
-        />
-      )}
-      <AnularObservacionDrawer observacion={anulando} onClose={() => setAnulando(null)} />
     </Card>
   );
 }

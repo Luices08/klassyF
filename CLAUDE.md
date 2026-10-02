@@ -222,9 +222,15 @@ Análisis completo: `doc/Analisis_M14_M15_Klassy.md`. Reglas que no se ven leyen
   sedes del coordinador. No se abre `/students` a convivencia.
 - **Se audita también la lectura** (`CONVIVENCIA_HISTORIAL_CONSULTADO`, `..._OBSERVACIONES_PROPIAS_CONSULTADAS`). El `detalle` de la
   auditoría nunca lleva contenido (ni el motivo de una anulación, que queda en la observación).
+- **Seguimiento de una observación** (embebido en `Observacion`): `compromisos[]` (PENDIENTE → CUMPLIDO/INCUMPLIDO; "vencido" no es un
+  estado, lo calcula el servidor por la fecha límite), `citaciones[]` (**solo registro**: cuándo, medio, a quién, resultado; el envío es
+  de M28) y `solicitud_caso`. Una falta de situación II/III crea sola la solicitud (`AUTOMATICA`, RN-14-07); el autor puede pedirla en una
+  disciplinaria (`MANUAL`, una sola vez). La atiende `COORDINADOR_CONVIVENCIA`/ADMIN en su sede desde `/convivencia/solicitudes`
+  (`GET /observaciones/solicitudes-caso`, auditada); hoy solo se puede **descartar con motivo**: M15 agrega "abrir caso" y el estado
+  CONVERTIDA. Compromisos y citaciones los agrega el autor o coordinación (sin plazo, pero nunca en un año CERRADO ni sobre una anulada).
 - **Pruebas con base real**: `tests/integracion/` usa `mongodb-memory-server` con réplica (solo dev; la primera ejecución descarga el
   binario de MongoDB). `npm test` las incluye.
-- **Pendiente, a propósito**: compromisos y solicitud de caso (Fase 3), casos y comité (M15), cargas masivas, retención. Registrar
+- **Pendiente, a propósito**: casos y comité (M15), cargas masivas, retención. Registrar
   "en nombre de" un docente existe en la API (`en_nombre_de_id`) pero aún no tiene pantalla.
 
 ### M10 (Espacios físicos) — estado: núcleo completo

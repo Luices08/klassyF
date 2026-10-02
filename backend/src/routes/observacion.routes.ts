@@ -44,8 +44,17 @@ router.post('/', checkRole(...REGISTRAN), validate(v.registrarObservacion), ctrl
 router.get('/mias', checkRole(...REGISTRAN), validate(v.listarMisObservaciones), ctrl.listarMisObservaciones);
 router.get('/mi-observador', checkRole(ROLES.ESTUDIANTE), ctrl.miObservador);
 router.get('/estudiantes/:studentId', checkRole(...CONSULTAN_HISTORIAL), validate(v.historialDeEstudiante), ctrl.historialDeEstudiante);
+// Bandeja de solicitudes de caso: la atiende convivencia (antes de `/:id` para que no se confunda con un id).
+router.get('/solicitudes-caso', checkRole(...GESTORES), validate(v.bandejaDeCasos), ctrl.bandejaDeCasos);
 router.get('/:id', checkRole(...REGISTRAN), validate(v.obtenerObservacion), ctrl.obtenerObservacion);
 router.patch('/:id', checkRole(...REGISTRAN), validate(v.enmendarObservacion), ctrl.enmendarObservacion);
 router.patch('/:id/anular', checkRole(...REGISTRAN), validate(v.anularObservacion), ctrl.anularObservacion);
+
+// Seguimiento: compromisos, citaciones (solo registro) y solicitud de caso.
+router.post('/:id/compromisos', checkRole(...REGISTRAN), validate(v.agregarCompromiso), ctrl.agregarCompromiso);
+router.patch('/:id/compromisos/:compromisoId', checkRole(...REGISTRAN), validate(v.cerrarCompromiso), ctrl.cerrarCompromiso);
+router.post('/:id/citaciones', checkRole(...REGISTRAN), validate(v.agregarCitacion), ctrl.agregarCitacion);
+router.post('/:id/solicitud-caso', checkRole(...REGISTRAN), validate(v.solicitarCaso), ctrl.solicitarCaso);
+router.patch('/:id/solicitud-caso/descartar', checkRole(...GESTORES), validate(v.descartarSolicitudCaso), ctrl.descartarSolicitudCaso);
 
 export default router;

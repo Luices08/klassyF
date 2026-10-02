@@ -3,14 +3,13 @@ import { ApiError } from '../../types/api';
 import { Alert, errorMessage } from '../ui/Alert';
 import { Button } from '../ui/Button';
 import { Spinner } from '../ui/Spinner';
-import { useCatalogoConvivencia, useHistorialObservaciones, type ObservacionVista } from '../../hooks/useObservaciones';
-import { AnularObservacionDrawer } from './AnularObservacionDrawer';
-import { ObservacionDrawer } from './ObservacionDrawer';
+import { useCatalogoConvivencia, useHistorialObservaciones } from '../../hooks/useObservaciones';
+import { AccionesObservacion } from './AccionesObservacion';
 import { ObservacionesTimeline } from './ObservacionesTimeline';
 
 interface Props {
   studentId: string;
-  /** Muestra enmendar/anular; el servidor valida el permiso y el plazo de cada una. */
+  /** Muestra las acciones (enmendar, anular, compromisos…); el servidor valida el permiso y el plazo de cada una. */
   conAcciones?: boolean;
 }
 
@@ -19,8 +18,6 @@ export function HistorialObservaciones({ studentId, conAcciones = true }: Props)
   const [pagina, setPagina] = useState(1);
   const historial = useHistorialObservaciones(studentId, pagina);
   const catalogo = useCatalogoConvivencia();
-  const [enmendando, setEnmendando] = useState<ObservacionVista | null>(null);
-  const [anulando, setAnulando] = useState<ObservacionVista | null>(null);
 
   if (historial.isLoading) return <Spinner />;
   if (historial.isError) {
@@ -39,21 +36,7 @@ export function HistorialObservaciones({ studentId, conAcciones = true }: Props)
     <div className="space-y-4">
       <ObservacionesTimeline
         observaciones={data}
-        acciones={
-          conAcciones
-            ? (obs) =>
-                obs.estado === 'ACTIVA' && (
-                  <span className="flex gap-2">
-                    <Button variant="soft-edit" className="px-3 py-1 text-xs" onClick={() => setEnmendando(obs)}>
-                      Enmendar
-                    </Button>
-                    <Button variant="soft-danger" className="px-3 py-1 text-xs" onClick={() => setAnulando(obs)}>
-                      Anular
-                    </Button>
-                  </span>
-                )
-            : undefined
-        }
+        acciones={conAcciones ? (obs) => <AccionesObservacion observacion={obs} catalogo={catalogo.data} /> : undefined}
       />
 
       {paginas > 1 && (
@@ -71,16 +54,6 @@ export function HistorialObservaciones({ studentId, conAcciones = true }: Props)
           </span>
         </div>
       )}
-
-      {catalogo.data && (
-        <ObservacionDrawer
-          open={Boolean(enmendando)}
-          onClose={() => setEnmendando(null)}
-          catalogo={catalogo.data}
-          observacion={enmendando ?? undefined}
-        />
-      )}
-      <AnularObservacionDrawer observacion={anulando} onClose={() => setAnulando(null)} />
     </div>
   );
 }

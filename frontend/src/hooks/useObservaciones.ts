@@ -76,6 +76,53 @@ export interface DescriptorRegistrado {
   tipo_situacion: TipoSituacion | null;
 }
 
+export const RESPONSABLES_COMPROMISO = ['ESTUDIANTE', 'ACUDIENTE', 'DOCENTE', 'INSTITUCION'] as const;
+export type ResponsableCompromiso = (typeof RESPONSABLES_COMPROMISO)[number];
+export const NOMBRES_RESPONSABLE: Record<ResponsableCompromiso, string> = {
+  ESTUDIANTE: 'Estudiante',
+  ACUDIENTE: 'Acudiente',
+  DOCENTE: 'Docente',
+  INSTITUCION: 'Institución',
+};
+
+export const MEDIOS_CITACION = ['LLAMADA', 'MENSAJE', 'CORREO', 'PRESENCIAL', 'OTRO'] as const;
+export type MedioCitacion = (typeof MEDIOS_CITACION)[number];
+export const NOMBRES_MEDIO: Record<MedioCitacion, string> = {
+  LLAMADA: 'Llamada',
+  MENSAJE: 'Mensaje',
+  CORREO: 'Correo',
+  PRESENCIAL: 'Presencial',
+  OTRO: 'Otro',
+};
+
+export interface CompromisoObservacion {
+  _id: string;
+  descripcion: string;
+  responsable: ResponsableCompromiso;
+  fecha_limite: string;
+  estado: 'PENDIENTE' | 'CUMPLIDO' | 'INCUMPLIDO';
+  /** Calculado por el servidor: pendiente y con la fecha límite ya pasada. */
+  vencido: boolean;
+  fecha_cierre: string | null;
+  nota_cierre: string;
+}
+
+export interface CitacionObservacion {
+  _id: string;
+  fecha: string;
+  medio: MedioCitacion;
+  dirigida_a: string;
+  resultado: string;
+}
+
+export interface SolicitudCaso {
+  estado: 'PENDIENTE' | 'DESCARTADA';
+  origen: 'AUTOMATICA' | 'MANUAL';
+  motivo: string;
+  fecha: string;
+  motivo_resolucion: string;
+}
+
 /** Lo que el servidor devuelve según quién consulta: `reservada` oculta el contenido (situaciones II y III). */
 export interface ObservacionVista {
   _id: string;
@@ -98,6 +145,9 @@ export interface ObservacionVista {
   evento_id?: string | null;
   anulacion?: { motivo: string; fecha: string } | null;
   cantidad_enmiendas?: number;
+  compromisos?: CompromisoObservacion[];
+  citaciones?: CitacionObservacion[];
+  solicitud_caso?: SolicitudCaso | null;
   /** Solo en "Mis registros". */
   estudiante?: string;
 }
@@ -303,6 +353,71 @@ export function useMisObservaciones(pagina: number) {
       api.raw<{ success: true } & PaginaObservaciones>('/observaciones/mias', { query: { pagina, limite: 20 } }),
     select: (res): PaginaObservaciones => ({ data: res.data, total: res.total, pagina: res.pagina, limite: res.limite }),
     placeholderData: keepPreviousData,
+  });
+}
+
+export function useAgregarCompromiso() {
+  const invalidar = useInvalidarObservaciones();
+  return useMutation({
+    mutationFn: ({ id, ...input }: { id: string; descripcion: string; responsable: ResponsableCompromiso; fecha_limite: string }) =>
+      api.post<ObservacionVista>(`/observaciones/${id}/compromisos`, input),
+    onSuccess: invalidar,
+  });
+}
+
+export function useCerrarCompromiso() {
+  const invalidar = useInvalidarObservaciones();
+  return useMutation({
+    mutationFn: ({ id, compromisoId, ...input }: { id: string; compromisoId: string; estado: 'CUMPLIDO' | 'INCUMPLIDO'; nota?: string }) =>
+      api.patch<ObservacionVista>(`/observaciones/${id}/compromisos/${compromisoId}`, input),
+    onSuccess: invalidar,
+  });
+}
+
+export function useAgregarCitacion() {
+  const invalidar = useInvalidarObservaciones();
+  return useMutation({
+    mutationFn: ({ id, ...input }: { id: string; fecha: string; medio: MedioCitacion; dirigida_a?: string; resultado?: string }) =>
+      api.post<ObservacionVista>(`/observaciones/${id}/citaciones`, input),
+    onSuccess: invalidar,
+  });
+}
+
+export function useSolicitarCaso() {
+  const invalidar = useInvalidarObservaciones();
+  return useMutation({
+    mutationFn: ({ id, motivo }: { id: string; motivo: string }) =>
+      api.post<ObservacionVista>(`/observaciones/${id}/solicitud-caso`, { motivo }),
+    onSuccess: invalidar,
+  });
+}
+
+export function useDescartarSolicitudCaso() {
+  const invalidar = useInvalidarObservaciones();
+  return useMutation({
+    mutationFn: ({ id, motivo }: { id: string; motivo: string }) =>
+      api.patch<ObservacionVista>(`/observaciones/${id}/solicitud-caso/descartar`, { motivo }),
+    onSuccess: invalidar,
+  });
+}
+
+export interface SolicitudEnBandeja extends ObservacionVista {
+  estudiante: string;
+  numero_documento: string;
+  grupo: string;
+}
+
+export function useBandejaCasos(pagina: number) {
+  return useQuery({
+    queryKey: ['observaciones', 'bandeja', pagina],
+    queryFn: () =>
+      api.raw<{ success: true; data: SolicitudEnBandeja[]; total: number; pagina: number; limite: number }>(
+        '/observaciones/solicitudes-caso',
+        { query: { pagina, limite: 20 } }
+      ),
+    select: (res) => ({ data: res.data, total: res.total, pagina: res.pagina, limite: res.limite }),
+    placeholderData: keepPreviousData,
+    retry: false,
   });
 }
 

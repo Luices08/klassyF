@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   componerTextoObservacion,
   dentroDelPlazo,
+  esCompromisoVencido,
   esSituacionGrave,
   tipoSituacionMaxima,
   vistaObservacion,
@@ -54,6 +55,15 @@ describe('dentroDelPlazo', () => {
   });
 });
 
+describe('esCompromisoVencido', () => {
+  const hoy = new Date('2026-03-10T00:00:00Z');
+  it('vence solo después de la fecha límite y solo si sigue pendiente', () => {
+    expect(esCompromisoVencido({ estado: 'PENDIENTE', fecha_limite: new Date('2026-03-09T00:00:00Z') }, hoy)).toBe(true);
+    expect(esCompromisoVencido({ estado: 'PENDIENTE', fecha_limite: hoy }, hoy)).toBe(false);
+    expect(esCompromisoVencido({ estado: 'CUMPLIDO', fecha_limite: new Date('2026-03-01T00:00:00Z') }, hoy)).toBe(false);
+  });
+});
+
 describe('vistaObservacion', () => {
   const obs = {
     _id: 'o1',
@@ -75,6 +85,9 @@ describe('vistaObservacion', () => {
     evento_id: 'ev1',
     anulacion: null,
     enmiendas: [],
+    compromisos: [],
+    citaciones: [],
+    solicitud_caso: null,
     createdAt: new Date(),
   };
 

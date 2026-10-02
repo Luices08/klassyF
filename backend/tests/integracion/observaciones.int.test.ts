@@ -306,6 +306,104 @@ describe('M14 observaciones (con base de datos)', () => {
     expect(await observaciones.buscarEstudiantes(e.coordConvivencia, { q: 'ap' })).toHaveLength(0);
   });
 
+  describe('seguimiento', () => {
+    const mañana = () => new Date(hoyColombia().getTime() + 24 * 3_600_000).toISOString().slice(0, 10);
+    const ayer = () => new Date(hoyColombia().getTime() - 24 * 3_600_000).toISOString().slice(0, 10);
+
+    it('una situación II/III queda como solicitud de caso automática y aparece en la bandeja de su sede', async () => {
+      const [grave] = await registrar(e.docenteDeClase, [String(e.estudiante._id)], {
+        tipo_id: e.tipoDisciplinaria,
+        descriptores_ids: [e.faltaTipoII],
+        comentario: 'Hechos graves.',
+      });
+      const [leve] = await registrar(e.docenteDeClase, [String(e.estudiante._id)], {
+        tipo_id: e.tipoDisciplinaria,
+        descriptores_ids: [e.faltaTipoI],
+        comentario: 'Llegó tarde.',
+      });
+      expect(grave).toMatchObject({ solicitud_caso: { estado: 'PENDIENTE', origen: 'AUTOMATICA' } });
+      expect(leve).toMatchObject({ solicitud_caso: null });
+
+      const bandeja = await observaciones.bandejaDeCasos(e.coordConvivencia, { pagina: 1, limite: 20 });
+      expect(bandeja.data.map((o) => o._id)).toEqual([grave!._id]);
+      expect((await observaciones.bandejaDeCasos(e.coordConvivenciaOtraSede, { pagina: 1, limite: 20 })).data).toHaveLength(0);
+      await expect(observaciones.bandejaDeCasos(e.docenteDeClase, { pagina: 1, limite: 20 })).rejects.toMatchObject({ statusCode: 403 });
+    });
+
+    it('el autor puede pedir el caso de una disciplinaria una sola vez; convivencia lo descarta con motivo', async () => {
+      const [obs] = await registrar(e.docenteDeClase, [String(e.estudiante._id)], {
+        tipo_id: e.tipoDisciplinaria,
+        descriptores_ids: [e.faltaTipoI],
+        comentario: 'Reiterado.',
+      });
+      const pedida = await observaciones.solicitarCaso(obs!._id, 'Es reiterado y preocupa.', e.docenteDeClase);
+      expect(pedida).toMatchObject({ solicitud_caso: { origen: 'MANUAL', estado: 'PENDIENTE' } });
+      await expect(observaciones.solicitarCaso(obs!._id, 'Otra vez.', e.docenteDeClase)).rejects.toMatchObject({ statusCode: 409 });
+
+      await expect(observaciones.descartarSolicitudCaso(obs!._id, 'No es mi sede.', e.coordConvivenciaOtraSede)).rejects.toMatchObject({ statusCode: 404 });
+      await expect(observaciones.descartarSolicitudCaso(obs!._id, 'No amerita caso.', e.docenteDeClase)).rejects.toMatchObject({ statusCode: 404 });
+      const descartada = await observaciones.descartarSolicitudCaso(obs!._id, 'No amerita caso.', e.coordConvivencia);
+      expect(descartada).toMatchObject({ solicitud_caso: { estado: 'DESCARTADA', motivo_resolucion: 'No amerita caso.' } });
+      expect((await observaciones.bandejaDeCasos(e.coordConvivencia, { pagina: 1, limite: 20 })).data).toHaveLength(0);
+    });
+
+    it('una observación académica o comportamental no se escala a caso', async () => {
+      const [obs] = await registrar(e.docenteDeClase, [String(e.estudiante._id)]);
+      await expect(observaciones.solicitarCaso(obs!._id, 'Quiero escalarla.', e.docenteDeClase)).rejects.toMatchObject({ statusCode: 409 });
+    });
+
+    it('los compromisos se cierran una vez y los vencidos se calculan por fecha', async () => {
+      const [obs] = await registrar(e.docenteDeClase, [String(e.estudiante._id)]);
+      await expect(
+        observaciones.agregarCompromiso(obs!._id, { descripcion: 'Entregar el taller.', responsable: 'ESTUDIANTE', fecha_limite: ayer() }, e.docenteDeClase)
+      ).rejects.toMatchObject({ statusCode: 400 });
+
+      const conCompromiso = await observaciones.agregarCompromiso(
+        obs!._id,
+        { descripcion: 'Entregar el taller.', responsable: 'ESTUDIANTE', fecha_limite: mañana() },
+        e.docenteDeClase
+      );
+      const compromiso = (conCompromiso as { compromisos: { _id: string; vencido: boolean }[] }).compromisos[0]!;
+      expect(compromiso.vencido).toBe(false);
+
+      // Se hace vencer a mano: la fecha límite ya pasó y sigue pendiente.
+      await Observacion.collection.updateOne(
+        { _id: new Types.ObjectId(obs!._id) },
+        { $set: { 'compromisos.0.fecha_limite': new Date(hoyColombia().getTime() - 3 * 24 * 3_600_000) } }
+      );
+      const historial = await observaciones.historialDeEstudiante(String(e.estudiante._id), e.coordConvivencia, { pagina: 1, limite: 20 });
+      expect((historial.data[0] as { compromisos: { vencido: boolean }[] }).compromisos[0]!.vencido).toBe(true);
+
+      const cerrado = await observaciones.cerrarCompromiso(obs!._id, compromiso._id, 'CUMPLIDO', 'Lo entregó.', e.docenteDeClase);
+      expect((cerrado as { compromisos: { estado: string; vencido: boolean }[] }).compromisos[0]).toMatchObject({ estado: 'CUMPLIDO', vencido: false });
+      await expect(observaciones.cerrarCompromiso(obs!._id, compromiso._id, 'INCUMPLIDO', undefined, e.docenteDeClase)).rejects.toMatchObject({ statusCode: 409 });
+      await expect(observaciones.cerrarCompromiso(obs!._id, compromiso._id, 'CUMPLIDO', undefined, e.docenteAjeno)).rejects.toMatchObject({ statusCode: 404 });
+    });
+
+    it('la citación solo se registra: no admite fechas futuras', async () => {
+      const [obs] = await registrar(e.docenteDeClase, [String(e.estudiante._id)]);
+      const conCitacion = await observaciones.agregarCitacion(
+        obs!._id,
+        { fecha: hoy(), medio: 'LLAMADA', dirigida_a: 'Madre del estudiante', resultado: 'Asistirá el lunes.' },
+        e.coordConvivencia
+      );
+      expect((conCitacion as { citaciones: unknown[] }).citaciones).toHaveLength(1);
+      await expect(observaciones.agregarCitacion(obs!._id, { fecha: mañana(), medio: 'CORREO' }, e.coordConvivencia)).rejects.toMatchObject({ statusCode: 400 });
+    });
+
+    it('el director no ve los compromisos de una situación reservada ni el estudiante ninguno', async () => {
+      const [grave] = await registrar(e.docenteDeClase, [String(e.estudiante._id)], {
+        tipo_id: e.tipoDisciplinaria,
+        descriptores_ids: [e.faltaTipoII],
+        comentario: 'Hechos graves.',
+      });
+      await observaciones.agregarCompromiso(grave!._id, { descripcion: 'Pedir disculpas.', responsable: 'ESTUDIANTE', fecha_limite: mañana() }, e.coordConvivencia);
+      const comoDirectora = await observaciones.historialDeEstudiante(String(e.estudiante._id), e.directora, { pagina: 1, limite: 20 });
+      expect(JSON.stringify(comoDirectora.data)).not.toContain('Pedir disculpas');
+      expect(JSON.stringify(await observaciones.miObservador(e.estudiante))).not.toContain('Pedir disculpas');
+    });
+  });
+
   it('el catálogo no elimina lo que ya se usó, solo lo desactiva', async () => {
     await registrar(e.docenteDeClase, [String(e.estudiante._id)], { tipo_id: e.tipoDisciplinaria, descriptores_ids: [e.faltaTipoI], comentario: 'Hechos.' });
     await expect(catalogo.eliminarDescriptor(e.faltaTipoI, actor(e.admin))).rejects.toMatchObject({ statusCode: 409 });

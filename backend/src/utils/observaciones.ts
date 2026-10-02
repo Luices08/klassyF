@@ -32,6 +32,11 @@ export function dentroDelPlazo(desde: Date, horas: number, ahora: Date = new Dat
 /** Situaciones II y III: su contenido solo lo ve quien gestiona convivencia; el director de grupo ve que existen. */
 export const esSituacionGrave = (tipo: TipoSituacion | null): boolean => tipo === 'II' || tipo === 'III';
 
+/** Pendiente y con la fecha límite ya pasada (la fecha límite del día de hoy todavía no está vencida). */
+export function esCompromisoVencido(compromiso: { estado: string; fecha_limite: Date }, hoy: Date): boolean {
+  return compromiso.estado === 'PENDIENTE' && compromiso.fecha_limite < hoy;
+}
+
 export type ModoVistaObservacion = 'COMPLETA' | 'RESERVADA' | 'ESTUDIANTE';
 
 interface ObservacionParaVista {
@@ -54,6 +59,9 @@ interface ObservacionParaVista {
   evento_id: { toString(): string } | null;
   anulacion: { motivo: string; fecha: Date } | null;
   enmiendas: unknown[];
+  compromisos: { _id: { toString(): string }; descripcion: string; responsable: string; fecha_limite: Date; estado: string; fecha_cierre: Date | null; nota_cierre: string }[];
+  citaciones: { _id: { toString(): string }; fecha: Date; medio: string; dirigida_a: string; resultado: string }[];
+  solicitud_caso: { estado: string; origen: string; motivo: string; fecha: Date; motivo_resolucion: string } | null;
   createdAt: Date;
 }
 
@@ -61,7 +69,8 @@ interface ObservacionParaVista {
  * Lo que cada consultante recibe de una observación. Se arma aquí, en un solo lugar, para que ninguna ruta devuelva el
  * documento crudo: `RESERVADA` oculta el contenido (existencia y tipo), `ESTUDIANTE` solo el texto final.
  */
-export function vistaObservacion(obs: ObservacionParaVista, modo: ModoVistaObservacion) {
+/** `hoy` es el día de calendario de hoy (Colombia, medianoche UTC): con él se calculan los compromisos vencidos. */
+export function vistaObservacion(obs: ObservacionParaVista, modo: ModoVistaObservacion, hoy: Date = new Date()) {
   if (modo === 'ESTUDIANTE') {
     return {
       _id: obs._id.toString(),
@@ -99,5 +108,31 @@ export function vistaObservacion(obs: ObservacionParaVista, modo: ModoVistaObser
     evento_id: obs.evento_id ? obs.evento_id.toString() : null,
     anulacion: obs.anulacion ? { motivo: obs.anulacion.motivo, fecha: obs.anulacion.fecha } : null,
     cantidad_enmiendas: obs.enmiendas.length,
+    compromisos: obs.compromisos.map((c) => ({
+      _id: c._id.toString(),
+      descripcion: c.descripcion,
+      responsable: c.responsable,
+      fecha_limite: c.fecha_limite,
+      estado: c.estado,
+      vencido: esCompromisoVencido(c, hoy),
+      fecha_cierre: c.fecha_cierre,
+      nota_cierre: c.nota_cierre,
+    })),
+    citaciones: obs.citaciones.map((c) => ({
+      _id: c._id.toString(),
+      fecha: c.fecha,
+      medio: c.medio,
+      dirigida_a: c.dirigida_a,
+      resultado: c.resultado,
+    })),
+    solicitud_caso: obs.solicitud_caso
+      ? {
+          estado: obs.solicitud_caso.estado,
+          origen: obs.solicitud_caso.origen,
+          motivo: obs.solicitud_caso.motivo,
+          fecha: obs.solicitud_caso.fecha,
+          motivo_resolucion: obs.solicitud_caso.motivo_resolucion,
+        }
+      : null,
   };
 }

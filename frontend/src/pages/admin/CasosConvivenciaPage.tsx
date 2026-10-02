@@ -10,6 +10,7 @@ import { PageHeader } from '../../components/ui/PageHeader';
 import { Spinner } from '../../components/ui/Spinner';
 import { EmptyRow, Table, TableBody, TableHead, Td, Th } from '../../components/ui/Table';
 import { PlusIcon } from '../../components/ui/icons';
+import { useCasosConAlertas } from '../../hooks/useComite';
 import { ESTADOS_CASO, NOMBRES_ESTADO_CASO, NOMBRES_ROL_INVOLUCRADO, useCasos, type EstadoCaso } from '../../hooks/useCasos';
 import { TIPOS_SITUACION, type TipoSituacion } from '../../hooks/useObservaciones';
 import { formatoFechaCalendario } from '../../lib/fechas';
@@ -20,6 +21,7 @@ export function CasosConvivenciaPage() {
   const [tipo, setTipo] = useState<TipoSituacion | ''>('');
   const [pagina, setPagina] = useState(1);
   const casos = useCasos({ estado, tipo_situacion: tipo, pagina });
+  const alertas = useCasosConAlertas();
   const [abriendo, setAbriendo] = useState(false);
   const [abierto, setAbierto] = useState<string | null>(null);
 
@@ -37,6 +39,22 @@ export function CasosConvivenciaPage() {
           </Button>
         }
       />
+
+      {(alertas.data ?? []).length > 0 && (
+        <Alert tone="warning">
+          <p className="font-semibold">Casos que requieren atención:</p>
+          <ul className="mt-1 space-y-0.5">
+            {alertas.data?.map((c) => (
+              <li key={c._id}>
+                <button type="button" className="underline" onClick={() => setAbierto(c._id)}>
+                  {c.codigo}
+                </button>{' '}
+                · {c.alertas.map((a) => a.mensaje).join(' ')}
+              </li>
+            ))}
+          </ul>
+        </Alert>
+      )}
 
       <Card>
         <CardHeader title="Casos" subtitle={`${total} caso(s)`} />

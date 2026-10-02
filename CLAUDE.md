@@ -233,7 +233,7 @@ Análisis completo: `doc/Analisis_M14_M15_Klassy.md`. Reglas que no se ven leyen
 - **Pendiente, a propósito**: casos y comité (M15), cargas masivas, retención. Registrar
   "en nombre de" un docente existe en la API (`en_nombre_de_id`) pero aún no tiene pantalla.
 
-### M15 (Comité de Convivencia Escolar — casos) — estado: casos completos; comité y actas pendientes
+### M15 (Comité de Convivencia Escolar) — estado: casos, comité y actas completos
 
 Backend `/convivencia` (modelos `CasoConvivencia`, `MedidaConvivencia`, `EntidadExterna`, `ProtocoloConvivencia`), frontend
 `CasosConvivenciaPage` (`/convivencia/casos`), `SolicitudesCasoPage` (`/convivencia/solicitudes`, abre caso desde la bandeja de M14) y
@@ -257,7 +257,15 @@ las pestañas Medidas / Entidades / Protocolos de `CatalogoConvivenciaPage`. Reg
   caso con varios involucrados (el permiso se comprueba por estudiante).
 - **Alertas calculadas** (`alertasDeCaso`): tipo III sin remisión pasado `plazo_remision_tipo_iii_horas` y seguimiento con próxima fecha
   vencida. M15 las muestra; el envío de avisos es de M28.
-- **Pendiente, a propósito**: comité (miembros, sesiones, actas firmadas, PDF; Fase 5), cargas masivas (Fase 6), retención, orientación
+- **Comité y actas** (`/convivencia/comite`, `ComitePage`): `MiembroComite` por año (usuarios del sistema o **designaciones externas**: personero,
+  representante de padres; solo uno preside), `SesionComite` (BORRADOR → FIRMADA, o ANULADA). El **consecutivo del acta (`AC-<año>-001`) nace
+  al firmar**, dentro de la transacción, así un borrador anulado no deja huecos. **Firma solo el ADMIN (rector)**, con quórum
+  (`ConfiguracionConvivencia.quorum_porcentaje`, 51 por defecto) y desarrollo escrito. Un acta firmada es **inmutable en el modelo** (hook de
+  `pre('save')`: solo admite `anexos`) y lleva una **huella SHA-256** (`hashDeActa`) que `GET .../integridad` recalcula para detectar cambios
+  hechos directo en la base. **Recusación (RN-15-11)**: por cada caso tratado se marca a los miembros apartados; no cuentan ni como miembro ni como
+  presente para el quórum de ese caso, y quien (siendo usuario) se declaró impedido en el caso queda recusado solo. El PDF (`pdfkit`) identifica
+  el caso solo por su código, marca el borrador como tal, se baja con sesión y queda auditado. Alertas de casos: `GET /convivencia/alertas`.
+- **Pendiente, a propósito**: cargas masivas (Fase 6), retención, orientación
   (solo se registra la remisión, no hay rol), portal del acudiente/estudiante (M27), descuento en notas (diferido).
 
 ### M10 (Espacios físicos) — estado: núcleo completo

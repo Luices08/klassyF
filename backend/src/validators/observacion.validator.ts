@@ -97,6 +97,7 @@ export const actualizarConfiguracion: ValidationSchema = {
     plazo_enmienda_horas: Joi.number().integer().min(0).max(720),
     plazo_anulacion_horas: Joi.number().integer().min(0).max(720),
     plazo_remision_tipo_iii_horas: Joi.number().integer().min(0).max(720),
+    quorum_porcentaje: Joi.number().integer().min(1).max(100),
   }).min(1),
 };
 

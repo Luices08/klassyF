@@ -47,7 +47,7 @@ const comoUsuarioConvivencia = (u: UserDocument): UsuarioConvivencia => ({
  * Solo convivencia (ADMIN y el coordinador de convivencia de esa sede) ve y gestiona un caso. Quien fue apartado por
  * conflicto de interés (RN-15-11) tampoco. "No existe" y "no autorizado" responden igual.
  */
-async function cargarCaso(id: string, usuario: UserDocument): Promise<CasoConvivenciaDocument> {
+export async function cargarCaso(id: string, usuario: UserDocument): Promise<CasoConvivenciaDocument> {
   const caso = ROLES_CONVIVENCIA.includes(usuario.rol) && Types.ObjectId.isValid(id) ? await CasoConvivencia.findById(id) : null;
   if (!caso) throw new ApiError(404, NO_ENCONTRADO);
   if (usuario.rol !== ROLES.ADMIN) {
@@ -494,4 +494,24 @@ export async function declararImpedimento(id: string, datos: { usuario_id?: stri
   await registrarEvento({ usuario_id: usuario._id, accion: 'CASO_CONVIVENCIA_IMPEDIMENTO', entidad: 'CasoConvivencia', entidad_id: caso._id, ip });
   // Quien se aparta ya no debe ver el caso: se responde sin su contenido.
   return objetivoId === String(usuario._id) && usuario.rol !== ROLES.ADMIN ? { apartado: true } : vistaCaso(caso);
+}
+
+/** Casos abiertos de las sedes del usuario que tienen alguna alerta calculada (remisión tipo III vencida, seguimiento vencido). */
+export async function casosConAlertas(usuario: UserDocument) {
+  if (!ROLES_CONVIVENCIA.includes(usuario.rol)) throw new ApiError(403, 'Solo convivencia consulta las alertas.');
+  const alcance = alcanceDeSedes(comoUsuarioConvivencia(usuario));
+  const filtro: Record<string, unknown> = {
+    estado: { $nin: ESTADOS_CASO_FINALES },
+    'impedidos.usuario_id': { $ne: usuario._id },
+    ...(alcance === 'TODAS' ? {} : { sede_id: { $in: alcance } }),
+  };
+  const [casos, configuracion] = await Promise.all([
+    CasoConvivencia.find(filtro).select('codigo estado tipo_situacion remisiones justificacion_sin_remision seguimientos createdAt'),
+    obtenerConfiguracion(),
+  ]);
+  const ahora = new Date();
+  const hoy = hoyColombia();
+  return casos
+    .map((c) => ({ _id: String(c._id), codigo: c.codigo, estado: c.estado, tipo_situacion: c.tipo_situacion, alertas: alertasDeCaso(c, configuracion, ahora, hoy) }))
+    .filter((c) => c.alertas.length > 0);
 }

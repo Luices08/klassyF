@@ -485,6 +485,7 @@ function PoliticaTab() {
   const [enmienda, setEnmienda] = useState<string | null>(null);
   const [anulacion, setAnulacion] = useState<string | null>(null);
   const [remision, setRemision] = useState<string | null>(null);
+  const [quorum, setQuorum] = useState<string | null>(null);
 
   if (configuracion.isLoading) return <Spinner />;
   if (configuracion.isError) return <Alert tone="error">{errorMessage(configuracion.error)}</Alert>;
@@ -496,10 +497,12 @@ function PoliticaTab() {
       plazo_enmienda_horas: Number(enmienda ?? actual?.plazo_enmienda_horas),
       plazo_anulacion_horas: Number(anulacion ?? actual?.plazo_anulacion_horas),
       plazo_remision_tipo_iii_horas: Number(remision ?? actual?.plazo_remision_tipo_iii_horas),
+      quorum_porcentaje: Number(quorum ?? actual?.quorum_porcentaje),
     });
     setEnmienda(null);
     setAnulacion(null);
     setRemision(null);
+    setQuorum(null);
   };
 
   return (
@@ -519,6 +522,15 @@ function PoliticaTab() {
             value={remision ?? actual?.plazo_remision_tipo_iii_horas ?? ''}
             onChange={(e) => setRemision(e.target.value)}
             hint="Pasado este plazo sin remisión, el caso muestra una alerta."
+          />
+          <Input
+            label="Quórum del comité (% de miembros presentes)"
+            type="number"
+            min={1}
+            max={100}
+            value={quorum ?? actual?.quorum_porcentaje ?? ''}
+            onChange={(e) => setQuorum(e.target.value)}
+            hint="Para firmar un acta y deliberar cada caso, sin contar a los recusados."
           />
         </div>
         <Button type="submit" isLoading={actualizar.isPending}>

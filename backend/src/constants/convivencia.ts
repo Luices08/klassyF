@@ -72,3 +72,15 @@ export type ParteDescargo = (typeof PARTES_DESCARGO)[number];
 
 /** Valor inicial de la política; la institución lo cambia. Pasado este plazo sin remisión, un caso tipo III muestra alerta. */
 export const PLAZO_REMISION_TIPO_III_HORAS_INICIAL = 24;
+
+// --- M15: comité de convivencia ---
+
+export const TIPOS_SESION_COMITE = ['ORDINARIA', 'EXTRAORDINARIA'] as const;
+export type TipoSesionComite = (typeof TIPOS_SESION_COMITE)[number];
+
+// Un acta nace en BORRADOR (editable, sin consecutivo) y al firmarse queda inmutable; las correcciones son anexos.
+export const ESTADOS_SESION_COMITE = ['BORRADOR', 'FIRMADA', 'ANULADA'] as const;
+export type EstadoSesionComite = (typeof ESTADOS_SESION_COMITE)[number];
+
+/** Valor inicial de la política (porcentaje de miembros presentes para deliberar); cada institución lo ajusta. */
+export const QUORUM_PORCENTAJE_INICIAL = 51;

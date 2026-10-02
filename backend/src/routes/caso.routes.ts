@@ -2,9 +2,11 @@ import { Router } from 'express';
 import { Rol } from '../constants/enums';
 import { ROLES } from '../constants/roles';
 import * as ctrl from '../controllers/caso.controller';
+import * as comite from '../controllers/comite.controller';
 import { authenticate, checkRole } from '../middlewares/auth.middleware';
 import validate from '../middlewares/validate.middleware';
 import * as v from '../validators/caso.validator';
+import * as vc from '../validators/comite.validator';
 
 const router = Router();
 
@@ -39,5 +41,25 @@ router.post('/casos/:id/cierre', validate(v.cerrarCaso), ctrl.cerrarCaso);
 router.post('/casos/:id/reapertura', validate(v.accionConMotivo), ctrl.reabrirCaso);
 router.post('/casos/:id/anulacion', validate(v.accionConMotivo), ctrl.anularCaso);
 router.post('/casos/:id/impedimento', validate(v.declararImpedimento), ctrl.declararImpedimento);
+
+// Alertas calculadas (el envío de avisos es de M28).
+router.get('/alertas', comite.casosConAlertas);
+
+// Comité: miembros por año, sesiones y actas. Firmar es solo del ADMIN (rector); el servicio lo vuelve a comprobar.
+router.get('/comite/miembros', validate(vc.listarMiembros), comite.listarMiembros);
+router.post('/comite/miembros', validate(vc.crearMiembro), comite.crearMiembro);
+router.patch('/comite/miembros/:id', validate(vc.actualizarMiembro), comite.actualizarMiembro);
+router.patch('/comite/miembros/:id/estado', validate(vc.cambiarEstadoMiembro), comite.cambiarEstadoMiembro);
+router.delete('/comite/miembros/:id', validate(vc.eliminarMiembro), comite.eliminarMiembro);
+
+router.get('/comite/sesiones', validate(vc.listarSesiones), comite.listarSesiones);
+router.post('/comite/sesiones', validate(vc.crearSesion), comite.crearSesion);
+router.get('/comite/sesiones/:id', validate(vc.obtenerSesion), comite.obtenerSesion);
+router.patch('/comite/sesiones/:id', validate(vc.actualizarSesion), comite.actualizarSesion);
+router.post('/comite/sesiones/:id/firma', validate(vc.firmarSesion), comite.firmarSesion);
+router.get('/comite/sesiones/:id/integridad', validate(vc.verificarIntegridad), comite.verificarIntegridad);
+router.post('/comite/sesiones/:id/anexos', validate(vc.agregarAnexo), comite.agregarAnexo);
+router.post('/comite/sesiones/:id/anulacion', validate(vc.anularSesion), comite.anularSesion);
+router.get('/comite/sesiones/:id/pdf', validate(vc.descargarActa), comite.descargarActa);
 
 export default router;

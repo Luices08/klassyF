@@ -292,6 +292,7 @@ export interface DatosConfiguracionConvivencia {
   plazo_enmienda_horas: number;
   plazo_anulacion_horas: number;
   plazo_remision_tipo_iii_horas: number;
+  quorum_porcentaje: number;
 }
 
 export async function actualizarConfiguracion(

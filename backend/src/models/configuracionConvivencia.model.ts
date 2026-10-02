@@ -3,6 +3,7 @@ import {
   PLAZO_ANULACION_HORAS_INICIAL,
   PLAZO_ENMIENDA_HORAS_INICIAL,
   PLAZO_REMISION_TIPO_III_HORAS_INICIAL,
+  QUORUM_PORCENTAJE_INICIAL,
 } from '../constants/convivencia';
 
 /** Política de convivencia de la institución (una por instalación). Crece con M15 (alertas, retención, reincidencia). */
@@ -13,6 +14,8 @@ export interface IConfiguracionConvivencia {
   plazo_anulacion_horas: number;
   /** Horas que un caso tipo III puede estar abierto sin remisión antes de mostrar la alerta. */
   plazo_remision_tipo_iii_horas: number;
+  /** Porcentaje mínimo de miembros presentes para que una sesión (y cada caso que trata) tenga quórum. */
+  quorum_porcentaje: number;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -26,6 +29,7 @@ const configuracionConvivenciaSchema = new Schema<IConfiguracionConvivencia, Con
     plazo_enmienda_horas: { type: Number, min: 0, max: 720, default: PLAZO_ENMIENDA_HORAS_INICIAL },
     plazo_anulacion_horas: { type: Number, min: 0, max: 720, default: PLAZO_ANULACION_HORAS_INICIAL },
     plazo_remision_tipo_iii_horas: { type: Number, min: 0, max: 720, default: PLAZO_REMISION_TIPO_III_HORAS_INICIAL },
+    quorum_porcentaje: { type: Number, min: 1, max: 100, default: QUORUM_PORCENTAJE_INICIAL },
   },
   { timestamps: true }
 );

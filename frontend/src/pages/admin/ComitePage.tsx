@@ -248,7 +248,7 @@ function MiembrosTab() {
 
 /** Solo el administrador puede ver la lista de usuarios (M02): coordinación designa externos o pide el vínculo a un ADMIN. */
 function SelectorUsuario({ valor, onCambio }: { valor: string; onCambio: (id: string, nombre: string) => void }) {
-  const usuarios = useUsersPaginados({ roles: ['ADMIN', 'COORDINADOR', 'COORDINADOR_CONVIVENCIA', 'DOCENTE'], estado: 'activo', limit: 100 });
+  const usuarios = useUsersPaginados({ roles: ['ADMIN', 'COORDINADOR', 'COORDINADOR_CONVIVENCIA', 'ORIENTADOR', 'DOCENTE'], estado: 'activo', limit: 100 });
   return (
     <Select
       label="Vincular a un usuario del sistema (opcional)"

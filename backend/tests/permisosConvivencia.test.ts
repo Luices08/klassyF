@@ -20,6 +20,7 @@ const estudiante = (extra: Partial<EstudianteConvivencia> = {}): EstudianteConvi
 });
 const acciones: AccionConvivencia[] = [
   'REGISTRAR_OBSERVACION',
+  'REGISTRAR_FALTA',
   'CONSULTAR_OBSERVACIONES_PROPIAS',
   'CONSULTAR_HISTORIAL',
   'VER_ESTADO_CASO',
@@ -30,6 +31,17 @@ const acciones: AccionConvivencia[] = [
 const accionesDePersonal = acciones.filter((a) => a !== 'CONSULTAR_OBSERVACIONES_VISIBLES_PROPIAS');
 const permitidas = (u: UsuarioConvivencia, e: EstudianteConvivencia) =>
   acciones.filter((a) => permisoSobreEstudiante(u, e, a));
+
+describe('roles de convivencia y orientación en la jerarquía', () => {
+  it('solo el ADMIN gestiona al orientador, que también exige sede', () => {
+    expect(puedeGestionarRol('ADMIN', 'ORIENTADOR')).toBe(true);
+    for (const operador of ['COORDINADOR', 'COORDINADOR_CONVIVENCIA', 'DOCENTE', 'SECRETARIA'] as const) {
+      expect(puedeGestionarRol(operador, 'ORIENTADOR'), operador).toBe(false);
+    }
+    expect(puedeGestionarRol('ORIENTADOR', 'DOCENTE')).toBe(true);
+    expect(ROLES_CON_SEDE_OBLIGATORIA).toContain('ORIENTADOR');
+  });
+});
 
 describe('rol COORDINADOR_CONVIVENCIA en la jerarquía', () => {
   it('solo el ADMIN lo gestiona y no gestiona a su par', () => {
@@ -66,7 +78,19 @@ describe('permisoSobreEstudiante', () => {
     expect(permitidas(usuario('COORDINADOR_CONVIVENCIA', []), estudiante())).toEqual([]);
   });
 
-  it('el coordinador académico registra y ve el historial, pero no los casos', () => {
+  it('el orientador registra su seguimiento y ve el historial de su sede, pero no registra faltas ni gestiona casos', () => {
+    const u = usuario('ORIENTADOR');
+    expect(permitidas(u, estudiante())).toEqual([
+      'REGISTRAR_OBSERVACION',
+      'CONSULTAR_OBSERVACIONES_PROPIAS',
+      'CONSULTAR_HISTORIAL',
+      'VER_ESTADO_CASO',
+    ]);
+    expect(permitidas(u, estudiante({ sede_id: 's2' }))).toEqual([]);
+    expect(permitidas(usuario('ORIENTADOR', []), estudiante())).toEqual([]);
+  });
+
+  it('el coordinador académico registra observaciones y ve el historial, pero ni faltas ni casos', () => {
     expect(permitidas(usuario('COORDINADOR'), estudiante())).toEqual([
       'REGISTRAR_OBSERVACION',
       'CONSULTAR_OBSERVACIONES_PROPIAS',
@@ -77,6 +101,7 @@ describe('permisoSobreEstudiante', () => {
   it('el docente de clase registra y ve solo lo suyo, nunca el historial', () => {
     expect(permitidas(usuario('DOCENTE'), estudiante({ docenteDictaClase: true }))).toEqual([
       'REGISTRAR_OBSERVACION',
+      'REGISTRAR_FALTA',
       'CONSULTAR_OBSERVACIONES_PROPIAS',
     ]);
   });
@@ -88,6 +113,7 @@ describe('permisoSobreEstudiante', () => {
   it('el director de grupo ve el historial y el estado del caso, pero no gestiona', () => {
     expect(permitidas(usuario('DOCENTE'), estudiante({ esDirectorDeGrupo: true }))).toEqual([
       'REGISTRAR_OBSERVACION',
+      'REGISTRAR_FALTA',
       'CONSULTAR_OBSERVACIONES_PROPIAS',
       'CONSULTAR_HISTORIAL',
       'VER_ESTADO_CASO',

@@ -3,11 +3,12 @@ import { ROLES } from '../constants/roles';
 
 /**
  * Matriz de permisos de M14/M15 (convivencia). Es una lista de permitidos: un rol que no aparece aquí no tiene
- * acceso. SECRETARIA y ACUDIENTE quedan fuera a propósito (el acudiente entra con M27) y COORDINADOR no hereda
- * nada de COORDINADOR_CONVIVENCIA: son roles distintos con el mismo rango.
+ * acceso. SECRETARIA y ACUDIENTE quedan fuera a propósito (el acudiente entra con M27) y COORDINADOR y ORIENTADOR no
+ * heredan nada de COORDINADOR_CONVIVENCIA: son roles distintos con el mismo rango.
  */
 export type AccionConvivencia =
   | 'REGISTRAR_OBSERVACION'
+  | 'REGISTRAR_FALTA'
   | 'CONSULTAR_OBSERVACIONES_PROPIAS'
   | 'CONSULTAR_HISTORIAL'
   | 'VER_ESTADO_CASO'
@@ -56,7 +57,9 @@ export function permisoSobreEstudiante(
   if (usuario.rol === ROLES.DOCENTE) {
     if (accion === 'CONSULTAR_OBSERVACIONES_PROPIAS') return true;
     if (!enAlcanceDeSede(usuario, estudiante.sede_id)) return false;
-    if (accion === 'REGISTRAR_OBSERVACION') return Boolean(estudiante.docenteDictaClase || estudiante.esDirectorDeGrupo);
+    if (accion === 'REGISTRAR_OBSERVACION' || accion === 'REGISTRAR_FALTA') {
+      return Boolean(estudiante.docenteDictaClase || estudiante.esDirectorDeGrupo);
+    }
     if (accion === 'CONSULTAR_HISTORIAL' || accion === 'VER_ESTADO_CASO') return Boolean(estudiante.esDirectorDeGrupo);
     return false;
   }
@@ -65,7 +68,18 @@ export function permisoSobreEstudiante(
 
   if (usuario.rol === ROLES.COORDINADOR_CONVIVENCIA) return true;
 
-  // El coordinador académico solo registra y consulta el historial: los casos no son suyos.
+  // Orientación acompaña a los estudiantes de su sede: registra su seguimiento y ve el historial, pero ni registra faltas ni
+  // gestiona casos (recibe remisiones por su propia bandeja).
+  if (usuario.rol === ROLES.ORIENTADOR) {
+    return (
+      accion === 'REGISTRAR_OBSERVACION' ||
+      accion === 'CONSULTAR_OBSERVACIONES_PROPIAS' ||
+      accion === 'CONSULTAR_HISTORIAL' ||
+      accion === 'VER_ESTADO_CASO'
+    );
+  }
+
+  // El coordinador académico solo registra observaciones y consulta el historial: ni faltas ni casos son suyos.
   if (usuario.rol === ROLES.COORDINADOR) {
     return (
       accion === 'REGISTRAR_OBSERVACION' ||

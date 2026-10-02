@@ -97,7 +97,7 @@ Los 5 sub-módulos de M01 están implementados; no rehacer, solo extender si se 
 
 Backend `/users` (modelo `User`), frontend `/admin/users` (`UsersPage`).
 - **Matriz de permisos y jerarquía estricta** (`backend/src/constants/roles.ts`, `frontend/src/types/api.ts`):
-  `ADMIN (100) > COORDINADOR (70) = COORDINADOR_CONVIVENCIA (70) > SECRETARIA (40) = DOCENTE (40) > ESTUDIANTE (10) = ACUDIENTE (10)`.
+  `ADMIN (100) > COORDINADOR (70) = COORDINADOR_CONVIVENCIA (70) = ORIENTADOR (70) > SECRETARIA (40) = DOCENTE (40) > ESTUDIANTE (10) = ACUDIENTE (10)`.
   Un usuario solo puede crear, editar, cambiar estado, resetear contraseña, cerrar sesiones o eliminar a
   usuarios de rango estrictamente MENOR (con la excepción de que un ADMIN sí puede gestionar a otros ADMIN,
   salvo a sí mismo).
@@ -107,6 +107,10 @@ Backend `/users` (modelo `User`), frontend `/admin/users` (`UsersPage`).
   este rol (`checkRole` es lista de permitidos). Exige al menos una sede (`ROLES_CON_SEDE_OBLIGATORIA`, validado en el modelo
   `User`). Convivencia decide el acceso con `permisoSobreEstudiante` y `alcanceDeSedes` (`utils/permisosConvivencia.ts`, función
   pura con tests): sin sedes asignadas no ve nada, y SECRETARIA y ACUDIENTE no tienen acceso (el acudiente entra con M27).
+- **`ORIENTADOR` (Orientación / Psicología, M14/M15)**: el maestro (§3 y M02) lo lista como actor y rol base; se agregó con la misma lógica que
+  `COORDINADOR_CONVIVENCIA`: rango 70 (solo un ADMIN lo gestiona), sede obligatoria (`ROLES_CON_SEDE_OBLIGATORIA`) y sin herencia de ningún
+  otro rol. Sus funciones en este alcance son el seguimiento psicosocial (observaciones confidenciales) y las remisiones a orientación que
+  recibe de convivencia. **El PIAR (M16) no se construyó**: el rol existe pero M16 sigue pendiente. Tampoco ve la salud administrativa del estudiante.
 - **Secretaría en M02**: mantiene la consulta global del directorio de usuarios, pero todas las acciones sobre
   roles jerárquicamente iguales o superiores (`ADMIN`, `COORDINADOR`, `DOCENTE`, `SECRETARIA`) quedan bloqueadas
   tanto en frontend (`IconButton disabled` con tooltip explicativo) como en backend (403 con mensaje de

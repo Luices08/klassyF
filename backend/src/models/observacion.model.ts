@@ -95,6 +95,8 @@ export interface IObservacion {
   texto_generado: string;
   /** Un mismo hecho con varios estudiantes crea un registro por estudiante con este id común. */
   evento_id: Types.ObjectId | null;
+  /** Carga masiva (Excel/CSV) de la que viene; permite anular el lote completo. */
+  lote_id: Types.ObjectId | null;
   registrado_por: Types.ObjectId;
   /** A quién se atribuye: el propio autor, o el docente en cuyo nombre registró coordinación. */
   autor_id: Types.ObjectId;
@@ -191,6 +193,7 @@ const observacionSchema = new Schema<IObservacion, ObservacionModel>(
     comentario: { type: String, default: '', maxlength: MAX_COMENTARIO_OBSERVACION },
     texto_generado: { type: String, required: true },
     evento_id: { type: Schema.Types.ObjectId, default: null },
+    lote_id: { type: Schema.Types.ObjectId, ref: 'LoteImportacion', default: null },
     registrado_por: { type: Schema.Types.ObjectId, ref: 'User', required: true },
     autor_id: { type: Schema.Types.ObjectId, ref: 'User', required: true },
     contexto: { type: String, enum: CONTEXTOS_OBSERVACION, required: true },
@@ -209,6 +212,7 @@ observacionSchema.index({ group_id: 1, periodo_numero: 1 });
 observacionSchema.index({ autor_id: 1, fecha_hecho: -1 });
 observacionSchema.index({ registrado_por: 1, fecha_hecho: -1 });
 observacionSchema.index({ evento_id: 1 }, { sparse: true });
+observacionSchema.index({ lote_id: 1 }, { sparse: true });
 // Bandeja de coordinación de convivencia.
 observacionSchema.index({ 'solicitud_caso.estado': 1, sede_id: 1, fecha_hecho: -1 }, { sparse: true });
 

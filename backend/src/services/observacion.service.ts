@@ -284,7 +284,11 @@ function contextoDeRegistro(usuario: UserDocument, datos: EstudianteConvivencia)
   return datos.docenteDictaClase ? 'CLASE' : 'DIRECCION_GRUPO';
 }
 
-export async function registrarObservacion(input: RegistrarObservacionInput, usuario: UserDocument, ip?: string | null) {
+/**
+ * Valida y arma las observaciones de un hecho (una por estudiante) SIN escribir: el registro individual y la carga masiva
+ * pasan por aquí, así que rigen exactamente las mismas reglas (alcance, matrícula, fecha, periodo, frases, contenido).
+ */
+export async function prepararObservaciones(input: RegistrarObservacionInput, usuario: UserDocument, loteId: Types.ObjectId | null = null) {
   const comentario = (input.comentario ?? '').trim();
   const anio = await anioEnCurso();
   const fecha = fechaDeClase(input.fecha_hecho);
@@ -343,6 +347,7 @@ export async function registrarObservacion(input: RegistrarObservacionInput, usu
       registrado_por: usuario._id,
       autor_id: autorId,
       contexto: contextoDeRegistro(usuario, contexto.datos),
+      lote_id: loteId,
       // RN-14-07: una situación II/III no puede quedarse solo como observación; coordinación de convivencia la atiende.
       solicitud_caso: esSituacionGrave(situacionMaxima)
         ? {
@@ -360,6 +365,11 @@ export async function registrarObservacion(input: RegistrarObservacionInput, usu
     });
   }
 
+  return { documentos, eventoId };
+}
+
+export async function registrarObservacion(input: RegistrarObservacionInput, usuario: UserDocument, ip?: string | null) {
+  const { documentos, eventoId } = await prepararObservaciones(input, usuario);
   const creadas = await runTransaction((session) => Observacion.insertMany(documentos, { session }));
 
   await registrarEvento({

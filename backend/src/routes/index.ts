@@ -15,6 +15,7 @@ import gradeRoutes from './grade.routes';
 import groupRoutes from './group.routes';
 import guardianRoutes from './guardian.routes';
 import institutionRoutes from './institution.routes';
+import importacionConvivenciaRoutes from './importacionConvivencia.routes';
 import jornadaOperativaRoutes from './jornadaOperativa.routes';
 import observacionRoutes from './observacion.routes';
 import periodLockRoutes from './periodLock.routes';
@@ -62,6 +63,8 @@ router.use('/teacher-assignments', teacherAssignmentRoutes);
 router.use('/curricular-developments', curricularDevelopmentRoutes);
 
 // M14: Observaciones y convivencia (Observador)
+// Las cargas masivas se montan antes: `/observaciones/:id` no debe interceptarlas.
+router.use('/observaciones/importacion', importacionConvivenciaRoutes);
 router.use('/observaciones', observacionRoutes);
 
 // M15: Comité de convivencia escolar (casos, protocolos, medidas y entidades de remisión)

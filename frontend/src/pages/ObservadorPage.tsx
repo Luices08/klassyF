@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import { AccionesObservacion } from '../components/convivencia/AccionesObservacion';
+import { CargaMasivaDrawer } from '../components/convivencia/CargaMasivaDrawer';
 import { HistorialObservaciones } from '../components/convivencia/HistorialObservaciones';
 import { ChipsObservacion } from '../components/convivencia/ObservacionesTimeline';
 import { ObservacionDrawer } from '../components/convivencia/ObservacionDrawer';
@@ -62,6 +63,7 @@ function RegistrarTab({ esDocente }: { esDocente: boolean }) {
   const estudiantes = useEstudiantesObservables({ group_id: grupoId || undefined, q: busqueda });
   const [seleccion, setSeleccion] = useState<Set<string>>(new Set());
   const [registrando, setRegistrando] = useState(false);
+  const [cargando, setCargando] = useState(false);
   const [historialDe, setHistorialDe] = useState<EstudianteObservable | null>(null);
 
   const lista = estudiantes.data ?? [];
@@ -87,9 +89,14 @@ function RegistrarTab({ esDocente }: { esDocente: boolean }) {
         title="Estudiantes"
         subtitle="Elige un grupo o busca por nombre o documento (mínimo 3 letras)."
         action={
-          <Button disabled={elegidos.length === 0} onClick={() => setRegistrando(true)}>
-            Registrar observación{elegidos.length > 0 ? ` (${elegidos.length})` : ''}
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <Button variant="outline" onClick={() => setCargando(true)}>
+              Cargar archivo
+            </Button>
+            <Button disabled={elegidos.length === 0} onClick={() => setRegistrando(true)}>
+              Registrar observación{elegidos.length > 0 ? ` (${elegidos.length})` : ''}
+            </Button>
+          </div>
         }
       />
       <div className="grid grid-cols-1 gap-4 p-4 sm:grid-cols-2">
@@ -167,6 +174,7 @@ function RegistrarTab({ esDocente }: { esDocente: boolean }) {
         </TableBody>
       </Table>
 
+      <CargaMasivaDrawer proceso={cargando ? 'observaciones' : null} grupoId={grupoId || undefined} onClose={() => setCargando(false)} />
       {catalogo.data && (
         <ObservacionDrawer
           open={registrando}

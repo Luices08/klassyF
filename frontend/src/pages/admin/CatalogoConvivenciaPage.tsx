@@ -1,5 +1,7 @@
 import { type FormEvent, useState } from 'react';
+import { CargaMasivaDrawer } from '../../components/convivencia/CargaMasivaDrawer';
 import { EntidadesTab, MedidasTab, ProtocolosTab } from '../../components/convivencia/CatalogosCasoTabs';
+import type { ProcesoConvivencia } from '../../lib/columnasImportacion';
 import { Alert, errorMessage } from '../../components/ui/Alert';
 import { Chip, EstadoUsuarioBadge, type Tone } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
@@ -11,7 +13,7 @@ import { PageHeader } from '../../components/ui/PageHeader';
 import { Spinner } from '../../components/ui/Spinner';
 import { EmptyRow, Table, TableBody, TableHead, Td, Th } from '../../components/ui/Table';
 import { TabPanel, Tabs } from '../../components/ui/Tabs';
-import { BanIcon, PencilIcon, PlusIcon, RefreshIcon, TrashIcon } from '../../components/ui/icons';
+import { BanIcon, PencilIcon, PlusIcon, RefreshIcon, TrashIcon, UploadIcon } from '../../components/ui/icons';
 import {
   FAMILIAS_OBSERVACION,
   NOMBRES_FAMILIA,
@@ -50,6 +52,8 @@ export function CatalogoConvivenciaPage() {
   const cambiarEstado = useCambiarEstadoCatalogo();
   const eliminar = useEliminarDelCatalogo();
   const [porEliminar, setPorEliminar] = useState<PorEliminar | null>(null);
+  const [carga, setCarga] = useState<ProcesoConvivencia | null>(null);
+  const procesoDeCarga = tab === 'tipos' || tab === 'categorias' ? tab : tab === 'frases' ? 'frases' : null;
 
   const alternarEstado = (recurso: RecursoCatalogo, id: string, estado: EstadoActivo) =>
     cambiarEstado.mutate({ recurso, id, estado: estado === 'activo' ? 'inactivo' : 'activo' });
@@ -59,7 +63,15 @@ export function CatalogoConvivenciaPage() {
       <PageHeader
         title="Catálogo de convivencia"
         subtitle="Los tipos de observación, las categorías y las faltas de tu manual de convivencia. Cada institución define los suyos."
+        action={
+          procesoDeCarga ? (
+            <Button variant="outline" onClick={() => setCarga(procesoDeCarga)}>
+              <UploadIcon className="h-4 w-4" /> Cargar archivo
+            </Button>
+          ) : undefined
+        }
       />
+      <CargaMasivaDrawer proceso={carga} onClose={() => setCarga(null)} />
       <Alert tone="info">
         Agrega, edita o elimina lo que necesites. Lo que ya se usó en una observación no se elimina: se desactiva, para conservar el historial.
       </Alert>

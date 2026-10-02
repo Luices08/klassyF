@@ -228,9 +228,19 @@ Análisis completo: `doc/Analisis_M14_M15_Klassy.md`. Reglas que no se ven leyen
   disciplinaria (`MANUAL`, una sola vez). La atiende `COORDINADOR_CONVIVENCIA`/ADMIN en su sede desde `/convivencia/solicitudes`
   (`GET /observaciones/solicitudes-caso`, auditada); hoy solo se puede **descartar con motivo**: M15 agrega "abrir caso" y el estado
   CONVERTIDA. Compromisos y citaciones los agrega el autor o coordinación (sin plazo, pero nunca en un año CERRADO ni sobre una anulada).
+- **Cargas masivas** (`/observaciones/importacion`, `CargaMasivaDrawer`; columnas en `constants/importacionConvivencia.ts` y su guía en
+  `lib/columnasImportacion.ts`, que se actualizan en el mismo cambio): una plantilla por proceso (`tipos`, `categorias`, `frases` —las faltas del manual
+  van aquí, con tipo de situación y décimas—, `observaciones`), `.xlsx` o `.csv` por **un mismo canal** (`leerCsv` o `exceljs` → filas normalizadas →
+  mismo plan de validación). **Se valida todo el archivo antes de escribir**: una fila con error y no se guarda nada (a diferencia de las cargas de
+  usuarios/estudiantes, que omiten la fila). Las observaciones pasan por `prepararObservaciones`, **el mismo camino del registro individual** (alcance
+  del docente, matrícula, periodo, frases), nunca una vía paralela; lo disciplinario no se carga por archivo. Idempotente por clave natural (reenviar
+  no duplica). Una carga es un `LoteImportacion` (solo guarda la huella SHA-256 del archivo, no el archivo) y un **ADMIN puede anular el lote de
+  observaciones** (quedan anuladas, no borradas); las de catálogo se corrigen desde su pantalla. Seguridad: fórmulas neutralizadas al generar y
+  rechazadas al leer, firma ZIP del `.xlsx`, 2 MB, tope de filas. **La migración histórica de un observador antiguo (T6) quedó fuera**: exige decidir cómo
+  representar años lectivos que no existen en el sistema.
 - **Pruebas con base real**: `tests/integracion/` usa `mongodb-memory-server` con réplica (solo dev; la primera ejecución descarga el
   binario de MongoDB). `npm test` las incluye.
-- **Pendiente, a propósito**: casos y comité (M15), cargas masivas, retención. Registrar
+- **Pendiente, a propósito**: retención (Fase 7) y la migración histórica de un observador antiguo. Registrar
   "en nombre de" un docente existe en la API (`en_nombre_de_id`) pero aún no tiene pantalla.
 
 ### M15 (Comité de Convivencia Escolar) — estado: casos, comité y actas completos
@@ -265,7 +275,7 @@ las pestañas Medidas / Entidades / Protocolos de `CatalogoConvivenciaPage`. Reg
   hechos directo en la base. **Recusación (RN-15-11)**: por cada caso tratado se marca a los miembros apartados; no cuentan ni como miembro ni como
   presente para el quórum de ese caso, y quien (siendo usuario) se declaró impedido en el caso queda recusado solo. El PDF (`pdfkit`) identifica
   el caso solo por su código, marca el borrador como tal, se baja con sesión y queda auditado. Alertas de casos: `GET /convivencia/alertas`.
-- **Pendiente, a propósito**: cargas masivas (Fase 6), retención, orientación
+- **Pendiente, a propósito**: retención, orientación
   (solo se registra la remisión, no hay rol), portal del acudiente/estudiante (M27), descuento en notas (diferido).
 
 ### M10 (Espacios físicos) — estado: núcleo completo

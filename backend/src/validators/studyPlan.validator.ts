@@ -3,6 +3,9 @@ import { METODOS_CALCULO_EVALUACION } from '../constants/enums';
 import { ValidationSchema } from '../middlewares/validate.middleware';
 import { objectId } from './common.validator';
 
+// Con el año en curso todo cambio al plan debe justificarse (el servicio decide si hace falta).
+const motivo = Joi.string().trim().min(5).max(500).optional();
+
 const asignaturaGradoSchema = Joi.object({
   subject_id: objectId.required(),
   intensidad_horaria_semanal: Joi.number().integer().min(1).required(),
@@ -14,6 +17,7 @@ export const configurarAsignaturasGrado: ValidationSchema = {
     academic_year_id: objectId.required(),
     grade_id: objectId.required(),
     asignaturas: Joi.array().items(asignaturaGradoSchema).default([]),
+    motivo,
   }),
 };
 
@@ -30,6 +34,7 @@ export const configurarAsignaturasMultiplesGrados: ValidationSchema = {
       )
       .min(1)
       .required(),
+    motivo,
   }),
 };
 
@@ -54,6 +59,7 @@ export const configurarEvaluacionArea: ValidationSchema = {
       then: Joi.array().items(ponderacionAsignaturaSchema).min(1).required(),
       otherwise: Joi.array().items(ponderacionAsignaturaSchema).default([]),
     }),
+    motivo,
   }),
 };
 
@@ -71,6 +77,7 @@ export const configurarDistribucionGrupo: ValidationSchema = {
     group_id: objectId.required(),
     intensidades_personalizadas: Joi.array().items(asignaturaPersonalizadaSchema).default([]),
     asignaturas_agregadas: Joi.array().items(asignaturaPersonalizadaSchema).default([]),
+    motivo,
   }),
 };
 

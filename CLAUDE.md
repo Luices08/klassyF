@@ -214,6 +214,32 @@ Backend `/espacios` (modelo `Espacio`), frontend `/admin/espacios` (`EspaciosPag
   usará el motor de horarios (M09). La malla semanal se arma **por espacio y jornada** con los días y franjas reales de la jornada (ver
   arriba) y solo muestra ocupación por grupo titular; la ocupación por asignatura llega con M09.
 
+### M06 (Plan de estudios) y M08 (Carga docente) — reglas que no se ven en un solo archivo
+
+- **El tope de horas semanales del plan es configuración institucional** (`Institution.limites_horas_plan_estudios`, por
+  nivel) y lo exige el **servidor** (`exigirTopeDeHoras` en `studyPlan.service.ts`), por grado y por grupo; la pantalla solo
+  lo refleja. Al cambiar la base de un grado también se revisan sus grupos personalizados, que heredan esas horas.
+  Bajar el tope no bloquea ni invalida planes ya guardados: la respuesta de `PATCH /institution/limites-horas-plan` trae
+  `grados_excedidos` (planes de años no cerrados que quedaron por encima) y la pantalla los lista.
+- **El plan no se congela entero al activar el año; se congela por dependencias** (`planEstudiosDependencias.service.ts`).
+  Año CERRADO: histórico, no se toca. PLANIFICACION: libre. EN_CURSO: todo cambio exige `motivo` (queda en auditoría) y solo
+  se permite lo que no tiene resultados calculados encima: las horas semanales siempre (no entran en el cálculo de notas, y se
+  propagan a las asignaciones docentes de M08 con `sincronizarHorasDeAsignaciones`); agregar/quitar asignaturas o cambiar
+  ponderaciones solo si el área no tiene actividades en ese grado/grupo. Quitar una asignatura del plan exige antes retirar
+  su asignación docente, en cualquier estado del año. El versionamiento completo del Análisis_M06 (nueva versión con fechas
+  e impacto) queda para cuando existan M09 y el cálculo de boletín por periodo (M12).
+- **Una asignatura que ya está en la malla, en una ponderación o en la distribución de un grupo de cualquier plan no cambia de
+  `area_id`** (`actualizarSubject`): dejaría ponderaciones colgando de un área que ya no es la suya.
+- **Topes de carga docente** (`Institution.limites_carga_docente`, `max_direcciones_grupo_por_docente`,
+  `tolerancia_subcarga_horas`) se editan juntos en M08 y no hay valores quemados en el diagnóstico. El semáforo es la función
+  pura `resumirCargaDocente` (`utils/cargaDocente.ts`, con tests en `backend/tests/`, `npm test`): un docente en varios niveles se
+  mide como fracción de su jornada (`fraccion_carga`), y sin horas por nivel no se supone ninguno (`SIN_CARGA`).
+- **Las horas de una dirección de grupo las fija quien la asigna** (`horas_semanales`, 0 por defecto = no suma). Si son más de 0
+  cuentan en el nivel del grupo dirigido, igual que una clase.
+- **Asignar una dirección a un grupo que ya tiene director exige `reemplazar_director: true`** (409 si falta); el anterior queda
+  inactivo (historial) y se audita `ASIGNACION_DOCENTE_REEMPLAZADA`. El límite de direcciones por docente se protege de la
+  concurrencia con un contador común dentro de la transacción (`DIR-<año>-<docente>`).
+
 ### M13 (Asistencia) — estado: núcleo completo
 
 Backend `/attendance` (modelos `AttendanceState`, `Attendance`, `AttendanceJustification`), frontend `/docente/asistencia`

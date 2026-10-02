@@ -23,25 +23,33 @@ async function exigirAreaActiva(areaId: string): Promise<void> {
 }
 
 /**
- * La asignatura aparece en la malla (Configuracion General o asignaturas agregadas de un grupo) del
- * plan de estudios de un año lectivo que ya no esta en PLANIFICACION. Mismo criterio de congelamiento
- * que studyPlan.service.ts: generateReportCard (M12) lee el area de la asignatura en vivo, asi que
- * reubicarla con el año EN_CURSO o CERRADO reescribiria boletines ya calculados.
+ * Años lectivos cuyo plan de estudios (M06) usa la asignatura: en la malla del grado, en la ponderación
+ * de un área, o en la distribución de un grupo (asignaturas agregadas o evaluación personalizada).
+ */
+async function aniosLectivosQueUsanLaAsignatura(subjectId: string): Promise<Array<{ year: number; estado: string }>> {
+  const planes = await StudyPlan.find({
+    $or: [
+      { 'grades.asignaturas.subject_id': subjectId },
+      { 'grades.evaluaciones_area.asignaturas.subject_id': subjectId },
+      { 'grades.personalizaciones_grupo.asignaturas_agregadas.subject_id': subjectId },
+      { 'grades.personalizaciones_grupo.evaluaciones_area_personalizadas.asignaturas.subject_id': subjectId },
+    ],
+  }).select('academic_year_id');
+  if (planes.length === 0) return [];
+
+  const anios = await AcademicYear.find({ _id: { $in: planes.map((p) => p.academic_year_id) } })
+    .select('year estado')
+    .sort({ year: 1 });
+  return anios.map((a) => ({ year: a.year, estado: a.estado }));
+}
+
+/**
+ * Con un año ya activado o cerrado, reubicar la asignatura alteraria boletines ya calculados:
+ * generateReportCard (M12) lee su area en vivo.
  */
 async function estaEnPlanDeAnioNoPlanificacion(subjectId: string): Promise<boolean> {
-  const anios = await AcademicYear.find({ estado: { $ne: 'PLANIFICACION' } }).select('_id');
-  if (anios.length === 0) return false;
-
-  const planes = await StudyPlan.find({ academic_year_id: { $in: anios.map((a) => a._id) } }).select('grades');
-  return planes.some((plan) =>
-    plan.grades.some(
-      (grado) =>
-        grado.asignaturas.some((a) => String(a.subject_id) === subjectId) ||
-        grado.personalizaciones_grupo.some((p) =>
-          p.asignaturas_agregadas.some((a) => String(a.subject_id) === subjectId)
-        )
-    )
-  );
+  const anios = await aniosLectivosQueUsanLaAsignatura(subjectId);
+  return anios.some((a) => a.estado !== 'PLANIFICACION');
 }
 
 export interface CrearSubjectInput {
@@ -104,11 +112,21 @@ export async function actualizarSubject(
 
   if (input.area_id && input.area_id !== String(subject.area_id)) {
     await exigirAreaActiva(input.area_id);
-    if (await estaEnPlanDeAnioNoPlanificacion(id)) {
+    const anios = await aniosLectivosQueUsanLaAsignatura(id);
+    if (anios.some((a) => a.estado !== 'PLANIFICACION')) {
       throw new ApiError(
         409,
         'Esta asignatura ya está en el plan de estudios de un año lectivo activado o cerrado: reubicarla de área ' +
-          'alteraría boletines ya calculados. Solo se puede cambiar de área mientras ese año sigue en planificación.'
+          'alteraría boletines ya calculados.'
+      );
+    }
+    // Aunque el año siga en planificación, sus ponderaciones apuntan al área actual de la asignatura:
+    // cambiarla dejaría porcentajes colgando de un área que ya no es la suya.
+    if (anios.length > 0) {
+      throw new ApiError(
+        409,
+        `Esta asignatura ya está en la malla o en las ponderaciones del Plan de Estudios ${anios.map((a) => a.year).join(', ')}. ` +
+          'Retírala de ese plan antes de cambiarle el área.'
       );
     }
   }

@@ -174,13 +174,13 @@ export type ComponenteSiee = (typeof COMPONENTES_SIEE)[number];
 export const NIVELES_DESEMPENO = ['BAJO', 'BASICO', 'ALTO', 'SUPERIOR'] as const;
 export type NivelDesempeno = (typeof NIVELES_DESEMPENO)[number];
 
-export const ESTADOS_ASISTENCIA = [
-  'PRESENTE',
-  'FALTA_JUSTIFICADA',
-  'FALTA_INJUSTIFICADA',
-  'RETARDO',
-] as const;
-export type EstadoAsistencia = (typeof ESTADOS_ASISTENCIA)[number];
+// M13: los estados de asistencia (Presente, Ausencia, Retardo, Excusa...) los define cada institución en
+// `AttendanceState`; aquí solo viven los tonos de chip que el frontend ya tiene (no son colores nuevos).
+export const TONOS_ESTADO_ASISTENCIA = ['green', 'orange', 'red', 'blue', 'neutral'] as const;
+export type TonoEstadoAsistencia = (typeof TONOS_ESTADO_ASISTENCIA)[number];
+
+export const ESTADOS_JUSTIFICACION = ['PENDIENTE', 'APROBADA', 'RECHAZADA'] as const;
+export type EstadoJustificacion = (typeof ESTADOS_JUSTIFICACION)[number];
 
 export const ESTADOS_GRUPO = ['ACTIVE', 'CLOSED'] as const;
 export type EstadoGrupo = (typeof ESTADOS_GRUPO)[number];

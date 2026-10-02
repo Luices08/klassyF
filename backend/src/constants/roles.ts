@@ -20,11 +20,18 @@ export { ROLES_LIST };
 export const JERARQUIA_ROLES: Record<Rol, number> = {
   ADMIN: 100,
   COORDINADOR: 70,
+  COORDINADOR_CONVIVENCIA: 70,
   SECRETARIA: 40,
   DOCENTE: 40,
   ESTUDIANTE: 10,
   ACUDIENTE: 10,
 };
+
+/**
+ * Roles cuyo alcance es por sede: sin sede asignada no ven nada, así que no se permite crearlos sin una
+ * (convivencia maneja datos de menores; el alcance se decide por sede, nunca "todas por omisión").
+ */
+export const ROLES_CON_SEDE_OBLIGATORIA: readonly Rol[] = [ROLES.COORDINADOR_CONVIVENCIA];
 
 export function puedeGestionarRol(operadorRol: Rol, objetivoRol: Rol): boolean {
   if (operadorRol === ROLES.ADMIN) return true;

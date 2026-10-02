@@ -97,10 +97,16 @@ Los 5 sub-módulos de M01 están implementados; no rehacer, solo extender si se 
 
 Backend `/users` (modelo `User`), frontend `/admin/users` (`UsersPage`).
 - **Matriz de permisos y jerarquía estricta** (`backend/src/constants/roles.ts`, `frontend/src/types/api.ts`):
-  `ADMIN (100) > COORDINADOR (70) > SECRETARIA (40) = DOCENTE (40) > ESTUDIANTE (10) = ACUDIENTE (10)`.
+  `ADMIN (100) > COORDINADOR (70) = COORDINADOR_CONVIVENCIA (70) > SECRETARIA (40) = DOCENTE (40) > ESTUDIANTE (10) = ACUDIENTE (10)`.
   Un usuario solo puede crear, editar, cambiar estado, resetear contraseña, cerrar sesiones o eliminar a
   usuarios de rango estrictamente MENOR (con la excepción de que un ADMIN sí puede gestionar a otros ADMIN,
   salvo a sí mismo).
+- **`COORDINADOR_CONVIVENCIA` (M14/M15)**: rol aprobado por el usuario para procesos disciplinarios y comité de convivencia; es
+  la excepción documentada a "un solo rol administrativo" (esa regla es sobre `SUPERADMIN`). Rango 70, par de `COORDINADOR`: solo
+  un ADMIN lo gestiona. **No hereda nada del coordinador académico y viceversa**: los usos de `ROLES.COORDINADOR` no se amplían a
+  este rol (`checkRole` es lista de permitidos). Exige al menos una sede (`ROLES_CON_SEDE_OBLIGATORIA`, validado en el modelo
+  `User`). Convivencia decide el acceso con `permisoSobreEstudiante` y `alcanceDeSedes` (`utils/permisosConvivencia.ts`, función
+  pura con tests): sin sedes asignadas no ve nada, y SECRETARIA y ACUDIENTE no tienen acceso (el acudiente entra con M27).
 - **Secretaría en M02**: mantiene la consulta global del directorio de usuarios, pero todas las acciones sobre
   roles jerárquicamente iguales o superiores (`ADMIN`, `COORDINADOR`, `DOCENTE`, `SECRETARIA`) quedan bloqueadas
   tanto en frontend (`IconButton disabled` con tooltip explicativo) como en backend (403 con mensaje de

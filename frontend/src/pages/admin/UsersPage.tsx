@@ -41,7 +41,7 @@ import {
 import { ROLES, type Rol, puedeGestionarRol } from '../../types/api';
 import { TIPOS_DOCUMENTO, type TipoDocumento, type User } from '../../types/domain';
 
-const DEFAULT_ROLES_FILTRO: Rol[] = ['ADMIN', 'COORDINADOR', 'DOCENTE', 'SECRETARIA'];
+const DEFAULT_ROLES_FILTRO: Rol[] = ['ADMIN', 'COORDINADOR', 'COORDINADOR_CONVIVENCIA', 'DOCENTE', 'SECRETARIA'];
 const PAGE_SIZE = 20;
 
 const EMPTY_FORM: CreateUserInput = {

@@ -80,6 +80,10 @@ export const ACCIONES_AUDITORIA = [
   'ASISTENCIA_REGISTRADA',
   'JUSTIFICACION_ASISTENCIA_CREADA',
   'JUSTIFICACION_ASISTENCIA_REVISADA',
+  // M14/M15: Convivencia. Se audita también la LECTURA (datos de menores); las de escritura se agregan con cada fase.
+  'CONVIVENCIA_HISTORIAL_CONSULTADO',
+  'CONVIVENCIA_CASO_CONSULTADO',
+  'CONVIVENCIA_OBSERVACIONES_PROPIAS_CONSULTADAS',
 ] as const;
 export type AccionAuditoria = (typeof ACCIONES_AUDITORIA)[number];
 

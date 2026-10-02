@@ -54,6 +54,7 @@ export function DesempenoBadge({ value }: { value: Desempeno }) {
 export const ROL_LABELS: Record<Rol, string> = {
   ADMIN: 'Administrador',
   COORDINADOR: 'Coordinador',
+  COORDINADOR_CONVIVENCIA: 'Coord. de convivencia',
   DOCENTE: 'Docente',
   SECRETARIA: 'Secretaría',
   ESTUDIANTE: 'Estudiante',
@@ -63,6 +64,7 @@ export const ROL_LABELS: Record<Rol, string> = {
 const ROL_TONE: Record<Rol, Tone> = {
   ADMIN: 'blue',
   COORDINADOR: 'blue',
+  COORDINADOR_CONVIVENCIA: 'blue',
   SECRETARIA: 'blue',
   DOCENTE: 'green',
   ESTUDIANTE: 'orange',

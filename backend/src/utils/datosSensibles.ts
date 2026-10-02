@@ -26,11 +26,11 @@ export function tieneDatoSaludSensible(valores: object): boolean {
 
 /**
  * Oculta los campos de salud puramente administrativos cuando quien consulta
- * es DOCENTE. ADMIN/COORDINADOR/SECRETARIA (gestion de matricula, salud,
- * convivencia) y el propio flujo administrativo siguen viendo todo.
+ * es DOCENTE o COORDINADOR_CONVIVENCIA (no gestionan matrícula ni salud).
+ * ADMIN/COORDINADOR/SECRETARIA y el propio flujo administrativo siguen viendo todo.
  */
 export function ocultarSaludAdministrativa<T extends object>(perfil: T, rolSolicitante: Rol): T {
-  if (rolSolicitante !== ROLES.DOCENTE) return perfil;
+  if (rolSolicitante !== ROLES.DOCENTE && rolSolicitante !== ROLES.COORDINADOR_CONVIVENCIA) return perfil;
   const copia = { ...perfil } as Record<string, unknown>;
   for (const campo of CAMPOS_SALUD_ADMINISTRATIVA) delete copia[campo];
   return copia as T;

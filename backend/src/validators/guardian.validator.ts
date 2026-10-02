@@ -44,6 +44,7 @@ export const vincularAcudiente: ValidationSchema = {
       .required(),
     es_principal: Joi.boolean(),
     autorizado_retiro: Joi.boolean(),
+    habilitar_portal: Joi.boolean(),
   }),
 };
 

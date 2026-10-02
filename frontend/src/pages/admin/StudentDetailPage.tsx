@@ -79,6 +79,7 @@ const ACUDIENTE_VACIO = {
   telefono_principal: '',
   email: '',
   parentesco: '' as Parentesco | '',
+  habilitar_portal: false,
 };
 
 export function StudentDetailPage() {
@@ -424,6 +425,7 @@ function NucleoFamiliarTab({
       await vincular.mutateAsync({ studentId, guardian_id: form.guardian_id, parentesco: form.parentesco });
     } else {
       if (!form.parentesco) return;
+      if (form.habilitar_portal && !form.email) return;
       await vincular.mutateAsync({
         studentId,
         tipo_documento: form.tipo_documento,
@@ -433,6 +435,7 @@ function NucleoFamiliarTab({
         telefono_principal: form.telefono_principal,
         email: form.email || undefined,
         parentesco: form.parentesco,
+        habilitar_portal: form.habilitar_portal,
       });
     }
     cerrarDrawer();
@@ -584,6 +587,27 @@ function NucleoFamiliarTab({
             </option>
           ))}
         </Select>
+
+        {modo === 'nuevo' && (
+          <div className="space-y-2 rounded-lg border border-border bg-soft p-3">
+            <label className="flex items-center gap-2 text-sm font-medium text-ink">
+              <input
+                type="checkbox"
+                checked={form.habilitar_portal}
+                onChange={(e) => setForm((f) => ({ ...f, habilitar_portal: e.target.checked }))}
+                className="h-4 w-4 rounded border-border text-primary focus:ring-primary"
+              />
+              Habilitar acceso al portal de acudientes
+            </label>
+            <p className="text-xs text-muted">
+              Se crea la cuenta (o se reutiliza la que ya exista con ese documento). Ingresa con su número de documento y
+              lo usa también como contraseña temporal: el sistema le exige cambiarla en el primer inicio de sesión.
+            </p>
+            {form.habilitar_portal && !form.email && (
+              <p className="text-xs text-danger">Para habilitar el portal el acudiente debe tener un correo.</p>
+            )}
+          </div>
+        )}
       </Drawer>
     </div>
   );

@@ -8,9 +8,11 @@ import type {
   EstadoEspacio,
   EstadoEstudiante,
   EstadoGrupo,
+  EstadoJustificacion,
   EstadoMatricula,
   EstadoPeriodoAcademico,
   NivelDesempeno,
+  TonoEstadoAsistencia,
 } from '../../types/domain';
 import { NOMBRES_ESTADO_ESPACIO } from '../../types/domain';
 import type { Desempeno } from '../../types/reportCard';
@@ -216,4 +218,27 @@ export function EstadoDesarrolloCurricularBadge({ value }: { value: EstadoDesarr
 /** Vigente/Histórico de un referente del banco M07 (DBA/EBC/Lineamiento): mismo campo `estado` activo/inactivo, otra etiqueta. */
 export function EstadoVigenciaReferenteBadge({ value }: { value: EstadoActivo }) {
   return <Chip tone={value === 'activo' ? 'green' : 'neutral'}>{value === 'activo' ? 'Vigente' : 'Histórico'}</Chip>;
+}
+
+// Los estados de asistencia (M13) los parametriza cada institución; el tono viene guardado con el estado y es
+// uno de los de la librería (no un color nuevo).
+export function EstadoAsistenciaChip({ nombre, tono }: { nombre: string; tono: TonoEstadoAsistencia }) {
+  return <Chip tone={tono}>{nombre}</Chip>;
+}
+
+const JUSTIFICACION_LABELS: Record<EstadoJustificacion, string> = {
+  PENDIENTE: 'Pendiente',
+  APROBADA: 'Aprobada',
+  RECHAZADA: 'Rechazada',
+};
+
+const JUSTIFICACION_TONE: Record<EstadoJustificacion, Tone> = {
+  PENDIENTE: 'orange',
+  APROBADA: 'green',
+  RECHAZADA: 'red',
+};
+
+/** Revisión por coordinación de la excusa de una inasistencia (M13). */
+export function EstadoJustificacionBadge({ value }: { value: EstadoJustificacion }) {
+  return <Chip tone={JUSTIFICACION_TONE[value]}>{JUSTIFICACION_LABELS[value]}</Chip>;
 }

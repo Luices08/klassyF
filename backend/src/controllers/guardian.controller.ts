@@ -44,6 +44,7 @@ interface VincularBody {
   parentesco: Parentesco;
   es_principal?: boolean;
   autorizado_retiro?: boolean;
+  habilitar_portal?: boolean;
 }
 
 export const vincularAcudiente = catchAsync<UserIdParams, unknown, VincularBody>(async (req, res) => {

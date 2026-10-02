@@ -5,7 +5,6 @@ import AcademicYear from '../models/academicYear.model';
 import Activity, { ActivityDocument } from '../models/activity.model';
 import ActivitySubmission from '../models/activitySubmission.model';
 import Area, { AreaDocument } from '../models/area.model';
-import Attendance from '../models/attendance.model';
 import { CampusDocument } from '../models/campus.model';
 import Enrollment from '../models/enrollment.model';
 import Group from '../models/group.model';
@@ -18,6 +17,7 @@ import TeacherAssignment from '../models/teacherAssignment.model';
 import User, { UserDocument } from '../models/user.model';
 import ApiError from '../utils/ApiError';
 import type { ResultadoDesempeno } from '../utils/escalaEvaluacion';
+import { resumenAsistenciaParaBoletin } from './attendanceStats.service';
 import { desempenoCualitativo, ponderacionEfectiva, round2 } from '../utils/siee';
 
 export interface ReportCardParams {
@@ -255,24 +255,10 @@ export async function generateReportCard(
     submissionMap.set(`${String(sub.activity_id)}_${String(sub.student_id)}`, sub.calificacion_numerica as number);
   }
 
-  const attendanceRecords = await Attendance.find({ group_id: group._id, periodo_numero: params.periodo_numero });
-  const fallasPorAsignatura = new Map<string, number>();
-  const asistenciaTotales = new Map<string, { justificadas: number; injustificadas: number; retardos: number }>();
-  for (const rec of attendanceRecords) {
-    for (const reg of rec.registros) {
-      const sid = String(reg.student_id);
-      const totals = asistenciaTotales.get(sid) ?? { justificadas: 0, injustificadas: 0, retardos: 0 };
-      if (reg.estado === 'FALTA_JUSTIFICADA') totals.justificadas += 1;
-      else if (reg.estado === 'FALTA_INJUSTIFICADA') totals.injustificadas += 1;
-      else if (reg.estado === 'RETARDO') totals.retardos += 1;
-      asistenciaTotales.set(sid, totals);
-
-      if (reg.estado === 'FALTA_JUSTIFICADA' || reg.estado === 'FALTA_INJUSTIFICADA') {
-        const key = `${String(rec.subject_id)}_${sid}`;
-        fallasPorAsignatura.set(key, (fallasPorAsignatura.get(key) ?? 0) + 1);
-      }
-    }
-  }
+  const { porEstudiante: asistenciaTotales, fallasPorAsignatura } = await resumenAsistenciaParaBoletin(
+    group._id,
+    params.periodo_numero
+  );
 
   const areaGroups = new Map<string, AreaGroup>();
   for (const subjectId of subjectIdsMalla) {

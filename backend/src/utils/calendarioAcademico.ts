@@ -56,6 +56,12 @@ function enRango(dia: number, rango: RangoFechas): boolean {
   return dia >= rango.fecha_inicio.getTime() && dia <= rango.fecha_fin.getTime();
 }
 
+/** Dentro de un receso, vacaciones o jornada de desarrollo institucional. */
+export function hayEventoNoLectivo(dia: Date, eventos: readonly EventoCalendario[]): boolean {
+  const t = dia.getTime();
+  return eventos.some((e) => TIPOS_EVENTO_NO_LECTIVO.includes(e.tipo) && enRango(t, e));
+}
+
 /**
  * Un dia es lectivo si es de lunes a viernes y no cae dentro de un receso,
  * vacaciones o jornada de desarrollo institucional. M13 (asistencia) lo usa
@@ -64,9 +70,7 @@ function enRango(dia: number, rango: RangoFechas): boolean {
 export function esDiaLectivo(dia: Date, eventos: readonly EventoCalendario[]): boolean {
   const diaSemana = dia.getUTCDay();
   if (diaSemana === 0 || diaSemana === 6) return false;
-
-  const t = dia.getTime();
-  return !eventos.some((e) => TIPOS_EVENTO_NO_LECTIVO.includes(e.tipo) && enRango(t, e));
+  return !hayEventoNoLectivo(dia, eventos);
 }
 
 function contarDiasLectivos(rango: RangoFechas, eventos: readonly EventoCalendario[]): number {

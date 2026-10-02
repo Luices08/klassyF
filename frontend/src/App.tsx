@@ -8,6 +8,8 @@ import { NotFoundPage } from './pages/NotFoundPage';
 import { ReportCardPage } from './pages/ReportCardPage';
 import { HomePage } from './pages/public/HomePage';
 import { AnioLectivoPage } from './pages/AnioLectivoPage';
+import { AsistenciaPage } from './pages/AsistenciaPage';
+import { GestionAsistenciaPage } from './pages/GestionAsistenciaPage';
 import { AcademicCatalogPage } from './pages/admin/AcademicCatalogPage';
 import { AdmissionRequestsPage } from './pages/admin/AdmissionRequestsPage';
 import { EnrollmentDetailPage } from './pages/admin/EnrollmentDetailPage';
@@ -66,6 +68,11 @@ export default function App() {
           <Route element={<ProtectedRoute allowedRoles={['DOCENTE']} />}>
             <Route path="/docente/mi-carga" element={<MyTeacherLoadPage />} />
             <Route path="/docente/planeacion-curricular" element={<DesarrolloCurricularPage />} />
+            <Route path="/docente/asistencia" element={<AsistenciaPage />} />
+          </Route>
+
+          <Route element={<ProtectedRoute allowedRoles={['ADMIN', 'COORDINADOR', 'SECRETARIA', 'DOCENTE']} />}>
+            <Route path="/asistencia/gestion" element={<GestionAsistenciaPage />} />
           </Route>
         </Route>
       </Route>

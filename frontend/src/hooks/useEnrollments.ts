@@ -33,7 +33,7 @@ export interface EnrollmentsFilter {
   limit?: number;
 }
 
-export function useEnrollmentsList(filter: EnrollmentsFilter) {
+export function useEnrollmentsList(filter: EnrollmentsFilter, enabled = true) {
   return useQuery({
     queryKey: ['enrollments', filter],
     queryFn: () =>
@@ -41,6 +41,7 @@ export function useEnrollmentsList(filter: EnrollmentsFilter) {
         query: { ...filter },
       }),
     select: (res) => ({ data: res.data, total: res.total, page: res.page, pages: res.pages }),
+    enabled,
   });
 }
 

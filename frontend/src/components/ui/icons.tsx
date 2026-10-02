@@ -224,7 +224,7 @@ export const UserIcon = (p: IconProps) => (
 
 export const EyeIcon = (p: IconProps) => (
   <Icon {...p}>
-    <path d="M2.5 12S6 5 12 5s9.5 7 9.5 7-3.5 7-9.5 7-9.5-7Z" />
+    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8Z" />
     <circle cx="12" cy="12" r="3" />
   </Icon>
 );

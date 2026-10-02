@@ -1,7 +1,10 @@
+import { Response } from 'express';
 import { ParamsDictionary } from 'express-serve-static-core';
 import { ParsedQs } from 'qs';
 import { EstadoJustificacion, EstadoUsuario } from '../constants/enums';
+import * as pdfService from '../services/asistenciaPdf.service';
 import * as attendanceService from '../services/attendance.service';
+import * as cuadriculaService from '../services/attendanceCuadricula.service';
 import * as excelService from '../services/attendanceExcel.service';
 import * as justificacionService from '../services/attendanceJustification.service';
 import * as statsService from '../services/attendanceStats.service';
@@ -139,4 +142,65 @@ export const descargarSoporte = catchAsync<IdParams>(async (req, res) => {
   if (!req.user) throw new ApiError(401, 'No autenticado.');
   const { ruta } = await justificacionService.rutaDelSoporte(req.params.id, req.user);
   res.sendFile(ruta);
+});
+
+// --- Planilla clásica (cuadrícula mensual) ---
+
+export const listarClases = catchAsync<unknown, unknown, unknown, ParsedQs & { academic_year_id: string; group_id?: string }>(
+  async (req, res) => {
+    const clases = await cuadriculaService.listarClases(req.query, req.user!);
+    res.status(200).json({ success: true, count: clases.length, data: clases });
+  }
+);
+
+export const obtenerCuadricula = catchAsync<unknown, unknown, unknown, ParsedQs & { group_id: string; subject_id: string; mes: string }>(
+  async (req, res) => {
+    const cuadricula = await cuadriculaService.construirCuadricula(req.query, req.user!);
+    res.status(200).json({ success: true, data: cuadricula });
+  }
+);
+
+export const guardarCuadricula = catchAsync<unknown, unknown, attendanceService.RegistrarAsistenciaLoteInput>(async (req, res) => {
+  const resultado = await attendanceService.registrarAsistenciaLote(req.body, req.user!, req.ip);
+  res.status(200).json({ success: true, data: resultado });
+});
+
+// --- PDFs ---
+
+function enviarPdf(res: Response, { buffer, nombreArchivo }: { buffer: Buffer; nombreArchivo: string }): void {
+  res.setHeader('Content-Type', 'application/pdf');
+  res.setHeader('Content-Disposition', `inline; filename="${nombreArchivo}"`);
+  res.send(buffer);
+}
+
+const aNumero = (valor?: string): number | undefined => (valor ? Number(valor) : undefined);
+
+export const pdfPlanilla = catchAsync<
+  unknown,
+  unknown,
+  unknown,
+  ParsedQs & { group_id: string; subject_id: string; mes?: string; periodo_numero?: string }
+>(async (req, res) => {
+  enviarPdf(res, await pdfService.generarPdfPlanilla({ ...req.query, periodo_numero: aNumero(req.query.periodo_numero) }, req.user!));
+});
+
+export const pdfConsolidadoGrupo = catchAsync<unknown, unknown, unknown, ParsedQs & { group_id: string; periodo_numero?: string }>(
+  async (req, res) => {
+    enviarPdf(res, await pdfService.generarPdfConsolidadoGrupo({ ...req.query, periodo_numero: aNumero(req.query.periodo_numero) }, req.user!));
+  }
+);
+
+export const pdfReporteInstitucional = catchAsync<unknown, unknown, unknown, ParsedQs & { academic_year_id: string; periodo_numero?: string }>(
+  async (req, res) => {
+    enviarPdf(res, await pdfService.generarPdfReporteInstitucional({ ...req.query, periodo_numero: aNumero(req.query.periodo_numero) }, req.user!));
+  }
+);
+
+export const pdfFichaEstudiante = catchAsync<
+  unknown,
+  unknown,
+  unknown,
+  ParsedQs & { student_id: string; academic_year_id: string; periodo_numero?: string }
+>(async (req, res) => {
+  enviarPdf(res, await pdfService.generarPdfFichaEstudiante({ ...req.query, periodo_numero: aNumero(req.query.periodo_numero) }, req.user!));
 });

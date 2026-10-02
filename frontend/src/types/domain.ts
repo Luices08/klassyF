@@ -948,3 +948,44 @@ export interface EstadisticasAsistencia {
   total: TotalesAsistencia;
   filas: FilaEstadistica[];
 }
+
+// --- M13: Planilla clásica (cuadrícula mensual) ---
+
+export interface ClaseAsistencia {
+  group_id: string;
+  subject_id: string;
+  grupo: string;
+  grado: string;
+  asignatura: string;
+  docente: string;
+  /** El docente la dicta él mismo; si es false solo la consulta (director de grupo o staff). */
+  editable: boolean;
+}
+
+export interface CeldaCuadricula {
+  state_id: string;
+  novedad: string;
+  registro_id: string;
+  justificacion: EstadoJustificacion | null;
+}
+
+export interface DiaCuadricula {
+  fecha: string;
+  periodo_numero: number;
+  /** Por qué no se puede editar ese día (futuro, periodo cerrado...); null si se puede. */
+  bloqueo: string | null;
+  attendance_id: string | null;
+}
+
+export interface CuadriculaAsistencia {
+  grupo: { _id: string; nomenclatura: string; grado: string };
+  asignatura: { _id: string; nombre: string };
+  docente: string | null;
+  mes: string;
+  editable: boolean;
+  estados: EstadoAsistencia[];
+  estudiantes: Array<{ student_id: string; nombre: string; apellido: string; numero_documento: string }>;
+  dias: DiaCuadricula[];
+  /** estudiante -> fecha -> celda; una celda ausente es un día todavía sin registrar. */
+  celdas: Record<string, Record<string, CeldaCuadricula>>;
+}

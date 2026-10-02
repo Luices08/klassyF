@@ -154,7 +154,11 @@ async function etiquetasDe(dimension: DimensionEstadistica, claves: string[]): P
  * solo ve el de sus propias clases; el resto de roles con acceso ve toda la institución.
  */
 export async function obtenerEstadisticas(consulta: ConsultaEstadistica, usuario: UserDocument) {
-  const alcance = await filtroAlcanceAsistencia(usuario, consulta.academic_year_id);
+  return calcularEstadisticas(consulta, await filtroAlcanceAsistencia(usuario, consulta.academic_year_id));
+}
+
+/** El cálculo en sí, con el alcance ya decidido por quien llama (p. ej. el director de grupo ve todas las asignaturas de su grupo). */
+export async function calcularEstadisticas(consulta: ConsultaEstadistica, alcance: Record<string, unknown> | null) {
   const filtro: Record<string, unknown> = {
     academic_year_id: new Types.ObjectId(consulta.academic_year_id),
     ...(consulta.periodo_numero ? { periodo_numero: consulta.periodo_numero } : {}),
@@ -208,11 +212,11 @@ export interface ResumenAsistenciaGrupo {
 /** M13 -> M17: las fallas y retardos de un grupo en un periodo, ya interpretados con las banderas de cada estado. */
 export async function resumenAsistenciaParaBoletin(
   groupId: Types.ObjectId | string,
-  periodoNumero: number
+  periodoNumero?: number
 ): Promise<ResumenAsistenciaGrupo> {
   const [conteos, estados] = await Promise.all([
     contarRegistros(
-      { group_id: new Types.ObjectId(String(groupId)), periodo_numero: periodoNumero },
+      { group_id: new Types.ObjectId(String(groupId)), ...(periodoNumero ? { periodo_numero: periodoNumero } : {}) },
       { student: '$registros.student_id', subject: '$subject_id' }
     ),
     mapaDeEstados(),
@@ -235,4 +239,52 @@ export async function resumenAsistenciaParaBoletin(
     resumen.porEstudiante.set(student, totales);
   }
   return resumen;
+}
+
+export interface TotalesPorGrupoYAsignatura extends TotalesAsistencia {
+  group_id: string;
+  subject_id: string;
+}
+
+/** Todos los totales de la institución en una sola consulta; los reportes por grado y por asignatura se arman sumando estas filas. */
+export async function estadisticasPorGrupoYAsignatura(
+  academicYearId: string,
+  periodoNumero?: number
+): Promise<TotalesPorGrupoYAsignatura[]> {
+  const [conteos, estados] = await Promise.all([
+    contarRegistros(
+      {
+        academic_year_id: new Types.ObjectId(academicYearId),
+        ...(periodoNumero ? { periodo_numero: periodoNumero } : {}),
+      },
+      { group: '$group_id', subject: '$subject_id' }
+    ),
+    mapaDeEstados(),
+  ]);
+
+  const filas = new Map<string, TotalesPorGrupoYAsignatura>();
+  for (const conteo of conteos) {
+    const group_id = String(conteo.clave.group);
+    const subject_id = String(conteo.clave.subject);
+    const clave = `${group_id}_${subject_id}`;
+    const fila = filas.get(clave) ?? { group_id, subject_id, ...totalesVacios() };
+    acumular(fila, conteo, estados);
+    filas.set(clave, fila);
+  }
+  return [...filas.values()];
+}
+
+/** Suma varios totales y recalcula el porcentaje con el total, no promediando porcentajes. */
+export function sumarTotales(lista: readonly TotalesAsistencia[]): TotalesAsistencia {
+  const suma = totalesVacios();
+  for (const t of lista) {
+    suma.total_registros += t.total_registros;
+    suma.asistencias += t.asistencias;
+    suma.retardos += t.retardos;
+    suma.fallas += t.fallas;
+    suma.fallas_justificadas += t.fallas_justificadas;
+    suma.fallas_injustificadas += t.fallas_injustificadas;
+  }
+  suma.porcentaje_ausentismo = suma.total_registros ? redondear1((suma.fallas / suma.total_registros) * 100) : 0;
+  return suma;
 }

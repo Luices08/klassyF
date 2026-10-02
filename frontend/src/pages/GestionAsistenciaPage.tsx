@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { EstadisticasAsistenciaPanel } from '../components/asistencia/EstadisticasAsistenciaPanel';
 import { EstadosAsistenciaPanel } from '../components/asistencia/EstadosAsistenciaPanel';
 import { JustificacionesPanel } from '../components/asistencia/JustificacionesPanel';
+import { ReportesAsistenciaPanel } from '../components/asistencia/ReportesAsistenciaPanel';
 import { Alert } from '../components/ui/Alert';
 import { PageHeader } from '../components/ui/PageHeader';
 import { Spinner } from '../components/ui/Spinner';
@@ -21,6 +22,7 @@ export function GestionAsistenciaPage() {
   const pestanas: TabItem[] = [
     { key: 'estadisticas', label: 'Estadísticas' },
     { key: 'justificaciones', label: 'Justificaciones' },
+    { key: 'reportes', label: 'Reportes PDF' },
     ...(esAdmin ? [{ key: 'estados', label: 'Estados de asistencia' }] : []),
   ];
 
@@ -46,6 +48,9 @@ export function GestionAsistenciaPage() {
           </TabPanel>
           <TabPanel active={pestana} tabKey="justificaciones">
             <JustificacionesPanel academicYearId={anio._id} puedeRevisar={puedeRevisar} />
+          </TabPanel>
+          <TabPanel active={pestana} tabKey="reportes">
+            <ReportesAsistenciaPanel anio={anio} rol={user?.rol ?? 'DOCENTE'} />
           </TabPanel>
           {esAdmin && (
             <TabPanel active={pestana} tabKey="estados">

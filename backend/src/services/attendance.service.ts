@@ -1,13 +1,13 @@
 import { HydratedDocument, Types } from 'mongoose';
 import { ESTADOS_MATRICULA_ACTIVOS, EstadoJustificacion } from '../constants/enums';
 import { ROLES } from '../constants/roles';
-import AcademicYear from '../models/academicYear.model';
+import AcademicYear, { AcademicYearDocument } from '../models/academicYear.model';
 import Attendance, { AttendanceDocument } from '../models/attendance.model';
 import AttendanceJustification from '../models/attendanceJustification.model';
 import { AttendanceStateDocument } from '../models/attendanceState.model';
 import Enrollment from '../models/enrollment.model';
 import Group, { IGroup } from '../models/group.model';
-import JornadaOperativa from '../models/jornadaOperativa.model';
+import JornadaOperativa, { JornadaOperativaDocument } from '../models/jornadaOperativa.model';
 import PeriodLock from '../models/periodLock.model';
 import Subject from '../models/subject.model';
 import TeacherAssignment from '../models/teacherAssignment.model';
@@ -22,7 +22,7 @@ const MS_HORA = 3_600_000;
 const formatoFecha = (fecha: Date): string => fecha.toISOString().slice(0, 10);
 
 /** El dia de calendario de hoy en Colombia (UTC-5, sin horario de verano), a medianoche UTC como las demas fechas. */
-function hoyColombia(): Date {
+export function hoyColombia(): Date {
   const hoy = new Date(Date.now() - 5 * MS_HORA);
   hoy.setUTCHours(0, 0, 0, 0);
   return hoy;
@@ -34,7 +34,7 @@ export function fechaDeClase(fecha: string): Date {
 }
 
 /** ISO 1=lunes ... 7=domingo, el mismo formato de `JornadaOperativa.dias_habiles`. */
-function diaIso(fecha: Date): number {
+export function diaIso(fecha: Date): number {
   return fecha.getUTCDay() === 0 ? 7 : fecha.getUTCDay();
 }
 
@@ -44,19 +44,31 @@ export interface EvaluacionFecha {
   bloqueo: string | null;
 }
 
+/** Lo que hace falta de M05 para evaluar muchas fechas de un mismo grupo sin volver a consultar la base. */
+export interface ContextoFechas {
+  grupo: HydratedDocument<IGroup>;
+  anio: AcademicYearDocument;
+  jornada: JornadaOperativaDocument;
+  periodosCerradosDelGrupo: Set<number>;
+}
+
+export async function cargarContextoFechas(grupo: HydratedDocument<IGroup>): Promise<ContextoFechas> {
+  const [anio, jornada, cierres] = await Promise.all([
+    AcademicYear.findById(grupo.academic_year_id),
+    JornadaOperativa.findById(grupo.jornada_id),
+    PeriodLock.find({ academic_year_id: grupo.academic_year_id, group_id: grupo._id, estado: 'CERRADO' }),
+  ]);
+  if (!anio) throw new ApiError(404, 'Año lectivo no encontrado.');
+  if (!jornada) throw new ApiError(404, 'Jornada del grupo no encontrada.');
+  return { grupo, anio, jornada, periodosCerradosDelGrupo: new Set(cierres.map((c) => c.periodo_numero)) };
+}
+
 /**
  * Lee de M05 si la fecha admite asistencia: año vigente, dentro de un periodo (con las fechas de la sede si tiene
  * calendario propio) que no esté cerrado, no futura, día hábil de la jornada del grupo (no hay días fijos en el
  * código: un grupo SABATINA trabaja sábado) y fuera de recesos/vacaciones/desarrollo institucional.
  */
-async function evaluarFecha(grupo: HydratedDocument<IGroup>, fecha: Date): Promise<EvaluacionFecha> {
-  const [anio, jornada] = await Promise.all([
-    AcademicYear.findById(grupo.academic_year_id),
-    JornadaOperativa.findById(grupo.jornada_id),
-  ]);
-  if (!anio) throw new ApiError(404, 'Año lectivo no encontrado.');
-  if (!jornada) throw new ApiError(404, 'Jornada del grupo no encontrada.');
-
+export function evaluarFechaEnContexto({ grupo, anio, jornada, periodosCerradosDelGrupo }: ContextoFechas, fecha: Date): EvaluacionFecha {
   if (anio.estado !== 'EN_CURSO') {
     return { periodo_numero: null, bloqueo: `El año lectivo ${anio.year} no está vigente; no se puede registrar asistencia.` };
   }
@@ -80,19 +92,23 @@ async function evaluarFecha(grupo: HydratedDocument<IGroup>, fecha: Date): Promi
   }
   const evento = anio.eventos.find((e) => hayEventoNoLectivo(fecha, [e]));
   if (evento) return resultado(`El ${formatoFecha(fecha)} no es lectivo (${evento.nombre}).`);
-
-  const cierreDelGrupo = await PeriodLock.findOne({
-    academic_year_id: anio._id,
-    group_id: grupo._id,
-    periodo_numero: periodo.numero,
-    estado: 'CERRADO',
-  });
-  if (cierreDelGrupo) return resultado(`El periodo ${periodo.numero} está cerrado para este grupo.`);
+  if (periodosCerradosDelGrupo.has(periodo.numero)) return resultado(`El periodo ${periodo.numero} está cerrado para este grupo.`);
 
   return resultado(null);
 }
 
-async function obtenerGrupoYAsignatura(groupId: string, subjectId: string) {
+/** Periodo (con las fechas de la sede si tiene calendario propio) al que pertenece el día, sin importar si el año está vigente. */
+export function periodoDeFecha({ grupo, anio }: ContextoFechas, fecha: Date): number | null {
+  const calendarioSede = anio.calendarios_sede.find((c) => String(c.sede_id) === String(grupo.sede_id));
+  const periodo = periodosEfectivos(anio.periodos, calendarioSede).find((p) => fecha >= p.fecha_inicio && fecha <= p.fecha_fin);
+  return periodo?.numero ?? null;
+}
+
+async function evaluarFecha(grupo: HydratedDocument<IGroup>, fecha: Date): Promise<EvaluacionFecha> {
+  return evaluarFechaEnContexto(await cargarContextoFechas(grupo), fecha);
+}
+
+export async function obtenerGrupoYAsignatura(groupId: string, subjectId: string) {
   const [grupo, asignatura] = await Promise.all([Group.findById(groupId), Subject.findById(subjectId)]);
   if (!grupo) throw new ApiError(404, 'Grupo no encontrado.');
   if (!asignatura) throw new ApiError(404, 'Asignatura no encontrada.');
@@ -100,7 +116,7 @@ async function obtenerGrupoYAsignatura(groupId: string, subjectId: string) {
 }
 
 /** M08: solo se toma lista en las clases oficialmente asignadas al docente en el año del grupo. */
-async function exigirAsignacionDocente(docenteId: Types.ObjectId, grupo: HydratedDocument<IGroup>, subjectId: string) {
+export async function exigirAsignacionDocente(docenteId: Types.ObjectId, grupo: HydratedDocument<IGroup>, subjectId: string) {
   const asignacion = await TeacherAssignment.exists({
     docente_id: docenteId,
     group_id: grupo._id,
@@ -112,7 +128,7 @@ async function exigirAsignacionDocente(docenteId: Types.ObjectId, grupo: Hydrate
   if (!asignacion) throw new ApiError(403, 'No tiene una asignación académica activa para esta asignatura y grupo.');
 }
 
-async function matriculasActivas(groupId: Types.ObjectId | string) {
+export async function matriculasActivas(groupId: Types.ObjectId | string) {
   const matriculas = await Enrollment.find({ group_id: groupId, estado: { $in: ESTADOS_MATRICULA_ACTIVOS } }).populate<{
     student_id: { _id: Types.ObjectId; nombre: string; apellido: string; numero_documento: string };
   }>('student_id', 'nombre apellido numero_documento');
@@ -225,51 +241,61 @@ export interface RegistrarAsistenciaInput extends ConsultaPlanilla {
   registros: RegistroAsistenciaInput[];
 }
 
-/**
- * Guarda la planilla de un grupo+asignatura+día en un solo lote. Solo el docente con la clase asignada (M08), en un
- * día hábil de un periodo abierto (M05), y solo para estudiantes con matrícula activa en el grupo (M04). Volver a
- * guardar actualiza los registros existentes en vez de reemplazarlos: sus justificaciones quedan ancladas.
- */
-export async function registrarAsistencia(
-  input: RegistrarAsistenciaInput,
-  docente: UserDocument,
-  ip?: string | null
-): Promise<AttendanceDocument> {
-  const { grupo } = await obtenerGrupoYAsignatura(input.group_id, input.subject_id);
-  await exigirAsignacionDocente(docente._id, grupo, input.subject_id);
+interface ContextoAsistencia {
+  grupo: HydratedDocument<IGroup>;
+  subjectId: string;
+  fechas: ContextoFechas;
+  matriculados: Set<string>;
+  estados: Map<string, AttendanceStateDocument>;
+}
 
-  const fecha = fechaDeClase(input.fecha);
-  const evaluacion = await evaluarFecha(grupo, fecha);
+/** Carga una sola vez lo que comparten todos los días que se guarden de una clase (y verifica la clase asignada, M08). */
+async function cargarContextoAsistencia(groupId: string, subjectId: string, docente: UserDocument): Promise<ContextoAsistencia> {
+  const { grupo } = await obtenerGrupoYAsignatura(groupId, subjectId);
+  await exigirAsignacionDocente(docente._id, grupo, subjectId);
+  const [fechas, matriculas, estados] = await Promise.all([
+    cargarContextoFechas(grupo),
+    matriculasActivas(grupo._id),
+    mapaDeEstados(),
+  ]);
+  return { grupo, subjectId, fechas, matriculados: new Set(matriculas.map((m) => String(m.student_id._id))), estados };
+}
+
+/** Valida un día completo y deja su planilla lista en memoria, sin escribir: un lote se valida entero antes de guardar. */
+async function prepararDia(
+  contexto: ContextoAsistencia,
+  dia: { fecha: string; registros: RegistroAsistenciaInput[] },
+  docente: UserDocument
+): Promise<AttendanceDocument> {
+  const { grupo, subjectId, fechas, matriculados, estados } = contexto;
+  const fecha = fechaDeClase(dia.fecha);
+  const evaluacion = evaluarFechaEnContexto(fechas, fecha);
   if (evaluacion.bloqueo || evaluacion.periodo_numero === null) {
     throw new ApiError(409, evaluacion.bloqueo ?? 'La fecha no admite asistencia.');
   }
 
-  const idsEstudiantes = input.registros.map((r) => r.student_id);
+  const idsEstudiantes = dia.registros.map((r) => r.student_id);
   if (new Set(idsEstudiantes).size !== idsEstudiantes.length) {
     throw new ApiError(400, 'No se puede registrar más de un estado de asistencia para el mismo estudiante.');
   }
-
-  const matriculados = new Set((await matriculasActivas(grupo._id)).map((m) => String(m.student_id._id)));
   const noMatriculados = idsEstudiantes.filter((id) => !matriculados.has(id));
   if (noMatriculados.length > 0) {
     throw new ApiError(400, `Los siguientes estudiantes no están matriculados en el grupo: ${noMatriculados.join(', ')}.`);
   }
 
-  const estados = await mapaDeEstados();
-  let planilla = await Attendance.findOne({ group_id: grupo._id, subject_id: input.subject_id, fecha });
-  if (!planilla) {
-    planilla = new Attendance({
+  const planilla =
+    (await Attendance.findOne({ group_id: grupo._id, subject_id: subjectId, fecha })) ??
+    new Attendance({
       group_id: grupo._id,
-      subject_id: input.subject_id,
+      subject_id: subjectId,
       academic_year_id: grupo.academic_year_id,
       fecha,
       periodo_numero: evaluacion.periodo_numero,
       registros: [],
       registrado_por: docente._id,
     });
-  }
 
-  for (const entrada of input.registros) {
+  for (const entrada of dia.registros) {
     const estado = estados.get(entrada.state_id);
     if (!estado) throw new ApiError(400, 'Uno de los estados de asistencia no existe.');
 
@@ -286,7 +312,16 @@ export async function registrarAsistencia(
       planilla.registros.push({ student_id: entrada.student_id, state_id: estado._id, novedad: entrada.novedad ?? '' });
     }
   }
+  return planilla;
+}
 
+async function guardarDia(
+  planilla: AttendanceDocument,
+  contexto: ContextoAsistencia,
+  fecha: string,
+  docente: UserDocument,
+  ip?: string | null
+): Promise<void> {
   try {
     await planilla.save();
   } catch (err) {
@@ -296,17 +331,66 @@ export async function registrarAsistencia(
     throw err;
   }
 
-  const fallas = planilla.registros.filter((r) => estados.get(String(r.state_id))?.cuenta_como_falla).length;
+  const fallas = planilla.registros.filter((r) => contexto.estados.get(String(r.state_id))?.cuenta_como_falla).length;
   await registrarEvento({
     usuario_id: docente._id,
     accion: 'ASISTENCIA_REGISTRADA',
     entidad: 'Attendance',
     entidad_id: planilla._id,
-    detalle: `Grupo ${grupo.nomenclatura}, ${input.fecha}: ${planilla.registros.length} registros, ${fallas} fallas.`,
+    detalle: `Grupo ${contexto.grupo.nomenclatura}, ${fecha}: ${planilla.registros.length} registros, ${fallas} fallas.`,
     ip,
   });
+}
 
+/**
+ * Guarda la planilla de un grupo+asignatura+día en un solo lote. Solo el docente con la clase asignada (M08), en un
+ * día hábil de un periodo abierto (M05), y solo para estudiantes con matrícula activa en el grupo (M04). Volver a
+ * guardar actualiza los registros existentes en vez de reemplazarlos: sus justificaciones quedan ancladas.
+ */
+export async function registrarAsistencia(
+  input: RegistrarAsistenciaInput,
+  docente: UserDocument,
+  ip?: string | null
+): Promise<AttendanceDocument> {
+  const contexto = await cargarContextoAsistencia(input.group_id, input.subject_id, docente);
+  const planilla = await prepararDia(contexto, input, docente);
+  await guardarDia(planilla, contexto, input.fecha, docente, ip);
   return planilla;
+}
+
+export interface RegistrarAsistenciaLoteInput {
+  group_id: string;
+  subject_id: string;
+  dias: Array<{ fecha: string; registros: RegistroAsistenciaInput[] }>;
+}
+
+/**
+ * Cuadrícula mensual: guarda varios días de una clase a la vez. Se valida cada día completo (fecha, matrícula,
+ * estados) antes de escribir el primero, así un error en un día no deja la cuadrícula a medio guardar.
+ */
+export async function registrarAsistenciaLote(
+  input: RegistrarAsistenciaLoteInput,
+  docente: UserDocument,
+  ip?: string | null
+): Promise<{ dias_guardados: number }> {
+  const fechasPedidas = input.dias.map((d) => d.fecha);
+  if (new Set(fechasPedidas).size !== fechasPedidas.length) {
+    throw new ApiError(400, 'No se puede enviar el mismo día dos veces.');
+  }
+
+  const contexto = await cargarContextoAsistencia(input.group_id, input.subject_id, docente);
+  const preparadas: Array<{ planilla: AttendanceDocument; fecha: string }> = [];
+  for (const dia of input.dias) {
+    try {
+      preparadas.push({ planilla: await prepararDia(contexto, dia, docente), fecha: dia.fecha });
+    } catch (err) {
+      if (err instanceof ApiError) throw new ApiError(err.statusCode, `${dia.fecha}: ${err.message}`);
+      throw err;
+    }
+  }
+
+  for (const { planilla, fecha } of preparadas) await guardarDia(planilla, contexto, fecha, docente, ip);
+  return { dias_guardados: preparadas.length };
 }
 
 export interface ConsultaInasistencias {

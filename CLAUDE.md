@@ -217,8 +217,8 @@ Backend `/espacios` (modelo `Espacio`), frontend `/admin/espacios` (`EspaciosPag
 ### M13 (Asistencia) — estado: núcleo completo
 
 Backend `/attendance` (modelos `AttendanceState`, `Attendance`, `AttendanceJustification`), frontend `/docente/asistencia`
-(`AsistenciaPage`, planilla del docente) y `/asistencia/gestion` (`GestionAsistenciaPage`: estadísticas, justificaciones y, solo
-ADMIN, estados). Reglas que no se ven leyendo un solo archivo:
+(`AsistenciaPage`: planilla del mes y registro diario) y `/asistencia/gestion` (`GestionAsistenciaPage`: estadísticas,
+justificaciones, reportes PDF y, solo ADMIN, estados). Reglas que no se ven leyendo un solo archivo:
 
 - **Los estados son configuración, las banderas son el contrato.** `AttendanceState` (por institución; se siembran 4 la primera vez:
   Presente/Ausencia/Retardo/Excusa) tiene `cuenta_como_falla`, `es_retardo`, `es_justificada` y `es_predeterminado`. Ningún reporte, ni
@@ -227,6 +227,20 @@ ADMIN, estados). Reglas que no se ven leyendo un solo archivo:
   siguen resolviendo su estado). El `tono` es uno de los 5 de `Chip`, no un color nuevo.
 - **La planilla es una por grupo+asignatura+día** (índice único) con `registros[]` embebidos. Volver a guardar **actualiza** cada registro
   por estudiante, no reemplaza el arreglo: el `_id` del registro es estable porque la justificación se ancla a él.
+- **Planilla clásica = cuadrícula mensual** (`GET/PUT /attendance/cuadricula`, `attendanceCuadricula.service.ts`, `CuadriculaAsistencia`):
+  estudiantes en filas y los días de clase del mes en columnas. Los días salen de `JornadaOperativa.dias_habiles` y del calendario de M05
+  (se omiten recesos/vacaciones y días fuera de los periodos; los futuros o de periodo cerrado se ven pero no se editan). Es la vista principal
+  del docente; el registro diario (con novedades, justificar y Excel) es la misma planilla vista de un día. `PUT` guarda varios días de una
+  clase en un lote (`registrarAsistenciaLote`): primero **valida todos** los días y solo entonces escribe. En la pantalla, en un día tocado los
+  estudiantes sin marcar se guardan con el estado predeterminado (se ven atenuados como "implícito").
+- **Quién ve qué planilla** (`permisoSobreClase`): el docente **edita** las clases que dicta (`TeacherAssignment` CLASE, M08) y **consulta** las
+  demás asignaturas del grupo que dirige (`Group.director_grupo_id`); ADMIN/COORDINADOR/SECRETARIA solo consultan (la asistencia la toma el
+  docente). `GET /attendance/clases` arma el selector con ese mismo criterio.
+- **PDFs** (`GET /attendance/pdf/*`, `asistenciaPdf.service.ts`, `pdfkit`; el permiso fino lo decide el servicio): `planilla` (un mes, o un
+  periodo = una hoja por mes + resumen; la imprime quien pueda ver esa clase), `consolidado-grupo` (fallas por asignatura y totales por estudiante;
+  ADMIN/COORDINADOR y el director de ese grupo), `reporte` (institucional: por grado con sus grupos, por asignatura y matriz grado × asignatura;
+  solo ADMIN/COORDINADOR) y `estudiante` (ficha con el historial de inasistencias; ADMIN/COORDINADOR/SECRETARIA). Los colores del papel son los
+  mismos de la guía visual. Todos se bajan con sesión (`descargarPdfAsistencia`), nunca por URL directa.
 - **Qué fecha admite asistencia** (`evaluarFecha` en `attendance.service.ts`, lee M05): año EN_CURSO, dentro de un periodo (con las fechas de
   la sede si tiene calendario propio) que no esté CERRADO ni cerrado por `PeriodLock` del grupo, no futura (hora Colombia), día en
   `JornadaOperativa.dias_habiles` (así un grupo SABATINA toma lista el sábado) y fuera de recesos/vacaciones (`hayEventoNoLectivo`). La

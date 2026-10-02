@@ -10,11 +10,18 @@ import {
   crearJustificacion,
   descargarPlantillaExcel,
   descargarSoporte,
+  guardarCuadricula,
+  listarClases,
   listarEstados,
   listarInasistencias,
   importarPlantillaExcel,
   listarJustificaciones,
+  obtenerCuadricula,
   obtenerEstadisticas,
+  pdfConsolidadoGrupo,
+  pdfFichaEstudiante,
+  pdfPlanilla,
+  pdfReporteInstitucional,
   obtenerPlanilla,
   registrarAsistencia,
   revisarJustificacion,
@@ -82,6 +89,18 @@ router.get(
   descargarPlantillaExcel
 );
 router.post('/planilla/excel', checkRole(ROLES.DOCENTE), uploadExcel.single('file'), importarPlantillaExcel);
+
+// Planilla clásica: estudiantes en filas y los días del mes en columnas. El docente edita sus clases y consulta las del
+// grupo que dirige; la coordinación y secretaría consultan (service decide por clase).
+router.get('/clases', checkRole(...CONSULTA), validate(attendanceValidator.listarClases), listarClases);
+router.get('/cuadricula', checkRole(...CONSULTA), validate(attendanceValidator.obtenerCuadricula), obtenerCuadricula);
+router.put('/cuadricula', checkRole(ROLES.DOCENTE), validate(attendanceValidator.guardarCuadricula), guardarCuadricula);
+
+// PDFs (el service aplica el permiso fino de cada uno).
+router.get('/pdf/planilla', checkRole(...CONSULTA), validate(attendanceValidator.pdfPlanilla), pdfPlanilla);
+router.get('/pdf/consolidado-grupo', checkRole(ROLES.ADMIN, ROLES.COORDINADOR, ROLES.DOCENTE), validate(attendanceValidator.pdfConsolidadoGrupo), pdfConsolidadoGrupo);
+router.get('/pdf/reporte', checkRole(...REVISION), validate(attendanceValidator.pdfReporteInstitucional), pdfReporteInstitucional);
+router.get('/pdf/estudiante', checkRole(ROLES.ADMIN, ROLES.COORDINADOR, ROLES.SECRETARIA), validate(attendanceValidator.pdfFichaEstudiante), pdfFichaEstudiante);
 
 router.get('/inasistencias', checkRole(...CONSULTA), validate(attendanceValidator.listarInasistencias), listarInasistencias);
 router.get('/estadisticas', checkRole(...CONSULTA), validate(attendanceValidator.obtenerEstadisticas), obtenerEstadisticas);

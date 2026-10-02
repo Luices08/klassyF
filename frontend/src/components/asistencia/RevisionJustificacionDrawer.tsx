@@ -22,7 +22,11 @@ export function RevisionJustificacionDrawer({
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
-    await revisar.mutateAsync({ id: justificacion._id, estado: decision, comentario });
+    try {
+      await revisar.mutateAsync({ id: justificacion._id, estado: decision, comentario });
+    } catch {
+      return; // el mensaje lo muestra la mutación; el drawer queda abierto
+    }
     onClose();
   }
 

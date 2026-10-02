@@ -1,6 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../lib/apiClient';
 import type {
+  ClaseAsistencia,
+  CuadriculaAsistencia,
   DimensionEstadistica,
   EstadisticasAsistencia,
   EstadoActivo,
@@ -233,4 +235,63 @@ export function useImportarPlantillaExcel() {
       void queryClient.invalidateQueries({ queryKey: ['attendance'] });
     },
   });
+}
+
+// --- Planilla clásica (cuadrícula mensual) ---
+
+export function useClasesAsistencia(academicYearId: string | undefined) {
+  return useQuery({
+    queryKey: ['attendance', 'clases', academicYearId],
+    queryFn: () => api.get<ClaseAsistencia[]>('/attendance/clases', { academic_year_id: academicYearId }),
+    enabled: Boolean(academicYearId),
+    staleTime: 5 * 60_000,
+  });
+}
+
+export interface CuadriculaFiltro {
+  group_id?: string;
+  subject_id?: string;
+  mes?: string;
+}
+
+export function useCuadricula(filtro: CuadriculaFiltro) {
+  return useQuery({
+    queryKey: ['attendance', 'cuadricula', filtro],
+    queryFn: () => api.get<CuadriculaAsistencia>('/attendance/cuadricula', { ...filtro }),
+    enabled: Boolean(filtro.group_id && filtro.subject_id && filtro.mes),
+    staleTime: 0,
+  });
+}
+
+export interface GuardarCuadriculaInput {
+  group_id: string;
+  subject_id: string;
+  dias: Array<{ fecha: string; registros: Array<{ student_id: string; state_id: string; novedad: string }> }>;
+}
+
+export function useGuardarCuadricula() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: GuardarCuadriculaInput) =>
+      api.put<{ dias_guardados: number }>('/attendance/cuadricula', input),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['attendance'] });
+    },
+  });
+}
+
+// --- PDFs ---
+
+/** Los PDF son de acceso autenticado: se bajan con el token y se guardan con el nombre dado. */
+export async function descargarPdfAsistencia(ruta: string, consulta: Record<string, string | number | undefined>, nombreArchivo: string): Promise<void> {
+  const parametros = new URLSearchParams();
+  Object.entries(consulta).forEach(([clave, valor]) => {
+    if (valor !== undefined && valor !== '') parametros.set(clave, String(valor));
+  });
+  const { url } = await api.downloadBlob(`/attendance/pdf/${ruta}?${parametros.toString()}`);
+  const enlace = document.createElement('a');
+  enlace.href = url;
+  enlace.download = nombreArchivo;
+  enlace.click();
+  URL.revokeObjectURL(url);
 }

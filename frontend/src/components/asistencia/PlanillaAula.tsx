@@ -88,16 +88,20 @@ export function PlanillaAula({ planilla }: { planilla: PlanillaAsistencia }) {
 
   async function handleGuardar() {
     guardar.reset();
-    await guardar.mutateAsync({
-      group_id: planilla.grupo._id,
-      subject_id: planilla.asignatura._id,
-      fecha: planilla.fecha,
-      registros: planilla.estudiantes.map((e) => ({
-        student_id: e.student_id,
-        state_id: estadoDe(e.student_id, e.state_id) as string,
-        novedad: novedadDe(e.student_id, e.novedad),
-      })),
-    });
+    try {
+      await guardar.mutateAsync({
+        group_id: planilla.grupo._id,
+        subject_id: planilla.asignatura._id,
+        fecha: planilla.fecha,
+        registros: planilla.estudiantes.map((e) => ({
+          student_id: e.student_id,
+          state_id: estadoDe(e.student_id, e.state_id) as string,
+          novedad: novedadDe(e.student_id, e.novedad),
+        })),
+      });
+    } catch {
+      return; // el mensaje lo muestra la mutación y las ediciones se conservan para reintentar
+    }
     setEdiciones({});
     setGuardada(true);
   }

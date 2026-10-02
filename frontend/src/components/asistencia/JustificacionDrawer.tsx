@@ -60,13 +60,17 @@ export function JustificacionDrawer({ academicYearId, inicial, onClose }: Justif
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     if (!attendanceId || !registroId) return;
-    await crear.mutateAsync({
-      attendance_id: attendanceId,
-      registro_id: registroId,
-      motivo,
-      acudiente_id: acudienteId || undefined,
-      archivo,
-    });
+    try {
+      await crear.mutateAsync({
+        attendance_id: attendanceId,
+        registro_id: registroId,
+        motivo,
+        acudiente_id: acudienteId || undefined,
+        archivo,
+      });
+    } catch {
+      return; // el mensaje lo muestra la mutación; el drawer queda abierto para corregir
+    }
     onClose();
   }
 

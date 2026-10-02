@@ -120,3 +120,71 @@ export const revisarJustificacion: ValidationSchema = {
 export const idParam: ValidationSchema = {
   params: Joi.object({ id: objectId.required() }),
 };
+
+// --- Planilla clásica (cuadrícula mensual) y PDFs ---
+
+const mes = Joi.string()
+  .pattern(/^\d{4}-(0[1-9]|1[0-2])$/)
+  .message('"{{#label}}" debe tener el formato YYYY-MM.');
+
+export const listarClases: ValidationSchema = {
+  query: Joi.object({
+    academic_year_id: objectId.required(),
+    group_id: objectId,
+  }),
+};
+
+export const obtenerCuadricula: ValidationSchema = {
+  query: Joi.object({
+    group_id: objectId.required(),
+    subject_id: objectId.required(),
+    mes: mes.required(),
+  }),
+};
+
+export const guardarCuadricula: ValidationSchema = {
+  body: Joi.object({
+    group_id: objectId.required(),
+    subject_id: objectId.required(),
+    dias: Joi.array()
+      .items(
+        Joi.object({
+          fecha: fechaDeClase.required(),
+          registros: Joi.array()
+            .items(
+              Joi.object({
+                student_id: objectId.required(),
+                state_id: objectId.required(),
+                novedad: Joi.string().trim().max(500).allow(''),
+              })
+            )
+            .min(1)
+            .required(),
+        })
+      )
+      .min(1)
+      .max(31)
+      .required(),
+  }),
+};
+
+export const pdfPlanilla: ValidationSchema = {
+  query: Joi.object({
+    group_id: objectId.required(),
+    subject_id: objectId.required(),
+    mes,
+    periodo_numero: periodo,
+  }).xor('mes', 'periodo_numero'),
+};
+
+export const pdfConsolidadoGrupo: ValidationSchema = {
+  query: Joi.object({ group_id: objectId.required(), periodo_numero: periodo }),
+};
+
+export const pdfReporteInstitucional: ValidationSchema = {
+  query: Joi.object({ academic_year_id: objectId.required(), periodo_numero: periodo }),
+};
+
+export const pdfFichaEstudiante: ValidationSchema = {
+  query: Joi.object({ student_id: objectId.required(), academic_year_id: objectId.required(), periodo_numero: periodo }),
+};

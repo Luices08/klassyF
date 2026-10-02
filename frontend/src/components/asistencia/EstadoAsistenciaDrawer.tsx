@@ -38,8 +38,12 @@ export function EstadoAsistenciaDrawer({ estado, onClose }: { estado: EstadoAsis
       es_predeterminado: conteo === 'PRESENCIA' && predeterminado,
       orden: estado?.orden ?? 99,
     };
-    if (estado) await actualizar.mutateAsync({ id: estado._id, ...datos });
-    else await crear.mutateAsync(datos);
+    try {
+      if (estado) await actualizar.mutateAsync({ id: estado._id, ...datos });
+      else await crear.mutateAsync(datos);
+    } catch {
+      return; // el mensaje lo muestra la mutación; el drawer queda abierto para corregir
+    }
     onClose();
   }
 

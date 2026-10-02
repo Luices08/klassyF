@@ -66,6 +66,8 @@ export interface ISolicitudCaso {
   resuelta_por: Types.ObjectId | null;
   fecha_resolucion: Date | null;
   motivo_resolucion: string;
+  /** Caso de convivencia (M15) en que se convirtió la solicitud. */
+  caso_id: Types.ObjectId | null;
 }
 
 /**
@@ -157,6 +159,7 @@ const solicitudCasoSchema = new Schema<ISolicitudCaso>(
     resuelta_por: { type: Schema.Types.ObjectId, ref: 'User', default: null },
     fecha_resolucion: { type: Date, default: null },
     motivo_resolucion: { type: String, default: '', maxlength: 500 },
+    caso_id: { type: Schema.Types.ObjectId, ref: 'CasoConvivencia', default: null },
   },
   { _id: false }
 );

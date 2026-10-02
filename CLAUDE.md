@@ -233,6 +233,33 @@ Análisis completo: `doc/Analisis_M14_M15_Klassy.md`. Reglas que no se ven leyen
 - **Pendiente, a propósito**: casos y comité (M15), cargas masivas, retención. Registrar
   "en nombre de" un docente existe en la API (`en_nombre_de_id`) pero aún no tiene pantalla.
 
+### M15 (Comité de Convivencia Escolar — casos) — estado: casos completos; comité y actas pendientes
+
+Backend `/convivencia` (modelos `CasoConvivencia`, `MedidaConvivencia`, `EntidadExterna`, `ProtocoloConvivencia`), frontend
+`CasosConvivenciaPage` (`/convivencia/casos`), `SolicitudesCasoPage` (`/convivencia/solicitudes`, abre caso desde la bandeja de M14) y
+las pestañas Medidas / Entidades / Protocolos de `CatalogoConvivenciaPage`. Reglas que no se ven leyendo un solo archivo:
+
+- **Solo convivencia ve un caso**: ADMIN y el `COORDINADOR_CONVIVENCIA` de la sede del caso (ni coordinador académico, ni secretaría, ni
+  docente). "No existe" y "no autorizado" son el mismo 404. Quien se declara impedido (o un ADMIN lo aparta) por conflicto de interés
+  deja de verlo (`impedidos[]`, RN-15-11); el ADMIN siempre puede auditarlo. El director de grupo solo ve, en su historial, que existe un
+  caso y su estado (`caso` en la observación reservada). **Todo detalle de caso se audita**, sin muestreo.
+- **Tipos I/II/III fijos (ley); todo lo demás es del colegio.** El tipo lo fija quien abre el caso (no el docente); subir de tipo es de
+  convivencia con motivo (y suma los pasos del protocolo nuevo sin perder lo hecho); bajarlo, solo ADMIN. Las faltas del manual son los
+  `Descriptor` de M14: la decisión las referencia (copiadas). `ProtocoloConvivencia` (pasos por tipo) se **copia** al caso al abrirlo:
+  editar el protocolo no altera casos en curso.
+- **Flujo por tabla** (`TRANSICIONES_CASO`, `utils/casoConvivencia.ts`): ABIERTO → EN_ATENCION → EN_MEDIACION → EN_SEGUIMIENTO, REMITIDO
+  (exige haber registrado la remisión; sigue en seguimiento). **Cerrar** no es transición genérica: `pendientesParaCerrar` exige pasos
+  obligatorios cumplidos; en II y III, atención inmediata e informe a los acudientes; en III, remisión o justificación escrita; y según el
+  resultado, remisión (REMITIDO) o decisión + medida (MEDIDA_APLICADA). **La decisión exige descargos previos** (presunción de inocencia).
+  Reabrir y anular son solo ADMIN con motivo (anular solo un caso recién ABIERTO y devuelve la solicitud a la bandeja de M14).
+- **Consecutivo anual sin huecos** (`CC-<año>-0001`): `Counter` dentro de la misma transacción de la apertura; si falla, no se consume.
+  Un caso **no se bloquea** al cerrar el año lectivo (RN-15-09); abrir sí exige el año EN_CURSO. Un mismo hecho con varios estudiantes es un
+  caso con varios involucrados (el permiso se comprueba por estudiante).
+- **Alertas calculadas** (`alertasDeCaso`): tipo III sin remisión pasado `plazo_remision_tipo_iii_horas` y seguimiento con próxima fecha
+  vencida. M15 las muestra; el envío de avisos es de M28.
+- **Pendiente, a propósito**: comité (miembros, sesiones, actas firmadas, PDF; Fase 5), cargas masivas (Fase 6), retención, orientación
+  (solo se registra la remisión, no hay rol), portal del acudiente/estudiante (M27), descuento en notas (diferido).
+
 ### M10 (Espacios físicos) — estado: núcleo completo
 
 Backend `/espacios` (modelo `Espacio`), frontend `/admin/espacios` (`EspaciosPage`, ADMIN y COORDINADOR; la lectura de
@@ -456,7 +483,7 @@ nuevos para lo que ya existe aquí** — extenderlos si falta un caso, no duplic
   mapeo rol→color o estado→color en una página), `Card`/`CardHeader`, `Table`/`TableHead`/`Th`/
   `TableBody`/`Td`/`EmptyRow`, `Drawer` (formularios de creación/edición; su botón principal
   acepta `submitVariant` para casos como confirmar un borrado en rojo), `PageHeader` (título +
-  subtítulo + acción de la página), `Field` (`Input`/`Select`), `MultiSelect` (selector desplegable de selección múltiple con checkboxes, contador y badges de rol/estado), `Alert`, `Spinner`, `EstadoEspacioBadge` (M10), `EstadoAsistenciaChip`/`EstadoJustificacionBadge` (M13), `GuiaColumnas` (guía colapsable de columnas de una carga CSV), `ProgressBar` (barra de avance con tono, ej. semanas lectivas vs. el mínimo de 40), `LineaTiempo` (línea de tiempo vertical con punto, fecha, chips y contenido por registro; la usa el historial de convivencia), `Tabs`/`TabPanel` (navegación por pestañas con subrayado azul en la activa; reusar en vez de reinventar un switch de pestañas en otra página), `Stepper` (indicador de pasos para formularios largos por secciones, ej. el asistente de creación de estudiante en M03), e iconos SVG propios en `components/ui/icons.tsx` (no se agregó ninguna librería de iconos).
+  subtítulo + acción de la página), `Field` (`Input`/`Select`), `MultiSelect` (selector desplegable de selección múltiple con checkboxes, contador y badges de rol/estado), `Alert`, `Spinner`, `EstadoEspacioBadge` (M10), `EstadoAsistenciaChip`/`EstadoJustificacionBadge` (M13), `GuiaColumnas` (guía colapsable de columnas de una carga CSV), `ProgressBar` (barra de avance con tono, ej. semanas lectivas vs. el mínimo de 40), `LineaTiempo` (línea de tiempo vertical con punto, fecha, chips y contenido por registro; la usa el historial de convivencia), `EstadoCasoBadge`/`TipoSituacionBadge` (M15), `Tabs`/`TabPanel` (navegación por pestañas con subrayado azul en la activa; reusar en vez de reinventar un switch de pestañas en otra página), `Stepper` (indicador de pasos para formularios largos por secciones, ej. el asistente de creación de estudiante en M03), e iconos SVG propios en `components/ui/icons.tsx` (no se agregó ninguna librería de iconos).
 - **Contenedor global y densidad** (`components/layout/AppShell.tsx`): el `<main>` centra el
   contenido en `max-w-7xl` (no `max-w-5xl`) para que las tablas anchas (Usuarios, Grupos) no
   scrolleen antes de tiempo en pantallas grandes. Cada página usa `space-y-4` (no `space-y-6`)

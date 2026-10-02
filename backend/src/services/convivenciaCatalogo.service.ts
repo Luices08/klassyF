@@ -11,7 +11,7 @@ import ApiError from '../utils/ApiError';
 import { ESTADO_ACTIVO } from '../utils/filtroEstado';
 import { registrarEvento } from './audit.service';
 
-interface ContextoActor {
+export interface ContextoActor {
   usuarioId: Types.ObjectId | string;
   ip?: string | null;
 }
@@ -25,7 +25,7 @@ export async function obtenerInstitucionConvivencia() {
 
 const esErrorDeDuplicado = (err: unknown): boolean => (err as { code?: number })?.code === 11000;
 
-function traducirDuplicado(err: unknown, mensaje: string): never {
+export function traducirDuplicado(err: unknown, mensaje: string): never {
   if (esErrorDeDuplicado(err)) throw new ApiError(409, mensaje);
   throw err;
 }
@@ -60,7 +60,7 @@ export async function listarCatalogo(incluirInactivos: boolean): Promise<Catalog
   return { tipos, categorias, descriptores };
 }
 
-async function registrarCambio(
+export async function registrarCambio(
   accion:
     | 'CATALOGO_CONVIVENCIA_CREADO'
     | 'CATALOGO_CONVIVENCIA_ACTUALIZADO'
@@ -74,7 +74,7 @@ async function registrarCambio(
   await registrarEvento({ usuario_id: usuarioId, accion, entidad, entidad_id: id, detalle, ip });
 }
 
-async function cambiarEstadoDe<T extends { estado: EstadoUsuario; _id: Types.ObjectId; save(): Promise<unknown> }>(
+export async function cambiarEstadoDe<T extends { estado: EstadoUsuario; _id: Types.ObjectId; save(): Promise<unknown> }>(
   modelo: Model<any>,
   nombreEntidad: string,
   id: string,
@@ -291,6 +291,7 @@ export async function obtenerConfiguracion(): Promise<ConfiguracionConvivenciaDo
 export interface DatosConfiguracionConvivencia {
   plazo_enmienda_horas: number;
   plazo_anulacion_horas: number;
+  plazo_remision_tipo_iii_horas: number;
 }
 
 export async function actualizarConfiguracion(

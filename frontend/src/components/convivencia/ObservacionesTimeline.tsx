@@ -83,7 +83,10 @@ export function ObservacionesTimeline({ observaciones, acciones }: Props) {
         atenuado: obs.estado === 'ANULADA',
         encabezado: <ChipsObservacion obs={obs} />,
         children: obs.reservada ? (
-          <p className="text-muted">Situación en atención de coordinación de convivencia. El contenido es reservado.</p>
+          <p className="text-muted">
+            Situación en atención de coordinación de convivencia. El contenido es reservado.
+            {obs.caso ? ` Caso ${obs.caso.codigo}: ${obs.caso.estado.toLowerCase().replace('_', ' ')}.` : ''}
+          </p>
         ) : (
           <div className="space-y-2">
             <p className="whitespace-pre-line">{obs.texto_generado}</p>

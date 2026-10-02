@@ -50,6 +50,7 @@ export interface CatalogoConvivencia {
 export interface ConfiguracionConvivencia {
   plazo_enmienda_horas: number;
   plazo_anulacion_horas: number;
+  plazo_remision_tipo_iii_horas: number;
 }
 
 export interface GrupoObservable {
@@ -148,6 +149,8 @@ export interface ObservacionVista {
   compromisos?: CompromisoObservacion[];
   citaciones?: CitacionObservacion[];
   solicitud_caso?: SolicitudCaso | null;
+  /** Solo en una situación reservada: que existe un caso y en qué estado (nunca su contenido). */
+  caso?: { codigo: string; estado: string; tipo_situacion: TipoSituacion } | null;
   /** Solo en "Mis registros". */
   estudiante?: string;
 }

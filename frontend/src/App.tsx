@@ -14,6 +14,7 @@ import { MiObservadorPage } from './pages/MiObservadorPage';
 import { ObservadorPage } from './pages/ObservadorPage';
 import { AcademicCatalogPage } from './pages/admin/AcademicCatalogPage';
 import { AdmissionRequestsPage } from './pages/admin/AdmissionRequestsPage';
+import { CasosConvivenciaPage } from './pages/admin/CasosConvivenciaPage';
 import { CatalogoConvivenciaPage } from './pages/admin/CatalogoConvivenciaPage';
 import { SolicitudesCasoPage } from './pages/admin/SolicitudesCasoPage';
 import { EnrollmentDetailPage } from './pages/admin/EnrollmentDetailPage';
@@ -85,6 +86,7 @@ export default function App() {
           </Route>
           <Route element={<ProtectedRoute allowedRoles={['ADMIN', 'COORDINADOR_CONVIVENCIA']} />}>
             <Route path="/convivencia/catalogo" element={<CatalogoConvivenciaPage />} />
+            <Route path="/convivencia/casos" element={<CasosConvivenciaPage />} />
             <Route path="/convivencia/solicitudes" element={<SolicitudesCasoPage />} />
           </Route>
           <Route element={<ProtectedRoute allowedRoles={['ESTUDIANTE']} />}>

@@ -7,6 +7,7 @@ import attendanceRoutes from './attendance.routes';
 import auditLogRoutes from './auditLog.routes';
 import authRoutes from './auth.routes';
 import campusRoutes from './campus.routes';
+import casoRoutes from './caso.routes';
 import curricularDevelopmentRoutes from './curricularDevelopment.routes';
 import enrollmentRoutes from './enrollment.routes';
 import espacioRoutes from './espacio.routes';
@@ -62,6 +63,9 @@ router.use('/curricular-developments', curricularDevelopmentRoutes);
 
 // M14: Observaciones y convivencia (Observador)
 router.use('/observaciones', observacionRoutes);
+
+// M15: Comité de convivencia escolar (casos, protocolos, medidas y entidades de remisión)
+router.use('/convivencia', casoRoutes);
 
 // Prompt 3: Actividades, Calificaciones, Asistencia y Motor de Boletines
 router.use('/activities', activityRoutes);

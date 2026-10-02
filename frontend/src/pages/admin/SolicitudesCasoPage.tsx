@@ -1,4 +1,6 @@
 import { type FormEvent, useState } from 'react';
+import { AbrirCasoDrawer } from '../../components/convivencia/AbrirCasoDrawer';
+import { CasoDetalleDrawer } from '../../components/convivencia/CasoDetalleDrawer';
 import { ChipsObservacion } from '../../components/convivencia/ObservacionesTimeline';
 import { Alert, errorMessage } from '../../components/ui/Alert';
 import { Chip } from '../../components/ui/Badge';
@@ -17,6 +19,8 @@ export function SolicitudesCasoPage() {
   const [pagina, setPagina] = useState(1);
   const bandeja = useBandejaCasos(pagina);
   const [descartando, setDescartando] = useState<SolicitudEnBandeja | null>(null);
+  const [abriendo, setAbriendo] = useState<SolicitudEnBandeja | null>(null);
+  const [casoAbierto, setCasoAbierto] = useState<string | null>(null);
 
   const { data = [], total = 0, limite = 20 } = bandeja.data ?? {};
   const paginas = Math.max(1, Math.ceil(total / limite));
@@ -65,9 +69,14 @@ export function SolicitudesCasoPage() {
                     <span className="mt-1 block text-xs text-muted">{s.solicitud_caso?.motivo}</span>
                   </Td>
                   <Td className="text-right">
-                    <Button variant="soft-danger" className="px-3 py-1 text-xs" onClick={() => setDescartando(s)}>
-                      Descartar
-                    </Button>
+                    <span className="flex justify-end gap-2">
+                      <Button variant="soft-edit" className="px-3 py-1 text-xs" onClick={() => setAbriendo(s)}>
+                        Abrir caso
+                      </Button>
+                      <Button variant="soft-danger" className="px-3 py-1 text-xs" onClick={() => setDescartando(s)}>
+                        Descartar
+                      </Button>
+                    </span>
                   </Td>
                 </tr>
               ))}
@@ -92,6 +101,8 @@ export function SolicitudesCasoPage() {
         </Card>
       )}
       <DescartarDrawer solicitud={descartando} onClose={() => setDescartando(null)} />
+      <AbrirCasoDrawer open={Boolean(abriendo)} solicitud={abriendo} onClose={() => setAbriendo(null)} onAbierto={setCasoAbierto} />
+      <CasoDetalleDrawer casoId={casoAbierto} onClose={() => setCasoAbierto(null)} />
     </div>
   );
 }

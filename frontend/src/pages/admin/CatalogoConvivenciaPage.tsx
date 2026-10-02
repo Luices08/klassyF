@@ -1,4 +1,5 @@
 import { type FormEvent, useState } from 'react';
+import { EntidadesTab, MedidasTab, ProtocolosTab } from '../../components/convivencia/CatalogosCasoTabs';
 import { Alert, errorMessage } from '../../components/ui/Alert';
 import { Chip, EstadoUsuarioBadge, type Tone } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
@@ -69,6 +70,9 @@ export function CatalogoConvivenciaPage() {
           { key: 'tipos', label: 'Tipos de observación' },
           { key: 'categorias', label: 'Categorías' },
           { key: 'frases', label: 'Frases y faltas' },
+          { key: 'medidas', label: 'Medidas' },
+          { key: 'entidades', label: 'Entidades de remisión' },
+          { key: 'protocolos', label: 'Protocolos' },
           { key: 'politica', label: 'Plazos' },
         ]}
         active={tab}
@@ -96,6 +100,15 @@ export function CatalogoConvivenciaPage() {
           </TabPanel>
         </>
       )}
+      <TabPanel active={tab} tabKey="medidas">
+        <MedidasTab />
+      </TabPanel>
+      <TabPanel active={tab} tabKey="entidades">
+        <EntidadesTab />
+      </TabPanel>
+      <TabPanel active={tab} tabKey="protocolos">
+        <ProtocolosTab />
+      </TabPanel>
       <TabPanel active={tab} tabKey="politica">
         <PoliticaTab />
       </TabPanel>
@@ -471,6 +484,7 @@ function PoliticaTab() {
   const actualizar = useActualizarConfiguracionConvivencia();
   const [enmienda, setEnmienda] = useState<string | null>(null);
   const [anulacion, setAnulacion] = useState<string | null>(null);
+  const [remision, setRemision] = useState<string | null>(null);
 
   if (configuracion.isLoading) return <Spinner />;
   if (configuracion.isError) return <Alert tone="error">{errorMessage(configuracion.error)}</Alert>;
@@ -481,9 +495,11 @@ function PoliticaTab() {
     await actualizar.mutateAsync({
       plazo_enmienda_horas: Number(enmienda ?? actual?.plazo_enmienda_horas),
       plazo_anulacion_horas: Number(anulacion ?? actual?.plazo_anulacion_horas),
+      plazo_remision_tipo_iii_horas: Number(remision ?? actual?.plazo_remision_tipo_iii_horas),
     });
     setEnmienda(null);
     setAnulacion(null);
+    setRemision(null);
   };
 
   return (
@@ -495,6 +511,15 @@ function PoliticaTab() {
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <Input label="Horas para enmendar" type="number" min={0} max={720} value={enmienda ?? actual?.plazo_enmienda_horas ?? ''} onChange={(e) => setEnmienda(e.target.value)} />
           <Input label="Horas para anular" type="number" min={0} max={720} value={anulacion ?? actual?.plazo_anulacion_horas ?? ''} onChange={(e) => setAnulacion(e.target.value)} />
+          <Input
+            label="Horas para remitir un caso tipo III"
+            type="number"
+            min={0}
+            max={720}
+            value={remision ?? actual?.plazo_remision_tipo_iii_horas ?? ''}
+            onChange={(e) => setRemision(e.target.value)}
+            hint="Pasado este plazo sin remisión, el caso muestra una alerta."
+          />
         </div>
         <Button type="submit" isLoading={actualizar.isPending}>
           Guardar plazos

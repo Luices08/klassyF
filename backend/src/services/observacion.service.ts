@@ -9,6 +9,7 @@ import {
 import { ESTADOS_MATRICULA_ACTIVOS } from '../constants/enums';
 import { ROLES } from '../constants/roles';
 import AcademicYear from '../models/academicYear.model';
+import CasoConvivencia from '../models/casoConvivencia.model';
 import Descriptor, { DescriptorDocument } from '../models/descriptor.model';
 import Enrollment from '../models/enrollment.model';
 import Group, { IGroup } from '../models/group.model';
@@ -126,6 +127,9 @@ async function exigirPermiso(
   }
   return contexto;
 }
+
+/** Lo usa M15 para decidir si quien gestiona un caso tiene acceso a cada estudiante involucrado (misma regla, mismo 404). */
+export const exigirPermisoSobreEstudiante = exigirPermiso;
 
 // --- Buscador acotado (no abre /students) ---
 
@@ -350,6 +354,7 @@ export async function registrarObservacion(input: RegistrarObservacionInput, usu
             resuelta_por: null,
             fecha_resolucion: null,
             motivo_resolucion: '',
+            caso_id: null,
           }
         : null,
     });
@@ -398,6 +403,18 @@ async function conNombres(vistas: ReturnType<typeof vistaObservacion>[]) {
   return vistas.map((v) => ('autor_id' in v ? { ...v, autor: nombre.get(v.autor_id) ?? null } : v));
 }
 
+/** Una situación reservada muestra al director que existe un caso y en qué estado, nunca su contenido (M15). */
+async function conEstadoDeCaso<V extends { _id: string; reservada?: boolean }>(vistas: V[]) {
+  const reservadas = vistas.filter((v) => v.reservada).map((v) => v._id);
+  if (reservadas.length === 0) return vistas;
+  const casos = await CasoConvivencia.find({ observacion_ids: { $in: reservadas } }).select('codigo estado tipo_situacion observacion_ids');
+  return vistas.map((v) => {
+    if (!v.reservada) return v;
+    const caso = casos.find((c) => c.observacion_ids.some((o) => String(o) === v._id));
+    return { ...v, caso: caso ? { codigo: caso.codigo, estado: caso.estado, tipo_situacion: caso.tipo_situacion } : null };
+  });
+}
+
 export interface Paginacion {
   pagina: number;
   limite: number;
@@ -433,7 +450,7 @@ export async function historialDeEstudiante(
     ip,
   });
   const vistas = await conNombres(datos.map((o) => vista(o, modoParaConsultante(usuario, o))));
-  return { total, ...paginacion, data: vistas };
+  return { total, ...paginacion, data: await conEstadoDeCaso(vistas) };
 }
 
 export async function obtenerObservacion(id: string, usuario: UserDocument, ip?: string | null) {
@@ -678,6 +695,7 @@ export async function solicitarCaso(id: string, motivo: string, usuario: UserDoc
     resuelta_por: null,
     fecha_resolucion: null,
     motivo_resolucion: '',
+    caso_id: null,
   };
   await obs.save();
   await registrarEvento({ usuario_id: usuario._id, accion: 'SOLICITUD_CASO_REGISTRADA', entidad: 'Observacion', entidad_id: obs._id, ip });

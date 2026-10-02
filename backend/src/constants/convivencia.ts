@@ -27,7 +27,7 @@ export type MedioCitacion = (typeof MEDIOS_CITACION)[number];
 
 // Una situación II/III (o una disciplinaria que un docente pide escalar) queda como solicitud hasta que coordinación
 // de convivencia la atienda. M15 agrega CONVERTIDA al abrir el caso.
-export const ESTADOS_SOLICITUD_CASO = ['PENDIENTE', 'DESCARTADA'] as const;
+export const ESTADOS_SOLICITUD_CASO = ['PENDIENTE', 'DESCARTADA', 'CONVERTIDA'] as const;
 export type EstadoSolicitudCaso = (typeof ESTADOS_SOLICITUD_CASO)[number];
 export const ORIGENES_SOLICITUD_CASO = ['AUTOMATICA', 'MANUAL'] as const;
 export type OrigenSolicitudCaso = (typeof ORIGENES_SOLICITUD_CASO)[number];
@@ -45,3 +45,30 @@ export const TIPOS_OBSERVACION_BASE = [
   { nombre: 'Comportamental', familia: 'COMPORTAMENTAL', visible_estudiante: true, orden: 2 },
   { nombre: 'Disciplinaria', familia: 'DISCIPLINARIA', visible_estudiante: false, orden: 3 },
 ] as const;
+
+// --- M15: casos de convivencia ---
+
+// El flujo es el contrato del sistema (se lee por estado, no por etiqueta). Ver TRANSICIONES_CASO en utils/casoConvivencia.ts.
+export const ESTADOS_CASO = ['ABIERTO', 'EN_ATENCION', 'EN_MEDIACION', 'EN_SEGUIMIENTO', 'REMITIDO', 'CERRADO', 'REABIERTO', 'ANULADO'] as const;
+export type EstadoCaso = (typeof ESTADOS_CASO)[number];
+
+export const RESULTADOS_CIERRE_CASO = ['SOLUCIONADO', 'DESESTIMADO', 'REMITIDO', 'MEDIDA_APLICADA'] as const;
+export type ResultadoCierreCaso = (typeof RESULTADOS_CIERRE_CASO)[number];
+
+export const ROLES_INVOLUCRADO = ['AFECTADO', 'PRESUNTO_RESPONSABLE', 'TESTIGO', 'REPORTANTE'] as const;
+export type RolInvolucrado = (typeof ROLES_INVOLUCRADO)[number];
+
+export const ORIGENES_CASO = ['OBSERVACION', 'DIRECTO'] as const;
+export type OrigenCaso = (typeof ORIGENES_CASO)[number];
+
+export const ESTADOS_PASO_PROTOCOLO = ['PENDIENTE', 'CUMPLIDO', 'NO_APLICA'] as const;
+export type EstadoPasoProtocolo = (typeof ESTADOS_PASO_PROTOCOLO)[number];
+
+export const TIPOS_NOTIFICACION_CASO = ['ACUDIENTES', 'CITACION', 'DECISION', 'OTRA'] as const;
+export type TipoNotificacionCaso = (typeof TIPOS_NOTIFICACION_CASO)[number];
+
+export const PARTES_DESCARGO = ['ESTUDIANTE', 'ACUDIENTE'] as const;
+export type ParteDescargo = (typeof PARTES_DESCARGO)[number];
+
+/** Valor inicial de la política; la institución lo cambia. Pasado este plazo sin remisión, un caso tipo III muestra alerta. */
+export const PLAZO_REMISION_TIPO_III_HORAS_INICIAL = 24;

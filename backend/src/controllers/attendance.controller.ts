@@ -2,6 +2,7 @@ import { ParamsDictionary } from 'express-serve-static-core';
 import { ParsedQs } from 'qs';
 import { EstadoJustificacion, EstadoUsuario } from '../constants/enums';
 import * as attendanceService from '../services/attendance.service';
+import * as excelService from '../services/attendanceExcel.service';
 import * as justificacionService from '../services/attendanceJustification.service';
 import * as statsService from '../services/attendanceStats.service';
 import * as estadoService from '../services/attendanceState.service';
@@ -59,6 +60,21 @@ export const registrarAsistencia = catchAsync<unknown, unknown, attendanceServic
     res.status(200).json({ success: true, data: planilla });
   }
 );
+
+export const descargarPlantillaExcel = catchAsync<unknown, unknown, unknown, ParsedQs & attendanceService.ConsultaPlanilla>(
+  async (req, res) => {
+    const { buffer, nombreArchivo } = await excelService.generarPlantillaExcel(req.query, req.user!);
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename="${nombreArchivo}"`);
+    res.send(buffer);
+  }
+);
+
+export const importarPlantillaExcel = catchAsync(async (req, res) => {
+  if (!req.file) throw new ApiError(400, 'Debes adjuntar un archivo en el campo "file".');
+  const resultado = await excelService.importarPlantillaExcel(req.file.buffer, req.user!, req.ip);
+  res.status(200).json({ success: true, data: resultado });
+});
 
 export const listarInasistencias = catchAsync<
   unknown,

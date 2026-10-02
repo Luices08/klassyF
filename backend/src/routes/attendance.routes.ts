@@ -8,9 +8,11 @@ import {
   cambiarEstadoActivo,
   crearEstado,
   crearJustificacion,
+  descargarPlantillaExcel,
   descargarSoporte,
   listarEstados,
   listarInasistencias,
+  importarPlantillaExcel,
   listarJustificaciones,
   obtenerEstadisticas,
   obtenerPlanilla,
@@ -19,6 +21,7 @@ import {
 } from '../controllers/attendance.controller';
 import { authenticate, checkRole } from '../middlewares/auth.middleware';
 import validate from '../middlewares/validate.middleware';
+import { MAX_BYTES_EXCEL } from '../services/attendanceExcel.service';
 import ApiError from '../utils/ApiError';
 import * as attendanceValidator from '../validators/attendance.validator';
 
@@ -43,6 +46,17 @@ const upload = multer({
   limits: { fileSize: MAX_BYTES_EVIDENCIA },
 });
 
+// Google Sheets exporta el mismo .xlsx; algunos navegadores lo declaran como octet-stream, así que se confía en
+// la extensión aquí y el servicio confirma por firma de bytes.
+const uploadExcel = multer({
+  storage: multer.memoryStorage(),
+  fileFilter: (_req, file, cb) =>
+    /\.xlsx$/i.test(file.originalname)
+      ? cb(null, true)
+      : cb(new ApiError(400, 'Solo se acepta un archivo Excel (.xlsx).') as unknown as Error),
+  limits: { fileSize: MAX_BYTES_EXCEL },
+});
+
 router.use(authenticate);
 
 // Estados parametrizables por la institución (solo ADMIN los modifica; todos los que consultan los leen).
@@ -59,6 +73,15 @@ router.patch(
 // Planilla rápida de aula (CU-DOC-04).
 router.get('/planilla', checkRole(ROLES.DOCENTE), validate(attendanceValidator.obtenerPlanilla), obtenerPlanilla);
 router.put('/planilla', checkRole(ROLES.DOCENTE), validate(attendanceValidator.registrarAsistencia), registrarAsistencia);
+
+// Trabajo sin conexión (CU-DOC-05): se descarga la planilla en Excel y se vuelve a subir diligenciada.
+router.get(
+  '/planilla/excel',
+  checkRole(ROLES.DOCENTE),
+  validate(attendanceValidator.obtenerPlanilla),
+  descargarPlantillaExcel
+);
+router.post('/planilla/excel', checkRole(ROLES.DOCENTE), uploadExcel.single('file'), importarPlantillaExcel);
 
 router.get('/inasistencias', checkRole(...CONSULTA), validate(attendanceValidator.listarInasistencias), listarInasistencias);
 router.get('/estadisticas', checkRole(...CONSULTA), validate(attendanceValidator.obtenerEstadisticas), obtenerEstadisticas);

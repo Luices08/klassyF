@@ -199,3 +199,38 @@ export async function abrirSoporteJustificacion(id: string): Promise<void> {
   const { url } = await api.downloadBlob(`/attendance/justificaciones/${id}/archivo`);
   window.open(url, '_blank');
 }
+
+// --- Trabajo sin conexión (Excel) ---
+
+/** La planilla del día en .xlsx (abre también en Google Sheets). Baja con el token y se guarda con el nombre dado. */
+export async function descargarPlantillaExcel(filtro: Required<PlanillaFiltro>, nombreArchivo: string): Promise<void> {
+  const consulta = new URLSearchParams(filtro).toString();
+  const { url } = await api.downloadBlob(`/attendance/planilla/excel?${consulta}`);
+  const enlace = document.createElement('a');
+  enlace.href = url;
+  enlace.download = nombreArchivo;
+  enlace.click();
+  URL.revokeObjectURL(url);
+}
+
+export interface ResultadoImportacionAsistencia {
+  grupo: string;
+  asignatura: string;
+  fecha: string;
+  registros: number;
+  fallas: number;
+}
+
+export function useImportarPlantillaExcel() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (archivo: File) => {
+      const formData = new FormData();
+      formData.append('file', archivo);
+      return api.upload<ResultadoImportacionAsistencia>('/attendance/planilla/excel', formData);
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['attendance'] });
+    },
+  });
+}

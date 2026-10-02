@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { ExcelAsistencia } from '../components/asistencia/ExcelAsistencia';
 import { PlanillaAula } from '../components/asistencia/PlanillaAula';
 import { Alert, errorMessage } from '../components/ui/Alert';
 import { Card } from '../components/ui/Card';
@@ -65,6 +66,8 @@ export function AsistenciaPage() {
           />
         </div>
       </Card>
+
+      <ExcelAsistencia planilla={planilla.data} />
 
       {!cargandoClases && clases.length === 0 && (
         <Alert tone="info">No tienes clases asignadas en el año lectivo vigente. Coordinación las asigna en Carga académica.</Alert>

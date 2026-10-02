@@ -241,8 +241,14 @@ ADMIN, estados). Reglas que no se ven leyendo un solo archivo:
   vinculado al estudiante en M03); la API ya es la que consumirá el portal. Revisar (aprobar/rechazar) es solo ADMIN/COORDINADOR; rechazar
   exige motivo.
 - **M17**: `resumenAsistenciaParaBoletin` es lo que lee `reportCard.service.ts` (justificadas, injustificadas, retardos y fallas por asignatura).
-- **Pendiente, a propósito fuera de alcance**: la carga offline por Excel/Google Sheets (CU-DOC-05); la vista del acudiente (CU-ACU-02, depende
-  de M27); umbrales de ausentismo (alertas por %), que serían política institucional.
+- **Trabajo sin conexión (CU-DOC-05)**: `GET /attendance/planilla/excel` baja la planilla en `.xlsx` (`attendanceExcel.service.ts`, `exceljs`) y
+  `POST /attendance/planilla/excel` la importa. Google Sheets no tiene integración propia: importa y exporta ese mismo `.xlsx`. El archivo lleva
+  una hoja `Datos` oculta con grupo, asignatura y fecha, así que subirlo no depende de lo que el docente tenga seleccionado; el estudiante se
+  identifica por `numero_documento` (texto, conserva ceros) y el estado por nombre o abreviatura. Se valida **toda** la hoja antes de guardar
+  (documento ajeno, estado desconocido, fila repetida = error de fila, no se guarda nada) y guardar pasa por `registrarAsistencia`, o sea las
+  mismas reglas de la planilla en línea. Solo DOCENTE; máximo 2 MB, firma ZIP verificada.
+- **Pendiente, a propósito fuera de alcance**: la vista del acudiente (CU-ACU-02, depende de M27); umbrales de ausentismo (alertas por %), que
+  serían política institucional.
 
 ### Cargas masivas por CSV (M02 usuarios, M03 estudiantes)
 

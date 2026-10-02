@@ -189,7 +189,7 @@ describe('M15 comité y actas (con base de datos)', () => {
     expect(alertas[0]!.alertas[0]!.codigo).toBe('REMISION_TIPO_III_PENDIENTE');
     expect(await casos.casosConAlertas(e.coordConvivenciaOtraSede)).toEqual([]);
     await expect(casos.casosConAlertas(e.docenteDeClase)).rejects.toMatchObject({ statusCode: 403 });
-    await catalogo.actualizarConfiguracion({ plazo_remision_tipo_iii_horas: 200 }, actor(e.admin));
+    await catalogo.actualizarConfiguracion({ plazo_remision_tipo_iii_horas: 200 }, actor(e.admin), 'ADMIN');
     expect(await casos.casosConAlertas(e.coordConvivencia)).toEqual([]);
   });
 

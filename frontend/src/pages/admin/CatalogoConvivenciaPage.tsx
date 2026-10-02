@@ -1,6 +1,8 @@
 import { type FormEvent, useState } from 'react';
 import { CargaMasivaDrawer } from '../../components/convivencia/CargaMasivaDrawer';
 import { EntidadesTab, MedidasTab, ProtocolosTab } from '../../components/convivencia/CatalogosCasoTabs';
+import { useAuth } from '../../context/AuthContext';
+import { useInformeRetencion } from '../../hooks/useComite';
 import type { ProcesoConvivencia } from '../../lib/columnasImportacion';
 import { Alert, errorMessage } from '../../components/ui/Alert';
 import { Chip, EstadoUsuarioBadge, type Tone } from '../../components/ui/Badge';
@@ -498,6 +500,10 @@ function PoliticaTab() {
   const [anulacion, setAnulacion] = useState<string | null>(null);
   const [remision, setRemision] = useState<string | null>(null);
   const [quorum, setQuorum] = useState<string | null>(null);
+  const [retObs, setRetObs] = useState<string | null>(null);
+  const [retCasos, setRetCasos] = useState<string | null>(null);
+  const esAdmin = useAuth().user?.rol === 'ADMIN';
+  const informe = useInformeRetencion(esAdmin);
 
   if (configuracion.isLoading) return <Spinner />;
   if (configuracion.isError) return <Alert tone="error">{errorMessage(configuracion.error)}</Alert>;
@@ -510,11 +516,19 @@ function PoliticaTab() {
       plazo_anulacion_horas: Number(anulacion ?? actual?.plazo_anulacion_horas),
       plazo_remision_tipo_iii_horas: Number(remision ?? actual?.plazo_remision_tipo_iii_horas),
       quorum_porcentaje: Number(quorum ?? actual?.quorum_porcentaje),
+      ...(esAdmin
+        ? {
+            retencion_anios_observaciones: aAnios(retObs, actual?.retencion_anios_observaciones),
+            retencion_anios_casos: aAnios(retCasos, actual?.retencion_anios_casos),
+          }
+        : {}),
     });
     setEnmienda(null);
     setAnulacion(null);
     setRemision(null);
     setQuorum(null);
+    setRetObs(null);
+    setRetCasos(null);
   };
 
   return (
@@ -545,10 +559,41 @@ function PoliticaTab() {
             hint="Para firmar un acta y deliberar cada caso, sin contar a los recusados."
           />
         </div>
+        {esAdmin && (
+          <div className="space-y-3 rounded-xl border border-border p-4">
+            <p className="text-label text-ink">Conservación de los datos</p>
+            <p className="text-xs text-muted">
+              Años que la institución conserva observaciones y casos, según su tabla de retención documental. Vacío = sin plazo definido: el sistema no supone ninguno ni borra nada.
+            </p>
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <Input label="Años de las observaciones" type="number" min={1} max={100} value={retObs ?? actual?.retencion_anios_observaciones ?? ''} onChange={(e) => setRetObs(e.target.value)} />
+              <Input label="Años de los casos (desde que se cierran)" type="number" min={1} max={100} value={retCasos ?? actual?.retencion_anios_casos ?? ''} onChange={(e) => setRetCasos(e.target.value)} />
+            </div>
+            {informe.data && (informe.data.observaciones || informe.data.casos) && (
+              <Alert tone="warning">
+                {informe.data.observaciones && <p>{informe.data.observaciones.total} observación(es) ya cumplieron su plazo de conservación.</p>}
+                {informe.data.casos && (
+                  <p>
+                    {informe.data.casos.total} caso(s) cerrado(s) ya cumplieron su plazo
+                    {informe.data.casos.casos.length > 0 ? `: ${informe.data.casos.casos.map((c) => c.codigo).join(', ')}` : ''}.
+                  </p>
+                )}
+                <p className="mt-1 text-xs">{informe.data.nota}</p>
+              </Alert>
+            )}
+            {informe.data && !informe.data.observaciones && !informe.data.casos && <p className="text-xs text-muted">No hay plazos definidos, así que no hay nada vencido.</p>}
+          </div>
+        )}
         <Button type="submit" isLoading={actualizar.isPending}>
           Guardar plazos
         </Button>
       </form>
     </Card>
   );
+}
+
+/** Vacío = sin plazo (null); un número = esos años. Si no se tocó el campo, queda como está. */
+function aAnios(editado: string | null, actual: number | null | undefined): number | null {
+  if (editado === null) return actual ?? null;
+  return editado.trim() === '' ? null : Number(editado);
 }

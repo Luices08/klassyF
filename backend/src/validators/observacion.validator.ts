@@ -98,6 +98,8 @@ export const actualizarConfiguracion: ValidationSchema = {
     plazo_anulacion_horas: Joi.number().integer().min(0).max(720),
     plazo_remision_tipo_iii_horas: Joi.number().integer().min(0).max(720),
     quorum_porcentaje: Joi.number().integer().min(1).max(100),
+    retencion_anios_observaciones: Joi.number().integer().min(1).max(100).allow(null),
+    retencion_anios_casos: Joi.number().integer().min(1).max(100).allow(null),
   }).min(1),
 };
 

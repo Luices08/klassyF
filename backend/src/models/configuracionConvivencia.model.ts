@@ -16,6 +16,12 @@ export interface IConfiguracionConvivencia {
   plazo_remision_tipo_iii_horas: number;
   /** Porcentaje mínimo de miembros presentes para que una sesión (y cada caso que trata) tenga quórum. */
   quorum_porcentaje: number;
+  /**
+   * Años que se conservan las observaciones y los casos (según la tabla de retención documental de la institución). `null` = la
+   * institución todavía no definió el plazo: el sistema no asume ninguno ni borra nada; solo informa lo vencido cuando se defina.
+   */
+  retencion_anios_observaciones: number | null;
+  retencion_anios_casos: number | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -30,6 +36,8 @@ const configuracionConvivenciaSchema = new Schema<IConfiguracionConvivencia, Con
     plazo_anulacion_horas: { type: Number, min: 0, max: 720, default: PLAZO_ANULACION_HORAS_INICIAL },
     plazo_remision_tipo_iii_horas: { type: Number, min: 0, max: 720, default: PLAZO_REMISION_TIPO_III_HORAS_INICIAL },
     quorum_porcentaje: { type: Number, min: 1, max: 100, default: QUORUM_PORCENTAJE_INICIAL },
+    retencion_anios_observaciones: { type: Number, min: 1, max: 100, default: null },
+    retencion_anios_casos: { type: Number, min: 1, max: 100, default: null },
   },
   { timestamps: true }
 );

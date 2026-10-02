@@ -45,6 +45,9 @@ router.post('/casos/:id/impedimento', validate(v.declararImpedimento), ctrl.decl
 // Alertas calculadas (el envío de avisos es de M28).
 router.get('/alertas', comite.casosConAlertas);
 
+// Informe de registros que ya cumplieron su plazo de conservación (solo ADMIN; el sistema no borra nada).
+router.get('/retencion', comite.reporteRetencion);
+
 // Comité: miembros por año, sesiones y actas. Firmar es solo del ADMIN (rector); el servicio lo vuelve a comprobar.
 router.get('/comite/miembros', validate(vc.listarMiembros), comite.listarMiembros);
 router.post('/comite/miembros', validate(vc.crearMiembro), comite.crearMiembro);

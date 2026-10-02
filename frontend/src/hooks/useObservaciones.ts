@@ -52,6 +52,8 @@ export interface ConfiguracionConvivencia {
   plazo_anulacion_horas: number;
   plazo_remision_tipo_iii_horas: number;
   quorum_porcentaje: number;
+  retencion_anios_observaciones: number | null;
+  retencion_anios_casos: number | null;
 }
 
 export interface GrupoObservable {

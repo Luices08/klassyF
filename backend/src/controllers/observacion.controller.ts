@@ -82,7 +82,7 @@ export const obtenerConfiguracion = catchAsync(async (_req, res) => {
 });
 export const actualizarConfiguracion = catchAsync<unknown, unknown, Partial<catalogoService.DatosConfiguracionConvivencia>>(
   async (req, res) => {
-    res.status(200).json({ success: true, data: await catalogoService.actualizarConfiguracion(req.body, actor(req)) });
+    res.status(200).json({ success: true, data: await catalogoService.actualizarConfiguracion(req.body, actor(req), req.user!.rol) });
   }
 );
 

@@ -191,3 +191,22 @@ export async function descargarActaPdf(id: string, nombreArchivo: string): Promi
   enlace.click();
   URL.revokeObjectURL(url);
 }
+
+export interface InformeRetencion {
+  retencion_anios_observaciones: number | null;
+  retencion_anios_casos: number | null;
+  observaciones: { limite: string; total: number; por_anio: { anio: number; total: number }[] } | null;
+  casos: { limite: string; total: number; casos: { codigo: string; anio: number; estado: string }[] } | null;
+  nota: string;
+}
+
+/** Solo ADMIN. Cada consulta queda auditada; el informe solo informa, no borra nada. */
+export function useInformeRetencion(habilitado: boolean) {
+  return useQuery({
+    queryKey: ['comite', 'retencion'],
+    queryFn: () => api.get<InformeRetencion>('/convivencia/retencion'),
+    enabled: habilitado,
+    staleTime: 60_000,
+    retry: false,
+  });
+}

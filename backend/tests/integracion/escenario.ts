@@ -15,7 +15,7 @@ export const actor = (u: UserDocument) => ({ usuarioId: u._id });
 export const hoy = () => hoyColombia().toISOString().slice(0, 10);
 
 let contador = 0;
-async function crearUsuario(rol: UserDocument['rol'], extra: Partial<UserDocument> = {}): Promise<UserDocument> {
+export async function crearUsuario(rol: UserDocument['rol'], extra: Partial<UserDocument> = {}): Promise<UserDocument> {
   contador += 1;
   const u = new User({
     nombre: `Nombre${contador}`,

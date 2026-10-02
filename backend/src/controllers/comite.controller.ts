@@ -4,6 +4,7 @@ import { EstadoUsuario } from '../constants/enums';
 import * as actaPdf from '../services/actaComitePdf.service';
 import * as casoService from '../services/caso.service';
 import * as comiteService from '../services/comite.service';
+import * as retencionService from '../services/retencion.service';
 import catchAsync from '../utils/catchAsync';
 
 interface IdParams extends ParamsDictionary {
@@ -72,6 +73,10 @@ export const descargarActa = catchAsync<IdParams>(async (req, res) => {
   res.setHeader('Content-Type', 'application/pdf');
   res.setHeader('Content-Disposition', `inline; filename="${nombreArchivo}"`);
   res.send(buffer);
+});
+
+export const reporteRetencion = catchAsync(async (req, res) => {
+  res.status(200).json({ success: true, data: await retencionService.reporteRetencion(req.user!, req.ip) });
 });
 
 export const casosConAlertas = catchAsync(async (req, res) => {

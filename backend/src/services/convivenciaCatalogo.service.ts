@@ -293,12 +293,21 @@ export interface DatosConfiguracionConvivencia {
   plazo_anulacion_horas: number;
   plazo_remision_tipo_iii_horas: number;
   quorum_porcentaje: number;
+  retencion_anios_observaciones: number | null;
+  retencion_anios_casos: number | null;
 }
+
+/** Los plazos de retención de datos de menores son política institucional: solo un ADMIN los define. */
+const CAMPOS_SOLO_ADMIN = ['retencion_anios_observaciones', 'retencion_anios_casos'] as const;
 
 export async function actualizarConfiguracion(
   input: Partial<DatosConfiguracionConvivencia>,
-  { usuarioId, ip }: ContextoActor
+  { usuarioId, ip }: ContextoActor,
+  rol: string
 ): Promise<ConfiguracionConvivenciaDocument> {
+  if (rol !== 'ADMIN' && CAMPOS_SOLO_ADMIN.some((campo) => input[campo] !== undefined)) {
+    throw new ApiError(403, 'Solo un administrador define los plazos de conservación de los datos.');
+  }
   const configuracion = await obtenerConfiguracion();
   configuracion.set(input);
   await configuracion.save();

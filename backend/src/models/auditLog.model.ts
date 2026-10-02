@@ -54,6 +54,7 @@ export const ACCIONES_AUDITORIA = [
   'ACUDIENTE_DESVINCULADO',
   'ACUDIENTE_ACTUALIZADO',
   'ACUDIENTE_ESTADO_CAMBIADO',
+  'ACUDIENTE_PORTAL_HABILITADO',
   // M06: Plan de estudios (catalogo de areas/asignaturas y configuracion curricular)
   'AREA_CREADA',
   'AREA_ACTUALIZADA',

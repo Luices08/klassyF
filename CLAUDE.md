@@ -280,6 +280,16 @@ Backend `/espacios` (modelo `Espacio`), frontend `/admin/espacios` (`EspaciosPag
 
 ## 6. Guía de diseño visual (frontend) — Klassy UI Spec
 
+### Acceso al portal del acudiente (M03 → M02/M27)
+
+- `POST /users/:userId/guardians` acepta `habilitar_portal` (checkbox en el drawer "Vincular acudiente", solo al
+  registrar uno nuevo). Sin marcar, M02 no se toca. Marcado, `vincularAcudiente` corre **todo en una transacción**
+  (`runTransaction`: acudiente + cuenta + vínculo; si algo falla no queda nada a medias).
+- Dato único: si ya existe un `User` con ese `numero_documento` se reutiliza su id (si su rol no es `ACUDIENTE` →
+  409, no se mezclan roles); si no, se crea con rol `ACUDIENTE`, contraseña temporal = número de documento y
+  `debe_cambiar_password: true`. Requiere correo del acudiente (el `email` de `User` es obligatorio y único).
+  El id queda en `Guardian.user_id`, que es lo que usa M27/boletín para ubicar al acudiente.
+
 Referencia completa: `doc/Klassy_UI_Spec_1.docx`. Resumen para uso diario:
 
 - **Color con propósito**: el color guía la acción y el estado, no decora. 4 familias ×

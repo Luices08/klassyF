@@ -33,6 +33,7 @@ export interface VincularAcudienteInput {
   parentesco: Parentesco;
   es_principal?: boolean;
   autorizado_retiro?: boolean;
+  habilitar_portal?: boolean;
 }
 
 export function useVincularAcudiente() {

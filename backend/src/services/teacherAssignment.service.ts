@@ -1,19 +1,20 @@
 import { Types } from 'mongoose';
 import Activity from '../models/activity.model';
+import Counter from '../models/counter.model';
 import AcademicYear from '../models/academicYear.model';
 import CurricularDevelopment from '../models/curricularDevelopment.model';
 import Group from '../models/group.model';
-import { ILimitesCargaDocente } from '../models/institution.model';
 import StudyPlan from '../models/studyPlan.model';
 import Subject from '../models/subject.model';
 import TeacherAssignment, { TeacherAssignmentDocument } from '../models/teacherAssignment.model';
 import User from '../models/user.model';
-import { NIVELES_EDUCATIVOS, NivelEducativo, TipoAsignacionDocente } from '../constants/enums';
+import { NivelEducativo, TipoAsignacionDocente } from '../constants/enums';
 import { ROLES } from '../constants/roles';
 import { asegurarAnioNoCerrado } from './academicYear.service';
 import { registrarEvento } from './audit.service';
 import { getLimitesCarga } from './institution.service';
 import ApiError from '../utils/ApiError';
+import { resumirCargaDocente } from '../utils/cargaDocente';
 import { ESTADO_ACTIVO, filtroPorEstado } from '../utils/filtroEstado';
 import { runTransaction } from '../utils/runTransaction';
 
@@ -29,6 +30,8 @@ export interface CreateTeacherAssignmentInput {
   group_id?: string | null;
   subject_id?: string | null;
   horas_semanales: number;
+  /** Solo DIRECCION_GRUPO: confirma que se quita al director actual del grupo, si lo tiene. */
+  reemplazar_director?: boolean;
   proyecto_nombre?: string;
   observaciones?: string;
 }
@@ -172,8 +175,38 @@ export async function createTeacherAssignment(
         throw new ApiError(409, 'Este docente ya es el director de este grupo.');
       }
 
-      // Dirección de grupo no computa horas lectivas
-      input.horas_semanales = 0;
+      // Cuántos grupos puede dirigir un mismo docente es política de la institución (por defecto 1):
+      // un docente con grupos en mañana y tarde puede necesitar más de uno. El grupo que se está
+      // reasignando no cuenta, porque su titularidad actual la deja de tener este mismo docente.
+      // Las transacciones solo chocan si escriben el MISMO documento: dos direcciones simultáneas del mismo
+      // docente en grupos distintos no lo harían y ambas pasarían el límite. Este contador común fuerza el
+      // conflicto; runTransaction reintenta la perdedora, que ya ve a la primera y recibe el 409.
+      await Counter.findByIdAndUpdate(
+        `DIR-${input.academic_year_id}-${docente._id}`,
+        { $inc: { seq: 1 } },
+        { upsert: true, session }
+      );
+      const { max_direcciones_grupo_por_docente: maxDirecciones } = await getLimitesCarga();
+      const gruposQueYaDirige = await TeacherAssignment.find({
+        academic_year_id: input.academic_year_id,
+        docente_id: docente._id,
+        tipo_asignacion: 'DIRECCION_GRUPO',
+        estado: ESTADO_ACTIVO,
+        group_id: { $ne: group._id },
+      })
+        .populate('group_id', 'nomenclatura')
+        .session(session);
+      if (gruposQueYaDirige.length >= maxDirecciones) {
+        const nombres = gruposQueYaDirige
+          .map((a) => (a.group_id as unknown as { nomenclatura?: string } | null)?.nomenclatura)
+          .filter(Boolean)
+          .join(', ');
+        throw new ApiError(
+          409,
+          `El docente ya dirige ${gruposQueYaDirige.length} grupo(s)${nombres ? ` (${nombres})` : ''} en este año lectivo ` +
+            `y la institución permite un máximo de ${maxDirecciones} por docente.`
+        );
+      }
 
       // Reemplazar al director anterior (si lo hay): su(s) asignacion(es) quedan inactivas, no se
       // borran (preserva el historial). Se buscan TODAS las activas (no solo una) para que, aunque
@@ -184,6 +217,14 @@ export async function createTeacherAssignment(
         tipo_asignacion: 'DIRECCION_GRUPO',
         estado: ESTADO_ACTIVO,
       }).session(session);
+      if (asignacionesAnteriores.length > 0 && !input.reemplazar_director) {
+        const actual = await User.findById(asignacionesAnteriores[0]?.docente_id).select('nombre apellido');
+        throw new ApiError(
+          409,
+          `El grupo ${group.nomenclatura} ya tiene director${actual ? ` (${actual.apellido}, ${actual.nombre})` : ''}. ` +
+            'Confirma el reemplazo para quitarle la dirección y asignarla a este docente.'
+        );
+      }
       if (asignacionesAnteriores.length > 0) {
         await TeacherAssignment.updateMany(
           { _id: { $in: asignacionesAnteriores.map((a) => a._id) } },
@@ -207,8 +248,9 @@ export async function createTeacherAssignment(
       detalleAuditoria = `${tipo === 'PROYECTO_TRANSVERSAL' ? 'Proyecto transversal' : 'Otra asignación'}: ${input.proyecto_nombre}`;
     }
 
+    const { reemplazar_director: _confirmacion, ...datosAsignacion } = input;
     const [creada] = await TeacherAssignment.create(
-      [{ ...input, tipo_asignacion: tipo, estado: 'activo' }],
+      [{ ...datosAsignacion, tipo_asignacion: tipo, estado: 'activo' }],
       { session }
     );
     if (!creada) throw new ApiError(500, 'No se pudo crear la asignación académica.');
@@ -308,56 +350,14 @@ export async function getDocentesCargaResumen(academicYearId: string) {
     const docId = String(doc._id);
     const docAssignments = assignmentsByDocente.get(docId) ?? [];
 
-    let horasClase = 0;
-    let horasDireccion = 0;
-    let horasProyectos = 0;
-    let tieneDireccionGrupo = false;
-
-    const horasPorNivel: Partial<Record<NivelEducativo, number>> = {};
-
-    for (const a of docAssignments) {
-      if (a.tipo_asignacion === 'CLASE') {
-        horasClase += a.horas_semanales;
-        if (a.group_id) {
-          const grp = a.group_id as unknown as { grade_id?: { nivel?: NivelEducativo } };
-          const nivel = grp.grade_id?.nivel;
-          if (nivel) {
-            // Ponderado por horas, no por numero de asignaciones: una sola clase de 10h no debe
-            // perder frente a tres de 1h cada una al decidir el tope de carga que aplica.
-            horasPorNivel[nivel] = (horasPorNivel[nivel] ?? 0) + a.horas_semanales;
-          }
-        }
-      } else if (a.tipo_asignacion === 'DIRECCION_GRUPO') {
-        horasDireccion += a.horas_semanales;
-        tieneDireccionGrupo = true;
-      } else {
-        horasProyectos += a.horas_semanales;
-      }
-    }
-
-    const horasTotales = horasClase + horasDireccion + horasProyectos;
-
-    // Determinar nivel predominante del docente (mas horas; empate se rompe por el orden fijo
-    // PREESCOLAR < PRIMARIA < SECUNDARIA < MEDIA para que el resultado sea siempre el mismo, no
-    // dependa del orden de iteracion de las asignaciones en BD).
-    let nivelPredominante: NivelEducativo = 'SECUNDARIA';
-    let maxHoras = 0;
-    for (const lvl of NIVELES_EDUCATIVOS) {
-      const horas = horasPorNivel[lvl] ?? 0;
-      if (horas > maxHoras) {
-        maxHoras = horas;
-        nivelPredominante = lvl;
-      }
-    }
-
-    // Tope de horas según nivel educativo
-    const topeHoras = (limites as ILimitesCargaDocente)[nivelPredominante as keyof ILimitesCargaDocente] ?? 22;
-
-    // Diagnóstico según normativa colombiana (Decreto 1850 de 2002) y configuración institucional
-    let estadoCarga: 'SUB_CARGA' | 'NORMAL' | 'SOBRE_CARGA' = 'NORMAL';
-    if (horasTotales === 0) estadoCarga = 'SUB_CARGA';
-    else if (horasTotales > topeHoras) estadoCarga = 'SOBRE_CARGA';
-    else if (horasTotales < topeHoras - 2) estadoCarga = 'SUB_CARGA';
+    const resumen = resumirCargaDocente(
+      docAssignments.map((a) => {
+        const grupo = a.group_id as unknown as { grade_id?: { nivel?: NivelEducativo } } | null;
+        return { tipo_asignacion: a.tipo_asignacion, horas_semanales: a.horas_semanales, nivel: grupo?.grade_id?.nivel };
+      }),
+      limites,
+      limites.tolerancia_subcarga_horas
+    );
 
     return {
       docente: {
@@ -367,14 +367,7 @@ export async function getDocentesCargaResumen(academicYearId: string) {
         numero_documento: doc.numero_documento,
         email: doc.email,
       },
-      horas_clase: horasClase,
-      horas_direccion: horasDireccion,
-      horas_proyectos: horasProyectos,
-      tiene_direccion_grupo: tieneDireccionGrupo,
-      horas_totales: horasTotales,
-      estado_carga: estadoCarga,
-      nivel_predominante: nivelPredominante,
-      tope_horas: topeHoras,
+      ...resumen,
       total_asignaciones: docAssignments.length,
       asignaciones: docAssignments,
     };

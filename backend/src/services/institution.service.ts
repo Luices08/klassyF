@@ -3,7 +3,7 @@ import { ROLES } from '../constants/roles';
 import { Calendario, EstadoUsuario, ModalidadInstitucion, PoliticaAforoAula } from '../constants/enums';
 import AcademicYear, { AcademicYearDocument } from '../models/academicYear.model';
 import Campus, { CampusDocument } from '../models/campus.model';
-import Institution, { InstitutionDocument } from '../models/institution.model';
+import Institution, { ILimitesCargaDocente, InstitutionDocument } from '../models/institution.model';
 import User from '../models/user.model';
 import ApiError from '../utils/ApiError';
 import { FranjaPlantilla } from '../utils/franjas';
@@ -183,18 +183,31 @@ export async function updateInstitution(
   return institucion;
 }
 
-export async function getLimitesCarga(): Promise<InstitutionDocument['limites_carga_docente']> {
-  const institucion = await Institution.findOne();
-  if (!institucion || !institucion.limites_carga_docente) {
-    return { PREESCOLAR: 20, PRIMARIA: 25, SECUNDARIA: 22, MEDIA: 22 };
-  }
-  return institucion.limites_carga_docente;
+export interface ConfiguracionCargaDocente extends ILimitesCargaDocente {
+  max_direcciones_grupo_por_docente: number;
+  tolerancia_subcarga_horas: number;
+}
+
+function configuracionCarga(institucion: InstitutionDocument | null): ConfiguracionCargaDocente {
+  const limites = institucion?.limites_carga_docente ?? { PREESCOLAR: 20, PRIMARIA: 25, SECUNDARIA: 22, MEDIA: 22 };
+  return {
+    PREESCOLAR: limites.PREESCOLAR,
+    PRIMARIA: limites.PRIMARIA,
+    SECUNDARIA: limites.SECUNDARIA,
+    MEDIA: limites.MEDIA,
+    max_direcciones_grupo_por_docente: institucion?.max_direcciones_grupo_por_docente ?? 1,
+    tolerancia_subcarga_horas: institucion?.tolerancia_subcarga_horas ?? 2,
+  };
+}
+
+export async function getLimitesCarga(): Promise<ConfiguracionCargaDocente> {
+  return configuracionCarga(await Institution.findOne());
 }
 
 export async function updateLimitesCarga(
-  limites: { PREESCOLAR?: number; PRIMARIA?: number; SECUNDARIA?: number; MEDIA?: number },
+  limites: Partial<ConfiguracionCargaDocente>,
   { usuarioId, ip }: { usuarioId: Types.ObjectId | string; ip?: string | null }
-): Promise<InstitutionDocument['limites_carga_docente']> {
+): Promise<ConfiguracionCargaDocente> {
   const institucion = await Institution.findOne();
   if (!institucion) throw new ApiError(404, 'No hay una institución configurada todavía.');
 
@@ -211,18 +224,25 @@ export async function updateLimitesCarga(
     SECUNDARIA: limites.SECUNDARIA ?? actual.SECUNDARIA,
     MEDIA: limites.MEDIA ?? actual.MEDIA,
   };
+  if (limites.max_direcciones_grupo_por_docente !== undefined) {
+    institucion.max_direcciones_grupo_por_docente = limites.max_direcciones_grupo_por_docente;
+  }
+  if (limites.tolerancia_subcarga_horas !== undefined) {
+    institucion.tolerancia_subcarga_horas = limites.tolerancia_subcarga_horas;
+  }
 
   await institucion.save();
 
+  const resultado = configuracionCarga(institucion);
   await registrarEvento({
     usuario_id: usuarioId,
     accion: 'LIMITES_CARGA_DOCENTE_ACTUALIZADOS',
     entidad: 'Institution',
     entidad_id: institucion._id,
-    detalle: `PREESCOLAR ${institucion.limites_carga_docente.PREESCOLAR}h, PRIMARIA ${institucion.limites_carga_docente.PRIMARIA}h, SECUNDARIA ${institucion.limites_carga_docente.SECUNDARIA}h, MEDIA ${institucion.limites_carga_docente.MEDIA}h`,
+    detalle: `PREESCOLAR ${resultado.PREESCOLAR}h, PRIMARIA ${resultado.PRIMARIA}h, SECUNDARIA ${resultado.SECUNDARIA}h, MEDIA ${resultado.MEDIA}h, direcciones de grupo por docente: ${resultado.max_direcciones_grupo_por_docente}, tolerancia de subcarga: ${resultado.tolerancia_subcarga_horas}h`,
     ip,
   });
-  return institucion.limites_carga_docente;
+  return resultado;
 }
 
 /** M06: tope de horas semanales del Plan de Estudios por nivel (antes quemado a 30 para todos en el frontend). */

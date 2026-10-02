@@ -46,6 +46,10 @@ export interface IInstitution {
   limites_carga_docente?: ILimitesCargaDocente;
   /** M06: Tope maximo de horas semanales del Plan de Estudios por nivel (antes quemado en el frontend). */
   limites_horas_plan_estudios?: ILimitesHorasPlanEstudios;
+  /** M08: cuántos grupos puede dirigir un mismo docente a la vez en un año lectivo (1 si no se configura). */
+  max_direcciones_grupo_por_docente?: number;
+  /** M08: holgura en horas bajo el tope antes de marcar subcarga a un docente (2 si no se configura). */
+  tolerancia_subcarga_horas?: number;
   estado: EstadoUsuario;
   createdAt: Date;
   updatedAt: Date;
@@ -105,6 +109,8 @@ const institutionSchema = new Schema<IInstitution, InstitutionModel>(
       ),
       default: () => ({ PREESCOLAR: 30, PRIMARIA: 30, SECUNDARIA: 30, MEDIA: 30 }),
     },
+    max_direcciones_grupo_por_docente: { type: Number, default: 1, min: 1, max: 10 },
+    tolerancia_subcarga_horas: { type: Number, default: 2, min: 0, max: 10 },
     estado: { type: String, enum: ESTADOS_USUARIO, default: 'activo' },
   },
   { timestamps: true }

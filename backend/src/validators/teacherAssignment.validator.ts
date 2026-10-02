@@ -26,6 +26,7 @@ export const createTeacherAssignment: ValidationSchema = {
       otherwise: Joi.valid(null).optional(),
     }),
     horas_semanales: Joi.number().integer().min(0).max(50).default(0),
+    reemplazar_director: Joi.boolean().default(false),
     proyecto_nombre: Joi.alternatives().conditional('tipo_asignacion', {
       is: Joi.valid('PROYECTO_TRANSVERSAL', 'OTRO'),
       // oxlint-disable-next-line unicorn/no-thenable

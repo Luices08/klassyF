@@ -6,6 +6,8 @@ import { EstadoUsuario } from '../constants/enums';
 import validate from '../middlewares/validate.middleware';
 import * as casoService from '../services/caso.service';
 import * as catalogoService from '../services/casoCatalogo.service';
+import * as importacionFaltas from '../services/importacionFaltas.service';
+import * as solicitudService from '../services/solicitudCaso.service';
 import ApiError from '../utils/ApiError';
 import catchAsync from '../utils/catchAsync';
 import { coleccionesRegistroCaso, esquemaDeRegistro } from '../validators/caso.validator';
@@ -36,6 +38,45 @@ export const cambiarEstadoMedida = catchAsync<IdParams, unknown, { estado: Estad
 export const eliminarMedida = catchAsync<IdParams>(async (req, res) => {
   await catalogoService.eliminarMedida(req.params.id, actor(req));
   res.status(200).json({ success: true });
+});
+
+export const crearFalta = catchAsync<unknown, unknown, catalogoService.DatosFalta>(async (req, res) => {
+  res.status(201).json({ success: true, data: await catalogoService.crearFalta(req.body, actor(req)) });
+});
+export const actualizarFalta = catchAsync<IdParams, unknown, Partial<catalogoService.DatosFalta>>(async (req, res) => {
+  res.status(200).json({ success: true, data: await catalogoService.actualizarFalta(req.params.id, req.body, actor(req)) });
+});
+export const cambiarEstadoFalta = catchAsync<IdParams, unknown, { estado: EstadoUsuario }>(async (req, res) => {
+  res.status(200).json({ success: true, data: await catalogoService.cambiarEstadoFalta(req.params.id, req.body.estado, actor(req)) });
+});
+export const eliminarFalta = catchAsync<IdParams>(async (req, res) => {
+  await catalogoService.eliminarFalta(req.params.id, actor(req));
+  res.status(200).json({ success: true });
+});
+
+// --- Carga masiva de faltas (Excel o CSV) ---
+
+export const descargarPlantillaFaltas = catchAsync<unknown, unknown, unknown, ParsedQs & { formato?: string }>(async (req, res) => {
+  const { buffer, nombreArchivo, contentType } = await importacionFaltas.generarPlantillaFaltas(req.user!, req.query.formato === 'csv' ? 'csv' : 'xlsx');
+  res.setHeader('Content-Type', contentType);
+  res.setHeader('Content-Disposition', `attachment; filename="${nombreArchivo}"`);
+  res.send(buffer);
+});
+
+export const importarFaltas = catchAsync(async (req, res) => {
+  if (!req.file) throw new ApiError(400, 'Adjunta el archivo en el campo "archivo".');
+  res.status(201).json({ success: true, data: await importacionFaltas.importarFaltas(req.file, req.user!, req.ip) });
+});
+
+// --- Solicitudes de caso ---
+
+export const listarSolicitudes = catchAsync<unknown, unknown, unknown, ParsedQs & { pagina?: number; limite?: number }>(async (req, res) => {
+  const paginacion = { pagina: Number(req.query.pagina ?? 1), limite: Number(req.query.limite ?? 20) };
+  res.status(200).json({ success: true, ...(await solicitudService.bandejaDeSolicitudes(req.user!, paginacion, req.ip)) });
+});
+
+export const descartarSolicitud = catchAsync<IdParams, unknown, { motivo: string }>(async (req, res) => {
+  res.status(200).json({ success: true, data: await solicitudService.descartarSolicitud(req.params.id, req.body.motivo, req.user!, req.ip) });
 });
 
 export const crearEntidad = catchAsync<unknown, unknown, catalogoService.DatosEntidad>(async (req, res) => {
@@ -103,7 +144,7 @@ interface ColeccionParams extends IdParams {
 export function validarRegistroDeCaso(req: Request, res: Response, next: NextFunction) {
   const esquema = coleccionesRegistroCaso.includes(req.params.coleccion ?? '') ? esquemaDeRegistro(req.params.coleccion ?? '') : undefined;
   if (!esquema) return next(new ApiError(404, 'Tipo de registro no válido.'));
-  return validate({ params: v.obtenerCaso.params, body: esquema })(req, res, next);
+  return validate({ params: v.paramsRegistroCaso, body: esquema })(req, res, next);
 }
 
 export const agregarRegistroCaso = catchAsync<ColeccionParams, unknown, casoService.DatosRegistroCaso>(async (req, res) => {
@@ -111,7 +152,7 @@ export const agregarRegistroCaso = catchAsync<ColeccionParams, unknown, casoServ
   res.status(201).json({ success: true, data: await casoService.agregarRegistroCaso(req.params.id, coleccion, req.body, req.user!, req.ip) });
 });
 
-export const registrarDecision = catchAsync<IdParams, unknown, { motivacion: string; descriptores_ids?: string[] }>(async (req, res) => {
+export const registrarDecision = catchAsync<IdParams, unknown, { motivacion: string; faltas_ids?: string[] }>(async (req, res) => {
   res.status(200).json({ success: true, data: await casoService.registrarDecision(req.params.id, req.body, req.user!, req.ip) });
 });
 

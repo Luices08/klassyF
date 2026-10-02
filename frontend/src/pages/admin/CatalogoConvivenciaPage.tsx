@@ -1,15 +1,15 @@
 import { type FormEvent, useState } from 'react';
-import { CargaMasivaDrawer } from '../../components/convivencia/CargaMasivaDrawer';
+import { CargaFaltasDrawer } from '../../components/convivencia/CargaFaltasDrawer';
 import { EntidadesTab, MedidasTab, ProtocolosTab } from '../../components/convivencia/CatalogosCasoTabs';
 import { useAuth } from '../../context/AuthContext';
+import { useCambiarEstadoFalta, useEliminarFalta, useGuardarFalta } from '../../hooks/useCasos';
 import { useInformeRetencion } from '../../hooks/useComite';
-import type { ProcesoConvivencia } from '../../lib/columnasImportacion';
 import { Alert, errorMessage } from '../../components/ui/Alert';
-import { Chip, EstadoUsuarioBadge, type Tone } from '../../components/ui/Badge';
+import { EstadoUsuarioBadge, TipoSituacionBadge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import { Card, CardHeader } from '../../components/ui/Card';
 import { Drawer } from '../../components/ui/Drawer';
-import { Input, Select } from '../../components/ui/Field';
+import { Input, Select, Textarea } from '../../components/ui/Field';
 import { IconButton } from '../../components/ui/IconButton';
 import { PageHeader } from '../../components/ui/PageHeader';
 import { Spinner } from '../../components/ui/Spinner';
@@ -17,33 +17,23 @@ import { EmptyRow, Table, TableBody, TableHead, Td, Th } from '../../components/
 import { TabPanel, Tabs } from '../../components/ui/Tabs';
 import { BanIcon, PencilIcon, PlusIcon, RefreshIcon, TrashIcon, UploadIcon } from '../../components/ui/icons';
 import {
-  FAMILIAS_OBSERVACION,
-  NOMBRES_FAMILIA,
+  NOMBRES_GRAVEDAD,
   TIPOS_SITUACION,
-  type CategoriaDescriptor,
-  type Descriptor,
-  type FamiliaObservacion,
-  type RecursoCatalogo,
+  type FaltaConvivencia,
   type TipoObservacion,
   type TipoSituacion,
-  useActualizarCategoriaDescriptor,
   useActualizarConfiguracionConvivencia,
-  useActualizarDescriptor,
   useActualizarTipoObservacion,
-  useCambiarEstadoCatalogo,
+  useCambiarEstadoTipo,
   useCatalogoConvivencia,
   useConfiguracionConvivencia,
-  useCrearCategoriaDescriptor,
-  useCrearDescriptor,
   useCrearTipoObservacion,
-  useEliminarDelCatalogo,
+  useEliminarTipo,
 } from '../../hooks/useObservaciones';
 import type { EstadoActivo } from '../../types/domain';
 
-const TONO_SITUACION: Record<TipoSituacion, Tone> = { I: 'blue', II: 'orange', III: 'red' };
-
 interface PorEliminar {
-  recurso: RecursoCatalogo;
+  recurso: 'tipo' | 'falta';
   id: string;
   nombre: string;
 }
@@ -51,39 +41,44 @@ interface PorEliminar {
 export function CatalogoConvivenciaPage() {
   const catalogo = useCatalogoConvivencia(true);
   const [tab, setTab] = useState('tipos');
-  const cambiarEstado = useCambiarEstadoCatalogo();
-  const eliminar = useEliminarDelCatalogo();
+  const cambiarEstadoTipo = useCambiarEstadoTipo();
+  const cambiarEstadoFalta = useCambiarEstadoFalta();
+  const eliminarTipo = useEliminarTipo();
+  const eliminarFalta = useEliminarFalta();
   const [porEliminar, setPorEliminar] = useState<PorEliminar | null>(null);
-  const [carga, setCarga] = useState<ProcesoConvivencia | null>(null);
-  const procesoDeCarga = tab === 'tipos' || tab === 'categorias' ? tab : tab === 'frases' ? 'frases' : null;
+  const [cargando, setCargando] = useState(false);
+  const eliminar = porEliminar?.recurso === 'falta' ? eliminarFalta : eliminarTipo;
+  const errorEstado = cambiarEstadoTipo.isError ? cambiarEstadoTipo.error : cambiarEstadoFalta.isError ? cambiarEstadoFalta.error : null;
 
-  const alternarEstado = (recurso: RecursoCatalogo, id: string, estado: EstadoActivo) =>
-    cambiarEstado.mutate({ recurso, id, estado: estado === 'activo' ? 'inactivo' : 'activo' });
+  const alternarEstado = (recurso: 'tipo' | 'falta', id: string, estado: EstadoActivo) => {
+    const nuevo = estado === 'activo' ? 'inactivo' : 'activo';
+    if (recurso === 'falta') cambiarEstadoFalta.mutate({ id, estado: nuevo });
+    else cambiarEstadoTipo.mutate({ id, estado: nuevo });
+  };
 
   return (
     <div className="space-y-4">
       <PageHeader
         title="Catálogo de convivencia"
-        subtitle="Los tipos de observación, las categorías y las faltas de tu manual de convivencia. Cada institución define los suyos."
+        subtitle="Los tipos de observación y las faltas de tu manual de convivencia, con sus medidas, protocolos y plazos. Cada institución define los suyos."
         action={
-          procesoDeCarga ? (
-            <Button variant="outline" onClick={() => setCarga(procesoDeCarga)}>
+          tab === 'faltas' ? (
+            <Button variant="outline" onClick={() => setCargando(true)}>
               <UploadIcon className="h-4 w-4" /> Cargar archivo
             </Button>
           ) : undefined
         }
       />
-      <CargaMasivaDrawer proceso={carga} onClose={() => setCarga(null)} />
+      <CargaFaltasDrawer open={cargando} onClose={() => setCargando(false)} />
       <Alert tone="info">
-        Agrega, edita o elimina lo que necesites. Lo que ya se usó en una observación no se elimina: se desactiva, para conservar el historial.
+        Agrega, edita o elimina lo que necesites. Lo que ya se usó en un registro no se elimina: se desactiva, para conservar el historial.
       </Alert>
-      {cambiarEstado.isError && <Alert tone="error">{errorMessage(cambiarEstado.error)}</Alert>}
+      {errorEstado && <Alert tone="error">{errorMessage(errorEstado)}</Alert>}
 
       <Tabs
         items={[
           { key: 'tipos', label: 'Tipos de observación' },
-          { key: 'categorias', label: 'Categorías' },
-          { key: 'frases', label: 'Frases y faltas' },
+          { key: 'faltas', label: 'Faltas del manual' },
           { key: 'medidas', label: 'Medidas' },
           { key: 'entidades', label: 'Entidades de remisión' },
           { key: 'protocolos', label: 'Protocolos' },
@@ -100,17 +95,8 @@ export function CatalogoConvivenciaPage() {
           <TabPanel active={tab} tabKey="tipos">
             <TiposTab tipos={catalogo.data.tipos} onEstado={alternarEstado} onEliminar={setPorEliminar} />
           </TabPanel>
-          <TabPanel active={tab} tabKey="categorias">
-            <CategoriasTab categorias={catalogo.data.categorias} onEstado={alternarEstado} onEliminar={setPorEliminar} />
-          </TabPanel>
-          <TabPanel active={tab} tabKey="frases">
-            <FrasesTab
-              tipos={catalogo.data.tipos}
-              categorias={catalogo.data.categorias}
-              descriptores={catalogo.data.descriptores}
-              onEstado={alternarEstado}
-              onEliminar={setPorEliminar}
-            />
+          <TabPanel active={tab} tabKey="faltas">
+            <FaltasTab faltas={catalogo.data.faltas} onEstado={alternarEstado} onEliminar={setPorEliminar} />
           </TabPanel>
         </>
       )}
@@ -133,12 +119,13 @@ export function CatalogoConvivenciaPage() {
         subtitle={porEliminar?.nombre}
         onClose={() => {
           setPorEliminar(null);
-          eliminar.reset();
+          eliminarTipo.reset();
+          eliminarFalta.reset();
         }}
         onSubmit={async (e) => {
           e.preventDefault();
           if (!porEliminar) return;
-          await eliminar.mutateAsync({ recurso: porEliminar.recurso, id: porEliminar.id });
+          await eliminar.mutateAsync(porEliminar.id);
           setPorEliminar(null);
         }}
         submitLabel="Eliminar"
@@ -147,7 +134,7 @@ export function CatalogoConvivenciaPage() {
       >
         {eliminar.isError && <Alert tone="error">{errorMessage(eliminar.error)}</Alert>}
         <Alert tone="warning">
-          Esta acción no se puede deshacer. Si ya se usó en observaciones, el sistema no lo elimina: desactívalo.
+          Esta acción no se puede deshacer. Si ya se usó en algún registro, el sistema no lo elimina: desactívalo.
         </Alert>
       </Drawer>
     </div>
@@ -155,7 +142,7 @@ export function CatalogoConvivenciaPage() {
 }
 
 interface AccionesProps {
-  onEstado: (recurso: RecursoCatalogo, id: string, estado: EstadoActivo) => void;
+  onEstado: (recurso: 'tipo' | 'falta', id: string, estado: EstadoActivo) => void;
   onEliminar: (e: PorEliminar) => void;
 }
 
@@ -167,7 +154,7 @@ function Acciones({
   onEditar,
   onEstado,
   onEliminar,
-}: AccionesProps & { recurso: RecursoCatalogo; id: string; nombre: string; estado: EstadoActivo; onEditar: () => void }) {
+}: AccionesProps & { recurso: 'tipo' | 'falta'; id: string; nombre: string; estado: EstadoActivo; onEditar: () => void }) {
   return (
     <div className="flex justify-end gap-2">
       <IconButton tone="edit" label="Editar" icon={<PencilIcon />} onClick={onEditar} />
@@ -182,7 +169,7 @@ function Acciones({
   );
 }
 
-// --- Tipos ---
+// --- Tipos de observación ---
 
 function TiposTab({ tipos, onEstado, onEliminar }: { tipos: TipoObservacion[] } & AccionesProps) {
   const [drawer, setDrawer] = useState<{ tipo: TipoObservacion | null } | null>(null);
@@ -190,7 +177,7 @@ function TiposTab({ tipos, onEstado, onEliminar }: { tipos: TipoObservacion[] } 
     <Card>
       <CardHeader
         title="Tipos de observación"
-        subtitle="La familia define qué exige el sistema (la disciplinaria exige describir los hechos) y no se cambia después de crear el tipo."
+        subtitle="Con qué clasifica el docente una observación cotidiana del Observador, por ejemplo «Académica» o «Comportamental»."
         action={
           <Button onClick={() => setDrawer({ tipo: null })}>
             <PlusIcon className="h-4 w-4" /> Nuevo tipo
@@ -201,7 +188,6 @@ function TiposTab({ tipos, onEstado, onEliminar }: { tipos: TipoObservacion[] } 
         <TableHead>
           <tr>
             <Th>Nombre</Th>
-            <Th>Familia</Th>
             <Th>Lo ve el estudiante</Th>
             <Th>Estado</Th>
             <Th className="text-right">Acciones</Th>
@@ -211,19 +197,16 @@ function TiposTab({ tipos, onEstado, onEliminar }: { tipos: TipoObservacion[] } 
           {tipos.map((t) => (
             <tr key={t._id}>
               <Td>{t.nombre}</Td>
-              <Td>
-                <Chip tone="neutral">{NOMBRES_FAMILIA[t.familia]}</Chip>
-              </Td>
               <Td>{t.visible_estudiante ? 'Sí' : 'No'}</Td>
               <Td>
                 <EstadoUsuarioBadge value={t.estado} />
               </Td>
               <Td>
-                <Acciones recurso="tipos" id={t._id} nombre={t.nombre} estado={t.estado} onEditar={() => setDrawer({ tipo: t })} onEstado={onEstado} onEliminar={onEliminar} />
+                <Acciones recurso="tipo" id={t._id} nombre={t.nombre} estado={t.estado} onEditar={() => setDrawer({ tipo: t })} onEstado={onEstado} onEliminar={onEliminar} />
               </Td>
             </tr>
           ))}
-          {tipos.length === 0 && <EmptyRow colSpan={5}>Sin tipos.</EmptyRow>}
+          {tipos.length === 0 && <EmptyRow colSpan={4}>Sin tipos.</EmptyRow>}
         </TableBody>
       </Table>
       {drawer && <TipoDrawer tipo={drawer.tipo} onClose={() => setDrawer(null)} />}
@@ -236,7 +219,6 @@ function TipoDrawer({ tipo, onClose }: { tipo: TipoObservacion | null; onClose: 
   const actualizar = useActualizarTipoObservacion();
   const mutation = tipo ? actualizar : crear;
   const [nombre, setNombre] = useState(tipo?.nombre ?? '');
-  const [familia, setFamilia] = useState<FamiliaObservacion>(tipo?.familia ?? 'COMPORTAMENTAL');
   const [visible, setVisible] = useState(tipo?.visible_estudiante ?? false);
   const [orden, setOrden] = useState(String(tipo?.orden ?? 0));
 
@@ -244,7 +226,7 @@ function TipoDrawer({ tipo, onClose }: { tipo: TipoObservacion | null; onClose: 
     e.preventDefault();
     const datos = { nombre, visible_estudiante: visible, orden: Number(orden) || 0 };
     if (tipo) await actualizar.mutateAsync({ id: tipo._id, ...datos });
-    else await crear.mutateAsync({ ...datos, familia });
+    else await crear.mutateAsync(datos);
     onClose();
   };
 
@@ -252,13 +234,6 @@ function TipoDrawer({ tipo, onClose }: { tipo: TipoObservacion | null; onClose: 
     <Drawer open title={tipo ? 'Editar tipo' : 'Nuevo tipo de observación'} onClose={onClose} onSubmit={guardar} isSubmitting={mutation.isPending} submitDisabled={!nombre.trim()}>
       {mutation.isError && <Alert tone="error">{errorMessage(mutation.error)}</Alert>}
       <Input label="Nombre" value={nombre} onChange={(e) => setNombre(e.target.value)} maxLength={60} required />
-      <Select label="Familia" value={familia} onChange={(e) => setFamilia(e.target.value as FamiliaObservacion)} disabled={Boolean(tipo)}>
-        {FAMILIAS_OBSERVACION.map((f) => (
-          <option key={f} value={f}>
-            {NOMBRES_FAMILIA[f]}
-          </option>
-        ))}
-      </Select>
       <label className="flex items-start gap-2 text-sm text-body">
         <input type="checkbox" className="mt-0.5 h-4 w-4 rounded border-border text-primary focus:ring-primary" checked={visible} onChange={(e) => setVisible(e.target.checked)} />
         <span>
@@ -271,222 +246,123 @@ function TipoDrawer({ tipo, onClose }: { tipo: TipoObservacion | null; onClose: 
   );
 }
 
-// --- Categorías ---
+// --- Faltas del manual (M15), agrupadas por gravedad ---
 
-function CategoriasTab({ categorias, onEstado, onEliminar }: { categorias: CategoriaDescriptor[] } & AccionesProps) {
-  const [drawer, setDrawer] = useState<{ categoria: CategoriaDescriptor | null } | null>(null);
+function FaltasTab({ faltas, onEstado, onEliminar }: { faltas: FaltaConvivencia[] } & AccionesProps) {
+  const [drawer, setDrawer] = useState<{ falta: FaltaConvivencia | null } | null>(null);
   return (
     <Card>
       <CardHeader
-        title="Categorías"
-        subtitle="Agrupan las frases, por ejemplo «Compromisos académicos» o «Filosofía institucional»."
+        title="Faltas del manual"
+        subtitle="Cada falta tiene la gravedad (Tipo I, II o III) que fija tu manual. El docente elige la falta y el tipo sale de ella."
         action={
-          <Button onClick={() => setDrawer({ categoria: null })}>
-            <PlusIcon className="h-4 w-4" /> Nueva categoría
+          <Button onClick={() => setDrawer({ falta: null })}>
+            <PlusIcon className="h-4 w-4" /> Nueva falta
           </Button>
         }
       />
-      <Table>
-        <TableHead>
-          <tr>
-            <Th>Nombre</Th>
-            <Th>Orden</Th>
-            <Th>Estado</Th>
-            <Th className="text-right">Acciones</Th>
-          </tr>
-        </TableHead>
-        <TableBody>
-          {categorias.map((c) => (
-            <tr key={c._id}>
-              <Td>{c.nombre}</Td>
-              <Td>{c.orden}</Td>
-              <Td>
-                <EstadoUsuarioBadge value={c.estado} />
-              </Td>
-              <Td>
-                <Acciones recurso="categorias" id={c._id} nombre={c.nombre} estado={c.estado} onEditar={() => setDrawer({ categoria: c })} onEstado={onEstado} onEliminar={onEliminar} />
-              </Td>
-            </tr>
-          ))}
-          {categorias.length === 0 && <EmptyRow colSpan={4}>Aún no hay categorías.</EmptyRow>}
-        </TableBody>
-      </Table>
-      {drawer && <CategoriaDrawer categoria={drawer.categoria} onClose={() => setDrawer(null)} />}
-    </Card>
-  );
-}
-
-function CategoriaDrawer({ categoria, onClose }: { categoria: CategoriaDescriptor | null; onClose: () => void }) {
-  const crear = useCrearCategoriaDescriptor();
-  const actualizar = useActualizarCategoriaDescriptor();
-  const mutation = categoria ? actualizar : crear;
-  const [nombre, setNombre] = useState(categoria?.nombre ?? '');
-  const [orden, setOrden] = useState(String(categoria?.orden ?? 0));
-
-  const guardar = async (e: FormEvent) => {
-    e.preventDefault();
-    const datos = { nombre, orden: Number(orden) || 0 };
-    if (categoria) await actualizar.mutateAsync({ id: categoria._id, ...datos });
-    else await crear.mutateAsync(datos);
-    onClose();
-  };
-
-  return (
-    <Drawer open title={categoria ? 'Editar categoría' : 'Nueva categoría'} onClose={onClose} onSubmit={guardar} isSubmitting={mutation.isPending} submitDisabled={!nombre.trim()}>
-      {mutation.isError && <Alert tone="error">{errorMessage(mutation.error)}</Alert>}
-      <Input label="Nombre" value={nombre} onChange={(e) => setNombre(e.target.value)} maxLength={80} required />
-      <Input label="Orden" type="number" min={0} value={orden} onChange={(e) => setOrden(e.target.value)} />
-    </Drawer>
-  );
-}
-
-// --- Frases y faltas ---
-
-function FrasesTab({
-  tipos,
-  categorias,
-  descriptores,
-  onEstado,
-  onEliminar,
-}: { tipos: TipoObservacion[]; categorias: CategoriaDescriptor[]; descriptores: Descriptor[] } & AccionesProps) {
-  const [tipoId, setTipoId] = useState('');
-  const tipoActual = tipos.find((t) => t._id === (tipoId || tipos[0]?._id));
-  const [drawer, setDrawer] = useState<{ descriptor: Descriptor | null } | null>(null);
-  const filas = descriptores.filter((d) => d.tipo_id === tipoActual?._id);
-  const nombreCategoria = (id: string | null) => categorias.find((c) => c._id === id)?.nombre ?? '—';
-  const esFalta = tipoActual?.familia === 'DISCIPLINARIA';
-
-  return (
-    <Card>
-      <CardHeader
-        title="Frases y faltas"
-        subtitle={esFalta ? 'En un tipo disciplinario cada frase es una falta de tu manual, con su código y su tipo de situación.' : 'Frases que el docente puede marcar al registrar.'}
-        action={
-          <Button disabled={!tipoActual} onClick={() => setDrawer({ descriptor: null })}>
-            <PlusIcon className="h-4 w-4" /> Nueva frase
-          </Button>
-        }
-      />
-      <div className="p-4">
-        <Select label="Tipo de observación" value={tipoActual?._id ?? ''} onChange={(e) => setTipoId(e.target.value)}>
-          {tipos.map((t) => (
-            <option key={t._id} value={t._id}>
-              {t.nombre}
-            </option>
-          ))}
-        </Select>
-      </div>
       <Table>
         <TableHead>
           <tr>
             <Th>Código</Th>
-            <Th>Texto</Th>
-            <Th>Categoría</Th>
-            {esFalta && <Th>Situación</Th>}
-            {esFalta && <Th>Décimas</Th>}
+            <Th>Descripción</Th>
+            <Th>Décimas</Th>
             <Th>Estado</Th>
             <Th className="text-right">Acciones</Th>
           </tr>
         </TableHead>
         <TableBody>
-          {filas.map((d) => (
-            <tr key={d._id}>
-              <Td>{d.codigo ?? '—'}</Td>
-              <Td className="max-w-md">{d.texto}</Td>
-              <Td>{nombreCategoria(d.categoria_id)}</Td>
-              {esFalta && <Td>{d.tipo_situacion ? <Chip tone={TONO_SITUACION[d.tipo_situacion]}>Tipo {d.tipo_situacion}</Chip> : '—'}</Td>}
-              {esFalta && <Td>{d.descuento_decimas ?? '—'}</Td>}
-              <Td>
-                <EstadoUsuarioBadge value={d.estado} />
-              </Td>
-              <Td>
-                <Acciones recurso="descriptores" id={d._id} nombre={d.codigo ?? d.texto.slice(0, 40)} estado={d.estado} onEditar={() => setDrawer({ descriptor: d })} onEstado={onEstado} onEliminar={onEliminar} />
-              </Td>
-            </tr>
-          ))}
-          {filas.length === 0 && <EmptyRow colSpan={esFalta ? 7 : 5}>Este tipo todavía no tiene frases.</EmptyRow>}
+          {TIPOS_SITUACION.map((gravedad) => {
+            const filas = faltas.filter((f) => f.gravedad === gravedad);
+            return (
+              <FilasDeGravedad key={gravedad} gravedad={gravedad} filas={filas} onEstado={onEstado} onEliminar={onEliminar} onEditar={(falta) => setDrawer({ falta })} />
+            );
+          })}
         </TableBody>
       </Table>
-      {drawer && tipoActual && <DescriptorDrawer tipo={tipoActual} categorias={categorias} descriptor={drawer.descriptor} onClose={() => setDrawer(null)} />}
+      {drawer && <FaltaCatalogoDrawer falta={drawer.falta} onClose={() => setDrawer(null)} />}
     </Card>
   );
 }
 
-function DescriptorDrawer({
-  tipo,
-  categorias,
-  descriptor,
-  onClose,
-}: {
-  tipo: TipoObservacion;
-  categorias: CategoriaDescriptor[];
-  descriptor: Descriptor | null;
-  onClose: () => void;
-}) {
-  const crear = useCrearDescriptor();
-  const actualizar = useActualizarDescriptor();
-  const mutation = descriptor ? actualizar : crear;
-  const esFalta = tipo.familia === 'DISCIPLINARIA';
-  const [codigo, setCodigo] = useState(descriptor?.codigo ?? '');
-  const [texto, setTexto] = useState(descriptor?.texto ?? '');
-  const [categoriaId, setCategoriaId] = useState(descriptor?.categoria_id ?? '');
-  const [situacion, setSituacion] = useState<TipoSituacion | ''>(descriptor?.tipo_situacion ?? '');
-  const [decimas, setDecimas] = useState(descriptor?.descuento_decimas?.toString() ?? '');
-  const [orden, setOrden] = useState(String(descriptor?.orden ?? 0));
+function FilasDeGravedad({
+  gravedad,
+  filas,
+  onEditar,
+  onEstado,
+  onEliminar,
+}: AccionesProps & { gravedad: TipoSituacion; filas: FaltaConvivencia[]; onEditar: (f: FaltaConvivencia) => void }) {
+  return (
+    <>
+      <tr className="bg-soft">
+        <Td colSpan={5}>
+          <span className="flex items-center gap-2">
+            <TipoSituacionBadge value={gravedad} />
+            <span className="text-xs text-muted">
+              {NOMBRES_GRAVEDAD[gravedad]} · {filas.length} falta(s)
+            </span>
+          </span>
+        </Td>
+      </tr>
+      {filas.map((f) => (
+        <tr key={f._id}>
+          <Td>{f.codigo}</Td>
+          <Td className="max-w-md">{f.descripcion}</Td>
+          <Td>{f.descuento_decimas ?? '—'}</Td>
+          <Td>
+            <EstadoUsuarioBadge value={f.estado} />
+          </Td>
+          <Td>
+            <Acciones recurso="falta" id={f._id} nombre={`${f.codigo} · ${f.descripcion.slice(0, 40)}`} estado={f.estado} onEditar={() => onEditar(f)} onEstado={onEstado} onEliminar={onEliminar} />
+          </Td>
+        </tr>
+      ))}
+      {filas.length === 0 && <EmptyRow colSpan={5}>Sin faltas de este tipo.</EmptyRow>}
+    </>
+  );
+}
+
+function FaltaCatalogoDrawer({ falta, onClose }: { falta: FaltaConvivencia | null; onClose: () => void }) {
+  const guardarFalta = useGuardarFalta();
+  const [codigo, setCodigo] = useState(falta?.codigo ?? '');
+  const [descripcion, setDescripcion] = useState(falta?.descripcion ?? '');
+  const [gravedad, setGravedad] = useState<TipoSituacion>(falta?.gravedad ?? 'I');
+  const [decimas, setDecimas] = useState(falta?.descuento_decimas?.toString() ?? '');
 
   const guardar = async (e: FormEvent) => {
     e.preventDefault();
-    const datos = {
-      categoria_id: categoriaId || null,
-      codigo: codigo.trim() || null,
-      texto,
-      tipo_situacion: esFalta && situacion ? situacion : null,
-      descuento_decimas: esFalta && decimas !== '' ? Number(decimas) : null,
-      orden: Number(orden) || 0,
-    };
-    if (descriptor) await actualizar.mutateAsync({ id: descriptor._id, ...datos });
-    else await crear.mutateAsync({ ...datos, tipo_id: tipo._id });
+    await guardarFalta.mutateAsync({
+      id: falta?._id,
+      codigo: codigo.trim(),
+      descripcion,
+      gravedad,
+      descuento_decimas: decimas !== '' ? Number(decimas) : null,
+    });
     onClose();
   };
 
   return (
     <Drawer
       open
-      size="lg"
-      title={descriptor ? 'Editar frase' : 'Nueva frase'}
-      subtitle={tipo.nombre}
+      title={falta ? 'Editar falta' : 'Nueva falta'}
       onClose={onClose}
       onSubmit={guardar}
-      isSubmitting={mutation.isPending}
-      submitDisabled={!texto.trim()}
+      isSubmitting={guardarFalta.isPending}
+      submitDisabled={!codigo.trim() || !descripcion.trim()}
     >
-      {mutation.isError && <Alert tone="error">{errorMessage(mutation.error)}</Alert>}
+      {guardarFalta.isError && <Alert tone="error">{errorMessage(guardarFalta.error)}</Alert>}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <Input label="Código (opcional)" value={codigo} onChange={(e) => setCodigo(e.target.value)} maxLength={20} hint="Por ejemplo 2.15, como en tu manual." />
-        <Select label="Categoría" value={categoriaId} onChange={(e) => setCategoriaId(e.target.value)}>
-          <option value="">Sin categoría</option>
-          {categorias.map((c) => (
-            <option key={c._id} value={c._id}>
-              {c.nombre}
+        <Input label="Código del manual" value={codigo} onChange={(e) => setCodigo(e.target.value)} maxLength={20} required hint="Por ejemplo 2.15, como en tu manual." />
+        <Select label="Gravedad" value={gravedad} onChange={(e) => setGravedad(e.target.value as TipoSituacion)} hint="Lo fija tu manual; el docente no la decide.">
+          {TIPOS_SITUACION.map((t) => (
+            <option key={t} value={t}>
+              {NOMBRES_GRAVEDAD[t]}
             </option>
           ))}
         </Select>
       </div>
-      <Input label="Texto" value={texto} onChange={(e) => setTexto(e.target.value)} maxLength={400} required />
-      {esFalta && (
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <Select label="Tipo de situación" value={situacion} onChange={(e) => setSituacion(e.target.value as TipoSituacion | '')} hint="Lo asigna tu manual; el docente no lo decide.">
-            <option value="">Sin tipificar</option>
-            {TIPOS_SITUACION.map((t) => (
-              <option key={t} value={t}>
-                Tipo {t}
-              </option>
-            ))}
-          </Select>
-          <Input label="Décimas (opcional)" type="number" step="0.1" min={0} max={5} value={decimas} onChange={(e) => setDecimas(e.target.value)} hint="Solo se guarda; todavía no se descuenta de ninguna nota." />
-        </div>
-      )}
-      <Input label="Orden" type="number" min={0} value={orden} onChange={(e) => setOrden(e.target.value)} />
+      <Textarea label="Descripción" rows={3} value={descripcion} onChange={(e) => setDescripcion(e.target.value)} maxLength={400} required />
+      <Input label="Décimas (opcional)" type="number" step="0.1" min={0} max={5} value={decimas} onChange={(e) => setDecimas(e.target.value)} hint="Solo se guarda; todavía no se descuenta de ninguna nota." />
     </Drawer>
   );
 }
@@ -533,7 +409,7 @@ function PoliticaTab() {
 
   return (
     <Card>
-      <CardHeader title="Plazos para corregir" subtitle="Pasado el plazo, solo coordinación o administración pueden enmendar o anular una observación." />
+      <CardHeader title="Plazos para corregir" subtitle="Pasado el plazo, solo coordinación o administración pueden enmendar o anular un registro." />
       <form onSubmit={guardar} className="space-y-4 p-4">
         {actualizar.isError && <Alert tone="error">{errorMessage(actualizar.error)}</Alert>}
         {actualizar.isSuccess && <Alert tone="success">Plazos guardados.</Alert>}

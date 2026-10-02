@@ -19,7 +19,14 @@ import {
   TipoNotificacionCaso,
   TipoSituacion,
 } from '../constants/convivencia';
-import { IDescriptorRegistrado } from './observacion.model';
+
+/** Falta del manual en que se funda una decisión, copiada al decidir. */
+export interface IFaltaDecision {
+  falta_id: Types.ObjectId;
+  codigo: string;
+  descripcion: string;
+  gravedad: TipoSituacion;
+}
 
 export interface IInvolucradoCaso {
   student_id: Types.ObjectId;
@@ -99,8 +106,7 @@ export interface IDecisionCaso {
   motivacion: string;
   fecha: Date;
   por: Types.ObjectId;
-  /** Faltas del manual en que se funda, copiadas al decidir. */
-  descriptores: IDescriptorRegistrado[];
+  faltas: IFaltaDecision[];
 }
 
 export interface IReclasificacionCaso {
@@ -127,11 +133,16 @@ export interface ICasoConvivencia {
   tipo_situacion: TipoSituacion;
   estado: EstadoCaso;
   origen: OrigenCaso;
+  /** Solicitud (M14) de la que nació; null en una apertura directa. */
+  solicitud_id: Types.ObjectId | null;
+  /** Antecedentes en el Observador de los presuntos responsables (para mostrar al director que existe un caso). */
   observacion_ids: Types.ObjectId[];
   fecha_hecho: Date;
   lugar: string;
   hechos: string;
   como_se_conocio: string;
+  /** Las acciones inmediatas de contención que reportó el docente al enviar la solicitud. */
+  contencion_reportada: string;
   involucrados: Types.DocumentArray<IInvolucradoCaso>;
   atencion_inmediata: IAtencionInmediata | null;
   medidas_proteccion: Types.DocumentArray<IMedidaProteccionCaso>;
@@ -249,14 +260,14 @@ const decisionSchema = new Schema<IDecisionCaso>(
     motivacion: { type: String, required: true, maxlength: 4000 },
     fecha: { type: Date, required: true },
     por: { type: Schema.Types.ObjectId, ref: 'User', required: true },
-    descriptores: {
+    faltas: {
       type: [
-        new Schema(
+        new Schema<IFaltaDecision>(
           {
-            descriptor_id: { type: Schema.Types.ObjectId, ref: 'Descriptor', required: true },
-            codigo: { type: String, default: null },
-            texto: { type: String, required: true },
-            tipo_situacion: { type: String, enum: [...TIPOS_SITUACION, null], default: null },
+            falta_id: { type: Schema.Types.ObjectId, ref: 'FaltaConvivencia', required: true },
+            codigo: { type: String, required: true },
+            descripcion: { type: String, required: true },
+            gravedad: { type: String, enum: TIPOS_SITUACION, required: true },
           },
           { _id: false }
         ),
@@ -277,11 +288,13 @@ const casoSchema = new Schema<ICasoConvivencia, CasoConvivenciaModel>(
     tipo_situacion: { type: String, enum: TIPOS_SITUACION, required: true },
     estado: { type: String, enum: ESTADOS_CASO, default: 'ABIERTO' },
     origen: { type: String, enum: ORIGENES_CASO, required: true },
+    solicitud_id: { type: Schema.Types.ObjectId, ref: 'SolicitudCaso', default: null },
     observacion_ids: { type: [{ type: Schema.Types.ObjectId, ref: 'Observacion' }], default: [] },
     fecha_hecho: { type: Date, required: true },
     lugar: { type: String, default: '', trim: true, maxlength: 200 },
     hechos: { type: String, required: true, trim: true, maxlength: 4000 },
     como_se_conocio: { type: String, default: '', trim: true, maxlength: 300 },
+    contencion_reportada: { type: String, default: '', maxlength: 1000 },
     involucrados: { type: [involucradoSchema], default: [] },
     atencion_inmediata: { type: atencionSchema, default: null },
     medidas_proteccion: { type: [medidaProteccionSchema], default: [] },

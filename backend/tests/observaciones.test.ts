@@ -1,46 +1,28 @@
 import { describe, expect, it } from 'vitest';
 import {
-  componerTextoObservacion,
+  debeRemitirse,
   dentroDelPlazo,
-  esCompromisoVencido,
   esSituacionGrave,
-  tipoSituacionMaxima,
+  esVisibleParaEstudiante,
+  problemasDeFalta,
+  tituloDeRegistro,
+  visibilidadDeObservacion,
   vistaObservacion,
 } from '../src/utils/observaciones';
 
-describe('componerTextoObservacion', () => {
-  it('pone una línea por frase, con su código, y luego el comentario', () => {
-    expect(
-      componerTextoObservacion(
-        [
-          { codigo: '1.3', texto: 'Debe estar puntual en clase.' },
-          { codigo: null, texto: 'Participa activamente.' },
-        ],
-        '  Llegó tarde dos veces.  '
-      )
-    ).toBe('1.3. Debe estar puntual en clase.\nParticipa activamente.\nLlegó tarde dos veces.');
-  });
-
-  it('solo comentario o solo frases', () => {
-    expect(componerTextoObservacion([], 'Texto libre')).toBe('Texto libre');
-    expect(componerTextoObservacion([{ codigo: null, texto: 'Frase' }], '')).toBe('Frase');
-  });
+const observacion = (extra: Partial<Parameters<typeof visibilidadDeObservacion>[1]> = {}) => ({
+  clase: 'OBSERVACION' as const,
+  estado: 'ACTIVA',
+  confidencial: false,
+  falta: null,
+  ...extra,
 });
-
-describe('tipoSituacionMaxima', () => {
-  it('toma el mayor tipo y respeta el orden I < II < III', () => {
-    expect(tipoSituacionMaxima([{ tipo_situacion: 'I' }, { tipo_situacion: 'III' }, { tipo_situacion: 'II' }])).toBe('III');
-    expect(tipoSituacionMaxima([{ tipo_situacion: 'I' }, { tipo_situacion: null }])).toBe('I');
-  });
-
-  it('sin tipos devuelve null', () => {
-    expect(tipoSituacionMaxima([])).toBeNull();
-    expect(tipoSituacionMaxima([{ tipo_situacion: null }])).toBeNull();
-  });
-
-  it('II y III son graves; I y null no', () => {
-    expect(['I', 'II', 'III', null].map((t) => esSituacionGrave(t as 'I' | null))).toEqual([false, true, true, false]);
-  });
+const falta = (gravedad: 'I' | 'II' | 'III', extra: Partial<Parameters<typeof visibilidadDeObservacion>[1]> = {}) => ({
+  clase: 'FALTA' as const,
+  estado: 'ACTIVA',
+  confidencial: false,
+  falta: { gravedad },
+  ...extra,
 });
 
 describe('dentroDelPlazo', () => {
@@ -55,12 +37,129 @@ describe('dentroDelPlazo', () => {
   });
 });
 
-describe('esCompromisoVencido', () => {
-  const hoy = new Date('2026-03-10T00:00:00Z');
-  it('vence solo después de la fecha límite y solo si sigue pendiente', () => {
-    expect(esCompromisoVencido({ estado: 'PENDIENTE', fecha_limite: new Date('2026-03-09T00:00:00Z') }, hoy)).toBe(true);
-    expect(esCompromisoVencido({ estado: 'PENDIENTE', fecha_limite: hoy }, hoy)).toBe(false);
-    expect(esCompromisoVencido({ estado: 'CUMPLIDO', fecha_limite: new Date('2026-03-01T00:00:00Z') }, hoy)).toBe(false);
+describe('esSituacionGrave', () => {
+  it('II y III son graves; I y sin gravedad no', () => {
+    expect(['I', 'II', 'III', null].map((g) => esSituacionGrave(g as 'I' | null))).toEqual([false, true, true, false]);
+  });
+});
+
+describe('visibilidadDeObservacion', () => {
+  it('ADMIN y coordinación de convivencia lo ven todo, incluso confidencial y anulado', () => {
+    for (const rol of ['ADMIN', 'COORDINADOR_CONVIVENCIA'] as const) {
+      expect(visibilidadDeObservacion(rol, observacion({ confidencial: true, estado: 'ANULADA' }), false)).toBe('COMPLETA');
+      expect(visibilidadDeObservacion(rol, falta('III'), false)).toBe('COMPLETA');
+    }
+  });
+
+  it('una observación confidencial solo la leen su autor y orientación, no el director, el coordinador ni otro docente', () => {
+    const confidencial = observacion({ confidencial: true });
+    expect(visibilidadDeObservacion('ORIENTADOR', confidencial, false)).toBe('COMPLETA');
+    expect(visibilidadDeObservacion('DOCENTE', confidencial, true)).toBe('COMPLETA');
+    expect(visibilidadDeObservacion('DOCENTE', confidencial, false)).toBeNull();
+    expect(visibilidadDeObservacion('COORDINADOR', confidencial, false)).toBeNull();
+  });
+
+  it('una observación común la ven el director, el coordinador académico y orientación', () => {
+    for (const rol of ['DOCENTE', 'COORDINADOR', 'ORIENTADOR'] as const) {
+      expect(visibilidadDeObservacion(rol, observacion(), false), rol).toBe('COMPLETA');
+    }
+  });
+
+  it('lo anulado solo lo ve convivencia', () => {
+    expect(visibilidadDeObservacion('DOCENTE', observacion({ estado: 'ANULADA' }), true)).toBeNull();
+    expect(visibilidadDeObservacion('ORIENTADOR', falta('I', { estado: 'ANULADA' }), false)).toBeNull();
+  });
+
+  it('el coordinador académico no ve ninguna falta', () => {
+    for (const gravedad of ['I', 'II', 'III'] as const) {
+      expect(visibilidadDeObservacion('COORDINADOR', falta(gravedad), false)).toBeNull();
+    }
+  });
+
+  it('una falta Tipo I la ven completa el director y orientación; la Tipo II/III solo su autor, el resto solo que existe', () => {
+    expect(visibilidadDeObservacion('DOCENTE', falta('I'), false)).toBe('COMPLETA');
+    expect(visibilidadDeObservacion('ORIENTADOR', falta('I'), false)).toBe('COMPLETA');
+    for (const gravedad of ['II', 'III'] as const) {
+      expect(visibilidadDeObservacion('DOCENTE', falta(gravedad), false)).toBe('RESERVADA');
+      expect(visibilidadDeObservacion('ORIENTADOR', falta(gravedad), false)).toBe('RESERVADA');
+      expect(visibilidadDeObservacion('DOCENTE', falta(gravedad), true)).toBe('COMPLETA');
+    }
+  });
+
+  it('secretaría, acudiente y estudiante no entran por aquí', () => {
+    for (const rol of ['SECRETARIA', 'ACUDIENTE', 'ESTUDIANTE'] as const) {
+      expect(visibilidadDeObservacion(rol, observacion(), true), rol).toBeNull();
+    }
+  });
+});
+
+describe('esVisibleParaEstudiante', () => {
+  const con = (obs: ReturnType<typeof observacion> | ReturnType<typeof falta>, visible: boolean) => ({ ...obs, visible_estudiante: visible });
+
+  it('un menor ve solo las observaciones de tipos visibles y nunca las confidenciales ni las faltas', () => {
+    expect(esVisibleParaEstudiante(con(observacion(), true), false)).toBe(true);
+    expect(esVisibleParaEstudiante(con(observacion(), false), false)).toBe(false);
+    expect(esVisibleParaEstudiante(con(observacion({ confidencial: true }), true), false)).toBe(false);
+    expect(esVisibleParaEstudiante(con(falta('I'), true), false)).toBe(false);
+  });
+
+  it('un adulto ve sus observaciones no confidenciales y sus faltas Tipo I, no las graves', () => {
+    expect(esVisibleParaEstudiante(con(observacion(), false), true)).toBe(true);
+    expect(esVisibleParaEstudiante(con(observacion({ confidencial: true }), false), true)).toBe(false);
+    expect(esVisibleParaEstudiante(con(falta('I'), false), true)).toBe(true);
+    expect(esVisibleParaEstudiante(con(falta('II'), false), true)).toBe(false);
+    expect(esVisibleParaEstudiante(con(observacion({ estado: 'ANULADA' }), true), true)).toBe(false);
+  });
+});
+
+describe('problemasDeFalta', () => {
+  const presunto = [{ rol: 'PRESUNTO_RESPONSABLE' as const }];
+
+  it('una falta Tipo I solo pide hechos; versión y acuerdo son opcionales', () => {
+    expect(problemasDeFalta('I', { hechos: 'Llegó tarde.', involucrados: presunto })).toEqual([]);
+    expect(problemasDeFalta('I', { hechos: 'Llegó tarde.', version_estudiante: 'Se me dañó la ruta.', compromiso: 'Llegará a tiempo.', involucrados: presunto })).toEqual([]);
+  });
+
+  it('una falta Tipo I no acepta contención ni otros roles', () => {
+    const problemas = problemasDeFalta('I', {
+      hechos: 'Discusión.',
+      acciones_contencion: 'Se separó a los estudiantes.',
+      involucrados: [{ rol: 'PRESUNTO_RESPONSABLE' }, { rol: 'AFECTADO' }],
+    });
+    expect(problemas).toHaveLength(2);
+  });
+
+  it('una falta Tipo II/III exige contención y no acepta versión ni acuerdo', () => {
+    for (const gravedad of ['II', 'III'] as const) {
+      expect(problemasDeFalta(gravedad, { hechos: 'Agresión.', involucrados: presunto })).toEqual(['Una falta Tipo II o III exige las acciones inmediatas de contención.']);
+      expect(
+        problemasDeFalta(gravedad, {
+          hechos: 'Agresión.',
+          acciones_contencion: 'Se llevó a enfermería.',
+          compromiso: 'No lo volverá a hacer.',
+          involucrados: [...presunto, { rol: 'AFECTADO' }, { rol: 'TESTIGO' }],
+        })
+      ).toHaveLength(1);
+      expect(
+        problemasDeFalta(gravedad, { hechos: 'Agresión.', acciones_contencion: 'Se llevó a enfermería.', involucrados: [...presunto, { rol: 'AFECTADO' }] })
+      ).toEqual([]);
+    }
+  });
+
+  it('siempre pide hechos y un presunto responsable', () => {
+    expect(problemasDeFalta('I', { hechos: '  ', involucrados: [] })).toEqual(['Describe los hechos.', 'Indica al menos un presunto responsable.']);
+    expect(problemasDeFalta('II', { hechos: 'x', acciones_contencion: 'Contención inmediata.', involucrados: [{ rol: 'AFECTADO' }] })).toEqual([
+      'Indica al menos un presunto responsable.',
+    ]);
+  });
+});
+
+describe('debeRemitirse', () => {
+  it('lo grave siempre va a convivencia; lo leve solo si el docente lo decide', () => {
+    expect(debeRemitirse('II', false)).toBe(true);
+    expect(debeRemitirse('III', undefined)).toBe(true);
+    expect(debeRemitirse('I', undefined)).toBe(false);
+    expect(debeRemitirse('I', true)).toBe(true);
   });
 });
 
@@ -68,15 +167,21 @@ describe('vistaObservacion', () => {
   const obs = {
     _id: 'o1',
     student_id: 'e1',
+    clase: 'FALTA' as const,
     fecha_hecho: new Date('2026-03-02T00:00:00Z'),
     periodo_numero: 1,
-    tipo_id: 't1',
-    tipo_nombre: 'Disciplinaria',
-    familia: 'DISCIPLINARIA',
-    tipo_situacion_maxima: 'II' as const,
-    descriptores: [{ texto: 'x' }],
-    comentario: 'relato con detalles',
-    texto_generado: 'x\nrelato con detalles',
+    tipo_id: null,
+    tipo_nombre: '',
+    visible_estudiante: false,
+    requiere_citacion: false,
+    confidencial: false,
+    citacion_realizada: null,
+    falta: { falta_id: 'f1', codigo: '3.3', descripcion: 'Agrede físicamente a un miembro de la comunidad.', gravedad: 'II' as const },
+    version_estudiante: '',
+    solicitud_id: 's1',
+    descripcion: 'relato con detalles',
+    compromiso: '',
+    compromiso_estado: null,
     contexto: 'CLASE',
     estado: 'ACTIVA',
     autor_id: 'd1',
@@ -85,28 +190,24 @@ describe('vistaObservacion', () => {
     evento_id: 'ev1',
     anulacion: null,
     enmiendas: [],
-    compromisos: [],
-    citaciones: [],
-    solicitud_caso: null,
+    seguimientos: [],
     createdAt: new Date(),
   };
 
-  it('la vista reservada no trae contenido ni autor', () => {
+  it('la vista reservada solo dice que hay una falta y su gravedad', () => {
     const v = vistaObservacion(obs, 'RESERVADA') as Record<string, unknown>;
-    expect(v.reservada).toBe(true);
-    expect(v.tipo_situacion_maxima).toBe('II');
-    for (const campo of ['texto_generado', 'comentario', 'descriptores', 'autor_id', 'evento_id']) {
+    expect(v).toMatchObject({ reservada: true, gravedad: 'II', clase: 'FALTA' });
+    for (const campo of ['descripcion', 'falta', 'autor_id', 'evento_id', 'solicitud_id', 'tipo_nombre', 'version_estudiante']) {
       expect(v).not.toHaveProperty(campo);
     }
   });
 
   it('la vista del estudiante solo trae el texto final', () => {
-    expect(Object.keys(vistaObservacion(obs, 'ESTUDIANTE')).sort()).toEqual(
-      ['_id', 'fecha_hecho', 'periodo_numero', 'texto_generado', 'tipo_nombre'].sort()
-    );
+    expect(Object.keys(vistaObservacion(obs, 'ESTUDIANTE')).sort()).toEqual(['_id', 'descripcion', 'fecha_hecho', 'periodo_numero', 'tipo_nombre']);
   });
 
-  it('la vista completa trae el contenido', () => {
-    expect(vistaObservacion(obs, 'COMPLETA')).toMatchObject({ reservada: false, comentario: 'relato con detalles' });
+  it('la vista completa trae el contenido y rotula la falta con su código', () => {
+    expect(vistaObservacion(obs, 'COMPLETA')).toMatchObject({ reservada: false, descripcion: 'relato con detalles', tipo_nombre: 'Falta 3.3', gravedad: 'II' });
+    expect(tituloDeRegistro({ clase: 'OBSERVACION', tipo_nombre: 'Académica', falta: null })).toBe('Académica');
   });
 });

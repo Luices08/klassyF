@@ -9,6 +9,7 @@ import JornadaOperativa from '../../src/models/jornadaOperativa.model';
 import TeacherAssignment from '../../src/models/teacherAssignment.model';
 import { User, UserDocument } from '../../src/models/user.model';
 import { hoyColombia } from '../../src/services/attendance.service';
+import * as catalogoCaso from '../../src/services/casoCatalogo.service';
 import * as catalogo from '../../src/services/convivenciaCatalogo.service';
 
 export const actor = (u: UserDocument) => ({ usuarioId: u._id });
@@ -36,16 +37,19 @@ export interface Escenario {
   coordConvivencia: UserDocument;
   coordConvivenciaOtraSede: UserDocument;
   coordAcademico: UserDocument;
+  orientador: UserDocument;
   directora: UserDocument;
   docenteDeClase: UserDocument;
   docenteAjeno: UserDocument;
   secretaria: UserDocument;
   estudiante: UserDocument;
   otroEstudiante: UserDocument;
+  tercerEstudiante: UserDocument;
+  tipoAcademica: string;
   tipoComportamental: string;
-  tipoDisciplinaria: string;
-  faltaTipoI: string;
-  faltaTipoII: string;
+  faltaI: string;
+  faltaII: string;
+  faltaIII: string;
 }
 
 export async function armarEscenario(): Promise<Escenario> {
@@ -84,12 +88,14 @@ export async function armarEscenario(): Promise<Escenario> {
   const coordConvivencia = await crearUsuario('COORDINADOR_CONVIVENCIA', { sedes_ids: [sede._id] });
   const coordConvivenciaOtraSede = await crearUsuario('COORDINADOR_CONVIVENCIA', { sedes_ids: [otraSede._id] });
   const coordAcademico = await crearUsuario('COORDINADOR', { sedes_ids: [sede._id] });
+  const orientador = await crearUsuario('ORIENTADOR', { sedes_ids: [sede._id] });
   const directora = await crearUsuario('DOCENTE', { sedes_ids: [sede._id] });
   const docenteDeClase = await crearUsuario('DOCENTE', { sedes_ids: [sede._id] });
   const docenteAjeno = await crearUsuario('DOCENTE', { sedes_ids: [sede._id] });
   const secretaria = await crearUsuario('SECRETARIA');
   const estudiante = await crearUsuario('ESTUDIANTE');
   const otroEstudiante = await crearUsuario('ESTUDIANTE');
+  const tercerEstudiante = await crearUsuario('ESTUDIANTE');
 
   const grupo = await Group.create({
     sede_id: sede._id,
@@ -100,7 +106,7 @@ export async function armarEscenario(): Promise<Escenario> {
     max_capacity: 40,
     director_grupo_id: directora._id,
   });
-  for (const alumno of [estudiante, otroEstudiante]) {
+  for (const alumno of [estudiante, otroEstudiante, tercerEstudiante]) {
     await Enrollment.create({
       student_id: alumno._id,
       group_id: grupo._id,
@@ -120,32 +126,30 @@ export async function armarEscenario(): Promise<Escenario> {
   });
 
   const { tipos } = await catalogo.listarCatalogo(true);
-  const tipoComportamental = String(tipos.find((t) => t.familia === 'COMPORTAMENTAL')!._id);
-  const tipoDisciplinaria = String(tipos.find((t) => t.familia === 'DISCIPLINARIA')!._id);
-  const faltaTipoI = await catalogo.crearDescriptor(
-    { tipo_id: tipoDisciplinaria, categoria_id: null, codigo: '1.3', texto: 'Debe estar puntual en clase.', tipo_situacion: 'I', descuento_decimas: 0.3, orden: 1 },
-    actor(admin)
-  );
-  const faltaTipoII = await catalogo.crearDescriptor(
-    { tipo_id: tipoDisciplinaria, categoria_id: null, codigo: '3.3', texto: 'Agrede físicamente a un miembro de la comunidad.', tipo_situacion: 'II', descuento_decimas: 2, orden: 2 },
-    actor(admin)
-  );
+  const tipoAcademica = String(tipos.find((t) => t.nombre === 'Académica')!._id);
+  const tipoComportamental = String(tipos.find((t) => t.nombre === 'Comportamental')!._id);
+  const faltaI = await catalogoCaso.crearFalta({ codigo: '1.3', descripcion: 'Debe estar puntual en clase.', gravedad: 'I', descuento_decimas: 0.3 }, actor(admin));
+  const faltaII = await catalogoCaso.crearFalta({ codigo: '3.3', descripcion: 'Agrede físicamente a miembros de la comunidad educativa.', gravedad: 'II', descuento_decimas: 2 }, actor(admin));
+  const faltaIII = await catalogoCaso.crearFalta({ codigo: '4.3', descripcion: 'Ocasiona lesiones que ponen en riesgo la vida de otra persona.', gravedad: 'III', descuento_decimas: null }, actor(admin));
 
   return {
     admin,
     coordConvivencia,
     coordConvivenciaOtraSede,
     coordAcademico,
+    orientador,
     directora,
     docenteDeClase,
     docenteAjeno,
     secretaria,
     estudiante,
     otroEstudiante,
+    tercerEstudiante,
+    tipoAcademica,
     tipoComportamental,
-    tipoDisciplinaria,
-    faltaTipoI: String(faltaTipoI._id),
-    faltaTipoII: String(faltaTipoII._id),
+    faltaI: String(faltaI._id),
+    faltaII: String(faltaII._id),
+    faltaIII: String(faltaIII._id),
   };
 }
 

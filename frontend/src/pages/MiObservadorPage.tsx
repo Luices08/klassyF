@@ -27,7 +27,7 @@ export function MiObservadorPage() {
                 {o.periodo_numero !== null && <Chip tone="neutral">Periodo {o.periodo_numero}</Chip>}
               </>
             ),
-            children: <p className="whitespace-pre-line">{o.texto_generado}</p>,
+            children: <p className="whitespace-pre-line">{o.descripcion}</p>,
           }))}
         />
       )}

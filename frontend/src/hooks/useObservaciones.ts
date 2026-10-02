@@ -2,49 +2,40 @@ import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tansta
 import { api } from '../lib/apiClient';
 import type { EstadoActivo } from '../types/domain';
 
-export const FAMILIAS_OBSERVACION = ['ACADEMICA', 'COMPORTAMENTAL', 'DISCIPLINARIA'] as const;
-export type FamiliaObservacion = (typeof FAMILIAS_OBSERVACION)[number];
-export const NOMBRES_FAMILIA: Record<FamiliaObservacion, string> = {
-  ACADEMICA: 'Académica',
-  COMPORTAMENTAL: 'Comportamental',
-  DISCIPLINARIA: 'Disciplinaria',
-};
-
 export const TIPOS_SITUACION = ['I', 'II', 'III'] as const;
 export type TipoSituacion = (typeof TIPOS_SITUACION)[number];
+export const NOMBRES_GRAVEDAD: Record<TipoSituacion, string> = { I: 'Tipo I (leve)', II: 'Tipo II', III: 'Tipo III' };
+
+export const ROLES_INVOLUCRADO = ['AFECTADO', 'PRESUNTO_RESPONSABLE', 'TESTIGO', 'REPORTANTE'] as const;
+export type RolInvolucrado = (typeof ROLES_INVOLUCRADO)[number];
+export const NOMBRES_ROL_INVOLUCRADO: Record<RolInvolucrado, string> = {
+  AFECTADO: 'Afectado',
+  PRESUNTO_RESPONSABLE: 'Presunto responsable',
+  TESTIGO: 'Testigo',
+  REPORTANTE: 'Reportante',
+};
 
 export interface TipoObservacion {
   _id: string;
   nombre: string;
-  familia: FamiliaObservacion;
   visible_estudiante: boolean;
   orden: number;
   estado: EstadoActivo;
 }
 
-export interface CategoriaDescriptor {
+/** Una falta del manual de convivencia con su gravedad (la define la institución, M15). */
+export interface FaltaConvivencia {
   _id: string;
-  nombre: string;
-  orden: number;
-  estado: EstadoActivo;
-}
-
-export interface Descriptor {
-  _id: string;
-  tipo_id: string;
-  categoria_id: string | null;
-  codigo: string | null;
-  texto: string;
-  tipo_situacion: TipoSituacion | null;
+  codigo: string;
+  descripcion: string;
+  gravedad: TipoSituacion;
   descuento_decimas: number | null;
-  orden: number;
   estado: EstadoActivo;
 }
 
 export interface CatalogoConvivencia {
   tipos: TipoObservacion[];
-  categorias: CategoriaDescriptor[];
-  descriptores: Descriptor[];
+  faltas: FaltaConvivencia[];
 }
 
 export interface ConfiguracionConvivencia {
@@ -73,21 +64,8 @@ export interface EstudianteObservable {
   grupo: string;
 }
 
-export interface DescriptorRegistrado {
-  descriptor_id: string;
-  codigo: string | null;
-  texto: string;
-  tipo_situacion: TipoSituacion | null;
-}
-
-export const RESPONSABLES_COMPROMISO = ['ESTUDIANTE', 'ACUDIENTE', 'DOCENTE', 'INSTITUCION'] as const;
-export type ResponsableCompromiso = (typeof RESPONSABLES_COMPROMISO)[number];
-export const NOMBRES_RESPONSABLE: Record<ResponsableCompromiso, string> = {
-  ESTUDIANTE: 'Estudiante',
-  ACUDIENTE: 'Acudiente',
-  DOCENTE: 'Docente',
-  INSTITUCION: 'Institución',
-};
+export const ESTADOS_COMPROMISO = ['PENDIENTE', 'CUMPLIDO', 'INCUMPLIDO'] as const;
+export type EstadoCompromiso = (typeof ESTADOS_COMPROMISO)[number];
 
 export const MEDIOS_CITACION = ['LLAMADA', 'MENSAJE', 'CORREO', 'PRESENCIAL', 'OTRO'] as const;
 export type MedioCitacion = (typeof MEDIOS_CITACION)[number];
@@ -99,60 +77,45 @@ export const NOMBRES_MEDIO: Record<MedioCitacion, string> = {
   OTRO: 'Otro',
 };
 
-export interface CompromisoObservacion {
-  _id: string;
-  descripcion: string;
-  responsable: ResponsableCompromiso;
-  fecha_limite: string;
-  estado: 'PENDIENTE' | 'CUMPLIDO' | 'INCUMPLIDO';
-  /** Calculado por el servidor: pendiente y con la fecha límite ya pasada. */
-  vencido: boolean;
-  fecha_cierre: string | null;
-  nota_cierre: string;
-}
+export type ClaseRegistro = 'OBSERVACION' | 'FALTA';
+export type ContextoRegistro = 'CLASE' | 'DIRECCION_GRUPO' | 'COORDINACION' | 'ORIENTACION';
 
-export interface CitacionObservacion {
-  _id: string;
-  fecha: string;
-  medio: MedioCitacion;
-  dirigida_a: string;
-  resultado: string;
-}
-
-export interface SolicitudCaso {
-  estado: 'PENDIENTE' | 'DESCARTADA';
-  origen: 'AUTOMATICA' | 'MANUAL';
-  motivo: string;
-  fecha: string;
-  motivo_resolucion: string;
-}
-
-/** Lo que el servidor devuelve según quién consulta: `reservada` oculta el contenido (situaciones II y III). */
+/**
+ * Lo que el servidor devuelve según quién consulta. `reservada` es una falta Tipo II/III vista por quien solo puede saber que
+ * existe: trae la clase y la gravedad, nada más.
+ */
 export interface ObservacionVista {
   _id: string;
   student_id: string;
+  clase: ClaseRegistro;
   fecha_hecho: string;
   periodo_numero: number | null;
-  tipo_nombre: string;
-  familia: FamiliaObservacion;
-  tipo_situacion_maxima: TipoSituacion | null;
+  gravedad: TipoSituacion | null;
   estado: 'ACTIVA' | 'ANULADA';
   createdAt: string;
   reservada: boolean;
-  descriptores?: DescriptorRegistrado[];
-  comentario?: string;
-  texto_generado?: string;
-  tipo_id?: string;
-  contexto?: 'CLASE' | 'DIRECCION_GRUPO' | 'COORDINACION';
+  /** Tipo de la observación, o «Falta <código>». */
+  tipo_nombre?: string;
+  tipo_id?: string | null;
+  requiere_citacion?: boolean;
+  confidencial?: boolean;
+  citacion_realizada?: { fecha: string; resultado: string } | null;
+  falta?: { codigo: string; descripcion: string; gravedad: TipoSituacion } | null;
+  version_estudiante?: string;
+  solicitud_id?: string | null;
+  descripcion?: string;
+  compromiso?: string;
+  compromiso_estado?: EstadoCompromiso | null;
+  contexto?: ContextoRegistro;
   autor?: string | null;
   autor_id?: string;
   evento_id?: string | null;
   anulacion?: { motivo: string; fecha: string } | null;
   cantidad_enmiendas?: number;
-  compromisos?: CompromisoObservacion[];
-  citaciones?: CitacionObservacion[];
-  solicitud_caso?: SolicitudCaso | null;
-  /** Solo en una situación reservada: que existe un caso y en qué estado (nunca su contenido). */
+  seguimientos?: { _id: string; fecha: string; nota: string }[];
+  /** Qué pasó con lo que se remitió a convivencia (solo quien registró). */
+  solicitud?: { estado: 'PENDIENTE' | 'DESCARTADA' | 'CONVERTIDA'; motivo_resolucion: string } | null;
+  /** Que existe un caso y en qué estado (nunca su contenido). */
   caso?: { codigo: string; estado: string; tipo_situacion: TipoSituacion } | null;
   /** Solo en "Mis registros". */
   estudiante?: string;
@@ -163,7 +126,7 @@ export interface ObservacionPropia {
   fecha_hecho: string;
   periodo_numero: number | null;
   tipo_nombre: string;
-  texto_generado: string;
+  descripcion: string;
 }
 
 export interface PaginaObservaciones {
@@ -200,8 +163,7 @@ export interface TipoObservacionInput {
 export function useCrearTipoObservacion() {
   const invalidar = useInvalidarObservaciones();
   return useMutation({
-    mutationFn: (input: TipoObservacionInput & { familia: FamiliaObservacion }) =>
-      api.post<TipoObservacion>('/observaciones/tipos', input),
+    mutationFn: (input: TipoObservacionInput) => api.post<TipoObservacion>('/observaciones/tipos', input),
     onSuccess: invalidar,
   });
 }
@@ -215,72 +177,18 @@ export function useActualizarTipoObservacion() {
   });
 }
 
-export interface CategoriaInput {
-  nombre: string;
-  orden: number;
-}
-
-export function useCrearCategoriaDescriptor() {
+export function useCambiarEstadoTipo() {
   const invalidar = useInvalidarObservaciones();
   return useMutation({
-    mutationFn: (input: CategoriaInput) => api.post<CategoriaDescriptor>('/observaciones/categorias', input),
+    mutationFn: ({ id, estado }: { id: string; estado: EstadoActivo }) =>
+      api.patch<TipoObservacion>(`/observaciones/tipos/${id}/estado`, { estado }),
     onSuccess: invalidar,
   });
 }
 
-export function useActualizarCategoriaDescriptor() {
+export function useEliminarTipo() {
   const invalidar = useInvalidarObservaciones();
-  return useMutation({
-    mutationFn: ({ id, ...input }: CategoriaInput & { id: string }) =>
-      api.patch<CategoriaDescriptor>(`/observaciones/categorias/${id}`, input),
-    onSuccess: invalidar,
-  });
-}
-
-export interface DescriptorInput {
-  categoria_id: string | null;
-  codigo: string | null;
-  texto: string;
-  tipo_situacion: TipoSituacion | null;
-  descuento_decimas: number | null;
-  orden: number;
-}
-
-export function useCrearDescriptor() {
-  const invalidar = useInvalidarObservaciones();
-  return useMutation({
-    mutationFn: (input: DescriptorInput & { tipo_id: string }) => api.post<Descriptor>('/observaciones/descriptores', input),
-    onSuccess: invalidar,
-  });
-}
-
-export function useActualizarDescriptor() {
-  const invalidar = useInvalidarObservaciones();
-  return useMutation({
-    mutationFn: ({ id, ...input }: DescriptorInput & { id: string }) =>
-      api.patch<Descriptor>(`/observaciones/descriptores/${id}`, input),
-    onSuccess: invalidar,
-  });
-}
-
-export type RecursoCatalogo = 'tipos' | 'categorias' | 'descriptores';
-
-export function useCambiarEstadoCatalogo() {
-  const invalidar = useInvalidarObservaciones();
-  return useMutation({
-    mutationFn: ({ recurso, id, estado }: { recurso: RecursoCatalogo; id: string; estado: EstadoActivo }) =>
-      api.patch<unknown>(`/observaciones/${recurso}/${id}/estado`, { estado }),
-    onSuccess: invalidar,
-  });
-}
-
-export function useEliminarDelCatalogo() {
-  const invalidar = useInvalidarObservaciones();
-  return useMutation({
-    mutationFn: ({ recurso, id }: { recurso: RecursoCatalogo; id: string }) =>
-      api.delete<null>(`/observaciones/${recurso}/${id}`),
-    onSuccess: invalidar,
-  });
+  return useMutation({ mutationFn: (id: string) => api.delete<null>(`/observaciones/tipos/${id}`), onSuccess: invalidar });
 }
 
 export function useConfiguracionConvivencia() {
@@ -299,7 +207,7 @@ export function useActualizarConfiguracionConvivencia() {
   });
 }
 
-// --- Observaciones ---
+// --- Buscador acotado ---
 
 export function useGruposObservables() {
   return useQuery({
@@ -319,13 +227,16 @@ export function useEstudiantesObservables(params: { group_id?: string; q?: strin
   });
 }
 
+// --- Registro ---
+
 export interface RegistrarObservacionInput {
   estudiantes_ids: string[];
   tipo_id: string;
-  descriptores_ids: string[];
-  comentario: string;
+  descripcion: string;
+  compromiso?: string;
+  requiere_citacion: boolean;
+  confidencial: boolean;
   fecha_hecho: string;
-  en_nombre_de_id?: string;
 }
 
 export function useRegistrarObservacion() {
@@ -335,6 +246,33 @@ export function useRegistrarObservacion() {
     onSuccess: invalidar,
   });
 }
+
+export interface RegistrarFaltaInput {
+  falta_id: string;
+  fecha_hecho: string;
+  hechos: string;
+  version_estudiante?: string;
+  compromiso?: string;
+  acciones_contencion?: string;
+  remitir_comite?: boolean;
+  involucrados: { student_id: string; rol: RolInvolucrado }[];
+}
+
+export interface ResultadoFalta {
+  registros: ObservacionVista[];
+  /** true si se generó una solicitud de caso para convivencia. */
+  remitida: boolean;
+}
+
+export function useRegistrarFalta() {
+  const invalidar = useInvalidarObservaciones();
+  return useMutation({
+    mutationFn: (input: RegistrarFaltaInput) => api.post<ResultadoFalta>('/observaciones/faltas', input),
+    onSuccess: invalidar,
+  });
+}
+
+// --- Consulta ---
 
 export function useHistorialObservaciones(studentId: string | undefined, pagina: number) {
   return useQuery({
@@ -362,71 +300,6 @@ export function useMisObservaciones(pagina: number) {
   });
 }
 
-export function useAgregarCompromiso() {
-  const invalidar = useInvalidarObservaciones();
-  return useMutation({
-    mutationFn: ({ id, ...input }: { id: string; descripcion: string; responsable: ResponsableCompromiso; fecha_limite: string }) =>
-      api.post<ObservacionVista>(`/observaciones/${id}/compromisos`, input),
-    onSuccess: invalidar,
-  });
-}
-
-export function useCerrarCompromiso() {
-  const invalidar = useInvalidarObservaciones();
-  return useMutation({
-    mutationFn: ({ id, compromisoId, ...input }: { id: string; compromisoId: string; estado: 'CUMPLIDO' | 'INCUMPLIDO'; nota?: string }) =>
-      api.patch<ObservacionVista>(`/observaciones/${id}/compromisos/${compromisoId}`, input),
-    onSuccess: invalidar,
-  });
-}
-
-export function useAgregarCitacion() {
-  const invalidar = useInvalidarObservaciones();
-  return useMutation({
-    mutationFn: ({ id, ...input }: { id: string; fecha: string; medio: MedioCitacion; dirigida_a?: string; resultado?: string }) =>
-      api.post<ObservacionVista>(`/observaciones/${id}/citaciones`, input),
-    onSuccess: invalidar,
-  });
-}
-
-export function useSolicitarCaso() {
-  const invalidar = useInvalidarObservaciones();
-  return useMutation({
-    mutationFn: ({ id, motivo }: { id: string; motivo: string }) =>
-      api.post<ObservacionVista>(`/observaciones/${id}/solicitud-caso`, { motivo }),
-    onSuccess: invalidar,
-  });
-}
-
-export function useDescartarSolicitudCaso() {
-  const invalidar = useInvalidarObservaciones();
-  return useMutation({
-    mutationFn: ({ id, motivo }: { id: string; motivo: string }) =>
-      api.patch<ObservacionVista>(`/observaciones/${id}/solicitud-caso/descartar`, { motivo }),
-    onSuccess: invalidar,
-  });
-}
-
-export interface SolicitudEnBandeja extends ObservacionVista {
-  estudiante: string;
-  numero_documento: string;
-  grupo: string;
-}
-
-export function useBandejaCasos(pagina: number) {
-  return useQuery({
-    queryKey: ['observaciones', 'bandeja', pagina],
-    queryFn: () =>
-      api.raw<{ success: true; data: SolicitudEnBandeja[]; total: number; pagina: number; limite: number }>(
-        '/observaciones/solicitudes-caso',
-        { query: { pagina, limite: 20 } }
-      ),
-    select: (res) => ({ data: res.data, total: res.total, pagina: res.pagina, limite: res.limite }),
-    placeholderData: keepPreviousData,
-    retry: false,
-  });
-}
-
 export function useMiObservador() {
   return useQuery({
     queryKey: ['observaciones', 'mi-observador'],
@@ -435,10 +308,20 @@ export function useMiObservador() {
   });
 }
 
+// --- Enmienda, anulación y seguimiento ---
+
+export interface EnmendarObservacionInput {
+  descripcion?: string;
+  compromiso?: string;
+  requiere_citacion?: boolean;
+  confidencial?: boolean;
+  version_estudiante?: string;
+}
+
 export function useEnmendarObservacion() {
   const invalidar = useInvalidarObservaciones();
   return useMutation({
-    mutationFn: ({ id, ...input }: { id: string; descriptores_ids?: string[]; comentario?: string }) =>
+    mutationFn: ({ id, ...input }: EnmendarObservacionInput & { id: string }) =>
       api.patch<ObservacionVista>(`/observaciones/${id}`, input),
     onSuccess: invalidar,
   });
@@ -449,6 +332,33 @@ export function useAnularObservacion() {
   return useMutation({
     mutationFn: ({ id, motivo }: { id: string; motivo: string }) =>
       api.patch<ObservacionVista>(`/observaciones/${id}/anular`, { motivo }),
+    onSuccess: invalidar,
+  });
+}
+
+export function useAgregarSeguimiento() {
+  const invalidar = useInvalidarObservaciones();
+  return useMutation({
+    mutationFn: ({ id, nota }: { id: string; nota: string }) =>
+      api.post<ObservacionVista>(`/observaciones/${id}/seguimientos`, { nota }),
+    onSuccess: invalidar,
+  });
+}
+
+export function useMarcarCompromiso() {
+  const invalidar = useInvalidarObservaciones();
+  return useMutation({
+    mutationFn: ({ id, ...input }: { id: string; estado: 'CUMPLIDO' | 'INCUMPLIDO'; nota?: string }) =>
+      api.patch<ObservacionVista>(`/observaciones/${id}/compromiso`, input),
+    onSuccess: invalidar,
+  });
+}
+
+export function useRegistrarCitacionRealizada() {
+  const invalidar = useInvalidarObservaciones();
+  return useMutation({
+    mutationFn: ({ id, ...input }: { id: string; fecha: string; resultado?: string }) =>
+      api.post<ObservacionVista>(`/observaciones/${id}/citacion`, input),
     onSuccess: invalidar,
   });
 }

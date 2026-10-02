@@ -1,6 +1,9 @@
 import { TipoSituacion } from '../constants/convivencia';
 import { EstadoUsuario } from '../constants/enums';
 import CasoConvivencia from '../models/casoConvivencia.model';
+import FaltaConvivencia, { FaltaConvivenciaDocument } from '../models/faltaConvivencia.model';
+import Observacion from '../models/observacion.model';
+import SolicitudCaso from '../models/solicitudCaso.model';
 import {
   EntidadExterna,
   EntidadExternaDocument,
@@ -37,6 +40,61 @@ export async function listarCatalogosCaso(incluirInactivos: boolean): Promise<Ca
     ProtocoloConvivencia.find({ institucion_id: institucion._id }).sort({ tipo_situacion: 1 }),
   ]);
   return { medidas, entidades, protocolos };
+}
+
+// --- Faltas del manual (gravedad Tipo I, II o III) ---
+
+export interface DatosFalta {
+  codigo: string;
+  descripcion: string;
+  gravedad: TipoSituacion;
+  descuento_decimas: number | null;
+}
+
+const mensajeFaltaDuplicada = 'Ya existe una falta con ese código.';
+
+export async function crearFalta(input: DatosFalta, actor: ContextoActor): Promise<FaltaConvivenciaDocument> {
+  const institucion = await obtenerInstitucionConvivencia();
+  const falta = new FaltaConvivencia({ ...input, institucion_id: institucion._id });
+  try {
+    await falta.save();
+  } catch (err) {
+    traducirDuplicado(err, mensajeFaltaDuplicada);
+  }
+  await registrarCambio('CATALOGO_CONVIVENCIA_CREADO', 'FaltaConvivencia', falta._id, falta.codigo, actor);
+  return falta;
+}
+
+// Cambiar la gravedad solo afecta lo que se registre desde ahora: cada registro copia la falta y su gravedad al guardarse.
+export async function actualizarFalta(id: string, input: Partial<DatosFalta>, actor: ContextoActor): Promise<FaltaConvivenciaDocument> {
+  const falta = await FaltaConvivencia.findById(id);
+  if (!falta) throw new ApiError(404, 'Falta no encontrada.');
+  falta.set(input);
+  try {
+    await falta.save();
+  } catch (err) {
+    traducirDuplicado(err, mensajeFaltaDuplicada);
+  }
+  await registrarCambio('CATALOGO_CONVIVENCIA_ACTUALIZADO', 'FaltaConvivencia', falta._id, Object.keys(input).join(', '), actor);
+  return falta;
+}
+
+export const cambiarEstadoFalta = (id: string, estado: EstadoUsuario, actor: ContextoActor) =>
+  cambiarEstadoDe<FaltaConvivenciaDocument>(FaltaConvivencia, 'FaltaConvivencia', id, estado, actor);
+
+export async function eliminarFalta(id: string, actor: ContextoActor): Promise<void> {
+  const falta = await FaltaConvivencia.findById(id);
+  if (!falta) throw new ApiError(404, 'Falta no encontrada.');
+  const [enRegistros, enSolicitudes, enDecisiones] = await Promise.all([
+    Observacion.exists({ 'falta.falta_id': falta._id }),
+    SolicitudCaso.exists({ 'falta.falta_id': falta._id }),
+    CasoConvivencia.exists({ 'decision.faltas.falta_id': falta._id }),
+  ]);
+  if (enRegistros || enSolicitudes || enDecisiones) {
+    throw new ApiError(409, 'La falta ya se usó en registros o casos: desactívala en lugar de eliminarla.');
+  }
+  await falta.deleteOne();
+  await registrarCambio('CATALOGO_CONVIVENCIA_ELIMINADO', 'FaltaConvivencia', falta._id, falta.codigo, actor);
 }
 
 // --- Medidas ---

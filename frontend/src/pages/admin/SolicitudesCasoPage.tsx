@@ -1,9 +1,8 @@
 import { type FormEvent, useState } from 'react';
 import { AbrirCasoDrawer } from '../../components/convivencia/AbrirCasoDrawer';
 import { CasoDetalleDrawer } from '../../components/convivencia/CasoDetalleDrawer';
-import { ChipsObservacion } from '../../components/convivencia/ObservacionesTimeline';
 import { Alert, errorMessage } from '../../components/ui/Alert';
-import { Chip } from '../../components/ui/Badge';
+import { TipoSituacionBadge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import { Card, CardHeader } from '../../components/ui/Card';
 import { Drawer } from '../../components/ui/Drawer';
@@ -11,15 +10,15 @@ import { Textarea } from '../../components/ui/Field';
 import { PageHeader } from '../../components/ui/PageHeader';
 import { Spinner } from '../../components/ui/Spinner';
 import { EmptyRow, Table, TableBody, TableHead, Td, Th } from '../../components/ui/Table';
-import { type SolicitudEnBandeja, useBandejaCasos, useDescartarSolicitudCaso } from '../../hooks/useObservaciones';
+import { NOMBRES_ROL_INVOLUCRADO, type SolicitudCasoVista, useBandejaSolicitudes, useDescartarSolicitud } from '../../hooks/useCasos';
 import { formatoFechaCalendario } from '../../lib/fechas';
 
 /** Lo que convivencia tiene por atender: situaciones II/III y disciplinarias que un docente pidió escalar. */
 export function SolicitudesCasoPage() {
   const [pagina, setPagina] = useState(1);
-  const bandeja = useBandejaCasos(pagina);
-  const [descartando, setDescartando] = useState<SolicitudEnBandeja | null>(null);
-  const [abriendo, setAbriendo] = useState<SolicitudEnBandeja | null>(null);
+  const bandeja = useBandejaSolicitudes(pagina);
+  const [descartando, setDescartando] = useState<SolicitudCasoVista | null>(null);
+  const [abriendo, setAbriendo] = useState<SolicitudCasoVista | null>(null);
   const [casoAbierto, setCasoAbierto] = useState<string | null>(null);
 
   const { data = [], total = 0, limite = 20 } = bandeja.data ?? {};
@@ -29,7 +28,7 @@ export function SolicitudesCasoPage() {
     <div className="space-y-4">
       <PageHeader
         title="Solicitudes de caso"
-        subtitle="Situaciones que requieren atención de convivencia. Cada consulta de esta bandeja queda registrada en la auditoría."
+        subtitle="Faltas que los docentes enviaron a convivencia para que se abra el caso. Cada consulta de esta bandeja queda registrada en la auditoría."
       />
       {bandeja.isLoading && <Spinner />}
       {bandeja.isError && <Alert tone="error">{errorMessage(bandeja.error)}</Alert>}
@@ -40,9 +39,9 @@ export function SolicitudesCasoPage() {
             <TableHead>
               <tr>
                 <Th>Fecha</Th>
-                <Th>Estudiante</Th>
-                <Th>Hechos</Th>
-                <Th>Origen</Th>
+                <Th>Falta</Th>
+                <Th>Involucrados</Th>
+                <Th>Hechos y contención</Th>
                 <Th className="text-right">Acciones</Th>
               </tr>
             </TableHead>
@@ -50,23 +49,28 @@ export function SolicitudesCasoPage() {
               {data.map((s) => (
                 <tr key={s._id}>
                   <Td>{formatoFechaCalendario(s.fecha_hecho)}</Td>
-                  <Td>
-                    {s.estudiante}
-                    <span className="block text-xs text-muted">
-                      {s.numero_documento} · {s.grupo}
+                  <Td className="max-w-xs">
+                    <TipoSituacionBadge value={s.gravedad} />
+                    <span className="mt-1 block text-sm">
+                      {s.falta.codigo} · {s.falta.descripcion}
                     </span>
+                    {s.solicitada_por && <span className="block text-xs text-muted">Reporta: {s.solicitada_por}</span>}
+                  </Td>
+                  <Td>
+                    {s.involucrados.map((i) => (
+                      <span key={i.student_id} className="block text-sm">
+                        {i.estudiante}
+                        <span className="block text-xs text-muted">
+                          {NOMBRES_ROL_INVOLUCRADO[i.rol]} · {i.numero_documento} · {i.grupo}
+                        </span>
+                      </span>
+                    ))}
                   </Td>
                   <Td className="max-w-md">
-                    <div className="mb-1 flex flex-wrap gap-1">
-                      <ChipsObservacion obs={s} />
-                    </div>
-                    <p className="whitespace-pre-line">{s.texto_generado}</p>
-                  </Td>
-                  <Td>
-                    <Chip tone={s.solicitud_caso?.origen === 'AUTOMATICA' ? 'orange' : 'blue'}>
-                      {s.solicitud_caso?.origen === 'AUTOMATICA' ? 'Por tipificación' : 'Pedida por docente'}
-                    </Chip>
-                    <span className="mt-1 block text-xs text-muted">{s.solicitud_caso?.motivo}</span>
+                    <p className="whitespace-pre-line">{s.hechos}</p>
+                    {s.acciones_contencion && (
+                      <p className="mt-1 whitespace-pre-line text-xs text-muted">Contención: {s.acciones_contencion}</p>
+                    )}
                   </Td>
                   <Td className="text-right">
                     <span className="flex justify-end gap-2">
@@ -107,13 +111,13 @@ export function SolicitudesCasoPage() {
   );
 }
 
-function DescartarDrawer({ solicitud, onClose }: { solicitud: SolicitudEnBandeja | null; onClose: () => void }) {
+function DescartarDrawer({ solicitud, onClose }: { solicitud: SolicitudCasoVista | null; onClose: () => void }) {
   if (!solicitud) return null;
   return <Formulario solicitud={solicitud} onClose={onClose} />;
 }
 
-function Formulario({ solicitud, onClose }: { solicitud: SolicitudEnBandeja; onClose: () => void }) {
-  const descartar = useDescartarSolicitudCaso();
+function Formulario({ solicitud, onClose }: { solicitud: SolicitudCasoVista; onClose: () => void }) {
+  const descartar = useDescartarSolicitud();
   const [motivo, setMotivo] = useState('');
 
   const guardar = async (e: FormEvent) => {
@@ -126,7 +130,7 @@ function Formulario({ solicitud, onClose }: { solicitud: SolicitudEnBandeja; onC
     <Drawer
       open
       title="Descartar solicitud"
-      subtitle={solicitud.estudiante}
+      subtitle={`Falta ${solicitud.falta.codigo}`}
       onClose={onClose}
       onSubmit={guardar}
       submitLabel="Descartar"
@@ -135,7 +139,7 @@ function Formulario({ solicitud, onClose }: { solicitud: SolicitudEnBandeja; onC
       submitDisabled={motivo.trim().length < 5}
     >
       {descartar.isError && <Alert tone="error">{errorMessage(descartar.error)}</Alert>}
-      <Alert tone="warning">La observación se conserva; solo se cierra la solicitud, con el motivo que escribas.</Alert>
+      <Alert tone="warning">La falta se conserva en el Observador; solo se cierra la solicitud, con el motivo que escribas.</Alert>
       <Textarea label="Motivo" rows={3} maxLength={500} value={motivo} onChange={(e) => setMotivo(e.target.value)} />
     </Drawer>
   );

@@ -1,15 +1,14 @@
 import { HydratedDocument, Model, Schema, Types, model } from 'mongoose';
 import { ESTADOS_USUARIO, EstadoUsuario } from '../constants/enums';
-import { FAMILIAS_OBSERVACION, FamiliaObservacion } from '../constants/convivencia';
 
 /**
- * Tipo de observación configurable por institución (M14). La `familia` es el contrato del sistema (qué exige y qué ve
- * cada rol); el nombre es del colegio. Ninguna lógica compara por nombre.
+ * Tipo de observación configurable por institución (M14): Académica, Comportamental u otros que defina el coordinador. Solo
+ * clasifica la observación; lo disciplinario no es un tipo de observación sino una falta del manual (M15). Ninguna lógica
+ * compara por nombre.
  */
 export interface ITipoObservacion {
   institucion_id: Types.ObjectId;
   nombre: string;
-  familia: FamiliaObservacion;
   /** Se copia a cada observación al guardarla: cambiarlo no revela ni oculta lo ya registrado. */
   visible_estudiante: boolean;
   orden: number;
@@ -25,7 +24,6 @@ const tipoObservacionSchema = new Schema<ITipoObservacion, TipoObservacionModel>
   {
     institucion_id: { type: Schema.Types.ObjectId, ref: 'Institution', required: true },
     nombre: { type: String, required: true, trim: true, maxlength: 60 },
-    familia: { type: String, enum: FAMILIAS_OBSERVACION, required: true },
     visible_estudiante: { type: Boolean, default: false },
     orden: { type: Number, default: 0 },
     estado: { type: String, enum: ESTADOS_USUARIO, default: 'activo' },

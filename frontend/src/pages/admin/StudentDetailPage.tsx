@@ -118,7 +118,7 @@ export function StudentDetailPage() {
             { key: 'general', label: 'Datos generales y médicos' },
             { key: 'familia', label: 'Núcleo familiar y acudientes' },
             { key: 'historial', label: 'Historial académico' },
-            { key: 'bienestar', label: 'Observador' },
+            { key: 'bienestar', label: 'Observador y bienestar' },
           ]}
           active={tab}
           onChange={setTab}

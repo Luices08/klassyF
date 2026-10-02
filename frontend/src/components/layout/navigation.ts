@@ -32,7 +32,7 @@ const GROUP_MANAGERS: Rol[] = ['ADMIN', 'COORDINADOR'];
 const CURRICULUM_MANAGERS: Rol[] = ['ADMIN', 'COORDINADOR'];
 const STRUCTURAL_ADMINS: Rol[] = ['ADMIN'];
 // Convivencia: SECRETARIA no tiene acceso. El docente solo registra y ve lo suyo; el estudiante, su propio observador.
-const CONVIVENCIA_REGISTRA: Rol[] = ['ADMIN', 'COORDINADOR', 'COORDINADOR_CONVIVENCIA', 'DOCENTE'];
+const CONVIVENCIA_REGISTRA: Rol[] = ['ADMIN', 'COORDINADOR', 'COORDINADOR_CONVIVENCIA', 'ORIENTADOR', 'DOCENTE'];
 const CONVIVENCIA_GESTIONA: Rol[] = ['ADMIN', 'COORDINADOR_CONVIVENCIA'];
 
 export const NAV_ITEMS: NavItem[] = [

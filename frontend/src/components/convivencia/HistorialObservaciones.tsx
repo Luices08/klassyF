@@ -3,7 +3,7 @@ import { ApiError } from '../../types/api';
 import { Alert, errorMessage } from '../ui/Alert';
 import { Button } from '../ui/Button';
 import { Spinner } from '../ui/Spinner';
-import { useCatalogoConvivencia, useHistorialObservaciones } from '../../hooks/useObservaciones';
+import { useHistorialObservaciones } from '../../hooks/useObservaciones';
 import { AccionesObservacion } from './AccionesObservacion';
 import { ObservacionesTimeline } from './ObservacionesTimeline';
 
@@ -17,7 +17,6 @@ interface Props {
 export function HistorialObservaciones({ studentId, conAcciones = true }: Props) {
   const [pagina, setPagina] = useState(1);
   const historial = useHistorialObservaciones(studentId, pagina);
-  const catalogo = useCatalogoConvivencia();
 
   if (historial.isLoading) return <Spinner />;
   if (historial.isError) {
@@ -36,7 +35,7 @@ export function HistorialObservaciones({ studentId, conAcciones = true }: Props)
     <div className="space-y-4">
       <ObservacionesTimeline
         observaciones={data}
-        acciones={conAcciones ? (obs) => <AccionesObservacion observacion={obs} catalogo={catalogo.data} /> : undefined}
+        acciones={conAcciones ? (obs) => <AccionesObservacion observacion={obs} /> : undefined}
       />
 
       {paginas > 1 && (

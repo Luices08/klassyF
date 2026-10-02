@@ -45,38 +45,6 @@ export const eliminarTipo = catchAsync<IdParams>(async (req, res) => {
   res.status(200).json({ success: true });
 });
 
-export const crearCategoria = catchAsync<unknown, unknown, catalogoService.DatosCategoriaDescriptor>(async (req, res) => {
-  res.status(201).json({ success: true, data: await catalogoService.crearCategoria(req.body, actor(req)) });
-});
-export const actualizarCategoria = catchAsync<IdParams, unknown, Partial<catalogoService.DatosCategoriaDescriptor>>(
-  async (req, res) => {
-    res.status(200).json({ success: true, data: await catalogoService.actualizarCategoria(req.params.id, req.body, actor(req)) });
-  }
-);
-export const cambiarEstadoCategoria = catchAsync<IdParams, unknown, { estado: EstadoUsuario }>(async (req, res) => {
-  res.status(200).json({ success: true, data: await catalogoService.cambiarEstadoCategoria(req.params.id, req.body.estado, actor(req)) });
-});
-export const eliminarCategoria = catchAsync<IdParams>(async (req, res) => {
-  await catalogoService.eliminarCategoria(req.params.id, actor(req));
-  res.status(200).json({ success: true });
-});
-
-export const crearDescriptor = catchAsync<unknown, unknown, catalogoService.DatosDescriptor>(async (req, res) => {
-  res.status(201).json({ success: true, data: await catalogoService.crearDescriptor(req.body, actor(req)) });
-});
-export const actualizarDescriptor = catchAsync<IdParams, unknown, Partial<Omit<catalogoService.DatosDescriptor, 'tipo_id'>>>(
-  async (req, res) => {
-    res.status(200).json({ success: true, data: await catalogoService.actualizarDescriptor(req.params.id, req.body, actor(req)) });
-  }
-);
-export const cambiarEstadoDescriptor = catchAsync<IdParams, unknown, { estado: EstadoUsuario }>(async (req, res) => {
-  res.status(200).json({ success: true, data: await catalogoService.cambiarEstadoDescriptor(req.params.id, req.body.estado, actor(req)) });
-});
-export const eliminarDescriptor = catchAsync<IdParams>(async (req, res) => {
-  await catalogoService.eliminarDescriptor(req.params.id, actor(req));
-  res.status(200).json({ success: true });
-});
-
 export const obtenerConfiguracion = catchAsync(async (_req, res) => {
   res.status(200).json({ success: true, data: await catalogoService.obtenerConfiguracion() });
 });
@@ -106,6 +74,10 @@ export const registrarObservacion = catchAsync<unknown, unknown, observacionServ
     res.status(201).json({ success: true, count: creadas.length, data: creadas });
   }
 );
+
+export const registrarFalta = catchAsync<unknown, unknown, observacionService.RegistrarFaltaInput>(async (req, res) => {
+  res.status(201).json({ success: true, data: await observacionService.registrarFalta(req.body, req.user!, req.ip) });
+});
 
 export const historialDeEstudiante = catchAsync<EstudianteParams, unknown, unknown, ParsedQs & { pagina?: number; limite?: number }>(
   async (req, res) => {
@@ -143,34 +115,15 @@ export const anularObservacion = catchAsync<IdParams, unknown, { motivo: string 
 
 // --- Seguimiento ---
 
-export const agregarCompromiso = catchAsync<IdParams, unknown, observacionService.CompromisoInput>(async (req, res) => {
-  res.status(201).json({ success: true, data: await observacionService.agregarCompromiso(req.params.id, req.body, req.user!, req.ip) });
+export const agregarSeguimiento = catchAsync<IdParams, unknown, { nota: string }>(async (req, res) => {
+  res.status(201).json({ success: true, data: await observacionService.agregarSeguimiento(req.params.id, req.body.nota, req.user!, req.ip) });
 });
 
-interface CompromisoParams extends IdParams {
-  compromisoId: string;
-}
-
-export const cerrarCompromiso = catchAsync<CompromisoParams, unknown, { estado: 'CUMPLIDO' | 'INCUMPLIDO'; nota?: string }>(
-  async (req, res) => {
-    const { estado, nota } = req.body;
-    res.status(200).json({ success: true, data: await observacionService.cerrarCompromiso(req.params.id, req.params.compromisoId, estado, nota, req.user!, req.ip) });
-  }
-);
-
-export const agregarCitacion = catchAsync<IdParams, unknown, observacionService.CitacionInput>(async (req, res) => {
-  res.status(201).json({ success: true, data: await observacionService.agregarCitacion(req.params.id, req.body, req.user!, req.ip) });
+export const marcarCompromiso = catchAsync<IdParams, unknown, { estado: 'CUMPLIDO' | 'INCUMPLIDO'; nota?: string }>(async (req, res) => {
+  const { estado, nota } = req.body;
+  res.status(200).json({ success: true, data: await observacionService.marcarCompromiso(req.params.id, estado, nota, req.user!, req.ip) });
 });
 
-export const solicitarCaso = catchAsync<IdParams, unknown, { motivo: string }>(async (req, res) => {
-  res.status(201).json({ success: true, data: await observacionService.solicitarCaso(req.params.id, req.body.motivo, req.user!, req.ip) });
-});
-
-export const descartarSolicitudCaso = catchAsync<IdParams, unknown, { motivo: string }>(async (req, res) => {
-  res.status(200).json({ success: true, data: await observacionService.descartarSolicitudCaso(req.params.id, req.body.motivo, req.user!, req.ip) });
-});
-
-export const bandejaDeCasos = catchAsync<unknown, unknown, unknown, ParsedQs & { pagina?: number; limite?: number }>(async (req, res) => {
-  const paginacion = { pagina: Number(req.query.pagina ?? 1), limite: Number(req.query.limite ?? 20) };
-  res.status(200).json({ success: true, ...(await observacionService.bandejaDeCasos(req.user!, paginacion, req.ip)) });
+export const registrarCitacionRealizada = catchAsync<IdParams, unknown, { fecha: string; resultado?: string }>(async (req, res) => {
+  res.status(201).json({ success: true, data: await observacionService.registrarCitacionRealizada(req.params.id, req.body, req.user!, req.ip) });
 });

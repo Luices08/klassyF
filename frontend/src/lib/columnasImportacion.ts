@@ -99,59 +99,19 @@ export const COLUMNAS_ESTUDIANTES: ColumnaGuia[] = [
   { nombre: 'acudiente_parentesco', obligatoria: false, formato: `${uno(PARENTESCOS)}. Con datos de acudiente: obligatoria`, ejemplo: 'MADRE' },
 ];
 
-// --- Convivencia (M14): una plantilla por proceso. Las columnas reflejan backend/src/constants/importacionConvivencia.ts ---
+// --- Convivencia (M15): la única carga masiva es la de faltas del manual. Las columnas reflejan backend/src/constants/importacionConvivencia.ts ---
 
-export type ProcesoConvivencia = 'tipos' | 'categorias' | 'frases' | 'observaciones';
-
-export const NOMBRES_PROCESO_CONVIVENCIA: Record<ProcesoConvivencia, string> = {
-  tipos: 'Tipos de observación',
-  categorias: 'Categorías',
-  frases: 'Frases y faltas del manual',
-  observaciones: 'Observaciones académicas y comportamentales',
-};
-
-export const NOTAS_CONVIVENCIA = [
+export const NOTAS_FALTAS = [
   'Descarga la plantilla (Excel o CSV) y diligénciala: Excel trae listas desplegables y una hoja con instrucciones; el CSV usa punto y coma.',
   'Se revisa TODO el archivo antes de guardar: si una fila tiene un error, no se guarda ninguna y se te dice cuáles corregir.',
-  'Reenviar el mismo archivo no duplica nada: lo que ya existe se omite o se actualiza.',
+  'Reenviar el mismo archivo no duplica nada: la falta se identifica por su código y, si ya existe, se actualiza.',
   'No se aceptan fórmulas: pega solo valores. Tamaño máximo 2 MB.',
 ];
 
-export const NOTAS_CONVIVENCIA_OBSERVACIONES = [
-  ...NOTAS_CONVIVENCIA,
-  'Cada fila pasa por las mismas reglas del registro individual: solo estudiantes de tus grupos, con matrícula activa y fechas válidas.',
-  'Lo disciplinario no se carga por archivo: exige un proceso individual (caso, descargos, protocolo).',
-  'La plantilla puede bajarse por grupo, con los estudiantes ya escritos. La columna «estudiante» es solo informativa.',
+export const COLUMNAS_FALTAS: ColumnaGuia[] = [
+  { nombre: 'codigo', obligatoria: true, formato: 'Numeral de la falta en el manual. Identifica la fila: si ya existe, se actualiza.', ejemplo: '2.15' },
+  { nombre: 'descripcion', obligatoria: true, formato: 'Texto de la falta (máximo 400 caracteres).', ejemplo: 'Debe portar los tenis correspondientes al uniforme.' },
+  { nombre: 'gravedad', obligatoria: true, formato: 'I, II o III, según el manual.', ejemplo: 'I' },
+  { nombre: 'descuento_decimas', obligatoria: false, formato: 'Décimas que descuenta el manual (0 a 5, con coma o punto). Solo se guarda; no se aplica a notas.', ejemplo: '0,2' },
+  { nombre: 'estado', obligatoria: false, formato: 'ACTIVO o INACTIVO (vacío = ACTIVO).', ejemplo: 'ACTIVO' },
 ];
-
-export const COLUMNAS_CONVIVENCIA: Record<ProcesoConvivencia, ColumnaGuia[]> = {
-  tipos: [
-    { nombre: 'nombre', obligatoria: true, formato: 'Nombre del tipo. Si ya existe, se actualiza.', ejemplo: 'Comportamental' },
-    { nombre: 'familia', obligatoria: true, formato: 'ACADEMICA, COMPORTAMENTAL o DISCIPLINARIA. No se cambia en un tipo ya creado.', ejemplo: 'COMPORTAMENTAL' },
-    { nombre: 'visible_estudiante', obligatoria: false, formato: 'SI o NO: si el estudiante ve estas observaciones (vacío = NO).', ejemplo: 'SI' },
-    { nombre: 'orden', obligatoria: false, formato: 'Número entero (vacío = 0).', ejemplo: '2' },
-    { nombre: 'estado', obligatoria: false, formato: 'ACTIVO o INACTIVO (vacío = ACTIVO).', ejemplo: 'ACTIVO' },
-  ],
-  categorias: [
-    { nombre: 'nombre', obligatoria: true, formato: 'Nombre de la categoría. Si ya existe, se actualiza.', ejemplo: 'Compromisos académicos' },
-    { nombre: 'orden', obligatoria: false, formato: 'Número entero (vacío = 0).', ejemplo: '1' },
-    { nombre: 'estado', obligatoria: false, formato: 'ACTIVO o INACTIVO (vacío = ACTIVO).', ejemplo: 'ACTIVO' },
-  ],
-  frases: [
-    { nombre: 'tipo', obligatoria: true, formato: 'Nombre de un tipo de observación que ya existe.', ejemplo: 'Disciplinaria' },
-    { nombre: 'categoria', obligatoria: false, formato: 'Nombre de una categoría que ya existe (cárgala antes).', ejemplo: 'Compromisos académicos' },
-    { nombre: 'codigo', obligatoria: false, formato: 'Código de la falta en el manual; identifica la fila dentro de su tipo.', ejemplo: '1.3' },
-    { nombre: 'texto', obligatoria: true, formato: 'Texto de la frase o falta (máximo 400 caracteres).', ejemplo: 'Debe estar puntual en clase.' },
-    { nombre: 'tipo_situacion', obligatoria: false, formato: 'I, II o III. Solo en tipos disciplinarios.', ejemplo: 'I' },
-    { nombre: 'descuento_decimas', obligatoria: false, formato: 'Décimas del manual (0 a 5, con coma o punto). Solo se guarda; no se aplica a notas.', ejemplo: '0,3' },
-    { nombre: 'orden', obligatoria: false, formato: 'Número entero (vacío = 0).', ejemplo: '3' },
-    { nombre: 'estado', obligatoria: false, formato: 'ACTIVO o INACTIVO (vacío = ACTIVO).', ejemplo: 'ACTIVO' },
-  ],
-  observaciones: [
-    { nombre: 'numero_documento', obligatoria: true, formato: 'Documento del estudiante, como texto (conserva los ceros).', ejemplo: '1098765432' },
-    { nombre: 'fecha_hecho', obligatoria: true, formato: 'AAAA-MM-DD o DD/MM/AAAA. No puede ser futura.', ejemplo: '2026-03-12' },
-    { nombre: 'tipo', obligatoria: true, formato: 'Nombre de un tipo académico o comportamental.', ejemplo: 'Comportamental' },
-    { nombre: 'descriptores', obligatoria: false, formato: 'Códigos o textos de frases del tipo, separados con |. Hay que poner frases o comentario.', ejemplo: 'C-01|C-04' },
-    { nombre: 'comentario', obligatoria: false, formato: 'Texto libre (máximo 2000 caracteres).', ejemplo: 'Participó activamente en el debate.' },
-  ],
-};

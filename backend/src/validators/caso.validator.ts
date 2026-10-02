@@ -62,6 +62,31 @@ export const guardarProtocolo: ValidationSchema = {
   }),
 };
 
+// --- Faltas del manual (gravedad Tipo I, II o III) ---
+
+const camposFalta = {
+  codigo: Joi.string().trim().max(20),
+  descripcion: Joi.string().trim().max(400),
+  gravedad: tipoSituacion,
+  descuento_decimas: Joi.number().min(0).max(5).allow(null),
+};
+
+export const crearFalta: ValidationSchema = {
+  body: Joi.object({
+    ...camposFalta,
+    codigo: camposFalta.codigo.required(),
+    descripcion: camposFalta.descripcion.required(),
+    gravedad: camposFalta.gravedad.required(),
+  }),
+};
+export const actualizarFalta: ValidationSchema = { params: idParam.params, body: Joi.object(camposFalta).min(1) };
+
+// --- Solicitudes de caso (lo que envían los docentes al registrar una falta) ---
+
+export const plantillaFaltas: ValidationSchema = { query: Joi.object({ formato: Joi.string().valid('xlsx', 'csv').default('xlsx') }) };
+
+export const listarSolicitudes: ValidationSchema = { query: Joi.object(paginacion) };
+
 // --- Casos ---
 
 export const abrirCaso: ValidationSchema = {
@@ -74,7 +99,7 @@ export const abrirCaso: ValidationSchema = {
     involucrados: Joi.array()
       .items(Joi.object({ student_id: objectId.required(), rol: Joi.string().valid(...ROLES_INVOLUCRADO).required() }))
       .max(30),
-    observacion_id: objectId,
+    solicitud_id: objectId,
   }),
 };
 
@@ -147,6 +172,8 @@ const ESQUEMAS_REGISTRO: Record<string, Joi.ObjectSchema> = {
   }),
 };
 
+// `validate` descarta lo que el esquema no declara y reasigna `req.params`: `coleccion` debe estar aquí o el controlador no la recibe.
+export const paramsRegistroCaso = Joi.object({ id: objectId.required(), coleccion: Joi.string().required() });
 export const coleccionesRegistroCaso: readonly string[] = COLECCIONES_REGISTRO_CASO;
 export const esquemaDeRegistro = (coleccion: string): Joi.ObjectSchema | undefined => ESQUEMAS_REGISTRO[coleccion];
 
@@ -154,7 +181,7 @@ export const registrarDecision: ValidationSchema = {
   params: idParam.params,
   body: Joi.object({
     motivacion: Joi.string().trim().min(20).max(4000).required(),
-    descriptores_ids: Joi.array().items(objectId).max(30),
+    faltas_ids: Joi.array().items(objectId).max(30),
   }),
 };
 

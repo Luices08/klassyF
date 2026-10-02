@@ -1,7 +1,7 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../lib/apiClient';
 import type { EstadoActivo } from '../types/domain';
-import type { MedioCitacion, TipoSituacion } from './useObservaciones';
+import type { MedioCitacion, RolInvolucrado as RolInvolucradoBase, TipoSituacion } from './useObservaciones';
 
 export const ESTADOS_CASO = ['ABIERTO', 'EN_ATENCION', 'EN_MEDIACION', 'EN_SEGUIMIENTO', 'REMITIDO', 'CERRADO', 'REABIERTO', 'ANULADO'] as const;
 export type EstadoCaso = (typeof ESTADOS_CASO)[number];
@@ -38,14 +38,8 @@ export const NOMBRES_RESULTADO: Record<ResultadoCierre, string> = {
   MEDIDA_APLICADA: 'Medida aplicada',
 };
 
-export const ROLES_INVOLUCRADO = ['AFECTADO', 'PRESUNTO_RESPONSABLE', 'TESTIGO', 'REPORTANTE'] as const;
-export type RolInvolucrado = (typeof ROLES_INVOLUCRADO)[number];
-export const NOMBRES_ROL_INVOLUCRADO: Record<RolInvolucrado, string> = {
-  AFECTADO: 'Afectado',
-  PRESUNTO_RESPONSABLE: 'Presunto responsable',
-  TESTIGO: 'Testigo',
-  REPORTANTE: 'Reportante',
-};
+export { NOMBRES_ROL_INVOLUCRADO, ROLES_INVOLUCRADO } from './useObservaciones';
+export type RolInvolucrado = RolInvolucradoBase;
 
 export const TIPOS_NOTIFICACION = ['ACUDIENTES', 'CITACION', 'DECISION', 'OTRA'] as const;
 export type TipoNotificacion = (typeof TIPOS_NOTIFICACION)[number];
@@ -82,12 +76,15 @@ export interface CasoDetalle {
   codigo: string;
   estado: EstadoCaso;
   tipo_situacion: TipoSituacion;
-  origen: 'OBSERVACION' | 'DIRECTO';
+  origen: 'SOLICITUD' | 'DIRECTO';
+  solicitud_id: string | null;
   observacion_ids: string[];
   fecha_hecho: string;
   lugar: string;
   hechos: string;
   como_se_conocio: string;
+  /** Las acciones inmediatas de contención que reportó el docente al enviar la solicitud. */
+  contencion_reportada: string;
   involucrados: { student_id: string; rol: RolInvolucrado; estudiante: string }[];
   atencion_inmediata: ({ descripcion: string; hubo_dano: boolean; fecha: string } & ConAutor) | null;
   medidas_proteccion: ({ _id: string; descripcion: string; fecha: string } & ConAutor)[];
@@ -97,7 +94,7 @@ export interface CasoDetalle {
   seguimientos: ({ _id: string; fecha: string; nota: string; proxima_fecha: string | null } & ConAutor)[];
   remisiones: ({ _id: string; entidad_nombre: string; fecha: string; oficio: string; funcionario: string; respuesta: string } & ConAutor)[];
   justificacion_sin_remision: string;
-  decision: ({ motivacion: string; fecha: string; descriptores: { codigo: string | null; texto: string }[] } & ConAutor) | null;
+  decision: ({ motivacion: string; fecha: string; faltas: { codigo: string; descripcion: string; gravedad: TipoSituacion }[] } & ConAutor) | null;
   medidas_aplicadas: ({ _id: string; nombre: string; dias: number | null; observaciones: string; fecha: string } & ConAutor)[];
   reclasificaciones: ({ de: TipoSituacion; a: TipoSituacion; motivo: string; fecha: string } & ConAutor)[];
   resultado_cierre: ResultadoCierre | null;
@@ -193,7 +190,7 @@ export interface AbrirCasoInput {
   hechos: string;
   como_se_conocio?: string;
   involucrados?: { student_id: string; rol: RolInvolucrado }[];
-  observacion_id?: string;
+  solicitud_id?: string;
 }
 
 export function useAbrirCaso() {
@@ -222,7 +219,7 @@ export const useActualizarPaso = usarAccionDeCaso<{ pasoId: string; estado: 'PEN
   url: `/convivencia/casos/${id}/pasos/${pasoId}`,
   cuerpo: e,
 }));
-export const useRegistrarDecision = usarAccionDeCaso<{ motivacion: string; descriptores_ids?: string[] }>((id, e) => ({ metodo: 'put', url: `/convivencia/casos/${id}/decision`, cuerpo: e }));
+export const useRegistrarDecision = usarAccionDeCaso<{ motivacion: string; faltas_ids?: string[] }>((id, e) => ({ metodo: 'put', url: `/convivencia/casos/${id}/decision`, cuerpo: e }));
 export const useCerrarCaso = usarAccionDeCaso<{ resultado: ResultadoCierre; motivo: string; justificacion_sin_remision?: string }>((id, e) => ({ metodo: 'post', url: `/convivencia/casos/${id}/cierre`, cuerpo: e }));
 export const useReabrirCaso = usarAccionDeCaso<{ motivo: string }>((id, e) => ({ metodo: 'post', url: `/convivencia/casos/${id}/reapertura`, cuerpo: e }));
 export const useAnularCaso = usarAccionDeCaso<{ motivo: string }>((id, e) => ({ metodo: 'post', url: `/convivencia/casos/${id}/anulacion`, cuerpo: e }));
@@ -274,6 +271,111 @@ export function useGuardarProtocolo() {
   return useMutation({
     mutationFn: ({ tipo, pasos }: { tipo: TipoSituacion; pasos: { nombre: string; obligatorio: boolean }[] }) =>
       api.put<ProtocoloConvivencia>(`/convivencia/protocolos/${tipo}`, { pasos }),
+    onSuccess: invalidar,
+  });
+}
+
+// --- Faltas del manual (M15): catálogo y carga por archivo ---
+
+export interface FaltaInput {
+  codigo: string;
+  descripcion: string;
+  gravedad: TipoSituacion;
+  descuento_decimas: number | null;
+}
+
+export function useGuardarFalta() {
+  const invalidar = useInvalidarCasos();
+  return useMutation({
+    mutationFn: ({ id, ...datos }: FaltaInput & { id?: string }) =>
+      id ? api.patch<unknown>(`/convivencia/faltas/${id}`, datos) : api.post<unknown>('/convivencia/faltas', datos),
+    onSuccess: invalidar,
+  });
+}
+
+export function useCambiarEstadoFalta() {
+  const invalidar = useInvalidarCasos();
+  return useMutation({
+    mutationFn: ({ id, estado }: { id: string; estado: EstadoActivo }) => api.patch<unknown>(`/convivencia/faltas/${id}/estado`, { estado }),
+    onSuccess: invalidar,
+  });
+}
+
+export function useEliminarFalta() {
+  const invalidar = useInvalidarCasos();
+  return useMutation({ mutationFn: (id: string) => api.delete<null>(`/convivencia/faltas/${id}`), onSuccess: invalidar });
+}
+
+export interface ResultadoImportacionFaltas {
+  lote_id: string;
+  formato: 'xlsx' | 'csv';
+  filas: number;
+  creados: number;
+  actualizados: number;
+  omitidos: number;
+}
+
+export interface ErrorFilaImportacion {
+  fila: number;
+  mensaje: string;
+}
+
+export function useImportarFaltas() {
+  const invalidar = useInvalidarCasos();
+  return useMutation({
+    mutationFn: (archivo: File) => {
+      const formData = new FormData();
+      formData.append('archivo', archivo);
+      return api.upload<ResultadoImportacionFaltas>('/convivencia/faltas/importacion', formData);
+    },
+    onSuccess: invalidar,
+  });
+}
+
+/** La plantilla se baja con sesión (nunca por una URL pública). */
+export async function descargarPlantillaFaltas(formato: 'xlsx' | 'csv'): Promise<void> {
+  const { url } = await api.downloadBlob(`/convivencia/faltas/plantilla?formato=${formato}`);
+  const enlace = document.createElement('a');
+  enlace.href = url;
+  enlace.download = `plantilla-faltas.${formato}`;
+  enlace.click();
+  URL.revokeObjectURL(url);
+}
+
+// --- Solicitudes de caso: lo que los docentes envían al registrar una falta ---
+
+export interface SolicitudCasoVista {
+  _id: string;
+  estado: 'PENDIENTE' | 'DESCARTADA' | 'CONVERTIDA';
+  gravedad: TipoSituacion;
+  falta: { falta_id: string; codigo: string; descripcion: string };
+  fecha_hecho: string;
+  hechos: string;
+  acciones_contencion: string;
+  solicitada_por: string | null;
+  createdAt: string;
+  involucrados: { student_id: string; rol: RolInvolucrado; estudiante: string; numero_documento: string; grupo: string }[];
+  resolucion: { motivo: string; fecha: string } | null;
+  caso_id: string | null;
+}
+
+export function useBandejaSolicitudes(pagina: number) {
+  return useQuery({
+    queryKey: ['casos', 'solicitudes', pagina],
+    queryFn: () =>
+      api.raw<{ success: true; data: SolicitudCasoVista[]; total: number; pagina: number; limite: number }>('/convivencia/solicitudes', {
+        query: { pagina, limite: 20 },
+      }),
+    select: (res) => ({ data: res.data, total: res.total, pagina: res.pagina, limite: res.limite }),
+    placeholderData: keepPreviousData,
+    retry: false,
+  });
+}
+
+export function useDescartarSolicitud() {
+  const invalidar = useInvalidarCasos();
+  return useMutation({
+    mutationFn: ({ id, motivo }: { id: string; motivo: string }) => api.patch<SolicitudCasoVista>(`/convivencia/solicitudes/${id}/descartar`, { motivo }),
     onSuccess: invalidar,
   });
 }

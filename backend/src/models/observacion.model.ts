@@ -1,79 +1,48 @@
 import { HydratedDocument, Model, Schema, Types, model } from 'mongoose';
 import {
+  CLASES_REGISTRO,
+  ClaseRegistro,
   CONTEXTOS_OBSERVACION,
   ContextoObservacion,
-  ESTADOS_OBSERVACION,
-  EstadoObservacion,
-  FAMILIAS_OBSERVACION,
-  FamiliaObservacion,
-  MAX_COMENTARIO_OBSERVACION,
   ESTADOS_COMPROMISO,
-  ESTADOS_SOLICITUD_CASO,
+  ESTADOS_OBSERVACION,
   EstadoCompromiso,
-  EstadoSolicitudCaso,
-  MEDIOS_CITACION,
-  MedioCitacion,
-  ORIGENES_SOLICITUD_CASO,
-  OrigenSolicitudCaso,
-  RESPONSABLES_COMPROMISO,
-  ResponsableCompromiso,
+  EstadoObservacion,
+  MAX_COMPROMISO,
+  MAX_DESCRIPCION_OBSERVACION,
   TIPOS_SITUACION,
   TipoSituacion,
 } from '../constants/convivencia';
 
-/** Frase elegida, copiada al guardar: cambiar o desactivar el catálogo no altera lo ya registrado. */
-export interface IDescriptorRegistrado {
-  descriptor_id: Types.ObjectId;
-  codigo: string | null;
-  texto: string;
-  tipo_situacion: TipoSituacion | null;
-}
-
 export interface IEnmiendaObservacion {
   fecha: Date;
   por: Types.ObjectId;
-  descriptores_anteriores: IDescriptorRegistrado[];
-  comentario_anterior: string;
-  texto_anterior: string;
+  descripcion_anterior: string;
+  compromiso_anterior: string;
+  version_estudiante_anterior: string;
 }
 
-export interface ICompromisoObservacion {
+export interface ISeguimientoObservacion {
+  fecha: Date;
+  nota: string;
+  por: Types.ObjectId;
+}
+
+/** La falta del manual elegida, copiada al guardar: editar o desactivar el catálogo no altera lo ya registrado. */
+export interface IFaltaRegistrada {
+  falta_id: Types.ObjectId;
+  codigo: string;
   descripcion: string;
-  responsable: ResponsableCompromiso;
-  fecha_limite: Date;
-  estado: EstadoCompromiso;
-  registrado_por: Types.ObjectId;
-  fecha_cierre: Date | null;
-  cerrado_por: Types.ObjectId | null;
-  nota_cierre: string;
-}
-
-export interface ICitacionObservacion {
-  fecha: Date;
-  medio: MedioCitacion;
-  /** A quién se dirigió (texto libre: el acudiente o responsable citado). */
-  dirigida_a: string;
-  resultado: string;
-  registrado_por: Types.ObjectId;
-}
-
-export interface ISolicitudCaso {
-  estado: EstadoSolicitudCaso;
-  origen: OrigenSolicitudCaso;
-  motivo: string;
-  solicitada_por: Types.ObjectId;
-  fecha: Date;
-  resuelta_por: Types.ObjectId | null;
-  fecha_resolucion: Date | null;
-  motivo_resolucion: string;
-  /** Caso de convivencia (M15) en que se convirtió la solicitud. */
-  caso_id: Types.ObjectId | null;
+  gravedad: TipoSituacion;
 }
 
 /**
- * Registro primario del Observador (M14). Pertenece al estudiante (persona), no al grupo: el grupo, la sede y la
- * matrícula vigentes en la fecha del hecho quedan como contexto. Nunca se borra: se enmienda (versión anterior
- * conservada) o se anula con motivo.
+ * Registro primario del Observador (M14). Pertenece al estudiante (persona), no al grupo: el grupo, la sede y la matrícula
+ * vigentes en la fecha del hecho quedan como contexto. Hay dos clases que comparten el Observador y el historial:
+ *  - OBSERVACION: cotidiana, de un tipo que define el coordinador (tipo, descripción, compromiso, citación, confidencial).
+ *  - FALTA: una falta del manual de convivencia (M15) con su gravedad; la Tipo I se queda aquí como antecedente
+ *    pedagógico y la Tipo II/III (o la que el docente remite) genera una solicitud de caso.
+ * Nunca se borra: se enmienda (versión anterior conservada) o se anula con motivo.
  */
 export interface IObservacion {
   student_id: Types.ObjectId;
@@ -83,20 +52,31 @@ export interface IObservacion {
   academic_year_id: Types.ObjectId;
   periodo_numero: number | null;
   fecha_hecho: Date;
-  tipo_id: Types.ObjectId;
+  clase: ClaseRegistro;
+  /** Los hechos, en texto libre y de forma objetiva. */
+  descripcion: string;
+  /** Texto opcional: en una falta Tipo I es el acuerdo formativo. */
+  compromiso: string;
+  /** null mientras no haya compromiso; el seguimiento lo marca cumplido o incumplido. */
+  compromiso_estado: EstadoCompromiso | null;
+  // --- OBSERVACION ---
+  tipo_id: Types.ObjectId | null;
   tipo_nombre: string;
-  familia: FamiliaObservacion;
+  /** Se copia del tipo al guardar: cambiarlo después no revela ni oculta lo ya registrado. */
   visible_estudiante: boolean;
-  descriptores: IDescriptorRegistrado[];
-  /** El mayor tipo de situación entre los descriptores elegidos; null si ninguno trae. Lo fija el catálogo, no el docente. */
-  tipo_situacion_maxima: TipoSituacion | null;
-  /** Texto libre; en una disciplinaria son los hechos. */
-  comentario: string;
-  texto_generado: string;
+  /** Indicador de que la situación amerita citar a la familia; el seguimiento registra si se hizo. */
+  requiere_citacion: boolean;
+  citacion_realizada: { fecha: Date; resultado: string; por: Types.ObjectId } | null;
+  /** Restringe la consulta a quien la escribió, orientación, coordinación de convivencia y el ADMIN. */
+  confidencial: boolean;
+  // --- FALTA ---
+  falta: IFaltaRegistrada | null;
+  /** Falta Tipo I: lo que el estudiante manifestó. En II/III los descargos son del comité. */
+  version_estudiante: string;
+  /** Solicitud de caso que esta falta generó (Tipo II/III, o Tipo I remitida). */
+  solicitud_id: Types.ObjectId | null;
   /** Un mismo hecho con varios estudiantes crea un registro por estudiante con este id común. */
   evento_id: Types.ObjectId | null;
-  /** Carga masiva (Excel/CSV) de la que viene; permite anular el lote completo. */
-  lote_id: Types.ObjectId | null;
   registrado_por: Types.ObjectId;
   /** A quién se atribuye: el propio autor, o el docente en cuyo nombre registró coordinación. */
   autor_id: Types.ObjectId;
@@ -104,9 +84,7 @@ export interface IObservacion {
   estado: EstadoObservacion;
   anulacion: { motivo: string; por: Types.ObjectId; fecha: Date } | null;
   enmiendas: Types.DocumentArray<IEnmiendaObservacion>;
-  compromisos: Types.DocumentArray<ICompromisoObservacion>;
-  citaciones: Types.DocumentArray<ICitacionObservacion>;
-  solicitud_caso: ISolicitudCaso | null;
+  seguimientos: Types.DocumentArray<ISeguimientoObservacion>;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -114,54 +92,35 @@ export interface IObservacion {
 export type ObservacionDocument = HydratedDocument<IObservacion>;
 type ObservacionModel = Model<IObservacion>;
 
-const descriptorRegistradoSchema = new Schema<IDescriptorRegistrado>(
+const enmiendaSchema = new Schema<IEnmiendaObservacion>({
+  fecha: { type: Date, required: true },
+  por: { type: Schema.Types.ObjectId, ref: 'User', required: true },
+  descripcion_anterior: { type: String, default: '' },
+  compromiso_anterior: { type: String, default: '' },
+  version_estudiante_anterior: { type: String, default: '' },
+});
+
+const seguimientoSchema = new Schema<ISeguimientoObservacion>({
+  fecha: { type: Date, required: true },
+  nota: { type: String, required: true, trim: true, maxlength: 500 },
+  por: { type: Schema.Types.ObjectId, ref: 'User', required: true },
+});
+
+const faltaRegistradaSchema = new Schema<IFaltaRegistrada>(
   {
-    descriptor_id: { type: Schema.Types.ObjectId, ref: 'Descriptor', required: true },
-    codigo: { type: String, default: null },
-    texto: { type: String, required: true },
-    tipo_situacion: { type: String, enum: [...TIPOS_SITUACION, null], default: null },
+    falta_id: { type: Schema.Types.ObjectId, ref: 'FaltaConvivencia', required: true },
+    codigo: { type: String, required: true },
+    descripcion: { type: String, required: true },
+    gravedad: { type: String, enum: TIPOS_SITUACION, required: true },
   },
   { _id: false }
 );
 
-const enmiendaSchema = new Schema<IEnmiendaObservacion>({
-  fecha: { type: Date, required: true },
-  por: { type: Schema.Types.ObjectId, ref: 'User', required: true },
-  descriptores_anteriores: { type: [descriptorRegistradoSchema], default: [] },
-  comentario_anterior: { type: String, default: '' },
-  texto_anterior: { type: String, default: '' },
-});
-
-const compromisoSchema = new Schema<ICompromisoObservacion>({
-  descripcion: { type: String, required: true, trim: true, maxlength: 500 },
-  responsable: { type: String, enum: RESPONSABLES_COMPROMISO, required: true },
-  fecha_limite: { type: Date, required: true },
-  estado: { type: String, enum: ESTADOS_COMPROMISO, default: 'PENDIENTE' },
-  registrado_por: { type: Schema.Types.ObjectId, ref: 'User', required: true },
-  fecha_cierre: { type: Date, default: null },
-  cerrado_por: { type: Schema.Types.ObjectId, ref: 'User', default: null },
-  nota_cierre: { type: String, default: '', maxlength: 500 },
-});
-
-const citacionSchema = new Schema<ICitacionObservacion>({
-  fecha: { type: Date, required: true },
-  medio: { type: String, enum: MEDIOS_CITACION, required: true },
-  dirigida_a: { type: String, default: '', trim: true, maxlength: 120 },
-  resultado: { type: String, default: '', trim: true, maxlength: 500 },
-  registrado_por: { type: Schema.Types.ObjectId, ref: 'User', required: true },
-});
-
-const solicitudCasoSchema = new Schema<ISolicitudCaso>(
+const citacionRealizadaSchema = new Schema(
   {
-    estado: { type: String, enum: ESTADOS_SOLICITUD_CASO, default: 'PENDIENTE' },
-    origen: { type: String, enum: ORIGENES_SOLICITUD_CASO, required: true },
-    motivo: { type: String, required: true, maxlength: 500 },
-    solicitada_por: { type: Schema.Types.ObjectId, ref: 'User', required: true },
     fecha: { type: Date, required: true },
-    resuelta_por: { type: Schema.Types.ObjectId, ref: 'User', default: null },
-    fecha_resolucion: { type: Date, default: null },
-    motivo_resolucion: { type: String, default: '', maxlength: 500 },
-    caso_id: { type: Schema.Types.ObjectId, ref: 'CasoConvivencia', default: null },
+    resultado: { type: String, default: '', maxlength: 500 },
+    por: { type: Schema.Types.ObjectId, ref: 'User', required: true },
   },
   { _id: false }
 );
@@ -184,37 +143,48 @@ const observacionSchema = new Schema<IObservacion, ObservacionModel>(
     academic_year_id: { type: Schema.Types.ObjectId, ref: 'AcademicYear', required: true },
     periodo_numero: { type: Number, default: null },
     fecha_hecho: { type: Date, required: true },
-    tipo_id: { type: Schema.Types.ObjectId, ref: 'TipoObservacion', required: true },
-    tipo_nombre: { type: String, required: true },
-    familia: { type: String, enum: FAMILIAS_OBSERVACION, required: true },
+    clase: { type: String, enum: CLASES_REGISTRO, required: true },
+    descripcion: { type: String, required: true, trim: true, maxlength: MAX_DESCRIPCION_OBSERVACION },
+    compromiso: { type: String, default: '', trim: true, maxlength: MAX_COMPROMISO },
+    compromiso_estado: { type: String, enum: [...ESTADOS_COMPROMISO, null], default: null },
+    tipo_id: { type: Schema.Types.ObjectId, ref: 'TipoObservacion', default: null },
+    tipo_nombre: { type: String, default: '' },
     visible_estudiante: { type: Boolean, default: false },
-    descriptores: { type: [descriptorRegistradoSchema], default: [] },
-    tipo_situacion_maxima: { type: String, enum: [...TIPOS_SITUACION, null], default: null },
-    comentario: { type: String, default: '', maxlength: MAX_COMENTARIO_OBSERVACION },
-    texto_generado: { type: String, required: true },
+    requiere_citacion: { type: Boolean, default: false },
+    citacion_realizada: { type: citacionRealizadaSchema, default: null },
+    confidencial: { type: Boolean, default: false },
+    falta: { type: faltaRegistradaSchema, default: null },
+    version_estudiante: { type: String, default: '', trim: true, maxlength: MAX_DESCRIPCION_OBSERVACION },
+    solicitud_id: { type: Schema.Types.ObjectId, ref: 'SolicitudCaso', default: null },
     evento_id: { type: Schema.Types.ObjectId, default: null },
-    lote_id: { type: Schema.Types.ObjectId, ref: 'LoteImportacion', default: null },
     registrado_por: { type: Schema.Types.ObjectId, ref: 'User', required: true },
     autor_id: { type: Schema.Types.ObjectId, ref: 'User', required: true },
     contexto: { type: String, enum: CONTEXTOS_OBSERVACION, required: true },
     estado: { type: String, enum: ESTADOS_OBSERVACION, default: 'ACTIVA' },
     anulacion: { type: anulacionSchema, default: null },
     enmiendas: { type: [enmiendaSchema], default: [] },
-    compromisos: { type: [compromisoSchema], default: [] },
-    citaciones: { type: [citacionSchema], default: [] },
-    solicitud_caso: { type: solicitudCasoSchema, default: null },
+    seguimientos: { type: [seguimientoSchema], default: [] },
   },
   { timestamps: true }
 );
+
+// Invariantes de cada clase: una observación tiene tipo y ninguna falta; una falta tiene falta y ningún tipo.
+observacionSchema.pre('validate', function validarClase(this: IObservacion, next) {
+  if (this.clase === 'OBSERVACION' && (!this.tipo_id || this.falta)) {
+    return next(new Error('Una observación debe tener tipo de observación y no puede traer una falta.'));
+  }
+  if (this.clase === 'FALTA' && (!this.falta || this.tipo_id || this.confidencial || this.requiere_citacion)) {
+    return next(new Error('Una falta debe traer la falta del manual y no usa tipo, confidencialidad ni citación.'));
+  }
+  next();
+});
 
 observacionSchema.index({ student_id: 1, academic_year_id: 1, fecha_hecho: -1 });
 observacionSchema.index({ group_id: 1, periodo_numero: 1 });
 observacionSchema.index({ autor_id: 1, fecha_hecho: -1 });
 observacionSchema.index({ registrado_por: 1, fecha_hecho: -1 });
 observacionSchema.index({ evento_id: 1 }, { sparse: true });
-observacionSchema.index({ lote_id: 1 }, { sparse: true });
-// Bandeja de coordinación de convivencia.
-observacionSchema.index({ 'solicitud_caso.estado': 1, sede_id: 1, fecha_hecho: -1 }, { sparse: true });
+observacionSchema.index({ solicitud_id: 1 }, { sparse: true });
 
 export const Observacion = model<IObservacion, ObservacionModel>('Observacion', observacionSchema);
 export default Observacion;

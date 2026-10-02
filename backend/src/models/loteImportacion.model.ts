@@ -12,8 +12,6 @@ export interface ILoteImportacion {
   creados: number;
   actualizados: number;
   omitidos: number;
-  estado: 'ACTIVO' | 'ANULADO';
-  anulacion: { motivo: string; por: Types.ObjectId; fecha: Date; observaciones_anuladas: number } | null;
   createdAt: Date;
 }
 export type LoteImportacionDocument = HydratedDocument<ILoteImportacion>;
@@ -29,19 +27,6 @@ const loteSchema = new Schema<ILoteImportacion, Model<ILoteImportacion>>(
     creados: { type: Number, default: 0 },
     actualizados: { type: Number, default: 0 },
     omitidos: { type: Number, default: 0 },
-    estado: { type: String, enum: ['ACTIVO', 'ANULADO'], default: 'ACTIVO' },
-    anulacion: {
-      type: new Schema(
-        {
-          motivo: { type: String, required: true },
-          por: { type: Schema.Types.ObjectId, ref: 'User', required: true },
-          fecha: { type: Date, required: true },
-          observaciones_anuladas: { type: Number, default: 0 },
-        },
-        { _id: false }
-      ),
-      default: null,
-    },
   },
   { timestamps: { createdAt: true, updatedAt: false } }
 );

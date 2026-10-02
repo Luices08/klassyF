@@ -14,8 +14,8 @@ import AcademicYear from '../models/academicYear.model';
 import CasoConvivencia, { CasoConvivenciaDocument } from '../models/casoConvivencia.model';
 import { EntidadExterna, MedidaConvivencia, ProtocoloConvivencia } from '../models/catalogosCaso.model';
 import Counter from '../models/counter.model';
-import Descriptor from '../models/descriptor.model';
-import Observacion from '../models/observacion.model';
+import FaltaConvivencia from '../models/faltaConvivencia.model';
+import SolicitudCaso from '../models/solicitudCaso.model';
 import { User, UserDocument } from '../models/user.model';
 import ApiError from '../utils/ApiError';
 import {
@@ -117,8 +117,8 @@ export interface AbrirCasoInput {
   hechos: string;
   como_se_conocio?: string;
   involucrados?: { student_id: string; rol: RolInvolucrado }[];
-  /** Si viene, el caso convierte la solicitud pendiente de esa observación. */
-  observacion_id?: string;
+  /** Si viene, el caso convierte esa solicitud pendiente (la que envió un docente al registrar una falta). */
+  solicitud_id?: string;
 }
 
 export async function abrirCaso(input: AbrirCasoInput, usuario: UserDocument, ip?: string | null) {
@@ -128,19 +128,15 @@ export async function abrirCaso(input: AbrirCasoInput, usuario: UserDocument, ip
   const fecha = fechaDeClase(input.fecha_hecho);
   exigirFechaNoFutura(fecha, 'La fecha del hecho');
 
-  const observacion = input.observacion_id
-    ? await Observacion.findOne({ _id: input.observacion_id, estado: 'ACTIVA', 'solicitud_caso.estado': 'PENDIENTE' })
-    : null;
-  if (input.observacion_id && !observacion) throw new ApiError(404, 'La observación no existe o no tiene una solicitud de caso pendiente.');
-  if (observacion && !enAlcanceDeSede(comoUsuarioConvivencia(usuario), String(observacion.sede_id)) && usuario.rol !== ROLES.ADMIN) {
-    throw new ApiError(404, 'La observación no existe o no tiene una solicitud de caso pendiente.');
-  }
+  const solicitud = input.solicitud_id && Types.ObjectId.isValid(input.solicitud_id) ? await SolicitudCaso.findOne({ _id: input.solicitud_id, estado: 'PENDIENTE' }) : null;
+  const solicitudNoDisponible = () => new ApiError(404, 'La solicitud no existe o ya fue atendida.');
+  if (input.solicitud_id && !solicitud) throw solicitudNoDisponible();
+  if (solicitud && usuario.rol !== ROLES.ADMIN && !enAlcanceDeSede(comoUsuarioConvivencia(usuario), String(solicitud.sede_id))) throw solicitudNoDisponible();
 
+  // Sin involucrados nuevos, el caso toma los de la solicitud: convivencia puede agregar los que el docente no pudo nombrar.
   const pedidos = input.involucrados?.length
     ? input.involucrados
-    : observacion
-      ? [{ student_id: String(observacion.student_id), rol: 'PRESUNTO_RESPONSABLE' as RolInvolucrado }]
-      : [];
+    : (solicitud?.involucrados.map((i) => ({ student_id: String(i.student_id), rol: i.rol })) ?? []);
   if (pedidos.length === 0) throw new ApiError(400, 'Indica al menos un estudiante involucrado.');
 
   const vistos = new Set<string>();
@@ -170,8 +166,10 @@ export async function abrirCaso(input: AbrirCasoInput, usuario: UserDocument, ip
           anio: anio.year,
           sede_id: sedeDelCaso,
           tipo_situacion: input.tipo_situacion,
-          origen: observacion ? 'OBSERVACION' : 'DIRECTO',
-          observacion_ids: observacion ? [observacion._id] : [],
+          origen: solicitud ? 'SOLICITUD' : 'DIRECTO',
+          solicitud_id: solicitud?._id ?? null,
+          observacion_ids: solicitud?.involucrados.flatMap((i) => (i.observacion_id ? [i.observacion_id] : [])) ?? [],
+          contencion_reportada: solicitud?.acciones_contencion ?? '',
           fecha_hecho: fecha,
           lugar: input.lugar ?? '',
           hechos: input.hechos,
@@ -185,16 +183,11 @@ export async function abrirCaso(input: AbrirCasoInput, usuario: UserDocument, ip
     );
     if (!creado) throw new ApiError(500, 'No se pudo abrir el caso.');
 
-    if (observacion?.solicitud_caso) {
-      const obs = await Observacion.findById(observacion._id).session(session);
-      if (obs?.solicitud_caso) {
-        obs.solicitud_caso.estado = 'CONVERTIDA';
-        obs.solicitud_caso.caso_id = creado._id;
-        obs.solicitud_caso.resuelta_por = usuario._id;
-        obs.solicitud_caso.fecha_resolucion = new Date();
-        obs.solicitud_caso.motivo_resolucion = `Se abrió el caso ${creado.codigo}.`;
-        await obs.save({ session });
-      }
+    if (solicitud) {
+      solicitud.estado = 'CONVERTIDA';
+      solicitud.caso_id = creado._id;
+      solicitud.resolucion = { por: usuario._id, fecha: new Date(), motivo: `Se abrió el caso ${creado.codigo}.` };
+      await solicitud.save({ session });
     }
     return creado;
   });
@@ -404,20 +397,20 @@ export async function agregarRegistroCaso(id: string, coleccion: ColeccionRegist
 }
 
 /** La decisión es motivada y solo se toma después de oír los descargos (RN-15-04/05). */
-export async function registrarDecision(id: string, datos: { motivacion: string; descriptores_ids?: string[] }, usuario: UserDocument, ip?: string | null) {
+export async function registrarDecision(id: string, datos: { motivacion: string; faltas_ids?: string[] }, usuario: UserDocument, ip?: string | null) {
   const caso = await cargarCaso(id, usuario);
   exigirEditable(caso);
   if (caso.descargos.length === 0) throw new ApiError(409, 'Registra los descargos del estudiante y su acudiente antes de la decisión.');
 
-  const ids = [...new Set(datos.descriptores_ids ?? [])];
-  const faltas = ids.length ? await Descriptor.find({ _id: { $in: ids } }) : [];
+  const ids = [...new Set(datos.faltas_ids ?? [])];
+  const faltas = ids.length ? await FaltaConvivencia.find({ _id: { $in: ids } }) : [];
   if (faltas.length !== ids.length) throw new ApiError(400, 'Alguna de las faltas del manual no existe.');
 
   caso.decision = {
     motivacion: datos.motivacion.trim(),
     fecha: new Date(),
     por: usuario._id,
-    descriptores: faltas.map((f) => ({ descriptor_id: f._id, codigo: f.codigo, texto: f.texto, tipo_situacion: f.tipo_situacion })),
+    faltas: faltas.map((f) => ({ falta_id: f._id, codigo: f.codigo, descripcion: f.descripcion, gravedad: f.gravedad })),
   };
   return guardarYAuditar(caso, usuario, 'CASO_CONVIVENCIA_ACTUALIZADO', 'decision', ip);
 }
@@ -466,10 +459,7 @@ export async function anularCaso(id: string, motivo: string, usuario: UserDocume
   if (caso.estado !== 'ABIERTO') throw new ApiError(409, 'Solo se anula un caso recién abierto.');
   caso.estado = 'ANULADO';
   caso.anulacion = { motivo: motivo.trim(), por: usuario._id, fecha: new Date() };
-  await Observacion.updateMany(
-    { _id: { $in: caso.observacion_ids }, 'solicitud_caso.caso_id': caso._id },
-    { $set: { 'solicitud_caso.estado': 'PENDIENTE', 'solicitud_caso.caso_id': null, 'solicitud_caso.motivo_resolucion': '' } }
-  );
+  await SolicitudCaso.updateOne({ _id: caso.solicitud_id, caso_id: caso._id }, { $set: { estado: 'PENDIENTE', caso_id: null, resolucion: null } });
   return guardarYAuditar(caso, usuario, 'CASO_CONVIVENCIA_ANULADO', 'anulado', ip);
 }
 

@@ -29,11 +29,11 @@ describe('Retención de datos de convivencia (con base de datos)', () => {
 
   it('informa lo que ya cumplió el plazo, sin borrar nada, y deja rastro de la consulta', async () => {
     const [vieja] = await observaciones.registrarObservacion(
-      { estudiantes_ids: [String(e.estudiante._id)], tipo_id: e.tipoComportamental, descriptores_ids: [], comentario: 'Antigua.', fecha_hecho: hoy() },
+      { estudiantes_ids: [String(e.estudiante._id)], tipo_id: e.tipoComportamental, descripcion: 'Antigua.', fecha_hecho: hoy() },
       e.docenteDeClase
     );
     await observaciones.registrarObservacion(
-      { estudiantes_ids: [String(e.estudiante._id)], tipo_id: e.tipoComportamental, descriptores_ids: [], comentario: 'Reciente.', fecha_hecho: hoy() },
+      { estudiantes_ids: [String(e.estudiante._id)], tipo_id: e.tipoComportamental, descripcion: 'Reciente.', fecha_hecho: hoy() },
       e.docenteDeClase
     );
     await Observacion.collection.updateOne({ _id: new Types.ObjectId(vieja!._id) }, { $set: { fecha_hecho: haceAnios(6) } });

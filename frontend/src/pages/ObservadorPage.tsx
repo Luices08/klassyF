@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { AccionesObservacion } from '../components/convivencia/AccionesObservacion';
-import { CargaMasivaDrawer } from '../components/convivencia/CargaMasivaDrawer';
+import { FaltaDrawer } from '../components/convivencia/FaltaDrawer';
 import { HistorialObservaciones } from '../components/convivencia/HistorialObservaciones';
 import { ChipsObservacion } from '../components/convivencia/ObservacionesTimeline';
 import { ObservacionDrawer } from '../components/convivencia/ObservacionDrawer';
@@ -46,7 +46,10 @@ export function ObservadorPage() {
         onChange={setTab}
       />
       <TabPanel active={tab} tabKey="registrar">
-        <RegistrarTab esDocente={user?.rol === 'DOCENTE'} />
+        <RegistrarTab
+          esDocente={user?.rol === 'DOCENTE'}
+          puedeRegistrarFalta={user?.rol === 'DOCENTE' || user?.rol === 'COORDINADOR_CONVIVENCIA' || user?.rol === 'ADMIN'}
+        />
       </TabPanel>
       <TabPanel active={tab} tabKey="mias">
         <MisRegistrosTab />
@@ -55,7 +58,7 @@ export function ObservadorPage() {
   );
 }
 
-function RegistrarTab({ esDocente }: { esDocente: boolean }) {
+function RegistrarTab({ esDocente, puedeRegistrarFalta }: { esDocente: boolean; puedeRegistrarFalta: boolean }) {
   const grupos = useGruposObservables();
   const catalogo = useCatalogoConvivencia();
   const [grupoId, setGrupoId] = useState('');
@@ -63,7 +66,8 @@ function RegistrarTab({ esDocente }: { esDocente: boolean }) {
   const estudiantes = useEstudiantesObservables({ group_id: grupoId || undefined, q: busqueda });
   const [seleccion, setSeleccion] = useState<Set<string>>(new Set());
   const [registrando, setRegistrando] = useState(false);
-  const [cargando, setCargando] = useState(false);
+  const [registrandoFalta, setRegistrandoFalta] = useState(false);
+  const [aviso, setAviso] = useState<string | null>(null);
   const [historialDe, setHistorialDe] = useState<EstudianteObservable | null>(null);
 
   const lista = estudiantes.data ?? [];
@@ -90,9 +94,11 @@ function RegistrarTab({ esDocente }: { esDocente: boolean }) {
         subtitle="Elige un grupo o busca por nombre o documento (mínimo 3 letras)."
         action={
           <div className="flex flex-wrap gap-2">
-            <Button variant="outline" onClick={() => setCargando(true)}>
-              Cargar archivo
-            </Button>
+            {puedeRegistrarFalta && (
+              <Button variant="outline" disabled={elegidos.length === 0} onClick={() => setRegistrandoFalta(true)}>
+                Registrar falta
+              </Button>
+            )}
             <Button disabled={elegidos.length === 0} onClick={() => setRegistrando(true)}>
               Registrar observación{elegidos.length > 0 ? ` (${elegidos.length})` : ''}
             </Button>
@@ -123,6 +129,11 @@ function RegistrarTab({ esDocente }: { esDocente: boolean }) {
           <Alert tone="info">
             No hay grupos disponibles: se necesita un año lectivo en curso y tener grupos asignados (clases o dirección de grupo).
           </Alert>
+        </div>
+      )}
+      {aviso && (
+        <div className="px-4 pb-4">
+          <Alert tone="success">{aviso}</Alert>
         </div>
       )}
       {estudiantes.isError && (
@@ -174,7 +185,20 @@ function RegistrarTab({ esDocente }: { esDocente: boolean }) {
         </TableBody>
       </Table>
 
-      <CargaMasivaDrawer proceso={cargando ? 'observaciones' : null} grupoId={grupoId || undefined} onClose={() => setCargando(false)} />
+      {catalogo.data && (
+        <FaltaDrawer
+          open={registrandoFalta}
+          onClose={() => {
+            setRegistrandoFalta(false);
+            setSeleccion(new Set());
+          }}
+          catalogo={catalogo.data}
+          estudiantes={elegidos}
+          onRegistrada={(r) =>
+            setAviso(r.remitida ? 'La falta quedó registrada y se envió a convivencia para que abra el caso.' : 'La falta quedó registrada en el Observador.')
+          }
+        />
+      )}
       {catalogo.data && (
         <ObservacionDrawer
           open={registrando}
@@ -202,7 +226,6 @@ function RegistrarTab({ esDocente }: { esDocente: boolean }) {
 function MisRegistrosTab() {
   const [pagina, setPagina] = useState(1);
   const mias = useMisObservaciones(pagina);
-  const catalogo = useCatalogoConvivencia();
 
   if (mias.isLoading) return <Spinner />;
   if (mias.isError) return <Alert tone="error">{errorMessage(mias.error)}</Alert>;
@@ -218,7 +241,7 @@ function MisRegistrosTab() {
             <Th>Fecha</Th>
             <Th>Estudiante</Th>
             <Th>Tipo</Th>
-            <Th>Observación</Th>
+            <Th>Descripción</Th>
             <Th className="text-right">Acciones</Th>
           </tr>
         </TableHead>
@@ -232,9 +255,9 @@ function MisRegistrosTab() {
                   <ChipsObservacion obs={o} />
                 </div>
               </Td>
-              <Td className="max-w-md whitespace-pre-line">{o.texto_generado}</Td>
+              <Td className="max-w-md whitespace-pre-line">{o.descripcion}</Td>
               <Td className="text-right">
-                <AccionesObservacion observacion={o} catalogo={catalogo.data} />
+                <AccionesObservacion observacion={o} />
               </Td>
             </tr>
           ))}

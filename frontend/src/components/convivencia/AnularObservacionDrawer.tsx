@@ -37,7 +37,7 @@ function Formulario({ observacion, onClose }: { observacion: ObservacionVista; o
       submitDisabled={motivo.trim().length < 5}
     >
       {anular.isError && <Alert tone="error">{errorMessage(anular.error)}</Alert>}
-      <p className="whitespace-pre-line rounded-lg bg-soft p-3 text-sm text-body">{observacion.texto_generado}</p>
+      <p className="whitespace-pre-line rounded-lg bg-soft p-3 text-sm text-body">{observacion.descripcion}</p>
       <Textarea
         label="Motivo de la anulación"
         rows={3}

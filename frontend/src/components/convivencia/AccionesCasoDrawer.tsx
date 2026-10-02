@@ -111,9 +111,7 @@ function Formulario({ caso, modo, esAdmin, onClose }: Props & { modo: ModoAccion
   const medida = catalogos.data?.medidas.find((m) => m._id === medidaId);
 
   const tiposDisponibles = TIPOS_SITUACION.filter((t) => t !== caso.tipo_situacion && (esAdmin || TIPOS_SITUACION.indexOf(t) > TIPOS_SITUACION.indexOf(caso.tipo_situacion)));
-  const faltasDelManual = (catalogoFaltas.data?.descriptores ?? []).filter(
-    (d) => catalogoFaltas.data?.tipos.find((t) => t._id === d.tipo_id)?.familia === 'DISCIPLINARIA'
-  );
+  const faltasDelManual = catalogoFaltas.data?.faltas ?? [];
   const sinRemision = caso.remisiones.length === 0;
 
   const guardar = async (e: FormEvent) => {
@@ -130,7 +128,7 @@ function Formulario({ caso, modo, esAdmin, onClose }: Props & { modo: ModoAccion
         await atencion.mutateAsync({ id, descripcion: texto, hubo_dano: huboDano });
         break;
       case 'decision':
-        await decision.mutateAsync({ id, motivacion: texto, descriptores_ids: [...faltas] });
+        await decision.mutateAsync({ id, motivacion: texto, faltas_ids: [...faltas] });
         break;
       case 'cierre':
         await cerrar.mutateAsync({ id, resultado, motivo: texto, justificacion_sin_remision: textoExtra || undefined });
@@ -326,8 +324,7 @@ function Formulario({ caso, modo, esAdmin, onClose }: Props & { modo: ModoAccion
                 }
               />
               <span>
-                {d.codigo ? `${d.codigo} ` : ''}
-                {d.texto}
+                {d.codigo} · Tipo {d.gravedad} · {d.descripcion}
               </span>
             </label>
           ))}

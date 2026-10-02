@@ -81,7 +81,7 @@ function Contenido({ caso }: { caso: CasoDetalle }) {
       <div className="flex flex-wrap items-center gap-2">
         <EstadoCasoBadge value={caso.estado} />
         <TipoSituacionBadge value={caso.tipo_situacion} />
-        <Chip tone="neutral">{caso.origen === 'OBSERVACION' ? 'Desde una observación' : 'Apertura directa'}</Chip>
+        <Chip tone="neutral">{caso.origen === 'SOLICITUD' ? 'Desde una solicitud' : 'Apertura directa'}</Chip>
         {caso.resultado_cierre && <Chip tone="green">{NOMBRES_RESULTADO[caso.resultado_cierre]}</Chip>}
       </div>
 
@@ -127,6 +127,7 @@ function Contenido({ caso }: { caso: CasoDetalle }) {
             <p className="whitespace-pre-line">{caso.hechos}</p>
           </Fila>
           {caso.como_se_conocio && <Fila etiqueta="Cómo se conoció">{caso.como_se_conocio}</Fila>}
+          {caso.contencion_reportada && <Fila etiqueta="Contención reportada">{caso.contencion_reportada}</Fila>}
           <Fila etiqueta="Involucrados">
             <ul className="space-y-1">
               {caso.involucrados.map((i) => (
@@ -288,8 +289,8 @@ function Contenido({ caso }: { caso: CasoDetalle }) {
             {caso.decision ? (
               <>
                 <p className="whitespace-pre-line">{caso.decision.motivacion}</p>
-                {caso.decision.descriptores.length > 0 && (
-                  <p className="mt-1 text-xs text-muted">Faltas: {caso.decision.descriptores.map((d) => d.codigo ?? d.texto).join(', ')}</p>
+                {caso.decision.faltas.length > 0 && (
+                  <p className="mt-1 text-xs text-muted">Faltas: {caso.decision.faltas.map((f) => f.codigo).join(', ')}</p>
                 )}
                 <p className="text-xs text-muted">
                   {formatoFechaCalendario(caso.decision.fecha)}

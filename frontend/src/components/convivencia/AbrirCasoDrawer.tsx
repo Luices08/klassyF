@@ -5,13 +5,8 @@ import { Drawer } from '../ui/Drawer';
 import { Input, Select, Textarea } from '../ui/Field';
 import { IconButton } from '../ui/IconButton';
 import { XIcon } from '../ui/icons';
-import { NOMBRES_ROL_INVOLUCRADO, ROLES_INVOLUCRADO, useAbrirCaso, type RolInvolucrado } from '../../hooks/useCasos';
-import {
-  TIPOS_SITUACION,
-  useEstudiantesObservables,
-  type SolicitudEnBandeja,
-  type TipoSituacion,
-} from '../../hooks/useObservaciones';
+import { NOMBRES_ROL_INVOLUCRADO, ROLES_INVOLUCRADO, useAbrirCaso, type RolInvolucrado, type SolicitudCasoVista } from '../../hooks/useCasos';
+import { TIPOS_SITUACION, useEstudiantesObservables, type TipoSituacion } from '../../hooks/useObservaciones';
 
 const hoyLocal = () => new Date().toLocaleDateString('en-CA');
 
@@ -24,8 +19,8 @@ interface Involucrado {
 interface Props {
   open: boolean;
   onClose: () => void;
-  /** Si viene, el caso convierte la solicitud pendiente de esa observación. */
-  solicitud?: SolicitudEnBandeja | null;
+  /** Si viene, el caso convierte esa solicitud pendiente: toma sus hechos, involucrados y contención. */
+  solicitud?: SolicitudCasoVista | null;
   onAbierto?: (casoId: string) => void;
 }
 
@@ -36,13 +31,13 @@ export function AbrirCasoDrawer(props: Props) {
 
 function Formulario({ onClose, solicitud, onAbierto }: Props) {
   const abrir = useAbrirCaso();
-  const [tipo, setTipo] = useState<TipoSituacion>(solicitud?.tipo_situacion_maxima ?? 'I');
+  const [tipo, setTipo] = useState<TipoSituacion>(solicitud?.gravedad ?? 'I');
   const [fecha, setFecha] = useState(solicitud ? solicitud.fecha_hecho.slice(0, 10) : hoyLocal());
   const [lugar, setLugar] = useState('');
-  const [hechos, setHechos] = useState(solicitud?.texto_generado ?? '');
+  const [hechos, setHechos] = useState(solicitud?.hechos ?? '');
   const [comoSeConocio, setComoSeConocio] = useState('');
   const [involucrados, setInvolucrados] = useState<Involucrado[]>(
-    solicitud ? [{ student_id: solicitud.student_id, nombre: solicitud.estudiante, rol: 'PRESUNTO_RESPONSABLE' }] : []
+    (solicitud?.involucrados ?? []).map((i) => ({ student_id: i.student_id, nombre: i.estudiante, rol: i.rol }))
   );
   const [busqueda, setBusqueda] = useState('');
   const resultados = useEstudiantesObservables({ q: busqueda });
@@ -62,7 +57,7 @@ function Formulario({ onClose, solicitud, onAbierto }: Props) {
       hechos,
       como_se_conocio: comoSeConocio,
       involucrados: involucrados.map(({ student_id, rol }) => ({ student_id, rol })),
-      observacion_id: solicitud?._id,
+      solicitud_id: solicitud?._id,
     });
     onAbierto?.(caso._id);
     onClose();
@@ -73,7 +68,7 @@ function Formulario({ onClose, solicitud, onAbierto }: Props) {
       open
       size="lg"
       title="Abrir caso de convivencia"
-      subtitle={solicitud ? `A partir de la solicitud de ${solicitud.estudiante}` : 'Apertura directa (denuncia, reporte o tercero)'}
+      subtitle={solicitud ? `A partir de la solicitud con la falta ${solicitud.falta.codigo}` : 'Apertura directa (denuncia, reporte o tercero)'}
       onClose={onClose}
       onSubmit={guardar}
       submitLabel="Abrir caso"
@@ -84,6 +79,12 @@ function Formulario({ onClose, solicitud, onAbierto }: Props) {
       <Alert tone="info">
         El tipo lo decides tú como coordinador de convivencia. Se asigna un consecutivo anual y se copian los pasos del protocolo de ese tipo.
       </Alert>
+
+      {solicitud?.acciones_contencion && (
+        <Alert tone="info">
+          <span className="font-semibold">Contención que reportó el docente:</span> {solicitud.acciones_contencion}
+        </Alert>
+      )}
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <Select label="Tipo de situación" value={tipo} onChange={(e) => setTipo(e.target.value as TipoSituacion)}>

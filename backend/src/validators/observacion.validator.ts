@@ -1,11 +1,9 @@
 import Joi from 'joi';
 import {
-  FAMILIAS_OBSERVACION,
-  MAX_COMENTARIO_OBSERVACION,
+  MAX_COMPROMISO,
+  MAX_DESCRIPCION_OBSERVACION,
   MAX_ESTUDIANTES_POR_EVENTO,
-  MEDIOS_CITACION,
-  RESPONSABLES_COMPROMISO,
-  TIPOS_SITUACION,
+  ROLES_INVOLUCRADO,
 } from '../constants/convivencia';
 import { ESTADOS_USUARIO } from '../constants/enums';
 import { ValidationSchema } from '../middlewares/validate.middleware';
@@ -35,11 +33,7 @@ const camposTipo = {
 };
 
 export const crearTipo: ValidationSchema = {
-  body: Joi.object({
-    ...camposTipo,
-    nombre: camposTipo.nombre.required(),
-    familia: Joi.string().valid(...FAMILIAS_OBSERVACION).required(),
-  }),
+  body: Joi.object({ ...camposTipo, nombre: camposTipo.nombre.required() }),
 };
 export const actualizarTipo: ValidationSchema = {
   params: Joi.object({ id: objectId.required() }),
@@ -47,48 +41,6 @@ export const actualizarTipo: ValidationSchema = {
 };
 export const cambiarEstadoTipo = cambioDeEstado;
 export const eliminarTipo = idParam;
-
-// --- Categorías ---
-
-const camposCategoria = {
-  nombre: Joi.string().trim().max(80),
-  orden: Joi.number().integer().min(0),
-};
-
-export const crearCategoria: ValidationSchema = {
-  body: Joi.object({ ...camposCategoria, nombre: camposCategoria.nombre.required() }),
-};
-export const actualizarCategoria: ValidationSchema = {
-  params: Joi.object({ id: objectId.required() }),
-  body: Joi.object(camposCategoria).min(1),
-};
-export const cambiarEstadoCategoria = cambioDeEstado;
-export const eliminarCategoria = idParam;
-
-// --- Descriptores (frases y faltas del manual) ---
-
-const camposDescriptor = {
-  categoria_id: objectId.allow(null),
-  codigo: Joi.string().trim().max(20).allow(null),
-  texto: Joi.string().trim().max(400),
-  tipo_situacion: Joi.string().valid(...TIPOS_SITUACION).allow(null),
-  descuento_decimas: Joi.number().min(0).max(5).allow(null),
-  orden: Joi.number().integer().min(0),
-};
-
-export const crearDescriptor: ValidationSchema = {
-  body: Joi.object({
-    ...camposDescriptor,
-    tipo_id: objectId.required(),
-    texto: camposDescriptor.texto.required(),
-  }),
-};
-export const actualizarDescriptor: ValidationSchema = {
-  params: Joi.object({ id: objectId.required() }),
-  body: Joi.object(camposDescriptor).min(1),
-};
-export const cambiarEstadoDescriptor = cambioDeEstado;
-export const eliminarDescriptor = idParam;
 
 // --- Política ---
 
@@ -103,19 +55,42 @@ export const actualizarConfiguracion: ValidationSchema = {
   }).min(1),
 };
 
-// --- Observaciones ---
+// --- Observaciones y faltas ---
 
 export const buscarEstudiantes: ValidationSchema = {
   query: Joi.object({ group_id: objectId, q: Joi.string().trim().max(60) }),
 };
 
+const descripcion = Joi.string().trim().max(MAX_DESCRIPCION_OBSERVACION);
+const compromiso = Joi.string().trim().max(MAX_COMPROMISO).allow('');
+
 export const registrarObservacion: ValidationSchema = {
   body: Joi.object({
     estudiantes_ids: Joi.array().items(objectId).min(1).max(MAX_ESTUDIANTES_POR_EVENTO).required(),
     tipo_id: objectId.required(),
-    descriptores_ids: Joi.array().items(objectId).max(30).default([]),
-    comentario: Joi.string().trim().max(MAX_COMENTARIO_OBSERVACION).allow(''),
+    descripcion: descripcion.min(1).required(),
+    compromiso,
+    requiere_citacion: Joi.boolean(),
+    confidencial: Joi.boolean(),
     fecha_hecho: fechaDeCalendario.required(),
+    en_nombre_de_id: objectId,
+  }),
+};
+
+export const registrarFalta: ValidationSchema = {
+  body: Joi.object({
+    falta_id: objectId.required(),
+    fecha_hecho: fechaDeCalendario.required(),
+    hechos: descripcion.min(1).required(),
+    version_estudiante: descripcion.allow(''),
+    compromiso,
+    acciones_contencion: Joi.string().trim().max(1000).allow(''),
+    remitir_comite: Joi.boolean(),
+    involucrados: Joi.array()
+      .items(Joi.object({ student_id: objectId.required(), rol: Joi.string().valid(...ROLES_INVOLUCRADO).required() }))
+      .min(1)
+      .max(MAX_ESTUDIANTES_POR_EVENTO)
+      .required(),
     en_nombre_de_id: objectId,
   }),
 };
@@ -135,8 +110,11 @@ export const obtenerObservacion = idParam;
 export const enmendarObservacion: ValidationSchema = {
   params: Joi.object({ id: objectId.required() }),
   body: Joi.object({
-    descriptores_ids: Joi.array().items(objectId).max(30),
-    comentario: Joi.string().trim().max(MAX_COMENTARIO_OBSERVACION).allow(''),
+    descripcion: descripcion.min(1),
+    compromiso,
+    requiere_citacion: Joi.boolean(),
+    confidencial: Joi.boolean(),
+    version_estudiante: descripcion.allow(''),
   }).min(1),
 };
 
@@ -147,37 +125,23 @@ export const anularObservacion: ValidationSchema = {
 
 // --- Seguimiento ---
 
-export const agregarCompromiso: ValidationSchema = {
+export const agregarSeguimiento: ValidationSchema = {
   params: Joi.object({ id: objectId.required() }),
-  body: Joi.object({
-    descripcion: Joi.string().trim().min(5).max(500).required(),
-    responsable: Joi.string().valid(...RESPONSABLES_COMPROMISO).required(),
-    fecha_limite: fechaDeCalendario.required(),
-  }),
+  body: Joi.object({ nota: Joi.string().trim().min(3).max(500).required() }),
 };
 
-export const cerrarCompromiso: ValidationSchema = {
-  params: Joi.object({ id: objectId.required(), compromisoId: objectId.required() }),
+export const marcarCompromiso: ValidationSchema = {
+  params: Joi.object({ id: objectId.required() }),
   body: Joi.object({
     estado: Joi.string().valid('CUMPLIDO', 'INCUMPLIDO').required(),
     nota: Joi.string().trim().max(500).allow(''),
   }),
 };
 
-export const agregarCitacion: ValidationSchema = {
+export const registrarCitacionRealizada: ValidationSchema = {
   params: Joi.object({ id: objectId.required() }),
   body: Joi.object({
     fecha: fechaDeCalendario.required(),
-    medio: Joi.string().valid(...MEDIOS_CITACION).required(),
-    dirigida_a: Joi.string().trim().max(120).allow(''),
     resultado: Joi.string().trim().max(500).allow(''),
   }),
 };
-
-export const solicitarCaso: ValidationSchema = {
-  params: Joi.object({ id: objectId.required() }),
-  body: Joi.object({ motivo: Joi.string().trim().min(5).max(500).required() }),
-};
-
-export const descartarSolicitudCaso = solicitarCaso;
-export const bandejaDeCasos: ValidationSchema = { query: Joi.object(paginacion) };

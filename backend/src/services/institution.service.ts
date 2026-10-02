@@ -3,7 +3,7 @@ import { ROLES } from '../constants/roles';
 import { Calendario, EstadoUsuario, ModalidadInstitucion, PoliticaAforoAula } from '../constants/enums';
 import AcademicYear, { AcademicYearDocument } from '../models/academicYear.model';
 import Campus, { CampusDocument } from '../models/campus.model';
-import Institution, { ILimitesCargaDocente, InstitutionDocument } from '../models/institution.model';
+import Institution, { ILimitesCargaDocente, ILimitesHorasPlanEstudios, InstitutionDocument } from '../models/institution.model';
 import User from '../models/user.model';
 import ApiError from '../utils/ApiError';
 import { FranjaPlantilla } from '../utils/franjas';
@@ -246,7 +246,7 @@ export async function updateLimitesCarga(
 }
 
 /** M06: tope de horas semanales del Plan de Estudios por nivel (antes quemado a 30 para todos en el frontend). */
-export async function getLimitesHorasPlan(): Promise<InstitutionDocument['limites_horas_plan_estudios']> {
+export async function getLimitesHorasPlan(): Promise<ILimitesHorasPlanEstudios> {
   const institucion = await Institution.findOne();
   if (!institucion || !institucion.limites_horas_plan_estudios) {
     return { PREESCOLAR: 30, PRIMARIA: 30, SECUNDARIA: 30, MEDIA: 30 };
@@ -255,8 +255,9 @@ export async function getLimitesHorasPlan(): Promise<InstitutionDocument['limite
 }
 
 export async function updateLimitesHorasPlan(
-  limites: { PREESCOLAR?: number; PRIMARIA?: number; SECUNDARIA?: number; MEDIA?: number }
-): Promise<InstitutionDocument['limites_horas_plan_estudios']> {
+  limites: { PREESCOLAR?: number; PRIMARIA?: number; SECUNDARIA?: number; MEDIA?: number },
+  { usuarioId, ip }: { usuarioId: Types.ObjectId | string; ip?: string | null }
+): Promise<ILimitesHorasPlanEstudios> {
   const institucion = await Institution.findOne();
   if (!institucion) throw new ApiError(404, 'No hay una institución configurada todavía.');
 
@@ -275,5 +276,15 @@ export async function updateLimitesHorasPlan(
   };
 
   await institucion.save();
-  return institucion.limites_horas_plan_estudios;
+
+  const resultado = institucion.limites_horas_plan_estudios;
+  await registrarEvento({
+    usuario_id: usuarioId,
+    accion: 'LIMITES_HORAS_PLAN_ACTUALIZADOS',
+    entidad: 'Institution',
+    entidad_id: institucion._id,
+    detalle: `PREESCOLAR ${resultado.PREESCOLAR}h, PRIMARIA ${resultado.PRIMARIA}h, SECUNDARIA ${resultado.SECUNDARIA}h, MEDIA ${resultado.MEDIA}h`,
+    ip,
+  });
+  return resultado;
 }

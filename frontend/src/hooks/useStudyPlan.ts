@@ -30,6 +30,8 @@ export interface ConfigurarAsignaturasGradoInput {
   academic_year_id: string;
   grade_id: string;
   asignaturas: AsignaturaGrado[];
+  /** Obligatorio cuando el año lectivo ya está en curso. */
+  motivo?: string;
 }
 
 export function useConfigurarAsignaturasGrado() {
@@ -48,6 +50,7 @@ export interface ConfigurarAsignaturasMultiplesGradosInput {
     grade_id: string;
     asignaturas: AsignaturaGrado[];
   }[];
+  motivo?: string;
 }
 
 export function useConfigurarAsignaturasMultiplesGrados() {
@@ -66,6 +69,7 @@ export interface ConfigurarEvaluacionAreaInput {
   area_id: string;
   metodo_calculo: MetodoCalculoEvaluacion;
   asignaturas: PonderacionAsignatura[];
+  motivo?: string;
 }
 
 export function useConfigurarEvaluacionArea() {
@@ -84,6 +88,7 @@ export interface ConfigurarDistribucionGrupoInput {
   group_id: string;
   intensidades_personalizadas: AsignaturaPersonalizadaGrupo[];
   asignaturas_agregadas: AsignaturaPersonalizadaGrupo[];
+  motivo?: string;
 }
 
 export function useConfigurarDistribucionGrupo() {
@@ -126,11 +131,22 @@ export function useLimitesHorasPlan() {
   });
 }
 
+/** Grado o grupo de un plan no cerrado que quedó por encima de un tope recién reducido. */
+export interface GradoExcedido {
+  anio: number;
+  grado: string;
+  grupo: string | null;
+  horas: number;
+  tope: number;
+}
+
+export type ActualizarLimitesHorasPlanRespuesta = LimitesHorasPlanEstudios & { grados_excedidos: GradoExcedido[] };
+
 export function useActualizarLimitesHorasPlan() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (input: Partial<LimitesHorasPlanEstudios>) =>
-      api.patch<LimitesHorasPlanEstudios>('/institution/limites-horas-plan', input),
+      api.patch<ActualizarLimitesHorasPlanRespuesta>('/institution/limites-horas-plan', input),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['limites-horas-plan'] });
     },

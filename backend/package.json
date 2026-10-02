@@ -45,6 +45,7 @@
     "@types/multer": "^2.2.0",
     "@types/node": "^22.20.2",
     "@types/pdfkit": "^0.17.6",
+    "mongodb-memory-server": "^11.3.0",
     "oxlint": "^1.86.0",
     "tsx": "^4.23.13",
     "typescript": "^5.9.3",

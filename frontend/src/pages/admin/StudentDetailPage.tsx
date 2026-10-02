@@ -1,5 +1,6 @@
 import { type FormEvent, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
+import { HistorialObservaciones } from '../../components/convivencia/HistorialObservaciones';
 import { ReportCardView } from '../../components/reportCard/ReportCardView';
 import { Alert, errorMessage } from '../../components/ui/Alert';
 import { Chip, EstadoEstudianteBadge, EstadoMatriculaBadge } from '../../components/ui/Badge';
@@ -13,6 +14,7 @@ import { Spinner } from '../../components/ui/Spinner';
 import { TabPanel, Tabs } from '../../components/ui/Tabs';
 import { EmptyRow, Table, TableBody, TableHead, Td, Th } from '../../components/ui/Table';
 import { PlusIcon, RefreshIcon, StarIcon, TrashIcon } from '../../components/ui/icons';
+import { useAuth } from '../../context/AuthContext';
 import {
   useActualizarVinculo,
   useDesvincularAcudiente,
@@ -84,6 +86,7 @@ const ACUDIENTE_VACIO = {
 
 export function StudentDetailPage() {
   const { id } = useParams<{ id: string }>();
+  const rol = useAuth().user?.rol;
   const navigate = useNavigate();
   const fichaQuery = useStudentFicha360(id);
   const [tab, setTab] = useState('general');
@@ -115,7 +118,7 @@ export function StudentDetailPage() {
             { key: 'general', label: 'Datos generales y médicos' },
             { key: 'familia', label: 'Núcleo familiar y acudientes' },
             { key: 'historial', label: 'Historial académico' },
-            { key: 'bienestar', label: 'Observador y bienestar' },
+            { key: 'bienestar', label: 'Observador' },
           ]}
           active={tab}
           onChange={setTab}
@@ -134,10 +137,12 @@ export function StudentDetailPage() {
         </TabPanel>
 
         <TabPanel active={tab} tabKey="bienestar">
-          <Alert tone="info">
-            El Observador y Bienestar se habilitará cuando se construyan los módulos M14 (Convivencia) y M16 (PIAR).
-            Este espacio queda reservado para esa información.
-          </Alert>
+          {/* Historial de convivencia (M14): el servidor decide qué ve cada rol; SECRETARIA no tiene acceso. */}
+          {rol === 'SECRETARIA' ? (
+            <Alert tone="info">El observador de convivencia no está disponible para secretaría.</Alert>
+          ) : (
+            <HistorialObservaciones studentId={estudiante._id} />
+          )}
         </TabPanel>
       </Card>
     </div>

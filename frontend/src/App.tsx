@@ -10,8 +10,11 @@ import { HomePage } from './pages/public/HomePage';
 import { AnioLectivoPage } from './pages/AnioLectivoPage';
 import { AsistenciaPage } from './pages/AsistenciaPage';
 import { GestionAsistenciaPage } from './pages/GestionAsistenciaPage';
+import { MiObservadorPage } from './pages/MiObservadorPage';
+import { ObservadorPage } from './pages/ObservadorPage';
 import { AcademicCatalogPage } from './pages/admin/AcademicCatalogPage';
 import { AdmissionRequestsPage } from './pages/admin/AdmissionRequestsPage';
+import { CatalogoConvivenciaPage } from './pages/admin/CatalogoConvivenciaPage';
 import { EnrollmentDetailPage } from './pages/admin/EnrollmentDetailPage';
 import { EnrollmentsPage } from './pages/admin/EnrollmentsPage';
 import { EspaciosPage } from './pages/admin/EspaciosPage';
@@ -73,6 +76,17 @@ export default function App() {
 
           <Route element={<ProtectedRoute allowedRoles={['ADMIN', 'COORDINADOR', 'SECRETARIA', 'DOCENTE']} />}>
             <Route path="/asistencia/gestion" element={<GestionAsistenciaPage />} />
+          </Route>
+
+          {/* Convivencia (M14): SECRETARIA no tiene acceso; el rol abre la puerta y el servidor decide por estudiante. */}
+          <Route element={<ProtectedRoute allowedRoles={['ADMIN', 'COORDINADOR', 'COORDINADOR_CONVIVENCIA', 'DOCENTE']} />}>
+            <Route path="/convivencia/observador" element={<ObservadorPage />} />
+          </Route>
+          <Route element={<ProtectedRoute allowedRoles={['ADMIN', 'COORDINADOR_CONVIVENCIA']} />}>
+            <Route path="/convivencia/catalogo" element={<CatalogoConvivenciaPage />} />
+          </Route>
+          <Route element={<ProtectedRoute allowedRoles={['ESTUDIANTE']} />}>
+            <Route path="/mi-observador" element={<MiObservadorPage />} />
           </Route>
         </Route>
       </Route>

@@ -15,6 +15,7 @@ import groupRoutes from './group.routes';
 import guardianRoutes from './guardian.routes';
 import institutionRoutes from './institution.routes';
 import jornadaOperativaRoutes from './jornadaOperativa.routes';
+import observacionRoutes from './observacion.routes';
 import periodLockRoutes from './periodLock.routes';
 import publicRoutes from './public.routes';
 import referenteCurricularRoutes from './referenteCurricular.routes';
@@ -58,6 +59,9 @@ router.use('/curriculum/referentes', referenteCurricularRoutes);
 router.use('/curriculum/study-plan', studyPlanRoutes);
 router.use('/teacher-assignments', teacherAssignmentRoutes);
 router.use('/curricular-developments', curricularDevelopmentRoutes);
+
+// M14: Observaciones y convivencia (Observador)
+router.use('/observaciones', observacionRoutes);
 
 // Prompt 3: Actividades, Calificaciones, Asistencia y Motor de Boletines
 router.use('/activities', activityRoutes);

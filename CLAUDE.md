@@ -195,6 +195,38 @@ Reglas que no se ven leyendo un solo archivo:
   clásicos de 1998 por área — se usa como tal). Matriz ICFES: sin documento fuente todavía,
   estructura lista pero banco vacío. `npm run seed:referentes` es idempotente.
 
+### M14 (Observaciones y convivencia — Observador) — estado: núcleo completo
+
+Backend `/observaciones` (modelos `TipoObservacion`, `CategoriaDescriptor`, `Descriptor`, `Observacion`,
+`ConfiguracionConvivencia`), frontend `ObservadorPage` (`/convivencia/observador`), `CatalogoConvivenciaPage`
+(`/convivencia/catalogo`), `MiObservadorPage` (`/mi-observador`) y la pestaña "Observador" de la ficha del estudiante.
+Análisis completo: `doc/Analisis_M14_M15_Klassy.md`. Reglas que no se ven leyendo un solo archivo:
+
+- **El catálogo es de cada colegio, no del sistema.** No se siembran faltas ni frases; solo 3 tipos base (Académica,
+  Comportamental, Disciplinaria) la primera vez. ADMIN y `COORDINADOR_CONVIVENCIA` agregan, editan, desactivan y eliminan
+  (eliminar solo lo que no se ha usado; lo usado se desactiva). El manual de convivencia de un colegio es solo un ejemplo.
+- **Un `Descriptor` de un tipo disciplinario es una falta del manual**: código, texto, `tipo_situacion` (I/II/III, fijo por ley)
+  y `descuento_decimas` (solo se guarda; descontar de notas está diferido y no toca M12/M17). El docente elige la falta y **no
+  tipifica**: `tipo_situacion_maxima` sale del catálogo. Lo variable se lee por la bandera `familia` del tipo, nunca por nombre.
+- **La observación copia lo que se eligió** (tipo, frases, `visible_estudiante`) al guardarse: editar o desactivar el catálogo no
+  altera ni revela lo ya registrado. No se borra: se **enmienda** (versión anterior en `enmiendas[]`) o se **anula** con motivo.
+  El autor puede hacerlo dentro de `ConfiguracionConvivencia.plazo_*_horas` (48 h por defecto, configurable); coordinación de
+  convivencia (de sus sedes) y ADMIN sin plazo; el coordinador académico solo las no disciplinarias; nunca con el año CERRADO.
+- **Quién ve qué** lo decide el servidor con `permisoSobreEstudiante` (`utils/permisosConvivencia.ts`) y `vistaObservacion`
+  (`utils/observaciones.ts`): el docente solo registra y ve lo suyo; el director de grupo ve el historial de su grupo pero de una
+  situación II/III solo que existe (`reservada`); el estudiante ve solo el texto final de los tipos `visible_estudiante`; "no existe"
+  y "no autorizado" responden igual (404). Nunca se devuelve el documento crudo.
+- **Registrar exige matrícula activa en el año EN_CURSO**, fecha no futura y dentro de un periodo (calendario de la sede, M05). Un
+  hecho con varios estudiantes crea un registro por estudiante (`evento_id` común) en una transacción: todos o ninguno.
+- **Buscador propio** (`GET /observaciones/estudiantes`, `/grupos`): acotado a los grupos del docente (CLASE o dirección) o a las
+  sedes del coordinador. No se abre `/students` a convivencia.
+- **Se audita también la lectura** (`CONVIVENCIA_HISTORIAL_CONSULTADO`, `..._OBSERVACIONES_PROPIAS_CONSULTADAS`). El `detalle` de la
+  auditoría nunca lleva contenido (ni el motivo de una anulación, que queda en la observación).
+- **Pruebas con base real**: `tests/integracion/` usa `mongodb-memory-server` con réplica (solo dev; la primera ejecución descarga el
+  binario de MongoDB). `npm test` las incluye.
+- **Pendiente, a propósito**: compromisos y solicitud de caso (Fase 3), casos y comité (M15), cargas masivas, retención. Registrar
+  "en nombre de" un docente existe en la API (`en_nombre_de_id`) pero aún no tiene pantalla.
+
 ### M10 (Espacios físicos) — estado: núcleo completo
 
 Backend `/espacios` (modelo `Espacio`), frontend `/admin/espacios` (`EspaciosPage`, ADMIN y COORDINADOR; la lectura de
@@ -418,7 +450,7 @@ nuevos para lo que ya existe aquí** — extenderlos si falta un caso, no duplic
   mapeo rol→color o estado→color en una página), `Card`/`CardHeader`, `Table`/`TableHead`/`Th`/
   `TableBody`/`Td`/`EmptyRow`, `Drawer` (formularios de creación/edición; su botón principal
   acepta `submitVariant` para casos como confirmar un borrado en rojo), `PageHeader` (título +
-  subtítulo + acción de la página), `Field` (`Input`/`Select`), `MultiSelect` (selector desplegable de selección múltiple con checkboxes, contador y badges de rol/estado), `Alert`, `Spinner`, `EstadoEspacioBadge` (M10), `EstadoAsistenciaChip`/`EstadoJustificacionBadge` (M13), `GuiaColumnas` (guía colapsable de columnas de una carga CSV), `ProgressBar` (barra de avance con tono, ej. semanas lectivas vs. el mínimo de 40), `Tabs`/`TabPanel` (navegación por pestañas con subrayado azul en la activa; reusar en vez de reinventar un switch de pestañas en otra página), `Stepper` (indicador de pasos para formularios largos por secciones, ej. el asistente de creación de estudiante en M03), e iconos SVG propios en `components/ui/icons.tsx` (no se agregó ninguna librería de iconos).
+  subtítulo + acción de la página), `Field` (`Input`/`Select`), `MultiSelect` (selector desplegable de selección múltiple con checkboxes, contador y badges de rol/estado), `Alert`, `Spinner`, `EstadoEspacioBadge` (M10), `EstadoAsistenciaChip`/`EstadoJustificacionBadge` (M13), `GuiaColumnas` (guía colapsable de columnas de una carga CSV), `ProgressBar` (barra de avance con tono, ej. semanas lectivas vs. el mínimo de 40), `LineaTiempo` (línea de tiempo vertical con punto, fecha, chips y contenido por registro; la usa el historial de convivencia), `Tabs`/`TabPanel` (navegación por pestañas con subrayado azul en la activa; reusar en vez de reinventar un switch de pestañas en otra página), `Stepper` (indicador de pasos para formularios largos por secciones, ej. el asistente de creación de estudiante en M03), e iconos SVG propios en `components/ui/icons.tsx` (no se agregó ninguna librería de iconos).
 - **Contenedor global y densidad** (`components/layout/AppShell.tsx`): el `<main>` centra el
   contenido en `max-w-7xl` (no `max-w-5xl`) para que las tablas anchas (Usuarios, Grupos) no
   scrolleen antes de tiempo en pantallas grandes. Cada página usa `space-y-4` (no `space-y-6`)

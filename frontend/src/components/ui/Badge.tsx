@@ -15,6 +15,8 @@ import type {
   TonoEstadoAsistencia,
 } from '../../types/domain';
 import { NOMBRES_ESTADO_ESPACIO } from '../../types/domain';
+import type { EstadoCaso } from '../../hooks/useCasos';
+import type { TipoSituacion } from '../../hooks/useObservaciones';
 import type { Desempeno } from '../../types/reportCard';
 
 export type Tone = 'blue' | 'green' | 'orange' | 'red' | 'neutral';
@@ -54,6 +56,8 @@ export function DesempenoBadge({ value }: { value: Desempeno }) {
 export const ROL_LABELS: Record<Rol, string> = {
   ADMIN: 'Administrador',
   COORDINADOR: 'Coordinador',
+  COORDINADOR_CONVIVENCIA: 'Coord. de convivencia',
+  ORIENTADOR: 'Orientación',
   DOCENTE: 'Docente',
   SECRETARIA: 'Secretaría',
   ESTUDIANTE: 'Estudiante',
@@ -63,6 +67,8 @@ export const ROL_LABELS: Record<Rol, string> = {
 const ROL_TONE: Record<Rol, Tone> = {
   ADMIN: 'blue',
   COORDINADOR: 'blue',
+  COORDINADOR_CONVIVENCIA: 'blue',
+  ORIENTADOR: 'blue',
   SECRETARIA: 'blue',
   DOCENTE: 'green',
   ESTUDIANTE: 'orange',
@@ -241,4 +247,38 @@ const JUSTIFICACION_TONE: Record<EstadoJustificacion, Tone> = {
 /** Revisión por coordinación de la excusa de una inasistencia (M13). */
 export function EstadoJustificacionBadge({ value }: { value: EstadoJustificacion }) {
   return <Chip tone={JUSTIFICACION_TONE[value]}>{JUSTIFICACION_LABELS[value]}</Chip>;
+}
+
+const ESTADO_CASO_LABELS: Record<EstadoCaso, string> = {
+  ABIERTO: 'Abierto',
+  EN_ATENCION: 'En atención',
+  EN_MEDIACION: 'En mediación',
+  EN_SEGUIMIENTO: 'En seguimiento',
+  REMITIDO: 'Remitido',
+  CERRADO: 'Cerrado',
+  REABIERTO: 'Reabierto',
+  ANULADO: 'Anulado',
+};
+
+const ESTADO_CASO_TONE: Record<EstadoCaso, Tone> = {
+  ABIERTO: 'orange',
+  EN_ATENCION: 'blue',
+  EN_MEDIACION: 'blue',
+  EN_SEGUIMIENTO: 'blue',
+  REMITIDO: 'orange',
+  CERRADO: 'green',
+  REABIERTO: 'orange',
+  ANULADO: 'neutral',
+};
+
+/** Estado de un caso de convivencia (M15). */
+export function EstadoCasoBadge({ value }: { value: EstadoCaso }) {
+  return <Chip tone={ESTADO_CASO_TONE[value]}>{ESTADO_CASO_LABELS[value]}</Chip>;
+}
+
+const SITUACION_TONE: Record<TipoSituacion, Tone> = { I: 'blue', II: 'orange', III: 'red' };
+
+/** Tipo de situación I/II/III (Ley 1620): el tipo lo fija la ley; el tono sube con la gravedad. */
+export function TipoSituacionBadge({ value }: { value: TipoSituacion }) {
+  return <Chip tone={SITUACION_TONE[value]}>Tipo {value}</Chip>;
 }

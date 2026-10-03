@@ -97,10 +97,20 @@ Los 5 sub-módulos de M01 están implementados; no rehacer, solo extender si se 
 
 Backend `/users` (modelo `User`), frontend `/admin/users` (`UsersPage`).
 - **Matriz de permisos y jerarquía estricta** (`backend/src/constants/roles.ts`, `frontend/src/types/api.ts`):
-  `ADMIN (100) > COORDINADOR (70) > SECRETARIA (40) = DOCENTE (40) > ESTUDIANTE (10) = ACUDIENTE (10)`.
+  `ADMIN (100) > COORDINADOR (70) = COORDINADOR_CONVIVENCIA (70) = ORIENTADOR (70) > SECRETARIA (40) = DOCENTE (40) > ESTUDIANTE (10) = ACUDIENTE (10)`.
   Un usuario solo puede crear, editar, cambiar estado, resetear contraseña, cerrar sesiones o eliminar a
   usuarios de rango estrictamente MENOR (con la excepción de que un ADMIN sí puede gestionar a otros ADMIN,
   salvo a sí mismo).
+- **`COORDINADOR_CONVIVENCIA` (M14/M15)**: rol aprobado por el usuario para procesos disciplinarios y comité de convivencia; es
+  la excepción documentada a "un solo rol administrativo" (esa regla es sobre `SUPERADMIN`). Rango 70, par de `COORDINADOR`: solo
+  un ADMIN lo gestiona. **No hereda nada del coordinador académico y viceversa**: los usos de `ROLES.COORDINADOR` no se amplían a
+  este rol (`checkRole` es lista de permitidos). Exige al menos una sede (`ROLES_CON_SEDE_OBLIGATORIA`, validado en el modelo
+  `User`). Convivencia decide el acceso con `permisoSobreEstudiante` y `alcanceDeSedes` (`utils/permisosConvivencia.ts`, función
+  pura con tests): sin sedes asignadas no ve nada, y SECRETARIA y ACUDIENTE no tienen acceso (el acudiente entra con M27).
+- **`ORIENTADOR` (Orientación / Psicología, M14/M15)**: el maestro (§3 y M02) lo lista como actor y rol base; se agregó con la misma lógica que
+  `COORDINADOR_CONVIVENCIA`: rango 70 (solo un ADMIN lo gestiona), sede obligatoria (`ROLES_CON_SEDE_OBLIGATORIA`) y sin herencia de ningún
+  otro rol. Sus funciones en este alcance son el seguimiento psicosocial (observaciones confidenciales) y las remisiones a orientación que
+  recibe de convivencia. **El PIAR (M16) no se construyó**: el rol existe pero M16 sigue pendiente. Tampoco ve la salud administrativa del estudiante.
 - **Secretaría en M02**: mantiene la consulta global del directorio de usuarios, pero todas las acciones sobre
   roles jerárquicamente iguales o superiores (`ADMIN`, `COORDINADOR`, `DOCENTE`, `SECRETARIA`) quedan bloqueadas
   tanto en frontend (`IconButton disabled` con tooltip explicativo) como en backend (403 con mensaje de
@@ -188,6 +198,111 @@ Reglas que no se ven leyendo un solo archivo:
   Lineamientos entregado es el marco general 2024 "Un viaje curricular", no los lineamientos
   clásicos de 1998 por área — se usa como tal). Matriz ICFES: sin documento fuente todavía,
   estructura lista pero banco vacío. `npm run seed:referentes` es idempotente.
+
+### M14 (Observaciones y convivencia — Observador) — estado: núcleo completo
+
+Backend `/observaciones` (modelos `TipoObservacion`, `Observacion`, `ConfiguracionConvivencia`; la falta del manual y la solicitud de caso
+viven en M15), frontend `ObservadorPage` (`/convivencia/observador`), `CatalogoConvivenciaPage` (`/convivencia/catalogo`), `MiObservadorPage`
+(`/mi-observador`) y la pestaña "Observador y bienestar" de la ficha del estudiante. Análisis: `doc/Analisis_M14_M15_Klassy.md`.
+Reglas que no se ven leyendo un solo archivo:
+
+- **Una observación NO es una falta.** Una sola colección `Observacion` con `clase` = `OBSERVACION` | `FALTA`, pero con contratos distintos
+  (se validan en el modelo y en `observacion.validator.ts`):
+  - **Observación** (lo cotidiano, Idea_Klassy M14): `tipo` (configurable), `descripcion` de los hechos (texto libre), `compromiso` (texto
+    opcional), `requiere_citacion` (booleano) y `confidencial` (booleano). Se asienta de inmediato en el Observador y en el historial.
+  - **Falta** (`POST /observaciones/faltas`, la registra el docente de clase o el titular de grupo, y convivencia): el docente **elige una falta
+    del manual** (`FaltaConvivencia`, M15) y **no tipifica**: la gravedad I/II/III sale de la falta. **Tipo I** se queda en el Observador (hechos,
+    versión del estudiante y compromiso opcionales; puede marcar "remitir al comité"). **Tipo II/III** (o una Tipo I remitida) crea siempre una
+    `SolicitudCaso` con hechos, involucrados con su rol (afectado, presunto responsable, testigo, reportante) y las acciones de contención; el
+    coordinador de convivencia abre el caso formal (M15). El antecedente en el Observador solo queda en los presuntos responsables.
+- **El catálogo es de cada colegio, no del sistema.** Solo se siembran los tipos base "Académica" y "Comportamental" (no hay `familia`: el sistema
+  no distingue tipos por nombre). ADMIN y `COORDINADOR_CONVIVENCIA` agregan, editan, desactivan y eliminan (eliminar solo lo no usado; lo
+  usado se desactiva). **No existen categorías ni "frases"**: se eliminaron porque eran de otro módulo; las faltas (con gravedad) son de M15.
+- **La observación copia lo que se eligió** (tipo, `visible_estudiante`, falta) al guardarse: editar o desactivar el catálogo no altera ni revela
+  lo ya registrado. No se borra: se **enmienda** (versión anterior en `enmiendas[]`) o se **anula** con motivo. El autor puede hacerlo dentro de
+  `ConfiguracionConvivencia.plazo_*_horas` (48 h por defecto); coordinación de convivencia (de sus sedes) y ADMIN sin plazo; nunca con el año
+  CERRADO. Una falta ya remitida a convivencia solo la corrige convivencia.
+- **Quién ve qué** lo decide el servidor con `permisoSobreEstudiante` (`utils/permisosConvivencia.ts`) y la función pura `visibilidadDeObservacion`
+  (`utils/observaciones.ts`: COMPLETA / RESERVADA / nada; el listado y el detalle usan la misma). ADMIN y coordinación de convivencia ven todo en su
+  alcance; una **confidencial** solo la ven su autor, `ORIENTADOR`, coordinación de convivencia y ADMIN; las **faltas** no las ve el coordinador
+  académico; de una falta II/III el director de grupo y el orientador solo ven que existe (`reservada`); el estudiante (menor o mayor) ve en `MiObservadorPage` sus
+  observaciones no confidenciales de tipos `visible_estudiante` y sus faltas: la Tipo I completa (descripción de la falta, hechos, su versión,
+  compromiso); de una Tipo II/III solo que hay una situación de convivencia y el estado del caso (`situacion`, o `EN_REVISION` si la solicitud sigue
+  pendiente), nunca la falta ni los hechos porque el caso está en debido proceso e involucra a otros menores. "No existe" y "no autorizado" responden igual (404). Nunca se
+  devuelve el documento crudo (`vistaObservacion`).
+- **`ORIENTADOR`** (rango 70, sede obligatoria): registra seguimiento psicosocial (contexto `ORIENTACION`, **siempre confidencial**), ve el
+  historial y recibirá las remisiones a orientación (M15). Su alcance son las sedes asignadas.
+- **Registrar exige matrícula activa en el año EN_CURSO**, fecha no futura y dentro de un periodo (calendario de la sede, M05). Un hecho con
+  varios estudiantes crea un registro por estudiante (`evento_id` común) en una transacción: todos o ninguno.
+- **Buscador propio** (`GET /observaciones/estudiantes`, `/grupos`): acotado a los grupos del docente (CLASE o dirección) o a las sedes del
+  coordinador/orientador. No se abre `/students` a convivencia.
+- **Se audita también la lectura** (`CONVIVENCIA_HISTORIAL_CONSULTADO`, `..._OBSERVACIONES_PROPIAS_CONSULTADAS`). El `detalle` de la auditoría
+  nunca lleva contenido (ni el motivo de una anulación, que queda en el registro).
+- **Seguimiento** (embebido en `Observacion`): `seguimientos[]` (notas), `compromiso_estado` (PENDIENTE → CUMPLIDO/INCUMPLIDO; "vencido" no es un
+  estado, lo calcula el servidor) y `citacion_realizada` (**solo registro**: cuándo, medio, resultado; el envío es de M28). Los agrega el autor o
+  coordinación, nunca en un año CERRADO ni sobre un registro anulado.
+- **La única carga masiva de convivencia es la de faltas** (ver M15). Las observaciones y el catálogo de tipos no se cargan por archivo. **La
+  migración histórica de un observador antiguo quedó fuera**: exige decidir cómo representar años lectivos que no existen en el sistema.
+- **Pruebas con base real**: `tests/integracion/` usa `mongodb-memory-server` con réplica (solo dev; la primera ejecución descarga el binario de
+  MongoDB). `npm test` las incluye.
+- **Retención**: es política del colegio (`ConfiguracionConvivencia.retencion_anios_*`, vacío = sin plazo); `GET /convivencia/retencion` solo informa lo
+  vencido, nunca borra. **Pendiente, a propósito**: la migración histórica. Registrar "en nombre de" un docente existe en la API
+  (`en_nombre_de_id`) pero aún no tiene pantalla. El descuento de décimas por falta está diferido (solo se guarda).
+
+### M15 (Comité de Convivencia Escolar) — estado: casos, comité y actas completos
+
+Backend `/convivencia` (modelos `CasoConvivencia`, `MedidaConvivencia`, `EntidadExterna`, `ProtocoloConvivencia`), frontend
+`CasosConvivenciaPage` (`/convivencia/casos`), `SolicitudesCasoPage` (`/convivencia/solicitudes`, abre caso desde la solicitud que envió el docente) y
+las pestañas Faltas / Medidas / Entidades / Protocolos / Plazos de `CatalogoConvivenciaPage`. Modelos nuevos: `FaltaConvivencia`, `SolicitudCaso`. Reglas que no se ven leyendo un solo archivo:
+
+- **Solo convivencia ve un caso**: ADMIN y el `COORDINADOR_CONVIVENCIA` de la sede del caso (ni coordinador académico, ni secretaría, ni
+  docente). "No existe" y "no autorizado" son el mismo 404. Quien se declara impedido (o un ADMIN lo aparta) por conflicto de interés
+  deja de verlo (`impedidos[]`, RN-15-11); el ADMIN siempre puede auditarlo. El director de grupo solo ve, en su historial, que existe un
+  caso y su estado (`caso` en la observación reservada). **Todo detalle de caso se audita**, sin muestreo.
+- **Faltas del manual** (`FaltaConvivencia`: código del manual único por institución, descripción, `gravedad` I/II/III, `descuento_decimas` solo
+  guardado, `estado`; sin categoría ni "frases"): las definen ADMIN y `COORDINADOR_CONVIVENCIA` en `/convivencia/faltas` (alta/edición/estado/
+  eliminar solo si no se usó) y por **carga Excel/CSV** (`/convivencia/faltas/importacion` y `/plantilla`; `importacionFaltas.service.ts`,
+  `COLUMNAS_FALTAS` en `constants/importacionConvivencia.ts` y su guía en `lib/columnasImportacion.ts`, que se actualizan en el mismo cambio). Es la
+  **única carga masiva de convivencia**: `.xlsx` o `.csv` por el mismo canal (`leerCsv` o `exceljs` → filas normalizadas → un plan de validación), **se
+  valida todo el archivo antes de escribir** (una fila con error y no se guarda nada), idempotente por código, fórmulas neutralizadas al generar y
+  rechazadas al leer, firma ZIP, 2 MB, 1000 filas. Cada carga queda en un `LoteImportacion` (solo la huella SHA-256, no el archivo).
+- **`SolicitudCaso` es el traspaso M14 → M15**: la crea el registro de una falta Tipo II/III (o una Tipo I que el docente remite) con la falta (copiada),
+  los hechos, los involucrados con su rol y las acciones de contención. La atiende convivencia de la sede desde `/convivencia/solicitudes`
+  (`GET`, auditada): **abrir caso** (`POST /convivencia/casos` con `solicitud_id`, la solicitud pasa a CONVERTIDA y el caso hereda hechos,
+  involucrados y `contencion_reportada`) o **descartar con motivo**. Un caso también puede abrirse directo (`origen`: `SOLICITUD` | `DIRECTO`).
+- **Tipos I/II/III fijos (ley); todo lo demás es del colegio.** El tipo lo fija quien abre el caso (no el docente); subir de tipo es de
+  convivencia con motivo (y suma los pasos del protocolo nuevo sin perder lo hecho); bajarlo, solo ADMIN. Las faltas del manual son las
+  `FaltaConvivencia`: la decisión las referencia (`faltas_ids`, copiadas). `ProtocoloConvivencia` (pasos por tipo) se **copia** al caso al abrirlo:
+  editar el protocolo no altera casos en curso.
+- **Flujo por tabla** (`TRANSICIONES_CASO`, `utils/casoConvivencia.ts`): ABIERTO → EN_ATENCION → EN_MEDIACION → EN_SEGUIMIENTO, REMITIDO
+  (exige haber registrado la remisión; sigue en seguimiento). **Cerrar** no es transición genérica: `pendientesParaCerrar` exige pasos
+  obligatorios cumplidos; en II y III, atención inmediata e informe a los acudientes; en III, remisión o justificación escrita; y según el
+  resultado, remisión (REMITIDO) o decisión + medida (MEDIDA_APLICADA). **La decisión exige descargos previos** (presunción de inocencia).
+  Reabrir y anular son solo ADMIN con motivo (anular solo un caso recién ABIERTO y devuelve su solicitud a PENDIENTE).
+- **Consecutivo anual sin huecos** (`CC-<año>-0001`): `Counter` dentro de la misma transacción de la apertura; si falla, no se consume.
+  Un caso **no se bloquea** al cerrar el año lectivo (RN-15-09); abrir sí exige el año EN_CURSO. Un mismo hecho con varios estudiantes es un
+  caso con varios involucrados (el permiso se comprueba por estudiante).
+- **Alertas calculadas** (`alertasDeCaso`): tipo III sin remisión pasado `plazo_remision_tipo_iii_horas` y seguimiento con próxima fecha
+  vencida. M15 las muestra; el envío de avisos es de M28.
+- **Comité y actas** (`/convivencia/comite`, `ComitePage`): `MiembroComite` por año (usuarios del sistema o **designaciones externas**: personero,
+  representante de padres; solo uno preside), `SesionComite` (BORRADOR → FIRMADA, o ANULADA). El **consecutivo del acta (`AC-<año>-001`) nace
+  al firmar**, dentro de la transacción, así un borrador anulado no deja huecos. **Firma solo el ADMIN (rector)**, con quórum
+  (`ConfiguracionConvivencia.quorum_porcentaje`, 51 por defecto) y desarrollo escrito. Un acta firmada es **inmutable en el modelo** (hook de
+  `pre('save')`: solo admite `anexos`) y lleva una **huella SHA-256** (`hashDeActa`) que `GET .../integridad` recalcula para detectar cambios
+  hechos directo en la base. **Recusación (RN-15-11)**: por cada caso tratado se marca a los miembros apartados; no cuentan ni como miembro ni como
+  presente para el quórum de ese caso, y quien (siendo usuario) se declaró impedido en el caso queda recusado solo. El PDF (`pdfkit`) identifica
+  el caso solo por su código, marca el borrador como tal, se baja con sesión y queda auditado. Alertas de casos: `GET /convivencia/alertas`.
+- **Remisión a orientación** (`RemisionOrientacion`, colección aparte; `remisionOrientacion.service.ts`): `MedidaConvivencia` y cada paso del
+  protocolo tienen la bandera `remite_a_orientacion` (la define el colegio en el catálogo). Aplicar una medida marcada o cumplir un paso marcado
+  remite a orientación a los **afectados y presuntos responsables** del caso (`ROLES_QUE_SE_REMITEN`; no a testigos ni reportantes), en la misma
+  transacción del cambio, y es idempotente por `clave` (caso+estudiante+medida/paso). Convivencia también remite a mano
+  (`POST /convivencia/casos/:id/orientacion`). La remisión copia el contexto del caso (código, tipo, hechos) para que orientación **vea los hechos pero no
+  a los demás involucrados**. Un caso con remisiones a orientación no se anula.
+- **Orientación** (`/orientacion/remisiones`, `OrientacionPage`; solo `ORIENTADOR` de la sede y ADMIN, "no existe" = "no autorizado" = 404): estados
+  PENDIENTE → EN_ATENCION (con la primera atención) → ATENDIDA (exige al menos una atención). Las **atenciones son confidenciales**: solo las lee quien
+  las escribió y un ADMIN (otro orientador ve que existe, no el texto); convivencia ve desde su caso solo estado y fechas (`remisiones_orientacion`), y
+  la auditoría nunca lleva el contenido. Solo el orientador registra atenciones; ADMIN solo consulta. La lectura se audita (`ORIENTACION_*`).
+- **Pendiente, a propósito**: PIAR (M16), portal del acudiente/estudiante (M27), descuento en notas (diferido).
 
 ### M10 (Espacios físicos) — estado: núcleo completo
 
@@ -412,7 +527,7 @@ nuevos para lo que ya existe aquí** — extenderlos si falta un caso, no duplic
   mapeo rol→color o estado→color en una página), `Card`/`CardHeader`, `Table`/`TableHead`/`Th`/
   `TableBody`/`Td`/`EmptyRow`, `Drawer` (formularios de creación/edición; su botón principal
   acepta `submitVariant` para casos como confirmar un borrado en rojo), `PageHeader` (título +
-  subtítulo + acción de la página), `Field` (`Input`/`Select`), `MultiSelect` (selector desplegable de selección múltiple con checkboxes, contador y badges de rol/estado), `Alert`, `Spinner`, `EstadoEspacioBadge` (M10), `EstadoAsistenciaChip`/`EstadoJustificacionBadge` (M13), `GuiaColumnas` (guía colapsable de columnas de una carga CSV), `ProgressBar` (barra de avance con tono, ej. semanas lectivas vs. el mínimo de 40), `Tabs`/`TabPanel` (navegación por pestañas con subrayado azul en la activa; reusar en vez de reinventar un switch de pestañas en otra página), `Stepper` (indicador de pasos para formularios largos por secciones, ej. el asistente de creación de estudiante en M03), e iconos SVG propios en `components/ui/icons.tsx` (no se agregó ninguna librería de iconos).
+  subtítulo + acción de la página), `Field` (`Input`/`Select`), `MultiSelect` (selector desplegable de selección múltiple con checkboxes, contador y badges de rol/estado), `Alert`, `Spinner`, `EstadoEspacioBadge` (M10), `EstadoAsistenciaChip`/`EstadoJustificacionBadge` (M13), `GuiaColumnas` (guía colapsable de columnas de una carga CSV), `ProgressBar` (barra de avance con tono, ej. semanas lectivas vs. el mínimo de 40), `LineaTiempo` (línea de tiempo vertical con punto, fecha, chips y contenido por registro; la usa el historial de convivencia), `EstadoCasoBadge`/`TipoSituacionBadge` (M15), `Tabs`/`TabPanel` (navegación por pestañas con subrayado azul en la activa; reusar en vez de reinventar un switch de pestañas en otra página), `Stepper` (indicador de pasos para formularios largos por secciones, ej. el asistente de creación de estudiante en M03), e iconos SVG propios en `components/ui/icons.tsx` (no se agregó ninguna librería de iconos).
 - **Contenedor global y densidad** (`components/layout/AppShell.tsx`): el `<main>` centra el
   contenido en `max-w-7xl` (no `max-w-5xl`) para que las tablas anchas (Usuarios, Grupos) no
   scrolleen antes de tiempo en pantallas grandes. Cada página usa `space-y-4` (no `space-y-6`)

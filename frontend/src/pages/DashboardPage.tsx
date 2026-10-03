@@ -6,6 +6,8 @@ import { NAV_ITEMS } from '../components/layout/navigation';
 const ROLE_LABELS: Record<string, string> = {
   ADMIN: 'Administrador',
   COORDINADOR: 'Coordinador',
+  COORDINADOR_CONVIVENCIA: 'Coordinador de convivencia',
+  ORIENTADOR: 'Orientación / Psicología',
   DOCENTE: 'Docente',
   SECRETARIA: 'Secretaría académica',
   ESTUDIANTE: 'Estudiante',

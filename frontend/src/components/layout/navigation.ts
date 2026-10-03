@@ -6,6 +6,7 @@ import {
   CalendarIcon,
   ClipboardListIcon,
   DoorIcon,
+  EyeIcon,
   FileTextIcon,
   FolderIcon,
   GraduationCapIcon,
@@ -30,6 +31,9 @@ const STAFF: Rol[] = ['ADMIN', 'COORDINADOR', 'SECRETARIA'];
 const GROUP_MANAGERS: Rol[] = ['ADMIN', 'COORDINADOR'];
 const CURRICULUM_MANAGERS: Rol[] = ['ADMIN', 'COORDINADOR'];
 const STRUCTURAL_ADMINS: Rol[] = ['ADMIN'];
+// Convivencia: SECRETARIA no tiene acceso. El docente solo registra y ve lo suyo; el estudiante, su propio observador.
+const CONVIVENCIA_REGISTRA: Rol[] = ['ADMIN', 'COORDINADOR', 'COORDINADOR_CONVIVENCIA', 'ORIENTADOR', 'DOCENTE'];
+const CONVIVENCIA_GESTIONA: Rol[] = ['ADMIN', 'COORDINADOR_CONVIVENCIA'];
 
 export const NAV_ITEMS: NavItem[] = [
   { to: '/panel', label: 'Inicio', icon: HomeIcon },
@@ -54,4 +58,11 @@ export const NAV_ITEMS: NavItem[] = [
   { to: '/asistencia/gestion', label: 'Gestión de asistencia', icon: UsersIcon, roles: [...STAFF, 'DOCENTE'] },
   { to: '/admin/enrollments', label: 'Matrículas', icon: ClipboardListIcon, roles: STAFF },
   { to: '/admin/admisiones', label: 'Admisiones', icon: InboxIcon, roles: STAFF },
+  { to: '/convivencia/observador', label: 'Observador', icon: EyeIcon, roles: CONVIVENCIA_REGISTRA },
+  { to: '/convivencia/catalogo', label: 'Catálogo de convivencia', icon: SlidersIcon, roles: CONVIVENCIA_GESTIONA },
+  { to: '/convivencia/casos', label: 'Casos de convivencia', icon: FolderIcon, roles: CONVIVENCIA_GESTIONA },
+  { to: '/convivencia/comite', label: 'Comité de convivencia', icon: UsersIcon, roles: CONVIVENCIA_GESTIONA },
+  { to: '/convivencia/solicitudes', label: 'Solicitudes de caso', icon: InboxIcon, roles: CONVIVENCIA_GESTIONA },
+  { to: '/orientacion/remisiones', label: 'Remisiones a orientación', icon: InboxIcon, roles: ['ADMIN', 'ORIENTADOR'] },
+  { to: '/mi-observador', label: 'Mi observador', icon: EyeIcon, roles: ['ESTUDIANTE'] },
 ];

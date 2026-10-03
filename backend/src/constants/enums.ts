@@ -15,7 +15,7 @@ export type TipoDocumento = (typeof TIPOS_DOCUMENTO)[number];
 // Un solo rol administrativo (ADMIN): Klassy es de una institucion por
 // instalacion (ver CLAUDE.md), asi que no hay un nivel "super" por encima del
 // admin de la institucion — ADMIN ya tiene el maximo privilegio del sistema.
-export const ROLES = ['ADMIN', 'COORDINADOR', 'DOCENTE', 'SECRETARIA', 'ESTUDIANTE', 'ACUDIENTE'] as const;
+export const ROLES = ['ADMIN', 'COORDINADOR', 'COORDINADOR_CONVIVENCIA', 'ORIENTADOR', 'DOCENTE', 'SECRETARIA', 'ESTUDIANTE', 'ACUDIENTE'] as const;
 export type Rol = (typeof ROLES)[number];
 
 // Estado activo/inactivo generico, reusado por User, Campus, Grade e Institution

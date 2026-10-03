@@ -10,8 +10,15 @@ import { HomePage } from './pages/public/HomePage';
 import { AnioLectivoPage } from './pages/AnioLectivoPage';
 import { AsistenciaPage } from './pages/AsistenciaPage';
 import { GestionAsistenciaPage } from './pages/GestionAsistenciaPage';
+import { MiObservadorPage } from './pages/MiObservadorPage';
+import { ObservadorPage } from './pages/ObservadorPage';
+import { OrientacionPage } from './pages/OrientacionPage';
 import { AcademicCatalogPage } from './pages/admin/AcademicCatalogPage';
 import { AdmissionRequestsPage } from './pages/admin/AdmissionRequestsPage';
+import { CasosConvivenciaPage } from './pages/admin/CasosConvivenciaPage';
+import { ComitePage } from './pages/admin/ComitePage';
+import { CatalogoConvivenciaPage } from './pages/admin/CatalogoConvivenciaPage';
+import { SolicitudesCasoPage } from './pages/admin/SolicitudesCasoPage';
 import { EnrollmentDetailPage } from './pages/admin/EnrollmentDetailPage';
 import { EnrollmentsPage } from './pages/admin/EnrollmentsPage';
 import { EspaciosPage } from './pages/admin/EspaciosPage';
@@ -73,6 +80,23 @@ export default function App() {
 
           <Route element={<ProtectedRoute allowedRoles={['ADMIN', 'COORDINADOR', 'SECRETARIA', 'DOCENTE']} />}>
             <Route path="/asistencia/gestion" element={<GestionAsistenciaPage />} />
+          </Route>
+
+          {/* Convivencia (M14): SECRETARIA no tiene acceso; el rol abre la puerta y el servidor decide por estudiante. */}
+          <Route element={<ProtectedRoute allowedRoles={['ADMIN', 'COORDINADOR', 'COORDINADOR_CONVIVENCIA', 'ORIENTADOR', 'DOCENTE']} />}>
+            <Route path="/convivencia/observador" element={<ObservadorPage />} />
+          </Route>
+          <Route element={<ProtectedRoute allowedRoles={['ADMIN', 'COORDINADOR_CONVIVENCIA']} />}>
+            <Route path="/convivencia/catalogo" element={<CatalogoConvivenciaPage />} />
+            <Route path="/convivencia/casos" element={<CasosConvivenciaPage />} />
+            <Route path="/convivencia/comite" element={<ComitePage />} />
+            <Route path="/convivencia/solicitudes" element={<SolicitudesCasoPage />} />
+          </Route>
+          <Route element={<ProtectedRoute allowedRoles={['ADMIN', 'ORIENTADOR']} />}>
+            <Route path="/orientacion/remisiones" element={<OrientacionPage />} />
+          </Route>
+          <Route element={<ProtectedRoute allowedRoles={['ESTUDIANTE']} />}>
+            <Route path="/mi-observador" element={<MiObservadorPage />} />
           </Route>
         </Route>
       </Route>

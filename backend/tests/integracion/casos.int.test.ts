@@ -112,6 +112,20 @@ describe('M15 casos de convivencia (con base de datos)', () => {
     expect(propias[0]).toMatchObject({ _id: registros[0]!._id, solicitud: { estado: 'CONVERTIDA' }, caso: { codigo: caso.codigo } });
   });
 
+  it('el estudiante ve de una falta grave solo que hay una situación y el estado del caso, nunca la falta ni los hechos', async () => {
+    await faltaGrave();
+    const enRevision = await observaciones.miObservador(e.estudiante);
+    expect(enRevision).toEqual([expect.objectContaining({ clase: 'FALTA', gravedad: 'II', tipo_nombre: 'Situación de convivencia', situacion: 'EN_REVISION' })]);
+
+    const [pendiente] = (await solicitudes.bandejaDeSolicitudes(e.coordConvivencia, { pagina: 1, limite: 20 })).data;
+    await abrir(e.coordConvivencia, 'II', { involucrados: undefined, solicitud_id: pendiente!._id });
+    const conCaso = await observaciones.miObservador(e.estudiante);
+    expect(conCaso[0]).toMatchObject({ situacion: 'ABIERTO' });
+    expect(JSON.stringify(conCaso)).not.toMatch(/Detalle reservado|3\.3|Agrede/);
+    // Quien fue solo afectado no tiene antecedente en su observador.
+    expect(await observaciones.miObservador(e.otroEstudiante)).toHaveLength(0);
+  });
+
   it('una solicitud ajena o ya atendida no se puede convertir otra vez', async () => {
     await faltaGrave();
     const [pendiente] = (await solicitudes.bandejaDeSolicitudes(e.coordConvivencia, { pagina: 1, limite: 20 })).data;

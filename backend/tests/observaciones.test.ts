@@ -96,19 +96,16 @@ describe('visibilidadDeObservacion', () => {
 describe('esVisibleParaEstudiante', () => {
   const con = (obs: ReturnType<typeof observacion> | ReturnType<typeof falta>, visible: boolean) => ({ ...obs, visible_estudiante: visible });
 
-  it('un menor ve solo las observaciones de tipos visibles y nunca las confidenciales ni las faltas', () => {
-    expect(esVisibleParaEstudiante(con(observacion(), true), false)).toBe(true);
-    expect(esVisibleParaEstudiante(con(observacion(), false), false)).toBe(false);
-    expect(esVisibleParaEstudiante(con(observacion({ confidencial: true }), true), false)).toBe(false);
-    expect(esVisibleParaEstudiante(con(falta('I'), true), false)).toBe(false);
+  it('ve las observaciones de tipos visibles y nunca las confidenciales', () => {
+    expect(esVisibleParaEstudiante(con(observacion(), true))).toBe(true);
+    expect(esVisibleParaEstudiante(con(observacion(), false))).toBe(false);
+    expect(esVisibleParaEstudiante(con(observacion({ confidencial: true }), true))).toBe(false);
   });
 
-  it('un adulto ve sus observaciones no confidenciales y sus faltas Tipo I, no las graves', () => {
-    expect(esVisibleParaEstudiante(con(observacion(), false), true)).toBe(true);
-    expect(esVisibleParaEstudiante(con(observacion({ confidencial: true }), false), true)).toBe(false);
-    expect(esVisibleParaEstudiante(con(falta('I'), false), true)).toBe(true);
-    expect(esVisibleParaEstudiante(con(falta('II'), false), true)).toBe(false);
-    expect(esVisibleParaEstudiante(con(observacion({ estado: 'ANULADA' }), true), true)).toBe(false);
+  it('ve sus faltas de cualquier gravedad (de las graves, el servicio solo muestra que hay un caso) y nunca lo anulado', () => {
+    for (const gravedad of ['I', 'II', 'III'] as const) expect(esVisibleParaEstudiante(con(falta(gravedad), false)), gravedad).toBe(true);
+    expect(esVisibleParaEstudiante(con(observacion({ estado: 'ANULADA' }), true))).toBe(false);
+    expect(esVisibleParaEstudiante(con(falta('I', { estado: 'ANULADA' }), true))).toBe(false);
   });
 });
 
@@ -202,8 +199,24 @@ describe('vistaObservacion', () => {
     }
   });
 
-  it('la vista del estudiante solo trae el texto final', () => {
-    expect(Object.keys(vistaObservacion(obs, 'ESTUDIANTE')).sort()).toEqual(['_id', 'descripcion', 'fecha_hecho', 'periodo_numero', 'tipo_nombre']);
+  it('la vista del estudiante de una falta grave no trae la falta, los hechos ni quién la registró', () => {
+    const v = vistaObservacion(obs, 'ESTUDIANTE');
+    expect(Object.keys(v).sort()).toEqual(['_id', 'clase', 'fecha_hecho', 'gravedad', 'periodo_numero', 'tipo_nombre']);
+    expect(v).toMatchObject({ tipo_nombre: 'Situación de convivencia', gravedad: 'II' });
+  });
+
+  it('la vista del estudiante de una observación o de una falta Tipo I trae el texto final', () => {
+    expect(Object.keys(vistaObservacion({ ...obs, clase: 'OBSERVACION', falta: null, tipo_nombre: 'Académica' }, 'ESTUDIANTE')).sort()).toEqual([
+      '_id',
+      'clase',
+      'descripcion',
+      'fecha_hecho',
+      'periodo_numero',
+      'tipo_nombre',
+    ]);
+    const leve = vistaObservacion({ ...obs, falta: { ...obs.falta, gravedad: 'I' as const }, version_estudiante: 'Mi versión' }, 'ESTUDIANTE');
+    expect(leve).toMatchObject({ tipo_nombre: 'Falta 3.3', gravedad: 'I', descripcion: 'relato con detalles', version_estudiante: 'Mi versión' });
+    expect(leve).not.toHaveProperty('autor_id');
   });
 
   it('la vista completa trae el contenido y rotula la falta con su código', () => {

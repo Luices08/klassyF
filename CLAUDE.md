@@ -225,8 +225,10 @@ Reglas que no se ven leyendo un solo archivo:
 - **Quién ve qué** lo decide el servidor con `permisoSobreEstudiante` (`utils/permisosConvivencia.ts`) y la función pura `visibilidadDeObservacion`
   (`utils/observaciones.ts`: COMPLETA / RESERVADA / nada; el listado y el detalle usan la misma). ADMIN y coordinación de convivencia ven todo en su
   alcance; una **confidencial** solo la ven su autor, `ORIENTADOR`, coordinación de convivencia y ADMIN; las **faltas** no las ve el coordinador
-  académico; de una falta II/III el director de grupo y el orientador solo ven que existe (`reservada`); el estudiante menor solo ve las
-  observaciones no confidenciales de tipos `visible_estudiante`; el mayor de edad, todas las no confidenciales y sus faltas Tipo I (nunca II/III). "No existe" y "no autorizado" responden igual (404). Nunca se
+  académico; de una falta II/III el director de grupo y el orientador solo ven que existe (`reservada`); el estudiante (menor o mayor) ve en `MiObservadorPage` sus
+  observaciones no confidenciales de tipos `visible_estudiante` y sus faltas: la Tipo I completa (descripción de la falta, hechos, su versión,
+  compromiso); de una Tipo II/III solo que hay una situación de convivencia y el estado del caso (`situacion`, o `EN_REVISION` si la solicitud sigue
+  pendiente), nunca la falta ni los hechos porque el caso está en debido proceso e involucra a otros menores. "No existe" y "no autorizado" responden igual (404). Nunca se
   devuelve el documento crudo (`vistaObservacion`).
 - **`ORIENTADOR`** (rango 70, sede obligatoria): registra seguimiento psicosocial (contexto `ORIENTACION`, **siempre confidencial**), ve el
   historial y recibirá las remisiones a orientación (M15). Su alcance son las sedes asignadas.

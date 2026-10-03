@@ -143,7 +143,7 @@ describe('M14 observaciones y faltas (con base de datos)', () => {
       await expect(observaciones.historialDeEstudiante('000000000000000000000000', e.coordConvivencia, PAGINA)).rejects.toMatchObject({ statusCode: 404, message: 'Estudiante no encontrado.' });
     });
 
-    it('el estudiante solo ve las observaciones visibles y no confidenciales, y solo el texto final', async () => {
+    it('el estudiante ve las observaciones visibles y no confidenciales y sus faltas Tipo I, con solo el texto final', async () => {
       await catalogo.actualizarTipo(e.tipoAcademica, { visible_estudiante: false }, actor(e.admin));
       await registrar(e.docenteDeClase, [id(e.estudiante)], { descripcion: 'Visible para el estudiante.' });
       await registrar(e.docenteDeClase, [id(e.estudiante)], { tipo_id: e.tipoAcademica, descripcion: 'Tipo no visible.' });
@@ -152,8 +152,16 @@ describe('M14 observaciones y faltas (con base de datos)', () => {
       await registrar(e.docenteDeClase, [id(e.otroEstudiante)], { descripcion: 'De otro estudiante.' });
 
       const propias = await observaciones.miObservador(e.estudiante);
-      expect(propias).toHaveLength(1);
-      expect(Object.keys(propias[0]!).sort()).toEqual(['_id', 'descripcion', 'fecha_hecho', 'periodo_numero', 'tipo_nombre']);
+      expect(propias).toHaveLength(2);
+      const observacion = propias.find((p) => p.clase === 'OBSERVACION')!;
+      expect(Object.keys(observacion).sort()).toEqual(['_id', 'clase', 'descripcion', 'fecha_hecho', 'periodo_numero', 'tipo_nombre']);
+      expect(propias.find((p) => p.clase === 'FALTA')).toMatchObject({
+        tipo_nombre: 'Falta 1.3',
+        gravedad: 'I',
+        falta: { codigo: '1.3' },
+        descripcion: 'Llegó diez minutos tarde a clase.',
+      });
+      expect(JSON.stringify(propias)).not.toContain('Confidencial.');
       await expect(observaciones.miObservador(e.docenteDeClase)).rejects.toMatchObject({ statusCode: 403 });
     });
 

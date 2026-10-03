@@ -49,13 +49,14 @@ export function visibilidadDeObservacion(
 }
 
 /**
- * Lo que el estudiante ve de su propio observador: las observaciones de los tipos marcados como visibles (nunca las
- * confidenciales). Un estudiante adulto (jornadas nocturna y sabatina) ve además sus faltas Tipo I como titular de sus datos.
+ * Lo que el estudiante ve de su propio observador, sea menor o mayor: las observaciones de los tipos que el colegio marcó como
+ * visibles (nunca las confidenciales) y sus faltas. Una Tipo I la ve completa; de una Tipo II/III solo ve que hay un caso de
+ * convivencia y en qué estado (el servicio decide si existe uno), porque el caso está en debido proceso e involucra a otros menores.
  */
-export function esVisibleParaEstudiante(obs: ObservacionParaVisibilidad & { visible_estudiante: boolean }, esAdulto: boolean): boolean {
+export function esVisibleParaEstudiante(obs: ObservacionParaVisibilidad & { visible_estudiante: boolean }): boolean {
   if (obs.estado !== 'ACTIVA') return false;
-  if (obs.clase === 'OBSERVACION') return !obs.confidencial && (esAdulto || obs.visible_estudiante);
-  return esAdulto && obs.falta?.gravedad === 'I';
+  if (obs.clase === 'OBSERVACION') return !obs.confidencial && obs.visible_estudiante;
+  return Boolean(obs.falta);
 }
 
 // --- Reglas de contenido de una falta (por gravedad) ---
@@ -141,12 +142,18 @@ export const tituloDeRegistro = (obs: Pick<ObservacionParaVista, 'clase' | 'tipo
  */
 export function vistaObservacion(obs: ObservacionParaVista, modo: ModoVistaObservacion) {
   if (modo === 'ESTUDIANTE') {
+    const comun = { _id: obs._id.toString(), clase: obs.clase, fecha_hecho: obs.fecha_hecho, periodo_numero: obs.periodo_numero };
+    if (obs.clase === 'OBSERVACION') return { ...comun, tipo_nombre: obs.tipo_nombre, descripcion: obs.descripcion };
+    // Una falta grave no revela cuál es ni los hechos: solo que existe una situación de convivencia.
+    if (esSituacionGrave(obs.falta?.gravedad)) return { ...comun, tipo_nombre: 'Situación de convivencia', gravedad: obs.falta?.gravedad ?? null };
     return {
-      _id: obs._id.toString(),
-      fecha_hecho: obs.fecha_hecho,
-      periodo_numero: obs.periodo_numero,
+      ...comun,
       tipo_nombre: tituloDeRegistro(obs),
+      gravedad: obs.falta?.gravedad ?? null,
+      falta: obs.falta ? { codigo: obs.falta.codigo, descripcion: obs.falta.descripcion } : null,
       descripcion: obs.descripcion,
+      version_estudiante: obs.version_estudiante,
+      compromiso: obs.compromiso,
     };
   }
 

@@ -13,7 +13,6 @@ import FaltaConvivencia from '../models/faltaConvivencia.model';
 import Group, { IGroup } from '../models/group.model';
 import Observacion, { IObservacion, ObservacionDocument } from '../models/observacion.model';
 import SolicitudCaso, { ISolicitudCaso } from '../models/solicitudCaso.model';
-import StudentProfile from '../models/studentProfile.model';
 import TeacherAssignment from '../models/teacherAssignment.model';
 import TipoObservacion from '../models/tipoObservacion.model';
 import { User, UserDocument } from '../models/user.model';
@@ -22,6 +21,7 @@ import { ESTADO_ACTIVO } from '../utils/filtroEstado';
 import {
   debeRemitirse,
   dentroDelPlazo,
+  esSituacionGrave,
   esVisibleParaEstudiante,
   ModoVistaObservacion,
   problemasDeFalta,
@@ -41,7 +41,6 @@ import { cargarContextoFechas, fechaDeClase, hoyColombia, periodoDeFecha } from 
 import { registrarEvento } from './audit.service';
 import { obtenerConfiguracion, obtenerInstitucionConvivencia } from './convivenciaCatalogo.service';
 
-const MAYORIA_DE_EDAD = 18;
 const LIMITE_BUSQUEDA = 30;
 const LIMITE_HISTORIAL = 1000;
 const NO_ENCONTRADO = 'Estudiante no encontrado.';
@@ -609,20 +608,25 @@ export async function misObservaciones(usuario: UserDocument, paginacion: Pagina
   return { total, ...paginacion, data: vistas };
 }
 
-async function esMayorDeEdad(studentId: Types.ObjectId): Promise<boolean> {
-  const perfil = await StudentProfile.findOne({ user_id: studentId }).select('fecha_nacimiento');
-  if (!perfil) return false;
-  const limite = new Date(perfil.fecha_nacimiento);
-  limite.setUTCFullYear(limite.getUTCFullYear() + MAYORIA_DE_EDAD);
-  return limite <= new Date();
-}
-
 /** El estudiante ve solo lo suyo y solo el texto final (ver `esVisibleParaEstudiante` para qué entra). */
 export async function miObservador(usuario: UserDocument, ip?: string | null) {
   if (usuario.rol !== ROLES.ESTUDIANTE) throw new ApiError(403, 'Solo un estudiante consulta su propio observador.');
-  const adulto = await esMayorDeEdad(usuario._id);
   const registros = (await Observacion.find({ student_id: usuario._id, estado: 'ACTIVA' }).sort({ fecha_hecho: -1, createdAt: -1 }).limit(LIMITE_HISTORIAL)).sort(porFechaDesc);
-  const visibles = registros.filter((o) => esVisibleParaEstudiante(o, adulto)).slice(0, 200);
+
+  // De una falta grave el estudiante solo ve que hay un caso (o que está en revisión) y su estado; sin caso ni solicitud viva, no hay nada que mostrar.
+  const graves = registros.filter((o) => esSituacionGrave(o.falta?.gravedad));
+  const [casos, solicitudes] = await Promise.all([
+    CasoConvivencia.find({ observacion_ids: { $in: graves.map((o) => o._id) }, estado: { $ne: 'ANULADO' } }).select('estado observacion_ids'),
+    SolicitudCaso.find({ _id: { $in: graves.flatMap((o) => (o.solicitud_id ? [o.solicitud_id] : [])) }, estado: 'PENDIENTE' }).select('_id'),
+  ]);
+  const situacionDe = (o: ObservacionDocument): string | null => {
+    const caso = casos.find((c) => c.observacion_ids.some((id) => String(id) === String(o._id)));
+    if (caso) return caso.estado;
+    return o.solicitud_id && solicitudes.some((s) => String(s._id) === String(o.solicitud_id)) ? 'EN_REVISION' : null;
+  };
+  const visibles = registros
+    .filter((o) => esVisibleParaEstudiante(o) && (!esSituacionGrave(o.falta?.gravedad) || situacionDe(o) !== null))
+    .slice(0, 200);
 
   await registrarEvento({
     usuario_id: usuario._id,
@@ -632,7 +636,7 @@ export async function miObservador(usuario: UserDocument, ip?: string | null) {
     detalle: `${visibles.length} registro(s)`,
     ip,
   });
-  return visibles.map((o) => vista(o, 'ESTUDIANTE'));
+  return visibles.map((o) => ({ ...vista(o, 'ESTUDIANTE'), ...(esSituacionGrave(o.falta?.gravedad) ? { situacion: situacionDe(o) } : {}) }));
 }
 
 // --- Enmienda y anulación ---

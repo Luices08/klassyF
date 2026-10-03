@@ -121,12 +121,22 @@ export interface ObservacionVista {
   estudiante?: string;
 }
 
+/**
+ * Lo que el estudiante ve de su observador. De una falta grave solo llega la gravedad y la `situacion` (el estado del caso de
+ * convivencia, o EN_REVISION): ni la falta ni los hechos.
+ */
 export interface ObservacionPropia {
   _id: string;
+  clase: ClaseRegistro;
   fecha_hecho: string;
   periodo_numero: number | null;
   tipo_nombre: string;
-  descripcion: string;
+  gravedad?: TipoSituacion | null;
+  falta?: { codigo: string; descripcion: string } | null;
+  descripcion?: string;
+  version_estudiante?: string;
+  compromiso?: string;
+  situacion?: string | null;
 }
 
 export interface PaginaObservaciones {

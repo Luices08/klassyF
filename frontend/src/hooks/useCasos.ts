@@ -88,7 +88,7 @@ export interface CasoDetalle {
   involucrados: { student_id: string; rol: RolInvolucrado; estudiante: string }[];
   atencion_inmediata: ({ descripcion: string; hubo_dano: boolean; fecha: string } & ConAutor) | null;
   medidas_proteccion: ({ _id: string; descripcion: string; fecha: string } & ConAutor)[];
-  pasos: { _id: string; nombre: string; obligatorio: boolean; estado: 'PENDIENTE' | 'CUMPLIDO' | 'NO_APLICA'; nota: string; fecha: string | null }[];
+  pasos: { _id: string; nombre: string; obligatorio: boolean; remite_a_orientacion: boolean; estado: 'PENDIENTE' | 'CUMPLIDO' | 'NO_APLICA'; nota: string; fecha: string | null }[];
   notificaciones: ({ _id: string; tipo: TipoNotificacion; fecha: string; medio: MedioCitacion; dirigida_a: string; resultado: string } & ConAutor)[];
   descargos: ({ _id: string; parte: 'ESTUDIANTE' | 'ACUDIENTE'; student_id: string | null; fecha: string; texto: string } & ConAutor)[];
   seguimientos: ({ _id: string; fecha: string; nota: string; proxima_fecha: string | null } & ConAutor)[];
@@ -101,7 +101,22 @@ export interface CasoDetalle {
   cierre: ({ motivo: string; fecha: string } & ConAutor) | null;
   reaperturas: ({ motivo: string; fecha: string } & ConAutor)[];
   anulacion: ({ motivo: string; fecha: string } & ConAutor) | null;
+  /** Estado de las remisiones a orientación del caso; nunca lo que orientación escribió. */
+  remisiones_orientacion: RemisionOrientacionResumen[];
   alertas: AlertaCaso[];
+}
+
+export interface RemisionOrientacionResumen {
+  _id: string;
+  student_id: string;
+  estudiante: string;
+  rol: RolInvolucrado;
+  origen: 'MEDIDA' | 'PASO' | 'MANUAL';
+  origen_detalle: string;
+  estado: 'PENDIENTE' | 'EN_ATENCION' | 'ATENDIDA';
+  createdAt: string;
+  primera_atencion: string | null;
+  atendida: string | null;
 }
 
 export interface MedidaConvivencia {
@@ -109,6 +124,7 @@ export interface MedidaConvivencia {
   nombre: string;
   descripcion: string;
   se_aplica_por_dias: boolean;
+  remite_a_orientacion: boolean;
   orden: number;
   estado: EstadoActivo;
 }
@@ -124,7 +140,7 @@ export interface EntidadExterna {
 export interface ProtocoloConvivencia {
   _id: string;
   tipo_situacion: TipoSituacion;
-  pasos: { nombre: string; obligatorio: boolean; orden: number }[];
+  pasos: { nombre: string; obligatorio: boolean; remite_a_orientacion: boolean; orden: number }[];
 }
 
 export interface CatalogosCaso {
@@ -225,6 +241,8 @@ export const useReabrirCaso = usarAccionDeCaso<{ motivo: string }>((id, e) => ({
 export const useAnularCaso = usarAccionDeCaso<{ motivo: string }>((id, e) => ({ metodo: 'post', url: `/convivencia/casos/${id}/anulacion`, cuerpo: e }));
 export const useDeclararImpedimento = usarAccionDeCaso<{ motivo: string }>((id, e) => ({ metodo: 'post', url: `/convivencia/casos/${id}/impedimento`, cuerpo: e }));
 
+export const useRemitirAOrientacion = usarAccionDeCaso<{ student_ids: string[]; motivo: string }>((id, e) => ({ metodo: 'post', url: `/convivencia/casos/${id}/orientacion`, cuerpo: e }));
+
 export type ColeccionRegistro = 'seguimientos' | 'notificaciones' | 'descargos' | 'medidas-proteccion' | 'remisiones' | 'medidas-aplicadas';
 
 export function useAgregarRegistroCaso() {
@@ -269,7 +287,7 @@ export function useEliminarCatalogoCaso() {
 export function useGuardarProtocolo() {
   const invalidar = useInvalidarCasos();
   return useMutation({
-    mutationFn: ({ tipo, pasos }: { tipo: TipoSituacion; pasos: { nombre: string; obligatorio: boolean }[] }) =>
+    mutationFn: ({ tipo, pasos }: { tipo: TipoSituacion; pasos: { nombre: string; obligatorio: boolean; remite_a_orientacion: boolean }[] }) =>
       api.put<ProtocoloConvivencia>(`/convivencia/protocolos/${tipo}`, { pasos }),
     onSuccess: invalidar,
   });

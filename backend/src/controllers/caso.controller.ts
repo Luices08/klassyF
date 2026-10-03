@@ -93,7 +93,7 @@ export const eliminarEntidad = catchAsync<IdParams>(async (req, res) => {
   res.status(200).json({ success: true });
 });
 
-export const guardarProtocolo = catchAsync<{ tipo: TipoSituacion } & ParamsDictionary, unknown, { pasos: { nombre: string; obligatorio: boolean }[] }>(
+export const guardarProtocolo = catchAsync<{ tipo: TipoSituacion } & ParamsDictionary, unknown, { pasos: { nombre: string; obligatorio: boolean; remite_a_orientacion: boolean }[] }>(
   async (req, res) => {
     res.status(200).json({ success: true, data: await catalogoService.guardarProtocolo(req.params.tipo, req.body.pasos, actor(req)) });
   }
@@ -166,6 +166,10 @@ export const reabrirCaso = catchAsync<IdParams, unknown, { motivo: string }>(asy
 
 export const anularCaso = catchAsync<IdParams, unknown, { motivo: string }>(async (req, res) => {
   res.status(200).json({ success: true, data: await casoService.anularCaso(req.params.id, req.body.motivo, req.user!, req.ip) });
+});
+
+export const remitirAOrientacion = catchAsync<IdParams, unknown, { student_ids: string[]; motivo: string }>(async (req, res) => {
+  res.status(200).json({ success: true, data: await casoService.remitirAOrientacion(req.params.id, req.body, req.user!, req.ip) });
 });
 
 export const declararImpedimento = catchAsync<IdParams, unknown, { motivo: string; usuario_id?: string }>(async (req, res) => {

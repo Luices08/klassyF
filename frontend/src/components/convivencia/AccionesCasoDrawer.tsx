@@ -15,7 +15,9 @@ import {
   useCambiarEstadoCaso,
   useCatalogosCaso,
   useCerrarCaso,
+  NOMBRES_ROL_INVOLUCRADO,
   useDeclararImpedimento,
+  useRemitirAOrientacion,
   useReabrirCaso,
   useReclasificarCaso,
   useRegistrarAtencion,
@@ -44,6 +46,7 @@ export type ModoAccionCaso =
   | 'reapertura'
   | 'anulacion'
   | 'impedimento'
+  | 'orientacion'
   | ColeccionRegistro;
 
 const TITULOS: Record<ModoAccionCaso, string> = {
@@ -55,6 +58,7 @@ const TITULOS: Record<ModoAccionCaso, string> = {
   reapertura: 'Reabrir el caso',
   anulacion: 'Anular el caso',
   impedimento: 'Declararme impedido',
+  orientacion: 'Remitir a orientación',
   seguimientos: 'Registrar seguimiento',
   notificaciones: 'Registrar notificación',
   descargos: 'Registrar descargos',
@@ -86,6 +90,7 @@ function Formulario({ caso, modo, esAdmin, onClose }: Props & { modo: ModoAccion
   const reabrir = useReabrirCaso();
   const anular = useAnularCaso();
   const impedimento = useDeclararImpedimento();
+  const remitirOrientacion = useRemitirAOrientacion();
   const registro = useAgregarRegistroCaso();
   const catalogos = useCatalogosCaso();
   const catalogoFaltas = useCatalogoConvivencia();
@@ -106,8 +111,9 @@ function Formulario({ caso, modo, esAdmin, onClose }: Props & { modo: ModoAccion
   const [dias, setDias] = useState('');
   const [huboDano, setHuboDano] = useState(false);
   const [faltas, setFaltas] = useState<Set<string>>(new Set());
+  const [aRemitir, setARemitir] = useState<Set<string>>(new Set());
 
-  const mutation = { estado: cambiarEstado, tipo: reclasificar, atencion, decision, cierre: cerrar, reapertura: reabrir, anulacion: anular, impedimento }[modo as string] ?? registro;
+  const mutation = { estado: cambiarEstado, tipo: reclasificar, atencion, decision, cierre: cerrar, reapertura: reabrir, anulacion: anular, impedimento, orientacion: remitirOrientacion }[modo as string] ?? registro;
   const medida = catalogos.data?.medidas.find((m) => m._id === medidaId);
 
   const tiposDisponibles = TIPOS_SITUACION.filter((t) => t !== caso.tipo_situacion && (esAdmin || TIPOS_SITUACION.indexOf(t) > TIPOS_SITUACION.indexOf(caso.tipo_situacion)));
@@ -142,6 +148,9 @@ function Formulario({ caso, modo, esAdmin, onClose }: Props & { modo: ModoAccion
       case 'impedimento':
         await impedimento.mutateAsync({ id, motivo: texto });
         break;
+      case 'orientacion':
+        await remitirOrientacion.mutateAsync({ id, student_ids: [...aRemitir], motivo: texto });
+        break;
       case 'seguimientos':
         await registro.mutateAsync({ id, coleccion: modo, fecha, nota: texto, proxima_fecha: proxima || null });
         break;
@@ -172,7 +181,8 @@ function Formulario({ caso, modo, esAdmin, onClose }: Props & { modo: ModoAccion
     texto.trim().length < textoMinimo ||
     (modo === 'remisiones' && !entidadId) ||
     (modo === 'medidas-aplicadas' && (!medidaId || (medida?.se_aplica_por_dias && !(Number(dias) > 0)))) ||
-    (modo === 'tipo' && tiposDisponibles.length === 0);
+    (modo === 'tipo' && tiposDisponibles.length === 0) ||
+    (modo === 'orientacion' && aRemitir.size === 0);
 
   return (
     <Drawer
@@ -188,6 +198,30 @@ function Formulario({ caso, modo, esAdmin, onClose }: Props & { modo: ModoAccion
       submitDisabled={Boolean(deshabilitar)}
     >
       {mutation.isError && <Alert tone="error">{errorMessage(mutation.error)}</Alert>}
+
+      {modo === 'orientacion' && (
+        <fieldset className="space-y-1.5">
+          <legend className="mb-1 text-label text-body">Estudiantes que se remiten</legend>
+          {caso.involucrados.map((i) => (
+            <label key={i.student_id} className="flex cursor-pointer items-center gap-2 text-sm text-body">
+              <input
+                type="checkbox"
+                className="h-4 w-4 rounded border-border text-primary focus:ring-primary"
+                checked={aRemitir.has(i.student_id)}
+                onChange={() =>
+                  setARemitir((previa) => {
+                    const siguiente = new Set(previa);
+                    if (siguiente.has(i.student_id)) siguiente.delete(i.student_id);
+                    else siguiente.add(i.student_id);
+                    return siguiente;
+                  })
+                }
+              />
+              {i.estudiante} · {NOMBRES_ROL_INVOLUCRADO[i.rol]}
+            </label>
+          ))}
+        </fieldset>
+      )}
 
       {modo === 'estado' && (
         <Select label="Nuevo estado" value={estado} onChange={(e) => setEstado(e.target.value as EstadoCaso)}>

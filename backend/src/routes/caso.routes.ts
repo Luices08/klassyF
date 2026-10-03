@@ -65,6 +65,7 @@ router.post('/casos/:id/cierre', validate(v.cerrarCaso), ctrl.cerrarCaso);
 router.post('/casos/:id/reapertura', validate(v.accionConMotivo), ctrl.reabrirCaso);
 router.post('/casos/:id/anulacion', validate(v.accionConMotivo), ctrl.anularCaso);
 router.post('/casos/:id/impedimento', validate(v.declararImpedimento), ctrl.declararImpedimento);
+router.post('/casos/:id/orientacion', validate(v.remitirAOrientacion), ctrl.remitirAOrientacion);
 
 // Alertas calculadas (el envío de avisos es de M28).
 router.get('/alertas', comite.casosConAlertas);

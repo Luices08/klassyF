@@ -33,6 +33,7 @@ const camposMedida = {
   nombre: Joi.string().trim().max(120),
   descripcion: Joi.string().trim().max(1000).allow(''),
   se_aplica_por_dias: Joi.boolean(),
+  remite_a_orientacion: Joi.boolean(),
   orden: Joi.number().integer().min(0),
 };
 export const crearMedida: ValidationSchema = { body: Joi.object({ ...camposMedida, nombre: camposMedida.nombre.required() }) };
@@ -56,7 +57,11 @@ export const guardarProtocolo: ValidationSchema = {
   params: Joi.object({ tipo: tipoSituacion.required() }),
   body: Joi.object({
     pasos: Joi.array()
-      .items(Joi.object({ nombre: Joi.string().trim().max(200).required(), obligatorio: Joi.boolean().default(false) }))
+      .items(Joi.object({
+          nombre: Joi.string().trim().max(200).required(),
+          obligatorio: Joi.boolean().default(false),
+          remite_a_orientacion: Joi.boolean().default(false),
+        }))
       .max(40)
       .required(),
   }),
@@ -195,6 +200,11 @@ export const cerrarCaso: ValidationSchema = {
 };
 
 export const accionConMotivo: ValidationSchema = { params: idParam.params, body: Joi.object({ motivo }) };
+
+export const remitirAOrientacion: ValidationSchema = {
+  params: idParam.params,
+  body: Joi.object({ student_ids: Joi.array().items(objectId).min(1).max(20).required(), motivo }),
+};
 
 export const declararImpedimento: ValidationSchema = {
   params: idParam.params,

@@ -66,6 +66,18 @@ export type TipoNotificacionCaso = (typeof TIPOS_NOTIFICACION_CASO)[number];
 export const PARTES_DESCARGO = ['ESTUDIANTE', 'ACUDIENTE'] as const;
 export type ParteDescargo = (typeof PARTES_DESCARGO)[number];
 
+// --- M15 → orientación: remisión de un estudiante a psicología/orientación ---
+
+export const ESTADOS_REMISION_ORIENTACION = ['PENDIENTE', 'EN_ATENCION', 'ATENDIDA'] as const;
+export type EstadoRemisionOrientacion = (typeof ESTADOS_REMISION_ORIENTACION)[number];
+
+/** Una remisión nace de una medida o de un paso del protocolo marcados por el colegio, o la hace convivencia a mano. */
+export const ORIGENES_REMISION_ORIENTACION = ['MEDIDA', 'PASO', 'MANUAL'] as const;
+export type OrigenRemisionOrientacion = (typeof ORIGENES_REMISION_ORIENTACION)[number];
+
+/** A quiénes de un caso se remite automáticamente: a quien resultó afectado y a quien presuntamente lo causó. */
+export const ROLES_QUE_SE_REMITEN: readonly RolInvolucrado[] = ['AFECTADO', 'PRESUNTO_RESPONSABLE'];
+
 /** Valor inicial de la política; la institución lo cambia. Pasado este plazo sin remisión, un caso tipo III muestra alerta. */
 export const PLAZO_REMISION_TIPO_III_HORAS_INICIAL = 24;
 

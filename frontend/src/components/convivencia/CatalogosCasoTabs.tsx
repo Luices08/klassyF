@@ -65,6 +65,7 @@ function TabSimple({ recurso, titulo, subtitulo, nuevo, items }: TabSimpleProps)
               <Td>
                 {i.nombre}
                 {'se_aplica_por_dias' in i && i.se_aplica_por_dias && <span className="ml-2 text-xs text-muted">(por días)</span>}
+                {'remite_a_orientacion' in i && i.remite_a_orientacion && <span className="ml-2 text-xs text-primary">(remite a orientación)</span>}
               </Td>
               <Td className="max-w-md">{i.descripcion || '—'}</Td>
               <Td>
@@ -118,6 +119,7 @@ function ItemDrawer({ recurso, item, onClose }: { recurso: RecursoCatalogoCaso; 
   const [nombre, setNombre] = useState(item?.nombre ?? '');
   const [descripcion, setDescripcion] = useState(item?.descripcion ?? '');
   const [porDias, setPorDias] = useState(item && 'se_aplica_por_dias' in item ? item.se_aplica_por_dias : false);
+  const [remiteOrientacion, setRemiteOrientacion] = useState(item && 'remite_a_orientacion' in item ? item.remite_a_orientacion : false);
   const [orden, setOrden] = useState(String(item?.orden ?? 0));
 
   const guardar = async (e: FormEvent) => {
@@ -128,7 +130,7 @@ function ItemDrawer({ recurso, item, onClose }: { recurso: RecursoCatalogoCaso; 
       nombre,
       descripcion,
       orden: Number(orden) || 0,
-      ...(recurso === 'medidas' ? { se_aplica_por_dias: porDias } : {}),
+      ...(recurso === 'medidas' ? { se_aplica_por_dias: porDias, remite_a_orientacion: remiteOrientacion } : {}),
     });
     onClose();
   };
@@ -142,6 +144,15 @@ function ItemDrawer({ recurso, item, onClose }: { recurso: RecursoCatalogoCaso; 
         <label className="flex items-center gap-2 text-sm text-body">
           <input type="checkbox" className="h-4 w-4 rounded border-border text-primary focus:ring-primary" checked={porDias} onChange={(e) => setPorDias(e.target.checked)} />
           Se aplica por días (se pedirá la duración al registrarla)
+        </label>
+      )}
+      {recurso === 'medidas' && (
+        <label className="flex items-start gap-2 text-sm text-body">
+          <input type="checkbox" className="mt-0.5 h-4 w-4 rounded border-border text-primary focus:ring-primary" checked={remiteOrientacion} onChange={(e) => setRemiteOrientacion(e.target.checked)} />
+          <span>
+            Remite a orientación
+            <span className="block text-xs text-muted">Al aplicarla en un caso, se remite a orientación a los afectados y a los presuntos responsables.</span>
+          </span>
         </label>
       )}
       <Input label="Orden" type="number" min={0} value={orden} onChange={(e) => setOrden(e.target.value)} />
@@ -184,6 +195,7 @@ export function EntidadesTab() {
 interface PasoEditable {
   nombre: string;
   obligatorio: boolean;
+  remite_a_orientacion: boolean;
 }
 
 export function ProtocolosTab() {
@@ -218,6 +230,7 @@ export function ProtocolosTab() {
                 {deTipo(t)?.pasos.map((p) => (
                   <li key={p.orden}>
                     {p.nombre} {p.obligatorio && <span className="text-xs text-warning">(obligatorio)</span>}
+                    {p.remite_a_orientacion && <span className="ml-1 text-xs text-primary">(remite a orientación)</span>}
                   </li>
                 ))}
               </ol>
@@ -232,7 +245,7 @@ export function ProtocolosTab() {
 
 function ProtocoloDrawer({ tipo, protocolo, onClose }: { tipo: TipoSituacion; protocolo?: ProtocoloConvivencia; onClose: () => void }) {
   const guardarProtocolo = useGuardarProtocolo();
-  const [pasos, setPasos] = useState<PasoEditable[]>((protocolo?.pasos ?? []).map(({ nombre, obligatorio }) => ({ nombre, obligatorio })));
+  const [pasos, setPasos] = useState<PasoEditable[]>((protocolo?.pasos ?? []).map(({ nombre, obligatorio, remite_a_orientacion }) => ({ nombre, obligatorio, remite_a_orientacion })));
 
   const mover = (i: number, delta: number) =>
     setPasos((previa) => {
@@ -245,7 +258,7 @@ function ProtocoloDrawer({ tipo, protocolo, onClose }: { tipo: TipoSituacion; pr
 
   const guardar = async (e: FormEvent) => {
     e.preventDefault();
-    await guardarProtocolo.mutateAsync({ tipo, pasos: pasos.filter((p) => p.nombre.trim()).map((p) => ({ nombre: p.nombre.trim(), obligatorio: p.obligatorio })) });
+    await guardarProtocolo.mutateAsync({ tipo, pasos: pasos.filter((p) => p.nombre.trim()).map((p) => ({ nombre: p.nombre.trim(), obligatorio: p.obligatorio, remite_a_orientacion: p.remite_a_orientacion })) });
     onClose();
   };
 
@@ -262,6 +275,10 @@ function ProtocoloDrawer({ tipo, protocolo, onClose }: { tipo: TipoSituacion; pr
             <input type="checkbox" className="h-4 w-4 rounded border-border text-primary focus:ring-primary" checked={p.obligatorio} onChange={(e) => setPasos((previa) => previa.map((x, n) => (n === i ? { ...x, obligatorio: e.target.checked } : x)))} />
             Obligatorio
           </label>
+          <label className="flex items-center gap-1 text-xs text-body">
+            <input type="checkbox" className="h-4 w-4 rounded border-border text-primary focus:ring-primary" checked={p.remite_a_orientacion} onChange={(e) => setPasos((previa) => previa.map((x, n) => (n === i ? { ...x, remite_a_orientacion: e.target.checked } : x)))} />
+            Remite a orientación
+          </label>
           <Button type="button" variant="secondary" className="px-2 py-1 text-xs" onClick={() => mover(i, -1)} disabled={i === 0}>
             ↑
           </Button>
@@ -271,7 +288,7 @@ function ProtocoloDrawer({ tipo, protocolo, onClose }: { tipo: TipoSituacion; pr
           <IconButton type="button" tone="danger" label="Quitar paso" icon={<XIcon />} onClick={() => setPasos((previa) => previa.filter((_, n) => n !== i))} />
         </div>
       ))}
-      <Button type="button" variant="outline" onClick={() => setPasos((previa) => [...previa, { nombre: '', obligatorio: false }])}>
+      <Button type="button" variant="outline" onClick={() => setPasos((previa) => [...previa, { nombre: '', obligatorio: false, remite_a_orientacion: false }])}>
         <PlusIcon className="h-4 w-4" /> Agregar paso
       </Button>
     </Drawer>

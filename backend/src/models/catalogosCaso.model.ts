@@ -11,6 +11,8 @@ export interface IMedidaConvivencia {
   descripcion: string;
   /** Si la medida se aplica por días (p. ej. desescolarización): al registrarla se pide la duración. */
   se_aplica_por_dias: boolean;
+  /** Aplicar esta medida en un caso remite a orientación a los afectados y presuntos responsables. */
+  remite_a_orientacion: boolean;
   orden: number;
   estado: EstadoUsuario;
 }
@@ -22,6 +24,7 @@ const medidaSchema = new Schema<IMedidaConvivencia, Model<IMedidaConvivencia>>(
     nombre: { type: String, required: true, trim: true, maxlength: 120 },
     descripcion: { type: String, default: '', trim: true, maxlength: 1000 },
     se_aplica_por_dias: { type: Boolean, default: false },
+    remite_a_orientacion: { type: Boolean, default: false },
     orden: { type: Number, default: 0 },
     estado: { type: String, enum: ESTADOS_USUARIO, default: 'activo' },
   },
@@ -57,6 +60,8 @@ export const EntidadExterna = model<IEntidadExterna>('EntidadExterna', entidadSc
 export interface IPasoProtocolo {
   nombre: string;
   obligatorio: boolean;
+  /** Cumplir este paso en un caso remite a orientación a los afectados y presuntos responsables. */
+  remite_a_orientacion: boolean;
   orden: number;
 }
 
@@ -77,6 +82,7 @@ const protocoloSchema = new Schema<IProtocoloConvivencia, Model<IProtocoloConviv
           {
             nombre: { type: String, required: true, trim: true, maxlength: 200 },
             obligatorio: { type: Boolean, default: false },
+            remite_a_orientacion: { type: Boolean, default: false },
             orden: { type: Number, default: 0 },
           },
           { _id: false }

@@ -290,8 +290,17 @@ las pestañas Faltas / Medidas / Entidades / Protocolos / Plazos de `CatalogoCon
   hechos directo en la base. **Recusación (RN-15-11)**: por cada caso tratado se marca a los miembros apartados; no cuentan ni como miembro ni como
   presente para el quórum de ese caso, y quien (siendo usuario) se declaró impedido en el caso queda recusado solo. El PDF (`pdfkit`) identifica
   el caso solo por su código, marca el borrador como tal, se baja con sesión y queda auditado. Alertas de casos: `GET /convivencia/alertas`.
-- **Pendiente, a propósito**: remisión automática a orientación desde medidas y pasos de protocolo (hoy la remisión externa se registra, la
-  de orientación aún no), PIAR (M16), portal del acudiente/estudiante (M27), descuento en notas (diferido).
+- **Remisión a orientación** (`RemisionOrientacion`, colección aparte; `remisionOrientacion.service.ts`): `MedidaConvivencia` y cada paso del
+  protocolo tienen la bandera `remite_a_orientacion` (la define el colegio en el catálogo). Aplicar una medida marcada o cumplir un paso marcado
+  remite a orientación a los **afectados y presuntos responsables** del caso (`ROLES_QUE_SE_REMITEN`; no a testigos ni reportantes), en la misma
+  transacción del cambio, y es idempotente por `clave` (caso+estudiante+medida/paso). Convivencia también remite a mano
+  (`POST /convivencia/casos/:id/orientacion`). La remisión copia el contexto del caso (código, tipo, hechos) para que orientación **vea los hechos pero no
+  a los demás involucrados**. Un caso con remisiones a orientación no se anula.
+- **Orientación** (`/orientacion/remisiones`, `OrientacionPage`; solo `ORIENTADOR` de la sede y ADMIN, "no existe" = "no autorizado" = 404): estados
+  PENDIENTE → EN_ATENCION (con la primera atención) → ATENDIDA (exige al menos una atención). Las **atenciones son confidenciales**: solo las lee quien
+  las escribió y un ADMIN (otro orientador ve que existe, no el texto); convivencia ve desde su caso solo estado y fechas (`remisiones_orientacion`), y
+  la auditoría nunca lleva el contenido. Solo el orientador registra atenciones; ADMIN solo consulta. La lectura se audita (`ORIENTACION_*`).
+- **Pendiente, a propósito**: PIAR (M16), portal del acudiente/estudiante (M27), descuento en notas (diferido).
 
 ### M10 (Espacios físicos) — estado: núcleo completo
 

@@ -103,6 +103,7 @@ export interface DatosMedida {
   nombre: string;
   descripcion: string;
   se_aplica_por_dias: boolean;
+  remite_a_orientacion?: boolean;
   orden: number;
 }
 
@@ -200,13 +201,13 @@ export async function eliminarEntidad(id: string, actor: ContextoActor): Promise
  */
 export async function guardarProtocolo(
   tipo: TipoSituacion,
-  pasos: Omit<IPasoProtocolo, 'orden'>[],
+  pasos: (Omit<IPasoProtocolo, 'orden' | 'remite_a_orientacion'> & { remite_a_orientacion?: boolean })[],
   { usuarioId, ip }: ContextoActor
 ): Promise<ProtocoloConvivenciaDocument> {
   const institucion = await obtenerInstitucionConvivencia();
   const protocolo = await ProtocoloConvivencia.findOneAndUpdate(
     { institucion_id: institucion._id, tipo_situacion: tipo },
-    { $set: { pasos: pasos.map((p, i) => ({ ...p, orden: i + 1 })) } },
+    { $set: { pasos: pasos.map((p, i) => ({ ...p, remite_a_orientacion: Boolean(p.remite_a_orientacion), orden: i + 1 })) } },
     { upsert: true, new: true, runValidators: true, setDefaultsOnInsert: true }
   );
   await registrarEvento({

@@ -38,6 +38,8 @@ export interface Escenario {
   coordConvivenciaOtraSede: UserDocument;
   coordAcademico: UserDocument;
   orientador: UserDocument;
+  orientadorColega: UserDocument;
+  orientadorOtraSede: UserDocument;
   directora: UserDocument;
   docenteDeClase: UserDocument;
   docenteAjeno: UserDocument;
@@ -89,6 +91,8 @@ export async function armarEscenario(): Promise<Escenario> {
   const coordConvivenciaOtraSede = await crearUsuario('COORDINADOR_CONVIVENCIA', { sedes_ids: [otraSede._id] });
   const coordAcademico = await crearUsuario('COORDINADOR', { sedes_ids: [sede._id] });
   const orientador = await crearUsuario('ORIENTADOR', { sedes_ids: [sede._id] });
+  const orientadorColega = await crearUsuario('ORIENTADOR', { sedes_ids: [sede._id] });
+  const orientadorOtraSede = await crearUsuario('ORIENTADOR', { sedes_ids: [otraSede._id] });
   const directora = await crearUsuario('DOCENTE', { sedes_ids: [sede._id] });
   const docenteDeClase = await crearUsuario('DOCENTE', { sedes_ids: [sede._id] });
   const docenteAjeno = await crearUsuario('DOCENTE', { sedes_ids: [sede._id] });
@@ -138,6 +142,8 @@ export async function armarEscenario(): Promise<Escenario> {
     coordConvivenciaOtraSede,
     coordAcademico,
     orientador,
+    orientadorColega,
+    orientadorOtraSede,
     directora,
     docenteDeClase,
     docenteAjeno,

@@ -1,4 +1,4 @@
-import { Types } from 'mongoose';
+import { ClientSession, Types } from 'mongoose';
 import {
   ESTADOS_CASO,
   EstadoCaso,
@@ -15,6 +15,7 @@ import CasoConvivencia, { CasoConvivenciaDocument } from '../models/casoConviven
 import { EntidadExterna, MedidaConvivencia, ProtocoloConvivencia } from '../models/catalogosCaso.model';
 import Counter from '../models/counter.model';
 import FaltaConvivencia from '../models/faltaConvivencia.model';
+import RemisionOrientacion from '../models/remisionOrientacion.model';
 import SolicitudCaso from '../models/solicitudCaso.model';
 import { User, UserDocument } from '../models/user.model';
 import ApiError from '../utils/ApiError';
@@ -33,6 +34,7 @@ import { fechaDeClase, hoyColombia } from './attendance.service';
 import { registrarEvento } from './audit.service';
 import { obtenerConfiguracion } from './convivenciaCatalogo.service';
 import { exigirPermisoSobreEstudiante } from './observacion.service';
+import { auditarRemisionesCreadas, remitirAutomaticamente, remitirManualmente, resumenDeRemisionesDelCaso } from './remisionOrientacion.service';
 
 const ROLES_CONVIVENCIA: string[] = [ROLES.ADMIN, ROLES.COORDINADOR_CONVIVENCIA];
 const NO_ENCONTRADO = 'Caso no encontrado.';
@@ -101,11 +103,15 @@ async function vistaCaso(caso: CasoConvivenciaDocument) {
   const autores = new Set<string>();
   recolectarAutores(plano, autores);
   const estudiantes = plano.involucrados.map((i) => String(i.student_id));
-  const [nombres, configuracion] = await Promise.all([nombresDeUsuarios([...autores, ...estudiantes]), obtenerConfiguracion()]);
+  const [nombres, configuracion, remisionesOrientacion] = await Promise.all([
+    nombresDeUsuarios([...autores, ...estudiantes]),
+    obtenerConfiguracion(),
+    resumenDeRemisionesDelCaso(caso._id),
+  ]);
 
   const anotado = anotarAutores(plano, nombres) as Record<string, unknown> & { involucrados: Record<string, unknown>[] };
   anotado.involucrados = anotado.involucrados.map((i) => ({ ...i, estudiante: nombres.get(String(i.student_id)) ?? '' }));
-  return { ...anotado, alertas: alertasDeCaso(caso, configuracion, new Date(), hoyColombia()) };
+  return { ...anotado, remisiones_orientacion: remisionesOrientacion, alertas: alertasDeCaso(caso, configuracion, new Date(), hoyColombia()) };
 }
 
 // --- Apertura ---
@@ -151,7 +157,7 @@ export async function abrirCaso(input: AbrirCasoInput, usuario: UserDocument, ip
   const sedeDelCaso = (involucrados.find((i) => i.rol === 'PRESUNTO_RESPONSABLE') ?? involucrados[0])!.sede_id;
 
   const protocolo = await ProtocoloConvivencia.findOne({ tipo_situacion: input.tipo_situacion });
-  const pasos = (protocolo?.pasos ?? []).map((p) => ({ nombre: p.nombre, obligatorio: p.obligatorio, orden: p.orden }));
+  const pasos = (protocolo?.pasos ?? []).map((p) => ({ nombre: p.nombre, obligatorio: p.obligatorio, remite_a_orientacion: p.remite_a_orientacion, orden: p.orden }));
 
   const caso = await runTransaction(async (session) => {
     // Consecutivo anual sin huecos: el contador sube dentro de la misma transacción del caso (si falla, se revierte).
@@ -253,8 +259,23 @@ export async function obtenerCaso(id: string, usuario: UserDocument, ip?: string
 
 // --- Flujo ---
 
-async function guardarYAuditar(caso: CasoConvivenciaDocument, usuario: UserDocument, accion: Parameters<typeof registrarEvento>[0]['accion'], detalle: string, ip?: string | null) {
-  await caso.save();
+/** Si el cambio arrastra otras escrituras (p. ej. remisiones a orientación), se guardan todas en la misma transacción: o todo o nada. */
+async function guardarYAuditar(
+  caso: CasoConvivenciaDocument,
+  usuario: UserDocument,
+  accion: Parameters<typeof registrarEvento>[0]['accion'],
+  detalle: string,
+  ip?: string | null,
+  conjuntamente?: (session: ClientSession) => Promise<void>
+) {
+  if (conjuntamente) {
+    await runTransaction(async (session) => {
+      await caso.save({ session });
+      await conjuntamente(session);
+    });
+  } else {
+    await caso.save();
+  }
   await registrarEvento({ usuario_id: usuario._id, accion, entidad: 'CasoConvivencia', entidad_id: caso._id, detalle, ip });
   return vistaCaso(caso);
 }
@@ -288,7 +309,7 @@ export async function reclasificarCaso(id: string, tipo: TipoSituacion, motivo: 
   const protocolo = await ProtocoloConvivencia.findOne({ tipo_situacion: tipo });
   const nuevos = pasosFaltantes(caso.pasos, protocolo?.pasos ?? []);
   const base = caso.pasos.length;
-  nuevos.forEach((p, i) => caso.pasos.push({ nombre: p.nombre, obligatorio: p.obligatorio, orden: base + i + 1, estado: 'PENDIENTE', fecha: null, por: null, nota: '' }));
+  nuevos.forEach((p, i) => caso.pasos.push({ nombre: p.nombre, obligatorio: p.obligatorio, remite_a_orientacion: p.remite_a_orientacion, orden: base + i + 1, estado: 'PENDIENTE', fecha: null, por: null, nota: '' }));
   return guardarYAuditar(caso, usuario, 'CASO_CONVIVENCIA_RECLASIFICADO', `${caso.reclasificaciones.at(-1)?.de} -> ${tipo}`, ip);
 }
 
@@ -308,7 +329,15 @@ export async function actualizarPaso(id: string, pasoId: string, datos: { estado
   paso.nota = (datos.nota ?? '').trim();
   paso.fecha = datos.estado === 'PENDIENTE' ? null : new Date();
   paso.por = datos.estado === 'PENDIENTE' ? null : usuario._id;
-  return guardarYAuditar(caso, usuario, 'CASO_CONVIVENCIA_ACTUALIZADO', 'paso', ip);
+
+  // Cumplir un paso que el colegio marcó como "remite a orientación" remite a los afectados y presuntos responsables.
+  let creadas = 0;
+  const remite = datos.estado === 'CUMPLIDO' && paso.remite_a_orientacion;
+  const vista = await guardarYAuditar(caso, usuario, 'CASO_CONVIVENCIA_ACTUALIZADO', 'paso', ip, remite ? async (session) => {
+    creadas = await remitirAutomaticamente(caso, { tipo: 'PASO', id: String(paso._id), nombre: paso.nombre }, usuario, session);
+  } : undefined);
+  if (creadas > 0) await auditarRemisionesCreadas(usuario, caso, creadas, `paso «${paso.nombre}»`, ip);
+  return vista;
 }
 
 // --- Registros del proceso ---
@@ -350,6 +379,7 @@ export async function agregarRegistroCaso(id: string, coleccion: ColeccionRegist
   const fecha = fechaDeClase(d.fecha);
   exigirFechaNoFutura(fecha, 'La fecha del registro');
   const por = usuario._id;
+  let remitePor: { tipo: 'MEDIDA'; id: string; nombre: string } | null = null;
 
   switch (coleccion) {
     case 'seguimientos': {
@@ -390,10 +420,27 @@ export async function agregarRegistroCaso(id: string, coleccion: ColeccionRegist
       if (!medida) throw new ApiError(400, 'La medida no existe o está inactiva.');
       if (medida.se_aplica_por_dias && !(d.dias && d.dias > 0)) throw new ApiError(400, 'Esta medida se aplica por días: indica cuántos.');
       caso.medidas_aplicadas.push({ medida_id: medida._id, nombre: medida.nombre, dias: medida.se_aplica_por_dias ? (d.dias ?? null) : null, observaciones: (d.observaciones ?? '').trim(), fecha, por });
+      // Una medida que el colegio marcó como "remite a orientación" remite a los afectados y presuntos responsables.
+      if (medida.remite_a_orientacion) remitePor = { tipo: 'MEDIDA', id: String(medida._id), nombre: medida.nombre };
       break;
     }
   }
-  return guardarYAuditar(caso, usuario, 'CASO_CONVIVENCIA_ACTUALIZADO', coleccion, ip);
+  let creadas = 0;
+  const origen = remitePor;
+  const vista = await guardarYAuditar(caso, usuario, 'CASO_CONVIVENCIA_ACTUALIZADO', coleccion, ip, origen ? async (session) => {
+    creadas = await remitirAutomaticamente(caso, origen, usuario, session);
+  } : undefined);
+  if (creadas > 0 && origen) await auditarRemisionesCreadas(usuario, caso, creadas, `medida «${origen.nombre}»`, ip);
+  return vista;
+}
+
+/** Convivencia remite a orientación, a mano, a estudiantes del caso (además de las remisiones automáticas de medidas y pasos). */
+export async function remitirAOrientacion(id: string, datos: { student_ids: string[]; motivo: string }, usuario: UserDocument, ip?: string | null) {
+  const caso = await cargarCaso(id, usuario);
+  exigirEditable(caso);
+  const creadas = await runTransaction((session) => remitirManualmente(caso, datos.student_ids, datos.motivo, usuario, session));
+  await auditarRemisionesCreadas(usuario, caso, creadas, 'manual', ip);
+  return vistaCaso(caso);
 }
 
 /** La decisión es motivada y solo se toma después de oír los descargos (RN-15-04/05). */
@@ -457,6 +504,7 @@ export async function anularCaso(id: string, motivo: string, usuario: UserDocume
   if (usuario.rol !== ROLES.ADMIN) throw new ApiError(403, 'Solo un administrador anula un caso.');
   const caso = await cargarCaso(id, usuario);
   if (caso.estado !== 'ABIERTO') throw new ApiError(409, 'Solo se anula un caso recién abierto.');
+  if (await RemisionOrientacion.exists({ caso_id: caso._id })) throw new ApiError(409, 'El caso ya remitió estudiantes a orientación: no se puede anular.');
   caso.estado = 'ANULADO';
   caso.anulacion = { motivo: motivo.trim(), por: usuario._id, fecha: new Date() };
   await SolicitudCaso.updateOne({ _id: caso.solicitud_id, caso_id: caso._id }, { $set: { estado: 'PENDIENTE', caso_id: null, resolucion: null } });

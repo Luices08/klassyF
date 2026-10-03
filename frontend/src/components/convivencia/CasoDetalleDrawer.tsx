@@ -285,6 +285,24 @@ function Contenido({ caso }: { caso: CasoDetalle }) {
           </Fila>
           {!finalizado && <Boton onAccion={setAccion} modo="remisiones">Registrar remisión</Boton>}
 
+          <Fila etiqueta="Remisiones a orientación">
+            <ul className="space-y-2">
+              {caso.remisiones_orientacion.map((r) => (
+                <Registro key={r._id} fecha={r.createdAt}>
+                  <strong>{r.estudiante}</strong> · {NOMBRES_ROL_INVOLUCRADO[r.rol]}
+                  <p className="text-xs text-muted">
+                    {r.origen === 'MEDIDA' ? 'Por la medida' : r.origen === 'PASO' ? 'Por el paso' : 'Manual'}: {r.origen_detalle}
+                  </p>
+                  <Chip tone={r.estado === 'ATENDIDA' ? 'green' : r.estado === 'EN_ATENCION' ? 'blue' : 'orange'}>
+                    {r.estado === 'ATENDIDA' ? 'Atendida' : r.estado === 'EN_ATENCION' ? 'En atención' : 'Pendiente'}
+                  </Chip>
+                </Registro>
+              ))}
+              {caso.remisiones_orientacion.length === 0 && <li className="text-muted">Ningún estudiante remitido a orientación.</li>}
+            </ul>
+          </Fila>
+          {!finalizado && <Boton onAccion={setAccion} modo="orientacion">Remitir a orientación</Boton>}
+
           <Fila etiqueta="Decisión">
             {caso.decision ? (
               <>

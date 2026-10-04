@@ -13,6 +13,9 @@ import { GestionAsistenciaPage } from './pages/GestionAsistenciaPage';
 import { MiObservadorPage } from './pages/MiObservadorPage';
 import { ObservadorPage } from './pages/ObservadorPage';
 import { OrientacionPage } from './pages/OrientacionPage';
+import { ExpedienteInclusionPage } from './pages/ExpedienteInclusionPage';
+import { InclusionPage } from './pages/InclusionPage';
+import { MisAjustesPage } from './pages/MisAjustesPage';
 import { AcademicCatalogPage } from './pages/admin/AcademicCatalogPage';
 import { AdmissionRequestsPage } from './pages/admin/AdmissionRequestsPage';
 import { CasosConvivenciaPage } from './pages/admin/CasosConvivenciaPage';
@@ -94,6 +97,16 @@ export default function App() {
           </Route>
           <Route element={<ProtectedRoute allowedRoles={['ADMIN', 'ORIENTADOR']} />}>
             <Route path="/orientacion/remisiones" element={<OrientacionPage />} />
+          </Route>
+          {/* Inclusión (M16): el expediente lo abren también los docentes con vínculo (el servidor decide qué ven). */}
+          <Route element={<ProtectedRoute allowedRoles={['ADMIN', 'ORIENTADOR', 'COORDINADOR']} />}>
+            <Route path="/inclusion" element={<InclusionPage />} />
+          </Route>
+          <Route element={<ProtectedRoute allowedRoles={['ADMIN', 'ORIENTADOR', 'COORDINADOR', 'DOCENTE']} />}>
+            <Route path="/inclusion/expedientes/:id" element={<ExpedienteInclusionPage />} />
+          </Route>
+          <Route element={<ProtectedRoute allowedRoles={['DOCENTE']} />}>
+            <Route path="/docente/ajustes-razonables" element={<MisAjustesPage />} />
           </Route>
           <Route element={<ProtectedRoute allowedRoles={['ESTUDIANTE']} />}>
             <Route path="/mi-observador" element={<MiObservadorPage />} />

@@ -63,6 +63,9 @@ export const NAV_ITEMS: NavItem[] = [
   { to: '/convivencia/casos', label: 'Casos de convivencia', icon: FolderIcon, roles: CONVIVENCIA_GESTIONA },
   { to: '/convivencia/comite', label: 'Comité de convivencia', icon: UsersIcon, roles: CONVIVENCIA_GESTIONA },
   { to: '/convivencia/solicitudes', label: 'Solicitudes de caso', icon: InboxIcon, roles: CONVIVENCIA_GESTIONA },
+  // Inclusión (M16): el rol abre la puerta y el servidor decide por estudiante, sede y vínculo docente.
+  { to: '/inclusion', label: 'Inclusión (PIAR)', icon: FolderIcon, roles: ['ADMIN', 'ORIENTADOR', 'COORDINADOR'] },
+  { to: '/docente/ajustes-razonables', label: 'Estudiantes con ajustes', icon: ClipboardListIcon, roles: ['DOCENTE'] },
   { to: '/orientacion/remisiones', label: 'Remisiones a orientación', icon: InboxIcon, roles: ['ADMIN', 'ORIENTADOR'] },
   { to: '/mi-observador', label: 'Mi observador', icon: EyeIcon, roles: ['ESTUDIANTE'] },
 ];

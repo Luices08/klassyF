@@ -110,7 +110,7 @@ Backend `/users` (modelo `User`), frontend `/admin/users` (`UsersPage`).
 - **`ORIENTADOR` (Orientación / Psicología, M14/M15)**: el maestro (§3 y M02) lo lista como actor y rol base; se agregó con la misma lógica que
   `COORDINADOR_CONVIVENCIA`: rango 70 (solo un ADMIN lo gestiona), sede obligatoria (`ROLES_CON_SEDE_OBLIGATORIA`) y sin herencia de ningún
   otro rol. Sus funciones en este alcance son el seguimiento psicosocial (observaciones confidenciales) y las remisiones a orientación que
-  recibe de convivencia. **El PIAR (M16) no se construyó**: el rol existe pero M16 sigue pendiente. Tampoco ve la salud administrativa del estudiante.
+  recibe de convivencia. **El PIAR vive en M16** (ver su sección): orientación lo lidera. Tampoco ve la salud administrativa del estudiante en M03; dentro de un expediente M16 abierto lee EPS y régimen de M03 sin copiarlos.
 - **Secretaría en M02**: mantiene la consulta global del directorio de usuarios, pero todas las acciones sobre
   roles jerárquicamente iguales o superiores (`ADMIN`, `COORDINADOR`, `DOCENTE`, `SECRETARIA`) quedan bloqueadas
   tanto en frontend (`IconButton disabled` con tooltip explicativo) como en backend (403 con mensaje de
@@ -302,7 +302,61 @@ las pestañas Faltas / Medidas / Entidades / Protocolos / Plazos de `CatalogoCon
   PENDIENTE → EN_ATENCION (con la primera atención) → ATENDIDA (exige al menos una atención). Las **atenciones son confidenciales**: solo las lee quien
   las escribió y un ADMIN (otro orientador ve que existe, no el texto); convivencia ve desde su caso solo estado y fechas (`remisiones_orientacion`), y
   la auditoría nunca lleva el contenido. Solo el orientador registra atenciones; ADMIN solo consulta. La lectura se audita (`ORIENTACION_*`).
-- **Pendiente, a propósito**: PIAR (M16), portal del acudiente/estudiante (M27), descuento en notas (diferido).
+- **Pendiente, a propósito**: portal del acudiente/estudiante (M27), descuento en notas (diferido). El PIAR es M16.
+
+### M16 (Inclusión — PIAR y plan de apoyo pedagógico) — estado: núcleo completo
+
+Backend `/inclusion` (modelos `SolicitudApoyo`, `ExpedienteInclusion`, `AjusteAsignatura`, `DocumentoPiar`, `ConfiguracionInclusion`), frontend
+`InclusionPage` (`/inclusion`), `ExpedienteInclusionPage` (`/inclusion/expedientes/:id`), `MisAjustesPage` (`/docente/ajustes-razonables`) y la sección
+«Educación inclusiva» de la pestaña «Observador y bienestar» de la ficha del estudiante. Análisis y decisiones: `doc/Analisis_M16_Integral_Klassy.md`
+(el `doc/Analisis_M16_Klassy.md` previo se contrastó y se corrigió: no usar sus modelos). Reglas que no se ven leyendo un solo archivo:
+
+- **PIAR ≠ plan de apoyo.** El PIAR (Decreto 1421) es solo para discapacidad. El «plan de apoyo pedagógico» (TDAH, dislexia, rezago) es un expediente liviano
+  del mismo módulo (`tipo: PLAN_APOYO`): sin categoría de discapacidad, sin ajustes por asignatura, sin anexos del MEN; **no se llama PIAR ni DUA**
+  (el DUA es planeación de aula para todos). Talento excepcional queda fuera. Su rótulo de necesidad es dato de salud igual.
+- **Un expediente por estudiante y año** (índice único), ligado al estudiante y no al grupo: el grupo vigente sale de su `Enrollment` activo (puede cambiar
+  durante el año). Estados por tabla (`TRANSICIONES_EXPEDIENTE`): BORRADOR → EN_CONSTRUCCION → LISTO_PARA_ACUERDO → ACTIVO (nace al firmar el acta) → CERRADO.
+  Un año CERRADO deja todo en solo lectura leyendo el año (no se tocó M05). El plazo de elaboración es parámetro del colegio (días) y **solo alerta**.
+- **Entrada única: `SolicitudApoyo`** (como `SolicitudCaso` en M14→M15). Orígenes: matrícula directa y preinscripción pública (campo opcional
+  `apoyo_declarado` en la creación de `Enrollment` y en `AdmissionRequest`, creada en la misma transacción — único cambio en M04), docente (de clase o
+  director de grupo, **con hechos observados, sin diagnosticar**), convivencia y directo. Secretaría solo transcribe lo declarado; orientación valora y decide
+  (`ABRIR_PIAR`, `PLAN_APOYO`, `SEGUIMIENTO_PSICOSOCIAL`, `RUTA_SALUD`, `DESCARTAR`, siempre con motivo). El docente solo ve que su reporte existe y su estado.
+- **Quién ve qué** lo decide `permisoInclusion` (`utils/permisosInclusion.ts`, función pura con tests, lista de permitidos, sin herencia): orientación (de
+  sus sedes) y ADMIN ven todo; **coordinación** supervisa y aprueba pero no ve lo clínico ni la modalidad; el **docente** ve la *ficha pedagógica* (barreras,
+  recomendaciones, pautas de evaluación, una «alerta de seguridad» opcional escrita por orientación) y edita **solo la asignatura que dicta**; el director
+  de grupo ve los ajustes de todas las de su grupo y edita las dimensiones transversales. **Ningún docente ve la modalidad (PIAR/plan) ni la categoría SIMAT**
+  (revelarían la condición). SECRETARIA, COORDINADOR_CONVIVENCIA, ACUDIENTE y ESTUDIANTE no tienen acceso (acudiente: M27). «No existe» = «no autorizado» = 404.
+  El buscador reusa el de convivencia (`gruposAccesibles`/`buscarEstudiantes`); no se abre `/students`.
+- **Datos sensibles (Ley 1581/1098).** Sin la **autorización específica del responsable legal** (`consentimiento`, propia de M16, distinta de la de salud de
+  M03) no se guarda nada clínico, no se inicia la construcción ni se emite ningún documento; revocarla lo bloquea de nuevo. EPS y régimen **se leen de M03**
+  dentro del expediente abierto (nunca se copian al expediente). Los soportes clínicos van a `uploads/inclusion/<expediente>/` (firma de bytes, 5 MB), solo se
+  descargan con sesión y permiso, y cada descarga y **cada consulta de un expediente se audita** (el `detalle` nunca lleva contenido). El soporte clínico es
+  **opcional**: no condiciona la atención pedagógica (sí el reporte a SIMAT); la categoría puede quedar `POR_CONFIRMAR`.
+- **Anexo 2 por asignatura** (`AjusteAsignatura`, único por expediente+asignatura, ligado a la asignatura y no al docente porque el docente se reemplaza):
+  las filas esperadas salen del **plan de estudios del grupo** (M06) y el docente de cada una de `TeacherAssignment` (M08); nunca se inventan filas. Los
+  objetivos se **eligen del banco curricular** (DBA, M07, por `_id`; el docente no escribe un DBA). Seguimiento por ajuste y periodo (mínimo configurable,
+  3 por defecto según el formato/SIEE) solo con el expediente ACTIVO y un periodo iniciado y no cerrado (M05).
+- **Versionado.** Cada cambio con el expediente aprobado o firmado sube `version` y devuelve lo aprobado a construcción; un documento emitido con una
+  versión anterior queda «desactualizado» y **no se puede firmar** (hay que emitirlo de nuevo). Las ediciones quedan en `ediciones[]` del ajuste.
+- **Documentos** (`DOCUMENTOS_PIAR` en `constants/inclusion.ts`, por **clave, no por número de anexo**: la numeración varía por fuente): Anexo 1 información
+  general (confidencial), PIAR (Anexo 2), acta de acuerdo con la familia, informe anual, **acta oficial PIAR** (paquete: portada + Anexo 1 versión carpeta sin
+  datos clínicos + PIAR + acta) y plan de apoyo (confidencial). Cada emisión **congela un snapshot**, asigna consecutivo anual sin huecos (`Counter`,
+  `PIAR-2026-0001`) y una **huella SHA-256** (`huellaDelDocumento`; `GET /inclusion/documentos/:id/integridad` la recalcula); el modelo impide editar lo emitido
+  y el PDF (`piarPdf.service.ts`, pdfkit) se dibuja **solo desde el snapshot**, con el código y la huella corta en cada hoja. Firma **física + escaneo** (v1):
+  la firma institucional de las actas es solo del ADMIN (rector), el estudiante menor la firma con su acudiente y el mayor de edad por sí mismo; al firmar el
+  acta el expediente pasa a ACTIVO. Re-emitir sustituye lo no firmado; lo firmado nunca se sustituye.
+- **Dónde se definen los documentos.** M16 define **qué lleva** cada uno (formatos normativos del MEN, no formularios libres). **Cómo se ven** (logo, encabezado,
+  textos) lo personalizará M21/M32 y el archivo general será M29; hoy hay un solo punto de enganche: `encabezadoInstitucional.service.ts` (institución, DANE,
+  NIT, resolución, sede, jornada, año y `logo_url`) y el registro `DOCUMENTOS_PIAR`. **No se construyó un constructor de plantillas en M16.**
+- **Configuración** (`ConfiguracionInclusion`, ADMIN): plazo de elaboración, seguimientos mínimos, retención (vacío = sin plazo; nunca se borra), textos de las
+  dos declaraciones del acta y versión de la política de datos. Las categorías de discapacidad (SIMAT) son una constante **versionada a validar** con el
+  anexo técnico vigente del MEN.
+- **Pruebas:** unitarias (`permisosInclusion`, `inclusion`, `piarPdf`) y de integración con base real (`tests/integracion/inclusion.int.test.ts`).
+- **Pendiente, a propósito**: portal del acudiente (M27) y notificaciones (M28); archivo y versiones generales (M29); constructor de formatos y personalización
+  (M21/M32); advertencia en la planilla de notas y ajuste de la evaluación (M12, solo se expone `GET /inclusion/grupos/:groupId/indicador`); anexo del informe
+  al boletín final (M17) y promoción (M19/M20); reportes SIMAT (M30); firma electrónica certificada; cierre automático del expediente al retirar la matrícula
+  (hoy se cierra a mano); aviso de informes anuales pendientes en la verificación de cierre del año (M05); carga de soportes por secretaría; contrastar los
+  campos con el formato oficial del MEN y el anexo técnico SIMAT (**validar**).
 
 ### M10 (Espacios físicos) — estado: núcleo completo
 
@@ -527,7 +581,7 @@ nuevos para lo que ya existe aquí** — extenderlos si falta un caso, no duplic
   mapeo rol→color o estado→color en una página), `Card`/`CardHeader`, `Table`/`TableHead`/`Th`/
   `TableBody`/`Td`/`EmptyRow`, `Drawer` (formularios de creación/edición; su botón principal
   acepta `submitVariant` para casos como confirmar un borrado en rojo), `PageHeader` (título +
-  subtítulo + acción de la página), `Field` (`Input`/`Select`), `MultiSelect` (selector desplegable de selección múltiple con checkboxes, contador y badges de rol/estado), `Alert`, `Spinner`, `EstadoEspacioBadge` (M10), `EstadoAsistenciaChip`/`EstadoJustificacionBadge` (M13), `GuiaColumnas` (guía colapsable de columnas de una carga CSV), `ProgressBar` (barra de avance con tono, ej. semanas lectivas vs. el mínimo de 40), `LineaTiempo` (línea de tiempo vertical con punto, fecha, chips y contenido por registro; la usa el historial de convivencia), `EstadoCasoBadge`/`TipoSituacionBadge` (M15), `Tabs`/`TabPanel` (navegación por pestañas con subrayado azul en la activa; reusar en vez de reinventar un switch de pestañas en otra página), `Stepper` (indicador de pasos para formularios largos por secciones, ej. el asistente de creación de estudiante en M03), e iconos SVG propios en `components/ui/icons.tsx` (no se agregó ninguna librería de iconos).
+  subtítulo + acción de la página), `Field` (`Input`/`Select`), `MultiSelect` (selector desplegable de selección múltiple con checkboxes, contador y badges de rol/estado), `Alert`, `Spinner`, `EstadoEspacioBadge` (M10), `EstadoAsistenciaChip`/`EstadoJustificacionBadge` (M13), `GuiaColumnas` (guía colapsable de columnas de una carga CSV), `ProgressBar` (barra de avance con tono, ej. semanas lectivas vs. el mínimo de 40), `LineaTiempo` (línea de tiempo vertical con punto, fecha, chips y contenido por registro; la usa el historial de convivencia), `EstadoCasoBadge`/`TipoSituacionBadge` (M15), `EstadoExpedienteBadge`/`EstadoSolicitudApoyoBadge` (M16), `Tabs`/`TabPanel` (navegación por pestañas con subrayado azul en la activa; reusar en vez de reinventar un switch de pestañas en otra página), `Stepper` (indicador de pasos para formularios largos por secciones, ej. el asistente de creación de estudiante en M03), e iconos SVG propios en `components/ui/icons.tsx` (no se agregó ninguna librería de iconos).
 - **Contenedor global y densidad** (`components/layout/AppShell.tsx`): el `<main>` centra el
   contenido en `max-w-7xl` (no `max-w-5xl`) para que las tablas anchas (Usuarios, Grupos) no
   scrolleen antes de tiempo en pantallas grandes. Cada página usa `space-y-4` (no `space-y-6`)

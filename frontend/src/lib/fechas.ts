@@ -41,3 +41,8 @@ export function aInputFechaHora(fecha: Date): string {
   const local = new Date(fecha.getTime() - fecha.getTimezoneOffset() * 60_000);
   return local.toISOString().slice(0, 16);
 }
+
+/** Fecha, en hora local, de un instante registrado por el sistema (creación, emisión…); no es una fecha de calendario del año lectivo. */
+export function formatoFechaLocal(iso: string | null | undefined): string {
+  return iso ? new Date(iso).toLocaleDateString('es-CO') : '—';
+}

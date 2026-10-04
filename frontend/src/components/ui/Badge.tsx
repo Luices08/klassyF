@@ -16,6 +16,8 @@ import type {
 } from '../../types/domain';
 import { NOMBRES_ESTADO_ESPACIO } from '../../types/domain';
 import type { EstadoCaso } from '../../hooks/useCasos';
+import type { EstadoExpediente, EstadoSolicitudApoyo } from '../../hooks/useInclusion';
+import { NOMBRES_ESTADO_EXPEDIENTE, NOMBRES_ESTADO_SOLICITUD } from '../../hooks/useInclusion';
 import type { TipoSituacion } from '../../hooks/useObservaciones';
 import type { Desempeno } from '../../types/reportCard';
 
@@ -281,4 +283,29 @@ const SITUACION_TONE: Record<TipoSituacion, Tone> = { I: 'blue', II: 'orange', I
 /** Tipo de situación I/II/III (Ley 1620): el tipo lo fija la ley; el tono sube con la gravedad. */
 export function TipoSituacionBadge({ value }: { value: TipoSituacion }) {
   return <Chip tone={SITUACION_TONE[value]}>Tipo {value}</Chip>;
+}
+
+const EXPEDIENTE_TONE: Record<EstadoExpediente, Tone> = {
+  BORRADOR: 'neutral',
+  EN_CONSTRUCCION: 'orange',
+  LISTO_PARA_ACUERDO: 'blue',
+  ACTIVO: 'green',
+  CERRADO: 'neutral',
+};
+
+/** Estado de un expediente de inclusión (M16): naranja en curso, azul listo para firmar, verde acordado y vigente. */
+export function EstadoExpedienteBadge({ value }: { value: EstadoExpediente }) {
+  return <Chip tone={EXPEDIENTE_TONE[value]}>{NOMBRES_ESTADO_EXPEDIENTE[value]}</Chip>;
+}
+
+const SOLICITUD_APOYO_TONE: Record<EstadoSolicitudApoyo, Tone> = {
+  PENDIENTE: 'orange',
+  EN_VALORACION: 'blue',
+  CONVERTIDA: 'green',
+  DESCARTADA: 'neutral',
+};
+
+/** Estado de una solicitud de apoyo (M16). */
+export function EstadoSolicitudApoyoBadge({ value }: { value: EstadoSolicitudApoyo }) {
+  return <Chip tone={SOLICITUD_APOYO_TONE[value]}>{NOMBRES_ESTADO_SOLICITUD[value]}</Chip>;
 }

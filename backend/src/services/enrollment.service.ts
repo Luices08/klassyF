@@ -18,6 +18,7 @@ import ApiError from '../utils/ApiError';
 import { runTransaction } from '../utils/runTransaction';
 import { registrarEvento } from './audit.service';
 import { generateFolioMatricula } from './folio.service';
+import { crearDesdeMatricula } from './solicitudApoyo.service';
 
 const ESTADOS_QUE_LIBERAN_CUPO: EstadoMatricula[] = ['RETIRADO', 'ANULADO'];
 const ESTADOS_TERMINALES: EstadoMatricula[] = ['RETIRADO', 'ANULADO'];
@@ -31,6 +32,8 @@ export interface CreateEnrollmentInput {
   estado_inicial?: 'MATRICULADO_CONDICIONAL' | 'MATRICULADO_DEFINITIVO';
   fecha_limite_compromiso?: string | Date;
   forzar_sobrecupo?: boolean;
+  /** Lo que la familia declara sobre apoyos o diagnósticos previos (M16): se transcribe, sin valorar ni rotular. */
+  apoyo_declarado?: { motivo_declarado: string; aporta_soporte?: boolean; observacion?: string };
 }
 
 /**
@@ -117,6 +120,23 @@ export async function createEnrollment(
       { session }
     );
     if (!enrollment) throw new ApiError(500, 'No se pudo crear la matricula.');
+
+    // Cambio mínimo de M16: en la misma transacción queda la solicitud en la bandeja de orientación.
+    if (input.apoyo_declarado) {
+      await crearDesdeMatricula(
+        {
+          student_id,
+          academic_year_id,
+          group_id,
+          origen: 'MATRICULA',
+          motivo_declarado: input.apoyo_declarado.motivo_declarado,
+          aporta_soporte: Boolean(input.apoyo_declarado.aporta_soporte),
+          observacion: input.apoyo_declarado.observacion,
+          solicitada_por: actor.id,
+        },
+        session
+      );
+    }
 
     await registrarEvento({
       usuario_id: actor.id,

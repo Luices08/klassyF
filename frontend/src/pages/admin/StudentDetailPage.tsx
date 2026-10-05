@@ -1,6 +1,7 @@
 import { type FormEvent, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { HistorialObservaciones } from '../../components/convivencia/HistorialObservaciones';
+import { InclusionResumen } from '../../components/inclusion/InclusionResumen';
 import { ReportCardView } from '../../components/reportCard/ReportCardView';
 import { Alert, errorMessage } from '../../components/ui/Alert';
 import { Chip, EstadoEstudianteBadge, EstadoMatriculaBadge } from '../../components/ui/Badge';
@@ -143,6 +144,8 @@ export function StudentDetailPage() {
           ) : (
             <HistorialObservaciones studentId={estudiante._id} />
           )}
+          {/* Inclusión (M16): solo quien tiene acceso al módulo; el expediente decide el detalle por rol y sede. */}
+          {(rol === 'ADMIN' || rol === 'ORIENTADOR' || rol === 'COORDINADOR') && <InclusionResumen numeroDocumento={estudiante.numero_documento} />}
         </TabPanel>
       </Card>
     </div>

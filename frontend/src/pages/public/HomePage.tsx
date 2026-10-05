@@ -12,6 +12,8 @@ import { PreinscripcionAprobada } from '../../components/public/PreinscripcionAp
 import { useEstadoSolicitud, useSolicitarCupo, type CredencialesPreinscripcion } from '../../hooks/useAdmissionRequests';
 import { usePublicGrades, usePublicInstitutionInfo } from '../../hooks/usePublicInfo';
 import { JORNADAS, TIPOS_DOCUMENTO, type Jornada, type TipoDocumento } from '../../types/domain';
+import { InformacionApoyoCampos } from '../../components/inclusion/InformacionApoyoCampos';
+import { APOYO_VACIO, aApoyoDeclarado } from '../../lib/apoyoDeclarado';
 
 const ANCLAS = [
   { href: '#inicio', label: 'Inicio' },
@@ -62,6 +64,7 @@ const SOLICITUD_VACIA = {
   acudiente_telefono: '',
   acudiente_email: '',
   observaciones: '',
+  apoyo: APOYO_VACIO,
 };
 
 export function HomePage() {
@@ -77,8 +80,10 @@ export function HomePage() {
   async function handleSolicitar(e: FormEvent) {
     e.preventDefault();
     solicitar.reset();
+    const { apoyo, ...datos } = form;
     await solicitar.mutateAsync({
-      ...form,
+      ...datos,
+      apoyo_declarado: aApoyoDeclarado(apoyo),
       sede_deseada_id: form.sede_deseada_id || undefined,
       jornada_deseada: form.jornada_deseada || undefined,
       observaciones: form.observaciones || undefined,
@@ -360,6 +365,7 @@ export function HomePage() {
               value={form.observaciones}
               onChange={(e) => setForm((f) => ({ ...f, observaciones: e.target.value }))}
             />
+            <InformacionApoyoCampos valor={form.apoyo} onChange={(apoyo) => setForm((f) => ({ ...f, apoyo }))} />
           </>
         )}
       </Drawer>

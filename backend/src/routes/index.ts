@@ -15,6 +15,7 @@ import espacioRoutes from './espacio.routes';
 import gradeRoutes from './grade.routes';
 import groupRoutes from './group.routes';
 import guardianRoutes from './guardian.routes';
+import inclusionRoutes from './inclusion.routes';
 import institutionRoutes from './institution.routes';
 import jornadaOperativaRoutes from './jornadaOperativa.routes';
 import observacionRoutes from './observacion.routes';
@@ -70,6 +71,9 @@ router.use('/convivencia', casoRoutes);
 
 // Orientación: remisiones que convivencia le envía desde un caso (psicología / orientación escolar)
 router.use('/orientacion', orientacionRoutes);
+
+// M16: Inclusión (PIAR, plan de apoyo pedagógico y sus documentos)
+router.use('/inclusion', inclusionRoutes);
 
 // Prompt 3: Actividades, Calificaciones, Asistencia y Motor de Boletines
 router.use('/activities', activityRoutes);

@@ -14,6 +14,7 @@ import { ESTADO_ACTIVO } from '../utils/filtroEstado';
 import { generarPasswordTemporal } from '../utils/generarPasswordTemporal';
 import { runTransaction } from '../utils/runTransaction';
 import { buscarMatriculaDePreinscripcion, construirDetalle, PreinscripcionDetalle } from './preinscripcionPublica.service';
+import { crearDesdeMatricula } from './solicitudApoyo.service';
 
 // Incluye APROBADA para que un aspirante ya admitido no pueda radicar una segunda solicitud
 // paralela (terminaria chocando con el numero_documento unico del User al aprobarla de nuevo).
@@ -33,6 +34,7 @@ export interface CrearSolicitudInput {
   acudiente_telefono: string;
   acudiente_email: string;
   observaciones?: string;
+  apoyo_declarado?: { motivo_declarado: string; aporta_soporte?: boolean; observacion?: string };
 }
 
 /** Solicitud publica (M04): sin autenticar, no crea cuentas ni consume cupos todavia. */
@@ -234,6 +236,23 @@ export async function aprobarSolicitud(
       { session }
     );
     if (!enrollment) throw new ApiError(500, 'No se pudo crear la matricula.');
+
+    // Cambio mínimo de M16: lo que la familia declaró pasa a orientación, en la misma transacción de la aprobación.
+    if (solicitud.apoyo_declarado) {
+      await crearDesdeMatricula(
+        {
+          student_id: student._id,
+          academic_year_id,
+          group_id,
+          origen: 'PREINSCRIPCION',
+          motivo_declarado: solicitud.apoyo_declarado.motivo_declarado,
+          aporta_soporte: solicitud.apoyo_declarado.aporta_soporte,
+          observacion: solicitud.apoyo_declarado.observacion,
+          solicitada_por: new Types.ObjectId(revisorId),
+        },
+        session
+      );
+    }
 
     solicitud.estado = 'APROBADA';
     solicitud.revisado_por = new Types.ObjectId(revisorId);

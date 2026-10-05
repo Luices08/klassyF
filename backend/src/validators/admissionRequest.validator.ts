@@ -21,6 +21,11 @@ export const crearSolicitud: ValidationSchema = {
     acudiente_telefono: Joi.string().required(),
     acudiente_email: Joi.string().email().required(),
     observaciones: Joi.string().allow(''),
+    apoyo_declarado: Joi.object({
+      motivo_declarado: Joi.string().trim().min(3).max(500).required(),
+      aporta_soporte: Joi.boolean().default(false),
+      observacion: Joi.string().trim().allow('').max(2000),
+    }),
   }),
 };
 

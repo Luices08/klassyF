@@ -11,6 +11,8 @@ export interface CreateEnrollmentInput {
   estado_inicial?: 'MATRICULADO_CONDICIONAL' | 'MATRICULADO_DEFINITIVO';
   fecha_limite_compromiso?: string;
   forzar_sobrecupo?: boolean;
+  /** Lo que la familia declara sobre apoyos o diagnósticos previos: pasa a la bandeja de orientación (M16). */
+  apoyo_declarado?: { motivo_declarado: string; aporta_soporte?: boolean; observacion?: string };
 }
 
 export function useCreateEnrollment() {

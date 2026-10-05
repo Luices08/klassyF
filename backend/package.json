@@ -1,6 +1,6 @@
 {
   "name": "klassy-nucleo-institucional",
-  "version": "1.0.0",
+  "version": "0.16.0",
   "description": "Klassy - Nucleo Institucional, RBAC y Matriculas con control de cupos (Prompt 1)",
   "main": "dist/server.js",
   "scripts": {

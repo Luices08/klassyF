@@ -5,9 +5,9 @@ import { UserDocument } from '../models/user.model';
 import { huellaCorta } from '../utils/inclusion';
 import { registrarEvento } from './audit.service';
 import { cargarDocumento } from './documentoPiar.service';
-import { COLOR, DatosEncabezado, MARGEN, cargarLogo, dibujarEncabezado } from './encabezadoInstitucional.service';
+import { COLOR, Documento, bufferDeDocumento } from '../utils/pdf';
+import { DatosEncabezado, MARGEN, cargarLogo, dibujarEncabezado } from './encabezadoInstitucional.service';
 
-type Documento = InstanceType<typeof PDFDocument>;
 type Obj = Record<string, unknown>;
 
 const txt = (v: unknown): string => (v === null || v === undefined ? '' : typeof v === 'string' ? v : String(v));
@@ -315,12 +315,7 @@ export async function renderizarPdf(documento: DocumentoParaPdf, logo: Buffer | 
   const def = definicionDocumento(documento.clave);
 
   const doc = new PDFDocument({ size: 'LETTER', margins: { top: MARGEN, left: MARGEN, right: MARGEN, bottom: MARGEN + 10 }, bufferPages: true });
-  const partes: Buffer[] = [];
-  doc.on('data', (p: Buffer) => partes.push(p));
-  const listo = new Promise<Buffer>((resolve, reject) => {
-    doc.on('end', () => resolve(Buffer.concat(partes)));
-    doc.on('error', reject);
-  });
+  const listo = bufferDeDocumento(doc);
 
   const encabezado = objeto(snapshot.encabezado) as unknown as DatosEncabezado;
   dibujarEncabezado(doc, encabezado, def.nombre + (def.numero_anexo ? ` (${def.numero_anexo})` : ''), documento.codigo, logo);

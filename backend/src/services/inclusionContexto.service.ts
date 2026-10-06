@@ -6,7 +6,6 @@ import Area from '../models/area.model';
 import ConfiguracionInclusion, { ConfiguracionInclusionDocument } from '../models/configuracionInclusion.model';
 import Enrollment, { EnrollmentDocument } from '../models/enrollment.model';
 import Group, { IGroup } from '../models/group.model';
-import Institution from '../models/institution.model';
 import StudyPlan from '../models/studyPlan.model';
 import Subject from '../models/subject.model';
 import TeacherAssignment from '../models/teacherAssignment.model';
@@ -14,6 +13,8 @@ import { UserDocument } from '../models/user.model';
 import ApiError from '../utils/ApiError';
 import { ESTADO_ACTIVO } from '../utils/filtroEstado';
 import { AccionInclusion, ContextoInclusion, UsuarioInclusion, permisoInclusion } from '../utils/permisosInclusion';
+import { exigirInstitucion } from './institution.service';
+import { exigirAnioEnCurso } from './academicYear.service';
 
 /** "No existe" y "no autorizado" responden igual (IDOR): nunca se revela qué estudiantes tienen apoyo. */
 export const noEncontrado = (que = 'Estudiante') => new ApiError(404, `${que} no encontrado.`);
@@ -21,8 +22,7 @@ export const noEncontrado = (que = 'Estudiante') => new ApiError(404, `${que} no
 export const comoUsuarioInclusion = (u: UserDocument): UsuarioInclusion => ({ id: String(u._id), rol: u.rol, sedes_ids: u.sedes_ids.map(String) });
 
 export async function obtenerConfiguracion(): Promise<ConfiguracionInclusionDocument> {
-  const institucion = await Institution.findOne();
-  if (!institucion) throw new ApiError(409, 'Configura primero la institución antes de usar inclusión.');
+  const institucion = await exigirInstitucion('Configura primero la institución antes de usar inclusión.');
   const existente = await ConfiguracionInclusion.findOne({ institucion_id: institucion._id });
   if (existente) return existente;
   try {
@@ -34,11 +34,7 @@ export async function obtenerConfiguracion(): Promise<ConfiguracionInclusionDocu
   }
 }
 
-export async function anioEnCurso(): Promise<AcademicYearDocument> {
-  const anio = await AcademicYear.findOne({ estado: 'EN_CURSO' });
-  if (!anio) throw new ApiError(409, 'No hay un año lectivo en curso.');
-  return anio;
-}
+export const anioEnCurso = (): Promise<AcademicYearDocument> => exigirAnioEnCurso('No hay un año lectivo en curso.');
 
 export interface ContextoEstudianteInclusion {
   matricula: EnrollmentDocument;

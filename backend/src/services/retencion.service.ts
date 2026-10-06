@@ -4,7 +4,7 @@ import Observacion from '../models/observacion.model';
 import { UserDocument } from '../models/user.model';
 import ApiError from '../utils/ApiError';
 import { fechaLimiteRetencion } from '../utils/retencion';
-import { hoyColombia } from './attendance.service';
+import { hoyColombia } from '../utils/tiempo';
 import { registrarEvento } from './audit.service';
 import { obtenerConfiguracion } from './convivenciaCatalogo.service';
 

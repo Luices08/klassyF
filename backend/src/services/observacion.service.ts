@@ -37,9 +37,11 @@ import {
   UsuarioConvivencia,
 } from '../utils/permisosConvivencia';
 import runTransaction from '../utils/runTransaction';
-import { cargarContextoFechas, fechaDeClase, hoyColombia, periodoDeFecha } from './attendance.service';
+import { fechaDeClase, hoyColombia } from '../utils/tiempo';
+import { cargarContextoFechas, periodoDeFecha } from './calendarioContexto.service';
 import { registrarEvento } from './audit.service';
 import { obtenerConfiguracion, obtenerInstitucionConvivencia } from './convivenciaCatalogo.service';
+import { buscarAnioEnCurso, exigirAnioEnCurso } from './academicYear.service';
 
 const LIMITE_BUSQUEDA = 30;
 const LIMITE_HISTORIAL = 1000;
@@ -57,11 +59,7 @@ const comoUsuarioConvivencia = (u: UserDocument): UsuarioConvivencia => ({
 
 const escaparRegex = (texto: string) => texto.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
-async function anioEnCurso() {
-  const anio = await AcademicYear.findOne({ estado: 'EN_CURSO' });
-  if (!anio) throw new ApiError(409, 'No hay un año lectivo en curso: no se pueden registrar observaciones.');
-  return anio;
-}
+const anioEnCurso = () => exigirAnioEnCurso('No hay un año lectivo en curso: no se pueden registrar observaciones.');
 
 interface ContextoEstudiante {
   student_id: Types.ObjectId;
@@ -78,7 +76,7 @@ interface ContextoEstudiante {
  */
 async function cargarContextoEstudiante(usuario: UserDocument, studentId: string): Promise<ContextoEstudiante | null> {
   if (!Types.ObjectId.isValid(studentId)) return null;
-  const anio = await AcademicYear.findOne({ estado: 'EN_CURSO' });
+  const anio = await buscarAnioEnCurso();
   const vigente = anio
     ? await Enrollment.findOne({
         student_id: studentId,
@@ -148,7 +146,7 @@ async function filtroDeGrupos(usuario: UserDocument, anioId: Types.ObjectId): Pr
 }
 
 export async function gruposAccesibles(usuario: UserDocument) {
-  const anio = await AcademicYear.findOne({ estado: 'EN_CURSO' });
+  const anio = await buscarAnioEnCurso();
   if (!anio) return [];
   const grupos = await Group.find(await filtroDeGrupos(usuario, anio._id))
     .populate<{ grade_id: { nombre: string } }>('grade_id', 'nombre')
@@ -168,7 +166,7 @@ export interface ConsultaEstudiantes {
 }
 
 export async function buscarEstudiantes(usuario: UserDocument, { group_id, q }: ConsultaEstudiantes) {
-  const anio = await AcademicYear.findOne({ estado: 'EN_CURSO' });
+  const anio = await buscarAnioEnCurso();
   if (!anio) return [];
   const texto = q?.trim() ?? '';
   if (!group_id && texto.length < 3) return [];

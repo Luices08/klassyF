@@ -3,7 +3,6 @@ import AcademicYear from '../models/academicYear.model';
 import AjusteAsignatura from '../models/ajusteAsignatura.model';
 import { ExpedienteInclusionDocument } from '../models/expedienteInclusion.model';
 import Guardian from '../models/guardian.model';
-import Institution from '../models/institution.model';
 import ReferenteCurricular from '../models/referenteCurricular.model';
 import StudentGuardian from '../models/studentGuardian.model';
 import { UserDocument } from '../models/user.model';
@@ -13,6 +12,7 @@ import DocumentoPiar from '../models/documentoPiar.model';
 import { identidadDelEstudiante } from './expedienteInclusion.service';
 import { asignaturasEsperadas, ContextoEstudianteInclusion, obtenerConfiguracion } from './inclusionContexto.service';
 import { User } from '../models/user.model';
+import { buscarInstitucion } from './institution.service';
 
 type Snapshot = Record<string, unknown>;
 
@@ -20,7 +20,7 @@ const iso = (fecha: Date | null | undefined) => (fecha ? fecha.toISOString() : n
 
 /** El encabezado lleva solo texto (no el logo): cómo se ve lo resolverá M21/M32; el logo se aplica al dibujar el PDF. */
 async function encabezadoYEstudiante(exp: ExpedienteInclusionDocument, ctx: ContextoEstudianteInclusion) {
-  const [institucion, identidad, anio] = await Promise.all([Institution.findOne(), identidadDelEstudiante(exp, ctx), AcademicYear.findById(exp.academic_year_id).select('year')]);
+  const [institucion, identidad, anio] = await Promise.all([buscarInstitucion(), identidadDelEstudiante(exp, ctx), AcademicYear.findById(exp.academic_year_id).select('year')]);
   const { perfil, ...estudiante } = identidad;
   return {
     perfil,

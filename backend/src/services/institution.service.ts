@@ -6,9 +6,31 @@ import Campus, { CampusDocument } from '../models/campus.model';
 import Institution, { ILimitesCargaDocente, ILimitesHorasPlanEstudios, InstitutionDocument } from '../models/institution.model';
 import User from '../models/user.model';
 import ApiError from '../utils/ApiError';
+import { ESTADO_ACTIVO } from '../utils/filtroEstado';
 import { FranjaPlantilla } from '../utils/franjas';
 import { registrarEvento } from './audit.service';
 import { runTransaction } from '../utils/runTransaction';
+
+export const MENSAJE_SIN_INSTITUCION = 'No hay una institución configurada todavía.';
+
+interface OpcionesBusquedaInstitucion {
+  /** Proyección de Mongoose: solo los campos que el llamador necesita. */
+  campos?: string;
+  soloActiva?: boolean;
+}
+
+/** Una sola institución por instalación (CLAUDE.md §2): único punto de lectura de ese registro, o null si aún no se creó. */
+export async function buscarInstitucion({ campos, soloActiva }: OpcionesBusquedaInstitucion = {}): Promise<InstitutionDocument | null> {
+  const consulta = Institution.findOne(soloActiva ? { estado: ESTADO_ACTIVO } : {});
+  return campos ? consulta.select(campos) : consulta;
+}
+
+/** Como `buscarInstitucion`, pero falla con el mensaje del proceso que la necesita (409 por defecto). */
+export async function exigirInstitucion(mensaje: string, estado = 409): Promise<InstitutionDocument> {
+  const institucion = await buscarInstitucion();
+  if (!institucion) throw new ApiError(estado, mensaje);
+  return institucion;
+}
 
 export interface UpdateInstitutionInput {
   nombre: string;
@@ -132,8 +154,7 @@ export async function actualizarPlantillaFranjas(
   franjas: FranjaPlantilla[],
   { usuarioId, ip }: { usuarioId: Types.ObjectId | string; ip?: string | null }
 ): Promise<InstitutionDocument> {
-  const institucion = await Institution.findOne();
-  if (!institucion) throw new ApiError(404, 'No hay una institución configurada todavía.');
+  const institucion = await exigirInstitucion(MENSAJE_SIN_INSTITUCION, 404);
 
   institucion.set('plantilla_franjas', franjas);
   await institucion.save();
@@ -151,7 +172,7 @@ export async function actualizarPlantillaFranjas(
 
 /** Como solo existe una institucion por despliegue, no recibe ni necesita un id. */
 export async function getInstitution(): Promise<InstitutionDocument | null> {
-  return Institution.findOne();
+  return buscarInstitucion();
 }
 
 export async function updateInstitution(
@@ -165,8 +186,7 @@ export async function updateInstitution(
   const passwordOk = await admin.comparePassword(confirmPassword);
   if (!passwordOk) throw new ApiError(401, 'Contraseña incorrecta.');
 
-  const institucion = await Institution.findOne();
-  if (!institucion) throw new ApiError(404, 'No hay una institución configurada todavía.');
+  const institucion = await exigirInstitucion(MENSAJE_SIN_INSTITUCION, 404);
 
   institucion.nombre = input.nombre;
   institucion.codigo_dane = input.codigo_dane;
@@ -201,15 +221,14 @@ function configuracionCarga(institucion: InstitutionDocument | null): Configurac
 }
 
 export async function getLimitesCarga(): Promise<ConfiguracionCargaDocente> {
-  return configuracionCarga(await Institution.findOne());
+  return configuracionCarga(await buscarInstitucion());
 }
 
 export async function updateLimitesCarga(
   limites: Partial<ConfiguracionCargaDocente>,
   { usuarioId, ip }: { usuarioId: Types.ObjectId | string; ip?: string | null }
 ): Promise<ConfiguracionCargaDocente> {
-  const institucion = await Institution.findOne();
-  if (!institucion) throw new ApiError(404, 'No hay una institución configurada todavía.');
+  const institucion = await exigirInstitucion(MENSAJE_SIN_INSTITUCION, 404);
 
   const actual = institucion.limites_carga_docente || {
     PREESCOLAR: 20,
@@ -247,7 +266,7 @@ export async function updateLimitesCarga(
 
 /** M06: tope de horas semanales del Plan de Estudios por nivel (antes quemado a 30 para todos en el frontend). */
 export async function getLimitesHorasPlan(): Promise<ILimitesHorasPlanEstudios> {
-  const institucion = await Institution.findOne();
+  const institucion = await buscarInstitucion();
   if (!institucion || !institucion.limites_horas_plan_estudios) {
     return { PREESCOLAR: 30, PRIMARIA: 30, SECUNDARIA: 30, MEDIA: 30 };
   }
@@ -258,8 +277,7 @@ export async function updateLimitesHorasPlan(
   limites: { PREESCOLAR?: number; PRIMARIA?: number; SECUNDARIA?: number; MEDIA?: number },
   { usuarioId, ip }: { usuarioId: Types.ObjectId | string; ip?: string | null }
 ): Promise<ILimitesHorasPlanEstudios> {
-  const institucion = await Institution.findOne();
-  if (!institucion) throw new ApiError(404, 'No hay una institución configurada todavía.');
+  const institucion = await exigirInstitucion(MENSAJE_SIN_INSTITUCION, 404);
 
   const actual = institucion.limites_horas_plan_estudios || {
     PREESCOLAR: 30,

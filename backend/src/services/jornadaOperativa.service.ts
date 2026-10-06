@@ -4,8 +4,8 @@ import JornadaOperativa, { JornadaOperativaDocument } from '../models/jornadaOpe
 import { Jornada } from '../constants/enums';
 import ApiError from '../utils/ApiError';
 import { Franja, generarFranjas } from '../utils/franjas';
-import Institution from '../models/institution.model';
 import { registrarEvento } from './audit.service';
+import { buscarInstitucion } from './institution.service';
 
 export interface CrearJornadaInput {
   sede_id: string | Types.ObjectId;
@@ -56,7 +56,7 @@ export async function franjasDesdePlantilla(id: string) {
   const jornada = await JornadaOperativa.findById(id);
   if (!jornada) throw new ApiError(404, 'La jornada indicada no existe.');
 
-  const institucion = await Institution.findOne().select('plantilla_franjas');
+  const institucion = await buscarInstitucion({ campos: 'plantilla_franjas' });
   return generarFranjas(institucion?.plantilla_franjas ?? [], jornada);
 }
 

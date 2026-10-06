@@ -3,12 +3,12 @@ import { TIPOS_OBSERVACION_BASE } from '../constants/convivencia';
 import { EstadoUsuario } from '../constants/enums';
 import ConfiguracionConvivencia, { ConfiguracionConvivenciaDocument } from '../models/configuracionConvivencia.model';
 import FaltaConvivencia, { FaltaConvivenciaDocument } from '../models/faltaConvivencia.model';
-import Institution from '../models/institution.model';
 import Observacion from '../models/observacion.model';
 import TipoObservacion, { TipoObservacionDocument } from '../models/tipoObservacion.model';
 import ApiError from '../utils/ApiError';
 import { ESTADO_ACTIVO } from '../utils/filtroEstado';
 import { registrarEvento } from './audit.service';
+import { exigirInstitucion } from './institution.service';
 
 export interface ContextoActor {
   usuarioId: Types.ObjectId | string;
@@ -16,11 +16,7 @@ export interface ContextoActor {
 }
 
 // Una sola institución por instalación (ver CLAUDE.md): el catálogo nunca recibe institucion_id del cliente.
-export async function obtenerInstitucionConvivencia() {
-  const institucion = await Institution.findOne();
-  if (!institucion) throw new ApiError(409, 'Configura primero la institución antes de parametrizar la convivencia.');
-  return institucion;
-}
+export const obtenerInstitucionConvivencia = () => exigirInstitucion('Configura primero la institución antes de parametrizar la convivencia.');
 
 const esErrorDeDuplicado = (err: unknown): boolean => (err as { code?: number })?.code === 11000;
 

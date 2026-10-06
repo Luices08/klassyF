@@ -1,11 +1,11 @@
 import { Types } from 'mongoose';
 import { EstadoArea } from '../constants/enums';
 import Area, { AreaDocument } from '../models/area.model';
-import Institution from '../models/institution.model';
 import Subject from '../models/subject.model';
 import ApiError from '../utils/ApiError';
 import { ESTADO_ACTIVO, filtroPorEstado } from '../utils/filtroEstado';
 import { registrarEvento } from './audit.service';
+import { exigirInstitucion } from './institution.service';
 
 interface ContextoActor {
   usuarioId: Types.ObjectId | string;
@@ -14,11 +14,7 @@ interface ContextoActor {
 
 // Una sola institucion por instalacion (ver CLAUDE.md): el area nunca recibe
 // institucion_id del cliente, se resuelve aqui, igual que academicYear.service.ts.
-async function obtenerInstitucion() {
-  const institucion = await Institution.findOne();
-  if (!institucion) throw new ApiError(409, 'Configura primero la institución antes de crear áreas.');
-  return institucion;
-}
+const obtenerInstitucion = () => exigirInstitucion('Configura primero la institución antes de crear áreas.');
 
 export interface CrearAreaInput {
   nombre: string;

@@ -1,20 +1,19 @@
 import PDFDocument from 'pdfkit';
 import { ROLES } from '../constants/roles';
 import { MiembroComite } from '../models/comiteConvivencia.model';
-import Institution from '../models/institution.model';
 import { User, UserDocument } from '../models/user.model';
 import ApiError from '../utils/ApiError';
 import { registrarEvento } from './audit.service';
+import { COLOR, Documento, bufferDeDocumento } from '../utils/pdf';
 import { obtenerSesion } from './comite.service';
+import { buscarInstitucion } from './institution.service';
 
 // Los mismos tonos de la guía visual, para que el papel se parezca a la pantalla.
-const COLOR = { ink: '#172235', cuerpo: '#3F4D61', tenue: '#788794', borde: '#DDE4EC', primario: '#2878EA', peligro: '#EF5350' };
 const MARGEN = 50;
 
 const formatoFecha = (fecha: Date) => fecha.toLocaleDateString('es-CO', { timeZone: 'UTC', day: '2-digit', month: 'long', year: 'numeric' });
 const formatoFechaHora = (fecha: Date) => fecha.toLocaleString('es-CO', { timeZone: 'America/Bogota' });
 
-type Documento = InstanceType<typeof PDFDocument>;
 
 function titulo(doc: Documento, texto: string) {
   doc.moveDown(0.8).font('Helvetica-Bold').fontSize(10).fillColor(COLOR.primario).text(texto.toUpperCase());
@@ -29,7 +28,7 @@ function titulo(doc: Documento, texto: string) {
 export async function generarPdfActa(id: string, usuario: UserDocument, ip?: string | null): Promise<{ buffer: Buffer; nombreArchivo: string }> {
   if (usuario.rol !== ROLES.ADMIN && usuario.rol !== ROLES.COORDINADOR_CONVIVENCIA) throw new ApiError(403, 'Solo convivencia accede a las actas.');
   const sesion = await obtenerSesion(id, usuario);
-  const institucion = (await Institution.findOne())?.nombre ?? 'Institución Educativa';
+  const institucion = (await buscarInstitucion())?.nombre ?? 'Institución Educativa';
 
   const miembros = await MiembroComite.find({ _id: { $in: sesion.casos_tratados.flatMap((c) => c.recusados_ids) } }).select('nombre');
   const nombreMiembro = new Map(miembros.map((m) => [String(m._id), m.nombre]));
@@ -37,12 +36,7 @@ export async function generarPdfActa(id: string, usuario: UserDocument, ip?: str
   const nombreAutor = new Map(autores.map((u) => [String(u._id), `${u.nombre} ${u.apellido}`]));
 
   const doc = new PDFDocument({ size: 'LETTER', margins: { top: MARGEN, left: MARGEN, right: MARGEN, bottom: MARGEN }, bufferPages: true });
-  const partes: Buffer[] = [];
-  doc.on('data', (p: Buffer) => partes.push(p));
-  const listo = new Promise<Buffer>((resolve, reject) => {
-    doc.on('end', () => resolve(Buffer.concat(partes)));
-    doc.on('error', reject);
-  });
+  const listo = bufferDeDocumento(doc);
 
   doc.font('Helvetica-Bold').fontSize(11).fillColor(COLOR.cuerpo).text(institucion);
   doc.font('Helvetica-Bold').fontSize(16).fillColor(COLOR.ink).text('Acta del Comité Escolar de Convivencia');

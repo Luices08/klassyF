@@ -11,10 +11,11 @@ import ApiError from '../utils/ApiError';
 import { calcularQuorum, hashDeActa, quorumDeCaso } from '../utils/comiteConvivencia';
 import { ESTADO_ACTIVO } from '../utils/filtroEstado';
 import runTransaction from '../utils/runTransaction';
-import { fechaDeClase, hoyColombia } from './attendance.service';
+import { fechaDeClase, hoyColombia } from '../utils/tiempo';
 import { registrarEvento } from './audit.service';
 import { cargarCaso } from './caso.service';
 import { obtenerConfiguracion } from './convivenciaCatalogo.service';
+import { buscarAnioEnCurso, exigirAnioEnCurso } from './academicYear.service';
 
 const ROLES_CONVIVENCIA: string[] = [ROLES.ADMIN, ROLES.COORDINADOR_CONVIVENCIA];
 
@@ -26,7 +27,7 @@ function exigirConvivencia(usuario: UserDocument) {
 async function resolverAnio(anioId?: string) {
   const anio = anioId
     ? await AcademicYear.findById(anioId)
-    : ((await AcademicYear.findOne({ estado: 'EN_CURSO' })) ?? (await AcademicYear.findOne().sort({ year: -1 })));
+    : ((await buscarAnioEnCurso()) ?? (await AcademicYear.findOne().sort({ year: -1 })));
   if (!anio) throw new ApiError(409, 'No hay un año lectivo configurado.');
   return anio;
 }
@@ -147,8 +148,7 @@ export interface DatosSesion {
 
 export async function crearSesion(input: DatosSesion, usuario: UserDocument, ip?: string | null) {
   exigirConvivencia(usuario);
-  const anio = await AcademicYear.findOne({ estado: 'EN_CURSO' });
-  if (!anio) throw new ApiError(409, 'No hay un año lectivo en curso: el comité sesiona en el año vigente.');
+const anio = await exigirAnioEnCurso('No hay un año lectivo en curso: el comité sesiona en el año vigente.');
   const fecha = fechaDeClase(input.fecha);
   if (fecha > hoyColombia()) throw new ApiError(400, 'El acta se levanta de una sesión ya realizada: la fecha no puede ser futura.');
 

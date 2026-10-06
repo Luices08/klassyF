@@ -9,7 +9,6 @@ import AcademicYear, {
 } from '../models/academicYear.model';
 import Campus from '../models/campus.model';
 import Group from '../models/group.model';
-import Institution, { InstitutionDocument } from '../models/institution.model';
 import PeriodoProrroga from '../models/periodoProrroga.model';
 import User from '../models/user.model';
 import ApiError from '../utils/ApiError';
@@ -17,6 +16,7 @@ import { calcularResumenSemanas, finDelDia } from '../utils/calendarioAcademico'
 import { sugerirRangos, SugerenciaRangosInput } from '../utils/escalaEvaluacion';
 import { runTransaction } from '../utils/runTransaction';
 import { registrarEvento } from './audit.service';
+import { buscarInstitucion, exigirInstitucion } from './institution.service';
 
 type FechaEntrada = Date | string;
 
@@ -95,12 +95,6 @@ export function aDto(anio: AcademicYearDocument) {
 }
 export type AnioLectivoDto = ReturnType<typeof aDto>;
 
-async function obtenerInstitucion(): Promise<InstitutionDocument> {
-  const institucion = await Institution.findOne();
-  if (!institucion) throw new ApiError(409, 'Configura primero la institución antes de crear un año lectivo.');
-  return institucion;
-}
-
 async function cargarAnio(id: string): Promise<AcademicYearDocument> {
   const anio = await AcademicYear.findById(id);
   if (!anio) throw new ApiError(404, 'Año lectivo no encontrado.');
@@ -136,7 +130,7 @@ async function cargarAnioEnPlanificacion(id: string): Promise<AcademicYearDocume
 }
 
 export async function listarAnios(): Promise<AnioLectivoDto[]> {
-  const institucion = await Institution.findOne();
+  const institucion = await buscarInstitucion();
   if (!institucion) return [];
 
   const anios = await AcademicYear.find({ institucion_id: institucion._id }).sort({ year: -1 });
@@ -147,9 +141,21 @@ export async function obtenerAnio(id: string): Promise<AnioLectivoDto> {
   return aDto(await cargarAnio(id));
 }
 
+/** La vigencia activa (única por institución: índice único parcial), o null si aún no se activó ninguna. */
+export async function buscarAnioEnCurso(): Promise<AcademicYearDocument | null> {
+  return AcademicYear.findOne({ estado: 'EN_CURSO' });
+}
+
+/** Como `buscarAnioEnCurso`, pero falla con 409 y el mensaje del proceso que necesita el año vigente. */
+export async function exigirAnioEnCurso(mensaje: string): Promise<AcademicYearDocument> {
+  const anio = await buscarAnioEnCurso();
+  if (!anio) throw new ApiError(409, mensaje);
+  return anio;
+}
+
 /** La vigencia activa de la institucion, o null si aun no se activo ninguna. */
 export async function obtenerAnioActivo(): Promise<AnioLectivoDto | null> {
-  const anio = await AcademicYear.findOne({ estado: 'EN_CURSO' });
+  const anio = await buscarAnioEnCurso();
   return anio ? aDto(anio) : null;
 }
 
@@ -170,7 +176,7 @@ export async function crearAnio(
   input: CrearAnioInput,
   { usuarioId, ip }: ContextoUsuario
 ): Promise<AnioLectivoDto & { grupos_copiados: number }> {
-  const institucion = await obtenerInstitucion();
+  const institucion = await exigirInstitucion('Configura primero la institución antes de crear un año lectivo.');
 
   const resultado = await runTransaction(async (session) => {
     const yaExiste = await AcademicYear.exists({ institucion_id: institucion._id, year: input.year }).session(session);

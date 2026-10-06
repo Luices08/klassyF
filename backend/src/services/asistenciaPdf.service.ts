@@ -4,7 +4,6 @@ import { ROLES } from '../constants/roles';
 import AcademicYear from '../models/academicYear.model';
 import Enrollment from '../models/enrollment.model';
 import Group, { IGroup } from '../models/group.model';
-import Institution from '../models/institution.model';
 import Subject from '../models/subject.model';
 import TeacherAssignment from '../models/teacherAssignment.model';
 import User, { UserDocument } from '../models/user.model';
@@ -12,12 +11,9 @@ import ApiError from '../utils/ApiError';
 import { periodosEfectivos } from '../utils/calendarioAcademico';
 import { ESTADO_ACTIVO } from '../utils/filtroEstado';
 import { ESTADOS_MATRICULA_ACTIVOS } from '../constants/enums';
-import {
-  cargarContextoFechas,
-  listarInasistencias,
-  matriculasActivas,
-  obtenerGrupoYAsignatura,
-} from './attendance.service';
+import { COLOR, Documento, bufferDeDocumento } from '../utils/pdf';
+import { listarInasistencias, matriculasActivas, obtenerGrupoYAsignatura } from './attendance.service';
+import { cargarContextoFechas } from './calendarioContexto.service';
 import { Cuadricula, TotalesEstudiante, construirCuadricula } from './attendanceCuadricula.service';
 import {
   TotalesAsistencia,
@@ -26,26 +22,13 @@ import {
   resumenAsistenciaParaBoletin,
   sumarTotales,
 } from './attendanceStats.service';
-
-// Los mismos tonos de la guía visual (Klassy UI Spec), para que el papel se parezca a la pantalla.
-const COLOR = {
-  ink: '#172235',
-  cuerpo: '#3F4D61',
-  tenue: '#788794',
-  borde: '#DDE4EC',
-  primario: '#2878EA',
-  primarioSuave: '#EAF3FF',
-  peligroSuave: '#FFF0F0',
-  alertaSuave: '#FFF5E6',
-  suave: '#F1F5F9',
-};
+import { buscarInstitucion } from './institution.service';
 
 const MARGEN = 30;
 const MARGEN_INFERIOR = 20;
 const LETRA_DIA = ['D', 'L', 'M', 'X', 'J', 'V', 'S'];
 const NOMBRES_MES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
 
-type Documento = InstanceType<typeof PDFDocument>;
 
 interface Pdf {
   doc: Documento;
@@ -59,12 +42,7 @@ function abrirPdf(orientacion: 'portrait' | 'landscape'): Pdf {
     margins: { top: MARGEN, left: MARGEN, right: MARGEN, bottom: MARGEN_INFERIOR },
     bufferPages: true,
   });
-  const partes: Buffer[] = [];
-  doc.on('data', (parte: Buffer) => partes.push(parte));
-  const listo = new Promise<Buffer>((resolve, reject) => {
-    doc.on('end', () => resolve(Buffer.concat(partes)));
-    doc.on('error', reject);
-  });
+  const listo = bufferDeDocumento(doc);
 
   const terminar = async () => {
     const { start, count } = doc.bufferedPageRange();
@@ -100,7 +78,7 @@ function recortar(doc: Documento, texto: string, ancho: number): string {
 }
 
 async function nombreInstitucion(): Promise<string> {
-  return (await Institution.findOne())?.nombre ?? 'Institución Educativa';
+  return (await buscarInstitucion())?.nombre ?? 'Institución Educativa';
 }
 
 /** Encabezado común: institución, título y líneas de contexto. Devuelve la `y` donde sigue el contenido. */

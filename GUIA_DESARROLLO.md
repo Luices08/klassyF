@@ -15,6 +15,7 @@ Para evitar pisar el trabajo de los demás y mantener estabilidad, trabajamos ba
 | **Corrección** | `fix/nombre-del-bug` | `fix/error-calculo-promedios` | Para arreglar errores o bugs en módulos existentes. |
 | **Documentación** | `docs/nombre` | `docs/guia-desarrollo` | Actualización de guías, manuales o comentarios. |
 | **Infraestructura** | `ci/nombre` | `ci/calidad-y-versiones` | Cambios en linters, scripts de npm o GitHub Actions. |
+| **Refactorización** | `refactor/faseN-tema` | `refactor/fase1-nucleo` | Reorganización de arquitectura sin cambio de comportamiento (ver `doc/Analisis_Arquitectura_Klassy.md`). Una rama corta por fase, creada desde `main` actualizado. |
 
 ---
 

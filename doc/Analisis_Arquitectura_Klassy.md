@@ -54,10 +54,10 @@ Tamaño aproximado por dominio funcional (backend):
      `PeriodoProrroga`, `TeacherAssignment` y `Enrollment`, para saber si un usuario tiene historial antes de borrarlo.
    - `enrollment.service` y `admissionRequest.service` (M04) llaman a `solicitudApoyo.service` (M16).
 4. **Reglas duplicadas por falta de un proveedor único.**
-   - `Institution.findOne()` aparece más de 30 veces en 17 servicios; al menos 4 reimplementan su propio `obtenerInstitucion()`
-     (`academicYear`, `area`, `attendanceState`, `convivenciaCatalogo`).
-   - `anioEnCurso()` está implementado dos veces (`observacion.service`, `inclusionContexto.service`) y hay consultas
-     `AcademicYear.findOne({estado:'EN_CURSO'})` sueltas en otros 4 servicios.
+   - `Institution.findOne()` se llama directamente 23 veces en 15 archivos, más ~20 llamadas a wrappers locales; al menos 4 servicios
+     reimplementan su propio `obtenerInstitucion()` (`academicYear`, `area`, `attendanceState`, `convivenciaCatalogo`).
+   - `anioEnCurso()` está implementado dos veces (`observacion.service`, `inclusionContexto.service`) y hay 10 consultas
+     `AcademicYear.findOne({estado:'EN_CURSO'})` repartidas en 6 archivos.
    - El patrón "obtener o crear la configuración" está duplicado en convivencia e inclusión.
    - Los 6 servicios que usan pdfkit no comparten una base; varios definen su propia paleta de colores.
 5. **Permisos y roles repartidos.** Arrays de roles en 6 archivos de rutas, funciones puras en `utils/permisos*`, y
@@ -80,10 +80,10 @@ Tamaño aproximado por dominio funcional (backend):
    1.694 líneas con tres pestañas completas dentro del mismo archivo; `TeacherAssignmentsPage` 989; `AnioLectivoPage` 807.
 2. **El sistema de diseño depende de los dominios.** `components/ui/Badge.tsx` (311 líneas, 20 componentes) importa tipos de
    `types/domain.ts` y de los hooks `useCasos`, `useInclusion` y `useObservaciones`.
-3. **Tipos en dos lugares.** `types/domain.ts` (M01–M13) y ~95 tipos exportados desde `hooks/` (convivencia, inclusión, asistencia).
+3. **Tipos en dos lugares.** `types/domain.ts` (M01–M13) y 158 tipos exportados desde `hooks/` (convivencia, inclusión, asistencia).
    `useInclusion.ts` (682 líneas) mezcla tipos, claves de query, consultas y mutaciones.
-4. **Permisos triplicados.** Roles en `App.tsx` (arrays inline), en `navigation.ts` (26 ítems) y 66 chequeos `rol ===` en páginas y
-   componentes; además se repiten en el backend.
+4. **Permisos triplicados.** Roles en `App.tsx` (arrays inline), en `navigation.ts` (26 ítems) y 25 comparaciones directas de rol (`rol ===` / `!==`) en páginas,
+   componentes y hooks (unas 66 referencias al rol con un patrón más amplio); además se repiten en el backend.
 5. **Estructura inconsistente.** `ComitePage` está en `pages/admin/` y `ObservadorPage` en la raíz; convivencia, inclusión y asistencia
    tienen carpeta de componentes propia, pero usuarios, estudiantes, grupos, matrículas y plan de estudios tienen su lógica dentro
    de las páginas. `lib/` mezcla infraestructura con piezas de dominio.
@@ -205,7 +205,7 @@ roles. Requiere compatibilidad con el `module: CommonJS` del backend; se hace en
 |---|---|---|
 | Funcionalidad repartida en 6 carpetas | Colocación por subárea dentro de un dominio | S / cohesión |
 | Utilidades de fecha viven en asistencia | `nucleo/tiempo` e `institucional/calendario` | D |
-| `Institution.findOne()` ×30 | `institucional.obtenerInstitucion()` | DRY / D |
+| `Institution.findOne()` ×23 directas (+ wrappers) | `institucional.obtenerInstitucion()` | DRY / D |
 | `anioEnCurso` duplicado | Una función en `institucional/calendario` | DRY |
 | `user.controller` con 14 modelos | Servicio de usuarios + vetos de eliminación | S / D |
 | Matrícula → apoyo (M04 → M16) | Puerto en `registro`, implementación en `bienestar` | D |

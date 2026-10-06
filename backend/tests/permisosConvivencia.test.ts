@@ -6,7 +6,7 @@ import {
   EstudianteConvivencia,
   permisoSobreEstudiante,
   UsuarioConvivencia,
-} from '../src/utils/permisosConvivencia';
+} from '../src/dominios/bienestar/comun/permisosConvivencia';
 
 const usuario = (rol: UsuarioConvivencia['rol'], sedes_ids: string[] = ['s1'], id = 'u1'): UsuarioConvivencia => ({
   id,

@@ -15,7 +15,7 @@ import { generarPasswordTemporal } from '../utils/generarPasswordTemporal';
 import { runTransaction } from '../utils/runTransaction';
 import { hoyColombia } from '../utils/tiempo';
 import { buscarMatriculaDePreinscripcion, construirDetalle, PreinscripcionDetalle } from './preinscripcionPublica.service';
-import { crearDesdeMatricula } from './solicitudApoyo.service';
+import { crearDesdeMatricula } from '../dominios/bienestar';
 
 // Incluye APROBADA para que un aspirante ya admitido no pueda radicar una segunda solicitud
 // paralela (terminaria chocando con el numero_documento unico del User al aprobarla de nuevo).

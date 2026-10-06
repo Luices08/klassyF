@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { claveDeRemision, involucradosARemitir } from '../src/utils/remisionOrientacion';
+import { claveDeRemision, involucradosARemitir } from '../src/dominios/bienestar/orientacion/remisionOrientacion';
 
 describe('involucradosARemitir', () => {
   it('remite a los afectados y a los presuntos responsables, no a testigos ni reportantes', () => {

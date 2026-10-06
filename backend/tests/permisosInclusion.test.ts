@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { ContextoInclusion, UsuarioInclusion, permisoInclusion } from '../src/utils/permisosInclusion';
-import type { AccionInclusion } from '../src/utils/permisosInclusion';
+import { ContextoInclusion, UsuarioInclusion, permisoInclusion } from '../src/dominios/bienestar/inclusion/permisosInclusion';
+import type { AccionInclusion } from '../src/dominios/bienestar/inclusion/permisosInclusion';
 
 const usuario = (rol: UsuarioInclusion['rol'], sedes_ids: string[] = ['s1']): UsuarioInclusion => ({ id: 'u1', rol, sedes_ids });
 const contexto = (extra: Partial<ContextoInclusion> = {}): ContextoInclusion => ({ sede_id: 's1', ...extra });

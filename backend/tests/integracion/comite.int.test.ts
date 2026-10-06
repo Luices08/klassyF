@@ -1,12 +1,12 @@
 import { Types } from 'mongoose';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import AuditLog from '../../src/models/auditLog.model';
-import { MiembroComite, SesionComite } from '../../src/models/comiteConvivencia.model';
+import { MiembroComite, SesionComite } from '../../src/dominios/bienestar/comite/comiteConvivencia.model';
 import { User } from '../../src/models/user.model';
-import { generarPdfActa } from '../../src/services/actaComitePdf.service';
-import * as casos from '../../src/services/caso.service';
-import * as comite from '../../src/services/comite.service';
-import * as catalogo from '../../src/services/convivenciaCatalogo.service';
+import { generarPdfActa } from '../../src/dominios/bienestar/comite/actaComitePdf.service';
+import * as casos from '../../src/dominios/bienestar/convivencia/caso.service';
+import * as comite from '../../src/dominios/bienestar/comite/comite.service';
+import * as catalogo from '../../src/dominios/bienestar/comun/convivenciaCatalogo.service';
 import { detenerBaseDeDatos, iniciarBaseDeDatos, limpiarBaseDeDatos } from './baseDeDatos';
 import { actor, armarEscenario, Escenario, hoy } from './escenario';
 
@@ -181,7 +181,7 @@ describe('M15 comité y actas (con base de datos)', () => {
       e.coordConvivencia
     )) as { _id: string; codigo: string };
     const antiguo = new Date(Date.now() - 72 * 3_600_000);
-    const { CasoConvivencia } = await import('../../src/models/casoConvivencia.model');
+    const { CasoConvivencia } = await import('../../src/dominios/bienestar/convivencia/casoConvivencia.model');
     await CasoConvivencia.collection.updateOne({ _id: new Types.ObjectId(tipoIII._id) }, { $set: { createdAt: antiguo } });
 
     const alertas = await casos.casosConAlertas(e.coordConvivencia);

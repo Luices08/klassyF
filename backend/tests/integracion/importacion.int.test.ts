@@ -1,9 +1,9 @@
 import ExcelJS from 'exceljs';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import AuditLog from '../../src/models/auditLog.model';
-import FaltaConvivencia from '../../src/models/faltaConvivencia.model';
-import LoteImportacion from '../../src/models/loteImportacion.model';
-import * as importacion from '../../src/services/importacionFaltas.service';
+import FaltaConvivencia from '../../src/dominios/bienestar/convivencia/faltaConvivencia.model';
+import LoteImportacion from '../../src/dominios/bienestar/convivencia/loteImportacion.model';
+import * as importacion from '../../src/dominios/bienestar/convivencia/importacionFaltas.service';
 import { detenerBaseDeDatos, iniciarBaseDeDatos, limpiarBaseDeDatos } from './baseDeDatos';
 import { armarEscenario, Escenario } from './escenario';
 

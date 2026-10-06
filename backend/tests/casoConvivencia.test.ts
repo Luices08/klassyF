@@ -7,8 +7,8 @@ import {
   pendientesParaCerrar,
   puedeTransicionar,
   TRANSICIONES_CASO,
-} from '../src/utils/casoConvivencia';
-import { ESTADOS_CASO } from '../src/constants/convivencia';
+} from '../src/dominios/bienestar/convivencia/casoConvivencia';
+import { ESTADOS_CASO } from '../src/dominios/bienestar/comun/convivencia.constants';
 
 describe('transiciones del caso', () => {
   it('permite el flujo normal y la remisión, y no deja volver atrás', () => {

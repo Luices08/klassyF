@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { CLAVES_DOCUMENTO_PIAR, ClaveDocumentoPiar } from '../src/constants/inclusion';
-import { huellaDelDocumento } from '../src/services/documentoPiar.service';
-import { renderizarPdf } from '../src/services/piarPdf.service';
+import { CLAVES_DOCUMENTO_PIAR, ClaveDocumentoPiar } from '../src/dominios/bienestar/inclusion/inclusion.constants';
+import { huellaDelDocumento } from '../src/dominios/bienestar/inclusion/documentoPiar.service';
+import { renderizarPdf } from '../src/dominios/bienestar/inclusion/piarPdf.service';
 
 // PNG de 1x1 píxel: basta para comprobar que el logo se incrusta sin romper el diseño.
 const PNG_1X1 = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==', 'base64');

@@ -1,12 +1,12 @@
 import { Types } from 'mongoose';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import AuditLog from '../../src/models/auditLog.model';
-import CasoConvivencia from '../../src/models/casoConvivencia.model';
-import SolicitudCaso from '../../src/models/solicitudCaso.model';
-import * as casos from '../../src/services/caso.service';
-import * as catalogosCaso from '../../src/services/casoCatalogo.service';
-import * as observaciones from '../../src/services/observacion.service';
-import * as solicitudes from '../../src/services/solicitudCaso.service';
+import CasoConvivencia from '../../src/dominios/bienestar/convivencia/casoConvivencia.model';
+import SolicitudCaso from '../../src/dominios/bienestar/convivencia/solicitudCaso.model';
+import * as casos from '../../src/dominios/bienestar/convivencia/caso.service';
+import * as catalogosCaso from '../../src/dominios/bienestar/convivencia/casoCatalogo.service';
+import * as observaciones from '../../src/dominios/bienestar/observador/observacion.service';
+import * as solicitudes from '../../src/dominios/bienestar/convivencia/solicitudCaso.service';
 import { detenerBaseDeDatos, iniciarBaseDeDatos, limpiarBaseDeDatos } from './baseDeDatos';
 import { actor, armarEscenario, Escenario, hoy } from './escenario';
 

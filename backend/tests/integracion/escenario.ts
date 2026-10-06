@@ -9,8 +9,8 @@ import JornadaOperativa from '../../src/models/jornadaOperativa.model';
 import TeacherAssignment from '../../src/models/teacherAssignment.model';
 import { User, UserDocument } from '../../src/models/user.model';
 import { hoyColombia } from '../../src/utils/tiempo';
-import * as catalogoCaso from '../../src/services/casoCatalogo.service';
-import * as catalogo from '../../src/services/convivenciaCatalogo.service';
+import * as catalogoCaso from '../../src/dominios/bienestar/convivencia/casoCatalogo.service';
+import * as catalogo from '../../src/dominios/bienestar/comun/convivenciaCatalogo.service';
 
 export const actor = (u: UserDocument) => ({ usuarioId: u._id });
 export const hoy = () => hoyColombia().toISOString().slice(0, 10);

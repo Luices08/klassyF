@@ -1,5 +1,5 @@
 import { HydratedDocument, Model, Schema, Types, model } from 'mongoose';
-import { COMPONENTES_SIEE, ComponenteSiee } from '../constants/enums';
+import { COMPONENTES_SIEE, ComponenteSiee } from '../../../constants/enums';
 
 export interface IActivity {
   teacher_assignment_id: Types.ObjectId;

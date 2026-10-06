@@ -1,7 +1,7 @@
 import Joi from 'joi';
-import { COMPONENTES_SIEE } from '../constants/enums';
-import { ValidationSchema } from '../middlewares/validate.middleware';
-import { objectId } from './common.validator';
+import { COMPONENTES_SIEE } from '../../../constants/enums';
+import { ValidationSchema } from '../../../middlewares/validate.middleware';
+import { objectId } from '../../../validators/common.validator';
 
 export const createActivity: ValidationSchema = {
   body: Joi.object({

@@ -1,20 +1,20 @@
 import { HydratedDocument, Types } from 'mongoose';
-import { EstadoJustificacion } from '../constants/enums';
-import { ROLES } from '../constants/roles';
-import Attendance from '../models/attendance.model';
-import AttendanceJustification from '../models/attendanceJustification.model';
-import { AttendanceStateDocument } from '../models/attendanceState.model';
-import Grade from '../dominios/institucional/estructura/grade.model';
-import { IGroup } from '../dominios/institucional/estructura/group.model';
-import TeacherAssignment from '../dominios/curricular/carga-docente/teacherAssignment.model';
-import { UserDocument } from '../models/user.model';
-import ApiError from '../utils/ApiError';
-import { hayEventoNoLectivo } from '../dominios/institucional';
-import { ESTADO_ACTIVO } from '../utils/filtroEstado';
-import { diaIso } from '../utils/tiempo';
+import { EstadoJustificacion } from '../../../constants/enums';
+import { ROLES } from '../../../constants/roles';
+import Attendance from './attendance.model';
+import AttendanceJustification from './attendanceJustification.model';
+import { AttendanceStateDocument } from './attendanceState.model';
+import Grade from '../../institucional/estructura/grade.model';
+import { IGroup } from '../../institucional/estructura/group.model';
+import TeacherAssignment from '../../curricular/carga-docente/teacherAssignment.model';
+import { UserDocument } from '../../../models/user.model';
+import ApiError from '../../../utils/ApiError';
+import { hayEventoNoLectivo } from '../../institucional';
+import { ESTADO_ACTIVO } from '../../../utils/filtroEstado';
+import { diaIso } from '../../../utils/tiempo';
 import { evaluarFechaEnContexto, matriculasActivas, obtenerGrupoYAsignatura } from './attendance.service';
 import { listarEstados } from './attendanceState.service';
-import { cargarContextoFechas, periodoDeFecha } from '../dominios/institucional';
+import { cargarContextoFechas, periodoDeFecha } from '../../institucional';
 
 const ROLES_DE_CONSULTA_TOTAL: string[] = [ROLES.ADMIN, ROLES.COORDINADOR, ROLES.SECRETARIA];
 

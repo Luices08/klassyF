@@ -1,6 +1,6 @@
 import ExcelJS from 'exceljs';
-import { UserDocument } from '../models/user.model';
-import ApiError from '../utils/ApiError';
+import { UserDocument } from '../../../models/user.model';
+import ApiError from '../../../utils/ApiError';
 import { ConsultaPlanilla, obtenerPlanilla, registrarAsistencia } from './attendance.service';
 
 const HOJA_ASISTENCIA = 'Asistencia';

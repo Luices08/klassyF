@@ -1,8 +1,8 @@
 import { Router } from 'express';
 import multer, { FileFilterCallback } from 'multer';
-import { MAX_BYTES_EVIDENCIA } from '../constants/asistencia';
-import { Rol } from '../constants/enums';
-import { ROLES } from '../constants/roles';
+import { MAX_BYTES_EVIDENCIA } from './asistencia.constants';
+import { Rol } from '../../../constants/enums';
+import { ROLES } from '../../../constants/roles';
 import {
   actualizarEstado,
   cambiarEstadoActivo,
@@ -25,12 +25,12 @@ import {
   obtenerPlanilla,
   registrarAsistencia,
   revisarJustificacion,
-} from '../controllers/attendance.controller';
-import { authenticate, checkRole } from '../middlewares/auth.middleware';
-import validate from '../middlewares/validate.middleware';
-import { MAX_BYTES_EXCEL } from '../services/attendanceExcel.service';
-import ApiError from '../utils/ApiError';
-import * as attendanceValidator from '../validators/attendance.validator';
+} from './attendance.controller';
+import { authenticate, checkRole } from '../../../middlewares/auth.middleware';
+import validate from '../../../middlewares/validate.middleware';
+import { MAX_BYTES_EXCEL } from './attendanceExcel.service';
+import ApiError from '../../../utils/ApiError';
+import * as attendanceValidator from './attendance.validator';
 
 const router = Router();
 

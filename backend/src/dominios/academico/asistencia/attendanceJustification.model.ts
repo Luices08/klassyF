@@ -1,5 +1,5 @@
 import { HydratedDocument, Model, Schema, Types, model } from 'mongoose';
-import { ESTADOS_JUSTIFICACION, EstadoJustificacion } from '../constants/enums';
+import { ESTADOS_JUSTIFICACION, EstadoJustificacion } from '../../../constants/enums';
 
 /**
  * Excusa de una inasistencia puntual (M13): se ancla al registro (`registro_id`) de la planilla.

@@ -1,8 +1,8 @@
 import Joi from 'joi';
-import { ESTADOS_JUSTIFICACION, ESTADOS_USUARIO, TONOS_ESTADO_ASISTENCIA } from '../constants/enums';
-import { ValidationSchema } from '../middlewares/validate.middleware';
-import { DIMENSIONES_ESTADISTICA } from '../services/attendanceStats.service';
-import { objectId } from './common.validator';
+import { ESTADOS_JUSTIFICACION, ESTADOS_USUARIO, TONOS_ESTADO_ASISTENCIA } from '../../../constants/enums';
+import { ValidationSchema } from '../../../middlewares/validate.middleware';
+import { DIMENSIONES_ESTADISTICA } from './attendanceStats.service';
+import { objectId } from '../../../validators/common.validator';
 
 // Las fechas de la planilla son días de calendario (YYYY-MM-DD), no instantes: así no se corren por zona horaria.
 const fechaDeClase = Joi.string()

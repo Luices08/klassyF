@@ -1,14 +1,14 @@
 import { Router } from 'express';
-import { ROLES } from '../constants/roles';
+import { ROLES } from '../../../constants/roles';
 import {
   createActivity,
   createSubmission,
   gradeActivity,
   listActivities,
-} from '../controllers/activity.controller';
-import { authenticate, checkRole } from '../middlewares/auth.middleware';
-import validate from '../middlewares/validate.middleware';
-import * as activityValidator from '../validators/activity.validator';
+} from './activity.controller';
+import { authenticate, checkRole } from '../../../middlewares/auth.middleware';
+import validate from '../../../middlewares/validate.middleware';
+import * as activityValidator from './activity.validator';
 
 const router = Router();
 

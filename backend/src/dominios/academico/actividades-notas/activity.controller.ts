@@ -1,9 +1,9 @@
 import { ParamsDictionary } from 'express-serve-static-core';
-import Activity from '../models/activity.model';
-import * as activityService from '../services/activity.service';
-import { CreateActivityInput, CreateSubmissionInput, GradeEntryInput } from '../services/activity.service';
-import ApiError from '../utils/ApiError';
-import catchAsync from '../utils/catchAsync';
+import Activity from './activity.model';
+import * as activityService from './activity.service';
+import { CreateActivityInput, CreateSubmissionInput, GradeEntryInput } from './activity.service';
+import ApiError from '../../../utils/ApiError';
+import catchAsync from '../../../utils/catchAsync';
 
 export const createActivity = catchAsync<unknown, unknown, CreateActivityInput>(async (req, res) => {
   if (!req.user) throw new ApiError(401, 'No autenticado.');

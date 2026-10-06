@@ -1,21 +1,21 @@
 import { HydratedDocument, Types } from 'mongoose';
-import { ESTADOS_MATRICULA_ACTIVOS, EstadoJustificacion } from '../constants/enums';
-import { ROLES } from '../constants/roles';
-import Attendance, { AttendanceDocument } from '../models/attendance.model';
-import AttendanceJustification from '../models/attendanceJustification.model';
-import { AttendanceStateDocument } from '../models/attendanceState.model';
-import Enrollment from '../dominios/registro/matriculas/enrollment.model';
-import Group, { IGroup } from '../dominios/institucional/estructura/group.model';
-import Subject from '../dominios/curricular/plan-estudios/subject.model';
-import TeacherAssignment from '../dominios/curricular/carga-docente/teacherAssignment.model';
-import { UserDocument } from '../models/user.model';
-import ApiError from '../utils/ApiError';
-import { hayEventoNoLectivo, periodosEfectivos } from '../dominios/institucional';
-import { ESTADO_ACTIVO } from '../utils/filtroEstado';
-import { diaIso, fechaDeClase, hoyColombia } from '../utils/tiempo';
-import { registrarEvento } from './audit.service';
+import { ESTADOS_MATRICULA_ACTIVOS, EstadoJustificacion } from '../../../constants/enums';
+import { ROLES } from '../../../constants/roles';
+import Attendance, { AttendanceDocument } from './attendance.model';
+import AttendanceJustification from './attendanceJustification.model';
+import { AttendanceStateDocument } from './attendanceState.model';
+import Enrollment from '../../registro/matriculas/enrollment.model';
+import Group, { IGroup } from '../../institucional/estructura/group.model';
+import Subject from '../../curricular/plan-estudios/subject.model';
+import TeacherAssignment from '../../curricular/carga-docente/teacherAssignment.model';
+import { UserDocument } from '../../../models/user.model';
+import ApiError from '../../../utils/ApiError';
+import { hayEventoNoLectivo, periodosEfectivos } from '../../institucional';
+import { ESTADO_ACTIVO } from '../../../utils/filtroEstado';
+import { diaIso, fechaDeClase, hoyColombia } from '../../../utils/tiempo';
+import { registrarEvento } from '../../../services/audit.service';
 import { listarEstados, mapaDeEstados } from './attendanceState.service';
-import { cargarContextoFechas, ContextoFechas } from '../dominios/institucional';
+import { cargarContextoFechas, ContextoFechas } from '../../institucional';
 
 const formatoFecha = (fecha: Date): string => fecha.toISOString().slice(0, 10);
 

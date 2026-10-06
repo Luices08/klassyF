@@ -1,7 +1,7 @@
 import { ParsedQs } from 'qs';
-import * as reportCardService from '../services/reportCard.service';
-import ApiError from '../utils/ApiError';
-import catchAsync from '../utils/catchAsync';
+import * as reportCardService from './reportCard.service';
+import ApiError from '../../../utils/ApiError';
+import catchAsync from '../../../utils/catchAsync';
 
 interface ReportCardQuery extends ParsedQs {
   student_id: string;

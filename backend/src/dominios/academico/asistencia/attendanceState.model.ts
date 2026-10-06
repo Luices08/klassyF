@@ -4,7 +4,7 @@ import {
   EstadoUsuario,
   TONOS_ESTADO_ASISTENCIA,
   TonoEstadoAsistencia,
-} from '../constants/enums';
+} from '../../../constants/enums';
 
 /**
  * Estado de asistencia parametrizable por institución (M13). Las reglas que dependen de él

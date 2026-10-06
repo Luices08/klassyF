@@ -1,5 +1,5 @@
 import { Types } from 'mongoose';
-import Activity from '../../../models/activity.model';
+import Activity from '../../academico/actividades-notas/activity.model';
 import Counter from '../../../models/counter.model';
 import AcademicYear from '../../institucional/calendario/academicYear.model';
 import CurricularDevelopment from '../desarrollo/curricularDevelopment.model';

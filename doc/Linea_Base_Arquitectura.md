@@ -166,3 +166,19 @@ relativa; el historial de Git conserva los renombres). Ningún identificador ni 
 1. `institucional/institucion/institution.controller.ts` llama a `studyPlan.service` (ya anotada en `institucional`).
 2. **Nueva:** `plan-estudios/planEstudiosDependencias.service.ts` y `carga-docente/teacherAssignment.service.ts` importan el modelo `Activity` (`academico`) para saber si un área ya tiene actividades en un grado o grupo antes de permitir cambios en el plan.
 
+### Fase 2 — dominio `academico` (`refactor/fase2-academico`)
+
+24 archivos movidos con `git mv` y 158 imports reescritos. La tabla de rutas de Express es idéntica contra `main` (294 entradas, mismo orden de registro).
+
+| Qué | Resultado |
+|---|---|
+| Ubicación | `backend/src/dominios/academico/{actividades-notas, asistencia, boletines}` |
+| Rutas | `dominios/academico/rutas.ts`, montadas por `routes/index.ts` (que ahora solo compone dominios, más `auth` y `audit-logs`) |
+| Dirección de dependencias | Correcta: `academico` importa de `institucional` (18), `curricular` (13) y `registro` (7); ningún otro dominio consume sus servicios |
+| Puerta pública (`index.ts`) | No se crea todavía |
+| Convención | `constants/asistencia.ts` pasa a `asistencia/asistencia.constants.ts` |
+
+**Dependencias hacia arriba que quedan para la fase 3:** `curricular` importa el modelo `Activity` (`planEstudiosDependencias`, `teacherAssignment`) y `institucional/usuarios/user.controller.ts` importa `Attendance` y `ActivitySubmission`.
+
+**Con esto terminan los movimientos de negocio de la fase 2.** Quedan sueltos en la estructura plana solo piezas del núcleo: modelos `User`, `AuditLog` y `Counter`; `audit.service`, `token.service`; `auth`/`audit-logs` (controlador, rutas, validador); middlewares; `config`; `constants/enums.ts` y `roles.ts`; y las utilidades genéricas (`ApiError`, `catchAsync`, `csv`, `filtroEstado`, `firmasArchivo`, `generarPasswordTemporal`, `importacion`, `pdf`, `runTransaction`, `tiempo`, `uploadPaths`).
+

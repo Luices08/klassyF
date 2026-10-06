@@ -1,5 +1,5 @@
 import { Types } from 'mongoose';
-import Activity from '../../../models/activity.model';
+import Activity from '../../academico/actividades-notas/activity.model';
 import Group from '../../institucional/estructura/group.model';
 import { StudyPlanDocument } from './studyPlan.model';
 import Subject from './subject.model';

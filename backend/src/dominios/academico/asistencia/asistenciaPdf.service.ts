@@ -1,19 +1,19 @@
 import { HydratedDocument, Types } from 'mongoose';
 import PDFDocument from 'pdfkit';
-import { ROLES } from '../constants/roles';
-import AcademicYear from '../dominios/institucional/calendario/academicYear.model';
-import Enrollment from '../dominios/registro/matriculas/enrollment.model';
-import Group, { IGroup } from '../dominios/institucional/estructura/group.model';
-import Subject from '../dominios/curricular/plan-estudios/subject.model';
-import TeacherAssignment from '../dominios/curricular/carga-docente/teacherAssignment.model';
-import User, { UserDocument } from '../models/user.model';
-import ApiError from '../utils/ApiError';
-import { periodosEfectivos } from '../dominios/institucional';
-import { ESTADO_ACTIVO } from '../utils/filtroEstado';
-import { ESTADOS_MATRICULA_ACTIVOS } from '../constants/enums';
-import { COLOR, Documento, bufferDeDocumento } from '../utils/pdf';
+import { ROLES } from '../../../constants/roles';
+import AcademicYear from '../../institucional/calendario/academicYear.model';
+import Enrollment from '../../registro/matriculas/enrollment.model';
+import Group, { IGroup } from '../../institucional/estructura/group.model';
+import Subject from '../../curricular/plan-estudios/subject.model';
+import TeacherAssignment from '../../curricular/carga-docente/teacherAssignment.model';
+import User, { UserDocument } from '../../../models/user.model';
+import ApiError from '../../../utils/ApiError';
+import { periodosEfectivos } from '../../institucional';
+import { ESTADO_ACTIVO } from '../../../utils/filtroEstado';
+import { ESTADOS_MATRICULA_ACTIVOS } from '../../../constants/enums';
+import { COLOR, Documento, bufferDeDocumento } from '../../../utils/pdf';
 import { listarInasistencias, matriculasActivas, obtenerGrupoYAsignatura } from './attendance.service';
-import { cargarContextoFechas } from '../dominios/institucional';
+import { cargarContextoFechas } from '../../institucional';
 import { Cuadricula, TotalesEstudiante, construirCuadricula } from './attendanceCuadricula.service';
 import {
   TotalesAsistencia,
@@ -22,7 +22,7 @@ import {
   resumenAsistenciaParaBoletin,
   sumarTotales,
 } from './attendanceStats.service';
-import { buscarInstitucion } from '../dominios/institucional';
+import { buscarInstitucion } from '../../institucional';
 
 const MARGEN = 30;
 const MARGEN_INFERIOR = 20;

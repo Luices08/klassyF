@@ -1,11 +1,11 @@
 import { Types } from 'mongoose';
-import { ESTADOS_ASISTENCIA_BASE } from '../constants/asistencia';
-import { EstadoUsuario, TonoEstadoAsistencia } from '../constants/enums';
-import AttendanceState, { AttendanceStateDocument } from '../models/attendanceState.model';
-import ApiError from '../utils/ApiError';
-import { ESTADO_ACTIVO } from '../utils/filtroEstado';
-import { registrarEvento } from './audit.service';
-import { exigirInstitucion } from '../dominios/institucional';
+import { ESTADOS_ASISTENCIA_BASE } from './asistencia.constants';
+import { EstadoUsuario, TonoEstadoAsistencia } from '../../../constants/enums';
+import AttendanceState, { AttendanceStateDocument } from './attendanceState.model';
+import ApiError from '../../../utils/ApiError';
+import { ESTADO_ACTIVO } from '../../../utils/filtroEstado';
+import { registrarEvento } from '../../../services/audit.service';
+import { exigirInstitucion } from '../../institucional';
 
 interface ContextoActor {
   usuarioId: Types.ObjectId | string;

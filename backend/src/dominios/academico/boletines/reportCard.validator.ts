@@ -1,6 +1,6 @@
 import Joi from 'joi';
-import { ValidationSchema } from '../middlewares/validate.middleware';
-import { objectId } from './common.validator';
+import { ValidationSchema } from '../../../middlewares/validate.middleware';
+import { objectId } from '../../../validators/common.validator';
 
 export const getReportCard: ValidationSchema = {
   query: Joi.object({

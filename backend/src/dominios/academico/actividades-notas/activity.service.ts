@@ -1,17 +1,17 @@
-import { ComponenteSiee, ESTADOS_MATRICULA_ACTIVOS } from '../constants/enums';
-import Activity, { ActivityDocument } from '../models/activity.model';
-import AcademicYear from '../dominios/institucional/calendario/academicYear.model';
-import ActivitySubmission, { ActivitySubmissionDocument } from '../models/activitySubmission.model';
-import { Dba } from '../dominios/curricular/referentes/referenteCurricular.model';
-import Enrollment from '../dominios/registro/matriculas/enrollment.model';
-import Group from '../dominios/institucional/estructura/group.model';
-import Subject from '../dominios/curricular/plan-estudios/subject.model';
-import TeacherAssignment from '../dominios/curricular/carga-docente/teacherAssignment.model';
-import { UserDocument } from '../models/user.model';
-import ApiError from '../utils/ApiError';
-import { validarNotaDentroDeEscala } from '../dominios/institucional';
-import { runTransaction } from '../utils/runTransaction';
-import { assertPeriodNotLocked } from '../dominios/institucional';
+import { ComponenteSiee, ESTADOS_MATRICULA_ACTIVOS } from '../../../constants/enums';
+import Activity, { ActivityDocument } from './activity.model';
+import AcademicYear from '../../institucional/calendario/academicYear.model';
+import ActivitySubmission, { ActivitySubmissionDocument } from './activitySubmission.model';
+import { Dba } from '../../curricular/referentes/referenteCurricular.model';
+import Enrollment from '../../registro/matriculas/enrollment.model';
+import Group from '../../institucional/estructura/group.model';
+import Subject from '../../curricular/plan-estudios/subject.model';
+import TeacherAssignment from '../../curricular/carga-docente/teacherAssignment.model';
+import { UserDocument } from '../../../models/user.model';
+import ApiError from '../../../utils/ApiError';
+import { validarNotaDentroDeEscala } from '../../institucional';
+import { runTransaction } from '../../../utils/runTransaction';
+import { assertPeriodNotLocked } from '../../institucional';
 
 export interface CreateActivityInput {
   teacher_assignment_id: string;

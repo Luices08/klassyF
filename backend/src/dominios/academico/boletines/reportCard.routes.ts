@@ -1,8 +1,8 @@
 import { Router } from 'express';
-import { getReportCard } from '../controllers/reportCard.controller';
-import { authenticate } from '../middlewares/auth.middleware';
-import validate from '../middlewares/validate.middleware';
-import * as reportCardValidator from '../validators/reportCard.validator';
+import { getReportCard } from './reportCard.controller';
+import { authenticate } from '../../../middlewares/auth.middleware';
+import validate from '../../../middlewares/validate.middleware';
+import * as reportCardValidator from './reportCard.validator';
 
 const router = Router();
 

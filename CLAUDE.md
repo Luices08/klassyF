@@ -702,6 +702,12 @@ modular por dominios**. Diagnóstico, propuesta y decisiones: `doc/Analisis_Arqu
   `dominios/curricular/rutas.ts`, montadas por `routes/index.ts`. Todavía no tiene `index.ts`: el único servicio que usa otro dominio es
   `studyPlan.service` desde `institution.controller` (la dependencia hacia arriba que corrige la fase 3). Los scripts `seedSubjects.ts` y
   `seedReferentesCurriculares.ts` siguen en `backend/scripts/` y apuntan a los modelos en su nueva ubicación.
+- **Dominio `academico` ya movido (fase 2)**: vive en `backend/src/dominios/academico/` con `actividades-notas` (M11/M12: `Activity` y
+  `ActivitySubmission`), `asistencia` (M13: modelos, planilla, cuadrícula, estadísticas, justificaciones, Excel y PDF, más
+  `asistencia.constants.ts`) y `boletines` (M17: `reportCard`). Rutas en `dominios/academico/rutas.ts`. Con este dominio, `routes/index.ts` queda
+  como la composición de las rutas de cada dominio más `auth` y `audit-logs` (que irán al núcleo). Todavía no tiene `index.ts`: ningún otro
+  dominio consume sus servicios; solo `curricular` (`planEstudiosDependencias`, `teacherAssignment`) importa el modelo `Activity` y
+  `user.controller` los modelos `Attendance` y `ActivitySubmission` (dependencias hacia arriba que corrige la fase 3).
 - **No agregar** más lógica de negocio en controladores, ni más tipos en `types/domain.ts` o dentro de `hooks/`, ni más imports de
   dominio en `components/ui/`.
 - **Ramas**: una rama corta por fase `refactor/faseN-tema` desde `main` actualizado (ver `GUIA_DESARROLLO.md`); cada PR deja en verde

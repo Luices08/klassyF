@@ -1,16 +1,16 @@
 import { Response } from 'express';
 import { ParamsDictionary } from 'express-serve-static-core';
 import { ParsedQs } from 'qs';
-import { EstadoJustificacion, EstadoUsuario } from '../constants/enums';
-import * as pdfService from '../services/asistenciaPdf.service';
-import * as attendanceService from '../services/attendance.service';
-import * as cuadriculaService from '../services/attendanceCuadricula.service';
-import * as excelService from '../services/attendanceExcel.service';
-import * as justificacionService from '../services/attendanceJustification.service';
-import * as statsService from '../services/attendanceStats.service';
-import * as estadoService from '../services/attendanceState.service';
-import ApiError from '../utils/ApiError';
-import catchAsync from '../utils/catchAsync';
+import { EstadoJustificacion, EstadoUsuario } from '../../../constants/enums';
+import * as pdfService from './asistenciaPdf.service';
+import * as attendanceService from './attendance.service';
+import * as cuadriculaService from './attendanceCuadricula.service';
+import * as excelService from './attendanceExcel.service';
+import * as justificacionService from './attendanceJustification.service';
+import * as statsService from './attendanceStats.service';
+import * as estadoService from './attendanceState.service';
+import ApiError from '../../../utils/ApiError';
+import catchAsync from '../../../utils/catchAsync';
 
 // --- Estados parametrizables ---
 

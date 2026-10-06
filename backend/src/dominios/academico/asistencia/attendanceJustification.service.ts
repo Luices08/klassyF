@@ -1,15 +1,15 @@
 import fs from 'fs/promises';
 import path from 'path';
-import { EstadoJustificacion } from '../constants/enums';
-import { ROLES } from '../constants/roles';
-import Attendance from '../models/attendance.model';
-import AttendanceJustification, { AttendanceJustificationDocument } from '../models/attendanceJustification.model';
-import StudentGuardian from '../dominios/registro/estudiantes/studentGuardian.model';
-import { UserDocument } from '../models/user.model';
-import ApiError from '../utils/ApiError';
-import { detectarFirmaArchivo } from '../utils/firmasArchivo';
-import { carpetaAsistencia } from '../utils/uploadPaths';
-import { registrarEvento } from './audit.service';
+import { EstadoJustificacion } from '../../../constants/enums';
+import { ROLES } from '../../../constants/roles';
+import Attendance from './attendance.model';
+import AttendanceJustification, { AttendanceJustificationDocument } from './attendanceJustification.model';
+import StudentGuardian from '../../registro/estudiantes/studentGuardian.model';
+import { UserDocument } from '../../../models/user.model';
+import ApiError from '../../../utils/ApiError';
+import { detectarFirmaArchivo } from '../../../utils/firmasArchivo';
+import { carpetaAsistencia } from '../../../utils/uploadPaths';
+import { registrarEvento } from '../../../services/audit.service';
 import { mapaDeEstados } from './attendanceState.service';
 import { filtroAlcanceAsistencia } from './attendance.service';
 

@@ -1,4 +1,4 @@
-import { TonoEstadoAsistencia } from './enums';
+import { TonoEstadoAsistencia } from '../../../constants/enums';
 
 export interface EstadoAsistenciaBase {
   nombre: string;

@@ -5,7 +5,7 @@ import AttendanceState, { AttendanceStateDocument } from '../models/attendanceSt
 import ApiError from '../utils/ApiError';
 import { ESTADO_ACTIVO } from '../utils/filtroEstado';
 import { registrarEvento } from './audit.service';
-import { exigirInstitucion } from './institution.service';
+import { exigirInstitucion } from '../dominios/institucional';
 
 interface ContextoActor {
   usuarioId: Types.ObjectId | string;

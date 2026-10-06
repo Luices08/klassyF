@@ -1,17 +1,17 @@
 import { ComponenteSiee, ESTADOS_MATRICULA_ACTIVOS } from '../constants/enums';
 import Activity, { ActivityDocument } from '../models/activity.model';
-import AcademicYear from '../models/academicYear.model';
+import AcademicYear from '../dominios/institucional/calendario/academicYear.model';
 import ActivitySubmission, { ActivitySubmissionDocument } from '../models/activitySubmission.model';
 import { Dba } from '../models/referenteCurricular.model';
 import Enrollment from '../models/enrollment.model';
-import Group from '../models/group.model';
+import Group from '../dominios/institucional/estructura/group.model';
 import Subject from '../models/subject.model';
 import TeacherAssignment from '../models/teacherAssignment.model';
 import { UserDocument } from '../models/user.model';
 import ApiError from '../utils/ApiError';
-import { validarNotaDentroDeEscala } from '../utils/escalaEvaluacion';
+import { validarNotaDentroDeEscala } from '../dominios/institucional';
 import { runTransaction } from '../utils/runTransaction';
-import { assertPeriodNotLocked } from './periodLock.service';
+import { assertPeriodNotLocked } from '../dominios/institucional';
 
 export interface CreateActivityInput {
   teacher_assignment_id: string;

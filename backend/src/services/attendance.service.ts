@@ -5,17 +5,17 @@ import Attendance, { AttendanceDocument } from '../models/attendance.model';
 import AttendanceJustification from '../models/attendanceJustification.model';
 import { AttendanceStateDocument } from '../models/attendanceState.model';
 import Enrollment from '../models/enrollment.model';
-import Group, { IGroup } from '../models/group.model';
+import Group, { IGroup } from '../dominios/institucional/estructura/group.model';
 import Subject from '../models/subject.model';
 import TeacherAssignment from '../models/teacherAssignment.model';
 import { UserDocument } from '../models/user.model';
 import ApiError from '../utils/ApiError';
-import { hayEventoNoLectivo, periodosEfectivos } from '../utils/calendarioAcademico';
+import { hayEventoNoLectivo, periodosEfectivos } from '../dominios/institucional';
 import { ESTADO_ACTIVO } from '../utils/filtroEstado';
 import { diaIso, fechaDeClase, hoyColombia } from '../utils/tiempo';
 import { registrarEvento } from './audit.service';
 import { listarEstados, mapaDeEstados } from './attendanceState.service';
-import { cargarContextoFechas, ContextoFechas } from './calendarioContexto.service';
+import { cargarContextoFechas, ContextoFechas } from '../dominios/institucional';
 
 const formatoFecha = (fecha: Date): string => fecha.toISOString().slice(0, 10);
 

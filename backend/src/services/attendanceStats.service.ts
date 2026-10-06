@@ -1,7 +1,7 @@
 import { Types } from 'mongoose';
 import Attendance from '../models/attendance.model';
 import AttendanceJustification from '../models/attendanceJustification.model';
-import Group from '../models/group.model';
+import Group from '../dominios/institucional/estructura/group.model';
 import Subject from '../models/subject.model';
 import User, { UserDocument } from '../models/user.model';
 import { filtroAlcanceAsistencia } from './attendance.service';

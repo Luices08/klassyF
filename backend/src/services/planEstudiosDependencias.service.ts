@@ -1,6 +1,6 @@
 import { Types } from 'mongoose';
 import Activity from '../models/activity.model';
-import Group from '../models/group.model';
+import Group from '../dominios/institucional/estructura/group.model';
 import { StudyPlanDocument } from '../models/studyPlan.model';
 import Subject from '../models/subject.model';
 import TeacherAssignment from '../models/teacherAssignment.model';

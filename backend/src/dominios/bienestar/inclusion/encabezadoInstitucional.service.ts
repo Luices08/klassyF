@@ -1,5 +1,5 @@
 import { COLOR, Documento } from '../../../utils/pdf';
-import { buscarInstitucion } from '../../../services/institution.service';
+import { buscarInstitucion } from '../../institucional';
 
 
 export const MARGEN = 50;

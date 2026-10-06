@@ -1,0 +1,18 @@
+import { Router } from 'express';
+import { ROLES } from '../../../constants/roles';
+import { setPeriodLock } from './periodLock.controller';
+import { authenticate, checkRole } from '../../../middlewares/auth.middleware';
+import validate from '../../../middlewares/validate.middleware';
+import * as periodLockValidator from './periodLock.validator';
+
+const router = Router();
+
+router.patch(
+  '/lock',
+  authenticate,
+  checkRole(ROLES.ADMIN, ROLES.COORDINADOR),
+  validate(periodLockValidator.setPeriodLock),
+  setPeriodLock
+);
+
+export default router;

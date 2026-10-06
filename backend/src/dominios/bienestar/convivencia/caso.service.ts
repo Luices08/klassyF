@@ -34,7 +34,7 @@ import { registrarEvento } from '../../../services/audit.service';
 import { obtenerConfiguracion } from '../comun/convivenciaCatalogo.service';
 import { exigirPermisoSobreEstudiante } from '../observador/observacion.service';
 import { auditarRemisionesCreadas, remitirAutomaticamente, remitirManualmente, resumenDeRemisionesDelCaso } from '../orientacion/remisionOrientacion.service';
-import { exigirAnioEnCurso } from '../../../services/academicYear.service';
+import { exigirAnioEnCurso } from '../../institucional';
 
 const ROLES_CONVIVENCIA: string[] = [ROLES.ADMIN, ROLES.COORDINADOR_CONVIVENCIA];
 const NO_ENCONTRADO = 'Caso no encontrado.';

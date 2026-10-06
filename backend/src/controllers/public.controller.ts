@@ -1,4 +1,4 @@
-import Grade from '../models/grade.model';
+import Grade from '../dominios/institucional/estructura/grade.model';
 import * as publicInfoService from '../services/publicInfo.service';
 import catchAsync from '../utils/catchAsync';
 import { ESTADO_ACTIVO } from '../utils/filtroEstado';

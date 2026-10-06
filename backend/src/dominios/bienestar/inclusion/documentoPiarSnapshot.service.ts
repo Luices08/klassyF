@@ -1,5 +1,5 @@
 import { ClaveDocumentoPiar } from './inclusion.constants';
-import AcademicYear from '../../../models/academicYear.model';
+import AcademicYear from '../../institucional/calendario/academicYear.model';
 import AjusteAsignatura from './ajusteAsignatura.model';
 import { ExpedienteInclusionDocument } from './expedienteInclusion.model';
 import Guardian from '../../../models/guardian.model';
@@ -12,7 +12,7 @@ import DocumentoPiar from './documentoPiar.model';
 import { identidadDelEstudiante } from './expedienteInclusion.service';
 import { asignaturasEsperadas, ContextoEstudianteInclusion, obtenerConfiguracion } from './inclusionContexto.service';
 import { User } from '../../../models/user.model';
-import { buscarInstitucion } from '../../../services/institution.service';
+import { buscarInstitucion } from '../../institucional';
 
 type Snapshot = Record<string, unknown>;
 

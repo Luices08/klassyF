@@ -5,7 +5,7 @@ import Guardian from '../models/guardian.model';
 import StudentGuardian from '../models/studentGuardian.model';
 import { UserDocument } from '../models/user.model';
 import ApiError from '../utils/ApiError';
-import { buscarInstitucion } from './institution.service';
+import { buscarInstitucion } from '../dominios/institucional';
 
 /**
  * Genera el Acta de Compromiso Digital (M04-C): comprobante en PDF con los

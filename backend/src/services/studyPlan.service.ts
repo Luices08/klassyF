@@ -1,8 +1,8 @@
 import { Types } from 'mongoose';
-import AcademicYear, { AcademicYearDocument } from '../models/academicYear.model';
+import AcademicYear, { AcademicYearDocument } from '../dominios/institucional/calendario/academicYear.model';
 import Area from '../models/area.model';
-import Grade, { GradeDocument } from '../models/grade.model';
-import Group from '../models/group.model';
+import Grade, { GradeDocument } from '../dominios/institucional/estructura/grade.model';
+import Group from '../dominios/institucional/estructura/group.model';
 import StudyPlan, {
   IAsignaturaGrado,
   IAsignaturaPersonalizadaGrupo,
@@ -16,7 +16,7 @@ import Subject, { SubjectDocument } from '../models/subject.model';
 import { MetodoCalculoEvaluacion, NivelEducativo } from '../constants/enums';
 import ApiError from '../utils/ApiError';
 import { registrarEvento } from './audit.service';
-import { getLimitesHorasPlan } from './institution.service';
+import { getLimitesHorasPlan } from '../dominios/institucional';
 import { horasSemanalesDelGrupo } from '../utils/horasPlanEstudios';
 import {
   AlcancePlan,

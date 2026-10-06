@@ -9,14 +9,14 @@ import {
 } from './inclusion.constants';
 import { ESTADOS_MATRICULA_ACTIVOS } from '../../../constants/enums';
 import { ROLES } from '../../../constants/roles';
-import AcademicYear from '../../../models/academicYear.model';
+import AcademicYear from '../../institucional/calendario/academicYear.model';
 import AjusteAsignatura from './ajusteAsignatura.model';
-import Campus from '../../../models/campus.model';
+import Campus from '../../institucional/estructura/campus.model';
 import Enrollment from '../../../models/enrollment.model';
 import ExpedienteInclusion, { ExpedienteInclusionDocument } from './expedienteInclusion.model';
-import Grade from '../../../models/grade.model';
-import Group from '../../../models/group.model';
-import JornadaOperativa from '../../../models/jornadaOperativa.model';
+import Grade from '../../institucional/estructura/grade.model';
+import Group from '../../institucional/estructura/group.model';
+import JornadaOperativa from '../../institucional/estructura/jornadaOperativa.model';
 import StudentProfile from '../../../models/studentProfile.model';
 import Subject from '../../../models/subject.model';
 import TeacherAssignment from '../../../models/teacherAssignment.model';
@@ -50,7 +50,7 @@ import {
   noEncontrado,
   obtenerConfiguracion,
 } from './inclusionContexto.service';
-import { buscarAnioEnCurso } from '../../../services/academicYear.service';
+import { buscarAnioEnCurso } from '../../institucional';
 
 export interface AbrirExpedienteInput {
   student_id: string;

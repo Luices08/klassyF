@@ -1,13 +1,13 @@
-import AcademicYear from '../models/academicYear.model';
+import AcademicYear from '../dominios/institucional/calendario/academicYear.model';
 import CurricularDevelopment, { CurricularDevelopmentDocument } from '../models/curricularDevelopment.model';
 import { Dba } from '../models/referenteCurricular.model';
-import Group from '../models/group.model';
+import Group from '../dominios/institucional/estructura/group.model';
 import Subject from '../models/subject.model';
 import TeacherAssignment, { TeacherAssignmentDocument } from '../models/teacherAssignment.model';
 import { UserDocument } from '../models/user.model';
 import { EstadoDesarrolloCurricular } from '../constants/enums';
 import { ROLES } from '../constants/roles';
-import { asegurarAnioNoCerrado } from './academicYear.service';
+import { asegurarAnioNoCerrado } from '../dominios/institucional';
 import { registrarEvento } from './audit.service';
 import ApiError from '../utils/ApiError';
 import { ESTADO_ACTIVO } from '../utils/filtroEstado';

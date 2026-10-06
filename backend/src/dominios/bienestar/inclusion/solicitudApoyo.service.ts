@@ -1,7 +1,7 @@
 import { ClientSession, Types } from 'mongoose';
 import { EstadoSolicitudApoyo, OrigenSolicitudApoyo, ResultadoSolicitudApoyo } from './inclusion.constants';
 import { ROLES } from '../../../constants/roles';
-import Group from '../../../models/group.model';
+import Group from '../../institucional/estructura/group.model';
 import SolicitudApoyo, { SolicitudApoyoDocument } from './solicitudApoyo.model';
 import { User, UserDocument } from '../../../models/user.model';
 import ApiError from '../../../utils/ApiError';

@@ -13,7 +13,7 @@ dotenv.config();
 import { env } from '../src/config/env';
 import { ROLES } from '../src/constants/roles';
 import { NivelEducativo } from '../src/constants/enums';
-import Grade from '../src/models/grade.model';
+import Grade from '../src/dominios/institucional/estructura/grade.model';
 import User from '../src/models/user.model';
 
 interface GradoSeed {

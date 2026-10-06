@@ -1,9 +1,9 @@
-import Campus from '../models/campus.model';
-import Grade from '../models/grade.model';
-import JornadaOperativa from '../models/jornadaOperativa.model';
+import Campus from '../dominios/institucional/estructura/campus.model';
+import Grade from '../dominios/institucional/estructura/grade.model';
+import JornadaOperativa from '../dominios/institucional/estructura/jornadaOperativa.model';
 import ApiError from '../utils/ApiError';
 import { ESTADO_ACTIVO } from '../utils/filtroEstado';
-import { buscarInstitucion } from './institution.service';
+import { buscarInstitucion } from '../dominios/institucional';
 
 export const KLASSY_VERSION = '1.0.0';
 

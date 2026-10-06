@@ -16,8 +16,8 @@ import mongoose from 'mongoose';
 dotenv.config();
 
 import { env } from '../src/config/env';
-import AcademicYear from '../src/models/academicYear.model';
-import { finDelDia } from '../src/utils/calendarioAcademico';
+import AcademicYear from '../src/dominios/institucional/calendario/academicYear.model';
+import { finDelDia } from '../src/dominios/institucional/calendario/calendarioAcademico';
 
 interface PeriodoLegacy {
   fecha_inicio: Date;

@@ -1,6 +1,6 @@
 import { HydratedDocument, Model, Schema, Types, model } from 'mongoose';
 import { METODOS_CALCULO_EVALUACION, MetodoCalculoEvaluacion } from '../constants/enums';
-import AcademicYear from './academicYear.model';
+import AcademicYear from '../dominios/institucional/calendario/academicYear.model';
 
 /**
  * m06_study_plans: el plan de estudios de una institucion para un año

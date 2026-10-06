@@ -1,7 +1,7 @@
 import { Types } from 'mongoose';
 import { CategoriaAjuste, EfectividadAjuste, TipoBarrera } from './inclusion.constants';
 import { ROLES } from '../../../constants/roles';
-import AcademicYear from '../../../models/academicYear.model';
+import AcademicYear from '../../institucional/calendario/academicYear.model';
 import AjusteAsignatura, { AjusteAsignaturaDocument } from './ajusteAsignatura.model';
 import ReferenteCurricular from '../../../models/referenteCurricular.model';
 import Subject from '../../../models/subject.model';

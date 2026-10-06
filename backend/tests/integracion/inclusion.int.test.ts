@@ -1,12 +1,12 @@
 import fs from 'fs/promises';
 import path from 'path';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import AcademicYear from '../../src/models/academicYear.model';
+import AcademicYear from '../../src/dominios/institucional/calendario/academicYear.model';
 import Area from '../../src/models/area.model';
 import AuditLog from '../../src/models/auditLog.model';
 import DocumentoPiar from '../../src/dominios/bienestar/inclusion/documentoPiar.model';
 import ExpedienteInclusion from '../../src/dominios/bienestar/inclusion/expedienteInclusion.model';
-import Institution from '../../src/models/institution.model';
+import Institution from '../../src/dominios/institucional/institucion/institution.model';
 import SolicitudApoyo from '../../src/dominios/bienestar/inclusion/solicitudApoyo.model';
 import StudyPlan from '../../src/models/studyPlan.model';
 import Subject from '../../src/models/subject.model';
@@ -51,7 +51,7 @@ describe('M16: inclusión (con base de datos)', () => {
     matematicas = String(mat._id);
     lenguaje = String(len._id);
 
-    const { default: Group } = await import('../../src/models/group.model');
+    const { default: Group } = await import('../../src/dominios/institucional/estructura/group.model');
     const grupo = (await Group.findOne())!;
     await StudyPlan.create({
       institucion_id: institucion._id,
@@ -122,7 +122,7 @@ describe('M16: inclusión (con base de datos)', () => {
 
     it('lo declarado en la matrícula (M04) llega a la bandeja dentro de la misma transacción', async () => {
       const nuevo = await crearUsuario('ESTUDIANTE');
-      const { default: Group } = await import('../../src/models/group.model');
+      const { default: Group } = await import('../../src/dominios/institucional/estructura/group.model');
       const grupo = (await Group.findOne())!;
       await createEnrollment(
         {

@@ -690,6 +690,12 @@ modular por dominios**. Diagnóstico, propuesta y decisiones: `doc/Analisis_Arqu
   dominios); rutas en `dominios/institucional/rutas.ts`. El modelo `User` y la autenticación se quedan fuera: pasarán a `nucleo/seguridad`
   porque el middleware de autenticación lo necesita y el núcleo no puede depender de `institucional`. Los modelos de este dominio todavía los
   importan otros dominios directo (deuda que se cierra al activar la regla de límites).
+- **Dominio `registro` ya movido (fase 2)**: vive en `backend/src/dominios/registro/` con `estudiantes` (M03: `StudentProfile`, `Guardian`,
+  `StudentGuardian` y `datosSensibles.ts`), `admisiones` (M04: solicitudes, preinscripción pública, comprobante e información pública del
+  colegio) y `matriculas` (`Enrollment`, folio, acta de compromiso y la lista de documentos `matriculaChecklist.constants.ts`). Rutas en
+  `dominios/registro/rutas.ts`, montadas por `routes/index.ts`. Todavía no tiene `index.ts`: ningún otro dominio consume sus servicios (solo sus
+  modelos, directo). Dependencias hacia arriba que quedan para la fase 3: `admissionRequest.service` y `enrollment.service` llaman a `bienestar`
+  (`crearDesdeMatricula`) y `usuarios/user.routes.ts` (institucional) monta los controladores de acudientes y perfil de estudiante.
 - **No agregar** más lógica de negocio en controladores, ni más tipos en `types/domain.ts` o dentro de `hooks/`, ni más imports de
   dominio en `components/ui/`.
 - **Ramas**: una rama corta por fase `refactor/faseN-tema` desde `main` actualizado (ver `GUIA_DESARROLLO.md`); cada PR deja en verde

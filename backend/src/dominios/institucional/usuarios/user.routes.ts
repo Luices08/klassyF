@@ -6,8 +6,8 @@ import {
   desvincularAcudiente,
   listarAcudientesDeEstudiante,
   vincularAcudiente,
-} from '../../../controllers/guardian.controller';
-import { actualizarEstadoPerfil, getProfile, upsertProfile } from '../../../controllers/studentProfile.controller';
+} from '../../registro/estudiantes/guardian.controller';
+import { actualizarEstadoPerfil, getProfile, upsertProfile } from '../../registro/estudiantes/studentProfile.controller';
 import {
   actualizarEstadoUsuario,
   actualizarMiPerfil,
@@ -23,8 +23,8 @@ import {
 } from './user.controller';
 import { authenticate, checkRole } from '../../../middlewares/auth.middleware';
 import validate from '../../../middlewares/validate.middleware';
-import * as guardianValidator from '../../../validators/guardian.validator';
-import * as studentProfileValidator from '../../../validators/studentProfile.validator';
+import * as guardianValidator from '../../registro/estudiantes/guardian.validator';
+import * as studentProfileValidator from '../../registro/estudiantes/studentProfile.validator';
 import * as userValidator from './user.validator';
 
 const router = Router();

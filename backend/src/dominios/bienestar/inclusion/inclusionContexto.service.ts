@@ -4,7 +4,7 @@ import { ROLES } from '../../../constants/roles';
 import AcademicYear, { AcademicYearDocument } from '../../institucional/calendario/academicYear.model';
 import Area from '../../../models/area.model';
 import ConfiguracionInclusion, { ConfiguracionInclusionDocument } from './configuracionInclusion.model';
-import Enrollment, { EnrollmentDocument } from '../../../models/enrollment.model';
+import Enrollment, { EnrollmentDocument } from '../../registro/matriculas/enrollment.model';
 import Group, { IGroup } from '../../institucional/estructura/group.model';
 import StudyPlan from '../../../models/studyPlan.model';
 import Subject from '../../../models/subject.model';

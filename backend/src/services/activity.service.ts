@@ -3,7 +3,7 @@ import Activity, { ActivityDocument } from '../models/activity.model';
 import AcademicYear from '../dominios/institucional/calendario/academicYear.model';
 import ActivitySubmission, { ActivitySubmissionDocument } from '../models/activitySubmission.model';
 import { Dba } from '../models/referenteCurricular.model';
-import Enrollment from '../models/enrollment.model';
+import Enrollment from '../dominios/registro/matriculas/enrollment.model';
 import Group from '../dominios/institucional/estructura/group.model';
 import Subject from '../models/subject.model';
 import TeacherAssignment from '../models/teacherAssignment.model';

@@ -4,7 +4,7 @@ import { ROLES } from '../constants/roles';
 import Attendance, { AttendanceDocument } from '../models/attendance.model';
 import AttendanceJustification from '../models/attendanceJustification.model';
 import { AttendanceStateDocument } from '../models/attendanceState.model';
-import Enrollment from '../models/enrollment.model';
+import Enrollment from '../dominios/registro/matriculas/enrollment.model';
 import Group, { IGroup } from '../dominios/institucional/estructura/group.model';
 import Subject from '../models/subject.model';
 import TeacherAssignment from '../models/teacherAssignment.model';

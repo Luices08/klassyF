@@ -7,7 +7,7 @@ import { User, UserDocument } from '../../../models/user.model';
 import ApiError from '../../../utils/ApiError';
 import { alcanceDeInclusion, ROLES_BANDEJA_INCLUSION } from './permisosInclusion';
 import runTransaction from '../../../utils/runTransaction';
-import Enrollment from '../../../models/enrollment.model';
+import Enrollment from '../../registro/matriculas/enrollment.model';
 import { registrarEvento } from '../../../services/audit.service';
 import { abrirExpediente } from './expedienteInclusion.service';
 import { anioEnCurso, cargarContextoEstudiante, comoUsuarioInclusion, exigirPermiso } from './inclusionContexto.service';

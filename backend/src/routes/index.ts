@@ -1,21 +1,13 @@
 import { Router } from 'express';
-import academicYearRoutes from './academicYear.routes';
 import activityRoutes from './activity.routes';
 import admissionRequestRoutes from './admissionRequest.routes';
 import areaRoutes from './area.routes';
 import attendanceRoutes from './attendance.routes';
 import auditLogRoutes from './auditLog.routes';
 import authRoutes from './auth.routes';
-import campusRoutes from './campus.routes';
 import curricularDevelopmentRoutes from './curricularDevelopment.routes';
 import enrollmentRoutes from './enrollment.routes';
-import espacioRoutes from './espacio.routes';
-import gradeRoutes from './grade.routes';
-import groupRoutes from './group.routes';
 import guardianRoutes from './guardian.routes';
-import institutionRoutes from './institution.routes';
-import jornadaOperativaRoutes from './jornadaOperativa.routes';
-import periodLockRoutes from './periodLock.routes';
 import publicRoutes from './public.routes';
 import referenteCurricularRoutes from './referenteCurricular.routes';
 import reportCardRoutes from './reportCard.routes';
@@ -23,26 +15,18 @@ import studentRoutes from './student.routes';
 import studyPlanRoutes from './studyPlan.routes';
 import subjectRoutes from './subject.routes';
 import teacherAssignmentRoutes from './teacherAssignment.routes';
-import userRoutes from './user.routes';
-import { rutasBienestar } from '../dominios/bienestar';
+import rutasBienestar from '../dominios/bienestar/rutas';
+import rutasInstitucional from '../dominios/institucional/rutas';
 
 const router = Router();
 
 router.use('/auth', authRoutes);
-router.use('/users', userRoutes);
 router.use('/audit-logs', auditLogRoutes);
-router.use('/institution', institutionRoutes);
-router.use('/campuses', campusRoutes);
-router.use('/shifts', jornadaOperativaRoutes);
-router.use('/grades', gradeRoutes);
-router.use('/groups', groupRoutes);
+
+// Institucional (M01 institución y estructura, M02 usuarios, M05 calendario, M10 espacios)
+router.use(rutasInstitucional);
+
 router.use('/enrollments', enrollmentRoutes);
-
-// M10: Espacios fisicos (aulas, laboratorios, canchas)
-router.use('/espacios', espacioRoutes);
-
-// M05: Año lectivo, periodos académicos y calendario
-router.use('/academic-years', academicYearRoutes);
 
 // M03: Expediente y hoja de vida del estudiante
 router.use('/students', studentRoutes);
@@ -66,7 +50,6 @@ router.use(rutasBienestar);
 // Prompt 3: Actividades, Calificaciones, Asistencia y Motor de Boletines
 router.use('/activities', activityRoutes);
 router.use('/attendance', attendanceRoutes);
-router.use('/periods', periodLockRoutes);
 router.use('/reports', reportCardRoutes);
 
 export default router;

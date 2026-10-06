@@ -1,7 +1,7 @@
 import { Types } from 'mongoose';
 import { grupoGradosDeNumero, TipoReferente } from '../constants/enums';
 import Area from '../models/area.model';
-import Grade from '../models/grade.model';
+import Grade from '../dominios/institucional/estructura/grade.model';
 import { Dba, Ebc, IEbc, ILineamiento, Lineamiento, ReferenteCurricular } from '../models/referenteCurricular.model';
 import ApiError from '../utils/ApiError';
 import { ESTADO_ACTIVO, filtroPorEstado } from '../utils/filtroEstado';

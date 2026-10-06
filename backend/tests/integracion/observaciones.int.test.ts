@@ -1,6 +1,6 @@
 import { Types } from 'mongoose';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import AcademicYear from '../../src/models/academicYear.model';
+import AcademicYear from '../../src/dominios/institucional/calendario/academicYear.model';
 import AuditLog from '../../src/models/auditLog.model';
 import Observacion from '../../src/dominios/bienestar/observador/observacion.model';
 import SolicitudCaso from '../../src/dominios/bienestar/convivencia/solicitudCaso.model';

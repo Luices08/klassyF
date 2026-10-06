@@ -8,7 +8,7 @@ import TipoObservacion, { TipoObservacionDocument } from '../observador/tipoObse
 import ApiError from '../../../utils/ApiError';
 import { ESTADO_ACTIVO } from '../../../utils/filtroEstado';
 import { registrarEvento } from '../../../services/audit.service';
-import { exigirInstitucion } from '../../../services/institution.service';
+import { exigirInstitucion } from '../../institucional';
 
 export interface ContextoActor {
   usuarioId: Types.ObjectId | string;

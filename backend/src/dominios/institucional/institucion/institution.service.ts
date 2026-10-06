@@ -1,0 +1,308 @@
+import { Types } from 'mongoose';
+import { ROLES } from '../../../constants/roles';
+import { Calendario, EstadoUsuario, ModalidadInstitucion, PoliticaAforoAula } from '../../../constants/enums';
+import AcademicYear, { AcademicYearDocument } from '../calendario/academicYear.model';
+import Campus, { CampusDocument } from '../estructura/campus.model';
+import Institution, { ILimitesCargaDocente, ILimitesHorasPlanEstudios, InstitutionDocument } from './institution.model';
+import User from '../../../models/user.model';
+import ApiError from '../../../utils/ApiError';
+import { ESTADO_ACTIVO } from '../../../utils/filtroEstado';
+import { FranjaPlantilla } from '../estructura/franjas';
+import { registrarEvento } from '../../../services/audit.service';
+import { runTransaction } from '../../../utils/runTransaction';
+
+export const MENSAJE_SIN_INSTITUCION = 'No hay una institución configurada todavía.';
+
+interface OpcionesBusquedaInstitucion {
+  /** Proyección de Mongoose: solo los campos que el llamador necesita. */
+  campos?: string;
+  soloActiva?: boolean;
+}
+
+/** Una sola institución por instalación (CLAUDE.md §2): único punto de lectura de ese registro, o null si aún no se creó. */
+export async function buscarInstitucion({ campos, soloActiva }: OpcionesBusquedaInstitucion = {}): Promise<InstitutionDocument | null> {
+  const consulta = Institution.findOne(soloActiva ? { estado: ESTADO_ACTIVO } : {});
+  return campos ? consulta.select(campos) : consulta;
+}
+
+/** Como `buscarInstitucion`, pero falla con el mensaje del proceso que la necesita (409 por defecto). */
+export async function exigirInstitucion(mensaje: string, estado = 409): Promise<InstitutionDocument> {
+  const institucion = await buscarInstitucion();
+  if (!institucion) throw new ApiError(estado, mensaje);
+  return institucion;
+}
+
+export interface UpdateInstitutionInput {
+  nombre: string;
+  codigo_dane: string;
+  nit: string;
+  resolucion_aprobacion: string;
+  estado?: EstadoUsuario;
+  logo_url?: string | null;
+  correo_secretaria?: string | null;
+  horario_atencion?: string | null;
+  modalidad?: ModalidadInstitucion;
+  politica_aforo_aula?: PoliticaAforoAula;
+}
+
+export interface SetupInstitutionInput {
+  institucion: {
+    nombre: string;
+    codigo_dane: string;
+    nit: string;
+    resolucion_aprobacion: string;
+    modalidad?: ModalidadInstitucion;
+    administrador_id?: string | Types.ObjectId;
+  };
+  sede_principal: {
+    nombre: string;
+    codigo_dane_sede: string;
+    direccion: string;
+  };
+  anio_lectivo: {
+    year: number;
+    calendario: Calendario;
+    periodos: Array<{
+      numero: number;
+      nombre: string;
+      porcentaje: number;
+      fecha_inicio: Date | string;
+      fecha_fin: Date | string;
+    }>;
+  };
+}
+
+export interface SetupInstitutionResult {
+  institution: InstitutionDocument;
+  sede_principal: CampusDocument;
+  academic_year: AcademicYearDocument;
+}
+
+/**
+ * Crea, en una unica transaccion, el colegio, su sede principal y el año
+ * lectivo inicial con sus periodos. Si cualquier paso falla (por ejemplo la
+ * validacion de que los porcentajes de periodos sumen 100), se revierte todo.
+ */
+export async function setupInstitution({
+  institucion,
+  sede_principal,
+  anio_lectivo,
+}: SetupInstitutionInput): Promise<SetupInstitutionResult> {
+  if (institucion.administrador_id) {
+    const administrador = await User.findById(institucion.administrador_id);
+    if (!administrador) throw new ApiError(404, 'administrador_id no corresponde a un usuario existente.');
+    if (administrador.rol !== ROLES.ADMIN) {
+      throw new ApiError(400, 'El usuario referenciado en administrador_id no tiene rol ADMIN.');
+    }
+  }
+
+  return runTransaction(async (session) => {
+    // Cada despliegue de Klassy pertenece a una sola institucion (se vende por
+    // colegio, con un dominio propio). El multitenant solo existe a nivel de
+    // sedes DENTRO de esa institucion, nunca entre instituciones distintas.
+    // Se verifica dentro de la misma transaccion para que sea atomico con la creacion.
+    const yaHayInstitucion = await Institution.exists({}).session(session);
+    if (yaHayInstitucion) {
+      throw new ApiError(
+        409,
+        'Este sistema ya tiene una institución configurada. Usa "Modificar institución" para editarla, o el módulo de Sedes y jornadas para agregar sedes adicionales.'
+      );
+    }
+
+    const [institution] = await Institution.create([institucion], { session });
+    if (!institution) throw new ApiError(500, 'No se pudo crear la institucion.');
+
+    const [campus] = await Campus.create(
+      [
+        {
+          ...sede_principal,
+          institucion_id: institution._id,
+          es_principal: true,
+        },
+      ],
+      { session }
+    );
+    if (!campus) throw new ApiError(500, 'No se pudo crear la sede principal.');
+
+    const [academicYear] = await AcademicYear.create(
+      [
+        {
+          institucion_id: institution._id,
+          year: anio_lectivo.year,
+          calendario: anio_lectivo.calendario,
+          estado: 'PLANIFICACION',
+          periodos: anio_lectivo.periodos.map((p) => ({ ...p, estado: 'PROGRAMADO' })),
+        },
+      ],
+      { session }
+    );
+    if (!academicYear) throw new ApiError(500, 'No se pudo crear el año lectivo.');
+
+    return {
+      institution,
+      sede_principal: campus,
+      academic_year: academicYear,
+    };
+  });
+}
+
+/**
+ * Plantilla base de franjas (clases y descansos, por duracion) que se carga en las jornadas. No lleva contraseña de
+ * confirmacion: no toca datos legales de la institucion, y editarla no altera las jornadas ya configuradas.
+ */
+export async function actualizarPlantillaFranjas(
+  franjas: FranjaPlantilla[],
+  { usuarioId, ip }: { usuarioId: Types.ObjectId | string; ip?: string | null }
+): Promise<InstitutionDocument> {
+  const institucion = await exigirInstitucion(MENSAJE_SIN_INSTITUCION, 404);
+
+  institucion.set('plantilla_franjas', franjas);
+  await institucion.save();
+
+  await registrarEvento({
+    usuario_id: usuarioId,
+    accion: 'PLANTILLA_FRANJAS_ACTUALIZADA',
+    entidad: 'Institution',
+    entidad_id: institucion._id,
+    detalle: `${franjas.length} bloque(s), ${franjas.reduce((s, f) => s + f.duracion_min, 0)} minutos en total`,
+    ip,
+  });
+  return institucion;
+}
+
+/** Como solo existe una institucion por despliegue, no recibe ni necesita un id. */
+export async function getInstitution(): Promise<InstitutionDocument | null> {
+  return buscarInstitucion();
+}
+
+export async function updateInstitution(
+  adminUserId: string | Types.ObjectId,
+  input: UpdateInstitutionInput,
+  confirmPassword: string
+): Promise<InstitutionDocument> {
+  const admin = await User.findById(adminUserId).select('+password_hash');
+  if (!admin) throw new ApiError(401, 'Usuario no encontrado.');
+
+  const passwordOk = await admin.comparePassword(confirmPassword);
+  if (!passwordOk) throw new ApiError(401, 'Contraseña incorrecta.');
+
+  const institucion = await exigirInstitucion(MENSAJE_SIN_INSTITUCION, 404);
+
+  institucion.nombre = input.nombre;
+  institucion.codigo_dane = input.codigo_dane;
+  institucion.nit = input.nit;
+  institucion.resolucion_aprobacion = input.resolucion_aprobacion;
+  if (input.estado !== undefined) institucion.estado = input.estado;
+  if (input.logo_url !== undefined) institucion.logo_url = input.logo_url;
+  if (input.correo_secretaria !== undefined) institucion.correo_secretaria = input.correo_secretaria;
+  if (input.horario_atencion !== undefined) institucion.horario_atencion = input.horario_atencion;
+  if (input.modalidad !== undefined) institucion.modalidad = input.modalidad;
+  if (input.politica_aforo_aula !== undefined) institucion.politica_aforo_aula = input.politica_aforo_aula;
+  await institucion.save();
+
+  return institucion;
+}
+
+export interface ConfiguracionCargaDocente extends ILimitesCargaDocente {
+  max_direcciones_grupo_por_docente: number;
+  tolerancia_subcarga_horas: number;
+}
+
+function configuracionCarga(institucion: InstitutionDocument | null): ConfiguracionCargaDocente {
+  const limites = institucion?.limites_carga_docente ?? { PREESCOLAR: 20, PRIMARIA: 25, SECUNDARIA: 22, MEDIA: 22 };
+  return {
+    PREESCOLAR: limites.PREESCOLAR,
+    PRIMARIA: limites.PRIMARIA,
+    SECUNDARIA: limites.SECUNDARIA,
+    MEDIA: limites.MEDIA,
+    max_direcciones_grupo_por_docente: institucion?.max_direcciones_grupo_por_docente ?? 1,
+    tolerancia_subcarga_horas: institucion?.tolerancia_subcarga_horas ?? 2,
+  };
+}
+
+export async function getLimitesCarga(): Promise<ConfiguracionCargaDocente> {
+  return configuracionCarga(await buscarInstitucion());
+}
+
+export async function updateLimitesCarga(
+  limites: Partial<ConfiguracionCargaDocente>,
+  { usuarioId, ip }: { usuarioId: Types.ObjectId | string; ip?: string | null }
+): Promise<ConfiguracionCargaDocente> {
+  const institucion = await exigirInstitucion(MENSAJE_SIN_INSTITUCION, 404);
+
+  const actual = institucion.limites_carga_docente || {
+    PREESCOLAR: 20,
+    PRIMARIA: 25,
+    SECUNDARIA: 22,
+    MEDIA: 22,
+  };
+
+  institucion.limites_carga_docente = {
+    PREESCOLAR: limites.PREESCOLAR ?? actual.PREESCOLAR,
+    PRIMARIA: limites.PRIMARIA ?? actual.PRIMARIA,
+    SECUNDARIA: limites.SECUNDARIA ?? actual.SECUNDARIA,
+    MEDIA: limites.MEDIA ?? actual.MEDIA,
+  };
+  if (limites.max_direcciones_grupo_por_docente !== undefined) {
+    institucion.max_direcciones_grupo_por_docente = limites.max_direcciones_grupo_por_docente;
+  }
+  if (limites.tolerancia_subcarga_horas !== undefined) {
+    institucion.tolerancia_subcarga_horas = limites.tolerancia_subcarga_horas;
+  }
+
+  await institucion.save();
+
+  const resultado = configuracionCarga(institucion);
+  await registrarEvento({
+    usuario_id: usuarioId,
+    accion: 'LIMITES_CARGA_DOCENTE_ACTUALIZADOS',
+    entidad: 'Institution',
+    entidad_id: institucion._id,
+    detalle: `PREESCOLAR ${resultado.PREESCOLAR}h, PRIMARIA ${resultado.PRIMARIA}h, SECUNDARIA ${resultado.SECUNDARIA}h, MEDIA ${resultado.MEDIA}h, direcciones de grupo por docente: ${resultado.max_direcciones_grupo_por_docente}, tolerancia de subcarga: ${resultado.tolerancia_subcarga_horas}h`,
+    ip,
+  });
+  return resultado;
+}
+
+/** M06: tope de horas semanales del Plan de Estudios por nivel (antes quemado a 30 para todos en el frontend). */
+export async function getLimitesHorasPlan(): Promise<ILimitesHorasPlanEstudios> {
+  const institucion = await buscarInstitucion();
+  if (!institucion || !institucion.limites_horas_plan_estudios) {
+    return { PREESCOLAR: 30, PRIMARIA: 30, SECUNDARIA: 30, MEDIA: 30 };
+  }
+  return institucion.limites_horas_plan_estudios;
+}
+
+export async function updateLimitesHorasPlan(
+  limites: { PREESCOLAR?: number; PRIMARIA?: number; SECUNDARIA?: number; MEDIA?: number },
+  { usuarioId, ip }: { usuarioId: Types.ObjectId | string; ip?: string | null }
+): Promise<ILimitesHorasPlanEstudios> {
+  const institucion = await exigirInstitucion(MENSAJE_SIN_INSTITUCION, 404);
+
+  const actual = institucion.limites_horas_plan_estudios || {
+    PREESCOLAR: 30,
+    PRIMARIA: 30,
+    SECUNDARIA: 30,
+    MEDIA: 30,
+  };
+
+  institucion.limites_horas_plan_estudios = {
+    PREESCOLAR: limites.PREESCOLAR ?? actual.PREESCOLAR,
+    PRIMARIA: limites.PRIMARIA ?? actual.PRIMARIA,
+    SECUNDARIA: limites.SECUNDARIA ?? actual.SECUNDARIA,
+    MEDIA: limites.MEDIA ?? actual.MEDIA,
+  };
+
+  await institucion.save();
+
+  const resultado = institucion.limites_horas_plan_estudios;
+  await registrarEvento({
+    usuario_id: usuarioId,
+    accion: 'LIMITES_HORAS_PLAN_ACTUALIZADOS',
+    entidad: 'Institution',
+    entidad_id: institucion._id,
+    detalle: `PREESCOLAR ${resultado.PREESCOLAR}h, PRIMARIA ${resultado.PRIMARIA}h, SECUNDARIA ${resultado.SECUNDARIA}h, MEDIA ${resultado.MEDIA}h`,
+    ip,
+  });
+  return resultado;
+}

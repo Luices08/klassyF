@@ -12,9 +12,9 @@ import mongoose from 'mongoose';
 dotenv.config();
 
 import { env } from '../src/config/env';
-import Campus from '../src/models/campus.model';
-import Grade from '../src/models/grade.model';
-import Institution from '../src/models/institution.model';
+import Campus from '../src/dominios/institucional/estructura/campus.model';
+import Grade from '../src/dominios/institucional/estructura/grade.model';
+import Institution from '../src/dominios/institucional/institucion/institution.model';
 import User from '../src/models/user.model';
 
 async function run(): Promise<void> {

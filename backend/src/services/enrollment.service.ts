@@ -9,10 +9,10 @@ import {
   TipoIngreso,
 } from '../constants/enums';
 import { ROLES } from '../constants/roles';
-import AcademicYear from '../models/academicYear.model';
+import AcademicYear from '../dominios/institucional/calendario/academicYear.model';
 import Enrollment, { EnrollmentDocument } from '../models/enrollment.model';
-import Grade from '../models/grade.model';
-import Group from '../models/group.model';
+import Grade from '../dominios/institucional/estructura/grade.model';
+import Group from '../dominios/institucional/estructura/group.model';
 import User from '../models/user.model';
 import ApiError from '../utils/ApiError';
 import { runTransaction } from '../utils/runTransaction';

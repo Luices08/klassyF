@@ -126,7 +126,7 @@ solo extender si se pide algo nuevo. Reglas que no se ven leyendo un solo archiv
   un índice único parcial además del chequeo del servicio) → `CERRADO` (histórico de solo lectura, no se
   reactiva). Crear un año nuevo puede copiar los grupos ACTIVOS del anterior (grupos nuevos, sin matrículas).
 - **Semáforo del periodo**: `PROGRAMADO` → `ABIERTO` → `EN_DIGITACION` → `CERRADO` (tabla
-  `TRANSICIONES_PERIODO` en `constants/anioLectivo.ts`); reabrir uno CERRADO solo lo hace ADMIN y con motivo.
+  `TRANSICIONES_PERIODO` en `dominios/institucional/calendario/anioLectivo.constants.ts`); reabrir uno CERRADO solo lo hace ADMIN y con motivo.
   `ESTADOS_PERIODO` (ABIERTO/CERRADO) es otra cosa: el cierre de un periodo *para un grupo* (`PeriodLock`).
 - **Permisos**: ADMIN crea/edita/activa/cierra el año y edita eventos y calendarios por sede; ADMIN y
   COORDINADOR cambian el estado de los periodos y otorgan/revocan prórrogas; el resto de roles solo consulta.
@@ -135,7 +135,7 @@ solo extender si se pide algo nuevo. Reglas que no se ven leyendo un solo archiv
   tiene calendario propio), o una prórroga vigente para ese docente/grupo; además el `PeriodLock` del grupo.
   Todo módulo que mute notas debe pasar por ahí (hoy lo hace `gradeActivity`).
 - **Fechas**: las fechas de calendario se guardan a medianoche UTC. Para compararlas con "ahora" se usa
-  `inicioDelDia`/`finDelDia` de `utils/calendarioAcademico.ts` (UTC-5, cierre inclusivo); en el frontend se
+  `inicioDelDia`/`finDelDia` de `dominios/institucional/calendario/calendarioAcademico.ts` (UTC-5, cierre inclusivo); en el frontend se
   formatean con `lib/fechas.ts`, nunca con `toLocaleDateString()` (mostraría el día anterior).
 - `esDiaLectivo(dia, eventos)` es el contrato para que M13 (asistencia) no exija lista en recesos/vacaciones/
   desarrollo institucional; las semanas lectivas (mínimo 40) se calculan con las mismas reglas.
@@ -151,7 +151,7 @@ solo extender si se pide algo nuevo. Reglas que no se ven leyendo un solo archiv
 - **Nunca hay días ni horas fijos en el código.** Cada `JornadaOperativa` guarda sus `dias_habiles` (ISO 1=lunes … 7=domingo;
   por defecto L–V, y solo sábado para `SABATINA`, editable para tener sábado/domingo) y sus `franjas`: bloques reales de
   `CLASE` y `DESCANSO` con hora de inicio y fin. Empiezan vacías: hasta que se definan, la malla de espacios muestra un aviso, no
-  una cuadrícula inventada. El modelo valida que estén dentro de la jornada, en orden y sin traslapes (`utils/franjas.ts`).
+  una cuadrícula inventada. El modelo valida que estén dentro de la jornada, en orden y sin traslapes (`dominios/institucional/estructura/franjas.ts`).
 - **Plantilla base**: `Institution.plantilla_franjas` (bloques por *duración*, sin hora fija, para que sirva a mañana y tarde). Se
   edita en Configuración institucional (`PUT /institution/plantilla-franjas`, ADMIN) y se "carga" en una jornada
   (`GET /shifts/:id/horario/plantilla` devuelve las franjas encadenadas desde su hora de inicio, sin guardar; el usuario las revisa y
@@ -670,7 +670,8 @@ modular por dominios**. Diagnóstico, propuesta y decisiones: `doc/Analisis_Arqu
   `comunicacion`. Un dominio no importa a un igual ni a uno superior; un dato ajeno se pide a la API pública (`index.ts`) de quien
   lo posee, no consultando sus modelos.
 - **Proveedores únicos (fase 1 hecha)**: la institución se lee con `buscarInstitucion()` / `exigirInstitucion(mensaje)`
-  (`institution.service.ts`) y el año vigente con `buscarAnioEnCurso()` / `exigirAnioEnCurso(mensaje)` (`academicYear.service.ts`);
+  (`institution.service.ts`) y el año vigente con `buscarAnioEnCurso()` / `exigirAnioEnCurso(mensaje)` (`academicYear.service.ts`), ambos
+  exportados por `dominios/institucional/index.ts` (desde otro dominio se importan de ahí);
   nunca con `Institution.findOne()` ni `AcademicYear.findOne({ estado: 'EN_CURSO' })` sueltos. Las fechas de Colombia salen de
   `utils/tiempo.ts` (`hoyColombia`, `fechaDeClase`, `diaIso`), el contexto de calendario de un grupo de
   `calendarioContexto.service.ts` y la paleta/`bufferDeDocumento` de los PDF de `utils/pdf.ts`.
@@ -678,9 +679,17 @@ modular por dominios**. Diagnóstico, propuesta y decisiones: `doc/Analisis_Arqu
   (casos, solicitudes, faltas, medidas, protocolos, carga de faltas y retención), `comite` (comité y actas), `orientacion`, `inclusion` (M16, con
   `encabezadoInstitucional.service.ts` y los PDF) y `comun` (lo que comparten: constantes, catálogo y configuración de convivencia, permisos por
   sede). Los archivos conservan su nombre (`observacion.service.ts`, `caso.routes.ts`...); los de constantes pasan a llevar el sufijo `.constants.ts`.
-  Su única puerta es `dominios/bienestar/index.ts` (`rutasBienestar`, `crearDesdeMatricula`); `routes/index.ts` monta `rutasBienestar` y matrícula
-  y admisión importan de ahí, nunca de una subcarpeta. Las rutas HTTP no cambiaron. Los demás archivos de este documento que se nombran sin
-  carpeta (`observacion.service.ts`, `piarPdf.service.ts`...) están en esa estructura.
+  Su única puerta es `dominios/bienestar/index.ts` (`crearDesdeMatricula`); las rutas están en `dominios/bienestar/rutas.ts` y solo las monta
+  `routes/index.ts` (no van en el `index.ts` para no cargar controladores al importar un servicio). Matrícula y admisión importan de la puerta,
+  nunca de una subcarpeta. Las rutas HTTP no cambiaron. Los demás archivos de este documento que se nombran sin carpeta
+  (`observacion.service.ts`, `piarPdf.service.ts`...) están en esa estructura.
+- **Dominio `institucional` ya movido (fase 2)**: vive en `backend/src/dominios/institucional/` con `institucion` (M01 `Institution`),
+  `estructura` (sedes, jornadas, grados, grupos y espacios M10, más `utils/franjas.ts`), `calendario` (M05: año lectivo, periodos, prórrogas,
+  `PeriodLock`, `calendarioContexto.service.ts` y `calendarioAcademico.ts`), `parametros` (SIEE y escala de evaluación, embrión de M32) y
+  `usuarios` (la gestión M02: controlador, rutas y validador). Puerta: `dominios/institucional/index.ts` (servicios y utilidades que usan otros
+  dominios); rutas en `dominios/institucional/rutas.ts`. El modelo `User` y la autenticación se quedan fuera: pasarán a `nucleo/seguridad`
+  porque el middleware de autenticación lo necesita y el núcleo no puede depender de `institucional`. Los modelos de este dominio todavía los
+  importan otros dominios directo (deuda que se cierra al activar la regla de límites).
 - **No agregar** más lógica de negocio en controladores, ni más tipos en `types/domain.ts` o dentro de `hooks/`, ni más imports de
   dominio en `components/ui/`.
 - **Ramas**: una rama corta por fase `refactor/faseN-tema` desde `main` actualizado (ver `GUIA_DESARROLLO.md`); cada PR deja en verde

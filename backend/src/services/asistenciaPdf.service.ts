@@ -1,19 +1,19 @@
 import { HydratedDocument, Types } from 'mongoose';
 import PDFDocument from 'pdfkit';
 import { ROLES } from '../constants/roles';
-import AcademicYear from '../models/academicYear.model';
+import AcademicYear from '../dominios/institucional/calendario/academicYear.model';
 import Enrollment from '../models/enrollment.model';
-import Group, { IGroup } from '../models/group.model';
+import Group, { IGroup } from '../dominios/institucional/estructura/group.model';
 import Subject from '../models/subject.model';
 import TeacherAssignment from '../models/teacherAssignment.model';
 import User, { UserDocument } from '../models/user.model';
 import ApiError from '../utils/ApiError';
-import { periodosEfectivos } from '../utils/calendarioAcademico';
+import { periodosEfectivos } from '../dominios/institucional';
 import { ESTADO_ACTIVO } from '../utils/filtroEstado';
 import { ESTADOS_MATRICULA_ACTIVOS } from '../constants/enums';
 import { COLOR, Documento, bufferDeDocumento } from '../utils/pdf';
 import { listarInasistencias, matriculasActivas, obtenerGrupoYAsignatura } from './attendance.service';
-import { cargarContextoFechas } from './calendarioContexto.service';
+import { cargarContextoFechas } from '../dominios/institucional';
 import { Cuadricula, TotalesEstudiante, construirCuadricula } from './attendanceCuadricula.service';
 import {
   TotalesAsistencia,
@@ -22,7 +22,7 @@ import {
   resumenAsistenciaParaBoletin,
   sumarTotales,
 } from './attendanceStats.service';
-import { buscarInstitucion } from './institution.service';
+import { buscarInstitucion } from '../dominios/institucional';
 
 const MARGEN = 30;
 const MARGEN_INFERIOR = 20;

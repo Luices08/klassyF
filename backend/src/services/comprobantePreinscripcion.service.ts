@@ -1,7 +1,7 @@
 import PDFDocument from 'pdfkit';
 import ApiError from '../utils/ApiError';
 import { buscarMatriculaDePreinscripcion, construirDetalle } from './preinscripcionPublica.service';
-import { buscarInstitucion } from './institution.service';
+import { buscarInstitucion } from '../dominios/institucional';
 
 // Fechas de calendario (medianoche UTC): se muestran en UTC para no correrlas un dia en Colombia.
 const formatoFecha = (fecha: Date): string =>

@@ -1,6 +1,6 @@
 import { Types } from 'mongoose';
 import { EstadoArea, NivelEducativo, TipoAsignatura } from '../constants/enums';
-import AcademicYear from '../models/academicYear.model';
+import AcademicYear from '../dominios/institucional/calendario/academicYear.model';
 import Area from '../models/area.model';
 import StudyPlan from '../models/studyPlan.model';
 import Subject, { SubjectDocument } from '../models/subject.model';

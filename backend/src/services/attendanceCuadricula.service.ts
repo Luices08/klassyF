@@ -4,17 +4,17 @@ import { ROLES } from '../constants/roles';
 import Attendance from '../models/attendance.model';
 import AttendanceJustification from '../models/attendanceJustification.model';
 import { AttendanceStateDocument } from '../models/attendanceState.model';
-import Grade from '../models/grade.model';
-import { IGroup } from '../models/group.model';
+import Grade from '../dominios/institucional/estructura/grade.model';
+import { IGroup } from '../dominios/institucional/estructura/group.model';
 import TeacherAssignment from '../models/teacherAssignment.model';
 import { UserDocument } from '../models/user.model';
 import ApiError from '../utils/ApiError';
-import { hayEventoNoLectivo } from '../utils/calendarioAcademico';
+import { hayEventoNoLectivo } from '../dominios/institucional';
 import { ESTADO_ACTIVO } from '../utils/filtroEstado';
 import { diaIso } from '../utils/tiempo';
 import { evaluarFechaEnContexto, matriculasActivas, obtenerGrupoYAsignatura } from './attendance.service';
 import { listarEstados } from './attendanceState.service';
-import { cargarContextoFechas, periodoDeFecha } from './calendarioContexto.service';
+import { cargarContextoFechas, periodoDeFecha } from '../dominios/institucional';
 
 const ROLES_DE_CONSULTA_TOTAL: string[] = [ROLES.ADMIN, ROLES.COORDINADOR, ROLES.SECRETARIA];
 

@@ -5,7 +5,7 @@ import { NOMBRES_DOCUMENTO_MATRICULA } from '../constants/matriculaChecklist';
 import AdmissionRequest from '../models/admissionRequest.model';
 import Enrollment, { EnrollmentDocument } from '../models/enrollment.model';
 import ApiError from '../utils/ApiError';
-import { finDelDia } from '../utils/calendarioAcademico';
+import { finDelDia } from '../dominios/institucional';
 import { detectarFirmaArchivo } from '../utils/firmasArchivo';
 import { carpetaMatricula } from '../utils/uploadPaths';
 import { cargarDocumento } from './enrollment.service';

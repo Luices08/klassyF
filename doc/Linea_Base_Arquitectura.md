@@ -118,3 +118,23 @@ relativa; el historial de Git conserva los renombres). Ningún identificador ni 
 | Convención nueva | Los archivos de constantes que se mueven llevan el sufijo `.constants.ts` (hubo un choque `constants/inclusion.ts` / `utils/inclusion.ts`) |
 | Se quedó fuera | `datosSensibles`, `counter.model`, `csv`, `importacion`, `firmasArchivo` y `uploadPaths` (los usan otros dominios; irán al núcleo) |
 
+### Fase 2 — dominio `institucional` (`refactor/fase2-institucional`)
+
+50 archivos movidos con `git mv` y 337 imports reescritos (mismo método que `bienestar`). La tabla de rutas de Express es idéntica como conjunto
+(294 entradas); el orden de registro cambió, pero los prefijos son distintos entre sí, así que no hay efecto.
+
+| Qué | Resultado |
+|---|---|
+| Ubicación | `backend/src/dominios/institucional/{institucion, estructura, calendario, parametros, usuarios}` |
+| Puerta pública | `dominios/institucional/index.ts` (`export *` de 7 archivos: institución, año lectivo, contexto de calendario, `PeriodLock`, calendario académico, escala y SIEE) |
+| Imports externos redirigidos a la puerta | 32 en 23 archivos (servicios y utilidades; los modelos siguen directos) |
+| Rutas | `dominios/institucional/rutas.ts`, montadas por `routes/index.ts`; la puerta de `bienestar` ya no incluye sus rutas (evita ciclos de carga) |
+| Fuera del dominio | `models/user.model.ts`, `auth.controller`, `auth.middleware`, `token.service` y `constants/roles.ts` (van a `nucleo/seguridad`) |
+
+**Dependencias hacia arriba que ya existían y quedan documentadas para la fase 3** (no se corrigen en un movimiento):
+
+1. `usuarios/user.controller.ts` importa 9 modelos de otros dominios (`Attendance`, `ActivitySubmission`, `CurricularDevelopment`, `PeriodoProrroga`, `TeacherAssignment`, `Enrollment`, `StudentProfile`, `Guardian`, `StudentGuardian`, `AdmissionRequest`) para decidir si un usuario tiene historial → vetos de eliminación por dominio.
+2. `usuarios/user.routes.ts` monta controladores y validadores de `registro` (`guardian`, `studentProfile`) bajo `/users/:userId/...` → `registro` debe exponer su router y montarse en la misma ruta.
+3. `institucion/institution.controller.ts` llama a `studyPlan.service` (`curricular`) en `PATCH /institution/limites-horas-plan` para devolver `grados_excedidos`.
+4. `estructura/espacio.service.ts` importa el modelo `Area` (`curricular`).
+

@@ -6,11 +6,11 @@ import {
 } from '../comun/convivencia.constants';
 import { ESTADOS_MATRICULA_ACTIVOS } from '../../../constants/enums';
 import { ROLES } from '../../../constants/roles';
-import AcademicYear, { AcademicYearDocument } from '../../../models/academicYear.model';
+import AcademicYear, { AcademicYearDocument } from '../../institucional/calendario/academicYear.model';
 import CasoConvivencia from '../convivencia/casoConvivencia.model';
 import Enrollment from '../../../models/enrollment.model';
 import FaltaConvivencia from '../convivencia/faltaConvivencia.model';
-import Group, { IGroup } from '../../../models/group.model';
+import Group, { IGroup } from '../../institucional/estructura/group.model';
 import Observacion, { IObservacion, ObservacionDocument } from './observacion.model';
 import SolicitudCaso, { ISolicitudCaso } from '../convivencia/solicitudCaso.model';
 import TeacherAssignment from '../../../models/teacherAssignment.model';
@@ -38,10 +38,10 @@ import {
 } from '../comun/permisosConvivencia';
 import runTransaction from '../../../utils/runTransaction';
 import { fechaDeClase, hoyColombia } from '../../../utils/tiempo';
-import { cargarContextoFechas, periodoDeFecha } from '../../../services/calendarioContexto.service';
+import { cargarContextoFechas, periodoDeFecha } from '../../institucional';
 import { registrarEvento } from '../../../services/audit.service';
 import { obtenerConfiguracion, obtenerInstitucionConvivencia } from '../comun/convivenciaCatalogo.service';
-import { buscarAnioEnCurso, exigirAnioEnCurso } from '../../../services/academicYear.service';
+import { buscarAnioEnCurso, exigirAnioEnCurso } from '../../institucional';
 
 const LIMITE_BUSQUEDA = 30;
 const LIMITE_HISTORIAL = 1000;

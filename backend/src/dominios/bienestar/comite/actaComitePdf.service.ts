@@ -6,7 +6,7 @@ import ApiError from '../../../utils/ApiError';
 import { registrarEvento } from '../../../services/audit.service';
 import { COLOR, Documento, bufferDeDocumento } from '../../../utils/pdf';
 import { obtenerSesion } from './comite.service';
-import { buscarInstitucion } from '../../../services/institution.service';
+import { buscarInstitucion } from '../../institucional';
 
 // Los mismos tonos de la guía visual, para que el papel se parezca a la pantalla.
 const MARGEN = 50;

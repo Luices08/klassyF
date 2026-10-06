@@ -1,14 +1,14 @@
 import { Types } from 'mongoose';
 import { ESTADOS_MATRICULA_ACTIVOS, MetodoCalculoEvaluacion } from '../constants/enums';
 import { ROLES } from '../constants/roles';
-import AcademicYear from '../models/academicYear.model';
+import AcademicYear from '../dominios/institucional/calendario/academicYear.model';
 import Activity, { ActivityDocument } from '../models/activity.model';
 import ActivitySubmission from '../models/activitySubmission.model';
 import Area, { AreaDocument } from '../models/area.model';
-import { CampusDocument } from '../models/campus.model';
+import { CampusDocument } from '../dominios/institucional/estructura/campus.model';
 import Enrollment from '../models/enrollment.model';
-import Group from '../models/group.model';
-import { JornadaOperativaDocument } from '../models/jornadaOperativa.model';
+import Group from '../dominios/institucional/estructura/group.model';
+import { JornadaOperativaDocument } from '../dominios/institucional/estructura/jornadaOperativa.model';
 import Guardian from '../models/guardian.model';
 import StudentGuardian from '../models/studentGuardian.model';
 import StudyPlan from '../models/studyPlan.model';
@@ -16,9 +16,9 @@ import Subject, { SubjectDocument } from '../models/subject.model';
 import TeacherAssignment from '../models/teacherAssignment.model';
 import User, { UserDocument } from '../models/user.model';
 import ApiError from '../utils/ApiError';
-import type { ResultadoDesempeno } from '../utils/escalaEvaluacion';
+import type { ResultadoDesempeno } from '../dominios/institucional';
 import { resumenAsistenciaParaBoletin } from './attendanceStats.service';
-import { desempenoCualitativo, ponderacionEfectiva, round2 } from '../utils/siee';
+import { desempenoCualitativo, ponderacionEfectiva, round2 } from '../dominios/institucional';
 
 export interface ReportCardParams {
   student_id: string;

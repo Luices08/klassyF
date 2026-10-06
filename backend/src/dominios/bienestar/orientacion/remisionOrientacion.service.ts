@@ -2,7 +2,7 @@ import { ClientSession, Types } from 'mongoose';
 import { EstadoRemisionOrientacion, OrigenRemisionOrientacion } from '../comun/convivencia.constants';
 import { ROLES } from '../../../constants/roles';
 import { CasoConvivenciaDocument } from '../convivencia/casoConvivencia.model';
-import Group from '../../../models/group.model';
+import Group from '../../institucional/estructura/group.model';
 import RemisionOrientacion, { RemisionOrientacionDocument } from './remisionOrientacion.model';
 import { User, UserDocument } from '../../../models/user.model';
 import ApiError from '../../../utils/ApiError';

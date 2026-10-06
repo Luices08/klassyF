@@ -1,11 +1,11 @@
 import { Types } from 'mongoose';
-import AcademicYear from '../../src/models/academicYear.model';
-import Campus from '../../src/models/campus.model';
+import AcademicYear from '../../src/dominios/institucional/calendario/academicYear.model';
+import Campus from '../../src/dominios/institucional/estructura/campus.model';
 import Enrollment from '../../src/models/enrollment.model';
-import Grade from '../../src/models/grade.model';
-import Group from '../../src/models/group.model';
-import Institution from '../../src/models/institution.model';
-import JornadaOperativa from '../../src/models/jornadaOperativa.model';
+import Grade from '../../src/dominios/institucional/estructura/grade.model';
+import Group from '../../src/dominios/institucional/estructura/group.model';
+import Institution from '../../src/dominios/institucional/institucion/institution.model';
+import JornadaOperativa from '../../src/dominios/institucional/estructura/jornadaOperativa.model';
 import TeacherAssignment from '../../src/models/teacherAssignment.model';
 import { User, UserDocument } from '../../src/models/user.model';
 import { hoyColombia } from '../../src/utils/tiempo';

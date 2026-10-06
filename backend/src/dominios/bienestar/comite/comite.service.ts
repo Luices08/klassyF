@@ -2,7 +2,7 @@ import { Types } from 'mongoose';
 import { TipoSesionComite } from '../comun/convivencia.constants';
 import { EstadoUsuario } from '../../../constants/enums';
 import { ROLES } from '../../../constants/roles';
-import AcademicYear from '../../../models/academicYear.model';
+import AcademicYear from '../../institucional/calendario/academicYear.model';
 import { MiembroComite, MiembroComiteDocument, SesionComite, SesionComiteDocument } from './comiteConvivencia.model';
 import Counter from '../../../models/counter.model';
 import { UserDocument } from '../../../models/user.model';
@@ -15,7 +15,7 @@ import { fechaDeClase, hoyColombia } from '../../../utils/tiempo';
 import { registrarEvento } from '../../../services/audit.service';
 import { cargarCaso } from '../convivencia/caso.service';
 import { obtenerConfiguracion } from '../comun/convivenciaCatalogo.service';
-import { buscarAnioEnCurso, exigirAnioEnCurso } from '../../../services/academicYear.service';
+import { buscarAnioEnCurso, exigirAnioEnCurso } from '../../institucional';
 
 const ROLES_CONVIVENCIA: string[] = [ROLES.ADMIN, ROLES.COORDINADOR_CONVIVENCIA];
 

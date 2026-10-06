@@ -1,11 +1,11 @@
 import { HydratedDocument, Types } from 'mongoose';
 import { ESTADOS_MATRICULA_ACTIVOS } from '../../../constants/enums';
 import { ROLES } from '../../../constants/roles';
-import AcademicYear, { AcademicYearDocument } from '../../../models/academicYear.model';
+import AcademicYear, { AcademicYearDocument } from '../../institucional/calendario/academicYear.model';
 import Area from '../../../models/area.model';
 import ConfiguracionInclusion, { ConfiguracionInclusionDocument } from './configuracionInclusion.model';
 import Enrollment, { EnrollmentDocument } from '../../../models/enrollment.model';
-import Group, { IGroup } from '../../../models/group.model';
+import Group, { IGroup } from '../../institucional/estructura/group.model';
 import StudyPlan from '../../../models/studyPlan.model';
 import Subject from '../../../models/subject.model';
 import TeacherAssignment from '../../../models/teacherAssignment.model';
@@ -13,8 +13,8 @@ import { UserDocument } from '../../../models/user.model';
 import ApiError from '../../../utils/ApiError';
 import { ESTADO_ACTIVO } from '../../../utils/filtroEstado';
 import { AccionInclusion, ContextoInclusion, UsuarioInclusion, permisoInclusion } from './permisosInclusion';
-import { exigirInstitucion } from '../../../services/institution.service';
-import { exigirAnioEnCurso } from '../../../services/academicYear.service';
+import { exigirInstitucion } from '../../institucional';
+import { exigirAnioEnCurso } from '../../institucional';
 
 /** "No existe" y "no autorizado" responden igual (IDOR): nunca se revela qué estudiantes tienen apoyo. */
 export const noEncontrado = (que = 'Estudiante') => new ApiError(404, `${que} no encontrado.`);

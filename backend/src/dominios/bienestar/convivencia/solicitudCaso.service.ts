@@ -1,6 +1,6 @@
 import { Types } from 'mongoose';
 import { ROLES } from '../../../constants/roles';
-import Group from '../../../models/group.model';
+import Group from '../../institucional/estructura/group.model';
 import SolicitudCaso, { SolicitudCasoDocument } from './solicitudCaso.model';
 import { User, UserDocument } from '../../../models/user.model';
 import ApiError from '../../../utils/ApiError';

@@ -7,18 +7,14 @@ import attendanceRoutes from './attendance.routes';
 import auditLogRoutes from './auditLog.routes';
 import authRoutes from './auth.routes';
 import campusRoutes from './campus.routes';
-import casoRoutes from './caso.routes';
-import orientacionRoutes from './orientacion.routes';
 import curricularDevelopmentRoutes from './curricularDevelopment.routes';
 import enrollmentRoutes from './enrollment.routes';
 import espacioRoutes from './espacio.routes';
 import gradeRoutes from './grade.routes';
 import groupRoutes from './group.routes';
 import guardianRoutes from './guardian.routes';
-import inclusionRoutes from './inclusion.routes';
 import institutionRoutes from './institution.routes';
 import jornadaOperativaRoutes from './jornadaOperativa.routes';
-import observacionRoutes from './observacion.routes';
 import periodLockRoutes from './periodLock.routes';
 import publicRoutes from './public.routes';
 import referenteCurricularRoutes from './referenteCurricular.routes';
@@ -28,6 +24,7 @@ import studyPlanRoutes from './studyPlan.routes';
 import subjectRoutes from './subject.routes';
 import teacherAssignmentRoutes from './teacherAssignment.routes';
 import userRoutes from './user.routes';
+import { rutasBienestar } from '../dominios/bienestar';
 
 const router = Router();
 
@@ -63,17 +60,8 @@ router.use('/curriculum/study-plan', studyPlanRoutes);
 router.use('/teacher-assignments', teacherAssignmentRoutes);
 router.use('/curricular-developments', curricularDevelopmentRoutes);
 
-// M14: Observaciones y convivencia (Observador)
-router.use('/observaciones', observacionRoutes);
-
-// M15: Comité de convivencia escolar (casos, protocolos, medidas y entidades de remisión)
-router.use('/convivencia', casoRoutes);
-
-// Orientación: remisiones que convivencia le envía desde un caso (psicología / orientación escolar)
-router.use('/orientacion', orientacionRoutes);
-
-// M16: Inclusión (PIAR, plan de apoyo pedagógico y sus documentos)
-router.use('/inclusion', inclusionRoutes);
+// Bienestar (M14 observador, M15 convivencia y comité, orientación, M16 inclusión)
+router.use(rutasBienestar);
 
 // Prompt 3: Actividades, Calificaciones, Asistencia y Motor de Boletines
 router.use('/activities', activityRoutes);

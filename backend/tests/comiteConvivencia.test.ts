@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { calcularQuorum, hashDeActa, quorumDeCaso, serializacionEstable } from '../src/utils/comiteConvivencia';
+import { calcularQuorum, hashDeActa, quorumDeCaso, serializacionEstable } from '../src/dominios/bienestar/comite/comiteConvivencia';
 
 describe('calcularQuorum', () => {
   it('exige el porcentaje de presentes sobre el total de miembros', () => {

@@ -105,7 +105,7 @@ Backend `/users` (modelo `User`), frontend `/admin/users` (`UsersPage`).
   la excepción documentada a "un solo rol administrativo" (esa regla es sobre `SUPERADMIN`). Rango 70, par de `COORDINADOR`: solo
   un ADMIN lo gestiona. **No hereda nada del coordinador académico y viceversa**: los usos de `ROLES.COORDINADOR` no se amplían a
   este rol (`checkRole` es lista de permitidos). Exige al menos una sede (`ROLES_CON_SEDE_OBLIGATORIA`, validado en el modelo
-  `User`). Convivencia decide el acceso con `permisoSobreEstudiante` y `alcanceDeSedes` (`utils/permisosConvivencia.ts`, función
+  `User`). Convivencia decide el acceso con `permisoSobreEstudiante` y `alcanceDeSedes` (`dominios/bienestar/comun/permisosConvivencia.ts`, función
   pura con tests): sin sedes asignadas no ve nada, y SECRETARIA y ACUDIENTE no tienen acceso (el acudiente entra con M27).
 - **`ORIENTADOR` (Orientación / Psicología, M14/M15)**: el maestro (§3 y M02) lo lista como actor y rol base; se agregó con la misma lógica que
   `COORDINADOR_CONVIVENCIA`: rango 70 (solo un ADMIN lo gestiona), sede obligatoria (`ROLES_CON_SEDE_OBLIGATORIA`) y sin herencia de ningún
@@ -222,8 +222,8 @@ Reglas que no se ven leyendo un solo archivo:
   lo ya registrado. No se borra: se **enmienda** (versión anterior en `enmiendas[]`) o se **anula** con motivo. El autor puede hacerlo dentro de
   `ConfiguracionConvivencia.plazo_*_horas` (48 h por defecto); coordinación de convivencia (de sus sedes) y ADMIN sin plazo; nunca con el año
   CERRADO. Una falta ya remitida a convivencia solo la corrige convivencia.
-- **Quién ve qué** lo decide el servidor con `permisoSobreEstudiante` (`utils/permisosConvivencia.ts`) y la función pura `visibilidadDeObservacion`
-  (`utils/observaciones.ts`: COMPLETA / RESERVADA / nada; el listado y el detalle usan la misma). ADMIN y coordinación de convivencia ven todo en su
+- **Quién ve qué** lo decide el servidor con `permisoSobreEstudiante` (`dominios/bienestar/comun/permisosConvivencia.ts`) y la función pura `visibilidadDeObservacion`
+  (`dominios/bienestar/observador/observaciones.ts`: COMPLETA / RESERVADA / nada; el listado y el detalle usan la misma). ADMIN y coordinación de convivencia ven todo en su
   alcance; una **confidencial** solo la ven su autor, `ORIENTADOR`, coordinación de convivencia y ADMIN; las **faltas** no las ve el coordinador
   académico; de una falta II/III el director de grupo y el orientador solo ven que existe (`reservada`); el estudiante (menor o mayor) ve en `MiObservadorPage` sus
   observaciones no confidenciales de tipos `visible_estudiante` y sus faltas: la Tipo I completa (descripción de la falta, hechos, su versión,
@@ -262,7 +262,7 @@ las pestañas Faltas / Medidas / Entidades / Protocolos / Plazos de `CatalogoCon
 - **Faltas del manual** (`FaltaConvivencia`: código del manual único por institución, descripción, `gravedad` I/II/III, `descuento_decimas` solo
   guardado, `estado`; sin categoría ni "frases"): las definen ADMIN y `COORDINADOR_CONVIVENCIA` en `/convivencia/faltas` (alta/edición/estado/
   eliminar solo si no se usó) y por **carga Excel/CSV** (`/convivencia/faltas/importacion` y `/plantilla`; `importacionFaltas.service.ts`,
-  `COLUMNAS_FALTAS` en `constants/importacionConvivencia.ts` y su guía en `lib/columnasImportacion.ts`, que se actualizan en el mismo cambio). Es la
+  `COLUMNAS_FALTAS` en `dominios/bienestar/convivencia/importacionConvivencia.constants.ts` y su guía en `lib/columnasImportacion.ts`, que se actualizan en el mismo cambio). Es la
   **única carga masiva de convivencia**: `.xlsx` o `.csv` por el mismo canal (`leerCsv` o `exceljs` → filas normalizadas → un plan de validación), **se
   valida todo el archivo antes de escribir** (una fila con error y no se guarda nada), idempotente por código, fórmulas neutralizadas al generar y
   rechazadas al leer, firma ZIP, 2 MB, 1000 filas. Cada carga queda en un `LoteImportacion` (solo la huella SHA-256, no el archivo).
@@ -274,7 +274,7 @@ las pestañas Faltas / Medidas / Entidades / Protocolos / Plazos de `CatalogoCon
   convivencia con motivo (y suma los pasos del protocolo nuevo sin perder lo hecho); bajarlo, solo ADMIN. Las faltas del manual son las
   `FaltaConvivencia`: la decisión las referencia (`faltas_ids`, copiadas). `ProtocoloConvivencia` (pasos por tipo) se **copia** al caso al abrirlo:
   editar el protocolo no altera casos en curso.
-- **Flujo por tabla** (`TRANSICIONES_CASO`, `utils/casoConvivencia.ts`): ABIERTO → EN_ATENCION → EN_MEDIACION → EN_SEGUIMIENTO, REMITIDO
+- **Flujo por tabla** (`TRANSICIONES_CASO`, `dominios/bienestar/convivencia/casoConvivencia.ts`): ABIERTO → EN_ATENCION → EN_MEDIACION → EN_SEGUIMIENTO, REMITIDO
   (exige haber registrado la remisión; sigue en seguimiento). **Cerrar** no es transición genérica: `pendientesParaCerrar` exige pasos
   obligatorios cumplidos; en II y III, atención inmediata e informe a los acudientes; en III, remisión o justificación escrita; y según el
   resultado, remisión (REMITIDO) o decisión + medida (MEDIDA_APLICADA). **La decisión exige descargos previos** (presunción de inocencia).
@@ -321,7 +321,7 @@ Backend `/inclusion` (modelos `SolicitudApoyo`, `ExpedienteInclusion`, `AjusteAs
   `apoyo_declarado` en la creación de `Enrollment` y en `AdmissionRequest`, creada en la misma transacción — único cambio en M04), docente (de clase o
   director de grupo, **con hechos observados, sin diagnosticar**), convivencia y directo. Secretaría solo transcribe lo declarado; orientación valora y decide
   (`ABRIR_PIAR`, `PLAN_APOYO`, `SEGUIMIENTO_PSICOSOCIAL`, `RUTA_SALUD`, `DESCARTAR`, siempre con motivo). El docente solo ve que su reporte existe y su estado.
-- **Quién ve qué** lo decide `permisoInclusion` (`utils/permisosInclusion.ts`, función pura con tests, lista de permitidos, sin herencia): orientación (de
+- **Quién ve qué** lo decide `permisoInclusion` (`dominios/bienestar/inclusion/permisosInclusion.ts`, función pura con tests, lista de permitidos, sin herencia): orientación (de
   sus sedes) y ADMIN ven todo; **coordinación** supervisa y aprueba pero no ve lo clínico ni la modalidad; el **docente** ve la *ficha pedagógica* (barreras,
   recomendaciones, pautas de evaluación, una «alerta de seguridad» opcional escrita por orientación) y edita **solo la asignatura que dicta**; el director
   de grupo ve los ajustes de todas las de su grupo y edita las dimensiones transversales. **Ningún docente ve la modalidad (PIAR/plan) ni la categoría SIMAT**
@@ -338,7 +338,7 @@ Backend `/inclusion` (modelos `SolicitudApoyo`, `ExpedienteInclusion`, `AjusteAs
   3 por defecto según el formato/SIEE) solo con el expediente ACTIVO y un periodo iniciado y no cerrado (M05).
 - **Versionado.** Cada cambio con el expediente aprobado o firmado sube `version` y devuelve lo aprobado a construcción; un documento emitido con una
   versión anterior queda «desactualizado» y **no se puede firmar** (hay que emitirlo de nuevo). Las ediciones quedan en `ediciones[]` del ajuste.
-- **Documentos** (`DOCUMENTOS_PIAR` en `constants/inclusion.ts`, por **clave, no por número de anexo**: la numeración varía por fuente): Anexo 1 información
+- **Documentos** (`DOCUMENTOS_PIAR` en `dominios/bienestar/inclusion/inclusion.constants.ts`, por **clave, no por número de anexo**: la numeración varía por fuente): Anexo 1 información
   general (confidencial), PIAR (Anexo 2), acta de acuerdo con la familia, informe anual, **acta oficial PIAR** (paquete: portada + Anexo 1 versión carpeta sin
   datos clínicos + PIAR + acta) y plan de apoyo (confidencial). Cada emisión **congela un snapshot**, asigna consecutivo anual sin huecos (`Counter`,
   `PIAR-2026-0001`) y una **huella SHA-256** (`huellaDelDocumento`; `GET /inclusion/documentos/:id/integridad` la recalcula); el modelo impide editar lo emitido
@@ -674,6 +674,13 @@ modular por dominios**. Diagnóstico, propuesta y decisiones: `doc/Analisis_Arqu
   nunca con `Institution.findOne()` ni `AcademicYear.findOne({ estado: 'EN_CURSO' })` sueltos. Las fechas de Colombia salen de
   `utils/tiempo.ts` (`hoyColombia`, `fechaDeClase`, `diaIso`), el contexto de calendario de un grupo de
   `calendarioContexto.service.ts` y la paleta/`bufferDeDocumento` de los PDF de `utils/pdf.ts`.
+- **Dominio `bienestar` ya movido (fase 2)**: vive en `backend/src/dominios/bienestar/` con las subáreas `observador` (M14), `convivencia`
+  (casos, solicitudes, faltas, medidas, protocolos, carga de faltas y retención), `comite` (comité y actas), `orientacion`, `inclusion` (M16, con
+  `encabezadoInstitucional.service.ts` y los PDF) y `comun` (lo que comparten: constantes, catálogo y configuración de convivencia, permisos por
+  sede). Los archivos conservan su nombre (`observacion.service.ts`, `caso.routes.ts`...); los de constantes pasan a llevar el sufijo `.constants.ts`.
+  Su única puerta es `dominios/bienestar/index.ts` (`rutasBienestar`, `crearDesdeMatricula`); `routes/index.ts` monta `rutasBienestar` y matrícula
+  y admisión importan de ahí, nunca de una subcarpeta. Las rutas HTTP no cambiaron. Los demás archivos de este documento que se nombran sin
+  carpeta (`observacion.service.ts`, `piarPdf.service.ts`...) están en esa estructura.
 - **No agregar** más lógica de negocio en controladores, ni más tipos en `types/domain.ts` o dentro de `hooks/`, ni más imports de
   dominio en `components/ui/`.
 - **Ramas**: una rama corta por fase `refactor/faseN-tema` desde `main` actualizado (ver `GUIA_DESARROLLO.md`); cada PR deja en verde

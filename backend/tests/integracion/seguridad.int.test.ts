@@ -1,9 +1,9 @@
 import type { AddressInfo } from 'net';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import Observacion from '../../src/models/observacion.model';
-import SolicitudCaso from '../../src/models/solicitudCaso.model';
+import Observacion from '../../src/dominios/bienestar/observador/observacion.model';
+import SolicitudCaso from '../../src/dominios/bienestar/convivencia/solicitudCaso.model';
 import { UserDocument } from '../../src/models/user.model';
-import * as casos from '../../src/services/caso.service';
+import * as casos from '../../src/dominios/bienestar/convivencia/caso.service';
 import { generateToken } from '../../src/services/token.service';
 import { detenerBaseDeDatos, iniciarBaseDeDatos, limpiarBaseDeDatos } from './baseDeDatos';
 import { armarEscenario, crearUsuario, Escenario, hoy } from './escenario';

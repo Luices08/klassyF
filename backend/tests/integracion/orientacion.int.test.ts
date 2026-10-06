@@ -1,10 +1,10 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import AuditLog from '../../src/models/auditLog.model';
-import CasoConvivencia from '../../src/models/casoConvivencia.model';
-import RemisionOrientacion from '../../src/models/remisionOrientacion.model';
-import * as casos from '../../src/services/caso.service';
-import * as catalogosCaso from '../../src/services/casoCatalogo.service';
-import * as orientacion from '../../src/services/remisionOrientacion.service';
+import CasoConvivencia from '../../src/dominios/bienestar/convivencia/casoConvivencia.model';
+import RemisionOrientacion from '../../src/dominios/bienestar/orientacion/remisionOrientacion.model';
+import * as casos from '../../src/dominios/bienestar/convivencia/caso.service';
+import * as catalogosCaso from '../../src/dominios/bienestar/convivencia/casoCatalogo.service';
+import * as orientacion from '../../src/dominios/bienestar/orientacion/remisionOrientacion.service';
 import { detenerBaseDeDatos, iniciarBaseDeDatos, limpiarBaseDeDatos } from './baseDeDatos';
 import { actor, armarEscenario, Escenario, hoy } from './escenario';
 

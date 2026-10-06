@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { CLAVES_DOCUMENTO_PIAR, DOCUMENTOS_PIAR, ESTADOS_EXPEDIENTE } from '../src/constants/inclusion';
+import { CLAVES_DOCUMENTO_PIAR, DOCUMENTOS_PIAR, ESTADOS_EXPEDIENTE } from '../src/dominios/bienestar/inclusion/inclusion.constants';
 import {
   TRANSICIONES_EXPEDIENTE,
   ajusteCompleto,
@@ -14,7 +14,7 @@ import {
   plazoVencido,
   puedeTransicionar,
   seguimientosFaltantes,
-} from '../src/utils/inclusion';
+} from '../src/dominios/bienestar/inclusion/inclusion';
 
 const ajuste = (extra: Partial<Parameters<typeof ajusteCompleto>[0]> = {}) => ({
   dba_ids: [],

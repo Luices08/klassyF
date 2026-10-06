@@ -103,3 +103,18 @@ Cada llamador conserva su mensaje de error (la sustitución no cambia el texto n
 - **No se abstrajo "obtener o crear la configuración"** (convivencia e inclusión): son dos usos de ~10 líneas con modelos distintos; por YAGNI se deja hasta que aparezca un tercero.
 - **No se tocaron** `actaCompromiso` ni `comprobantePreinscripcion` (PDF de 80 líneas con otro patrón: crean el documento dentro de la promesa); los reemplazará M21/M29.
 - `asistenciaPdf.service` conserva su paleta ampliada porque ahora es la paleta común (`utils/pdf.ts`), con los mismos valores hexadecimales de antes.
+
+### Fase 2 — dominio `bienestar` (`refactor/fase2-bienestar`)
+
+Solo cambian carpetas e imports (59 archivos movidos con `git mv`, 402 imports reescritos con un script que resuelve cada import y recalcula su ruta
+relativa; el historial de Git conserva los renombres). Ningún identificador ni ruta HTTP cambió.
+
+| Qué | Resultado |
+|---|---|
+| Ubicación | `backend/src/dominios/bienestar/{observador, convivencia, comite, orientacion, inclusion, comun}` |
+| Puerta pública | `dominios/bienestar/index.ts` (`rutasBienestar`, `crearDesdeMatricula`) |
+| Consumidores externos del dominio | `routes/index.ts` y, por ahora, matrícula y admisión (la inversión `registro` → `bienestar` que corrige la fase 3) |
+| Equivalencia de rutas | La tabla de rutas de Express (294 entradas, con el número de manejadores de cada una) es idéntica antes y después |
+| Convención nueva | Los archivos de constantes que se mueven llevan el sufijo `.constants.ts` (hubo un choque `constants/inclusion.ts` / `utils/inclusion.ts`) |
+| Se quedó fuera | `datosSensibles`, `counter.model`, `csv`, `importacion`, `firmasArchivo` y `uploadPaths` (los usan otros dominios; irán al núcleo) |
+

@@ -18,7 +18,7 @@ import ApiError from '../utils/ApiError';
 import { runTransaction } from '../utils/runTransaction';
 import { registrarEvento } from './audit.service';
 import { generateFolioMatricula } from './folio.service';
-import { crearDesdeMatricula } from './solicitudApoyo.service';
+import { crearDesdeMatricula } from '../dominios/bienestar';
 
 const ESTADOS_QUE_LIBERAN_CUPO: EstadoMatricula[] = ['RETIRADO', 'ANULADO'];
 const ESTADOS_TERMINALES: EstadoMatricula[] = ['RETIRADO', 'ANULADO'];

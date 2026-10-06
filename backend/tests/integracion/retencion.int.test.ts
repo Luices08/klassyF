@@ -1,13 +1,13 @@
 import { Types } from 'mongoose';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import AuditLog from '../../src/models/auditLog.model';
-import CasoConvivencia from '../../src/models/casoConvivencia.model';
-import Observacion from '../../src/models/observacion.model';
-import * as casos from '../../src/services/caso.service';
-import * as catalogo from '../../src/services/convivenciaCatalogo.service';
-import * as observaciones from '../../src/services/observacion.service';
-import { reporteRetencion } from '../../src/services/retencion.service';
-import { fechaLimiteRetencion } from '../../src/utils/retencion';
+import CasoConvivencia from '../../src/dominios/bienestar/convivencia/casoConvivencia.model';
+import Observacion from '../../src/dominios/bienestar/observador/observacion.model';
+import * as casos from '../../src/dominios/bienestar/convivencia/caso.service';
+import * as catalogo from '../../src/dominios/bienestar/comun/convivenciaCatalogo.service';
+import * as observaciones from '../../src/dominios/bienestar/observador/observacion.service';
+import { reporteRetencion } from '../../src/dominios/bienestar/convivencia/retencion.service';
+import { fechaLimiteRetencion } from '../../src/dominios/bienestar/convivencia/retencion';
 import { detenerBaseDeDatos, iniciarBaseDeDatos, limpiarBaseDeDatos } from './baseDeDatos';
 import { actor, armarEscenario, Escenario, hoy } from './escenario';
 

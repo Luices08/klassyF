@@ -8,7 +8,7 @@ import {
   tituloDeRegistro,
   visibilidadDeObservacion,
   vistaObservacion,
-} from '../src/utils/observaciones';
+} from '../src/dominios/bienestar/observador/observaciones';
 
 const observacion = (extra: Partial<Parameters<typeof visibilidadDeObservacion>[1]> = {}) => ({
   clase: 'OBSERVACION' as const,

@@ -15,8 +15,8 @@ dotenv.config();
 
 import { env } from '../src/config/env';
 import { NivelEducativo, TipoAsignatura } from '../src/constants/enums';
-import Area from '../src/models/area.model';
-import Subject from '../src/models/subject.model';
+import Area from '../src/dominios/curricular/plan-estudios/area.model';
+import Subject from '../src/dominios/curricular/plan-estudios/subject.model';
 
 interface AsignaturaSeed {
   areaCodigo: string;

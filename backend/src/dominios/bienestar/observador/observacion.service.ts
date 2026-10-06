@@ -13,7 +13,7 @@ import FaltaConvivencia from '../convivencia/faltaConvivencia.model';
 import Group, { IGroup } from '../../institucional/estructura/group.model';
 import Observacion, { IObservacion, ObservacionDocument } from './observacion.model';
 import SolicitudCaso, { ISolicitudCaso } from '../convivencia/solicitudCaso.model';
-import TeacherAssignment from '../../../models/teacherAssignment.model';
+import TeacherAssignment from '../../curricular/carga-docente/teacherAssignment.model';
 import TipoObservacion from './tipoObservacion.model';
 import { User, UserDocument } from '../../../models/user.model';
 import ApiError from '../../../utils/ApiError';

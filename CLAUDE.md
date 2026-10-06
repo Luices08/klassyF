@@ -401,7 +401,7 @@ Backend `/espacios` (modelo `Espacio`), frontend `/admin/espacios` (`EspaciosPag
   `area_id`** (`actualizarSubject`): dejaría ponderaciones colgando de un área que ya no es la suya.
 - **Topes de carga docente** (`Institution.limites_carga_docente`, `max_direcciones_grupo_por_docente`,
   `tolerancia_subcarga_horas`) se editan juntos en M08 y no hay valores quemados en el diagnóstico. El semáforo es la función
-  pura `resumirCargaDocente` (`utils/cargaDocente.ts`, con tests en `backend/tests/`, `npm test`): un docente en varios niveles se
+  pura `resumirCargaDocente` (`dominios/curricular/carga-docente/cargaDocente.ts`, con tests en `backend/tests/`, `npm test`): un docente en varios niveles se
   mide como fracción de su jornada (`fraccion_carga`), y sin horas por nivel no se supone ninguno (`SIN_CARGA`).
 - **Las horas de una dirección de grupo las fija quien la asigna** (`horas_semanales`, 0 por defecto = no suma). Si son más de 0
   cuentan en el nivel del grupo dirigido, igual que una clase.
@@ -696,6 +696,12 @@ modular por dominios**. Diagnóstico, propuesta y decisiones: `doc/Analisis_Arqu
   `dominios/registro/rutas.ts`, montadas por `routes/index.ts`. Todavía no tiene `index.ts`: ningún otro dominio consume sus servicios (solo sus
   modelos, directo). Dependencias hacia arriba que quedan para la fase 3: `admissionRequest.service` y `enrollment.service` llaman a `bienestar`
   (`crearDesdeMatricula`) y `usuarios/user.routes.ts` (institucional) monta los controladores de acudientes y perfil de estudiante.
+- **Dominio `curricular` ya movido (fase 2)**: vive en `backend/src/dominios/curricular/` con `plan-estudios` (M06: `Area`, `Subject`, `StudyPlan`,
+  `planEstudiosDependencias.service.ts` y `horasPlanEstudios.ts`), `referentes` (M07: banco `ReferenteCurricular` con sus discriminadores),
+  `desarrollo` (M07: `CurricularDevelopment` y su flujo de revisión) y `carga-docente` (M08: `TeacherAssignment` y `cargaDocente.ts`). Rutas en
+  `dominios/curricular/rutas.ts`, montadas por `routes/index.ts`. Todavía no tiene `index.ts`: el único servicio que usa otro dominio es
+  `studyPlan.service` desde `institution.controller` (la dependencia hacia arriba que corrige la fase 3). Los scripts `seedSubjects.ts` y
+  `seedReferentesCurriculares.ts` siguen en `backend/scripts/` y apuntan a los modelos en su nueva ubicación.
 - **No agregar** más lógica de negocio en controladores, ni más tipos en `types/domain.ts` o dentro de `hooks/`, ni más imports de
   dominio en `components/ui/`.
 - **Ramas**: una rama corta por fase `refactor/faseN-tema` desde `main` actualizado (ver `GUIA_DESARROLLO.md`); cada PR deja en verde

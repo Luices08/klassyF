@@ -2,7 +2,7 @@ import { Types } from 'mongoose';
 import Attendance from '../models/attendance.model';
 import AttendanceJustification from '../models/attendanceJustification.model';
 import Group from '../dominios/institucional/estructura/group.model';
-import Subject from '../models/subject.model';
+import Subject from '../dominios/curricular/plan-estudios/subject.model';
 import User, { UserDocument } from '../models/user.model';
 import { filtroAlcanceAsistencia } from './attendance.service';
 import { mapaDeEstados } from './attendanceState.service';

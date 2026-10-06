@@ -151,3 +151,18 @@ relativa; el historial de Git conserva los renombres). Ningún identificador ni 
 
 **Dependencias hacia arriba que quedan para la fase 3:** `admissionRequest.service` y `enrollment.service` llaman a `bienestar` (`crearDesdeMatricula`), y `institucional/usuarios/user.routes.ts` importa los controladores y validadores de acudientes y perfil de estudiante.
 
+### Fase 2 — dominio `curricular` (`refactor/fase2-curricular`)
+
+33 archivos movidos con `git mv` y 201 imports reescritos. La tabla de rutas de Express es idéntica contra `main` (294 entradas, mismo orden de registro).
+
+| Qué | Resultado |
+|---|---|
+| Ubicación | `backend/src/dominios/curricular/{plan-estudios, referentes, desarrollo, carga-docente}` |
+| Rutas | `dominios/curricular/rutas.ts`, montadas por `routes/index.ts` |
+| Puerta pública (`index.ts`) | No se crea todavía: el único servicio que usa otro dominio es `studyPlan.service`, desde `institution.controller` |
+
+**Dependencias hacia arriba que quedan para la fase 3:**
+
+1. `institucional/institucion/institution.controller.ts` llama a `studyPlan.service` (ya anotada en `institucional`).
+2. **Nueva:** `plan-estudios/planEstudiosDependencias.service.ts` y `carga-docente/teacherAssignment.service.ts` importan el modelo `Activity` (`academico`) para saber si un área ya tiene actividades en un grado o grupo antes de permitir cambios en el plan.
+

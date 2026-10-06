@@ -1,0 +1,67 @@
+import { ParamsDictionary } from 'express-serve-static-core';
+import * as cdService from './curricularDevelopment.service';
+import {
+  ListDevelopmentsQuery,
+  ReabrirInput,
+  ReviewInput,
+  UpsertDraftInput,
+} from './curricularDevelopment.service';
+import ApiError from '../../../utils/ApiError';
+import catchAsync from '../../../utils/catchAsync';
+
+export const upsertDraft = catchAsync<unknown, unknown, UpsertDraftInput>(async (req, res) => {
+  if (!req.user) throw new ApiError(401, 'No autenticado.');
+
+  const doc = await cdService.upsertDraft(req.body, req.user, { ip: req.ip ?? null });
+  res.status(200).json({ success: true, data: doc });
+});
+
+interface IdParams extends ParamsDictionary {
+  id: string;
+}
+
+export const submit = catchAsync<IdParams>(async (req, res) => {
+  if (!req.user) throw new ApiError(401, 'No autenticado.');
+
+  const doc = await cdService.submitForReview(req.params.id, req.user, { ip: req.ip ?? null });
+  res.status(200).json({ success: true, data: doc });
+});
+
+export const review = catchAsync<IdParams, unknown, ReviewInput>(async (req, res) => {
+  if (!req.user) throw new ApiError(401, 'No autenticado.');
+
+  const doc = await cdService.reviewDevelopment(req.params.id, req.body, req.user, { ip: req.ip ?? null });
+  res.status(200).json({ success: true, data: doc });
+});
+
+export const reabrir = catchAsync<IdParams, unknown, ReabrirInput>(async (req, res) => {
+  if (!req.user) throw new ApiError(401, 'No autenticado.');
+
+  const doc = await cdService.reabrirDevelopment(req.params.id, req.body, req.user, { ip: req.ip ?? null });
+  res.status(200).json({ success: true, data: doc });
+});
+
+interface GetOneParams extends ParamsDictionary {
+  assignmentId: string;
+  periodoNumero: string;
+}
+
+export const getByAssignmentAndPeriod = catchAsync<GetOneParams>(async (req, res) => {
+  if (!req.user) throw new ApiError(401, 'No autenticado.');
+
+  const doc = await cdService.getDevelopmentByAssignmentAndPeriod(
+    req.params.assignmentId,
+    Number(req.params.periodoNumero),
+    req.user
+  );
+  res.status(200).json({ success: true, data: doc });
+});
+
+export const listDevelopments = catchAsync<unknown, unknown, unknown, ListDevelopmentsQuery>(
+  async (req, res) => {
+    if (!req.user) throw new ApiError(401, 'No autenticado.');
+
+    const docs = await cdService.listDevelopments(req.query, req.user);
+    res.status(200).json({ success: true, count: docs.length, data: docs });
+  }
+);

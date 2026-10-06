@@ -1,6 +1,6 @@
 import { Types } from 'mongoose';
 import { EstadoEspacio, RecursoEspacio, TipoEspacio } from '../../../constants/enums';
-import Area from '../../../models/area.model';
+import Area from '../../curricular/plan-estudios/area.model';
 import Campus from './campus.model';
 import Espacio, { EspacioDocument } from './espacio.model';
 import Group from './group.model';

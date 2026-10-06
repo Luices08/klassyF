@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import type { IGradoPlan } from '../src/models/studyPlan.model';
-import { horasDeAsignaturaEnGrupo, horasSemanalesDelGrupo } from '../src/utils/horasPlanEstudios';
+import type { IGradoPlan } from '../src/dominios/curricular/plan-estudios/studyPlan.model';
+import { horasDeAsignaturaEnGrupo, horasSemanalesDelGrupo } from '../src/dominios/curricular/plan-estudios/horasPlanEstudios';
 
 const asignatura = (subject_id: string, intensidad_horaria_semanal: number) => ({ subject_id, intensidad_horaria_semanal });
 const grado = (...asignaturas: ReturnType<typeof asignatura>[]) =>

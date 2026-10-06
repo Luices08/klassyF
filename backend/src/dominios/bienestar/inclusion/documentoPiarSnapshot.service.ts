@@ -3,7 +3,7 @@ import AcademicYear from '../../institucional/calendario/academicYear.model';
 import AjusteAsignatura from './ajusteAsignatura.model';
 import { ExpedienteInclusionDocument } from './expedienteInclusion.model';
 import Guardian from '../../registro/estudiantes/guardian.model';
-import ReferenteCurricular from '../../../models/referenteCurricular.model';
+import ReferenteCurricular from '../../curricular/referentes/referenteCurricular.model';
 import StudentGuardian from '../../registro/estudiantes/studentGuardian.model';
 import { UserDocument } from '../../../models/user.model';
 import ApiError from '../../../utils/ApiError';

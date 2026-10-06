@@ -6,7 +6,7 @@ import Grade from '../../src/dominios/institucional/estructura/grade.model';
 import Group from '../../src/dominios/institucional/estructura/group.model';
 import Institution from '../../src/dominios/institucional/institucion/institution.model';
 import JornadaOperativa from '../../src/dominios/institucional/estructura/jornadaOperativa.model';
-import TeacherAssignment from '../../src/models/teacherAssignment.model';
+import TeacherAssignment from '../../src/dominios/curricular/carga-docente/teacherAssignment.model';
 import { User, UserDocument } from '../../src/models/user.model';
 import { hoyColombia } from '../../src/utils/tiempo';
 import * as catalogoCaso from '../../src/dominios/bienestar/convivencia/casoCatalogo.service';

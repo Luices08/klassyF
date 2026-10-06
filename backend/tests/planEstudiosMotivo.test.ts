@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { exigirMotivoSiAnioEnCurso } from '../src/services/planEstudiosDependencias.service';
+import { exigirMotivoSiAnioEnCurso } from '../src/dominios/curricular/plan-estudios/planEstudiosDependencias.service';
 
 describe('exigirMotivoSiAnioEnCurso', () => {
   it('antes de activar el año no se pide motivo', () => {

@@ -1,4 +1,4 @@
-import { gradosQueExcedenElTope } from '../../../services/studyPlan.service';
+import { gradosQueExcedenElTope } from '../../curricular/plan-estudios/studyPlan.service';
 import * as institutionService from './institution.service';
 import { SetupInstitutionInput, UpdateInstitutionInput } from './institution.service';
 import catchAsync from '../../../utils/catchAsync';

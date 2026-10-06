@@ -33,8 +33,8 @@ dotenv.config();
 import { env } from '../src/config/env';
 import { grupoGradosDeNumero } from '../src/constants/enums';
 import Grade from '../src/dominios/institucional/estructura/grade.model';
-import Subject from '../src/models/subject.model';
-import { Dba, Ebc, Lineamiento } from '../src/models/referenteCurricular.model';
+import Subject from '../src/dominios/curricular/plan-estudios/subject.model';
+import { Dba, Ebc, Lineamiento } from '../src/dominios/curricular/referentes/referenteCurricular.model';
 
 import dbaCienciasNaturales from './data/dbaCienciasNaturales.json';
 import dbaCienciasSociales from './data/dbaCienciasSociales.json';

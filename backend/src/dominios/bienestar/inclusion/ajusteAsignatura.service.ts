@@ -3,8 +3,8 @@ import { CategoriaAjuste, EfectividadAjuste, TipoBarrera } from './inclusion.con
 import { ROLES } from '../../../constants/roles';
 import AcademicYear from '../../institucional/calendario/academicYear.model';
 import AjusteAsignatura, { AjusteAsignaturaDocument } from './ajusteAsignatura.model';
-import ReferenteCurricular from '../../../models/referenteCurricular.model';
-import Subject from '../../../models/subject.model';
+import ReferenteCurricular from '../../curricular/referentes/referenteCurricular.model';
+import Subject from '../../curricular/plan-estudios/subject.model';
 import { User, UserDocument } from '../../../models/user.model';
 import ApiError from '../../../utils/ApiError';
 import { ajusteCompleto } from './inclusion';

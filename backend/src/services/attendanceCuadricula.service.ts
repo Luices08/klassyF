@@ -6,7 +6,7 @@ import AttendanceJustification from '../models/attendanceJustification.model';
 import { AttendanceStateDocument } from '../models/attendanceState.model';
 import Grade from '../dominios/institucional/estructura/grade.model';
 import { IGroup } from '../dominios/institucional/estructura/group.model';
-import TeacherAssignment from '../models/teacherAssignment.model';
+import TeacherAssignment from '../dominios/curricular/carga-docente/teacherAssignment.model';
 import { UserDocument } from '../models/user.model';
 import ApiError from '../utils/ApiError';
 import { hayEventoNoLectivo } from '../dominios/institucional';

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { diagnosticarCarga, resumirCargaDocente } from '../src/utils/cargaDocente';
+import { diagnosticarCarga, resumirCargaDocente } from '../src/dominios/curricular/carga-docente/cargaDocente';
 
 const limites = { PREESCOLAR: 20, PRIMARIA: 25, SECUNDARIA: 22, MEDIA: 22 };
 const tolerancia = 2;

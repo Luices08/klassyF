@@ -2,7 +2,7 @@ import { HydratedDocument, Types } from 'mongoose';
 import PDFDocument from 'pdfkit';
 import { ROLES } from '../constants/roles';
 import AcademicYear from '../dominios/institucional/calendario/academicYear.model';
-import Enrollment from '../models/enrollment.model';
+import Enrollment from '../dominios/registro/matriculas/enrollment.model';
 import Group, { IGroup } from '../dominios/institucional/estructura/group.model';
 import Subject from '../models/subject.model';
 import TeacherAssignment from '../models/teacherAssignment.model';

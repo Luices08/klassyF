@@ -14,7 +14,7 @@ import TeacherAssignment from '../../src/models/teacherAssignment.model';
 import { UserDocument } from '../../src/models/user.model';
 import * as ajustes from '../../src/dominios/bienestar/inclusion/ajusteAsignatura.service';
 import * as documentos from '../../src/dominios/bienestar/inclusion/documentoPiar.service';
-import { createEnrollment } from '../../src/services/enrollment.service';
+import { createEnrollment } from '../../src/dominios/registro/matriculas/enrollment.service';
 import * as expedientes from '../../src/dominios/bienestar/inclusion/expedienteInclusion.service';
 import * as solicitudes from '../../src/dominios/bienestar/inclusion/solicitudApoyo.service';
 import { detenerBaseDeDatos, iniciarBaseDeDatos, limpiarBaseDeDatos } from './baseDeDatos';

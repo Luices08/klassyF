@@ -18,7 +18,7 @@ dotenv.config();
 
 import { env } from '../src/config/env';
 import Counter from '../src/models/counter.model';
-import Enrollment from '../src/models/enrollment.model';
+import Enrollment from '../src/dominios/registro/matriculas/enrollment.model';
 
 const INDICES_FOLIO = ['folio_matricula_1', 'numero_libro_1_numero_folio_1'];
 // L{libro}-F{folio}-{año}

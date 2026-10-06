@@ -138,3 +138,16 @@ relativa; el historial de Git conserva los renombres). Ningún identificador ni 
 3. `institucion/institution.controller.ts` llama a `studyPlan.service` (`curricular`) en `PATCH /institution/limites-horas-plan` para devolver `grados_excedidos`.
 4. `estructura/espacio.service.ts` importa el modelo `Area` (`curricular`).
 
+### Fase 2 — dominio `registro` (`refactor/fase2-registro`)
+
+32 archivos movidos con `git mv` y 189 imports reescritos. La tabla de rutas de Express es idéntica (294 entradas, mismo orden de registro).
+
+| Qué | Resultado |
+|---|---|
+| Ubicación | `backend/src/dominios/registro/{estudiantes, admisiones, matriculas}` |
+| Rutas | `dominios/registro/rutas.ts`, montadas por `routes/index.ts` |
+| Puerta pública (`index.ts`) | No se crea todavía: ningún otro dominio consume servicios de `registro`, solo sus modelos (directo) y, desde `user.routes.ts`, dos controladores y dos validadores |
+| Convención | `constants/matriculaChecklist.ts` pasa a `matriculas/matriculaChecklist.constants.ts` |
+
+**Dependencias hacia arriba que quedan para la fase 3:** `admissionRequest.service` y `enrollment.service` llaman a `bienestar` (`crearDesdeMatricula`), y `institucional/usuarios/user.routes.ts` importa los controladores y validadores de acudientes y perfil de estudiante.
+

@@ -8,7 +8,7 @@ import { ESTADOS_MATRICULA_ACTIVOS } from '../../../constants/enums';
 import { ROLES } from '../../../constants/roles';
 import AcademicYear, { AcademicYearDocument } from '../../institucional/calendario/academicYear.model';
 import CasoConvivencia from '../convivencia/casoConvivencia.model';
-import Enrollment from '../../../models/enrollment.model';
+import Enrollment from '../../registro/matriculas/enrollment.model';
 import FaltaConvivencia from '../convivencia/faltaConvivencia.model';
 import Group, { IGroup } from '../../institucional/estructura/group.model';
 import Observacion, { IObservacion, ObservacionDocument } from './observacion.model';

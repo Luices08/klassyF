@@ -4,7 +4,7 @@ import { EstadoJustificacion } from '../constants/enums';
 import { ROLES } from '../constants/roles';
 import Attendance from '../models/attendance.model';
 import AttendanceJustification, { AttendanceJustificationDocument } from '../models/attendanceJustification.model';
-import StudentGuardian from '../models/studentGuardian.model';
+import StudentGuardian from '../dominios/registro/estudiantes/studentGuardian.model';
 import { UserDocument } from '../models/user.model';
 import ApiError from '../utils/ApiError';
 import { detectarFirmaArchivo } from '../utils/firmasArchivo';

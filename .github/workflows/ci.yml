@@ -37,6 +37,33 @@ jobs:
       - name: Verificación de tipos TypeScript
         run: npm run typecheck:all
 
+  backend-pruebas:
+    name: Backend (Pruebas)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    env:
+      MONGO_URI: mongodb://no-se-usa
+      JWT_SECRET: secreto-de-pruebas-ci
+    steps:
+      - name: Checkout del código
+        uses: actions/checkout@v4
+
+      - name: Configurar Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Instalar dependencias
+        run: npm ci
+
+      # Incluye las pruebas de integración: mongodb-memory-server descarga el binario de MongoDB en la primera ejecución.
+      - name: Pruebas (Vitest)
+        run: npm test
+
   frontend:
     name: Frontend (Lint & Build)
     runs-on: ubuntu-latest

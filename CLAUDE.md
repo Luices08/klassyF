@@ -657,8 +657,28 @@ estudiantes — se construye sobre este mismo patrón, nunca con `useEffect` + `
   una página; si un caso puntual necesita otro comportamiento, se pasa como opción de ese
   `useQuery`/`useMutation` específico, no cambiando el cliente global.
 
+## 8. Arquitectura objetivo (en migración por fases)
+
+El código hoy está organizado por capa técnica (`models/`, `services/`, `controllers/`...) y se está migrando a un **monolito
+modular por dominios**. Diagnóstico, propuesta y decisiones: `doc/Analisis_Arquitectura_Klassy.md`; punto de partida y métricas:
+`doc/Linea_Base_Arquitectura.md`. Mientras la migración no termine, el código nuevo debe **no empeorar** estas métricas:
+
+- **Dominios** (6 + núcleo): `institucional` (M01, M02, M05, M10, M32), `registro` (M03, M04, M26, M29), `curricular` (M06–M09, M23),
+  `academico` (M11–M13, M17–M22), `bienestar` (M14–M16) y `comunicacion` (M24, M25, M27, M28, M30); `nucleo` es técnico (sin reglas
+  de negocio). Dentro de cada dominio los archivos se agrupan **por subárea**, conservando los sufijos (`.model`, `.service`, ...).
+- **Dependencias solo hacia abajo**: `nucleo` ← `institucional` ← (`registro`, `curricular`) ← (`academico`, `bienestar`) ←
+  `comunicacion`. Un dominio no importa a un igual ni a uno superior; un dato ajeno se pide a la API pública (`index.ts`) de quien
+  lo posee, no consultando sus modelos.
+- **No agregar** más consultas sueltas a `Institution.findOne()` ni a `AcademicYear.findOne({ estado: 'EN_CURSO' })`, ni más
+  lógica de negocio en controladores, ni más tipos en `types/domain.ts` o dentro de `hooks/`, ni más imports de dominio en `components/ui/`.
+- **Ramas**: una rama corta por fase `refactor/faseN-tema` desde `main` actualizado (ver `GUIA_DESARROLLO.md`); cada PR deja en verde
+  backend (`typecheck:all`, `lint`, `npm test`) y frontend (`lint`, `build`). Las fases de movimiento (2 y 4) solo cambian carpetas e
+  imports: no se renombran identificadores ni se mezcla funcionalidad nueva.
+
 ## Documentos fuente
 
 - `doc/Idea_Klassy_Gestor_Academico_Administrativo_v2.docx` — documento maestro: 32 módulos,
   actores, reglas de negocio y grafo de dependencias de datos.
 - `doc/Klassy_UI_Spec_1.docx` — guía de identidad visual y especificación de componentes UI.
+- `doc/Analisis_Arquitectura_Klassy.md` y `doc/Linea_Base_Arquitectura.md` — análisis de arquitectura, propuesta modular por
+  dominios y línea base de métricas de la refactorización.

@@ -83,3 +83,23 @@ No hay ciclos entre servicios. Los cruces ⚠️ son los que corrigen las fases 
 - Las fases 0–1 y 3 no cambian el comportamiento; las fases de movimiento (2, 4) solo cambian rutas de archivo e imports (`git mv`).
 - Durante las fases 2 y 4 se congela el trabajo en módulos nuevos hasta fusionar cada PR.
 - No se renombran identificadores existentes; las carpetas nuevas van en español.
+
+## 6. Avance por fase
+
+### Fase 1 — proveedores únicos y utilidades compartidas (`refactor/fase1-nucleo`)
+
+Sin cambio de comportamiento ni de carpetas (los archivos se mueven en la fase 2). Se crearon los puntos únicos y se reemplazaron los usos duplicados:
+
+| Qué | Dónde queda | Antes → después |
+|---|---|---|
+| Lectura de la institución | `buscarInstitucion()` / `exigirInstitucion(mensaje, estado?)` en `institution.service.ts` | 23 llamadas directas en 15 archivos → 1 (el proveedor) |
+| Año lectivo en curso | `buscarAnioEnCurso()` / `exigirAnioEnCurso(mensaje)` en `academicYear.service.ts` | 10 consultas en 6 archivos → 1 (el proveedor) |
+| Fechas de Colombia | `utils/tiempo.ts` (`hoyColombia`, `fechaDeClase`, `diaIso`) | vivían en `attendance.service`; convivencia ya no depende de asistencia (5 → 0) |
+| Contexto de calendario de un grupo | `services/calendarioContexto.service.ts` (`cargarContextoFechas`, `periodoDeFecha`) | vivía en `attendance.service`; lo usaban asistencia y observador |
+| Base de PDF | `utils/pdf.ts` (`COLOR`, `Documento`, `bufferDeDocumento`) | 3 paletas y 3 bloques idénticos de stream → Buffer → 1 |
+
+Cada llamador conserva su mensaje de error (la sustitución no cambia el texto ni el código HTTP). Decisiones:
+
+- **No se abstrajo "obtener o crear la configuración"** (convivencia e inclusión): son dos usos de ~10 líneas con modelos distintos; por YAGNI se deja hasta que aparezca un tercero.
+- **No se tocaron** `actaCompromiso` ni `comprobantePreinscripcion` (PDF de 80 líneas con otro patrón: crean el documento dentro de la promesa); los reemplazará M21/M29.
+- `asistenciaPdf.service` conserva su paleta ampliada porque ahora es la paleta común (`utils/pdf.ts`), con los mismos valores hexadecimales de antes.

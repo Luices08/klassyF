@@ -1,7 +1,7 @@
 import PDFDocument from 'pdfkit';
-import Institution from '../models/institution.model';
 import ApiError from '../utils/ApiError';
 import { buscarMatriculaDePreinscripcion, construirDetalle } from './preinscripcionPublica.service';
+import { buscarInstitucion } from './institution.service';
 
 // Fechas de calendario (medianoche UTC): se muestran en UTC para no correrlas un dia en Colombia.
 const formatoFecha = (fecha: Date): string =>
@@ -28,7 +28,7 @@ export async function generarComprobantePreinscripcionPdf(
 
   const { solicitud, enrollment } = encontrada;
   const detalle = construirDetalle(enrollment);
-  const institucion = await Institution.findOne();
+  const institucion = await buscarInstitucion();
   const codigo = String(solicitud._id).slice(-8).toUpperCase();
 
   const pdf = await new Promise<Buffer>((resolve, reject) => {

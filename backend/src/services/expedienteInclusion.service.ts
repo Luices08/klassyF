@@ -50,6 +50,7 @@ import {
   noEncontrado,
   obtenerConfiguracion,
 } from './inclusionContexto.service';
+import { buscarAnioEnCurso } from './academicYear.service';
 
 export interface AbrirExpedienteInput {
   student_id: string;
@@ -368,7 +369,7 @@ async function estudiantesDeFiltro(filtro: FiltroExpedientes): Promise<Types.Obj
 /** Estudiantes con ajustes que le tocan a un docente (de clase o director), con las asignaturas suyas pendientes. */
 export async function misEstudiantesConApoyo(usuario: UserDocument) {
   if (usuario.rol !== ROLES.DOCENTE) throw new ApiError(403, 'Solo el docente consulta sus estudiantes con ajustes.');
-  const anio = await AcademicYear.findOne({ estado: 'EN_CURSO' });
+  const anio = await buscarAnioEnCurso();
   if (!anio) return [];
 
   const [clases, direccion] = await Promise.all([

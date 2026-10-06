@@ -1,66 +1,28 @@
 import { HydratedDocument, Types } from 'mongoose';
 import { ESTADOS_MATRICULA_ACTIVOS, EstadoJustificacion } from '../constants/enums';
 import { ROLES } from '../constants/roles';
-import AcademicYear, { AcademicYearDocument } from '../models/academicYear.model';
 import Attendance, { AttendanceDocument } from '../models/attendance.model';
 import AttendanceJustification from '../models/attendanceJustification.model';
 import { AttendanceStateDocument } from '../models/attendanceState.model';
 import Enrollment from '../models/enrollment.model';
 import Group, { IGroup } from '../models/group.model';
-import JornadaOperativa, { JornadaOperativaDocument } from '../models/jornadaOperativa.model';
-import PeriodLock from '../models/periodLock.model';
 import Subject from '../models/subject.model';
 import TeacherAssignment from '../models/teacherAssignment.model';
 import { UserDocument } from '../models/user.model';
 import ApiError from '../utils/ApiError';
 import { hayEventoNoLectivo, periodosEfectivos } from '../utils/calendarioAcademico';
 import { ESTADO_ACTIVO } from '../utils/filtroEstado';
+import { diaIso, fechaDeClase, hoyColombia } from '../utils/tiempo';
 import { registrarEvento } from './audit.service';
 import { listarEstados, mapaDeEstados } from './attendanceState.service';
+import { cargarContextoFechas, ContextoFechas } from './calendarioContexto.service';
 
-const MS_HORA = 3_600_000;
 const formatoFecha = (fecha: Date): string => fecha.toISOString().slice(0, 10);
-
-/** El dia de calendario de hoy en Colombia (UTC-5, sin horario de verano), a medianoche UTC como las demas fechas. */
-export function hoyColombia(): Date {
-  const hoy = new Date(Date.now() - 5 * MS_HORA);
-  hoy.setUTCHours(0, 0, 0, 0);
-  return hoy;
-}
-
-/** Las fechas de la planilla son dias de calendario: `YYYY-MM-DD` -> medianoche UTC, como el calendario de M05. */
-export function fechaDeClase(fecha: string): Date {
-  return new Date(`${fecha}T00:00:00.000Z`);
-}
-
-/** ISO 1=lunes ... 7=domingo, el mismo formato de `JornadaOperativa.dias_habiles`. */
-export function diaIso(fecha: Date): number {
-  return fecha.getUTCDay() === 0 ? 7 : fecha.getUTCDay();
-}
 
 export interface EvaluacionFecha {
   periodo_numero: number | null;
   /** Por qué no se puede tomar asistencia ese día; null si se puede. */
   bloqueo: string | null;
-}
-
-/** Lo que hace falta de M05 para evaluar muchas fechas de un mismo grupo sin volver a consultar la base. */
-export interface ContextoFechas {
-  grupo: HydratedDocument<IGroup>;
-  anio: AcademicYearDocument;
-  jornada: JornadaOperativaDocument;
-  periodosCerradosDelGrupo: Set<number>;
-}
-
-export async function cargarContextoFechas(grupo: HydratedDocument<IGroup>): Promise<ContextoFechas> {
-  const [anio, jornada, cierres] = await Promise.all([
-    AcademicYear.findById(grupo.academic_year_id),
-    JornadaOperativa.findById(grupo.jornada_id),
-    PeriodLock.find({ academic_year_id: grupo.academic_year_id, group_id: grupo._id, estado: 'CERRADO' }),
-  ]);
-  if (!anio) throw new ApiError(404, 'Año lectivo no encontrado.');
-  if (!jornada) throw new ApiError(404, 'Jornada del grupo no encontrada.');
-  return { grupo, anio, jornada, periodosCerradosDelGrupo: new Set(cierres.map((c) => c.periodo_numero)) };
 }
 
 /**
@@ -95,13 +57,6 @@ export function evaluarFechaEnContexto({ grupo, anio, jornada, periodosCerradosD
   if (periodosCerradosDelGrupo.has(periodo.numero)) return resultado(`El periodo ${periodo.numero} está cerrado para este grupo.`);
 
   return resultado(null);
-}
-
-/** Periodo (con las fechas de la sede si tiene calendario propio) al que pertenece el día, sin importar si el año está vigente. */
-export function periodoDeFecha({ grupo, anio }: ContextoFechas, fecha: Date): number | null {
-  const calendarioSede = anio.calendarios_sede.find((c) => String(c.sede_id) === String(grupo.sede_id));
-  const periodo = periodosEfectivos(anio.periodos, calendarioSede).find((p) => fecha >= p.fecha_inicio && fecha <= p.fecha_fin);
-  return periodo?.numero ?? null;
 }
 
 async function evaluarFecha(grupo: HydratedDocument<IGroup>, fecha: Date): Promise<EvaluacionFecha> {

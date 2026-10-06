@@ -13,6 +13,7 @@ import ApiError from '../utils/ApiError';
 import { ESTADO_ACTIVO } from '../utils/filtroEstado';
 import { generarPasswordTemporal } from '../utils/generarPasswordTemporal';
 import { runTransaction } from '../utils/runTransaction';
+import { hoyColombia } from '../utils/tiempo';
 import { buscarMatriculaDePreinscripcion, construirDetalle, PreinscripcionDetalle } from './preinscripcionPublica.service';
 import { crearDesdeMatricula } from './solicitudApoyo.service';
 
@@ -129,8 +130,7 @@ export async function obtenerSolicitud(id: string): Promise<AdmissionRequestDocu
 
 // Fecha de calendario (medianoche UTC, como el resto de fechas del sistema) N dias despues de hoy en Colombia (UTC-5).
 function plazoLegalizacionPorDefecto(): Date {
-  const hoyColombia = Date.now() - 5 * 3_600_000;
-  return new Date(new Date(hoyColombia + DIAS_PLAZO_LEGALIZACION * 86_400_000).toISOString().slice(0, 10));
+  return new Date(hoyColombia().getTime() + DIAS_PLAZO_LEGALIZACION * 86_400_000);
 }
 
 /**

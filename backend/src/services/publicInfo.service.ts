@@ -1,9 +1,9 @@
 import Campus from '../models/campus.model';
 import Grade from '../models/grade.model';
-import Institution from '../models/institution.model';
 import JornadaOperativa from '../models/jornadaOperativa.model';
 import ApiError from '../utils/ApiError';
 import { ESTADO_ACTIVO } from '../utils/filtroEstado';
+import { buscarInstitucion } from './institution.service';
 
 export const KLASSY_VERSION = '1.0.0';
 
@@ -12,7 +12,7 @@ export const KLASSY_VERSION = '1.0.0';
  * solo campos seguros de exponer — nunca administrador_id ni datos internos.
  */
 export async function obtenerInfoPublica() {
-  const institucion = await Institution.findOne({ estado: ESTADO_ACTIVO });
+  const institucion = await buscarInstitucion({ soloActiva: true });
   if (!institucion) throw new ApiError(404, 'La institución todavía no tiene configuración pública disponible.');
 
   const sedes = await Campus.find({ institucion_id: institucion._id, estado: ESTADO_ACTIVO }).sort({ es_principal: -1 });

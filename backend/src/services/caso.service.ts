@@ -10,7 +10,6 @@ import {
   TipoSituacion,
 } from '../constants/convivencia';
 import { ROLES } from '../constants/roles';
-import AcademicYear from '../models/academicYear.model';
 import CasoConvivencia, { CasoConvivenciaDocument } from '../models/casoConvivencia.model';
 import { EntidadExterna, MedidaConvivencia, ProtocoloConvivencia } from '../models/catalogosCaso.model';
 import Counter from '../models/counter.model';
@@ -30,11 +29,12 @@ import {
 } from '../utils/casoConvivencia';
 import { alcanceDeSedes, enAlcanceDeSede, UsuarioConvivencia } from '../utils/permisosConvivencia';
 import runTransaction from '../utils/runTransaction';
-import { fechaDeClase, hoyColombia } from './attendance.service';
+import { fechaDeClase, hoyColombia } from '../utils/tiempo';
 import { registrarEvento } from './audit.service';
 import { obtenerConfiguracion } from './convivenciaCatalogo.service';
 import { exigirPermisoSobreEstudiante } from './observacion.service';
 import { auditarRemisionesCreadas, remitirAutomaticamente, remitirManualmente, resumenDeRemisionesDelCaso } from './remisionOrientacion.service';
+import { exigirAnioEnCurso } from './academicYear.service';
 
 const ROLES_CONVIVENCIA: string[] = [ROLES.ADMIN, ROLES.COORDINADOR_CONVIVENCIA];
 const NO_ENCONTRADO = 'Caso no encontrado.';
@@ -129,8 +129,7 @@ export interface AbrirCasoInput {
 
 export async function abrirCaso(input: AbrirCasoInput, usuario: UserDocument, ip?: string | null) {
   if (!ROLES_CONVIVENCIA.includes(usuario.rol)) throw new ApiError(403, 'Solo convivencia abre casos.');
-  const anio = await AcademicYear.findOne({ estado: 'EN_CURSO' });
-  if (!anio) throw new ApiError(409, 'No hay un año lectivo en curso: no se pueden abrir casos.');
+const anio = await exigirAnioEnCurso('No hay un año lectivo en curso: no se pueden abrir casos.');
   const fecha = fechaDeClase(input.fecha_hecho);
   exigirFechaNoFutura(fecha, 'La fecha del hecho');
 

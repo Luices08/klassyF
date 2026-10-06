@@ -1,9 +1,7 @@
-import PDFDocument from 'pdfkit';
-import Institution from '../models/institution.model';
+import { COLOR, Documento } from '../utils/pdf';
+import { buscarInstitucion } from './institution.service';
 
-type Documento = InstanceType<typeof PDFDocument>;
 
-export const COLOR = { ink: '#172235', cuerpo: '#3F4D61', tenue: '#788794', borde: '#DDE4EC', primario: '#2878EA', peligro: '#EF5350', suave: '#F1F5F9' };
 export const MARGEN = 50;
 
 export interface DatosEncabezado {
@@ -18,7 +16,7 @@ export interface DatosEncabezado {
 
 /** El logo de la institución (data URI PNG/JPEG de M01). Si falta o no se puede leer, el documento sale igual solo con texto. */
 export async function cargarLogo(): Promise<Buffer | null> {
-  const institucion = await Institution.findOne().select('logo_url');
+  const institucion = await buscarInstitucion({ campos: 'logo_url' });
   const coincide = /^data:image\/(png|jpe?g);base64,(.+)$/i.exec(institucion?.logo_url ?? '');
   return coincide ? Buffer.from(coincide[2] as string, 'base64') : null;
 }

@@ -2,10 +2,10 @@ import { Types } from 'mongoose';
 import { ESTADOS_ASISTENCIA_BASE } from '../constants/asistencia';
 import { EstadoUsuario, TonoEstadoAsistencia } from '../constants/enums';
 import AttendanceState, { AttendanceStateDocument } from '../models/attendanceState.model';
-import Institution from '../models/institution.model';
 import ApiError from '../utils/ApiError';
 import { ESTADO_ACTIVO } from '../utils/filtroEstado';
 import { registrarEvento } from './audit.service';
+import { exigirInstitucion } from './institution.service';
 
 interface ContextoActor {
   usuarioId: Types.ObjectId | string;
@@ -13,11 +13,7 @@ interface ContextoActor {
 }
 
 // Una sola institución por instalación (ver CLAUDE.md): el estado nunca recibe institucion_id del cliente.
-async function obtenerInstitucion() {
-  const institucion = await Institution.findOne();
-  if (!institucion) throw new ApiError(409, 'Configura primero la institución antes de parametrizar la asistencia.');
-  return institucion;
-}
+const obtenerInstitucion = () => exigirInstitucion('Configura primero la institución antes de parametrizar la asistencia.');
 
 const esErrorDeDuplicado = (err: unknown): boolean => (err as { code?: number })?.code === 11000;
 

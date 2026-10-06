@@ -4,9 +4,9 @@ import Area from '../models/area.model';
 import Campus from '../models/campus.model';
 import Espacio, { EspacioDocument } from '../models/espacio.model';
 import Group from '../models/group.model';
-import Institution from '../models/institution.model';
 import ApiError from '../utils/ApiError';
 import { registrarEvento } from './audit.service';
+import { buscarInstitucion } from './institution.service';
 
 interface ContextoUsuario {
   usuarioId: Types.ObjectId | string;
@@ -32,7 +32,7 @@ export type ActualizarEspacioInput = Omit<EspacioInput, 'sede_id'>;
  * ni se asignan aulas a los grupos. Los documentos anteriores al campo `modalidad` cuentan como PRESENCIAL.
  */
 export async function exigirEspaciosFisicos(): Promise<void> {
-  const institucion = await Institution.findOne().select('modalidad');
+  const institucion = await buscarInstitucion({ campos: 'modalidad' });
   if (institucion?.modalidad === 'VIRTUAL') {
     throw new ApiError(
       409,
@@ -282,7 +282,7 @@ export async function validarAulaParaGrupo(input: AulaDeGrupoInput): Promise<{ a
   if (input.max_capacity <= espacio.capacidad) return { advertencia: null };
 
   const mensaje = `El cupo máximo (${input.max_capacity}) supera el aforo del aula "${espacio.nombre}" (${espacio.capacidad}).`;
-  const institucion = await Institution.findOne().select('politica_aforo_aula');
+  const institucion = await buscarInstitucion({ campos: 'politica_aforo_aula' });
   if ((institucion?.politica_aforo_aula ?? 'BLOQUEAR') === 'BLOQUEAR') {
     throw new ApiError(
       409,

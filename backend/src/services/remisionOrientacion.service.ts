@@ -8,7 +8,7 @@ import { User, UserDocument } from '../models/user.model';
 import ApiError from '../utils/ApiError';
 import { alcanceDeSedes, enAlcanceDeSede } from '../utils/permisosConvivencia';
 import { claveDeRemision, involucradosARemitir } from '../utils/remisionOrientacion';
-import { fechaDeClase, hoyColombia } from './attendance.service';
+import { fechaDeClase, hoyColombia } from '../utils/tiempo';
 import { registrarEvento } from './audit.service';
 
 const NO_ENCONTRADA = 'Remisión no encontrada.';

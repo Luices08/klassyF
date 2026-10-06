@@ -669,8 +669,13 @@ modular por dominios**. Diagnóstico, propuesta y decisiones: `doc/Analisis_Arqu
 - **Dependencias solo hacia abajo**: `nucleo` ← `institucional` ← (`registro`, `curricular`) ← (`academico`, `bienestar`) ←
   `comunicacion`. Un dominio no importa a un igual ni a uno superior; un dato ajeno se pide a la API pública (`index.ts`) de quien
   lo posee, no consultando sus modelos.
-- **No agregar** más consultas sueltas a `Institution.findOne()` ni a `AcademicYear.findOne({ estado: 'EN_CURSO' })`, ni más
-  lógica de negocio en controladores, ni más tipos en `types/domain.ts` o dentro de `hooks/`, ni más imports de dominio en `components/ui/`.
+- **Proveedores únicos (fase 1 hecha)**: la institución se lee con `buscarInstitucion()` / `exigirInstitucion(mensaje)`
+  (`institution.service.ts`) y el año vigente con `buscarAnioEnCurso()` / `exigirAnioEnCurso(mensaje)` (`academicYear.service.ts`);
+  nunca con `Institution.findOne()` ni `AcademicYear.findOne({ estado: 'EN_CURSO' })` sueltos. Las fechas de Colombia salen de
+  `utils/tiempo.ts` (`hoyColombia`, `fechaDeClase`, `diaIso`), el contexto de calendario de un grupo de
+  `calendarioContexto.service.ts` y la paleta/`bufferDeDocumento` de los PDF de `utils/pdf.ts`.
+- **No agregar** más lógica de negocio en controladores, ni más tipos en `types/domain.ts` o dentro de `hooks/`, ni más imports de
+  dominio en `components/ui/`.
 - **Ramas**: una rama corta por fase `refactor/faseN-tema` desde `main` actualizado (ver `GUIA_DESARROLLO.md`); cada PR deja en verde
   backend (`typecheck:all`, `lint`, `npm test`) y frontend (`lint`, `build`). Las fases de movimiento (2 y 4) solo cambian carpetas e
   imports: no se renombran identificadores ni se mezcla funcionalidad nueva.

@@ -5,7 +5,7 @@ import AuditLog from '../../src/models/auditLog.model';
 import Observacion from '../../src/models/observacion.model';
 import SolicitudCaso from '../../src/models/solicitudCaso.model';
 import { User, UserDocument } from '../../src/models/user.model';
-import { hoyColombia } from '../../src/services/attendance.service';
+import { hoyColombia } from '../../src/utils/tiempo';
 import * as catalogoCaso from '../../src/services/casoCatalogo.service';
 import * as catalogo from '../../src/services/convivenciaCatalogo.service';
 import * as observaciones from '../../src/services/observacion.service';

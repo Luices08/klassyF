@@ -2,10 +2,10 @@ import PDFDocument from 'pdfkit';
 import { NOMBRES_DOCUMENTO_MATRICULA } from '../constants/matriculaChecklist';
 import { EnrollmentDocument } from '../models/enrollment.model';
 import Guardian from '../models/guardian.model';
-import Institution from '../models/institution.model';
 import StudentGuardian from '../models/studentGuardian.model';
 import { UserDocument } from '../models/user.model';
 import ApiError from '../utils/ApiError';
+import { buscarInstitucion } from './institution.service';
 
 /**
  * Genera el Acta de Compromiso Digital (M04-C): comprobante en PDF con los
@@ -18,7 +18,7 @@ export async function generarActaCompromisoPdf(enrollment: EnrollmentDocument): 
   }
 
   const student = enrollment.student_id as unknown as UserDocument;
-  const institucion = await Institution.findOne();
+  const institucion = await buscarInstitucion();
 
   const vinculo = await StudentGuardian.findOne({ student_id: student._id, es_principal: true }).populate('guardian_id');
   const acudiente = vinculo?.guardian_id as unknown as InstanceType<typeof Guardian> | undefined;

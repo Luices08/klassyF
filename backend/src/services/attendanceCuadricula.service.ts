@@ -11,15 +11,10 @@ import { UserDocument } from '../models/user.model';
 import ApiError from '../utils/ApiError';
 import { hayEventoNoLectivo } from '../utils/calendarioAcademico';
 import { ESTADO_ACTIVO } from '../utils/filtroEstado';
-import {
-  cargarContextoFechas,
-  diaIso,
-  evaluarFechaEnContexto,
-  matriculasActivas,
-  obtenerGrupoYAsignatura,
-  periodoDeFecha,
-} from './attendance.service';
+import { diaIso } from '../utils/tiempo';
+import { evaluarFechaEnContexto, matriculasActivas, obtenerGrupoYAsignatura } from './attendance.service';
 import { listarEstados } from './attendanceState.service';
+import { cargarContextoFechas, periodoDeFecha } from './calendarioContexto.service';
 
 const ROLES_DE_CONSULTA_TOTAL: string[] = [ROLES.ADMIN, ROLES.COORDINADOR, ROLES.SECRETARIA];
 

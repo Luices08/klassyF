@@ -26,3 +26,7 @@ cd frontend
 npm install
 npm run dev    # http://localhost:5173
 ```
+
+## Docker (VPS)
+
+Para correr todo en contenedores (MongoDB, API y frontend con nginx) ver [`DOCKER.md`](DOCKER.md).

@@ -35,7 +35,7 @@ import {
   useTeacherAssignments,
 } from '../../hooks/useTeacherAssignments';
 import { useUsers } from '../../hooks/useUsers';
-import type { TeacherAssignment, TipoAsignacionDocente } from '../../types/domain';
+import type { DocenteCargaResumen, TeacherAssignment, TipoAsignacionDocente } from '../../types/domain';
 
 const TIPO_LABELS: Record<TipoAsignacionDocente, string> = {
   CLASE: 'Clase Regular',
@@ -53,6 +53,25 @@ const FORM_VACIO = {
   proyecto_nombre: '',
   observaciones: '',
 };
+
+/** Un docente en varios niveles se mide como % de su jornada: un tope en horas redondeado se contradiría con el diagnóstico. */
+function ChipCarga({ item }: { item: DocenteCargaResumen }) {
+  const horas = item.horas_totales;
+  if (item.estado_carga === 'SIN_CARGA') {
+    return (
+      <Chip tone="neutral">{horas === 0 ? 'Sin asignación (0 h)' : `Sin clases (${horas} h en otras asignaciones)`}</Chip>
+    );
+  }
+
+  const detalle =
+    item.nivel_predominante === 'MULTINIVEL' && item.fraccion_carga != null
+      ? `${horas}h · ${Math.round(item.fraccion_carga * 100)}% de la jornada`
+      : `${horas}h ${item.estado_carga === 'SOBRE_CARGA' ? '>' : '/'} ${item.tope_horas}h`;
+
+  if (item.estado_carga === 'SOBRE_CARGA') return <Chip tone="red">Sobrecarga ({detalle})</Chip>;
+  if (item.estado_carga === 'SUB_CARGA') return <Chip tone="orange">Subcarga ({detalle})</Chip>;
+  return <Chip tone="green">Normal ({detalle})</Chip>;
+}
 
 export function TeacherAssignmentsPage() {
   const { anio, anios } = useAnioDeTrabajo();
@@ -105,6 +124,8 @@ export function TeacherAssignmentsPage() {
     PRIMARIA: 25,
     SECUNDARIA: 22,
     MEDIA: 22,
+    max_direcciones_grupo_por_docente: 1,
+    tolerancia_subcarga_horas: 2,
   });
 
   // Métricas de diagnóstico
@@ -187,6 +208,28 @@ export function TeacherAssignmentsPage() {
     return director && typeof director === 'object' ? director : null;
   }, [form.tipo_asignacion, form.group_id, grupos]);
 
+  // Grupos que el docente elegido ya dirige (sin contar el grupo que se está reasignando): el servidor
+  // aplica el mismo límite, esto solo evita ofrecer una acción que va a rechazar.
+  const gruposQueYaDirigeElDocente = useMemo(() => {
+    if (form.tipo_asignacion !== 'DIRECCION_GRUPO' || !form.docente_id) return [];
+    return todasLasAsignaciones
+      .filter((a) => {
+        const docenteId = typeof a.docente_id === 'object' ? a.docente_id._id : a.docente_id;
+        const grupoId = typeof a.group_id === 'object' && a.group_id ? a.group_id._id : a.group_id;
+        return (
+          a.tipo_asignacion === 'DIRECCION_GRUPO' &&
+          a.estado === 'activo' &&
+          String(docenteId) === form.docente_id &&
+          String(grupoId) !== form.group_id
+        );
+      })
+      .map((a) => (typeof a.group_id === 'object' && a.group_id ? a.group_id.nomenclatura : ''))
+      .filter(Boolean);
+  }, [form.tipo_asignacion, form.docente_id, form.group_id, todasLasAsignaciones]);
+
+  const maxDirecciones = limitesCarga?.max_direcciones_grupo_por_docente ?? 1;
+  const docenteExcedeDirecciones = gruposQueYaDirigeElDocente.length >= maxDirecciones;
+
   const handleOpenDrawer = () => {
     setSelectedGradoId('');
     setForm(FORM_VACIO);
@@ -246,6 +289,20 @@ export function TeacherAssignmentsPage() {
         setFormError('Debe seleccionar el grupo para la dirección de curso.');
         return;
       }
+      if (docenteExcedeDirecciones) {
+        setFormError(
+          `El docente ya dirige ${gruposQueYaDirigeElDocente.length} grupo(s) y la institución permite un máximo de ${maxDirecciones} por docente.`
+        );
+        return;
+      }
+      if (
+        directorActualDelGrupo &&
+        !window.confirm(
+          `El grupo ya tiene como director a ${directorActualDelGrupo.apellido}, ${directorActualDelGrupo.nombre}. ¿Quitarle la dirección y asignarla a este docente?`
+        )
+      ) {
+        return;
+      }
     }
 
     if (form.tipo_asignacion === 'PROYECTO_TRANSVERSAL' || form.tipo_asignacion === 'OTRO') {
@@ -267,7 +324,8 @@ export function TeacherAssignmentsPage() {
         tipo_asignacion: form.tipo_asignacion,
         group_id: esProyectoUOtro ? null : form.group_id,
         subject_id: form.tipo_asignacion === 'CLASE' ? form.subject_id : null,
-        horas_semanales: form.tipo_asignacion === 'DIRECCION_GRUPO' ? 0 : form.horas_semanales,
+        horas_semanales: form.horas_semanales,
+        reemplazar_director: directorActualDelGrupo ? true : undefined,
         proyecto_nombre: esProyectoUOtro ? form.proyecto_nombre : undefined,
         observaciones: form.observaciones.trim() || undefined,
       };
@@ -439,35 +497,25 @@ export function TeacherAssignmentsPage() {
                       </Td>
                       <Td className="text-body text-xs">{item.docente.numero_documento}</Td>
                       <Td>
-                        <Chip tone="neutral">
-                          {item.nivel_predominante ?? 'SECUNDARIA'}
-                        </Chip>
+                        {item.nivel_predominante === 'MULTINIVEL' ? (
+                          <Chip tone="blue">Multinivel</Chip>
+                        ) : item.nivel_predominante ? (
+                          <Chip tone="neutral">{item.nivel_predominante}</Chip>
+                        ) : (
+                          <span className="text-xs text-muted">—</span>
+                        )}
                       </Td>
                       <Td className="text-center font-medium text-body">{item.horas_clase} h</Td>
                       <Td className="text-center font-medium text-body">
-                        {item.tiene_direccion_grupo ? 'Titular' : '—'}
+                        {item.tiene_direccion_grupo ? `Titular${item.horas_direccion > 0 ? ` (${item.horas_direccion} h)` : ''}` : '—'}
                       </Td>
                       <Td className="text-center font-medium text-body">{item.horas_proyectos} h</Td>
                       <Td className="text-center font-bold text-ink">{item.horas_totales} h</Td>
                       <Td className="text-center font-semibold text-muted">
-                        {item.tope_horas ?? 22} h
+                        {item.tope_horas ? `${item.nivel_predominante === 'MULTINIVEL' ? '≈ ' : ''}${item.tope_horas} h` : '—'}
                       </Td>
                       <Td>
-                        {item.estado_carga === 'NORMAL' && (
-                          <Chip tone="green">
-                            Normal ({item.horas_totales}h / {item.tope_horas ?? 22}h)
-                          </Chip>
-                        )}
-                        {item.estado_carga === 'SOBRE_CARGA' && (
-                          <Chip tone="red">
-                            Sobrecarga ({item.horas_totales}h &gt; {item.tope_horas ?? 22}h)
-                          </Chip>
-                        )}
-                        {item.estado_carga === 'SUB_CARGA' && (
-                          <Chip tone="orange">
-                            Subcarga ({item.horas_totales}h / {item.tope_horas ?? 22}h)
-                          </Chip>
-                        )}
+                        <ChipCarga item={item} />
                       </Td>
                       <Td className="text-center text-body">{item.total_asignaciones}</Td>
                     </tr>
@@ -578,7 +626,7 @@ export function TeacherAssignmentsPage() {
                             : asg.proyecto_nombre || 'Dirección de curso'}
                         </Td>
                         <Td className="text-center font-bold text-ink">
-                          {asg.tipo_asignacion === 'DIRECCION_GRUPO' ? '—' : `${asg.horas_semanales} h`}
+                          {asg.tipo_asignacion === 'DIRECCION_GRUPO' && asg.horas_semanales === 0 ? '—' : `${asg.horas_semanales} h`}
                         </Td>
                         <Td className="text-xs text-muted max-w-xs truncate">{asg.observaciones || '—'}</Td>
                         <Td className="text-right">
@@ -755,7 +803,7 @@ export function TeacherAssignmentsPage() {
                 label="Grupo a Dirigir *"
                 value={form.group_id}
                 disabled={!selectedGradoId}
-                onChange={(e) => setForm({ ...form, group_id: e.target.value, horas_semanales: 0 })}
+                onChange={(e) => setForm({ ...form, group_id: e.target.value })}
                 required
               >
                 <option value="">
@@ -767,13 +815,27 @@ export function TeacherAssignmentsPage() {
                   </option>
                 ))}
               </Select>
-              <p className="text-xs text-muted">
-                La titularidad de grupo es un acompañamiento tutorial y no computa horas lectivas de aula.
-              </p>
+              <Input
+                label="Horas semanales que suma al tope del docente"
+                type="number"
+                min={0}
+                max={10}
+                value={form.horas_semanales}
+                onChange={(e) => setForm({ ...form, horas_semanales: Number(e.target.value) })}
+                hint="0 = la dirección no suma a la carga. Si la institución la cuenta como parte de las horas lectivas, indica cuántas."
+                required
+              />
               {directorActualDelGrupo && (
                 <Alert tone="warning">
                   Este grupo ya tiene director: {directorActualDelGrupo.apellido}, {directorActualDelGrupo.nombre}.
                   Al guardar, lo reemplazará.
+                </Alert>
+              )}
+              {docenteExcedeDirecciones && (
+                <Alert tone="error">
+                  Este docente ya dirige {gruposQueYaDirigeElDocente.length} grupo(s) (
+                  {gruposQueYaDirigeElDocente.join(', ')}) y la institución permite un máximo de {maxDirecciones} por
+                  docente.
                 </Alert>
               )}
             </div>
@@ -820,7 +882,11 @@ export function TeacherAssignmentsPage() {
             <Button variant="secondary" type="button" onClick={() => setDrawerAbierto(false)}>
               Cancelar
             </Button>
-            <Button variant="primary" type="submit" disabled={crearMutation.isPending}>
+            <Button
+              variant="primary"
+              type="submit"
+              disabled={crearMutation.isPending || docenteExcedeDirecciones}
+            >
               {crearMutation.isPending ? 'Guardando...' : 'Asignar Carga'}
             </Button>
           </div>
@@ -881,6 +947,30 @@ export function TeacherAssignmentsPage() {
             value={limitesForm.MEDIA}
             onChange={(e) => setLimitesForm({ ...limitesForm, MEDIA: Number(e.target.value) })}
             hint="Estándar nacional: 22 horas efectivas."
+            required
+          />
+
+          <Input
+            label="Tolerancia de subcarga (horas)"
+            type="number"
+            min={0}
+            max={10}
+            value={limitesForm.tolerancia_subcarga_horas ?? 2}
+            onChange={(e) => setLimitesForm({ ...limitesForm, tolerancia_subcarga_horas: Number(e.target.value) })}
+            hint="Un docente se marca en subcarga cuando le faltan más de estas horas para llegar a su tope (por defecto 2)."
+            required
+          />
+
+          <Input
+            label="Direcciones de grupo por docente"
+            type="number"
+            min={1}
+            max={10}
+            value={limitesForm.max_direcciones_grupo_por_docente ?? 1}
+            onChange={(e) =>
+              setLimitesForm({ ...limitesForm, max_direcciones_grupo_por_docente: Number(e.target.value) })
+            }
+            hint="Cuántos grupos puede dirigir un mismo docente en el año lectivo (por defecto 1)."
             required
           />
 

@@ -88,6 +88,8 @@ export const updateLimitesCarga: ValidationSchema = {
     PRIMARIA: Joi.number().integer().min(1).max(40).optional(),
     SECUNDARIA: Joi.number().integer().min(1).max(40).optional(),
     MEDIA: Joi.number().integer().min(1).max(40).optional(),
+    max_direcciones_grupo_por_docente: Joi.number().integer().min(1).max(10).optional(),
+    tolerancia_subcarga_horas: Joi.number().integer().min(0).max(10).optional(),
   }).min(1),
 };
 

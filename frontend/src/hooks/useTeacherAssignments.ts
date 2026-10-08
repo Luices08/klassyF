@@ -55,6 +55,7 @@ export interface CrearTeacherAssignmentInput {
   group_id?: string | null;
   subject_id?: string | null;
   horas_semanales: number;
+  reemplazar_director?: boolean;
   proyecto_nombre?: string;
   observaciones?: string;
 }
@@ -91,6 +92,8 @@ export interface LimitesCargaDocente {
   PRIMARIA: number;
   SECUNDARIA: number;
   MEDIA: number;
+  max_direcciones_grupo_por_docente?: number;
+  tolerancia_subcarga_horas?: number;
 }
 
 export function useLimitesCarga() {

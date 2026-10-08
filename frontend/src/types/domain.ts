@@ -786,9 +786,11 @@ export interface DocenteCargaResumen {
   horas_proyectos: number;
   tiene_direccion_grupo: boolean;
   horas_totales: number;
-  estado_carga: 'SUB_CARGA' | 'NORMAL' | 'SOBRE_CARGA';
-  tope_horas?: number;
-  nivel_predominante?: NivelEducativo;
+  estado_carga: 'SUB_CARGA' | 'NORMAL' | 'SOBRE_CARGA' | 'SIN_CARGA';
+  tope_horas?: number | null;
+  /** 1 = 100% de la jornada lectiva; null si el docente no tiene clases. */
+  fraccion_carga?: number | null;
+  nivel_predominante?: NivelEducativo | 'MULTINIVEL' | null;
   total_asignaciones: number;
   asignaciones: TeacherAssignment[];
 }
@@ -844,3 +846,148 @@ export interface CurricularDevelopment {
   updatedAt: string;
 }
 
+
+// --- M13: Asistencia ---
+
+export type TonoEstadoAsistencia = 'green' | 'orange' | 'red' | 'blue' | 'neutral';
+
+/** Estado parametrizable por institución; las banderas (no el nombre) definen cómo cuenta en reportes y boletín. */
+export interface EstadoAsistencia {
+  _id: string;
+  nombre: string;
+  abreviatura: string;
+  tono: TonoEstadoAsistencia;
+  cuenta_como_falla: boolean;
+  es_retardo: boolean;
+  es_justificada: boolean;
+  es_predeterminado: boolean;
+  orden: number;
+  estado: EstadoActivo;
+}
+
+export type EstadoJustificacion = 'PENDIENTE' | 'APROBADA' | 'RECHAZADA';
+
+export interface FilaPlanilla {
+  student_id: string;
+  nombre: string;
+  apellido: string;
+  numero_documento: string;
+  /** null = todavía sin registrar: la planilla ofrece el estado predeterminado. */
+  state_id: string | null;
+  novedad: string;
+  registro_id: string | null;
+  justificacion: EstadoJustificacion | null;
+}
+
+export interface PlanillaAsistencia {
+  /** null hasta que se guarde la primera vez; con él se justifica una falla de la planilla. */
+  attendance_id: string | null;
+  grupo: { _id: string; nomenclatura: string };
+  asignatura: { _id: string; nombre: string };
+  fecha: string;
+  periodo_numero: number | null;
+  /** Por qué no se puede tomar asistencia ese día (M05); null si se puede. */
+  bloqueo: string | null;
+  planilla_guardada: boolean;
+  estados: EstadoAsistencia[];
+  estudiantes: FilaPlanilla[];
+}
+
+export interface InasistenciaEstudiante {
+  attendance_id: string;
+  registro_id: string;
+  fecha: string;
+  periodo_numero: number;
+  asignatura: string;
+  grupo: string;
+  estado: { _id: string; nombre: string; tono: TonoEstadoAsistencia; es_justificada: boolean };
+  novedad: string;
+  justificacion: { _id: string; estado: EstadoJustificacion; motivo: string } | null;
+}
+
+export interface JustificacionAsistencia {
+  _id: string;
+  student_id: { _id: string; nombre: string; apellido: string; numero_documento: string };
+  acudiente_id: { _id: string; nombre: string; apellido: string } | null;
+  motivo: string;
+  archivo_nombre: string | null;
+  tiene_soporte: boolean;
+  estado: EstadoJustificacion;
+  revisado_por: { _id: string; nombre: string; apellido: string } | null;
+  fecha_revision: string | null;
+  comentario_revision: string | null;
+  createdAt: string;
+  inasistencia: {
+    fecha: string | null;
+    periodo_numero: number | null;
+    grupo: string | null;
+    asignatura: string | null;
+    estado: string | null;
+  };
+}
+
+export const DIMENSIONES_ESTADISTICA = ['estudiante', 'grupo', 'asignatura', 'periodo'] as const;
+export type DimensionEstadistica = (typeof DIMENSIONES_ESTADISTICA)[number];
+
+export interface TotalesAsistencia {
+  total_registros: number;
+  asistencias: number;
+  retardos: number;
+  fallas: number;
+  fallas_justificadas: number;
+  fallas_injustificadas: number;
+  porcentaje_ausentismo: number;
+  por_estado: Record<string, number>;
+}
+
+export interface FilaEstadistica extends TotalesAsistencia {
+  clave: string;
+  etiqueta: string;
+}
+
+export interface EstadisticasAsistencia {
+  estados: Array<Pick<EstadoAsistencia, '_id' | 'nombre' | 'abreviatura' | 'tono'>>;
+  total: TotalesAsistencia;
+  filas: FilaEstadistica[];
+}
+
+// --- M13: Planilla clásica (cuadrícula mensual) ---
+
+export interface ClaseAsistencia {
+  group_id: string;
+  subject_id: string;
+  grupo: string;
+  grado: string;
+  asignatura: string;
+  docente: string;
+  /** El docente la dicta él mismo; si es false solo la consulta (director de grupo o staff). */
+  editable: boolean;
+}
+
+export interface CeldaCuadricula {
+  state_id: string;
+  novedad: string;
+  registro_id: string;
+  justificacion: EstadoJustificacion | null;
+}
+
+export interface DiaCuadricula {
+  fecha: string;
+  periodo_numero: number;
+  /** Por qué no se puede editar ese día (futuro, periodo cerrado...); null si se puede. */
+  bloqueo: string | null;
+  attendance_id: string | null;
+}
+
+export interface CuadriculaAsistencia {
+  grupo: { _id: string; nomenclatura: string; grado: string };
+  asignatura: { _id: string; nombre: string };
+  docente: string | null;
+  mes: string;
+  editable: boolean;
+  estados: EstadoAsistencia[];
+  estudiantes: Array<{ student_id: string; nombre: string; apellido: string; numero_documento: string }>;
+  dias: DiaCuadricula[];
+  /** estudiante -> fecha -> celda; una celda ausente es un día todavía sin registrar. */
+  celdas: Record<string, Record<string, CeldaCuadricula>>;
+}

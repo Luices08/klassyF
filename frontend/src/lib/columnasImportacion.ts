@@ -98,3 +98,20 @@ export const COLUMNAS_ESTUDIANTES: ColumnaGuia[] = [
   { nombre: 'acudiente_telefono', obligatoria: false, formato: 'Texto. Con datos de acudiente: obligatoria', ejemplo: '3001112233' },
   { nombre: 'acudiente_parentesco', obligatoria: false, formato: `${uno(PARENTESCOS)}. Con datos de acudiente: obligatoria`, ejemplo: 'MADRE' },
 ];
+
+// --- Convivencia (M15): la única carga masiva es la de faltas del manual. Las columnas reflejan backend/src/constants/importacionConvivencia.ts ---
+
+export const NOTAS_FALTAS = [
+  'Descarga la plantilla (Excel o CSV) y diligénciala: Excel trae listas desplegables y una hoja con instrucciones; el CSV usa punto y coma.',
+  'Se revisa TODO el archivo antes de guardar: si una fila tiene un error, no se guarda ninguna y se te dice cuáles corregir.',
+  'Reenviar el mismo archivo no duplica nada: la falta se identifica por su código y, si ya existe, se actualiza.',
+  'No se aceptan fórmulas: pega solo valores. Tamaño máximo 2 MB.',
+];
+
+export const COLUMNAS_FALTAS: ColumnaGuia[] = [
+  { nombre: 'codigo', obligatoria: true, formato: 'Numeral de la falta en el manual. Identifica la fila: si ya existe, se actualiza.', ejemplo: '2.15' },
+  { nombre: 'descripcion', obligatoria: true, formato: 'Texto de la falta (máximo 400 caracteres).', ejemplo: 'Debe portar los tenis correspondientes al uniforme.' },
+  { nombre: 'gravedad', obligatoria: true, formato: 'I, II o III, según el manual.', ejemplo: 'I' },
+  { nombre: 'descuento_decimas', obligatoria: false, formato: 'Décimas que descuenta el manual (0 a 5, con coma o punto). Solo se guarda; no se aplica a notas.', ejemplo: '0,2' },
+  { nombre: 'estado', obligatoria: false, formato: 'ACTIVO o INACTIVO (vacío = ACTIVO).', ejemplo: 'ACTIVO' },
+];

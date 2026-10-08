@@ -1,6 +1,6 @@
 {
   "name": "klassy-nucleo-institucional",
-  "version": "1.0.0",
+  "version": "0.16.0",
   "description": "Klassy - Nucleo Institucional, RBAC y Matriculas con control de cupos (Prompt 1)",
   "main": "dist/server.js",
   "scripts": {
@@ -18,14 +18,15 @@
     "reset-admin-password": "tsx scripts/resetAdminPassword.ts",
     "typecheck": "tsc --noEmit",
     "typecheck:all": "tsc --noEmit && tsc -p tsconfig.scripts.json",
-    "lint": "oxlint src scripts",
-    "test": "vitest run"
+    "test": "vitest run",
+    "lint": "oxlint src scripts"
   },
   "license": "UNLICENSED",
   "dependencies": {
     "bcryptjs": "^2.4.3",
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
+    "exceljs": "^4.4.0",
     "express": "^4.19.2",
     "express-rate-limit": "^8.7.0",
     "helmet": "^7.1.0",
@@ -45,6 +46,7 @@
     "@types/multer": "^2.2.0",
     "@types/node": "^22.20.2",
     "@types/pdfkit": "^0.17.6",
+    "mongodb-memory-server": "^11.3.0",
     "oxlint": "^1.86.0",
     "tsx": "^4.23.13",
     "typescript": "^5.9.3",

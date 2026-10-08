@@ -1,5 +1,7 @@
 import { type FormEvent, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
+import { HistorialObservaciones } from '../../components/convivencia/HistorialObservaciones';
+import { InclusionResumen } from '../../components/inclusion/InclusionResumen';
 import { ReportCardView } from '../../components/reportCard/ReportCardView';
 import { Alert, errorMessage } from '../../components/ui/Alert';
 import { Chip, EstadoEstudianteBadge, EstadoMatriculaBadge } from '../../components/ui/Badge';
@@ -13,6 +15,7 @@ import { Spinner } from '../../components/ui/Spinner';
 import { TabPanel, Tabs } from '../../components/ui/Tabs';
 import { EmptyRow, Table, TableBody, TableHead, Td, Th } from '../../components/ui/Table';
 import { PlusIcon, RefreshIcon, StarIcon, TrashIcon } from '../../components/ui/icons';
+import { useAuth } from '../../context/AuthContext';
 import {
   useActualizarVinculo,
   useDesvincularAcudiente,
@@ -79,10 +82,12 @@ const ACUDIENTE_VACIO = {
   telefono_principal: '',
   email: '',
   parentesco: '' as Parentesco | '',
+  habilitar_portal: false,
 };
 
 export function StudentDetailPage() {
   const { id } = useParams<{ id: string }>();
+  const rol = useAuth().user?.rol;
   const navigate = useNavigate();
   const fichaQuery = useStudentFicha360(id);
   const [tab, setTab] = useState('general');
@@ -133,10 +138,14 @@ export function StudentDetailPage() {
         </TabPanel>
 
         <TabPanel active={tab} tabKey="bienestar">
-          <Alert tone="info">
-            El Observador y Bienestar se habilitará cuando se construyan los módulos M14 (Convivencia) y M16 (PIAR).
-            Este espacio queda reservado para esa información.
-          </Alert>
+          {/* Historial de convivencia (M14): el servidor decide qué ve cada rol; SECRETARIA no tiene acceso. */}
+          {rol === 'SECRETARIA' ? (
+            <Alert tone="info">El observador de convivencia no está disponible para secretaría.</Alert>
+          ) : (
+            <HistorialObservaciones studentId={estudiante._id} />
+          )}
+          {/* Inclusión (M16): solo quien tiene acceso al módulo; el expediente decide el detalle por rol y sede. */}
+          {(rol === 'ADMIN' || rol === 'ORIENTADOR' || rol === 'COORDINADOR') && <InclusionResumen numeroDocumento={estudiante.numero_documento} />}
         </TabPanel>
       </Card>
     </div>
@@ -424,6 +433,7 @@ function NucleoFamiliarTab({
       await vincular.mutateAsync({ studentId, guardian_id: form.guardian_id, parentesco: form.parentesco });
     } else {
       if (!form.parentesco) return;
+      if (form.habilitar_portal && !form.email) return;
       await vincular.mutateAsync({
         studentId,
         tipo_documento: form.tipo_documento,
@@ -433,6 +443,7 @@ function NucleoFamiliarTab({
         telefono_principal: form.telefono_principal,
         email: form.email || undefined,
         parentesco: form.parentesco,
+        habilitar_portal: form.habilitar_portal,
       });
     }
     cerrarDrawer();
@@ -584,6 +595,27 @@ function NucleoFamiliarTab({
             </option>
           ))}
         </Select>
+
+        {modo === 'nuevo' && (
+          <div className="space-y-2 rounded-lg border border-border bg-soft p-3">
+            <label className="flex items-center gap-2 text-sm font-medium text-ink">
+              <input
+                type="checkbox"
+                checked={form.habilitar_portal}
+                onChange={(e) => setForm((f) => ({ ...f, habilitar_portal: e.target.checked }))}
+                className="h-4 w-4 rounded border-border text-primary focus:ring-primary"
+              />
+              Habilitar acceso al portal de acudientes
+            </label>
+            <p className="text-xs text-muted">
+              Se crea la cuenta (o se reutiliza la que ya exista con ese documento). Ingresa con su número de documento y
+              lo usa también como contraseña temporal: el sistema le exige cambiarla en el primer inicio de sesión.
+            </p>
+            {form.habilitar_portal && !form.email && (
+              <p className="text-xs text-danger">Para habilitar el portal el acudiente debe tener un correo.</p>
+            )}
+          </div>
+        )}
       </Drawer>
     </div>
   );

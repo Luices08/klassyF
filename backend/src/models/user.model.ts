@@ -1,6 +1,7 @@
 import bcrypt from 'bcryptjs';
 import { HydratedDocument, Model, Schema, Types, model } from 'mongoose';
 import { ESTADOS_USUARIO, EstadoUsuario, ROLES, Rol, TIPOS_DOCUMENTO, TipoDocumento } from '../constants/enums';
+import { ROLES_CON_SEDE_OBLIGATORIA } from '../constants/roles';
 
 const SALT_ROUNDS = 12;
 
@@ -58,7 +59,16 @@ const userSchema = new Schema<IUser, UserModel, IUserMethods>(
     password_hash: { type: String, required: true, select: false },
     rol: { type: String, enum: ROLES, required: true },
     estado: { type: String, enum: ESTADOS_USUARIO, default: 'activo' },
-    sedes_ids: { type: [{ type: Schema.Types.ObjectId, ref: 'Campus' }], default: [] },
+    sedes_ids: {
+      type: [{ type: Schema.Types.ObjectId, ref: 'Campus' }],
+      default: [],
+      validate: {
+        validator(this: UserDocument, sedes: Types.ObjectId[]) {
+          return !ROLES_CON_SEDE_OBLIGATORIA.includes(this.rol) || sedes.length > 0;
+        },
+        message: 'Este rol debe tener al menos una sede asignada.',
+      },
+    },
     debe_cambiar_password: { type: Boolean, default: false },
     intentos_fallidos: { type: Number, default: 0 },
     bloqueado_hasta: { type: Date, default: null },

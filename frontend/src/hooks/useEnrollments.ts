@@ -11,6 +11,8 @@ export interface CreateEnrollmentInput {
   estado_inicial?: 'MATRICULADO_CONDICIONAL' | 'MATRICULADO_DEFINITIVO';
   fecha_limite_compromiso?: string;
   forzar_sobrecupo?: boolean;
+  /** Lo que la familia declara sobre apoyos o diagnósticos previos: pasa a la bandeja de orientación (M16). */
+  apoyo_declarado?: { motivo_declarado: string; aporta_soporte?: boolean; observacion?: string };
 }
 
 export function useCreateEnrollment() {
@@ -33,7 +35,7 @@ export interface EnrollmentsFilter {
   limit?: number;
 }
 
-export function useEnrollmentsList(filter: EnrollmentsFilter) {
+export function useEnrollmentsList(filter: EnrollmentsFilter, enabled = true) {
   return useQuery({
     queryKey: ['enrollments', filter],
     queryFn: () =>
@@ -41,6 +43,7 @@ export function useEnrollmentsList(filter: EnrollmentsFilter) {
         query: { ...filter },
       }),
     select: (res) => ({ data: res.data, total: res.total, page: res.page, pages: res.pages }),
+    enabled,
   });
 }
 

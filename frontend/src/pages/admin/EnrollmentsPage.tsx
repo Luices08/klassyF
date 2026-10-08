@@ -19,6 +19,8 @@ import { useGroups } from '../../hooks/useGroups';
 import { useInstitution } from '../../hooks/useInstitution';
 import { useUsers } from '../../hooks/useUsers';
 import { ESTADOS_MATRICULA, TIPOS_INGRESO, type EstadoMatricula, type TipoIngreso } from '../../types/domain';
+import { InformacionApoyoCampos } from '../../components/inclusion/InformacionApoyoCampos';
+import { APOYO_VACIO, aApoyoDeclarado } from '../../lib/apoyoDeclarado';
 
 const PAGE_SIZE = 20;
 
@@ -37,6 +39,7 @@ const FORM_VACIO = {
   estado_inicial: 'MATRICULADO_CONDICIONAL' as 'MATRICULADO_CONDICIONAL' | 'MATRICULADO_DEFINITIVO',
   fecha_limite_compromiso: '',
   forzar_sobrecupo: false,
+  apoyo: APOYO_VACIO,
 };
 
 export function EnrollmentsPage() {
@@ -105,6 +108,7 @@ export function EnrollmentsPage() {
       estado_inicial: form.estado_inicial,
       fecha_limite_compromiso: form.estado_inicial === 'MATRICULADO_CONDICIONAL' ? form.fecha_limite_compromiso : undefined,
       forzar_sobrecupo: form.forzar_sobrecupo,
+      apoyo_declarado: aApoyoDeclarado(form.apoyo),
     });
     setForm(FORM_VACIO);
     setDrawerOpen(false);
@@ -341,6 +345,8 @@ export function EnrollmentsPage() {
             onChange={(e) => setForm((f) => ({ ...f, fecha_limite_compromiso: e.target.value }))}
           />
         )}
+
+        <InformacionApoyoCampos valor={form.apoyo} onChange={(apoyo) => setForm((f) => ({ ...f, apoyo }))} />
 
         {esAdmin && (
           <label className="flex items-center gap-2 text-sm text-body">

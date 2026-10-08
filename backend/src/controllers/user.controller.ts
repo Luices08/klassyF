@@ -241,7 +241,7 @@ async function tieneHistorial(userId: string): Promise<boolean> {
   const conteos = await Promise.all([
     Enrollment.countDocuments({ student_id: userId }),
     Enrollment.countDocuments({ 'checklist.revisado_por': userId }),
-    Attendance.countDocuments({ student_id: userId }),
+    Attendance.countDocuments({ 'registros.student_id': userId }),
     ActivitySubmission.countDocuments({ $or: [{ student_id: userId }, { docente_id: userId }] }),
     TeacherAssignment.countDocuments({ docente_id: userId }),
     StudentProfile.countDocuments({ $or: [{ user_id: userId }, { registrado_por_id: userId }] }),

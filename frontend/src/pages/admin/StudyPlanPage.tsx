@@ -33,6 +33,7 @@ import {
   useConfigurarAsignaturasMultiplesGrados,
   useConfigurarDistribucionGrupo,
   useConfigurarEvaluacionArea,
+  type GradoExcedido,
   useCrearPlanDesdeAnioAnterior,
   useLimitesHorasPlan,
   useStudyPlan,
@@ -58,6 +59,24 @@ const METODO_LABELS: Record<MetodoCalculoEvaluacion, string> = {
   PONDERADO: 'Promedio ponderado',
   ARITMETICO: 'Promedio aritmético',
 };
+
+/**
+ * Con el año en curso el servidor exige el motivo de cada cambio al plan (queda en auditoría).
+ * undefined = no hace falta; null = el usuario canceló o no escribió uno válido.
+ */
+function pedirMotivoDelCambio(exigeMotivo: boolean): string | undefined | null {
+  if (!exigeMotivo) return undefined;
+  const respuesta = window.prompt(
+    'El año lectivo ya está en curso. Indica el motivo de este cambio al plan de estudios (mínimo 5 caracteres):'
+  );
+  if (respuesta === null) return null;
+  const motivo = respuesta.trim();
+  if (motivo.length < 5) {
+    window.alert('El motivo debe tener al menos 5 caracteres. No se guardó ningún cambio.');
+    return null;
+  }
+  return motivo;
+}
 
 function getGradeId(gradeIdField: string | { _id: string } | undefined): string {
   if (!gradeIdField) return '';
@@ -86,7 +105,8 @@ export function StudyPlanPage() {
     }
   }, [anioDeTrabajo, academicYearId]);
 
-  const soloLectura = Boolean(anioActual && anioActual.estado !== 'PLANIFICACION');
+  const soloLectura = Boolean(anioActual && anioActual.estado === 'CERRADO');
+  const exigeMotivo = anioActual?.estado === 'EN_CURSO';
 
   const studyPlanQuery = useStudyPlan(institucionId || undefined, academicYearId || undefined);
   const crearDesdeAnioAnterior = useCrearPlanDesdeAnioAnterior();
@@ -235,13 +255,18 @@ export function StudyPlanPage() {
         )}
       </div>
 
-      {/* El plan de estudios se congela al activar el año: generateReportCard lo lee en vivo al
-          armar cada boletin, asi que cambiar asignaturas/ponderaciones con el año EN_CURSO
-          recalcularia retroactivamente boletines ya emitidos (ver studyPlan.service). */}
-      {anioActual && anioActual.estado !== 'PLANIFICACION' && (
+      {/* Un año cerrado es histórico. Con el año en curso el plan se corrige con motivo, pero solo lo que no tiene
+          resultados calculados encima: generateReportCard lo lee en vivo (ver studyPlan.service). */}
+      {anioActual?.estado === 'CERRADO' && (
         <Alert tone="info">
-          El año {anioActual.year} ya fue activado: el plan de estudios (asignaturas, ponderación de áreas y
-          distribución por grupos) quedó congelado y solo se puede consultar.
+          El año {anioActual.year} está cerrado: su plan de estudios es histórico y solo se puede consultar.
+        </Alert>
+      )}
+      {exigeMotivo && anioActual && (
+        <Alert tone="info">
+          El año {anioActual.year} ya está en curso. Las horas semanales se pueden corregir; agregar o quitar
+          asignaturas y cambiar ponderaciones solo es posible mientras su área no tenga actividades registradas.
+          Cada cambio pide un motivo y queda en auditoría.
         </Alert>
       )}
 
@@ -314,6 +339,7 @@ export function StudyPlanPage() {
               areaById={areaById}
               studyPlan={studyPlanQuery.data}
               soloLectura={soloLectura}
+              exigeMotivo={exigeMotivo}
               maxHorasPorNivel={limitesHorasQuery.data}
               onPlanUpdated={() => setUltimoGuardado(new Date())}
             />
@@ -330,6 +356,7 @@ export function StudyPlanPage() {
               studyPlan={studyPlanQuery.data}
               gruposDelAnio={todosLosGrupos}
               soloLectura={soloLectura}
+              exigeMotivo={exigeMotivo}
               maxHoras={limitesHorasQuery.data?.[nivel] ?? 30}
               onPlanUpdated={() => setUltimoGuardado(new Date())}
             />
@@ -345,6 +372,7 @@ export function StudyPlanPage() {
               areas={todasLasAreas}
               studyPlan={studyPlanQuery.data}
               soloLectura={soloLectura}
+              exigeMotivo={exigeMotivo}
               onPlanUpdated={() => setUltimoGuardado(new Date())}
             />
           )}
@@ -357,7 +385,7 @@ export function StudyPlanPage() {
 // ---------------------------------------------------------------------------
 // PESTAÑA 1: Configuración General por Nivel Educativo
 // 1. Muestra de inmediato todos los grados del nivel asignados a las materias del catálogo.
-// 3. Validación de tope máximo de 30 horas semanales por grado.
+// 3. Validación del tope máximo de horas semanales por grado (configurable por nivel).
 // 4. Edición masiva con un solo botón "Editar intensidades del nivel".
 // 7. Autorrellenado inteligente de izquierda a derecha desde el primer grado.
 // ---------------------------------------------------------------------------
@@ -372,6 +400,7 @@ interface ConfiguracionGeneralNivelTabProps {
   areaById: Map<string, { nombre: string }>;
   studyPlan: ReturnType<typeof useStudyPlan>['data'];
   soloLectura: boolean;
+  exigeMotivo: boolean;
   maxHorasPorNivel: LimitesHorasPlanEstudios | undefined;
   onPlanUpdated: () => void;
 }
@@ -386,6 +415,7 @@ function ConfiguracionGeneralNivelTab({
   areaById,
   studyPlan,
   soloLectura,
+  exigeMotivo,
   maxHorasPorNivel,
   onPlanUpdated,
 }: ConfiguracionGeneralNivelTabProps) {
@@ -415,15 +445,23 @@ function ConfiguracionGeneralNivelTab({
     MEDIA: 30,
   });
 
+  // Bajar un tope no invalida los planes ya guardados: el servidor avisa cuáles quedan por encima.
+  const [planesPorEncimaDelTope, setPlanesPorEncimaDelTope] = useState<GradoExcedido[]>([]);
+
   function abrirDrawerLimites() {
     if (maxHorasPorNivel) setFormLimites(maxHorasPorNivel);
     actualizarLimites.reset();
+    setPlanesPorEncimaDelTope([]);
     setDrawerLimitesOpen(true);
   }
 
   async function handleGuardarLimites(e: FormEvent) {
     e.preventDefault();
-    await actualizarLimites.mutateAsync(formLimites);
+    const { grados_excedidos } = await actualizarLimites.mutateAsync(formLimites);
+    if (grados_excedidos.length > 0) {
+      setPlanesPorEncimaDelTope(grados_excedidos);
+      return;
+    }
     setDrawerLimitesOpen(false);
   }
 
@@ -501,7 +539,7 @@ function ConfiguracionGeneralNivelTab({
 
   // 7. Modificar input: Si se edita el primer grado del nivel, se propaga hacia la derecha
   function handleChangeHora(subjectId: string, gradeId: string, indiceGrado: number, nuevoValor: string) {
-    const valorParsed = nuevoValor === '' ? '' : Math.max(0, Math.min(30, Number(nuevoValor)));
+    const valorParsed = nuevoValor === '' ? '' : Math.max(0, Math.min(MAX_HORAS_SEMANALES, Number(nuevoValor)));
 
     setHorasEdicion((prev) => {
       const fila = { ...(prev[subjectId] || {}) };
@@ -572,11 +610,15 @@ function ConfiguracionGeneralNivelTab({
       };
     });
 
+    const motivo = pedirMotivoDelCambio(exigeMotivo);
+    if (motivo === null) return;
+
     configurarMultiples.reset();
     await configurarMultiples.mutateAsync({
       institucion_id: institucionId,
       academic_year_id: academicYearId,
       grados: nuevosGrados,
+      motivo,
     });
     setModoEdicion(false);
     onPlanUpdated();
@@ -589,12 +631,16 @@ function ConfiguracionGeneralNivelTab({
     const gradoPlan = studyPlan?.grades.find((g) => g.grade_id === grade._id);
     const nuevasAsignaturas = (gradoPlan?.asignaturas ?? []).filter((a) => a.subject_id !== subject._id);
 
+    const motivo = pedirMotivoDelCambio(exigeMotivo);
+    if (motivo === null) return;
+
     configurarGrado.reset();
     await configurarGrado.mutateAsync({
       institucion_id: institucionId,
       academic_year_id: academicYearId,
       grade_id: grade._id,
       asignaturas: nuevasAsignaturas,
+      motivo,
     });
     setDesvinculandoGrado(null);
     onPlanUpdated();
@@ -614,11 +660,15 @@ function ConfiguracionGeneralNivelTab({
       };
     });
 
+    const motivo = pedirMotivoDelCambio(exigeMotivo);
+    if (motivo === null) return;
+
     configurarMultiples.reset();
     await configurarMultiples.mutateAsync({
       institucion_id: institucionId,
       academic_year_id: academicYearId,
       grados: nuevosGrados,
+      motivo,
     });
     setDesvinculandoNivel(null);
     onPlanUpdated();
@@ -671,7 +721,7 @@ function ConfiguracionGeneralNivelTab({
           }
         />
 
-        {/* 3. Alerta de validación si algún grado excede las 30 horas semanales */}
+        {/* 3. Alerta de validación si algún grado excede el tope de horas semanales del nivel */}
         {gradosExcedidos.length > 0 && (
           <div className="mb-4">
             <Alert tone="error">
@@ -848,7 +898,7 @@ function ConfiguracionGeneralNivelTab({
               )}
             </TableBody>
 
-            {/* 3. Pie de tabla con validación de 30 horas semanales por grado */}
+            {/* 3. Pie de tabla con validación del tope de horas semanales por grado */}
             {gradosDelNivel.length > 0 && asignaturasFiltradas.length > 0 && (
               <tfoot>
                 <tr className="border-t-2 border-border bg-soft/40 font-semibold text-ink">
@@ -881,7 +931,7 @@ function ConfiguracionGeneralNivelTab({
                   })}
                   <Td colSpan={modoEdicion ? 1 : 2} className="text-xs text-muted">
                     {gradosExcedidos.length > 0 ? (
-                      <span className="font-semibold text-danger">Corrige los grados que superan las 30 horas</span>
+                      <span className="font-semibold text-danger">Corrige los grados que superan las {MAX_HORAS_SEMANALES} horas</span>
                     ) : (
                       'Carga horaria semanal dentro de los límites normativos'
                     )}
@@ -952,6 +1002,16 @@ function ConfiguracionGeneralNivelTab({
           Define el tope máximo de horas semanales por grado para cada nivel educativo. Aplica a toda la institución, no solo a {NIVEL_LABELS[nivel]}.
         </p>
         {actualizarLimites.isError && <Alert tone="error">{errorMessage(actualizarLimites.error)}</Alert>}
+        {planesPorEncimaDelTope.length > 0 && (
+          <Alert tone="warning">
+            Se guardó el nuevo límite, pero estos planes quedaron por encima y no se podrán guardar de nuevo hasta
+            corregirlos:{' '}
+            {planesPorEncimaDelTope
+              .map((g) => `${g.grado}${g.grupo ? ` (grupo ${g.grupo})` : ''}, año ${g.anio}: ${g.horas} h > ${g.tope} h`)
+              .join('; ')}
+            .
+          </Alert>
+        )}
         <Input
           label="Preescolar (horas semanales)"
           type="number"
@@ -1009,6 +1069,7 @@ interface DistribucionGruposTabProps {
   studyPlan: ReturnType<typeof useStudyPlan>['data'];
   gruposDelAnio: ReturnType<typeof useGroups>['data'] & unknown[];
   soloLectura: boolean;
+  exigeMotivo: boolean;
   maxHoras: number;
   onPlanUpdated: () => void;
 }
@@ -1023,6 +1084,7 @@ function DistribucionGruposTab({
   studyPlan,
   gruposDelAnio,
   soloLectura,
+  exigeMotivo,
   maxHoras,
   onPlanUpdated,
 }: DistribucionGruposTabProps) {
@@ -1095,8 +1157,11 @@ function DistribucionGruposTab({
 
   async function handleGuardar() {
     if (!groupId) return;
+    const motivo = pedirMotivoDelCambio(exigeMotivo);
+    if (motivo === null) return;
     mutation.reset();
     await mutation.mutateAsync({
+      motivo,
       institucion_id: institucionId,
       academic_year_id: academicYearId,
       grade_id: gradeId,
@@ -1408,6 +1473,7 @@ interface ConfiguracionEvaluacionTabProps {
   areas: { _id: string; nombre: string }[];
   studyPlan: ReturnType<typeof useStudyPlan>['data'];
   soloLectura: boolean;
+  exigeMotivo: boolean;
   onPlanUpdated: () => void;
 }
 
@@ -1420,6 +1486,7 @@ function ConfiguracionEvaluacionTab({
   areas,
   studyPlan,
   soloLectura,
+  exigeMotivo,
   onPlanUpdated,
 }: ConfiguracionEvaluacionTabProps) {
   // Grado seleccionado: limitado a los grados del nivel
@@ -1473,8 +1540,11 @@ function ConfiguracionEvaluacionTab({
 
   async function handleGuardar() {
     if (!areaId) return;
+    const motivo = pedirMotivoDelCambio(exigeMotivo);
+    if (motivo === null) return;
     mutation.reset();
     await mutation.mutateAsync({
+      motivo,
       institucion_id: institucionId,
       academic_year_id: academicYearId,
       grade_id: gradeId,

@@ -1,10 +1,11 @@
-import { Types } from 'mongoose';
+import { ClientSession, Types } from 'mongoose';
 import { Parentesco, TipoDocumento } from '../constants/enums';
 import Guardian, { GuardianDocument } from '../models/guardian.model';
 import StudentGuardian, { StudentGuardianDocument } from '../models/studentGuardian.model';
 import User from '../models/user.model';
 import { ROLES } from '../constants/roles';
 import ApiError from '../utils/ApiError';
+import runTransaction from '../utils/runTransaction';
 import { registrarEvento } from './audit.service';
 
 export interface ContextoActor {
@@ -29,6 +30,54 @@ export interface VincularAcudienteInput extends Partial<DatosNuevoAcudiente> {
   parentesco: Parentesco;
   es_principal?: boolean;
   autorizado_retiro?: boolean;
+  /** Crea (o reutiliza) la cuenta de portal M27 del acudiente. Sin esto M02 no se toca. */
+  habilitar_portal?: boolean;
+}
+
+interface CuentaPortal {
+  usuarioId: Types.ObjectId;
+  creada: boolean;
+}
+
+/**
+ * Dato único: si ya hay un `User` con ese documento se reutiliza, nunca se duplica. Una persona que
+ * ya es personal del colegio (otro rol) no se convierte en acudiente por esta vía: el portal M27
+ * resuelve al acudiente por `user_id` + rol ACUDIENTE, y mezclar roles en un mismo usuario no existe.
+ * La contraseña temporal es el número de documento (decisión de producto); `debe_cambiar_password`
+ * obliga a cambiarla en el primer ingreso.
+ */
+async function asegurarCuentaPortal(guardian: GuardianDocument, session: ClientSession): Promise<CuentaPortal> {
+  const existente = await User.findOne({ numero_documento: guardian.numero_documento }).session(session);
+  if (existente) {
+    if (existente.rol !== ROLES.ACUDIENTE) {
+      throw new ApiError(
+        409,
+        `El documento ${guardian.numero_documento} ya pertenece a un usuario con rol ${existente.rol}; no se puede habilitar como acudiente.`
+      );
+    }
+    return { usuarioId: existente._id, creada: false };
+  }
+
+  if (!guardian.email) {
+    throw new ApiError(400, 'Para habilitar el acceso al portal el acudiente debe tener un correo registrado.');
+  }
+  if (await User.exists({ email: guardian.email }).session(session)) {
+    throw new ApiError(409, 'Ya existe un usuario con ese correo; usa otro correo para el acudiente.');
+  }
+
+  const usuario = new User({
+    nombre: guardian.nombre,
+    apellido: guardian.apellido,
+    tipo_documento: guardian.tipo_documento,
+    numero_documento: guardian.numero_documento,
+    email: guardian.email,
+    telefono: guardian.telefono_principal,
+    rol: ROLES.ACUDIENTE,
+    debe_cambiar_password: true,
+  });
+  usuario.password = guardian.numero_documento;
+  await usuario.save({ session });
+  return { usuarioId: usuario._id, creada: true };
 }
 
 async function obtenerEstudiante(studentId: string) {
@@ -82,41 +131,66 @@ export async function vincularAcudiente(
 ): Promise<StudentGuardianDocument> {
   await obtenerEstudiante(studentId);
 
-  let guardian: GuardianDocument | null;
-  if (input.guardian_id) {
-    guardian = await Guardian.findById(input.guardian_id);
-    if (!guardian) throw new ApiError(404, 'Acudiente no encontrado.');
-  } else {
-    if (!input.tipo_documento || !input.numero_documento || !input.nombre || !input.apellido || !input.telefono_principal) {
-      throw new ApiError(400, 'Faltan datos para registrar un acudiente nuevo.');
+  // Una sola transacción: si falla la cuenta de portal no queda un acudiente (ni vínculo) huérfano.
+  const { relacion, guardian, cuenta } = await runTransaction(async (session) => {
+    let guardian: GuardianDocument | null;
+    if (input.guardian_id) {
+      guardian = await Guardian.findById(input.guardian_id).session(session);
+      if (!guardian) throw new ApiError(404, 'Acudiente no encontrado.');
+    } else {
+      if (!input.tipo_documento || !input.numero_documento || !input.nombre || !input.apellido || !input.telefono_principal) {
+        throw new ApiError(400, 'Faltan datos para registrar un acudiente nuevo.');
+      }
+      guardian = await Guardian.findOne({ numero_documento: input.numero_documento }).session(session);
+      if (!guardian) {
+        const creados = await Guardian.create(
+          [
+            {
+              tipo_documento: input.tipo_documento,
+              numero_documento: input.numero_documento,
+              nombre: input.nombre,
+              apellido: input.apellido,
+              telefono_principal: input.telefono_principal,
+              telefono_secundario: input.telefono_secundario,
+              email: input.email,
+              ocupacion: input.ocupacion,
+              direccion: input.direccion,
+            },
+          ],
+          { session }
+        );
+        guardian = creados[0]!;
+      }
     }
-    guardian = await Guardian.findOne({ numero_documento: input.numero_documento });
-    if (!guardian) {
-      guardian = await Guardian.create({
-        tipo_documento: input.tipo_documento,
-        numero_documento: input.numero_documento,
-        nombre: input.nombre,
-        apellido: input.apellido,
-        telefono_principal: input.telefono_principal,
-        telefono_secundario: input.telefono_secundario,
-        email: input.email,
-        ocupacion: input.ocupacion,
-        direccion: input.direccion,
-      });
+
+    const yaVinculado = await StudentGuardian.findOne({ student_id: studentId, guardian_id: guardian!._id }).session(session);
+    if (yaVinculado) throw new ApiError(409, 'Este acudiente ya esta vinculado a este estudiante.');
+
+    let cuenta: CuentaPortal | null = null;
+    if (input.habilitar_portal && !guardian!.user_id) {
+      cuenta = await asegurarCuentaPortal(guardian!, session);
+      guardian!.user_id = cuenta.usuarioId;
+      await guardian!.save({ session });
     }
-  }
 
-  const yaVinculado = await StudentGuardian.findOne({ student_id: studentId, guardian_id: guardian._id });
-  if (yaVinculado) throw new ApiError(409, 'Este acudiente ya esta vinculado a este estudiante.');
+    if (input.es_principal) {
+      await StudentGuardian.updateMany({ student_id: studentId }, { $set: { es_principal: false } }, { session });
+    }
 
-  if (input.es_principal) await asegurarUnicoPrincipal(studentId);
+    const [relacion] = await StudentGuardian.create(
+      [
+        {
+          student_id: studentId,
+          guardian_id: guardian!._id,
+          parentesco: input.parentesco,
+          es_principal: Boolean(input.es_principal),
+          autorizado_retiro: input.autorizado_retiro ?? true,
+        },
+      ],
+      { session }
+    );
 
-  const relacion = await StudentGuardian.create({
-    student_id: studentId,
-    guardian_id: guardian._id,
-    parentesco: input.parentesco,
-    es_principal: Boolean(input.es_principal),
-    autorizado_retiro: input.autorizado_retiro ?? true,
+    return { relacion: relacion!, guardian: guardian!, cuenta };
   });
 
   await registrarEvento({
@@ -127,6 +201,27 @@ export async function vincularAcudiente(
     detalle: `Acudiente ${guardian.nombre} ${guardian.apellido} (${input.parentesco}) vinculado al estudiante ${studentId}${input.es_principal ? ' como principal' : ''}.`,
     ip,
   });
+
+  if (cuenta) {
+    await registrarEvento({
+      usuario_id: usuarioId,
+      accion: 'ACUDIENTE_PORTAL_HABILITADO',
+      entidad: 'Guardian',
+      entidad_id: guardian._id,
+      detalle: `Acceso al portal de ${guardian.nombre} ${guardian.apellido}: ${cuenta.creada ? 'cuenta creada' : 'cuenta existente reutilizada'}.`,
+      ip,
+    });
+    if (cuenta.creada) {
+      await registrarEvento({
+        usuario_id: usuarioId,
+        accion: 'USUARIO_CREADO',
+        entidad: 'User',
+        entidad_id: cuenta.usuarioId,
+        detalle: `${guardian.nombre} ${guardian.apellido} (${ROLES.ACUDIENTE}) — desde M03`,
+        ip,
+      });
+    }
+  }
 
   return relacion;
 }

@@ -28,7 +28,7 @@ export class ApiError extends Error {
 
 // Un solo rol administrativo (ADMIN): Klassy es de una institucion por
 // instalacion, no hay un nivel "super" por encima del admin institucional.
-export const ROLES = ['ADMIN', 'COORDINADOR', 'DOCENTE', 'SECRETARIA', 'ESTUDIANTE', 'ACUDIENTE'] as const;
+export const ROLES = ['ADMIN', 'COORDINADOR', 'COORDINADOR_CONVIVENCIA', 'ORIENTADOR', 'DOCENTE', 'SECRETARIA', 'ESTUDIANTE', 'ACUDIENTE'] as const;
 export type Rol = (typeof ROLES)[number];
 
 /**
@@ -41,6 +41,8 @@ export type Rol = (typeof ROLES)[number];
 export const JERARQUIA_ROLES: Record<Rol, number> = {
   ADMIN: 100,
   COORDINADOR: 70,
+  COORDINADOR_CONVIVENCIA: 70,
+  ORIENTADOR: 70,
   SECRETARIA: 40,
   DOCENTE: 40,
   ESTUDIANTE: 10,

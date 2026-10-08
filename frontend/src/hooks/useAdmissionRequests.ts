@@ -25,6 +25,7 @@ export interface SolicitarCupoInput {
   acudiente_telefono: string;
   acudiente_email: string;
   observaciones?: string;
+  apoyo_declarado?: { motivo_declarado: string; aporta_soporte?: boolean; observacion?: string };
 }
 
 export function useSolicitarCupo() {

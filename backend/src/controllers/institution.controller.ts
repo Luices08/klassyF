@@ -1,3 +1,4 @@
+import { gradosQueExcedenElTope } from '../services/studyPlan.service';
 import * as institutionService from '../services/institution.service';
 import { SetupInstitutionInput, UpdateInstitutionInput } from '../services/institution.service';
 import catchAsync from '../utils/catchAsync';
@@ -56,7 +57,12 @@ export const getLimitesHorasPlan = catchAsync(async (_req, res) => {
 
 export const updateLimitesHorasPlan = catchAsync<unknown, unknown, { PREESCOLAR?: number; PRIMARIA?: number; SECUNDARIA?: number; MEDIA?: number }>(
   async (req, res) => {
-    const limites = await institutionService.updateLimitesHorasPlan(req.body);
-    res.status(200).json({ success: true, data: limites });
+    const limites = await institutionService.updateLimitesHorasPlan(req.body, {
+      usuarioId: req.user!._id,
+      ip: req.ip ?? null,
+    });
+    // Bajar el tope no invalida los planes ya guardados: se avisa cuáles quedan por encima para corregirlos.
+    const grados_excedidos = await gradosQueExcedenElTope();
+    res.status(200).json({ success: true, data: { ...limites, grados_excedidos } });
   }
 );

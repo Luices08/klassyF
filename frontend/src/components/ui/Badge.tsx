@@ -8,11 +8,17 @@ import type {
   EstadoEspacio,
   EstadoEstudiante,
   EstadoGrupo,
+  EstadoJustificacion,
   EstadoMatricula,
   EstadoPeriodoAcademico,
   NivelDesempeno,
+  TonoEstadoAsistencia,
 } from '../../types/domain';
 import { NOMBRES_ESTADO_ESPACIO } from '../../types/domain';
+import type { EstadoCaso } from '../../hooks/useCasos';
+import type { EstadoExpediente, EstadoSolicitudApoyo } from '../../hooks/useInclusion';
+import { NOMBRES_ESTADO_EXPEDIENTE, NOMBRES_ESTADO_SOLICITUD } from '../../hooks/useInclusion';
+import type { TipoSituacion } from '../../hooks/useObservaciones';
 import type { Desempeno } from '../../types/reportCard';
 
 export type Tone = 'blue' | 'green' | 'orange' | 'red' | 'neutral';
@@ -52,6 +58,8 @@ export function DesempenoBadge({ value }: { value: Desempeno }) {
 export const ROL_LABELS: Record<Rol, string> = {
   ADMIN: 'Administrador',
   COORDINADOR: 'Coordinador',
+  COORDINADOR_CONVIVENCIA: 'Coord. de convivencia',
+  ORIENTADOR: 'Orientación',
   DOCENTE: 'Docente',
   SECRETARIA: 'Secretaría',
   ESTUDIANTE: 'Estudiante',
@@ -61,6 +69,8 @@ export const ROL_LABELS: Record<Rol, string> = {
 const ROL_TONE: Record<Rol, Tone> = {
   ADMIN: 'blue',
   COORDINADOR: 'blue',
+  COORDINADOR_CONVIVENCIA: 'blue',
+  ORIENTADOR: 'blue',
   SECRETARIA: 'blue',
   DOCENTE: 'green',
   ESTUDIANTE: 'orange',
@@ -216,4 +226,86 @@ export function EstadoDesarrolloCurricularBadge({ value }: { value: EstadoDesarr
 /** Vigente/Histórico de un referente del banco M07 (DBA/EBC/Lineamiento): mismo campo `estado` activo/inactivo, otra etiqueta. */
 export function EstadoVigenciaReferenteBadge({ value }: { value: EstadoActivo }) {
   return <Chip tone={value === 'activo' ? 'green' : 'neutral'}>{value === 'activo' ? 'Vigente' : 'Histórico'}</Chip>;
+}
+
+// Los estados de asistencia (M13) los parametriza cada institución; el tono viene guardado con el estado y es
+// uno de los de la librería (no un color nuevo).
+export function EstadoAsistenciaChip({ nombre, tono }: { nombre: string; tono: TonoEstadoAsistencia }) {
+  return <Chip tone={tono}>{nombre}</Chip>;
+}
+
+const JUSTIFICACION_LABELS: Record<EstadoJustificacion, string> = {
+  PENDIENTE: 'Pendiente',
+  APROBADA: 'Aprobada',
+  RECHAZADA: 'Rechazada',
+};
+
+const JUSTIFICACION_TONE: Record<EstadoJustificacion, Tone> = {
+  PENDIENTE: 'orange',
+  APROBADA: 'green',
+  RECHAZADA: 'red',
+};
+
+/** Revisión por coordinación de la excusa de una inasistencia (M13). */
+export function EstadoJustificacionBadge({ value }: { value: EstadoJustificacion }) {
+  return <Chip tone={JUSTIFICACION_TONE[value]}>{JUSTIFICACION_LABELS[value]}</Chip>;
+}
+
+const ESTADO_CASO_LABELS: Record<EstadoCaso, string> = {
+  ABIERTO: 'Abierto',
+  EN_ATENCION: 'En atención',
+  EN_MEDIACION: 'En mediación',
+  EN_SEGUIMIENTO: 'En seguimiento',
+  REMITIDO: 'Remitido',
+  CERRADO: 'Cerrado',
+  REABIERTO: 'Reabierto',
+  ANULADO: 'Anulado',
+};
+
+const ESTADO_CASO_TONE: Record<EstadoCaso, Tone> = {
+  ABIERTO: 'orange',
+  EN_ATENCION: 'blue',
+  EN_MEDIACION: 'blue',
+  EN_SEGUIMIENTO: 'blue',
+  REMITIDO: 'orange',
+  CERRADO: 'green',
+  REABIERTO: 'orange',
+  ANULADO: 'neutral',
+};
+
+/** Estado de un caso de convivencia (M15). */
+export function EstadoCasoBadge({ value }: { value: EstadoCaso }) {
+  return <Chip tone={ESTADO_CASO_TONE[value]}>{ESTADO_CASO_LABELS[value]}</Chip>;
+}
+
+const SITUACION_TONE: Record<TipoSituacion, Tone> = { I: 'blue', II: 'orange', III: 'red' };
+
+/** Tipo de situación I/II/III (Ley 1620): el tipo lo fija la ley; el tono sube con la gravedad. */
+export function TipoSituacionBadge({ value }: { value: TipoSituacion }) {
+  return <Chip tone={SITUACION_TONE[value]}>Tipo {value}</Chip>;
+}
+
+const EXPEDIENTE_TONE: Record<EstadoExpediente, Tone> = {
+  BORRADOR: 'neutral',
+  EN_CONSTRUCCION: 'orange',
+  LISTO_PARA_ACUERDO: 'blue',
+  ACTIVO: 'green',
+  CERRADO: 'neutral',
+};
+
+/** Estado de un expediente de inclusión (M16): naranja en curso, azul listo para firmar, verde acordado y vigente. */
+export function EstadoExpedienteBadge({ value }: { value: EstadoExpediente }) {
+  return <Chip tone={EXPEDIENTE_TONE[value]}>{NOMBRES_ESTADO_EXPEDIENTE[value]}</Chip>;
+}
+
+const SOLICITUD_APOYO_TONE: Record<EstadoSolicitudApoyo, Tone> = {
+  PENDIENTE: 'orange',
+  EN_VALORACION: 'blue',
+  CONVERTIDA: 'green',
+  DESCARTADA: 'neutral',
+};
+
+/** Estado de una solicitud de apoyo (M16). */
+export function EstadoSolicitudApoyoBadge({ value }: { value: EstadoSolicitudApoyo }) {
+  return <Chip tone={SOLICITUD_APOYO_TONE[value]}>{NOMBRES_ESTADO_SOLICITUD[value]}</Chip>;
 }

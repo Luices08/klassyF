@@ -3,6 +3,13 @@ import { ESTADOS_DOCUMENTO_MATRICULA, ESTADOS_MATRICULA, TIPOS_DOCUMENTO_MATRICU
 import { ValidationSchema } from '../middlewares/validate.middleware';
 import { objectId } from './common.validator';
 
+// Lo que la familia declara sobre apoyos o diagnósticos previos (M16): secretaría transcribe, no valora ni rotula.
+const apoyoDeclarado = Joi.object({
+  motivo_declarado: Joi.string().trim().min(3).max(500).required(),
+  aporta_soporte: Joi.boolean().default(false),
+  observacion: Joi.string().trim().allow('').max(2000),
+});
+
 export const createEnrollment: ValidationSchema = {
   body: Joi.object({
     student_id: objectId.required(),
@@ -15,6 +22,7 @@ export const createEnrollment: ValidationSchema = {
     estado_inicial: Joi.string().valid('MATRICULADO_CONDICIONAL', 'MATRICULADO_DEFINITIVO'),
     fecha_limite_compromiso: Joi.date(),
     forzar_sobrecupo: Joi.boolean(),
+    apoyo_declarado: apoyoDeclarado,
   }),
 };
 

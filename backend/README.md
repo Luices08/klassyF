@@ -26,7 +26,8 @@ Este directorio es el paquete `backend/` de un monorepo (`klassyfinal/`); el fut
 
 - Node.js 18+
 - MongoDB como **replica set** (las transacciones ACID de Mongoose lo requieren).
-  - Local: `mongod --replSet rs0` y luego `mongosh --eval "rs.initiate()"`.
+  - La URI local debe incluir `?replicaSet=rs0` (ya está configurada en `.env.example`).
+  - Inicia MongoDB con `mongod --replSet rs0` y, en otra terminal, ejecuta una sola vez `mongosh --eval "rs.initiate()"`.
   - O usar MongoDB Atlas (ya es replica set por defecto).
 
 ## Instalación

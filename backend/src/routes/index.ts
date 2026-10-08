@@ -13,6 +13,7 @@ import espacioRoutes from './espacio.routes';
 import gradeRoutes from './grade.routes';
 import groupRoutes from './group.routes';
 import guardianRoutes from './guardian.routes';
+import horarioRoutes from './horario.routes';
 import institutionRoutes from './institution.routes';
 import jornadaOperativaRoutes from './jornadaOperativa.routes';
 import periodLockRoutes from './periodLock.routes';
@@ -39,6 +40,9 @@ router.use('/enrollments', enrollmentRoutes);
 
 // M10: Espacios fisicos (aulas, laboratorios, canchas)
 router.use('/espacios', espacioRoutes);
+
+// M09: Horarios (variables, generación, versiones y publicación)
+router.use('/horarios', horarioRoutes);
 
 // M05: Año lectivo, periodos académicos y calendario
 router.use('/academic-years', academicYearRoutes);

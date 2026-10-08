@@ -15,6 +15,8 @@ import { EnrollmentsPage } from './pages/admin/EnrollmentsPage';
 import { EspaciosPage } from './pages/admin/EspaciosPage';
 import { GradesPage } from './pages/admin/GradesPage';
 import { GroupsPage } from './pages/admin/GroupsPage';
+import { HorariosPage } from './pages/admin/HorariosPage';
+import { MiHorarioPage } from './pages/MiHorarioPage';
 import { InstitutionSetupPage } from './pages/admin/InstitutionSetupPage';
 import { SedesPage } from './pages/admin/SedesPage';
 import { StudentDetailPage } from './pages/admin/StudentDetailPage';
@@ -58,9 +60,14 @@ export default function App() {
             <Route path="/admin/groups" element={<GroupsPage />} />
             <Route path="/admin/espacios" element={<EspaciosPage />} />
             <Route path="/admin/teacher-assignments" element={<TeacherAssignmentsPage />} />
+            <Route path="/admin/horarios" element={<HorariosPage />} />
             <Route path="/admin/academic-catalog" element={<AcademicCatalogPage />} />
             <Route path="/admin/study-plan" element={<StudyPlanPage />} />
             <Route path="/admin/revision-curricular" element={<RevisionCurricularPage />} />
+          </Route>
+
+          <Route element={<ProtectedRoute allowedRoles={['DOCENTE', 'ESTUDIANTE', 'ACUDIENTE']} />}>
+            <Route path="/mi-horario" element={<MiHorarioPage />} />
           </Route>
 
           <Route element={<ProtectedRoute allowedRoles={['DOCENTE']} />}>

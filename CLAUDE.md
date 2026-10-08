@@ -133,7 +133,7 @@ solo extender si se pide algo nuevo. Reglas que no se ven leyendo un solo archiv
   ADMIN + escribir el año). Revoca las prórrogas pendientes. Todo cambio queda en auditoría (M31).
 - Años creados antes de M05: `npm run migrate:m05-anio-lectivo` (idempotente).
 - **Pendiente, a propósito fuera de alcance**: la verificación de cierre no revisa las comisiones de evaluación
-  (M20, aún no existe); M13 no consulta `esDiaLectivo` todavía; matrículas y admisiones no se bloquean en un
+  (M20, aún no existe); M13 aplica las mismas reglas de calendario pero con los días hábiles de la jornada (ver M13), no con `esDiaLectivo`, que es solo lunes a viernes; matrículas y admisiones no se bloquean en un
   año cerrado (solo `POST /groups` lo valida); los festivos colombianos no se descuentan de las semanas.
 
 ### Estructura de tiempo de las jornadas (M01/M05, la comparte M10 y la usará M09)
@@ -214,6 +214,102 @@ Backend `/espacios` (modelo `Espacio`), frontend `/admin/espacios` (`EspaciosPag
   usará el motor de horarios (M09). La malla semanal se arma **por espacio y jornada** con los días y franjas reales de la jornada (ver
   arriba) y solo muestra ocupación por grupo titular; la ocupación por asignatura llega con M09.
 
+### M06 (Plan de estudios) y M08 (Carga docente) — reglas que no se ven en un solo archivo
+
+- **El tope de horas semanales del plan es configuración institucional** (`Institution.limites_horas_plan_estudios`, por
+  nivel) y lo exige el **servidor** (`exigirTopeDeHoras` en `studyPlan.service.ts`), por grado y por grupo; la pantalla solo
+  lo refleja. Al cambiar la base de un grado también se revisan sus grupos personalizados, que heredan esas horas.
+  Bajar el tope no bloquea ni invalida planes ya guardados: la respuesta de `PATCH /institution/limites-horas-plan` trae
+  `grados_excedidos` (planes de años no cerrados que quedaron por encima) y la pantalla los lista.
+- **El plan no se congela entero al activar el año; se congela por dependencias** (`planEstudiosDependencias.service.ts`).
+  Año CERRADO: histórico, no se toca. PLANIFICACION: libre. EN_CURSO: todo cambio exige `motivo` (queda en auditoría) y solo
+  se permite lo que no tiene resultados calculados encima: las horas semanales siempre (no entran en el cálculo de notas, y se
+  propagan a las asignaciones docentes de M08 con `sincronizarHorasDeAsignaciones`); agregar/quitar asignaturas o cambiar
+  ponderaciones solo si el área no tiene actividades en ese grado/grupo. Quitar una asignatura del plan exige antes retirar
+  su asignación docente, en cualquier estado del año. El versionamiento completo del Análisis_M06 (nueva versión con fechas
+  e impacto) queda para cuando existan M09 y el cálculo de boletín por periodo (M12).
+- **Una asignatura que ya está en la malla, en una ponderación o en la distribución de un grupo de cualquier plan no cambia de
+  `area_id`** (`actualizarSubject`): dejaría ponderaciones colgando de un área que ya no es la suya.
+- **Topes de carga docente** (`Institution.limites_carga_docente`, `max_direcciones_grupo_por_docente`,
+  `tolerancia_subcarga_horas`) se editan juntos en M08 y no hay valores quemados en el diagnóstico. El semáforo es la función
+  pura `resumirCargaDocente` (`utils/cargaDocente.ts`, con tests en `backend/tests/`, `npm test`): un docente en varios niveles se
+  mide como fracción de su jornada (`fraccion_carga`), y sin horas por nivel no se supone ninguno (`SIN_CARGA`).
+- **Las horas de una dirección de grupo las fija quien la asigna** (`horas_semanales`, 0 por defecto = no suma). Si son más de 0
+  cuentan en el nivel del grupo dirigido, igual que una clase.
+- **Asignar una dirección a un grupo que ya tiene director exige `reemplazar_director: true`** (409 si falta); el anterior queda
+  inactivo (historial) y se audita `ASIGNACION_DOCENTE_REEMPLAZADA`. El límite de direcciones por docente se protege de la
+  concurrencia con un contador común dentro de la transacción (`DIR-<año>-<docente>`).
+
+### M09 (Horarios) — estado: fase 1 (motor y modelos)
+
+Diseño completo y fases pendientes en `doc/Analisis_M09_Horarios.md`. Reglas que no se ven leyendo un solo archivo:
+
+- **M09 no crea insumos, los lee**: horas y docente de `TeacherAssignment` (CLASE, M08), días y franjas de
+  `JornadaOperativa`, espacios de M10. Lo propio de M09 son `VariableHorario` (restricciones/preferencias) y `Horario`
+  (versiones).
+- **Una sola forma para todas las variables**: tipo + severidad (`DURA`/`BLANDA` con peso 1–10) + alcance (`GLOBAL`,
+  `GRADOS` con lista, `GRUPOS` con lista) + filtros de asignatura/docente + `parametros` del tipo. Una regla nueva es
+  un tipo más en `constants/horarios.ts` (con su metadato) y su caso en el motor, nunca una colección nueva.
+- **Cascada** (`resolverVariables`, `utils/motorHorarios/alcance.ts`): en tipos de valor único gana la más específica
+  (GRUPOS > GRADOS > GLOBAL; a igual alcance, nombrar docentes/asignaturas gana); las relaciones se acumulan; una
+  excepción anula las de su tipo igual o menos específicas que cubre. No duplicar esta lógica en servicio ni frontend.
+- **El motor es puro** (`utils/motorHorarios/`, sin Mongoose, tests en `tests/motorHorarios.test.ts`): el servicio
+  traduce documentos a `EntradaMotor` con ids string. Los periodos son índices entre las franjas `CLASE`; el día que se
+  guarda es ISO.
+- **Diagnóstico antes que motor**: `diagnosticarCapacidad` explica lo imposible (horas > periodos, horas > franjas
+  libres del docente, `BLOQUES_NO_CABEN`). La pantalla debe mostrarlo antes de dejar generar.
+- Publicar exige 0 conflictos duros (lo valida el modelo) y hay una sola versión `PUBLICADO` por año + jornada.
+
+### M13 (Asistencia) — estado: núcleo completo
+
+Backend `/attendance` (modelos `AttendanceState`, `Attendance`, `AttendanceJustification`), frontend `/docente/asistencia`
+(`AsistenciaPage`: planilla del mes y registro diario) y `/asistencia/gestion` (`GestionAsistenciaPage`: estadísticas,
+justificaciones, reportes PDF y, solo ADMIN, estados). Reglas que no se ven leyendo un solo archivo:
+
+- **Los estados son configuración, las banderas son el contrato.** `AttendanceState` (por institución; se siembran 4 la primera vez:
+  Presente/Ausencia/Retardo/Excusa) tiene `cuenta_como_falla`, `es_retardo`, `es_justificada` y `es_predeterminado`. Ningún reporte, ni
+  el boletín (M17), compara por nombre: renombrar un estado no cambia nada. Un estado es falla, retardo o ninguno (nunca ambos), el
+  predeterminado no puede ser falla/retardo y siempre hay uno activo. Los estados no se eliminan, se desactivan (los registros viejos
+  siguen resolviendo su estado). El `tono` es uno de los 5 de `Chip`, no un color nuevo.
+- **La planilla es una por grupo+asignatura+día** (índice único) con `registros[]` embebidos. Volver a guardar **actualiza** cada registro
+  por estudiante, no reemplaza el arreglo: el `_id` del registro es estable porque la justificación se ancla a él.
+- **Planilla clásica = cuadrícula mensual** (`GET/PUT /attendance/cuadricula`, `attendanceCuadricula.service.ts`, `CuadriculaAsistencia`):
+  estudiantes en filas y los días de clase del mes en columnas. Los días salen de `JornadaOperativa.dias_habiles` y del calendario de M05
+  (se omiten recesos/vacaciones y días fuera de los periodos; los futuros o de periodo cerrado se ven pero no se editan). Es la vista principal
+  del docente; el registro diario (con novedades, justificar y Excel) es la misma planilla vista de un día. `PUT` guarda varios días de una
+  clase en un lote (`registrarAsistenciaLote`): primero **valida todos** los días y solo entonces escribe. En la pantalla, en un día tocado los
+  estudiantes sin marcar se guardan con el estado predeterminado (se ven atenuados como "implícito").
+- **Quién ve qué planilla** (`permisoSobreClase`): el docente **edita** las clases que dicta (`TeacherAssignment` CLASE, M08) y **consulta** las
+  demás asignaturas del grupo que dirige (`Group.director_grupo_id`); ADMIN/COORDINADOR/SECRETARIA solo consultan (la asistencia la toma el
+  docente). `GET /attendance/clases` arma el selector con ese mismo criterio.
+- **PDFs** (`GET /attendance/pdf/*`, `asistenciaPdf.service.ts`, `pdfkit`; el permiso fino lo decide el servicio): `planilla` (un mes, o un
+  periodo = una hoja por mes + resumen; la imprime quien pueda ver esa clase), `consolidado-grupo` (fallas por asignatura y totales por estudiante;
+  ADMIN/COORDINADOR y el director de ese grupo), `reporte` (institucional: por grado con sus grupos, por asignatura y matriz grado × asignatura;
+  solo ADMIN/COORDINADOR) y `estudiante` (ficha con el historial de inasistencias; ADMIN/COORDINADOR/SECRETARIA). Los colores del papel son los
+  mismos de la guía visual. Todos se bajan con sesión (`descargarPdfAsistencia`), nunca por URL directa.
+- **Qué fecha admite asistencia** (`evaluarFecha` en `attendance.service.ts`, lee M05): año EN_CURSO, dentro de un periodo (con las fechas de
+  la sede si tiene calendario propio) que no esté CERRADO ni cerrado por `PeriodLock` del grupo, no futura (hora Colombia), día en
+  `JornadaOperativa.dias_habiles` (así un grupo SABATINA toma lista el sábado) y fuera de recesos/vacaciones (`hayEventoNoLectivo`). La
+  ventana de digitación de notas y las prórrogas **no** aplican: son de notas. Solo el docente con `TeacherAssignment` CLASE activa (M08)
+  toma lista, y solo de estudiantes con matrícula activa en el grupo (M04).
+- **Falla justificada = el estado ya lo es (`es_justificada`) o tiene una justificación APROBADA.** La aprobación no modifica el registro del
+  docente: se deriva al contar (`attendanceStats.service.ts`, el único lugar que cruza planillas con justificaciones). Una justificación se
+  ancla a un registro cuyo estado cuenta como falla; solo una viva (PENDIENTE/APROBADA) por registro, una RECHAZADA se puede reenviar.
+- **Evidencia**: el soporte (PDF/JPG/PNG/WEBP, 5 MB, validado por firma de bytes) vive en `uploads/asistencia/<planilla>/`, nunca en Mongo, y se
+  descarga con sesión (`GET /attendance/justificaciones/:id/archivo`). Mientras no exista M27 la carga el personal (ADMIN, COORDINADOR,
+  SECRETARIA, o el docente de esa clase desde el botón "Justificar" de la planilla) en nombre del acudiente (`acudiente_id` debe estar
+  vinculado al estudiante en M03); la API ya es la que consumirá el portal. Revisar (aprobar/rechazar) es solo ADMIN/COORDINADOR; rechazar
+  exige motivo.
+- **M17**: `resumenAsistenciaParaBoletin` es lo que lee `reportCard.service.ts` (justificadas, injustificadas, retardos y fallas por asignatura).
+- **Trabajo sin conexión (CU-DOC-05)**: `GET /attendance/planilla/excel` baja la planilla en `.xlsx` (`attendanceExcel.service.ts`, `exceljs`) y
+  `POST /attendance/planilla/excel` la importa. Google Sheets no tiene integración propia: importa y exporta ese mismo `.xlsx`. El archivo lleva
+  una hoja `Datos` oculta con grupo, asignatura y fecha, así que subirlo no depende de lo que el docente tenga seleccionado; el estudiante se
+  identifica por `numero_documento` (texto, conserva ceros) y el estado por nombre o abreviatura. Se valida **toda** la hoja antes de guardar
+  (documento ajeno, estado desconocido, fila repetida = error de fila, no se guarda nada) y guardar pasa por `registrarAsistencia`, o sea las
+  mismas reglas de la planilla en línea. Solo DOCENTE; máximo 2 MB, firma ZIP verificada.
+- **Pendiente, a propósito fuera de alcance**: la vista del acudiente (CU-ACU-02, depende de M27); umbrales de ausentismo (alertas por %), que
+  serían política institucional.
+
 ### Cargas masivas por CSV (M02 usuarios, M03 estudiantes)
 
 - Todo CSV subido se lee con `leerCsv` (`backend/src/utils/csv.ts`), nunca con `toString('utf-8')` + parser a mano:
@@ -249,6 +345,16 @@ Backend `/espacios` (modelo `Espacio`), frontend `/admin/espacios` (`EspaciosPag
 - Nunca asumir que `folio_matricula` es un string: en frontend y PDFs manejar `null`.
 - Bases anteriores a este cambio: `npm run migrate:folio-al-matricular` (libera folios de preinscritos, reemplaza
   los índices y reajusta el contador; un hueco en medio del libro solo se reporta, no se renumera).
+
+### Acceso al portal del acudiente (M03 → M02/M27)
+
+- `POST /users/:userId/guardians` acepta `habilitar_portal` (checkbox en el drawer "Vincular acudiente", solo al
+  registrar uno nuevo). Sin marcar, M02 no se toca. Marcado, `vincularAcudiente` corre **todo en una transacción**
+  (`runTransaction`: acudiente + cuenta + vínculo; si algo falla no queda nada a medias).
+- Dato único: si ya existe un `User` con ese `numero_documento` se reutiliza su id (si su rol no es `ACUDIENTE` →
+  409, no se mezclan roles); si no, se crea con rol `ACUDIENTE`, contraseña temporal = número de documento y
+  `debe_cambiar_password: true`. Requiere correo del acudiente (el `email` de `User` es obligatorio y único).
+  El id queda en `Guardian.user_id`, que es lo que usa M27/boletín para ubicar al acudiente.
 
 ## 4. Principios SOLID
 
@@ -326,7 +432,7 @@ nuevos para lo que ya existe aquí** — extenderlos si falta un caso, no duplic
   mapeo rol→color o estado→color en una página), `Card`/`CardHeader`, `Table`/`TableHead`/`Th`/
   `TableBody`/`Td`/`EmptyRow`, `Drawer` (formularios de creación/edición; su botón principal
   acepta `submitVariant` para casos como confirmar un borrado en rojo), `PageHeader` (título +
-  subtítulo + acción de la página), `Field` (`Input`/`Select`), `MultiSelect` (selector desplegable de selección múltiple con checkboxes, contador y badges de rol/estado), `Alert`, `Spinner`, `EstadoEspacioBadge` (M10), `GuiaColumnas` (guía colapsable de columnas de una carga CSV), `ProgressBar` (barra de avance con tono, ej. semanas lectivas vs. el mínimo de 40), `Tabs`/`TabPanel` (navegación por pestañas con subrayado azul en la activa; reusar en vez de reinventar un switch de pestañas en otra página), `Stepper` (indicador de pasos para formularios largos por secciones, ej. el asistente de creación de estudiante en M03), e iconos SVG propios en `components/ui/icons.tsx` (no se agregó ninguna librería de iconos).
+  subtítulo + acción de la página), `Field` (`Input`/`Select`), `MultiSelect` (selector desplegable de selección múltiple con checkboxes, contador y badges de rol/estado), `Alert`, `Spinner`, `EstadoEspacioBadge` (M10), `EstadoAsistenciaChip`/`EstadoJustificacionBadge` (M13), `GuiaColumnas` (guía colapsable de columnas de una carga CSV), `ProgressBar` (barra de avance con tono, ej. semanas lectivas vs. el mínimo de 40), `Tabs`/`TabPanel` (navegación por pestañas con subrayado azul en la activa; reusar en vez de reinventar un switch de pestañas en otra página), `Stepper` (indicador de pasos para formularios largos por secciones, ej. el asistente de creación de estudiante en M03), e iconos SVG propios en `components/ui/icons.tsx` (no se agregó ninguna librería de iconos).
 - **Contenedor global y densidad** (`components/layout/AppShell.tsx`): el `<main>` centra el
   contenido en `max-w-7xl` (no `max-w-5xl`) para que las tablas anchas (Usuarios, Grupos) no
   scrolleen antes de tiempo en pantallas grandes. Cada página usa `space-y-4` (no `space-y-6`)

@@ -5,6 +5,7 @@ import {
   BuildingIcon,
   CalendarIcon,
   ClipboardListIcon,
+  ClockIcon,
   DoorIcon,
   FileTextIcon,
   FolderIcon,
@@ -34,6 +35,7 @@ const STRUCTURAL_ADMINS: Rol[] = ['ADMIN'];
 export const NAV_ITEMS: NavItem[] = [
   { to: '/panel', label: 'Inicio', icon: HomeIcon },
   { to: '/report-card', label: 'Boletín', icon: FileTextIcon },
+  { to: '/mi-horario', label: 'Mi horario', icon: ClockIcon, roles: ['DOCENTE', 'ESTUDIANTE', 'ACUDIENTE'] },
   { to: '/mi-cuenta', label: 'Mi cuenta', icon: UserIcon },
   { to: '/admin/setup', label: 'Configuración institucional', icon: SlidersIcon, roles: STRUCTURAL_ADMINS },
   { to: '/admin/sedes', label: 'Sedes y jornadas', icon: BuildingIcon, roles: STRUCTURAL_ADMINS },
@@ -47,6 +49,7 @@ export const NAV_ITEMS: NavItem[] = [
   { to: '/admin/academic-catalog', label: 'Catálogo académico', icon: BookIcon, roles: CURRICULUM_MANAGERS },
   { to: '/admin/study-plan', label: 'Plan de estudios', icon: ClipboardListIcon, roles: CURRICULUM_MANAGERS },
   { to: '/admin/teacher-assignments', label: 'Carga académica', icon: UsersIcon, roles: CURRICULUM_MANAGERS },
+  { to: '/admin/horarios', label: 'Horarios', icon: ClockIcon, roles: CURRICULUM_MANAGERS },
   { to: '/admin/revision-curricular', label: 'Revisión curricular', icon: FileTextIcon, roles: CURRICULUM_MANAGERS },
   { to: '/docente/mi-carga', label: 'Mi asignación', icon: ClipboardListIcon, roles: ['DOCENTE'] },
   { to: '/docente/planeacion-curricular', label: 'Planeación curricular', icon: BookIcon, roles: ['DOCENTE'] },

@@ -8,6 +8,7 @@
     "build": "tsc",
     "start": "node dist/server.js",
     "seed": "tsx scripts/seed.ts",
+    "seed:demo": "tsx scripts/seedDemoCompleto.ts",
     "seed:subjects": "tsx scripts/seedSubjects.ts",
     "seed:referentes": "tsx scripts/seedReferentesCurriculares.ts",
     "migrate:superadmin-to-admin": "tsx scripts/migrateSuperadminToAdmin.ts",
@@ -17,7 +18,8 @@
     "reset-admin-password": "tsx scripts/resetAdminPassword.ts",
     "typecheck": "tsc --noEmit",
     "typecheck:all": "tsc --noEmit && tsc -p tsconfig.scripts.json",
-    "lint": "oxlint src scripts"
+    "lint": "oxlint src scripts",
+    "test": "vitest run"
   },
   "license": "UNLICENSED",
   "dependencies": {
@@ -45,6 +47,7 @@
     "@types/pdfkit": "^0.17.6",
     "oxlint": "^1.86.0",
     "tsx": "^4.23.13",
-    "typescript": "^5.9.3"
+    "typescript": "^5.9.3",
+    "vitest": "^5.0.3"
   }
 }

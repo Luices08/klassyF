@@ -15,6 +15,8 @@ export interface MultiSelectProps<T extends string = string> {
   onChange: (selected: T[]) => void;
   placeholder?: string;
   allLabel?: string;
+  /** Texto cuando no hay nada elegido y elegir es obligatorio (si se omite, se muestra `allLabel`, como siempre). */
+  emptyLabel?: string;
   className?: string;
 }
 
@@ -25,6 +27,7 @@ export function MultiSelect<T extends string = string>({
   onChange,
   placeholder = 'Seleccionar...',
   allLabel = 'Todos',
+  emptyLabel,
   className = '',
 }: MultiSelectProps<T>) {
   const [isOpen, setIsOpen] = useState(false);
@@ -102,7 +105,7 @@ export function MultiSelect<T extends string = string>({
         className="flex w-full items-center justify-between gap-2 rounded-lg bg-white px-3 py-2 text-left text-sm text-ink ring-1 ring-inset ring-border transition-colors hover:bg-soft/40 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-primary"
       >
         <span className={`truncate ${isNoneSelected || isAllSelected ? 'text-muted' : 'font-medium text-ink'}`}>
-          {isNoneSelected ? (allLabel ?? placeholder) : triggerText}
+          {isNoneSelected ? (emptyLabel ?? allLabel ?? placeholder) : triggerText}
         </span>
 
         <div className="flex items-center gap-1.5">

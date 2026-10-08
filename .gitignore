@@ -23,3 +23,11 @@ npm-debug.log*
 # Documentos de matricula subidos por secretaria (M04): datos personales
 # reales, nunca se versionan. Se respaldan aparte del repositorio.
 backend/uploads/
+
+# Semillas de datos de demostracion (datos ficticios de prueba, no parte del
+# producto): se quedan solo en el equipo de quien las corre, nunca se suben.
+backend/scripts/seedDemo*.ts
+
+# Paquetes .zip usados para transferir modulos entre sesiones/equipos: una vez
+# integrados sus archivos al proyecto, el .zip ya no aporta nada al repositorio.
+*.zip

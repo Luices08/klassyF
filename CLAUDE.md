@@ -607,6 +607,20 @@ coordinación) y `CreadorPlanillasPage` (`/admin/creador-planillas`, ADMIN). La 
   nuevas, se renombran, se pesan y se guardan las notas por los mismos servicios de la planilla en línea (esos pasos son transacciones separadas: un fallo posterior a
   la validación, p. ej. el periodo se cierra en medio, puede dejar aplicada la primera parte). La protección de la hoja es una comodidad. Google Sheets usa el mismo `.xlsx`.
   **Las fórmulas no se probaron en Excel/Sheets** (no hay motor de hojas en el entorno de pruebas): solo su texto y el flujo de ida y vuelta.
+- **El Excel no pisa lo que cambió el sistema (conflictos)**: el archivo lleva en la hoja `Datos` una *instantánea* de lo descargado (nombre y peso de cada
+  casilla, nota de cada celda por documento; `VERSION_INSTANTANEA`). Al importar solo cuenta lo que el docente **cambió respecto a esa instantánea**: una celda
+  que no tocó se ignora aunque el sistema ya tenga otra nota (p. ej. una actividad calificada en línea mientras tanto), y si tocó una que el sistema también
+  cambió es **conflicto** (400 con la fila y «descarga de nuevo»; no se guarda nada, como el resto de errores). Igual con pesos y con el nombre de una nota suelta.
+  Lo que el Excel nunca puede romper el porcentaje: los % de los bloques no viajan en el archivo (son del molde), los pesos se validan ≤100% por bloque, las
+  casillas nuevas se miden contra el cupo vivo del bloque y la nota que se muestra después es la que calcula el servidor. Un archivo sin instantánea se rechaza.
+- **Vista previa y Excel de muestra del molde** (administración, pestaña «Vista del docente y Excel» del Creador de planillas): `GET /notas/molde/vista-previa` y
+  `/notas/molde/excel?academic_year_id=` (ADMIN/COORDINADOR; `planillaMuestra.service.ts`). Arman una `Planilla` inventada (3 estudiantes, 2 casillas por bloque) con
+  el molde y la plantilla de impresión vigentes, reusando `armarFila`/`armarBloques` y el mismo generador de Excel del docente; no tocan la base. El Excel lleva la
+  marca `MUESTRA` en vez de una clase y el importador lo rechaza.
+- **El estudiante ve sus notas** (`GET /notas/mias?periodo_numero=&academic_year_id=`, solo ESTUDIANTE, `notasEstudiante.service.ts`, página `MisNotasPage` en
+  `/mis-notas`): por asignatura, cada bloque con sus casillas y la nota de cada una; usa `armarFila` (la misma cuenta de la planilla), así que una planilla abierta
+  se muestra **provisional** (`parcial`) y una `CERRADO`/`DEFINITIVO` como nota final. Solo devuelve lo propio y de las actividades solo las ya publicadas
+  (`fecha_apertura`) o con nota. El boletín (M17) sigue leyendo solo lo cerrado.
 - **Quién ve qué:** el titular edita; ADMIN/COORDINADOR consultan (`GET /notas/planilla`, `GET /notas/bloques`), ven el seguimiento (`/notas/seguimiento`) y declaran definitivas;
   otro docente no entra (403). `declararDefinitivas` valida el rol también en el servicio.
 - **Evidencias dentro de la planilla:** cada casilla de una actividad con entrega digital lleva un punto (a tiempo / con retraso / ya calificada; sin punto = no entregó) y el

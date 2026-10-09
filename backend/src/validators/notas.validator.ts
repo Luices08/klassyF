@@ -112,3 +112,11 @@ export const actualizarPlantilla: ValidationSchema = {
       .max(MAX_FIRMAS_PLANILLA),
   }).min(1),
 };
+
+export const consultaAnio: ValidationSchema = {
+  query: Joi.object({ academic_year_id: objectId.required() }),
+};
+
+export const misNotas: ValidationSchema = {
+  query: Joi.object({ periodo_numero: periodo.required(), academic_year_id: objectId }),
+};

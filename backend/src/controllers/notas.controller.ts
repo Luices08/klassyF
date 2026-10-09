@@ -3,7 +3,9 @@ import * as casillasService from '../services/columnasPlanilla.service';
 import * as notasService from '../services/notas.service';
 import * as plantillaService from '../services/configuracionPlanilla.service';
 import * as excelService from '../services/notasExcel.service';
+import * as estudianteService from '../services/notasEstudiante.service';
 import * as pdfService from '../services/planillaPdf.service';
+import * as muestraService from '../services/planillaMuestra.service';
 import ApiError from '../utils/ApiError';
 import catchAsync from '../utils/catchAsync';
 
@@ -95,4 +97,25 @@ export const descargarPdf = catchAsync<unknown, unknown, unknown, ConsultaPlanil
   res.setHeader('Content-Type', 'application/pdf');
   res.setHeader('Content-Disposition', `attachment; filename="${nombreArchivo}"`);
   res.send(buffer);
+});
+
+// --- Vista previa y Excel de muestra del molde (administración) ---
+
+type ConsultaAnio = ParsedQs & { academic_year_id: string };
+
+export const vistaPreviaMolde = catchAsync<unknown, unknown, unknown, ConsultaAnio>(async (req, res) => {
+  res.status(200).json({ success: true, data: await muestraService.armarPlanillaDeMuestra(req.query.academic_year_id) });
+});
+
+export const descargarExcelDeMuestra = catchAsync<unknown, unknown, unknown, ConsultaAnio>(async (req, res) => {
+  const { buffer, nombreArchivo } = await excelService.generarExcelDeMuestra(req.query.academic_year_id);
+  res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+  res.setHeader('Content-Disposition', `attachment; filename="${nombreArchivo}"`);
+  res.send(buffer);
+});
+
+// --- Notas del propio estudiante ---
+
+export const misNotas = catchAsync<unknown, unknown, unknown, ParsedQs & { periodo_numero: number; academic_year_id?: string }>(async (req, res) => {
+  res.status(200).json({ success: true, data: await estudianteService.misNotas(req.user!, Number(req.query.periodo_numero), req.query.academic_year_id) });
 });

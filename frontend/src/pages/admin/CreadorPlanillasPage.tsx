@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { ImpresionPlanilla } from '../../components/notas/ImpresionPlanilla';
 import { MoldePlanilla } from '../../components/notas/MoldePlanilla';
+import { VistaPreviaPlanilla } from '../../components/notas/VistaPreviaPlanilla';
 import { Alert, errorMessage } from '../../components/ui/Alert';
 import { EstadoAnioLectivoBadge } from '../../components/ui/Badge';
 import { Card } from '../../components/ui/Card';
@@ -13,13 +14,15 @@ import { useAnioDeTrabajo } from '../../hooks/useAniosLectivos';
 const PESTANAS = [
   { key: 'molde', label: 'Molde de la nota' },
   { key: 'impresion', label: 'Impresión y firmas' },
+  { key: 'vista', label: 'Vista del docente y Excel' },
 ];
 
 /**
  * Creador de planillas (M12/M21, CU-ADM-04): el administrador define UNA VEZ cómo se divide el 100% de la nota en bloques y
  * cuántas casillas admite cada uno; esa es la plantilla de planilla que usa toda la institución el resto del año (y se copia
  * al año siguiente). Los docentes llenan las casillas con sus actividades y notas, y les ponen peso dentro del bloque.
- * La segunda pestaña es solo presentación (encabezado, columnas calculadas y firmas del PDF y del Excel).
+ * La segunda pestaña es solo presentación (encabezado, columnas calculadas y firmas del PDF y del Excel) y la tercera muestra
+ * cómo la recibirá el docente, en pantalla y en un Excel de muestra.
  */
 export function CreadorPlanillasPage() {
   const { anio: porDefecto, anios, query } = useAnioDeTrabajo();
@@ -70,6 +73,9 @@ export function CreadorPlanillasPage() {
           </TabPanel>
           <TabPanel active={pestana} tabKey="impresion">
             <ImpresionPlanilla />
+          </TabPanel>
+          <TabPanel active={pestana} tabKey="vista">
+            <VistaPreviaPlanilla anio={anio} />
           </TabPanel>
         </>
       )}

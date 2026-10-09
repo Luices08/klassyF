@@ -76,5 +76,6 @@ export const NAV_ITEMS: NavItem[] = [
   { to: '/docente/ajustes-razonables', label: 'Estudiantes con ajustes', icon: ClipboardListIcon, roles: ['DOCENTE'] },
   { to: '/orientacion/remisiones', label: 'Remisiones a orientación', icon: InboxIcon, roles: ['ADMIN', 'ORIENTADOR'] },
   { to: '/mis-actividades', label: 'Mis actividades', icon: ClipboardListIcon, roles: ['ESTUDIANTE'] },
+  { to: '/mis-notas', label: 'Mis notas', icon: FileTextIcon, roles: ['ESTUDIANTE'] },
   { to: '/mi-observador', label: 'Mi observador', icon: EyeIcon, roles: ['ESTUDIANTE'] },
 ];

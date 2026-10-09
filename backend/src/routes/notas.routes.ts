@@ -10,16 +10,19 @@ import {
   crearCasilla,
   declararDefinitivas,
   descargarExcel,
+  descargarExcelDeMuestra,
   descargarPdf,
   eliminarCasilla,
   establecerPesos,
   guardarCeldas,
   importarExcel,
+  misNotas,
   obtenerBloques,
   obtenerPlanilla,
   obtenerPlantilla,
   reabrirPlanilla,
   seguimiento,
+  vistaPreviaMolde,
 } from '../controllers/notas.controller';
 import { authenticate, checkRole } from '../middlewares/auth.middleware';
 import validate from '../middlewares/validate.middleware';
@@ -57,6 +60,13 @@ router.put('/pesos', checkRole(ROLES.DOCENTE), validate(notasValidator.establece
 // Plantilla de la planilla (M21 mínimo): la lee quien digita o consulta; solo el administrador la cambia.
 router.get('/plantilla', checkRole(ROLES.DOCENTE, ...GESTION), obtenerPlantilla);
 router.put('/plantilla', checkRole(ROLES.ADMIN), validate(notasValidator.actualizarPlantilla), actualizarPlantilla);
+
+// Vista previa del molde (administración): cómo recibirá el docente su planilla, con datos de ejemplo, en pantalla y en Excel.
+router.get('/molde/vista-previa', checkRole(...GESTION), validate(notasValidator.consultaAnio), vistaPreviaMolde);
+router.get('/molde/excel', checkRole(...GESTION), validate(notasValidator.consultaAnio), descargarExcelDeMuestra);
+
+// El estudiante ve sus propias notas por asignatura (lo del periodo abierto es provisional; el boletín solo lee lo cerrado).
+router.get('/mias', checkRole(ROLES.ESTUDIANTE), validate(notasValidator.misNotas), misNotas);
 
 // Versión para imprimir y firmar.
 router.get('/planilla/pdf', checkRole(ROLES.DOCENTE, ...GESTION), validate(notasValidator.obtenerPlanilla), descargarPdf);

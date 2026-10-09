@@ -228,7 +228,7 @@ export interface Planilla {
   };
 }
 
-function armarFila(ctx: ContextoPlanilla, estudiante: EstudianteDePlanilla): FilaPlanilla {
+export function armarFila(ctx: ContextoPlanilla, estudiante: EstudianteDePlanilla): FilaPlanilla {
   const registro = ctx.registros.get(estudiante._id);
   const resultado = resultadoDe(ctx, estudiante._id);
   const cerrado = esCerrado(registro) && registro?.resultado;

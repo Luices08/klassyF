@@ -5,7 +5,8 @@ import { UserDocument } from '../models/user.model';
 import ApiError from '../utils/ApiError';
 import { exigirPesosValidos } from './casillasBloque.service';
 import { actualizarCasilla, crearCasilla, establecerPesos } from './columnasPlanilla.service';
-import { CeldaPlanilla, guardarCeldas, obtenerPlanilla } from './notas.service';
+import { CeldaPlanilla, guardarCeldas, obtenerPlanilla, Planilla } from './notas.service';
+import { armarPlanillaDeMuestra } from './planillaMuestra.service';
 
 const HOJA_PLANILLA = 'Planilla';
 // La hoja de datos viaja con el archivo: dice a qué clase y periodo pertenece y qué significa cada columna, así subirlo no
@@ -22,6 +23,9 @@ const MAX_CASILLAS_EN_BLANCO = 30;
 // La protección de la hoja es una comodidad (evita borrar una fórmula sin querer), no la seguridad: al importar, el servidor
 // ignora las columnas calculadas y vuelve a validar cada nota contra la base.
 const CLAVE_PROTECCION = 'klassy-notas';
+const ASIGNACION_DE_MUESTRA = 'MUESTRA';
+// Versión de la instantánea que viaja en la hoja `Datos`; sin ella el servidor no puede saber qué cambió el docente.
+const VERSION_INSTANTANEA = 'v1';
 const FIRMA_ZIP = Buffer.from([0x50, 0x4b, 0x03, 0x04]);
 
 type TipoColumna = 'DOCUMENTO' | 'ESTUDIANTE' | 'CASILLA' | 'NUEVA' | 'BLOQUE' | 'NOTA' | 'DESEMPENO' | 'ESTADO';
@@ -62,7 +66,20 @@ export async function generarPlantillaNotas(
   periodoNumero: number,
   docente: UserDocument
 ): Promise<{ buffer: Buffer; nombreArchivo: string }> {
-  const planilla = await obtenerPlanilla(asignacionId, periodoNumero, docente);
+  return construirLibroPlanilla(await obtenerPlanilla(asignacionId, periodoNumero, docente), asignacionId, periodoNumero);
+}
+
+/**
+ * El Excel de muestra del administrador: el molde del año con tres estudiantes y dos casillas por bloque inventados, para ver
+ * cómo lo recibe el docente. Lleva la marca `MUESTRA` en lugar de una clase, así que no se puede subir como planilla.
+ */
+export async function generarExcelDeMuestra(academicYearId: string): Promise<{ buffer: Buffer; nombreArchivo: string }> {
+  const planilla = await armarPlanillaDeMuestra(academicYearId);
+  const { buffer } = await construirLibroPlanilla(planilla, ASIGNACION_DE_MUESTRA, planilla.periodo.numero);
+  return { buffer, nombreArchivo: 'muestra-planilla-de-notas.xlsx' };
+}
+
+async function construirLibroPlanilla(planilla: Planilla, asignacionId: string, periodoNumero: number): Promise<{ buffer: Buffer; nombreArchivo: string }> {
   const rangos = [...planilla.escala.rangos].sort((x, y) => y.valor_minimo - x.valor_minimo);
   const editable = planilla.edicion.puede_editar;
 
@@ -277,6 +294,23 @@ export async function generarPlantillaNotas(
     datos.getCell(FILA_LLAVES, c.indice).value = `${c.tipo}:${c.clave}`;
   });
 
+  // Instantánea de lo que se descargó: al subir solo cuenta lo que el docente cambió respecto a esto, y si alguien cambió lo mismo
+  // en el sistema entretanto (una actividad calificada en línea, un peso nuevo) se avisa en vez de pisarlo en silencio.
+  datos.getCell('A3').value = 'descargado_en';
+  datos.getCell('B3').value = new Date().toISOString();
+  datos.getCell('A4').value = 'instantanea';
+  datos.getCell('B4').value = VERSION_INSTANTANEA;
+  for (const c of columnas.filter((x) => x.tipo === 'CASILLA' || x.tipo === 'NUEVA')) {
+    datos.getCell(FILA_NOMBRES, c.indice).value = c.encabezado || null;
+    datos.getCell(FILA_PESOS, c.indice).value = c.peso ?? null;
+  }
+  planilla.estudiantes.forEach((fila, i) => {
+    const r = FILA_INICIAL + i;
+    datos.getCell(r, 1).value = fila.estudiante.numero_documento;
+    datos.getCell(r, 1).numFmt = '@';
+    for (const c of columnas.filter((x) => x.tipo === 'CASILLA')) datos.getCell(r, c.indice).value = fila.notas[c.clave] ?? null;
+  });
+
   await hoja.protect(CLAVE_PROTECCION, { selectLockedCells: true, selectUnlockedCells: true, formatColumns: true, formatRows: false });
 
   const nombreArchivo = `notas-${contexto?.asignatura?.nombre ?? 'clase'}-${contexto?.grupo?.nomenclatura ?? ''}-periodo-${periodoNumero}.xlsx`
@@ -318,6 +352,7 @@ export interface ResultadoImportacionNotas {
 }
 
 const igualesPeso = (a: number | null, b: number | null): boolean => (a === null || b === null ? a === b : Math.abs(a - b) < 0.005);
+const igualesNota = (a: number | null, b: number | null): boolean => (a === null || b === null ? a === b : Math.abs(a - b) < 0.0001);
 
 interface ColumnaImportada {
   indice: number;
@@ -326,6 +361,9 @@ interface ColumnaImportada {
   clave: string;
   nombre: string;
   peso: number | null;
+  /** Lo que el docente tocó respecto a lo que descargó: lo demás se deja como esté en el sistema. */
+  nombreCambiado: boolean;
+  pesoCambiado: boolean;
 }
 
 /**
@@ -334,6 +372,11 @@ interface ColumnaImportada {
  * suman más de 100% es error y no se guarda nada. Solo cuentan las celdas de nota, los nombres y los pesos (las columnas
  * calculadas se ignoran). Crear casillas, ponerles peso y guardar notas pasa por los mismos servicios de la planilla en línea,
  * o sea las mismas reglas (clase del docente, periodo que admita notas, escala del año, planilla no cerrada).
+ *
+ * Mientras el docente trabajaba sin conexión el sistema pudo cambiar (calificó una actividad en línea, ajustó un peso). Por eso
+ * el archivo trae una instantánea de lo que se descargó y solo se aplica lo que el docente cambió respecto a ella: una celda que
+ * no tocó nunca pisa lo nuevo del sistema, y si tocó una que alguien más cambió entretanto es un conflicto que se reporta (no se
+ * guarda nada) para que descargue de nuevo y decida.
  */
 export async function importarPlantillaNotas(archivo: Buffer, docente: UserDocument, ip?: string | null): Promise<ResultadoImportacionNotas> {
   if (archivo.length > MAX_BYTES_EXCEL_NOTAS) throw new ApiError(400, 'El archivo supera los 2 MB.');
@@ -350,8 +393,14 @@ export async function importarPlantillaNotas(archivo: Buffer, docente: UserDocum
   const datos = libro.getWorksheet(HOJA_DATOS);
   const asignacionId = datos ? textoDeCelda(datos.getCell('B1')) : '';
   const periodoNumero = datos ? Number(textoDeCelda(datos.getCell('B2'))) : NaN;
+  if (asignacionId === ASIGNACION_DE_MUESTRA) {
+    throw new ApiError(400, 'Este archivo es una muestra del formato de la planilla, no la de una clase. El docente descarga la suya desde «Planilla de notas».');
+  }
   if (!hoja || !datos || !Types.ObjectId.isValid(asignacionId) || !Number.isInteger(periodoNumero)) {
     throw new ApiError(400, 'El archivo no es una planilla de notas de Klassy. Descárgala desde «Notas» y vuelve a subirla.');
+  }
+  if (textoDeCelda(datos.getCell('B4')) !== VERSION_INSTANTANEA) {
+    throw new ApiError(400, 'Este archivo se descargó con una versión anterior de Klassy y no se puede comparar con lo que hay hoy en el sistema. Descarga la planilla de nuevo.');
   }
 
   const planilla = await obtenerPlanilla(asignacionId, periodoNumero, docente);
@@ -369,6 +418,19 @@ export async function importarPlantillaNotas(archivo: Buffer, docente: UserDocum
   const bloquesPorClave = new Map(planilla.bloques.map((b) => [b.clave, b]));
   const columnaDocumento = [...llaves.entries()].find(([, v]) => v.tipo === 'DOCUMENTO')?.[0] ?? 1;
 
+  // Lo que había al descargar. La nota se busca por documento (no por posición) por si las filas se reordenaron.
+  const filaBasePorDocumento = new Map<string, number>();
+  datos.eachRow({ includeEmpty: false }, (row, numeroFila) => {
+    const documento = numeroFila >= FILA_INICIAL ? textoDeCelda(row.getCell(1)) : '';
+    if (documento) filaBasePorDocumento.set(documento, numeroFila);
+  });
+  const nombreBase = (indice: number): string => textoDeCelda(datos.getCell(FILA_NOMBRES, indice));
+  const pesoBase = (indice: number): number | null => numeroDeCelda(datos.getCell(FILA_PESOS, indice));
+  const notaBase = (documento: string, indice: number): number | null => {
+    const fila = filaBasePorDocumento.get(documento);
+    return fila === undefined ? null : numeroDeCelda(datos.getCell(fila, indice));
+  };
+
   const errores: Array<{ fila: number; documento?: string; motivo: string }> = [];
 
   // --- Encabezados: nombre y peso de cada casilla ---
@@ -381,6 +443,8 @@ export async function importarPlantillaNotas(archivo: Buffer, docente: UserDocum
       errores.push({ fila: FILA_PESOS, motivo: `El peso de «${nombre || `columna ${letra(indice)}`}» debe ser un porcentaje entre 0 y 100.` });
       continue;
     }
+    const nombreCambiado = nombre !== nombreBase(indice);
+    const pesoCambiado = !igualesPeso(peso, pesoBase(indice));
     if (llave.tipo === 'CASILLA') {
       const existente = existentes.get(llave.clave);
       if (!existente) {
@@ -391,8 +455,22 @@ export async function importarPlantillaNotas(archivo: Buffer, docente: UserDocum
         errores.push({ fila: FILA_NOMBRES, motivo: `La casilla «${existente.titulo}» quedó sin nombre. Para quitarla elimínala desde la planilla en línea.` });
         continue;
       }
+      if (pesoCambiado && !igualesPeso(existente.peso, pesoBase(indice)) && !igualesPeso(existente.peso, peso)) {
+        errores.push({
+          fila: FILA_PESOS,
+          motivo: `El peso de «${existente.titulo}» cambió en el sistema después de que descargaste el archivo (ahora es ${existente.peso ?? 'automático'}). Descarga la planilla de nuevo para no pisar ese cambio.`,
+        });
+        continue;
+      }
+      if (existente.tipo === 'MANUAL' && nombreCambiado && existente.titulo !== nombreBase(indice) && existente.titulo !== nombre) {
+        errores.push({
+          fila: FILA_NOMBRES,
+          motivo: `La casilla «${existente.titulo}» cambió de nombre en el sistema después de que descargaste el archivo. Descarga la planilla de nuevo.`,
+        });
+        continue;
+      }
     }
-    importadas.push({ indice, tipo: llave.tipo, clave: llave.clave, nombre, peso });
+    importadas.push({ indice, tipo: llave.tipo, clave: llave.clave, nombre, peso, nombreCambiado, pesoCambiado });
   }
   const porIndice = new Map(importadas.map((c) => [c.indice, c]));
 
@@ -422,9 +500,23 @@ export async function importarPlantillaNotas(archivo: Buffer, docente: UserDocum
         return void errores.push({ fila: numeroFila, documento, motivo: `La nota ${nota} está fuera de la escala (${minimo} a ${maximo}).` });
       }
       conNotas.add(columna.indice);
-      if (columna.tipo === 'CASILLA' && fila.notas[columna.clave] === nota) {
-        sinCambios += 1;
-        continue;
+      if (columna.tipo === 'CASILLA') {
+        const actual = fila.notas[columna.clave] ?? null;
+        const alDescargar = notaBase(documento, columna.indice);
+        // Igual a lo descargado: el docente no la tocó (aunque el sistema ya tenga otra). Igual a lo de hoy: nada que hacer.
+        if (igualesNota(nota, alDescargar) || igualesNota(nota, actual)) {
+          sinCambios += 1;
+          continue;
+        }
+        if (!igualesNota(actual, alDescargar)) {
+          const titulo = existentes.get(columna.clave)?.titulo ?? 'la casilla';
+          errores.push({
+            fila: numeroFila,
+            documento,
+            motivo: `La nota de «${titulo}» cambió en el sistema después de que descargaste el archivo (en tu archivo: ${alDescargar ?? 'vacía'}, ahora en el sistema: ${actual}). Descarga la planilla de nuevo para no pisarla.`,
+          });
+          continue;
+        }
       }
       notas.push({ columna: columna.indice, estudianteId: fila.estudiante._id, nota });
     }
@@ -446,7 +538,7 @@ export async function importarPlantillaNotas(archivo: Buffer, docente: UserDocum
   const resultanteDePesos = [
     ...[...existentes.values()].map((e) => {
       const importada = importadas.find((c) => c.tipo === 'CASILLA' && c.clave === e.id);
-      return { id: e.id, bloque: e.bloque, peso: importada ? importada.peso : e.peso };
+      return { id: e.id, bloque: e.bloque, peso: importada?.pesoCambiado ? importada.peso : e.peso };
     }),
     ...nuevas.map((c) => ({ id: `nueva-${c.indice}`, bloque: c.clave, peso: c.peso })),
   ];
@@ -474,7 +566,7 @@ export async function importarPlantillaNotas(archivo: Buffer, docente: UserDocum
   for (const columna of importadas) {
     if (columna.tipo !== 'CASILLA') continue;
     const existente = existentes.get(columna.clave);
-    if (existente?.tipo === 'MANUAL' && columna.nombre !== existente.titulo) {
+    if (existente?.tipo === 'MANUAL' && columna.nombreCambiado && columna.nombre !== existente.titulo) {
       await actualizarCasilla(columna.clave, { nombre: columna.nombre }, docente, ip);
       renombradas += 1;
     }
@@ -484,7 +576,7 @@ export async function importarPlantillaNotas(archivo: Buffer, docente: UserDocum
   for (const columna of importadas) {
     if (columna.tipo === 'CASILLA') {
       const existente = existentes.get(columna.clave);
-      if (existente && !igualesPeso(existente.peso, columna.peso)) pesos.push({ casilla_id: columna.clave, peso: columna.peso });
+      if (existente && columna.pesoCambiado && !igualesPeso(existente.peso, columna.peso)) pesos.push({ casilla_id: columna.clave, peso: columna.peso });
     } else if (columna.peso !== null && idDeNueva.has(columna.indice)) {
       pesos.push({ casilla_id: idDeNueva.get(columna.indice) as string, peso: columna.peso });
     }

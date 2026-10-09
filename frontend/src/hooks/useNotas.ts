@@ -289,3 +289,73 @@ export async function descargarPdfPlanilla(teacherAssignmentId: string, periodoN
   enlace.click();
   URL.revokeObjectURL(url);
 }
+
+// --- Vista previa del molde (administración): la planilla de muestra tal como la recibirá el docente ---
+
+export function useVistaPreviaMolde(academicYearId: string | undefined) {
+  return useQuery({
+    queryKey: ['notas', 'molde-vista-previa', academicYearId],
+    queryFn: () => api.get<Planilla>('/notas/molde/vista-previa', { academic_year_id: academicYearId }),
+    enabled: Boolean(academicYearId),
+    // El molde y la plantilla de impresión se editan en otras pestañas: siempre se vuelve a pedir al abrir la vista previa.
+    staleTime: 0,
+  });
+}
+
+export async function descargarExcelDeMuestra(academicYearId: string): Promise<void> {
+  const { url } = await api.downloadBlob(`/notas/molde/excel?academic_year_id=${academicYearId}`);
+  const enlace = document.createElement('a');
+  enlace.href = url;
+  enlace.download = 'muestra-planilla-de-notas.xlsx';
+  enlace.click();
+  URL.revokeObjectURL(url);
+}
+
+// --- Notas del propio estudiante ---
+
+export interface CasillaDeMisNotas {
+  id: string;
+  titulo: string;
+  tipo: 'ACTIVIDAD' | 'MANUAL';
+  tipo_actividad: TipoActividad | null;
+  fecha_entrega: string | null;
+  /** Lo que realmente pesa dentro de su bloque (%). */
+  peso_efectivo: number;
+  nota: number | null;
+  /** Solo actividades con entrega digital. */
+  entrega: EstadoActividadEstudiante | null;
+}
+
+export interface BloqueDeMisNotas {
+  clave: string;
+  nombre: string;
+  porcentaje: number;
+  nota: number | null;
+  casillas: CasillaDeMisNotas[];
+}
+
+export interface AsignaturaDeMisNotas {
+  teacher_assignment_id: string;
+  asignacion: ContextoAsignacion | null;
+  estado: EstadoNota;
+  nota_asignatura: number | null;
+  /** La nota se calculó con lo que hay: todavía faltan notas. */
+  parcial: boolean;
+  desempeno: Desempeno | null;
+  bloques: BloqueDeMisNotas[];
+}
+
+export interface MisNotas {
+  periodo: { numero: number; nombre: string; estado: string };
+  nota_aprobatoria: number;
+  asignaturas: AsignaturaDeMisNotas[];
+}
+
+export function useMisNotas(periodoNumero: number | undefined, academicYearId?: string) {
+  return useQuery({
+    queryKey: ['notas', 'mias', academicYearId ?? null, periodoNumero],
+    queryFn: () => api.get<MisNotas>('/notas/mias', { periodo_numero: periodoNumero, academic_year_id: academicYearId }),
+    enabled: Boolean(periodoNumero),
+    staleTime: 15_000,
+  });
+}

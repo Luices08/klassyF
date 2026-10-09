@@ -555,5 +555,173 @@ describe('M12: notas (capa HTTP)', () => {
       expect(hoja.getCell(4, 3).protection?.locked ?? true).toBe(true);
       expect(hoja.getCell(6, 12).value).toBe('CERRADO');
     });
+
+    describe('conflictos con lo que cambió en el sistema mientras el docente trabajaba sin conexión', () => {
+      const bajar = async () => {
+        const { buffer } = await descargarExcel(e.docenteDeClase);
+        const libro = new ExcelJS.Workbook();
+        await libro.xlsx.load(buffer as unknown as ArrayBuffer);
+        return libro;
+      };
+      const subir = async (libro: ExcelJS.Workbook) => subirExcel(e.docenteDeClase, Buffer.from(await libro.xlsx.writeBuffer()));
+      const notaEnLinea = (casilla: string, nota: number) =>
+        json('PUT', '/notas/planilla', e.docenteDeClase, { teacher_assignment_id: asignacionId(), periodo_numero: 1, celdas: [{ student_id: String(e.estudiante._id), casilla_id: casilla, nota }] });
+      const celdaDe = (hoja: ExcelJS.Worksheet, columna: number) => hoja.getCell(FILAS.find((r) => hoja.getCell(r, 1).value === e.estudiante.numero_documento)!, columna);
+      const filaDelEstudiante = async () => {
+        const planilla = (await json('GET', `/notas/planilla?${consulta()}`, e.docenteDeClase)).cuerpo.data;
+        return planilla.estudiantes.find((f: any) => f.estudiante._id === String(e.estudiante._id));
+      };
+
+      it('una celda que el docente no tocó nunca pisa la nota que el sistema recibió después', async () => {
+        await notaEnLinea(a1, 4);
+        const libro = await bajar();
+        await notaEnLinea(a1, 5); // el docente califica en línea mientras el Excel está en su computador
+        celdaDe(libro.getWorksheet('Planilla')!, 4).value = 2; // en el Excel solo toca el Examen
+
+        const subido = await subir(libro);
+        expect(subido.estado).toBe(200);
+        expect(subido.cuerpo.data).toMatchObject({ guardadas: 1 });
+        const fila = await filaDelEstudiante();
+        expect(fila.notas[a1]).toBe(5);
+        expect(fila.notas[a2]).toBe(2);
+      });
+
+      it('si el docente cambia una nota que el sistema también cambió, es un conflicto y no se guarda nada', async () => {
+        const libro = await bajar();
+        await notaEnLinea(a1, 5); // un estudiante entregó y se calificó en línea
+        const hoja = libro.getWorksheet('Planilla')!;
+        celdaDe(hoja, 3).value = 3;
+        celdaDe(hoja, 4).value = 2;
+
+        const subido = await subir(libro);
+        expect(subido.estado).toBe(400);
+        expect(subido.cuerpo.details).toEqual([
+          { fila: expect.any(Number), documento: e.estudiante.numero_documento, motivo: expect.stringMatching(/cambió en el sistema.*Descarga la planilla de nuevo/) },
+        ]);
+        const fila = await filaDelEstudiante();
+        expect(fila.notas[a1]).toBe(5);
+        expect(fila.notas[a2]).toBeNull();
+      });
+
+      it('lo mismo con los pesos: no se pisa un reparto nuevo, pero tampoco se pierde si el docente no lo tocó', async () => {
+        const libro = await bajar();
+        await json('PUT', '/notas/pesos', e.docenteDeClase, { teacher_assignment_id: asignacionId(), periodo_numero: 1, pesos: [{ casilla_id: a1, peso: 40 }, { casilla_id: a2, peso: 60 }] });
+        celdaDe(libro.getWorksheet('Planilla')!, 4).value = 3; // solo una nota: los pesos del archivo (25/75) no deben revertir 40/60
+        expect((await subir(libro)).estado).toBe(200);
+        expect((await Activity.findById(a1))!.peso_en_componente).toBe(40);
+        expect((await Activity.findById(a2))!.peso_en_componente).toBe(60);
+
+        const otro = await bajar();
+        await json('PUT', '/notas/pesos', e.docenteDeClase, { teacher_assignment_id: asignacionId(), periodo_numero: 1, pesos: [{ casilla_id: a1, peso: 50 }, { casilla_id: a2, peso: 50 }] });
+        otro.getWorksheet('Planilla')!.getCell(4, 3).value = 10; // cambia el peso de Taller 1, que el sistema también cambió
+        const conflicto = await subir(otro);
+        expect(conflicto.estado).toBe(400);
+        expect(conflicto.cuerpo.details).toEqual([{ fila: 4, motivo: expect.stringMatching(/peso de «Taller 1» cambió en el sistema/) }]);
+        expect((await Activity.findById(a1))!.peso_en_componente).toBe(50);
+      });
+
+      it('un archivo sin la instantánea (de una versión anterior) se rechaza con la instrucción de descargarlo de nuevo', async () => {
+        const libro = await bajar();
+        libro.getWorksheet('Datos')!.getCell('B4').value = null;
+        const subido = await subir(libro);
+        expect(subido.estado).toBe(400);
+        expect(subido.cuerpo.message).toMatch(/versión anterior.*Descarga la planilla de nuevo/);
+      });
+    });
+  });
+
+  describe('vista previa y Excel de muestra del molde (administración)', () => {
+    it('el administrador ve la planilla como la recibirá el docente, con datos de ejemplo y sin tocar la base', async () => {
+      const antes = await ActivitySubmission.countDocuments();
+      const respuesta = await json('GET', `/notas/molde/vista-previa?academic_year_id=${n.anioId}`, e.admin);
+      expect(respuesta.estado).toBe(200);
+      const muestra = respuesta.cuerpo.data;
+      expect(muestra.bloques.map((b: any) => [b.nombre, b.porcentaje, b.max_casillas, b.casillas.length])).toEqual([
+        ['Heteroevaluación', 70, 4, 2],
+        ['Autoevaluación', 30, 1, 1],
+      ]);
+      expect(muestra.estudiantes).toHaveLength(3);
+      expect(muestra.estudiantes[0].nota_asignatura).not.toBeNull();
+      expect(muestra.estudiantes.some((f: any) => f.parcial)).toBe(true); // el tercero queda con una casilla sin nota
+      expect(JSON.stringify(muestra)).not.toContain(e.estudiante.numero_documento);
+      expect(await ActivitySubmission.countDocuments()).toBe(antes);
+    });
+
+    it('baja el Excel de muestra con el molde y las fórmulas, y ese archivo no se puede subir como planilla', async () => {
+      const respuesta = await fetch(`${base}/notas/molde/excel?academic_year_id=${n.anioId}`, { headers: encabezado(e.coordAcademico) });
+      expect(respuesta.status).toBe(200);
+      expect(respuesta.headers.get('content-disposition')).toMatch(/muestra-planilla-de-notas\.xlsx/);
+      const buffer = Buffer.from(await respuesta.arrayBuffer());
+      const libro = new ExcelJS.Workbook();
+      await libro.xlsx.load(buffer as unknown as ArrayBuffer);
+      const hoja = libro.getWorksheet('Planilla')!;
+      expect(hoja.getCell(2, 3).value).toBe('Heteroevaluación (70%) — hasta 4 casillas');
+      expect(hoja.getCell(3, 3).value).toBe('Ejemplo 1');
+      expect(typeof (hoja.getCell(6, 7).value as { formula?: string }).formula).toBe('string');
+
+      const subido = await subirExcel(e.docenteDeClase, buffer);
+      expect(subido.estado).toBe(400);
+      expect(subido.cuerpo.message).toMatch(/muestra del formato/);
+    });
+
+    it('solo administración y coordinación la piden', async () => {
+      const ruta = `/notas/molde/vista-previa?academic_year_id=${n.anioId}`;
+      expect((await json('GET', ruta, null)).estado).toBe(401);
+      expect((await json('GET', ruta, e.docenteDeClase)).estado).toBe(403);
+      expect((await json('GET', ruta, e.estudiante)).estado).toBe(403);
+      expect((await json('GET', '/notas/molde/vista-previa', e.admin)).estado).toBe(400);
+    });
+  });
+
+  describe('notas del estudiante (GET /notas/mias)', () => {
+    it('muestra solo sus notas, por asignatura y bloque, provisionales mientras la planilla está abierta', async () => {
+      await json('PUT', '/notas/planilla', e.docenteDeClase, {
+        teacher_assignment_id: asignacionId(),
+        periodo_numero: 1,
+        celdas: [
+          { student_id: String(e.estudiante._id), casilla_id: a1, nota: 4 },
+          { student_id: String(e.otroEstudiante._id), casilla_id: a1, nota: 1.5 },
+        ],
+      });
+      const respuesta = await json('GET', '/notas/mias?periodo_numero=1', e.estudiante);
+      expect(respuesta.estado).toBe(200);
+      const { asignaturas, nota_aprobatoria } = respuesta.cuerpo.data;
+      expect(nota_aprobatoria).toBeGreaterThan(0);
+      expect(asignaturas).toHaveLength(1);
+      const [mate] = asignaturas;
+      expect(mate.asignacion.asignatura.nombre).toBe('Matemáticas');
+      expect(mate.estado).toBe('PENDIENTE');
+      expect(mate.parcial).toBe(true);
+      const hetero = mate.bloques.find((b: any) => b.clave === 'HETEROEVALUACION');
+      expect(hetero.nota).toBe(4);
+      expect(hetero.casillas.map((c: any) => [c.titulo, c.nota, c.peso_efectivo])).toEqual([['Taller 1', 4, 25], ['Examen', null, 75]]);
+      expect(mate.bloques.find((b: any) => b.clave === 'AUTOEVALUACION').casillas[0]).toMatchObject({ titulo: 'Autoevaluación', nota: null });
+      // Nada de los compañeros: ni sus notas ni sus documentos.
+      expect(JSON.stringify(respuesta.cuerpo.data)).not.toContain(e.otroEstudiante.numero_documento);
+      expect(JSON.stringify(respuesta.cuerpo.data)).not.toContain('1.5');
+    });
+
+    it('una actividad aún no publicada no se lista, aunque ya cuente en el bloque', async () => {
+      await crearActividad(n.asignacion, 'HETEROEVALUACION', null, { titulo: 'Secreta', fecha_apertura: new Date(Date.now() + 7 * 86_400_000), fecha_entrega: new Date(Date.now() + 14 * 86_400_000) });
+      const respuesta = await json('GET', '/notas/mias?periodo_numero=1', e.estudiante);
+      const hetero = respuesta.cuerpo.data.asignaturas[0].bloques.find((b: any) => b.clave === 'HETEROEVALUACION');
+      expect(hetero.casillas.map((c: any) => c.titulo)).toEqual(['Taller 1', 'Examen']);
+    });
+
+    it('lo cerrado por el docente aparece con su nota final y como cerrado', async () => {
+      await json('PUT', '/notas/planilla', e.docenteDeClase, { teacher_assignment_id: asignacionId(), periodo_numero: 1, celdas: todas() });
+      await json('POST', '/notas/planilla/cerrar', e.docenteDeClase, { teacher_assignment_id: asignacionId(), periodo_numero: 1 });
+      const respuesta = await json('GET', '/notas/mias?periodo_numero=1', e.estudiante);
+      expect(respuesta.cuerpo.data.asignaturas[0]).toMatchObject({ estado: 'CERRADO', parcial: false, nota_asignatura: 3.25 });
+    });
+
+    it('solo el estudiante la pide, y sin matrícula en el año no ve asignaturas', async () => {
+      expect((await json('GET', '/notas/mias?periodo_numero=1', e.docenteDeClase)).estado).toBe(403);
+      expect((await json('GET', '/notas/mias?periodo_numero=1', null)).estado).toBe(401);
+      expect((await json('GET', '/notas/mias', e.estudiante)).estado).toBe(400);
+      expect((await json('GET', '/notas/mias?periodo_numero=9', e.estudiante)).estado).toBe(400);
+      await Enrollment.deleteMany({ student_id: e.estudiante._id });
+      expect((await json('GET', '/notas/mias?periodo_numero=1', e.estudiante)).cuerpo.data.asignaturas).toEqual([]);
+    });
   });
 });

@@ -66,7 +66,7 @@ export function ExcelNotas({ teacherAssignmentId, periodoNumero, nombreArchivo, 
         <div className="flex flex-wrap items-center justify-between gap-3 p-4">
           <p className="max-w-xl text-sm text-muted">
             Trabajo sin conexión: descarga la planilla en Excel con las casillas de cada bloque; escribe el nombre, el peso y las notas en las casillas blancas (los promedios y la nota se calculan solos) y súbela
-            cuando recuperes la conexión. En Google Sheets, impórtala allí y descárgala de nuevo como Excel (.xlsx).
+            cuando recuperes la conexión. Al subirla solo se aplica lo que tú cambiaste: si mientras tanto calificaste esa misma celda en línea, te avisamos para que descargues de nuevo en vez de pisarla. En Google Sheets, impórtala allí y descárgala de nuevo como Excel (.xlsx).
           </p>
           <div className="flex flex-wrap items-center gap-2">
             <Button type="button" variant="outline" disabled={!puedeDescargar} onClick={() => void descargar()}>

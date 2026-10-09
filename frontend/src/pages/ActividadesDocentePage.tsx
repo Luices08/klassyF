@@ -211,6 +211,7 @@ export function ActividadesDocentePage() {
           teacherAssignmentId={asignacion._id}
           periodoNumero={periodo.numero}
           planeacion={planeacion.data}
+          componentes={(anio?.componentes_efectivos ?? []).filter((c) => c.origen === 'ACTIVIDADES')}
           actividad={editando === 'nueva' ? null : editando}
         />
       )}

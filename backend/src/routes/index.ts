@@ -19,6 +19,7 @@ import horarioRoutes from './horario.routes';
 import inclusionRoutes from './inclusion.routes';
 import institutionRoutes from './institution.routes';
 import jornadaOperativaRoutes from './jornadaOperativa.routes';
+import notasRoutes from './notas.routes';
 import observacionRoutes from './observacion.routes';
 import periodLockRoutes from './periodLock.routes';
 import publicRoutes from './public.routes';
@@ -82,6 +83,9 @@ router.use('/inclusion', inclusionRoutes);
 // Prompt 3: Actividades, Calificaciones, Asistencia y Motor de Boletines
 router.use('/activities', activityRoutes);
 router.use('/attendance', attendanceRoutes);
+
+// M12: Evaluación y notas (planilla, cierre, definitivas, Excel offline)
+router.use('/notas', notasRoutes);
 router.use('/periods', periodLockRoutes);
 router.use('/reports', reportCardRoutes);
 

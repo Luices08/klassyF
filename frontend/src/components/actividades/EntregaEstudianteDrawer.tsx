@@ -6,7 +6,7 @@ import { Drawer } from '../ui/Drawer';
 import { Dropzone } from '../ui/Dropzone';
 import { Textarea } from '../ui/Field';
 import { type ActividadEstudiante, descargarEntrega, useEnviarEntrega } from '../../hooks/useActividades';
-import { MAX_BYTES_ENTREGA, NOMBRES_COMPONENTE_SIEE, etiquetaDeFormato, extensionesDe, formatoInstante } from '../../lib/actividades';
+import { MAX_BYTES_ENTREGA, etiquetaDeFormato, extensionesDe, formatoInstante } from '../../lib/actividades';
 
 interface EntregaEstudianteDrawerProps {
   actividad: ActividadEstudiante | null;
@@ -65,7 +65,7 @@ function Contenido({ actividad, onClose }: { actividad: ActividadEstudiante; onC
       <div className="flex flex-wrap items-center gap-2">
         <TipoActividadChip value={actividad.tipo} />
         <EstadoEntregaBadge value={actividad.estado} />
-        <span className="text-xs text-muted">{NOMBRES_COMPONENTE_SIEE[actividad.componente_siee]}</span>
+        <span className="text-xs text-muted">{actividad.componente_nombre}</span>
       </div>
 
       <p className="whitespace-pre-wrap text-sm text-body">{actividad.descripcion}</p>

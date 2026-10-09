@@ -1,8 +1,10 @@
 import Joi from 'joi';
 import { CLAVES_FORMATO_EVIDENCIA, ESTADOS_ACTIVIDAD_ESTUDIANTE, TIPOS_ACTIVIDAD } from '../constants/actividades';
-import { COMPONENTES_SIEE } from '../constants/enums';
 import { ValidationSchema } from '../middlewares/validate.middleware';
 import { objectId } from './common.validator';
+
+// La clave de un componente evaluativo del año (M12); que exista y se alimente de actividades lo comprueba el servicio.
+const componenteBloque = Joi.string().pattern(/^[A-Z0-9_]{2,40}$/);
 
 const formatos = Joi.array()
   .items(Joi.string().valid(...CLAVES_FORMATO_EVIDENCIA))
@@ -18,9 +20,7 @@ export const createActivity: ValidationSchema = {
     tipo: Joi.string()
       .valid(...TIPOS_ACTIVIDAD)
       .required(),
-    componente_siee: Joi.string()
-      .valid(...COMPONENTES_SIEE)
-      .required(),
+    componente_siee: componenteBloque.required(),
     peso_en_componente: Joi.number().min(0).required(),
     fecha_apertura: Joi.date().iso().required(),
     fecha_entrega: Joi.date().iso().min(Joi.ref('fecha_apertura')).required(),
@@ -40,7 +40,7 @@ export const updateActivity: ValidationSchema = {
     titulo: Joi.string().trim().max(150),
     descripcion: Joi.string().trim().max(5000),
     tipo: Joi.string().valid(...TIPOS_ACTIVIDAD),
-    componente_siee: Joi.string().valid(...COMPONENTES_SIEE),
+    componente_siee: componenteBloque,
     peso_en_componente: Joi.number().min(0),
     fecha_apertura: Joi.date().iso(),
     fecha_entrega: Joi.date().iso(),

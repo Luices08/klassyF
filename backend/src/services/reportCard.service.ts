@@ -1,10 +1,9 @@
-import { Types } from 'mongoose';
 import { ESTADOS_MATRICULA_ACTIVOS, MetodoCalculoEvaluacion } from '../constants/enums';
+import { ESTADOS_NOTA_CERRADOS } from '../constants/notas';
 import { ROLES } from '../constants/roles';
 import AcademicYear from '../models/academicYear.model';
-import Activity, { ActivityDocument } from '../models/activity.model';
-import ActivitySubmission from '../models/activitySubmission.model';
 import Area, { AreaDocument } from '../models/area.model';
+import CalificacionAsignatura from '../models/calificacionAsignatura.model';
 import { CampusDocument } from '../models/campus.model';
 import Enrollment from '../models/enrollment.model';
 import Group from '../models/group.model';
@@ -13,12 +12,12 @@ import Guardian from '../models/guardian.model';
 import StudentGuardian from '../models/studentGuardian.model';
 import StudyPlan from '../models/studyPlan.model';
 import Subject, { SubjectDocument } from '../models/subject.model';
-import TeacherAssignment from '../models/teacherAssignment.model';
 import User, { UserDocument } from '../models/user.model';
 import ApiError from '../utils/ApiError';
+import { calcularNotaArea, calcularPromedioGeneral } from '../utils/calculoNotas';
 import type { ResultadoDesempeno } from '../utils/escalaEvaluacion';
 import { resumenAsistenciaParaBoletin } from './attendanceStats.service';
-import { desempenoCualitativo, ponderacionEfectiva, round2 } from '../utils/siee';
+import { desempenoCualitativo, round2 } from '../utils/siee';
 
 export interface ReportCardParams {
   student_id: string;
@@ -26,27 +25,31 @@ export interface ReportCardParams {
   periodo_numero: number;
 }
 
-export interface ReportCardComponentes {
-  saber: number;
-  hacer: number;
-  ser: number;
+export interface ReportCardComponente {
+  clave: string;
+  nombre: string;
+  porcentaje: number;
+  nota: number;
 }
 
 export interface ReportCardAsignatura {
   subject_id: string;
   nombre: string;
   porcentaje_en_area: number;
-  nota_asignatura: number;
-  desempeno: ResultadoDesempeno;
+  /** null mientras el docente no cierre la planilla de la asignatura: el boletín solo muestra resultados cerrados. */
+  nota_asignatura: number | null;
+  estado: 'SIN_CERRAR' | 'CERRADO' | 'DEFINITIVO';
+  desempeno: ResultadoDesempeno | null;
   fallas_asignatura: number;
-  componentes: ReportCardComponentes;
+  componentes: ReportCardComponente[];
 }
 
 export interface ReportCardArea {
   area_id: string;
   nombre: string;
-  nota_area: number;
-  desempeno_area: ResultadoDesempeno;
+  /** null si alguna asignatura del área aún no está cerrada. */
+  nota_area: number | null;
+  desempeno_area: ResultadoDesempeno | null;
   asignaturas: ReportCardAsignatura[];
 }
 
@@ -61,10 +64,15 @@ export interface ReportCardResult {
   };
   periodo: number;
   academic_year: number;
-  puesto_grupo: number;
+  /** El boletín es oficial cuando todas sus asignaturas están cerradas. */
+  completo: boolean;
+  /** Asignaturas que todavía no tienen su planilla cerrada. */
+  pendientes: string[];
+  /** Solo entre los estudiantes del grupo con boletín completo; null si el de este estudiante no lo está. */
+  puesto_grupo: number | null;
   total_estudiantes_grupo: number;
-  promedio_general_periodo: number;
-  desempeno_general: ResultadoDesempeno;
+  promedio_general_periodo: number | null;
+  desempeno_general: ResultadoDesempeno | null;
   asistencia_periodo: {
     total_fallas_justificadas: number;
     total_fallas_injustificadas: number;
@@ -109,31 +117,28 @@ interface AreaGroup {
 interface StudentComputed {
   studentId: string;
   areas: ReportCardArea[];
-  promedio: number;
+  promedio: number | null;
+  pendientes: string[];
 }
 
 /**
- * Genera el boletin (JSON estructurado) de un estudiante para un periodo y año
- * lectivo, aplicando las reglas del Decreto 1290:
- *  - Nota de componente = promedio ponderado (peso_en_componente) de las
- *    actividades calificadas de ese componente. Sin actividades calificadas -> 0.
- *  - Nota de asignatura = Saber*peso + Hacer*peso + Ser*peso, según
- *    AcademicYear.ponderacion_componentes (o el respaldo 40/40/20 — CU-ADM-04).
+ * Genera el boletin (JSON estructurado) de un estudiante para un periodo y año lectivo. La fuente son los resultados
+ * CERRADOS o DEFINITIVOS de M12 (lo que el docente cerró, congelado con el cálculo de sus componentes): una nota en
+ * borrador nunca llega a un boletín. Lo que M17 calcula aquí es solo lo que M12 no guarda:
  *  - Nota de area = segun el metodo_calculo configurado en M06 para el area
  *    dentro del grado del estudiante (StudyPlan.grades[].evaluaciones_area):
  *    PONDERADO usa el porcentaje de cada asignatura, ARITMETICO promedia las
  *    asignaturas de esa area con el mismo peso. Si el area del grupo tiene su
  *    propia evaluacion personalizada (Distribucion por Grupos, RN-EVAL-02) se
- *    usa esa en vez de la del grado.
- *  - Promedio general = promedio aritmetico simple de las notas de area.
- *  - Puesto de grupo = ranking por promedio general entre los MATRICULADOS del
- *    grupo (ranking de competencia estandar: los empatados comparten puesto y
- *    el siguiente puesto salta la cantidad de empatados).
+ *    usa esa en vez de la del grado. Sin todas sus asignaturas cerradas, el área no se calcula.
+ *  - Promedio general = promedio aritmetico simple de las notas de area (solo con todas calculadas).
+ *  - Puesto de grupo = ranking por promedio general entre los estudiantes del grupo con boletín completo
+ *    (ranking de competencia estandar: los empatados comparten puesto y el siguiente puesto salta la cantidad de empatados).
  *
  * Para evitar N+1 queries al calcular el ranking (que requiere el promedio de
  * TODOS los estudiantes del grupo, no solo el consultado), esta funcion trae
- * una sola vez todos los datos crudos (actividades, calificaciones, asistencia)
- * del grupo+periodo y hace el resto del calculo en memoria.
+ * una sola vez todos los datos crudos (resultados cerrados, asistencia) del
+ * grupo+periodo y hace el resto del calculo en memoria.
  */
 export async function generateReportCard(
   params: ReportCardParams,
@@ -147,11 +152,8 @@ export async function generateReportCard(
   const academicYear = await AcademicYear.findById(params.academic_year_id);
   if (!academicYear) throw new ApiError(404, 'Año lectivo no encontrado.');
 
-  // Configuracion institucional del SIEE para este año (CU-ADM-04): ponderacion de componentes
-  // y escala de evaluacion, con sus respaldos mientras la institucion no las personalice. Se
-  // capturan en variables propias (no "academicYear.x") porque TS no reduce el tipo del objeto
-  // a traves de las funciones anidadas de mas abajo (computeStudent/subjectGrade).
-  const ponderacionComponentes = ponderacionEfectiva(academicYear.ponderacion_componentes);
+  // La escala del año (CU-ADM-04) se captura en una variable propia (no "academicYear.x") porque TS no reduce el tipo del
+  // objeto a traves de las funciones anidadas de mas abajo.
   const escalaEvaluacion = academicYear.escala_evaluacion;
 
   const enrollment = await Enrollment.findOne({
@@ -223,37 +225,14 @@ export async function generateReportCard(
     return evaluacionCache.get(areaId) as { metodo: MetodoCalculoEvaluacion; porcentajes: Map<string, number> };
   }
 
-  const subjectIds = subjects.map((s) => s._id);
-  const assignments = await TeacherAssignment.find({
-    subject_id: { $in: subjectIds },
+  // Solo lo cerrado: es la fuente oficial. Una asignatura por estudiante (una clase por asignatura y grupo en el año).
+  const cerrados = await CalificacionAsignatura.find({
     group_id: group._id,
     academic_year_id: academicYear._id,
-  });
-  const assignmentBySubject = new Map(assignments.map((a) => [String(a.subject_id), a]));
-  const assignmentIds = assignments.map((a) => a._id);
-
-  const activities = await Activity.find({
-    teacher_assignment_id: { $in: assignmentIds },
     periodo_numero: params.periodo_numero,
-  });
-  const activitiesByAssignment = new Map<string, ActivityDocument[]>();
-  for (const act of activities) {
-    const key = String(act.teacher_assignment_id);
-    const bucket = activitiesByAssignment.get(key) ?? [];
-    bucket.push(act);
-    activitiesByAssignment.set(key, bucket);
-  }
-
-  const activityIds = activities.map((a) => a._id);
-  const submissions = await ActivitySubmission.find({
-    activity_id: { $in: activityIds },
-    student_id: { $in: studentIds.map((id) => new Types.ObjectId(id)) },
-    calificacion_numerica: { $ne: null },
-  });
-  const submissionMap = new Map<string, number>();
-  for (const sub of submissions) {
-    submissionMap.set(`${String(sub.activity_id)}_${String(sub.student_id)}`, sub.calificacion_numerica as number);
-  }
+    estado: { $in: ESTADOS_NOTA_CERRADOS },
+  }).lean();
+  const cerradoPor = new Map(cerrados.map((c) => [`${String(c.subject_id)}|${String(c.student_id)}`, c]));
 
   const { porEstudiante: asistenciaTotales, fallasPorAsignatura } = await resumenAsistenciaParaBoletin(
     group._id,
@@ -276,44 +255,9 @@ export async function generateReportCard(
 
   // ---- 2. Calculo puro en memoria (sin queries adicionales) ----
 
-  function componentScore(assignmentId: string, componente: string, studentId: string): number {
-    const acts = (activitiesByAssignment.get(assignmentId) ?? []).filter((a) => a.componente_siee === componente);
-    if (acts.length === 0) return 0;
-
-    let sumaPonderada = 0;
-    let sumaPesos = 0;
-    for (const act of acts) {
-      const grade = submissionMap.get(`${String(act._id)}_${studentId}`);
-      if (grade === undefined) continue;
-      sumaPonderada += grade * act.peso_en_componente;
-      sumaPesos += act.peso_en_componente;
-    }
-    if (sumaPesos === 0) return 0;
-    return sumaPonderada / sumaPesos;
-  }
-
-  function subjectGrade(subject: SubjectDocument, studentId: string): { nota: number; componentes: ReportCardComponentes } {
-    const assignment = assignmentBySubject.get(String(subject._id));
-    if (!assignment) return { nota: 0, componentes: { saber: 0, hacer: 0, ser: 0 } };
-
-    const aid = String(assignment._id);
-    const saber = componentScore(aid, 'COGNITIVO_SABER', studentId);
-    const hacer = componentScore(aid, 'PROCEDIMENTAL_HACER', studentId);
-    const ser = componentScore(aid, 'ACTITUDINAL_SER', studentId);
-
-    const nota =
-      saber * ponderacionComponentes.COGNITIVO_SABER +
-      hacer * ponderacionComponentes.PROCEDIMENTAL_HACER +
-      ser * ponderacionComponentes.ACTITUDINAL_SER;
-
-    return {
-      nota: round2(nota),
-      componentes: { saber: round2(saber), hacer: round2(hacer), ser: round2(ser) },
-    };
-  }
-
   function computeStudent(studentId: string): StudentComputed {
     const areasResult: ReportCardArea[] = [];
+    const pendientes: string[] = [];
 
     for (const { area, metodo, entries } of areaGroups.values()) {
       // Con ARITMETICO no hay ponderacion configurada: se muestra el peso
@@ -321,38 +265,37 @@ export async function generateReportCard(
       const pesoEquivalente = entries.length > 0 ? round2(100 / entries.length) : 0;
 
       const asignaturas: ReportCardAsignatura[] = entries.map(({ subject, porcentaje }) => {
-        const { nota, componentes } = subjectGrade(subject, studentId);
+        const registro = cerradoPor.get(`${String(subject._id)}|${studentId}`);
+        const nota = registro?.resultado?.nota_asignatura ?? null;
+        if (nota === null) pendientes.push(subject.nombre);
         const fallas = fallasPorAsignatura.get(`${String(subject._id)}_${studentId}`) ?? 0;
         return {
           subject_id: String(subject._id),
           nombre: subject.nombre,
           porcentaje_en_area: metodo === 'PONDERADO' ? porcentaje ?? 0 : pesoEquivalente,
           nota_asignatura: nota,
-          desempeno: desempenoCualitativo(nota, escalaEvaluacion),
+          estado: registro ? (registro.estado as 'CERRADO' | 'DEFINITIVO') : 'SIN_CERRAR',
+          desempeno: nota === null ? null : desempenoCualitativo(nota, escalaEvaluacion),
           fallas_asignatura: fallas,
-          componentes,
+          componentes: registro?.resultado?.componentes ?? [],
         };
       });
 
-      const notaArea =
-        metodo === 'PONDERADO'
-          ? round2(asignaturas.reduce((sum, a) => sum + a.nota_asignatura * (a.porcentaje_en_area / 100), 0))
-          : asignaturas.length > 0
-            ? round2(asignaturas.reduce((sum, a) => sum + a.nota_asignatura, 0) / asignaturas.length)
-            : 0;
+      const notaArea = calcularNotaArea(
+        asignaturas.map((a) => ({ nota: a.nota_asignatura, porcentaje: a.porcentaje_en_area })),
+        metodo
+      );
 
       areasResult.push({
         area_id: String(area._id),
         nombre: area.nombre,
         nota_area: notaArea,
-        desempeno_area: desempenoCualitativo(notaArea, escalaEvaluacion),
+        desempeno_area: notaArea === null ? null : desempenoCualitativo(notaArea, escalaEvaluacion),
         asignaturas,
       });
     }
 
-    const promedio = areasResult.length > 0 ? round2(areasResult.reduce((s, a) => s + a.nota_area, 0) / areasResult.length) : 0;
-
-    return { studentId, areas: areasResult, promedio };
+    return { studentId, areas: areasResult, promedio: calcularPromedioGeneral(areasResult.map((a) => a.nota_area)), pendientes };
   }
 
   const allComputed = studentIds.map((sid) => computeStudent(sid));
@@ -361,7 +304,9 @@ export async function generateReportCard(
 
   // ---- 3. Ranking (competition ranking: empatados comparten puesto) ----
 
-  const sorted = [...allComputed].sort((a, b) => b.promedio - a.promedio);
+  const sorted = allComputed
+    .filter((r): r is StudentComputed & { promedio: number } => r.promedio !== null)
+    .sort((a, b) => b.promedio - a.promedio);
   const rankByStudent = new Map<string, number>();
   let puestoActual = 0;
   let notaAnterior: number | null = null;
@@ -390,10 +335,12 @@ export async function generateReportCard(
     },
     periodo: params.periodo_numero,
     academic_year: academicYear.year,
-    puesto_grupo: rankByStudent.get(String(student._id)) ?? sorted.length,
-    total_estudiantes_grupo: sorted.length,
+    completo: targetComputed.promedio !== null,
+    pendientes: [...new Set(targetComputed.pendientes)],
+    puesto_grupo: rankByStudent.get(String(student._id)) ?? null,
+    total_estudiantes_grupo: allComputed.length,
     promedio_general_periodo: targetComputed.promedio,
-    desempeno_general: desempenoCualitativo(targetComputed.promedio, escalaEvaluacion),
+    desempeno_general: targetComputed.promedio === null ? null : desempenoCualitativo(targetComputed.promedio, escalaEvaluacion),
     asistencia_periodo: {
       total_fallas_justificadas: asistenciaTarget.justificadas,
       total_fallas_injustificadas: asistenciaTarget.injustificadas,

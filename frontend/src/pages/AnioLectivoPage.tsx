@@ -5,7 +5,7 @@ import { CierreAnioDrawer } from '../components/anioLectivo/CierreAnioDrawer';
 import { EscalaEvaluacionDrawer } from '../components/anioLectivo/EscalaEvaluacionDrawer';
 import { EventoDrawer } from '../components/anioLectivo/EventoDrawer';
 import { PeriodoCard } from '../components/anioLectivo/PeriodoCard';
-import { PonderacionComponentesDrawer } from '../components/anioLectivo/PonderacionComponentesDrawer';
+import { ComponentesEvaluativosDrawer } from '../components/anioLectivo/ComponentesEvaluativosDrawer';
 import { ProrrogaDrawer } from '../components/anioLectivo/ProrrogaDrawer';
 import { Alert, errorMessage } from '../components/ui/Alert';
 import { Chip, EstadoAnioLectivoBadge, type Tone } from '../components/ui/Badge';
@@ -637,33 +637,29 @@ export function AnioLectivoPage() {
           {esAdmin && (
             <Card>
               <CardHeader
-                title="Ponderación de componentes del SIEE"
-                subtitle="Decreto 1290 de 2009: peso de Saber, Hacer y Ser en la nota de asignatura (CU-ADM-04)."
+                title="Componentes evaluativos"
+                subtitle="Los bloques que forman el 100% de la nota de una asignatura en el periodo y el peso de cada uno (CU-ADM-04)."
                 action={
                   anio.estado === 'PLANIFICACION' ? (
                     <Button type="button" variant="outline" onClick={() => setPonderacionAbierta(true)}>
                       <PencilIcon className="h-4 w-4" />
-                      {anio.ponderacion_componentes ? 'Editar' : 'Configurar'}
+                      {anio.componentes_evaluativos.length > 0 ? 'Editar' : 'Configurar'}
                     </Button>
                   ) : undefined
                 }
               />
               {anio.estado !== 'PLANIFICACION' && (
                 <Alert tone="info">
-                  El año ya fue activado: la ponderación de componentes queda congelada y solo se puede consultar.
+                  El año ya fue activado: los componentes evaluativos quedan congelados y solo se pueden consultar.
                 </Alert>
               )}
               <div className="flex flex-wrap gap-2">
-                <Chip tone="blue">
-                  Saber {(anio.ponderacion_componentes?.COGNITIVO_SABER ?? 0.4) * 100}%
-                </Chip>
-                <Chip tone="blue">
-                  Hacer {(anio.ponderacion_componentes?.PROCEDIMENTAL_HACER ?? 0.4) * 100}%
-                </Chip>
-                <Chip tone="blue">
-                  Ser {(anio.ponderacion_componentes?.ACTITUDINAL_SER ?? 0.2) * 100}%
-                </Chip>
-                {!anio.ponderacion_componentes && <Chip tone="neutral">Respaldo por defecto (sin personalizar)</Chip>}
+                {anio.componentes_efectivos.map((c) => (
+                  <Chip key={c.clave} tone={c.origen === 'ACTIVIDADES' ? 'blue' : 'green'}>
+                    {c.nombre} {c.porcentaje}%{c.origen === 'NOTA_DIRECTA' ? ' · nota directa' : ''}
+                  </Chip>
+                ))}
+                {anio.componentes_evaluativos.length === 0 && <Chip tone="neutral">Respaldo por defecto (sin personalizar)</Chip>}
               </div>
             </Card>
           )}
@@ -702,7 +698,7 @@ export function AnioLectivoPage() {
           />
           <CalendarioSedeDrawer open={sedeCalendario !== null} anio={anio} sede={sedeCalendario} onClose={() => setSedeCalendario(null)} />
           <EscalaEvaluacionDrawer open={escalaAbierta} anio={anio} onClose={() => setEscalaAbierta(false)} />
-          <PonderacionComponentesDrawer
+          <ComponentesEvaluativosDrawer
             open={ponderacionAbierta}
             anio={anio}
             onClose={() => setPonderacionAbierta(false)}

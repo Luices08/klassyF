@@ -13,8 +13,9 @@ import {
   TipoEventoCalendario,
 } from '../constants/enums';
 import { validarCalendario } from '../utils/calendarioAcademico';
+import { ORIGENES_COMPONENTE, OrigenComponente } from '../constants/notas';
 import { validarEscalaEvaluacion } from '../utils/escalaEvaluacion';
-import { validarPonderacionComponentes } from '../utils/siee';
+import { validarComponentesEvaluativos, validarPonderacionComponentes } from '../utils/siee';
 
 export interface IPeriodo {
   numero: number;
@@ -78,6 +79,15 @@ export interface IEscalaEvaluacion {
 // en el motor de boletines (regla de oro de datos, sección 3) — ver utils/siee#ponderacionEfectiva.
 export type IPonderacionComponentes = Record<ComponenteSiee, number>;
 
+// M12: bloques que forman el 100% de la nota de una asignatura en el periodo. La institucion los define (Saber/Hacer/Ser,
+// Heteroevaluacion, Autoevaluacion...); la `clave` es estable (las actividades la referencian), el nombre se puede cambiar.
+export interface IComponenteEvaluativo {
+  clave: string;
+  nombre: string;
+  porcentaje: number;
+  origen: OrigenComponente;
+}
+
 export interface IAcademicYear {
   institucion_id: Types.ObjectId;
   year: number;
@@ -94,6 +104,8 @@ export interface IAcademicYear {
   // null hasta que el ADMIN la personalice (CU-ADM-04); el respaldo 40/40/20 lo aplica
   // utils/siee#ponderacionEfectiva mientras tanto.
   ponderacion_componentes: IPonderacionComponentes | null;
+  // Vacio = la institucion aun no los definio: rige el respaldo derivado de ponderacion_componentes (utils/siee#componentesEfectivos).
+  componentes_evaluativos: Types.DocumentArray<IComponenteEvaluativo>;
   cerrado_at: Date | null;
   createdAt: Date;
   updatedAt: Date;
@@ -193,6 +205,16 @@ const ponderacionComponentesSchema = new Schema<IPonderacionComponentes>(
   { _id: false }
 );
 
+const componenteEvaluativoSchema = new Schema<IComponenteEvaluativo>(
+  {
+    clave: { type: String, required: true, trim: true, uppercase: true, match: /^[A-Z0-9_]{2,40}$/ },
+    nombre: { type: String, required: true, trim: true, maxlength: 60 },
+    porcentaje: { type: Number, required: true, min: 0, max: 100 },
+    origen: { type: String, enum: ORIGENES_COMPONENTE, required: true },
+  },
+  { _id: false }
+);
+
 const academicYearSchema = new Schema<IAcademicYear, AcademicYearModel>(
   {
     institucion_id: { type: Schema.Types.ObjectId, ref: 'Institution', required: true },
@@ -215,6 +237,7 @@ const academicYearSchema = new Schema<IAcademicYear, AcademicYearModel>(
     calendarios_sede: { type: [calendarioSedeSchema], default: [] },
     escala_evaluacion: { type: escalaEvaluacionSchema, default: null },
     ponderacion_componentes: { type: ponderacionComponentesSchema, default: null },
+    componentes_evaluativos: { type: [componenteEvaluativoSchema], default: [] },
     cerrado_at: { type: Date, default: null },
   },
   { timestamps: true }
@@ -287,6 +310,14 @@ academicYearSchema.pre('validate', function validarEscala(this: IAcademicYear, n
 academicYearSchema.pre('validate', function validarPonderacion(this: IAcademicYear, next) {
   if (!this.ponderacion_componentes) return next();
   const problema = validarPonderacionComponentes(this.ponderacion_componentes);
+  if (problema) return next(errorDeNegocio(problema));
+  next();
+});
+
+// Componentes evaluativos (M12): claves unicas y porcentajes que suman exactamente 100.
+academicYearSchema.pre('validate', function validarComponentes(this: IAcademicYear, next) {
+  if (!this.componentes_evaluativos || this.componentes_evaluativos.length === 0) return next();
+  const problema = validarComponentesEvaluativos(this.componentes_evaluativos);
   if (problema) return next(errorDeNegocio(problema));
   next();
 });

@@ -11,6 +11,7 @@ import TeacherAssignment, { TeacherAssignmentDocument } from '../../src/models/t
 import { UserDocument } from '../../src/models/user.model';
 import * as entregas from '../../src/services/actividadEntrega.service';
 import * as actividades from '../../src/services/activity.service';
+import * as notas from '../../src/services/notas.service';
 import { hoyColombia } from '../../src/services/attendance.service';
 import * as configuracion from '../../src/services/configuracionActividades.service';
 import { detenerBaseDeDatos, iniciarBaseDeDatos, limpiarBaseDeDatos } from './baseDeDatos';
@@ -218,7 +219,7 @@ describe('M11: actividades y entregas (con base de datos)', () => {
       expect(await actividades.updateActivity(id, { titulo: 'Taller de fracciones (v2)' }, docente)).toMatchObject({ titulo: 'Taller de fracciones (v2)' });
 
       await entregas.registrarEntrega(id, {}, pdf(), e.estudiante);
-      await actividades.gradeActivity(id, [{ student_id: String(e.estudiante._id), calificacion_numerica: 4 }], docente);
+      await notas.gradeActivity(id, [{ student_id: String(e.estudiante._id), calificacion_numerica: 4 }], docente);
 
       await expect(actividades.updateActivity(id, { peso_en_componente: 2 }, docente)).rejects.toMatchObject({ statusCode: 409, message: /notas/ });
       await expect(actividades.updateActivity(id, { requiere_entrega: false }, docente)).rejects.toMatchObject({ statusCode: 409 });
@@ -266,7 +267,7 @@ describe('M11: actividades y entregas (con base de datos)', () => {
       await expect(entregas.rutaDeEntrega(String(guardada._id), e.otroEstudiante)).rejects.toMatchObject({ statusCode: 404 });
       await expect(entregas.rutaDeEntrega(String(guardada._id), e.docenteAjeno)).rejects.toMatchObject({ statusCode: 403 });
 
-      await actividades.gradeActivity(id, [{ student_id: String(e.estudiante._id), calificacion_numerica: 4.5, retroalimentacion: 'Muy bien' }], docente);
+      await notas.gradeActivity(id, [{ student_id: String(e.estudiante._id), calificacion_numerica: 4.5, retroalimentacion: 'Muy bien' }], docente);
       const detalle = await entregas.detalleParaEstudiante(id, e.estudiante);
       expect(detalle).toMatchObject({
         estado: 'CALIFICADA',
@@ -321,7 +322,7 @@ describe('M11: actividades y entregas (con base de datos)', () => {
       await expect(entregas.registrarEntrega(cerrada, {}, pdf(), e.estudiante)).rejects.toMatchObject({ statusCode: 409, message: /no recibe entregas tardías/ });
       expect(await entregas.registrarEntrega(tardia, {}, pdf(), e.estudiante)).toMatchObject({ estado: 'ENTREGADA_TARDE', con_retraso: true });
 
-      await actividades.gradeActivity(tardia, [{ student_id: String(e.estudiante._id), calificacion_numerica: 3 }], docente);
+      await notas.gradeActivity(tardia, [{ student_id: String(e.estudiante._id), calificacion_numerica: 3 }], docente);
       expect((await entregas.detalleParaEstudiante(tardia, e.estudiante)).entrega).toMatchObject({ estado: 'CALIFICADA', con_retraso: true });
     });
 
@@ -342,7 +343,7 @@ describe('M11: actividades y entregas (con base de datos)', () => {
     it('el docente ve a todo el grupo con su estado, también a quien no entregó', async () => {
       const id = await programar();
       await entregas.registrarEntrega(id, {}, pdf(), e.estudiante);
-      await actividades.gradeActivity(id, [{ student_id: String(e.otroEstudiante._id), calificacion_numerica: 3 }], docente);
+      await notas.gradeActivity(id, [{ student_id: String(e.otroEstudiante._id), calificacion_numerica: 3 }], docente);
 
       const filas = await entregas.listarEntregas(id, docente);
       const estados = Object.fromEntries(filas.map((f) => [f.estudiante._id, f.estado]));

@@ -1,7 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../lib/apiClient';
 import type { FormatoEvidencia, TipoActividad } from '../lib/actividades';
-import type { ComponenteSiee } from '../types/domain';
 
 // --- Tipos (espejo de las respuestas de /activities) ---
 
@@ -24,7 +23,9 @@ export interface Actividad {
   titulo: string;
   descripcion: string;
   tipo: TipoActividad;
-  componente_siee: ComponenteSiee;
+  /** Clave del componente evaluativo del año (M12). */
+  componente_siee: string;
+  componente_nombre: string;
   peso_en_componente: number;
   fecha_apertura: string;
   fecha_entrega: string;
@@ -152,7 +153,7 @@ export interface DatosActividad {
   titulo: string;
   descripcion: string;
   tipo: TipoActividad;
-  componente_siee: ComponenteSiee;
+  componente_siee: string;
   peso_en_componente: number;
   fecha_apertura: string;
   fecha_entrega: string;
@@ -221,6 +222,7 @@ export function useCalificarEntrega() {
     onSuccess: () => {
       invalidar();
       void queryClient.invalidateQueries({ queryKey: ['report-card'] });
+      void queryClient.invalidateQueries({ queryKey: ['notas'] });
     },
   });
 }

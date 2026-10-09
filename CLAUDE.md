@@ -133,7 +133,7 @@ solo extender si se pide algo nuevo. Reglas que no se ven leyendo un solo archiv
 - **`assertPeriodNotLocked(año, grupo, periodo, docenteId)` es el único punto que decide si se pueden digitar
   notas**: año EN_CURSO, periodo ABIERTO/EN_DIGITACION y dentro de su ventana (la de la sede del grupo si esta
   tiene calendario propio), o una prórroga vigente para ese docente/grupo; además el `PeriodLock` del grupo.
-  Todo módulo que mute notas debe pasar por ahí (hoy lo hace `gradeActivity`).
+  Todo módulo que mute notas debe pasar por ahí (hoy lo hace `notas.service#registrarNotas`, que usan la planilla y `gradeActivity`).
 - **Fechas**: las fechas de calendario se guardan a medianoche UTC. Para compararlas con "ahora" se usa
   `inicioDelDia`/`finDelDia` de `utils/calendarioAcademico.ts` (UTC-5, cierre inclusivo); en el frontend se
   formatean con `lib/fechas.ts`, nunca con `toLocaleDateString()` (mostraría el día anterior).
@@ -515,16 +515,66 @@ lee `componente_siee` y `peso_en_componente`); M11 los extendió sin romper nada
   sobrevive a la calificación. Se puede reentregar (reemplaza el archivo) hasta que se califique; la carrera con una calificación
   concurrente la cierra el filtro `calificacion_numerica: null` + índice único (409). Entrega exige año `EN_CURSO`, periodo no `CERRADO` y
   sin `PeriodLock` del grupo. El estudiante no ve una actividad antes de su `fecha_apertura` (publicación): 404.
-- **Puente hacia M12:** la nota la sigue registrando `activity.service#gradeActivity` (escala de M05, `assertPeriodNotLocked`); lo único
-  que M11 le cambió es marcar la entrega `CALIFICADA`. `EntregasDrawer` solo ofrece nota + retroalimentación por estudiante sobre ese
-  endpoint; **la planilla de calificación completa es de M12**, no se hizo aquí. El docente no edita componente/peso de lo que ya tiene
-  notas, y no se elimina una actividad con entregas o notas. El periodo y la asignación de una actividad no se cambian (se elimina y
+- **Puente hacia M12:** la nota se registra con `notas.service#gradeActivity` (`PATCH /activities/:id/grade`; antes vivía en
+  `activity.service`), que pasa por el mismo núcleo que la planilla de M12 (escala de M05, `assertPeriodNotLocked`, historial,
+  planilla no cerrada) y marca la entrega `CALIFICADA`. `EntregasDrawer` ofrece nota + retroalimentación por estudiante sobre ese
+  endpoint; la planilla completa es M12. `Activity.componente_siee` ya no es un enum: es la **clave de un componente evaluativo del
+  año** (M12), validada al programar (existe y se alimenta de `ACTIVIDADES`); `componente_nombre` viaja en la vista. El docente no edita
+  componente/peso de lo que ya tiene notas, no programa actividades nuevas en una planilla cerrada, y no se elimina una actividad con entregas o notas. El periodo y la asignación de una actividad no se cambian (se elimina y
   se programa de nuevo con la planeación del otro periodo).
 - **Pruebas:** `tests/actividades.test.ts` (funciones puras), `tests/integracion/actividades.int.test.ts` (servicios con base real) y
   `actividades.http.int.test.ts` (rutas, validadores, permisos por rol y subida multipart real).
 - **Pendiente, a propósito:** vista del acudiente y notificaciones de actividades nuevas/por vencer (M27/M28), M25 como fuente del
   calendario, planilla de notas (M12), varios archivos por entrega, rúbricas y ajustes razonables de M16 sobre la actividad (solo se
   expone `GET /inclusion/grupos/:groupId/indicador`).
+
+### M12 (Evaluación y notas) — estado: núcleo completo
+
+Backend `/notas` (modelo `CalificacionAsignatura`; servicios `notas.service`, `notasExcel.service`; motor puro `utils/calculoNotas.ts`) y
+configuración en `/academic-years/:id/componentes-evaluativos`; frontend `NotasPlanillaPage` (`/docente/notas`), `NotasGestionPage`
+(`/admin/notas`, seguimiento de coordinación) y el editor de componentes en `AnioLectivoPage`. La escala, el congelamiento y la consolidación de áreas
+**ya existían** (M05/M06) y no se rehicieron. Reglas que no se ven leyendo un solo archivo:
+
+- **Componentes evaluativos configurables por año** (`AcademicYear.componentes_evaluativos`: `clave` estable, `nombre`, `porcentaje`, `origen`):
+  suman exactamente 100, hasta 8, al menos uno `ACTIVIDADES` (promedio ponderado de las actividades de M11) y los demás pueden ser
+  `NOTA_DIRECTA` (el docente la digita sin actividad: autoevaluación, coevaluación). **Sin configurar rige el respaldo** Saber/Hacer/Ser derivado
+  de `ponderacion_componentes` (`utils/siee#componentesEfectivos`), así un año anterior calcula igual sin migrar datos; `ponderacion_componentes`
+  y su endpoint quedan solo como respaldo (la UI de M05 ahora edita los componentes). Solo se editan con el año en PLANIFICACION (el congelamiento de
+  siempre, más estricto que «tras la primera nota») y no se quita ni se deja de alimentar con actividades un bloque que ya tiene actividades.
+- **«Falta nota» no es cero.** El motor devuelve `null` y una nota **parcial** (promedia solo los bloques con nota) mientras falte algo; un 0 es una nota.
+  Un bloque de actividades está completo cuando tiene al menos una y **todas** están calificadas. Nota de área y promedio general solo se calculan con todas
+  sus partes. Una sola fórmula en backend (`calculoNotas.ts`); `frontend/src/lib/calculoNotas.ts` la espeja solo para la vista en vivo de la planilla
+  (si cambia una, cambia la otra).
+- **Estados de la nota de una asignatura de un estudiante en un periodo** (`CalificacionAsignatura`, único por asignación+periodo+estudiante):
+  `PENDIENTE` (faltan notas) ⇄ `BORRADOR` (completa, editable) los fija el sistema al guardar → `CERRADO` (lo cierra el docente titular, exige todas
+  las notas y **congela** `resultado` con los componentes y la nota) → `DEFINITIVO` (coordinación/ADMIN, solo si toda la clase está cerrada). Cerrada o
+  definitiva: no se califican actividades (tampoco desde M11) ni se programan nuevas (`notasEstado.service#exigirPlanillaAbierta`). **Reabrir exige motivo**
+  (queda en `reaperturas[]` y auditoría): el titular y coordinación reabren lo `CERRADO` mientras el periodo admita notas; lo `DEFINITIVO` solo el ADMIN.
+  El estado abierto que se muestra se recalcula en vivo; el guardado puede quedar desfasado si se programa/elimina una actividad después (la planilla y
+  el seguimiento no dependen de él).
+- **Registro transaccional** (`registrarNotas`): valida TODO antes de escribir (clase del titular, periodo vía `assertPeriodNotLocked`, escala del año,
+  matrícula, duplicados, planilla abierta) y escribe en una transacción. Cada cambio de nota deja `historial_notas[]` (actividad) o `historial[]` (nota
+  directa) con valor anterior/nuevo, quién y cuándo; repetir una nota no genera ruido. Las notas de actividad siguen en `ActivitySubmission` (M11); las directas
+  y el estado, en `CalificacionAsignatura`, que copia `group_id`/`subject_id` de la asignación para consultar por grupo o asignatura (M17/M30).
+- **Boletín (M17) = solo lo cerrado.** `reportCard.service` ya no mira actividades: lee `resultado` de las notas `CERRADO`/`DEFINITIVO`. Una asignatura sin
+  cerrar sale `SIN_CERRAR` con `nota: null`; el área y el promedio general solo existen con todas sus partes; `completo`/`pendientes` dicen qué falta y
+  el puesto solo se calcula entre estudiantes con boletín completo. Los componentes viajan como arreglo (`clave`, `nombre`, `porcentaje`, `nota`), no como
+  saber/hacer/ser fijos.
+- **Nivel cualitativo con huecos entre rangos:** la escala por defecto (1.0–2.9 | 3.0–3.9 | 4.0–4.5 | 4.6–5.0) deja huecos y un promedio de 2 decimales (3.95) no
+  caía en ninguno (`resolverDesempeno` lanzaba 400). Ahora el nivel se resuelve con la nota redondeada a `precision_decimales` de la escala y, si aún queda en un
+  hueco, al rango inferior; la nota mostrada no se altera. La fórmula de «Desempeño» del Excel hace lo mismo.
+- **Excel offline (M22)** (`notasExcel.service`, mismo patrón que la asistencia): `GET/POST /notas/planilla/excel`. La hoja lleva encabezados por bloque, pesos,
+  promedios/nota/desempeño como **fórmulas** (con resultado en caché), solo las casillas de nota desprotegidas (y con validación de escala; las de estudiantes
+  cerrados, bloqueadas) y una hoja `Datos` oculta que identifica clase, periodo y columnas. La protección de la hoja es una comodidad: al importar se ignoran las
+  columnas calculadas y el servidor revalida todo (toda la hoja antes de guardar, solo viajan las celdas que cambiaron, coma decimal tolerada). Google Sheets usa
+  el mismo `.xlsx`. **Las fórmulas no se probaron en Excel/Sheets** (no hay motor de hojas en el entorno de pruebas): solo su texto y el flujo de ida y vuelta.
+- **Quién ve qué:** el titular edita; ADMIN/COORDINADOR consultan (`GET /notas/planilla`), ven el seguimiento (`/notas/seguimiento`) y declaran definitivas; otro
+  docente no entra (403). `declararDefinitivas` valida el rol también en el servicio.
+- **Pruebas:** `tests/calculoNotas.test.ts` (motor, configuración y escala), `tests/integracion/notas.int.test.ts` (servicios con base real: planilla,
+  historial, cierre, definitivas, reapertura, boletín, configuración) y `notas.http.int.test.ts` (rutas, permisos y Excel de ida y vuelta).
+- **Pendiente, a propósito:** personalización de encabezados, filtros y firmas de la planilla (M21); notificaciones de cierre (M28); recuperaciones y comisiones
+  de evaluación (M18/M20); estadísticas (M30, que leerá `CalificacionAsignatura`); cierre automático de las planillas al cerrar el periodo en M05; el director de grupo
+  no consulta las planillas de las demás asignaturas de su grupo (sí en asistencia); borrar una nota ya puesta (se corrige, no se borra).
 
 ### Cargas masivas por CSV (M02 usuarios, M03 estudiantes)
 
@@ -648,7 +698,7 @@ nuevos para lo que ya existe aquí** — extenderlos si falta un caso, no duplic
   mapeo rol→color o estado→color en una página), `Card`/`CardHeader`, `Table`/`TableHead`/`Th`/
   `TableBody`/`Td`/`EmptyRow`, `Drawer` (formularios de creación/edición; su botón principal
   acepta `submitVariant` para casos como confirmar un borrado en rojo), `PageHeader` (título +
-  subtítulo + acción de la página), `Field` (`Input`/`Select`), `MultiSelect` (selector desplegable de selección múltiple con checkboxes, contador y badges de rol/estado; prop opcional `emptyLabel` cuando elegir es obligatorio), `Alert`, `Spinner`, `EstadoEspacioBadge` (M10), `EstadoAsistenciaChip`/`EstadoJustificacionBadge` (M13), `MallaDisponibilidad` (M09: cuadrícula de tiempo libre por clic, disponible/condicional/no disponible), `GuiaColumnas` (guía colapsable de columnas de una carga CSV), `ProgressBar` (barra de avance con tono, ej. semanas lectivas vs. el mínimo de 40), `LineaTiempo` (línea de tiempo vertical con punto, fecha, chips y contenido por registro; la usa el historial de convivencia), `EstadoCasoBadge`/`TipoSituacionBadge` (M15), `EstadoExpedienteBadge`/`EstadoSolicitudApoyoBadge` (M16), `EstadoEntregaBadge`/`TipoActividadChip` (M11: programada → entregada → con retraso → calificada; tipo de actividad), `Dropzone` (zona para soltar o elegir un archivo, valida extensión y tamaño en el navegador y muestra el archivo elegido; el servidor siempre confirma el contenido), `Tabs`/`TabPanel` (navegación por pestañas con subrayado azul en la activa; reusar en vez de reinventar un switch de pestañas en otra página), `Stepper` (indicador de pasos para formularios largos por secciones, ej. el asistente de creación de estudiante en M03), e iconos SVG propios en `components/ui/icons.tsx` (no se agregó ninguna librería de iconos).
+  subtítulo + acción de la página), `Field` (`Input`/`Select`), `MultiSelect` (selector desplegable de selección múltiple con checkboxes, contador y badges de rol/estado; prop opcional `emptyLabel` cuando elegir es obligatorio), `Alert`, `Spinner`, `EstadoEspacioBadge` (M10), `EstadoAsistenciaChip`/`EstadoJustificacionBadge` (M13), `MallaDisponibilidad` (M09: cuadrícula de tiempo libre por clic, disponible/condicional/no disponible), `GuiaColumnas` (guía colapsable de columnas de una carga CSV), `ProgressBar` (barra de avance con tono, ej. semanas lectivas vs. el mínimo de 40), `LineaTiempo` (línea de tiempo vertical con punto, fecha, chips y contenido por registro; la usa el historial de convivencia), `EstadoCasoBadge`/`TipoSituacionBadge` (M15), `EstadoExpedienteBadge`/`EstadoSolicitudApoyoBadge` (M16), `EstadoNotaBadge` (M12: pendiente/borrador/cerrado/definitivo), `EstadoEntregaBadge`/`TipoActividadChip` (M11: programada → entregada → con retraso → calificada; tipo de actividad), `Dropzone` (zona para soltar o elegir un archivo, valida extensión y tamaño en el navegador y muestra el archivo elegido; el servidor siempre confirma el contenido), `Tabs`/`TabPanel` (navegación por pestañas con subrayado azul en la activa; reusar en vez de reinventar un switch de pestañas en otra página), `Stepper` (indicador de pasos para formularios largos por secciones, ej. el asistente de creación de estudiante en M03), e iconos SVG propios en `components/ui/icons.tsx` (no se agregó ninguna librería de iconos).
 - **Contenedor global y densidad** (`components/layout/AppShell.tsx`): el `<main>` centra el
   contenido en `max-w-7xl` (no `max-w-5xl`) para que las tablas anchas (Usuarios, Grupos) no
   scrolleen antes de tiempo en pantallas grandes. Cada página usa `space-y-4` (no `space-y-6`)
@@ -657,7 +707,7 @@ nuevos para lo que ya existe aquí** — extenderlos si falta un caso, no duplic
   `space-y-6` en una pantalla nueva sin pedirlo explícitamente, y el padding interno de
   `Table`/`Th`/`Td` no se toca por esta regla de densidad (es un ajuste del contenedor, no de
   las tablas).
-- `Drawer` acepta `size="lg"` (opcional, por defecto `md`) para formularios de varias columnas, como la
+- `Drawer` acepta `size="lg"` (y `"xl"` para tablas anchas, como la planilla de notas en solo consulta; opcional, por defecto `md`) para formularios de varias columnas, como la
   parametrización del año lectivo. Los componentes propios de M05 viven en `components/anioLectivo/`
   (`PeriodoCard`, drawers de año, cierre, prórroga, eventos y calendario por sede); las reglas de aviso de
   calendario A/B están en `lib/calendarioColombia.ts` y el formato de fechas en `lib/fechas.ts`.

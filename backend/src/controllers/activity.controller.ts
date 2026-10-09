@@ -3,6 +3,7 @@ import { ParsedQs } from 'qs';
 import * as activityService from '../services/activity.service';
 import * as entregaService from '../services/actividadEntrega.service';
 import * as configuracionService from '../services/configuracionActividades.service';
+import * as notasService from '../services/notas.service';
 import ApiError from '../utils/ApiError';
 import catchAsync from '../utils/catchAsync';
 
@@ -76,12 +77,12 @@ export const descargarEntrega = catchAsync<IdParams>(async (req, res) => {
 
 // --- Puente hacia M12 ---
 
-export const gradeActivity = catchAsync<IdParams, unknown, activityService.GradeEntryInput | activityService.GradeEntryInput[]>(
+export const gradeActivity = catchAsync<IdParams, unknown, notasService.GradeEntryInput | notasService.GradeEntryInput[]>(
   async (req, res) => {
     if (!req.user) throw new ApiError(401, 'No autenticado.');
 
     const entries = Array.isArray(req.body) ? req.body : [req.body];
-    const submissions = await activityService.gradeActivity(req.params.id, entries, req.user);
+    const submissions = await notasService.gradeActivity(req.params.id, entries, req.user, req.ip);
     res.status(200).json({ success: true, count: submissions.length, data: submissions });
   }
 );

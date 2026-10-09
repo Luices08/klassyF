@@ -9,6 +9,7 @@ import { ReportCardPage } from './pages/ReportCardPage';
 import { HomePage } from './pages/public/HomePage';
 import { AnioLectivoPage } from './pages/AnioLectivoPage';
 import { ActividadesDocentePage } from './pages/ActividadesDocentePage';
+import { NotasPlanillaPage } from './pages/NotasPlanillaPage';
 import { AsistenciaPage } from './pages/AsistenciaPage';
 import { GestionAsistenciaPage } from './pages/GestionAsistenciaPage';
 import { MisActividadesPage } from './pages/MisActividadesPage';
@@ -20,6 +21,7 @@ import { InclusionPage } from './pages/InclusionPage';
 import { MisAjustesPage } from './pages/MisAjustesPage';
 import { AcademicCatalogPage } from './pages/admin/AcademicCatalogPage';
 import { ActividadesGestionPage } from './pages/admin/ActividadesGestionPage';
+import { NotasGestionPage } from './pages/admin/NotasGestionPage';
 import { AdmissionRequestsPage } from './pages/admin/AdmissionRequestsPage';
 import { CasosConvivenciaPage } from './pages/admin/CasosConvivenciaPage';
 import { ComitePage } from './pages/admin/ComitePage';
@@ -80,6 +82,7 @@ export default function App() {
             <Route path="/admin/study-plan" element={<StudyPlanPage />} />
             <Route path="/admin/revision-curricular" element={<RevisionCurricularPage />} />
             <Route path="/admin/actividades" element={<ActividadesGestionPage />} />
+            <Route path="/admin/notas" element={<NotasGestionPage />} />
           </Route>
 
           <Route element={<ProtectedRoute allowedRoles={['DOCENTE', 'ESTUDIANTE', 'ACUDIENTE']} />}>
@@ -91,6 +94,7 @@ export default function App() {
             <Route path="/docente/planeacion-curricular" element={<DesarrolloCurricularPage />} />
             <Route path="/docente/asistencia" element={<AsistenciaPage />} />
             <Route path="/docente/actividades" element={<ActividadesDocentePage />} />
+            <Route path="/docente/notas" element={<NotasPlanillaPage />} />
           </Route>
 
           <Route element={<ProtectedRoute allowedRoles={['ADMIN', 'COORDINADOR', 'SECRETARIA', 'DOCENTE']} />}>

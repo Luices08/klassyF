@@ -1,6 +1,9 @@
 import { Types } from 'mongoose';
 import { TRANSICIONES_PERIODO } from '../constants/anioLectivo';
 import { Calendario, EstadoPeriodoAcademico, NivelDesempeno, Rol, TipoEventoCalendario } from '../constants/enums';
+import { OrigenComponente } from '../constants/notas';
+import Activity from '../models/activity.model';
+import TeacherAssignment from '../models/teacherAssignment.model';
 import AcademicYear, {
   AcademicYearDocument,
   IPeriodo,
@@ -16,6 +19,7 @@ import ApiError from '../utils/ApiError';
 import { calcularResumenSemanas, finDelDia } from '../utils/calendarioAcademico';
 import { sugerirRangos, SugerenciaRangosInput } from '../utils/escalaEvaluacion';
 import { runTransaction } from '../utils/runTransaction';
+import { claveDeComponente, componentesEfectivos, validarComponentesEvaluativos } from '../utils/siee';
 import { registrarEvento } from './audit.service';
 
 type FechaEntrada = Date | string;
@@ -91,6 +95,8 @@ export function aDto(anio: AcademicYearDocument) {
   return {
     ...anio.toObject(),
     resumen_semanas: calcularResumenSemanas(anio.periodos, anio.eventos),
+    // Los bloques que rigen la nota (M12): los configurados o, mientras no, Saber/Hacer/Ser.
+    componentes_efectivos: componentesEfectivos(anio),
   };
 }
 export type AnioLectivoDto = ReturnType<typeof aDto>;
@@ -682,6 +688,61 @@ export async function actualizarPonderacionComponentes(
     entidad: 'AcademicYear',
     entidad_id: anio._id,
     detalle: `Año ${anio.year}: ponderación Saber ${input.COGNITIVO_SABER}, Hacer ${input.PROCEDIMENTAL_HACER}, Ser ${input.ACTITUDINAL_SER}.`,
+    ip,
+  });
+
+  return aDto(anio);
+}
+
+export interface ComponenteEvaluativoInput {
+  /** Los que ya existen conservan su clave (las actividades la referencian); los nuevos la reciben del servidor. */
+  clave?: string;
+  nombre: string;
+  porcentaje: number;
+  origen: OrigenComponente;
+}
+
+/**
+ * Bloques que forman el 100% de la nota de una asignatura (M12): Saber/Hacer/Ser, Heteroevaluación, Autoevaluación, o los
+ * que defina el colegio. Como la escala y la ponderación anteriores, solo se editan con el año en PLANIFICACION; además no
+ * se puede quitar (ni dejar de alimentar con actividades) un bloque que ya tiene actividades programadas.
+ */
+export async function actualizarComponentesEvaluativos(
+  id: string,
+  input: ComponenteEvaluativoInput[],
+  { usuarioId, ip }: ContextoUsuario
+): Promise<AnioLectivoDto> {
+  const anio = await cargarAnioEnPlanificacion(id);
+
+  const usadas = new Set(input.flatMap((c) => (c.clave ? [c.clave] : [])));
+  const componentes = input.map((c) => {
+    const clave = c.clave ?? claveDeComponente(c.nombre, usadas);
+    usadas.add(clave);
+    return { clave, nombre: c.nombre.trim(), porcentaje: c.porcentaje, origen: c.origen };
+  });
+  const problema = validarComponentesEvaluativos(componentes);
+  if (problema) throw new ApiError(400, problema);
+
+  const asignaciones = await TeacherAssignment.find({ academic_year_id: anio._id }).select('_id').lean();
+  const clavesConActividades: string[] = await Activity.distinct('componente_siee', {
+    teacher_assignment_id: { $in: asignaciones.map((a) => a._id) },
+  });
+  for (const clave of clavesConActividades) {
+    const nuevo = componentes.find((c) => c.clave === clave);
+    if (!nuevo || nuevo.origen !== 'ACTIVIDADES') {
+      throw new ApiError(409, `El componente «${clave}» ya tiene actividades programadas: no se puede quitar ni dejar de alimentar con actividades.`);
+    }
+  }
+
+  anio.set('componentes_evaluativos', componentes);
+  await anio.save();
+
+  await registrarEvento({
+    usuario_id: usuarioId,
+    accion: 'COMPONENTES_EVALUATIVOS_ACTUALIZADOS',
+    entidad: 'AcademicYear',
+    entidad_id: anio._id,
+    detalle: `Año ${anio.year}: ${componentes.map((c) => `${c.nombre} ${c.porcentaje}%`).join(', ')}.`,
     ip,
   });
 

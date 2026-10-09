@@ -5,7 +5,7 @@ import type {
   Calendario,
   EstadoPeriodoAcademico,
   PeriodoSede,
-  PonderacionComponentes,
+  ComponenteEvaluativo,
   Prorroga,
   RangoCualitativo,
   TipoEventoCalendario,
@@ -261,16 +261,18 @@ export function useActualizarEscalaEvaluacion() {
   });
 }
 
-export interface ActualizarPonderacionComponentesInput extends PonderacionComponentes {
+export interface ActualizarComponentesEvaluativosInput {
   anioId: string;
+  /** Los que ya existen conservan su `clave` (las actividades la referencian); los nuevos no la mandan. */
+  componentes: Array<Pick<ComponenteEvaluativo, 'nombre' | 'porcentaje' | 'origen'> & { clave?: string }>;
 }
 
-/** Pesos de Saber/Hacer/Ser para la nota de asignatura (CU-ADM-04); la suma debe ser 1 (100%). */
-export function useActualizarPonderacionComponentes() {
+/** Bloques evaluativos del año (M12): deben sumar 100 y solo se editan con el año en planificación. */
+export function useActualizarComponentesEvaluativos() {
   const invalidar = useInvalidarAnios();
   return useMutation({
-    mutationFn: ({ anioId, ...input }: ActualizarPonderacionComponentesInput) =>
-      api.patch<AcademicYear>(`/academic-years/${anioId}/ponderacion-componentes`, input),
+    mutationFn: ({ anioId, componentes }: ActualizarComponentesEvaluativosInput) =>
+      api.patch<AcademicYear>(`/academic-years/${anioId}/componentes-evaluativos`, componentes),
     onSuccess: invalidar,
   });
 }

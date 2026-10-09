@@ -1,5 +1,3 @@
-import type { ComponenteSiee } from '../types/domain';
-
 // Espejo de backend/src/constants/actividades.ts: el contrato entre ambos lados se cambia en los dos a la vez.
 
 export const TIPOS_ACTIVIDAD = ['TAREA', 'EVALUACION', 'TRABAJO', 'PROYECTO'] as const;
@@ -10,12 +8,6 @@ export const NOMBRES_TIPO_ACTIVIDAD: Record<TipoActividad, string> = {
   EVALUACION: 'Evaluación',
   TRABAJO: 'Trabajo',
   PROYECTO: 'Proyecto',
-};
-
-export const NOMBRES_COMPONENTE_SIEE: Record<ComponenteSiee, string> = {
-  COGNITIVO_SABER: 'Saber (cognitivo)',
-  PROCEDIMENTAL_HACER: 'Hacer (procedimental)',
-  ACTITUDINAL_SER: 'Ser (actitudinal)',
 };
 
 export type FormatoEvidencia = 'PDF' | 'WORD' | 'EXCEL' | 'POWERPOINT' | 'IMAGEN';

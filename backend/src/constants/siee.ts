@@ -11,3 +11,10 @@ export const PONDERACION_COMPONENTES_POR_DEFECTO: Record<ComponenteSiee, number>
   PROCEDIMENTAL_HACER: 0.4,
   ACTITUDINAL_SER: 0.2,
 };
+
+/** Nombre de los 3 componentes del respaldo (Decreto 1290): lo que ve el usuario mientras la institucion no defina los suyos. */
+export const NOMBRES_COMPONENTE_SIEE: Record<ComponenteSiee, string> = {
+  COGNITIVO_SABER: 'Saber',
+  PROCEDIMENTAL_HACER: 'Hacer',
+  ACTITUDINAL_SER: 'Ser',
+};

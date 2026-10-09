@@ -14,15 +14,13 @@ import {
 import {
   FORMATOS_EVIDENCIA,
   type FormatoEvidencia,
-  NOMBRES_COMPONENTE_SIEE,
   NOMBRES_TIPO_ACTIVIDAD,
   TIPOS_ACTIVIDAD,
   type TipoActividad,
   aInputInstante,
   aInstante,
 } from '../../lib/actividades';
-import type { CurricularDevelopment, DbaReferente, ComponenteSiee } from '../../types/domain';
-import { COMPONENTES_SIEE } from '../../types/domain';
+import type { ComponenteEvaluativo, CurricularDevelopment, DbaReferente } from '../../types/domain';
 
 interface ActividadDrawerProps {
   open: boolean;
@@ -31,6 +29,8 @@ interface ActividadDrawerProps {
   periodoNumero: number;
   /** La planeación APROBADA del periodo: de ella salen los DBA y las competencias que la actividad puede evaluar. */
   planeacion: CurricularDevelopment;
+  /** Los componentes del año que se alimentan de actividades (M12): la actividad cuenta dentro de uno de ellos. */
+  componentes: ComponenteEvaluativo[];
   /** Con actividad se edita; sin ella se crea. */
   actividad: ActividadConResumen | null;
 }
@@ -39,7 +39,7 @@ interface Formulario {
   tipo: TipoActividad;
   titulo: string;
   descripcion: string;
-  componente: ComponenteSiee;
+  componente: string;
   peso: string;
   apertura: string;
   entrega: string;
@@ -51,7 +51,7 @@ interface Formulario {
   confirmar: boolean;
 }
 
-function formularioInicial(actividad: Actividad | null): Formulario {
+function formularioInicial(actividad: Actividad | null, componentes: ComponenteEvaluativo[]): Formulario {
   if (actividad) {
     return {
       tipo: actividad.tipo,
@@ -73,7 +73,7 @@ function formularioInicial(actividad: Actividad | null): Formulario {
     tipo: 'TAREA',
     titulo: '',
     descripcion: '',
-    componente: 'COGNITIVO_SABER',
+    componente: componentes[0]?.clave ?? '',
     peso: '1',
     apertura: aInputInstante(new Date().toISOString()),
     entrega: '',
@@ -94,8 +94,8 @@ export function ActividadDrawer(props: ActividadDrawerProps) {
   return props.open ? <FormularioActividad key={props.actividad?._id ?? 'nueva'} {...props} /> : null;
 }
 
-function FormularioActividad({ onClose, teacherAssignmentId, periodoNumero, planeacion, actividad }: ActividadDrawerProps) {
-  const [f, setF] = useState<Formulario>(() => formularioInicial(actividad));
+function FormularioActividad({ onClose, teacherAssignmentId, periodoNumero, planeacion, componentes, actividad }: ActividadDrawerProps) {
+  const [f, setF] = useState<Formulario>(() => formularioInicial(actividad, componentes));
   const [mensaje, setMensaje] = useState<string | null>(null);
   const crear = useCrearActividad();
   const actualizar = useActualizarActividad();
@@ -139,6 +139,7 @@ function FormularioActividad({ onClose, teacherAssignmentId, periodoNumero, plan
   const completo =
     f.titulo.trim() !== '' &&
     f.descripcion.trim() !== '' &&
+    f.componente !== '' &&
     f.entrega !== '' &&
     f.apertura !== '' &&
     Number.isFinite(peso) &&
@@ -257,14 +258,14 @@ function FormularioActividad({ onClose, teacherAssignmentId, periodoNumero, plan
       </fieldset>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <Select
-          label="Componente del SIEE"
-          value={f.componente}
-          onChange={(e) => cambiar('componente', e.target.value as ComponenteSiee)}
-        >
-          {COMPONENTES_SIEE.map((c) => (
-            <option key={c} value={c}>
-              {NOMBRES_COMPONENTE_SIEE[c]}
+        <Select label="Componente evaluativo" value={f.componente} onChange={(e) => cambiar('componente', e.target.value)}>
+          {/* Una actividad antigua puede apuntar a un componente que el año ya no ofrece: se conserva visible. */}
+          {actividad && !componentes.some((c) => c.clave === actividad.componente_siee) && (
+            <option value={actividad.componente_siee}>{actividad.componente_nombre}</option>
+          )}
+          {componentes.map((c) => (
+            <option key={c.clave} value={c.clave}>
+              {c.nombre} ({c.porcentaje}%)
             </option>
           ))}
         </Select>

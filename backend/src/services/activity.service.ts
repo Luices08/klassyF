@@ -1,10 +1,10 @@
 import { Types } from 'mongoose';
 import { FormatoEvidencia, TipoActividad } from '../constants/actividades';
-import { ComponenteSiee, ESTADOS_MATRICULA_ACTIVOS, EstadoDesarrolloCurricular } from '../constants/enums';
+import { ESTADOS_MATRICULA_ACTIVOS, EstadoDesarrolloCurricular } from '../constants/enums';
 import { ROLES } from '../constants/roles';
 import Activity, { ActivityDocument, IActivity } from '../models/activity.model';
 import AcademicYear, { AcademicYearDocument } from '../models/academicYear.model';
-import ActivitySubmission, { ActivitySubmissionDocument } from '../models/activitySubmission.model';
+import ActivitySubmission from '../models/activitySubmission.model';
 import CurricularDevelopment, { CurricularDevelopmentDocument } from '../models/curricularDevelopment.model';
 import Enrollment from '../models/enrollment.model';
 import { Dba } from '../models/referenteCurricular.model';
@@ -13,14 +13,13 @@ import { UserDocument } from '../models/user.model';
 import ApiError from '../utils/ApiError';
 import { estadoDeEntrega, evaluarVentanaEntrega, normalizarTexto } from '../utils/actividades';
 import { finDelDia, inicioDelDia } from '../utils/calendarioAcademico';
-import { validarNotaDentroDeEscala } from '../utils/escalaEvaluacion';
-import { runTransaction } from '../utils/runTransaction';
+import { componentesEfectivos } from '../utils/siee';
 import { ContextoAsignacion, contextosDeAsignaciones } from './actividadContexto.service';
 import { exigirAlertasResueltas, revisarCalendario } from './actividadCalendario.service';
 import { asegurarAnioNoCerrado } from './academicYear.service';
 import { registrarEvento } from './audit.service';
 import { fechaDeClase } from './attendance.service';
-import { assertPeriodNotLocked } from './periodLock.service';
+import { exigirPlanillaAbierta } from './notasEstado.service';
 
 export type ActividadPlana = IActivity & { _id: Types.ObjectId };
 
@@ -31,7 +30,9 @@ export interface VistaActividad {
   titulo: string;
   descripcion: string;
   tipo: TipoActividad;
-  componente_siee: ComponenteSiee;
+  componente_siee: string;
+  /** Nombre del componente evaluativo en el año de la actividad (M12); la clave si ese componente ya no existe. */
+  componente_nombre: string;
   peso_en_componente: number;
   fecha_apertura: Date;
   fecha_entrega: Date;
@@ -61,7 +62,14 @@ export async function armarVistas(actividades: ActividadPlana[], ahora = new Dat
   ]);
   const dbaPorId = new Map(dbas.map((d) => [String(d._id), { _id: String(d._id), numero_dba: d.numero_dba, enunciado: d.enunciado }]));
 
+  const aniosIds = [...new Set([...contextos.values()].map((c) => c.academic_year_id))];
+  const anios = await AcademicYear.find({ _id: { $in: aniosIds } }).select('componentes_evaluativos ponderacion_componentes');
+  const nombreDeComponente = new Map(
+    anios.map((anio) => [String(anio._id), new Map(componentesEfectivos(anio).map((c) => [c.clave, c.nombre]))])
+  );
+
   return actividades.map((a) => {
+    const anioId = contextos.get(String(a.teacher_assignment_id))?.academic_year_id ?? '';
     const ventana = evaluarVentanaEntrega(
       { fecha_apertura: a.fecha_apertura, fecha_entrega: a.fecha_entrega, permite_entrega_tardia: a.permite_entrega_tardia ?? false },
       ahora
@@ -74,6 +82,7 @@ export async function armarVistas(actividades: ActividadPlana[], ahora = new Dat
       descripcion: a.descripcion,
       tipo: a.tipo ?? 'TAREA',
       componente_siee: a.componente_siee,
+      componente_nombre: nombreDeComponente.get(anioId)?.get(a.componente_siee) ?? a.componente_siee,
       peso_en_componente: a.peso_en_componente,
       fecha_apertura: a.fecha_apertura,
       fecha_entrega: a.fecha_entrega,
@@ -154,6 +163,15 @@ function exigirPeriodoAbierto(anio: AcademicYearDocument, periodo: number): void
   }
 }
 
+/** El componente debe existir en la configuración de evaluación del año (M12) y alimentarse de actividades. */
+function validarComponente(anio: AcademicYearDocument, clave: string): void {
+  const componente = componentesEfectivos(anio).find((c) => c.clave === clave);
+  if (!componente) throw new ApiError(400, `El componente «${clave}» no existe en la configuración de evaluación de este año.`);
+  if (componente.origen !== 'ACTIVIDADES') {
+    throw new ApiError(400, `El componente «${componente.nombre}» se digita como nota directa: no recibe actividades.`);
+  }
+}
+
 // --- Gestión (CU-DOC-02) ---
 
 export interface CreateActivityInput {
@@ -162,7 +180,7 @@ export interface CreateActivityInput {
   titulo: string;
   descripcion: string;
   tipo: TipoActividad;
-  componente_siee: ComponenteSiee;
+  componente_siee: string;
   peso_en_componente: number;
   fecha_apertura: string | Date;
   fecha_entrega: string | Date;
@@ -181,6 +199,8 @@ export async function createActivity(input: CreateActivityInput, docente: UserDo
   const anio = await AcademicYear.findById(asignacion.academic_year_id);
   if (!anio) throw new ApiError(404, 'Año lectivo de la asignación académica no encontrado.');
   exigirPeriodoAbierto(anio, input.periodo_numero);
+  validarComponente(anio, input.componente_siee);
+  await exigirPlanillaAbierta(asignacion._id, input.periodo_numero, 'programar nuevas actividades');
 
   const planeacion = await planeacionAprobada(asignacion, input.periodo_numero);
   validarReferente(planeacion, input.dba_id, input.competencia_evaluada);
@@ -228,7 +248,7 @@ export interface UpdateActivityInput {
   titulo?: string;
   descripcion?: string;
   tipo?: TipoActividad;
-  componente_siee?: ComponenteSiee;
+  componente_siee?: string;
   peso_en_componente?: number;
   fecha_apertura?: string | Date;
   fecha_entrega?: string | Date;
@@ -265,6 +285,9 @@ export async function updateActivity(
   const cambiaPeso =
     (cambios.componente_siee !== undefined && cambios.componente_siee !== actividad.componente_siee) ||
     (cambios.peso_en_componente !== undefined && cambios.peso_en_componente !== actividad.peso_en_componente);
+  if (cambios.componente_siee !== undefined && cambios.componente_siee !== actividad.componente_siee) {
+    validarComponente(anio, cambios.componente_siee);
+  }
   if (hayNotas && cambiaPeso) {
     throw new ApiError(409, 'La actividad ya tiene notas: no se puede cambiar su componente ni su peso.');
   }
@@ -460,90 +483,4 @@ export async function detalleParaGestion(id: string, usuario: UserDocument) {
 
   const [[vista], resumenes] = await Promise.all([armarVistas([actividad]), resumenesDeEntrega([actividad])]);
   return { ...(vista as VistaActividad), resumen: resumenes.get(String(actividad._id)) as ResumenEntregas };
-}
-
-// --- Puente hacia M12 ---
-
-export interface GradeEntryInput {
-  student_id: string;
-  calificacion_numerica: number;
-  retroalimentacion?: string;
-}
-
-/**
- * Califica a uno o varios estudiantes de una actividad ("por lote"). Solo el
- * docente titular puede calificar, siempre que el periodo no este CERRADO
- * (bloqueo extemporaneo) y todos los estudiantes esten matriculados en el grupo.
- * Es un upsert por (activity_id, student_id): no requiere que el estudiante
- * haya enviado una entrega previa (ej. actividades actitudinales de aula).
- * Es el punto en que la nota viaja de M11 a M12: la entrega pasa a CALIFICADA.
- */
-export async function gradeActivity(
-  activityId: string,
-  entries: GradeEntryInput[],
-  requestingUser: UserDocument
-): Promise<ActivitySubmissionDocument[]> {
-  const activity = await Activity.findById(activityId);
-  if (!activity) throw new ApiError(404, 'Actividad no encontrada.');
-
-  const assignment = await TeacherAssignment.findById(activity.teacher_assignment_id);
-  if (!assignment) throw new ApiError(404, 'Asignacion academica asociada no encontrada.');
-  if (String(assignment.docente_id) !== String(requestingUser._id)) {
-    throw new ApiError(403, 'Solo el docente titular puede calificar esta actividad.');
-  }
-  if (!assignment.group_id) {
-    throw new ApiError(400, 'La asignación académica no tiene un grupo asociado.');
-  }
-
-  await assertPeriodNotLocked(
-    assignment.academic_year_id,
-    assignment.group_id,
-    activity.periodo_numero,
-    requestingUser._id
-  );
-
-  // Validacion cruzada con la escala de evaluacion del año (CU-ADM-04): no es forma propia de
-  // ActivitySubmission, por eso vive aqui y no en el schema (ver modelo y validador).
-  const anio = await AcademicYear.findById(assignment.academic_year_id).select('escala_evaluacion');
-  for (const entry of entries) {
-    validarNotaDentroDeEscala(entry.calificacion_numerica, anio?.escala_evaluacion ?? null);
-  }
-
-  const studentIds = entries.map((e) => e.student_id);
-  if (new Set(studentIds).size !== studentIds.length) {
-    throw new ApiError(400, 'No se puede calificar dos veces al mismo estudiante en la misma solicitud.');
-  }
-
-  const enrollments = await Enrollment.find({
-    student_id: { $in: studentIds },
-    group_id: assignment.group_id,
-    estado: { $in: ESTADOS_MATRICULA_ACTIVOS },
-  });
-  const enrolledSet = new Set(enrollments.map((e) => String(e.student_id)));
-  const noMatriculados = studentIds.filter((id) => !enrolledSet.has(id));
-  if (noMatriculados.length > 0) {
-    throw new ApiError(400, `Los siguientes estudiantes no estan matriculados en el grupo: ${noMatriculados.join(', ')}.`);
-  }
-
-  return runTransaction(async (session) => {
-    const results = await Promise.all(
-      entries.map((entry) =>
-        ActivitySubmission.findOneAndUpdate(
-          { activity_id: activityId, student_id: entry.student_id },
-          {
-            $set: {
-              estado: 'CALIFICADA',
-              calificacion_numerica: entry.calificacion_numerica,
-              retroalimentacion: entry.retroalimentacion ?? '',
-              fecha_calificacion: new Date(),
-              docente_id: requestingUser._id,
-            },
-          },
-          { new: true, upsert: true, runValidators: true, session }
-        )
-      )
-    );
-
-    return results.filter((r): r is ActivitySubmissionDocument => r !== null);
-  });
 }

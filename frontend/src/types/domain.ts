@@ -239,6 +239,20 @@ export type ComponenteSiee = (typeof COMPONENTES_SIEE)[number];
 
 export type PonderacionComponentes = Record<ComponenteSiee, number>;
 
+// M12: bloques que forman el 100% de la nota de una asignatura; la institución los define por año lectivo.
+export type OrigenComponente = 'ACTIVIDADES' | 'NOTA_DIRECTA';
+export const NOMBRES_ORIGEN_COMPONENTE: Record<OrigenComponente, string> = {
+  ACTIVIDADES: 'Promedio de actividades',
+  NOTA_DIRECTA: 'Nota directa del docente',
+};
+
+export interface ComponenteEvaluativo {
+  clave: string;
+  nombre: string;
+  porcentaje: number;
+  origen: OrigenComponente;
+}
+
 export interface AcademicYear {
   _id: string;
   institucion_id: string;
@@ -255,6 +269,10 @@ export interface AcademicYear {
   escala_evaluacion: EscalaEvaluacion | null;
   /** SIEE (CU-ADM-04): null hasta que el ADMIN la personalice (respaldo 40/40/20). */
   ponderacion_componentes: PonderacionComponentes | null;
+  /** Los configurados por el ADMIN; vacío mientras rija el respaldo Saber/Hacer/Ser. */
+  componentes_evaluativos: ComponenteEvaluativo[];
+  /** Los que realmente rigen el cálculo (los configurados o el respaldo). */
+  componentes_efectivos: ComponenteEvaluativo[];
   cerrado_at: string | null;
   resumen_semanas: ResumenSemanas;
 }

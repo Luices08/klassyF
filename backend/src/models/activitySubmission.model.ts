@@ -20,6 +20,8 @@ export interface IActivitySubmission {
   retroalimentacion: string;
   fecha_calificacion: Date | null;
   docente_id: Types.ObjectId | null;
+  /** Cada cambio de la nota (M12): quién, cuándo y de qué valor a cuál. Nunca se borra. */
+  historial_notas: Array<{ valor_anterior: number | null; valor_nuevo: number; por: Types.ObjectId; fecha: Date }>;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -46,6 +48,20 @@ const activitySubmissionSchema = new Schema<IActivitySubmission, ActivitySubmiss
     retroalimentacion: { type: String, default: '' },
     fecha_calificacion: { type: Date, default: null },
     docente_id: { type: Schema.Types.ObjectId, ref: 'User', default: null },
+    historial_notas: {
+      type: [
+        new Schema(
+          {
+            valor_anterior: { type: Number, default: null },
+            valor_nuevo: { type: Number, required: true },
+            por: { type: Schema.Types.ObjectId, ref: 'User', required: true },
+            fecha: { type: Date, required: true },
+          },
+          { _id: false }
+        ),
+      ],
+      default: [],
+    },
   },
   { timestamps: true }
 );

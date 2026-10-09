@@ -16,6 +16,8 @@ import type {
 } from '../../types/domain';
 import { NOMBRES_ESTADO_ESPACIO } from '../../types/domain';
 import type { EstadoActividadEstudiante } from '../../hooks/useActividades';
+import type { EstadoNota } from '../../hooks/useNotas';
+import { NOMBRES_ESTADO_NOTA } from '../../hooks/useNotas';
 import type { EstadoCaso } from '../../hooks/useCasos';
 import type { EstadoExpediente, EstadoSolicitudApoyo } from '../../hooks/useInclusion';
 import { NOMBRES_ESTADO_EXPEDIENTE, NOMBRES_ESTADO_SOLICITUD } from '../../hooks/useInclusion';
@@ -343,4 +345,16 @@ const TIPO_ACTIVIDAD_TONE: Record<TipoActividad, Tone> = {
 /** Tipo de actividad de aula (M11). */
 export function TipoActividadChip({ value }: { value: TipoActividad }) {
   return <Chip tone={TIPO_ACTIVIDAD_TONE[value]}>{NOMBRES_TIPO_ACTIVIDAD[value]}</Chip>;
+}
+
+const ESTADO_NOTA_TONE: Record<EstadoNota, Tone> = {
+  PENDIENTE: 'orange',
+  BORRADOR: 'neutral',
+  CERRADO: 'blue',
+  DEFINITIVO: 'green',
+};
+
+/** Estado de la nota de una asignatura (M12): pendiente (faltan notas) → borrador (completa) → cerrado (docente) → definitivo (coordinación). */
+export function EstadoNotaBadge({ value }: { value: EstadoNota }) {
+  return <Chip tone={ESTADO_NOTA_TONE[value]}>{NOMBRES_ESTADO_NOTA[value]}</Chip>;
 }

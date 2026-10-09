@@ -1,3 +1,4 @@
+import { Alert } from '../ui/Alert';
 import { Chip, DesempenoBadge } from '../ui/Badge';
 import { Card } from '../ui/Card';
 import type { ReportCard, ReportCardArea, ReportCardAsignatura } from '../../types/reportCard';
@@ -16,18 +17,26 @@ function AsignaturaRow({ asignatura }: { asignatura: ReportCardAsignatura }) {
           <p className="text-xs text-muted">{asignatura.porcentaje_en_area}% del área</p>
         </div>
         <div className="flex items-center gap-2">
-          <span className="text-lg font-bold text-ink">{asignatura.nota_asignatura.toFixed(2)}</span>
-          <DesempenoBadge value={asignatura.desempeno} />
+          {asignatura.nota_asignatura === null || asignatura.desempeno === null ? (
+            <Chip tone="neutral">Sin cerrar</Chip>
+          ) : (
+            <>
+              <span className="text-lg font-bold text-ink">{asignatura.nota_asignatura.toFixed(2)}</span>
+              <DesempenoBadge value={asignatura.desempeno} />
+            </>
+          )}
           {asignatura.fallas_asignatura > 0 && (
             <Chip tone="orange">{asignatura.fallas_asignatura} falla(s)</Chip>
           )}
         </div>
       </div>
-      <div className="mt-3 grid grid-cols-1 gap-1.5 sm:grid-cols-3 sm:gap-4">
-        <ComponentBar label="Saber" value={asignatura.componentes.saber} />
-        <ComponentBar label="Hacer" value={asignatura.componentes.hacer} />
-        <ComponentBar label="Ser" value={asignatura.componentes.ser} />
-      </div>
+      {asignatura.componentes.length > 0 && (
+        <div className="mt-3 grid grid-cols-1 gap-1.5 sm:grid-cols-2 sm:gap-x-4">
+          {asignatura.componentes.map((c) => (
+            <ComponentBar key={c.clave} label={`${c.nombre} ${c.porcentaje}%`} value={c.nota} />
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -38,8 +47,14 @@ function AreaSection({ area }: { area: ReportCardArea }) {
       <div className="mb-3 flex items-center justify-between gap-3">
         <h3 className="text-sm font-bold uppercase tracking-wide text-body">{area.nombre}</h3>
         <div className="flex items-center gap-2">
-          <span className="text-xl font-bold text-ink">{area.nota_area.toFixed(2)}</span>
-          <DesempenoBadge value={area.desempeno_area} />
+          {area.nota_area === null || area.desempeno_area === null ? (
+            <Chip tone="neutral">Sin calcular</Chip>
+          ) : (
+            <>
+              <span className="text-xl font-bold text-ink">{area.nota_area.toFixed(2)}</span>
+              <DesempenoBadge value={area.desempeno_area} />
+            </>
+          )}
         </div>
       </div>
       <div className="space-y-2">
@@ -56,6 +71,12 @@ export function ReportCardView({ reportCard }: { reportCard: ReportCard }) {
 
   return (
     <div className="space-y-4">
+      {!reportCard.completo && (
+        <Alert tone="info">
+          Este boletín aún no es oficial: solo muestra las asignaturas cuya planilla ya cerró el docente.
+          {reportCard.pendientes.length > 0 && <> Faltan: {reportCard.pendientes.join(', ')}.</>}
+        </Alert>
+      )}
       <Card>
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
@@ -73,7 +94,7 @@ export function ReportCardView({ reportCard }: { reportCard: ReportCard }) {
           <div className="text-right">
             <p className="text-xs font-medium uppercase tracking-wide text-muted">Puesto en el grupo</p>
             <p className="text-2xl font-extrabold text-primary">
-              {ordinal(reportCard.puesto_grupo)}{' '}
+              {reportCard.puesto_grupo === null ? '—' : ordinal(reportCard.puesto_grupo)}{' '}
               <span className="text-sm font-medium text-muted">de {reportCard.total_estudiantes_grupo}</span>
             </p>
           </div>
@@ -84,9 +105,11 @@ export function ReportCardView({ reportCard }: { reportCard: ReportCard }) {
         <Card className="flex items-center justify-between">
           <div>
             <p className="text-xs font-medium uppercase tracking-wide text-muted">Promedio general</p>
-            <p className="text-3xl font-extrabold text-ink">{reportCard.promedio_general_periodo.toFixed(2)}</p>
+            <p className="text-3xl font-extrabold text-ink">
+              {reportCard.promedio_general_periodo === null ? '—' : reportCard.promedio_general_periodo.toFixed(2)}
+            </p>
           </div>
-          <DesempenoBadge value={reportCard.desempeno_general} />
+          {reportCard.desempeno_general && <DesempenoBadge value={reportCard.desempeno_general} />}
         </Card>
 
         <Card>

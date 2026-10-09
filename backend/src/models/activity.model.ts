@@ -5,7 +5,6 @@ import {
   TIPOS_ACTIVIDAD,
   TipoActividad,
 } from '../constants/actividades';
-import { COMPONENTES_SIEE, ComponenteSiee } from '../constants/enums';
 
 export interface IActivity {
   teacher_assignment_id: Types.ObjectId;
@@ -13,7 +12,7 @@ export interface IActivity {
   titulo: string;
   descripcion: string;
   tipo: TipoActividad;
-  componente_siee: ComponenteSiee;
+  componente_siee: string;
   peso_en_componente: number;
   /** Desde cuándo la ven los estudiantes (fecha de publicación). */
   fecha_apertura: Date;
@@ -43,7 +42,7 @@ const activitySchema = new Schema<IActivity, ActivityModel>(
     descripcion: { type: String, required: true, trim: true, maxlength: 5000 },
     // Las actividades anteriores a M11 no lo tienen guardado: se leen como TAREA.
     tipo: { type: String, enum: TIPOS_ACTIVIDAD, default: 'TAREA' },
-    componente_siee: { type: String, enum: COMPONENTES_SIEE, required: true },
+    componente_siee: { type: String, required: true, trim: true, uppercase: true, match: /^[A-Z0-9_]{2,40}$/ },
     peso_en_componente: { type: Number, required: true, min: 0 },
     fecha_apertura: { type: Date, required: true },
     fecha_entrega: { type: Date, required: true },

@@ -153,7 +153,14 @@ export function resolverDesempeno(nota: number, configEscala: IEscalaEvaluacion)
     );
   }
 
-  const rango = configEscala.rangos.find((r) => nota >= r.valor_minimo && nota <= r.valor_maximo);
+  // Los promedios salen con 2 decimales y los rangos con la precisión de la escala (1.0–2.9 | 3.0–3.9...): un 3.95 no cae
+  // en ninguno. El nivel se resuelve con la nota redondeada a la precisión configurada y, si aun así queda en un hueco,
+  // pertenece al rango inmediatamente inferior (nunca se sube a un nivel que la nota no alcanza).
+  const factor = 10 ** (configEscala.precision_decimales ?? 1);
+  const redondeada = Math.round((nota + Number.EPSILON) * factor) / factor;
+  const rango =
+    configEscala.rangos.find((r) => redondeada >= r.valor_minimo && redondeada <= r.valor_maximo) ??
+    [...configEscala.rangos].sort((a, b) => b.valor_minimo - a.valor_minimo).find((r) => redondeada >= r.valor_minimo);
   if (!rango) {
     throw new ApiError(400, `La nota ${nota} no cae en ningún rango configurado de la escala de evaluación institucional.`);
   }

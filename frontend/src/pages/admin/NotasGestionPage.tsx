@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { PlanillaNotas } from '../../components/notas/PlanillaNotas';
 import { ReabrirPlanillaDrawer } from '../../components/notas/ReabrirPlanillaDrawer';
 import { Alert, errorMessage } from '../../components/ui/Alert';
@@ -27,6 +28,7 @@ const ESTADO_NOMBRE = { ABIERTA: 'Abierta', CERRADA: 'Cerrada por el docente', D
  */
 export function NotasGestionPage() {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const esAdmin = user?.rol === 'ADMIN';
   const { anio } = useAnioDeTrabajo();
   const grupos = useGroups({ academic_year_id: anio?._id });
@@ -74,10 +76,22 @@ export function NotasGestionPage() {
         title="Seguimiento de notas"
         subtitle="Cómo va la planilla de cada clase en el periodo y cuáles ya pueden declararse definitivas."
         action={
-          <Button type="button" disabled={!hayCerradas} isLoading={definitivas.isPending} onClick={() => void declarar()}>
-            <CheckIcon className="h-4 w-4" />
-            Declarar definitivas las cerradas
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            {esAdmin && (
+              <>
+                <Button type="button" variant="secondary" onClick={() => navigate('/anio-lectivo')}>
+                  Componentes evaluativos
+                </Button>
+                <Button type="button" variant="secondary" onClick={() => navigate('/admin/plantilla-planilla')}>
+                  Plantilla de la planilla
+                </Button>
+              </>
+            )}
+            <Button type="button" disabled={!hayCerradas} isLoading={definitivas.isPending} onClick={() => void declarar()}>
+              <CheckIcon className="h-4 w-4" />
+              Declarar definitivas las cerradas
+            </Button>
+          </div>
         }
       />
 

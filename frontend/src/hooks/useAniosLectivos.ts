@@ -264,10 +264,10 @@ export function useActualizarEscalaEvaluacion() {
 export interface ActualizarComponentesEvaluativosInput {
   anioId: string;
   /** Los que ya existen conservan su `clave` (las actividades la referencian); los nuevos no la mandan. */
-  componentes: Array<Pick<ComponenteEvaluativo, 'nombre' | 'porcentaje' | 'origen'> & { clave?: string }>;
+  componentes: Array<Pick<ComponenteEvaluativo, 'nombre' | 'porcentaje' | 'max_casillas'> & { clave?: string }>;
 }
 
-/** Bloques evaluativos del año (M12): deben sumar 100 y solo se editan con el año en planificación. */
+/** Molde de la planilla del año (M12): bloques que suman 100, cada uno con su máximo de casillas; se edita hasta la primera nota. */
 export function useActualizarComponentesEvaluativos() {
   const invalidar = useInvalidarAnios();
   return useMutation({

@@ -21,7 +21,8 @@ export const createActivity: ValidationSchema = {
       .valid(...TIPOS_ACTIVIDAD)
       .required(),
     componente_siee: componenteBloque.required(),
-    peso_en_componente: Joi.number().min(0).required(),
+    // Opcional: sin él la actividad se reparte en partes iguales con las demás casillas sin peso de su bloque.
+    peso_en_componente: Joi.number().min(0).max(100).allow(null),
     fecha_apertura: Joi.date().iso().required(),
     fecha_entrega: Joi.date().iso().min(Joi.ref('fecha_apertura')).required(),
     requiere_entrega: Joi.boolean(),
@@ -41,7 +42,7 @@ export const updateActivity: ValidationSchema = {
     descripcion: Joi.string().trim().max(5000),
     tipo: Joi.string().valid(...TIPOS_ACTIVIDAD),
     componente_siee: componenteBloque,
-    peso_en_componente: Joi.number().min(0),
+    peso_en_componente: Joi.number().min(0).max(100).allow(null),
     fecha_apertura: Joi.date().iso(),
     fecha_entrega: Joi.date().iso(),
     requiere_entrega: Joi.boolean(),

@@ -2,6 +2,7 @@ import { Types } from 'mongoose';
 import AcademicYear from '../../src/models/academicYear.model';
 import Activity from '../../src/models/activity.model';
 import Area from '../../src/models/area.model';
+import ColumnaPlanilla from '../../src/models/columnaPlanilla.model';
 import CurricularDevelopment from '../../src/models/curricularDevelopment.model';
 import Group from '../../src/models/group.model';
 import Institution from '../../src/models/institution.model';
@@ -82,7 +83,7 @@ export async function prepararNotas(e: Escenario): Promise<EscenarioNotas> {
 
 /** Define los componentes evaluativos del año directamente (las pruebas del servicio de configuración usan un año en planificación). */
 export async function definirComponentes(
-  componentes: Array<{ clave: string; nombre: string; porcentaje: number; origen: 'ACTIVIDADES' | 'NOTA_DIRECTA' }>
+  componentes: Array<{ clave: string; nombre: string; porcentaje: number; max_casillas: number }>
 ): Promise<void> {
   const anio = (await AcademicYear.findOne())!;
   anio.set('componentes_evaluativos', componentes);
@@ -101,8 +102,8 @@ export async function aprobarPlaneacion(asignacion: TeacherAssignmentDocument, p
   });
 }
 
-/** Una actividad ya programada (sin pasar por las reglas de programación de M11, que tienen sus propias pruebas). */
-export async function crearActividad(asignacion: TeacherAssignmentDocument, componente: string, peso: number, extra: Record<string, unknown> = {}) {
+/** Una actividad ya programada (sin pasar por las reglas de programación de M11, que tienen sus propias pruebas). `peso` null = automático. */
+export async function crearActividad(asignacion: TeacherAssignmentDocument, componente: string, peso: number | null, extra: Record<string, unknown> = {}) {
   return Activity.create({
     teacher_assignment_id: asignacion._id,
     periodo_numero: 1,
@@ -114,6 +115,20 @@ export async function crearActividad(asignacion: TeacherAssignmentDocument, comp
     fecha_apertura: new Date(Date.now() - 3_600_000),
     fecha_entrega: proximoDiaHabil(3),
     ...extra,
+  });
+}
+
+/** Una nota suelta de la planilla (sin actividad), creada directamente en la base. */
+export async function crearCasillaSuelta(asignacion: TeacherAssignmentDocument, bloque: string, nombre: string, peso: number | null = null, periodo = 1) {
+  return ColumnaPlanilla.create({
+    academic_year_id: asignacion.academic_year_id,
+    teacher_assignment_id: asignacion._id,
+    periodo_numero: periodo,
+    bloque_clave: bloque,
+    nombre,
+    peso,
+    orden: (await ColumnaPlanilla.countDocuments({ teacher_assignment_id: asignacion._id, periodo_numero: periodo })) + 1,
+    creada_por: asignacion.docente_id,
   });
 }
 

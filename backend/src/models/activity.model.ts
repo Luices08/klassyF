@@ -13,7 +13,8 @@ export interface IActivity {
   descripcion: string;
   tipo: TipoActividad;
   componente_siee: string;
-  peso_en_componente: number;
+  /** Porcentaje que pesa dentro de su bloque; null = automático (se reparte con las demás casillas sin peso). */
+  peso_en_componente: number | null;
   /** Desde cuándo la ven los estudiantes (fecha de publicación). */
   fecha_apertura: Date;
   /** Límite de entrega. */
@@ -43,7 +44,7 @@ const activitySchema = new Schema<IActivity, ActivityModel>(
     // Las actividades anteriores a M11 no lo tienen guardado: se leen como TAREA.
     tipo: { type: String, enum: TIPOS_ACTIVIDAD, default: 'TAREA' },
     componente_siee: { type: String, required: true, trim: true, uppercase: true, match: /^[A-Z0-9_]{2,40}$/ },
-    peso_en_componente: { type: Number, required: true, min: 0 },
+    peso_en_componente: { type: Number, default: null, min: 0, max: 100 },
     fecha_apertura: { type: Date, required: true },
     fecha_entrega: { type: Date, required: true },
     requiere_entrega: { type: Boolean, default: true },

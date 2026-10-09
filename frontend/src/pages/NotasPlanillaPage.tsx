@@ -1,5 +1,7 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
+import { EntregasDrawer } from '../components/actividades/EntregasDrawer';
+import { CasillaDrawer, type CasillaEnEdicion } from '../components/notas/CasillaDrawer';
 import { ExcelNotas } from '../components/notas/ExcelNotas';
 import { PlanillaNotas } from '../components/notas/PlanillaNotas';
 import { ReabrirPlanillaDrawer } from '../components/notas/ReabrirPlanillaDrawer';
@@ -11,7 +13,7 @@ import { Select } from '../components/ui/Field';
 import { PageHeader } from '../components/ui/PageHeader';
 import { Spinner } from '../components/ui/Spinner';
 import { useAnioDeTrabajo } from '../hooks/useAniosLectivos';
-import { type EstadoNota, useCerrarPlanilla, useGuardarCeldas, usePlanilla, useReabrirPlanilla } from '../hooks/useNotas';
+import { type CeldaPlanilla, type EstadoNota, descargarPdfPlanilla, useCasillasMutaciones, useCerrarPlanilla, useGuardarCeldas, usePlanilla, useReabrirPlanilla } from '../hooks/useNotas';
 import { useMyTeacherLoad } from '../hooks/useTeacherAssignments';
 import { hoyColombia } from '../lib/actividades';
 import { aInputFecha } from '../lib/fechas';
@@ -31,8 +33,9 @@ function pendientesDe(error: unknown): Pendiente[] {
 }
 
 /**
- * M12: la planilla de notas del docente. Digita las notas de sus actividades y de los componentes de nota directa, ve en vivo
- * los promedios y la nota de la asignatura, y al terminar CIERRA la planilla: desde ahí es lo que lee el boletín.
+ * M12: la planilla de notas del docente. Cada bloque del molde del colegio trae sus casillas (actividades y notas sueltas): el
+ * docente las agrega hasta el máximo del bloque, les pone un peso, digita las notas como en una hoja de cálculo, ve en vivo los
+ * promedios y la nota de la asignatura, y al terminar CIERRA la planilla: desde ahí es lo que lee el boletín.
  */
 export function NotasPlanillaPage() {
   const { anio } = useAnioDeTrabajo();
@@ -42,6 +45,10 @@ export function NotasPlanillaPage() {
   const [asignacionElegida, setAsignacionElegida] = useState('');
   const [periodoElegido, setPeriodoElegido] = useState<number | null>(null);
   const [reabriendo, setReabriendo] = useState(false);
+  const [revisando, setRevisando] = useState<{ _id: string; titulo: string } | null>(null);
+  const [errorPdf, setErrorPdf] = useState<string | null>(null);
+  // Formulario de casilla: agregar a un bloque o editar una existente.
+  const [casillaForm, setCasillaForm] = useState<{ bloqueInicial?: string; casillaId?: string } | null>(null);
 
   const asignacion = clases.find((c) => c._id === asignacionElegida) ?? clases[0];
   const periodos = anio?.periodos ?? [];
@@ -54,10 +61,37 @@ export function NotasPlanillaPage() {
   const guardar = useGuardarCeldas();
   const cerrar = useCerrarPlanilla();
   const reabrir = useReabrirPlanilla();
+  const casillas = useCasillasMutaciones();
 
   const grupo = typeof asignacion?.group_id === 'object' ? asignacion.group_id : null;
   const asignatura = typeof asignacion?.subject_id === 'object' ? asignacion.subject_id : null;
   const pendientes = pendientesDe(cerrar.error);
+
+  const casillaEnEdicion: CasillaEnEdicion | null = (() => {
+    if (!planilla || !casillaForm?.casillaId) return null;
+    for (const b of planilla.bloques) {
+      const c = b.casillas.find((x) => x.id === casillaForm.casillaId);
+      if (c) return { ...c, bloque: b.clave };
+    }
+    return null;
+  })();
+
+  /** Primero los pesos (para que las notas se calculen con ellos) y luego las notas. */
+  async function guardarCambios({ celdas, pesos }: { celdas: CeldaPlanilla[]; pesos: Array<{ casilla_id: string; peso: number | null }> }) {
+    if (!asignacion || !periodo) return;
+    if (pesos.length > 0) await casillas.establecerPesos.mutateAsync({ teacherAssignmentId: asignacion._id, periodoNumero: periodo.numero, pesos });
+    if (celdas.length > 0) await guardar.mutateAsync({ teacherAssignmentId: asignacion._id, periodoNumero: periodo.numero, celdas });
+  }
+
+  async function bajarPdf() {
+    if (!asignacion || !periodo) return;
+    setErrorPdf(null);
+    try {
+      await descargarPdfPlanilla(asignacion._id, periodo.numero, `planilla-${asignatura?.nombre ?? 'clase'}-${grupo?.nomenclatura ?? ''}-periodo-${periodo.numero}.pdf`);
+    } catch (error) {
+      setErrorPdf(errorMessage(error));
+    }
+  }
 
   async function confirmarCierre() {
     if (!asignacion || !periodo) return;
@@ -78,6 +112,9 @@ export function NotasPlanillaPage() {
         action={
           planilla && (
             <div className="flex flex-wrap gap-2">
+              <Button type="button" variant="outline" onClick={() => void bajarPdf()}>
+                Imprimir (PDF)
+              </Button>
               {planilla.edicion.puede_reabrir && (
                 <Button type="button" variant="outline" onClick={() => setReabriendo(true)}>
                   Reabrir planilla
@@ -131,6 +168,7 @@ export function NotasPlanillaPage() {
         <Alert tone="info">No tienes clases asignadas en el año lectivo vigente. Coordinación las asigna en Carga académica.</Alert>
       )}
       {consulta.isError && <Alert tone="error">{errorMessage(consulta.error)}</Alert>}
+      {errorPdf && <Alert tone="error">{errorPdf}</Alert>}
       {consulta.isLoading && (
         <div className="flex justify-center p-8">
           <Spinner />
@@ -140,9 +178,9 @@ export function NotasPlanillaPage() {
       {planilla && asignacion && periodo && (
         <>
           {!planilla.edicion.puede_editar && planilla.edicion.motivo && <Alert tone="info">{planilla.edicion.motivo}</Alert>}
-          {planilla.componentes.every((c) => c.origen === 'ACTIVIDADES' && c.actividades.length === 0) && (
+          {planilla.bloques.every((b) => b.casillas.length === 0) && (
             <Alert tone="info">
-              Esta clase aún no tiene actividades en el periodo. Prográmalas en{' '}
+              Esta clase aún no tiene casillas en el periodo. Agrega notas con el botón «+» de cada bloque, o programa actividades en{' '}
               <Link to="/docente/actividades" className="font-semibold underline">
                 Actividades y tareas
               </Link>
@@ -169,8 +207,24 @@ export function NotasPlanillaPage() {
           <PlanillaNotas
             key={`${asignacion._id}-${periodo.numero}`}
             planilla={planilla}
-            guardando={guardar.isPending}
-            onGuardar={(celdas) => guardar.mutateAsync({ teacherAssignmentId: asignacion._id, periodoNumero: periodo.numero, celdas })}
+            guardando={guardar.isPending || casillas.establecerPesos.isPending}
+            onRevisarActividad={setRevisando}
+            onGuardar={guardarCambios}
+            onAgregarCasilla={(bloqueClave) => setCasillaForm({ bloqueInicial: bloqueClave })}
+            onEditarCasilla={(casillaId) => setCasillaForm({ casillaId })}
+          />
+
+          <CasillaDrawer
+            open={casillaForm !== null}
+            bloques={planilla.bloques}
+            bloqueInicial={casillaForm?.bloqueInicial}
+            casilla={casillaEnEdicion}
+            onClose={() => setCasillaForm(null)}
+            onCrear={(datos) =>
+              casillas.crear.mutateAsync({ teacherAssignmentId: asignacion._id, periodoNumero: periodo.numero, bloqueClave: datos.bloque_clave, nombre: datos.nombre, peso: datos.peso })
+            }
+            onActualizar={(id, cambios) => casillas.actualizar.mutateAsync({ id, ...cambios })}
+            onEliminar={(id) => casillas.eliminar.mutateAsync(id)}
           />
 
           <ExcelNotas
@@ -180,6 +234,8 @@ export function NotasPlanillaPage() {
             puedeSubir={planilla.edicion.puede_editar}
             puedeDescargar
           />
+
+          <EntregasDrawer actividad={revisando} onClose={() => setRevisando(null)} escala={anio?.escala_evaluacion ?? null} />
 
           <ReabrirPlanillaDrawer
             open={reabriendo}

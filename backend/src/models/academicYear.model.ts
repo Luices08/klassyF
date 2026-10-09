@@ -13,7 +13,7 @@ import {
   TipoEventoCalendario,
 } from '../constants/enums';
 import { validarCalendario } from '../utils/calendarioAcademico';
-import { ORIGENES_COMPONENTE, OrigenComponente } from '../constants/notas';
+import { MAX_CASILLAS_BLOQUE, MAX_CASILLAS_POR_DEFECTO } from '../constants/notas';
 import { validarEscalaEvaluacion } from '../utils/escalaEvaluacion';
 import { validarComponentesEvaluativos, validarPonderacionComponentes } from '../utils/siee';
 
@@ -85,7 +85,8 @@ export interface IComponenteEvaluativo {
   clave: string;
   nombre: string;
   porcentaje: number;
-  origen: OrigenComponente;
+  /** Cuántas casillas (actividades o notas sueltas) admite este bloque en la planilla de una clase y periodo. */
+  max_casillas: number;
 }
 
 export interface IAcademicYear {
@@ -210,7 +211,7 @@ const componenteEvaluativoSchema = new Schema<IComponenteEvaluativo>(
     clave: { type: String, required: true, trim: true, uppercase: true, match: /^[A-Z0-9_]{2,40}$/ },
     nombre: { type: String, required: true, trim: true, maxlength: 60 },
     porcentaje: { type: Number, required: true, min: 0, max: 100 },
-    origen: { type: String, enum: ORIGENES_COMPONENTE, required: true },
+    max_casillas: { type: Number, required: true, min: 1, max: MAX_CASILLAS_BLOQUE, default: MAX_CASILLAS_POR_DEFECTO, validate: { validator: Number.isInteger, message: 'max_casillas debe ser un número entero.' } },
   },
   { _id: false }
 );

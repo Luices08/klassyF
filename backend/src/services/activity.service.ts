@@ -19,6 +19,7 @@ import { exigirAlertasResueltas, revisarCalendario } from './actividadCalendario
 import { asegurarAnioNoCerrado } from './academicYear.service';
 import { registrarEvento } from './audit.service';
 import { fechaDeClase } from './attendance.service';
+import { casillasDeClase, exigirCasillaDisponible, exigirPesosValidos } from './casillasBloque.service';
 import { exigirPlanillaAbierta } from './notasEstado.service';
 
 export type ActividadPlana = IActivity & { _id: Types.ObjectId };
@@ -31,9 +32,10 @@ export interface VistaActividad {
   descripcion: string;
   tipo: TipoActividad;
   componente_siee: string;
-  /** Nombre del componente evaluativo en el año de la actividad (M12); la clave si ese componente ya no existe. */
+  /** Nombre del bloque del molde en el año de la actividad (M12); la clave si ese bloque ya no existe. */
   componente_nombre: string;
-  peso_en_componente: number;
+  /** % que pesa dentro de su bloque; null = automático. */
+  peso_en_componente: number | null;
   fecha_apertura: Date;
   fecha_entrega: Date;
   requiere_entrega: boolean;
@@ -163,13 +165,30 @@ function exigirPeriodoAbierto(anio: AcademicYearDocument, periodo: number): void
   }
 }
 
-/** El componente debe existir en la configuración de evaluación del año (M12) y alimentarse de actividades. */
+/** El bloque debe existir en el molde de la planilla del año (M12). */
 function validarComponente(anio: AcademicYearDocument, clave: string): void {
-  const componente = componentesEfectivos(anio).find((c) => c.clave === clave);
-  if (!componente) throw new ApiError(400, `El componente «${clave}» no existe en la configuración de evaluación de este año.`);
-  if (componente.origen !== 'ACTIVIDADES') {
-    throw new ApiError(400, `El componente «${componente.nombre}» se digita como nota directa: no recibe actividades.`);
+  if (!componentesEfectivos(anio).some((c) => c.clave === clave)) {
+    throw new ApiError(400, `El bloque «${clave}» no existe en el molde de la planilla de este año.`);
   }
+}
+
+/**
+ * La actividad ocupa una casilla de su bloque: debe haber lugar (el molde fija el máximo) y los pesos puestos en el bloque no
+ * pueden pasar de 100%. `excluirId` es la propia actividad cuando se edita; `cambiaDeBloque` evita exigir lugar si no se mueve.
+ */
+async function validarCasilla(
+  anio: AcademicYearDocument,
+  asignacion: TeacherAssignmentDocument,
+  periodo: number,
+  bloque: string,
+  peso: number | null,
+  excluirId?: Types.ObjectId,
+  cambiaDeBloque = true
+): Promise<void> {
+  if (cambiaDeBloque) await exigirCasillaDisponible(asignacion, periodo, bloque, excluirId);
+  const existentes = (await casillasDeClase(asignacion._id, periodo)).filter((c) => c.id !== String(excluirId ?? ''));
+  const nombres = new Map(componentesEfectivos(anio).map((c) => [c.clave, c.nombre]));
+  exigirPesosValidos([...existentes, { id: 'nueva', bloque, peso }], (clave) => nombres.get(clave) ?? clave);
 }
 
 // --- Gestión (CU-DOC-02) ---
@@ -181,7 +200,8 @@ export interface CreateActivityInput {
   descripcion: string;
   tipo: TipoActividad;
   componente_siee: string;
-  peso_en_componente: number;
+  /** % del bloque; sin él la actividad se reparte en partes iguales con las demás casillas sin peso. */
+  peso_en_componente?: number | null;
   fecha_apertura: string | Date;
   fecha_entrega: string | Date;
   requiere_entrega?: boolean;
@@ -201,6 +221,7 @@ export async function createActivity(input: CreateActivityInput, docente: UserDo
   exigirPeriodoAbierto(anio, input.periodo_numero);
   validarComponente(anio, input.componente_siee);
   await exigirPlanillaAbierta(asignacion._id, input.periodo_numero, 'programar nuevas actividades');
+  await validarCasilla(anio, asignacion, input.periodo_numero, input.componente_siee, input.peso_en_componente ?? null);
 
   const planeacion = await planeacionAprobada(asignacion, input.periodo_numero);
   validarReferente(planeacion, input.dba_id, input.competencia_evaluada);
@@ -222,7 +243,7 @@ export async function createActivity(input: CreateActivityInput, docente: UserDo
     descripcion: input.descripcion,
     tipo: input.tipo,
     componente_siee: input.componente_siee,
-    peso_en_componente: input.peso_en_componente,
+    peso_en_componente: input.peso_en_componente ?? null,
     fecha_apertura: input.fecha_apertura,
     fecha_entrega: fechaEntrega,
     requiere_entrega: requiereEntrega,
@@ -249,7 +270,7 @@ export interface UpdateActivityInput {
   descripcion?: string;
   tipo?: TipoActividad;
   componente_siee?: string;
-  peso_en_componente?: number;
+  peso_en_componente?: number | null;
   fecha_apertura?: string | Date;
   fecha_entrega?: string | Date;
   requiere_entrega?: boolean;
@@ -279,17 +300,16 @@ export async function updateActivity(
   exigirPeriodoAbierto(anio, actividad.periodo_numero);
 
   const entregas = await ActivitySubmission.find({ activity_id: actividad._id }).select('calificacion_numerica fecha_entrega').lean();
-  const hayNotas = entregas.some((e) => typeof e.calificacion_numerica === 'number');
   const hayEntregas = entregas.some((e) => e.fecha_entrega);
 
-  const cambiaPeso =
-    (cambios.componente_siee !== undefined && cambios.componente_siee !== actividad.componente_siee) ||
-    (cambios.peso_en_componente !== undefined && cambios.peso_en_componente !== actividad.peso_en_componente);
-  if (cambios.componente_siee !== undefined && cambios.componente_siee !== actividad.componente_siee) {
-    validarComponente(anio, cambios.componente_siee);
-  }
-  if (hayNotas && cambiaPeso) {
-    throw new ApiError(409, 'La actividad ya tiene notas: no se puede cambiar su componente ni su peso.');
+  // El bloque y el peso de la casilla los decide el docente en su planilla mientras esté abierta; cerrada, no se mueve nada.
+  const bloqueNuevo = cambios.componente_siee ?? actividad.componente_siee;
+  const pesoNuevo = cambios.peso_en_componente !== undefined ? cambios.peso_en_componente : (actividad.peso_en_componente ?? null);
+  const cambiaDeBloque = bloqueNuevo !== actividad.componente_siee;
+  if (cambiaDeBloque) validarComponente(anio, bloqueNuevo);
+  if (cambiaDeBloque || pesoNuevo !== (actividad.peso_en_componente ?? null)) {
+    await exigirPlanillaAbierta(asignacion._id, actividad.periodo_numero, 'cambiar el bloque o el peso de una actividad');
+    await validarCasilla(anio, asignacion, actividad.periodo_numero, bloqueNuevo, pesoNuevo, actividad._id, cambiaDeBloque);
   }
   if (cambios.requiere_entrega === false && (actividad.requiere_entrega ?? true) && hayEntregas) {
     throw new ApiError(409, 'Ya hay estudiantes que entregaron: la actividad no puede pasar a no recibir entregas.');

@@ -26,7 +26,8 @@ export interface Actividad {
   /** Clave del componente evaluativo del año (M12). */
   componente_siee: string;
   componente_nombre: string;
-  peso_en_componente: number;
+  /** % que pesa dentro de su bloque; null = automático (se reparte con las demás casillas sin peso). */
+  peso_en_componente: number | null;
   fecha_apertura: string;
   fecha_entrega: string;
   requiere_entrega: boolean;
@@ -154,7 +155,7 @@ export interface DatosActividad {
   descripcion: string;
   tipo: TipoActividad;
   componente_siee: string;
-  peso_en_componente: number;
+  peso_en_componente: number | null;
   fecha_apertura: string;
   fecha_entrega: string;
   requiere_entrega: boolean;

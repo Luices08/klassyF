@@ -1,5 +1,5 @@
 import { COMPONENTES_SIEE } from '../constants/enums';
-import { MAX_COMPONENTES_EVALUATIVOS, OrigenComponente } from '../constants/notas';
+import { MAX_CASILLAS_BLOQUE, MAX_CASILLAS_POR_DEFECTO, MAX_COMPONENTES_EVALUATIVOS } from '../constants/notas';
 import { NOMBRES_COMPONENTE_SIEE, PONDERACION_COMPONENTES_POR_DEFECTO } from '../constants/siee';
 import type { IEscalaEvaluacion, IPonderacionComponentes } from '../models/academicYear.model';
 import { escalaEfectiva, resolverDesempeno, ResultadoDesempeno } from './escalaEvaluacion';
@@ -42,7 +42,7 @@ export interface ComponenteEvaluativo {
   clave: string;
   nombre: string;
   porcentaje: number;
-  origen: OrigenComponente;
+  max_casillas: number;
 }
 
 /**
@@ -55,14 +55,14 @@ export function componentesEfectivos(anio: {
   ponderacion_componentes?: IPonderacionComponentes | null;
 }): ComponenteEvaluativo[] {
   if (anio.componentes_evaluativos && anio.componentes_evaluativos.length > 0) {
-    return anio.componentes_evaluativos.map(({ clave, nombre, porcentaje, origen }) => ({ clave, nombre, porcentaje, origen }));
+    return anio.componentes_evaluativos.map(({ clave, nombre, porcentaje, max_casillas }) => ({ clave, nombre, porcentaje, max_casillas }));
   }
   const ponderacion = ponderacionEfectiva(anio.ponderacion_componentes ?? null);
   return COMPONENTES_SIEE.map((clave) => ({
     clave,
     nombre: NOMBRES_COMPONENTE_SIEE[clave],
     porcentaje: round2(ponderacion[clave] * 100),
-    origen: 'ACTIVIDADES' as const,
+    max_casillas: MAX_CASILLAS_POR_DEFECTO,
   }));
 }
 
@@ -76,9 +76,8 @@ export function validarComponentesEvaluativos(componentes: readonly ComponenteEv
   if (new Set(componentes.map((c) => c.nombre.trim().toLowerCase())).size !== componentes.length) {
     return 'Hay componentes con el mismo nombre.';
   }
-  if (!componentes.some((c) => c.origen === 'ACTIVIDADES')) {
-    return 'Al menos un componente debe alimentarse de actividades: de lo contrario no se podría programar ninguna.';
-  }
+  const sinCasillas = componentes.find((c) => !Number.isInteger(c.max_casillas) || c.max_casillas < 1 || c.max_casillas > MAX_CASILLAS_BLOQUE);
+  if (sinCasillas) return `«${sinCasillas.nombre}»: las casillas máximas deben ser un entero entre 1 y ${MAX_CASILLAS_BLOQUE}.`;
   const suma = Math.round(componentes.reduce((total, c) => total + c.porcentaje, 0) * 100) / 100;
   if (suma !== 100) return `Los porcentajes de los componentes deben sumar exactamente 100. Suma actual: ${suma}.`;
   return null;

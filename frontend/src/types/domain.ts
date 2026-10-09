@@ -239,18 +239,14 @@ export type ComponenteSiee = (typeof COMPONENTES_SIEE)[number];
 
 export type PonderacionComponentes = Record<ComponenteSiee, number>;
 
-// M12: bloques que forman el 100% de la nota de una asignatura; la institución los define por año lectivo.
-export type OrigenComponente = 'ACTIVIDADES' | 'NOTA_DIRECTA';
-export const NOMBRES_ORIGEN_COMPONENTE: Record<OrigenComponente, string> = {
-  ACTIVIDADES: 'Promedio de actividades',
-  NOTA_DIRECTA: 'Nota directa del docente',
-};
-
+// M12: el molde de la planilla. Los bloques forman el 100% de la nota de una asignatura y cada uno limita cuántas casillas
+// (actividades o notas sueltas) admite; la institución los define por año lectivo.
 export interface ComponenteEvaluativo {
   clave: string;
   nombre: string;
   porcentaje: number;
-  origen: OrigenComponente;
+  /** Cuántas casillas (actividades y notas) admite este bloque en la planilla de una clase y periodo. */
+  max_casillas: number;
 }
 
 export interface AcademicYear {
@@ -273,6 +269,8 @@ export interface AcademicYear {
   componentes_evaluativos: ComponenteEvaluativo[];
   /** Los que realmente rigen el cálculo (los configurados o el respaldo). */
   componentes_efectivos: ComponenteEvaluativo[];
+  /** La escala y el molde de la planilla se pueden cambiar hasta que se registre la primera nota del año. */
+  evaluacion_editable: boolean;
   cerrado_at: string | null;
   resumen_semanas: ResumenSemanas;
 }

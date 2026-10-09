@@ -3,31 +3,40 @@ import { Types } from 'mongoose';
 import { MAX_BYTES_EXCEL_NOTAS } from '../constants/notas';
 import { UserDocument } from '../models/user.model';
 import ApiError from '../utils/ApiError';
+import { exigirPesosValidos } from './casillasBloque.service';
+import { actualizarCasilla, crearCasilla, establecerPesos } from './columnasPlanilla.service';
 import { CeldaPlanilla, guardarCeldas, obtenerPlanilla } from './notas.service';
 
 const HOJA_PLANILLA = 'Planilla';
 // La hoja de datos viaja con el archivo: dice a qué clase y periodo pertenece y qué significa cada columna, así subirlo no
 // depende de lo que el docente tenga seleccionado en pantalla. Está oculta.
 const HOJA_DATOS = 'Datos';
-const FILA_ENCABEZADOS = 3;
+const FILA_BLOQUES = 2;
+const FILA_NOMBRES = 3;
 const FILA_PESOS = 4;
-const FILA_INICIAL = 5;
+const FILA_EFECTIVO = 5;
+const FILA_INICIAL = 6;
 const FILA_LLAVES = 5;
+// Casillas en blanco que se ofrecen por bloque: el molde puede permitir hasta 50, pero una hoja con tantas columnas vacías no se usa.
+const MAX_CASILLAS_EN_BLANCO = 30;
 // La protección de la hoja es una comodidad (evita borrar una fórmula sin querer), no la seguridad: al importar, el servidor
 // ignora las columnas calculadas y vuelve a validar cada nota contra la base.
 const CLAVE_PROTECCION = 'klassy-notas';
 const FIRMA_ZIP = Buffer.from([0x50, 0x4b, 0x03, 0x04]);
 
-type TipoColumna = 'DOCUMENTO' | 'ESTUDIANTE' | 'ACTIVIDAD' | 'DIRECTA' | 'PROMEDIO' | 'NOTA' | 'DESEMPENO' | 'ESTADO';
+type TipoColumna = 'DOCUMENTO' | 'ESTUDIANTE' | 'CASILLA' | 'NUEVA' | 'BLOQUE' | 'NOTA' | 'DESEMPENO' | 'ESTADO';
 
 interface Columna {
   indice: number;
   tipo: TipoColumna;
-  /** Id de la actividad, clave del componente o nombre fijo. */
+  /** Id de la casilla, clave del bloque (NUEVA/BLOQUE) o nombre fijo. */
   clave: string;
   encabezado: string;
-  /** Peso de la actividad o porcentaje del componente. */
-  peso?: number;
+  /** Peso puesto por el docente (null = automático). Solo en CASILLA. */
+  peso?: number | null;
+  pesoEfectivo?: number;
+  /** El título de una actividad lo manda Actividades y tareas: no se edita desde la hoja. */
+  tituloFijo?: boolean;
 }
 
 const letra = (n: number): string => {
@@ -43,42 +52,47 @@ const letra = (n: number): string => {
 
 const comillas = (texto: string): string => texto.replace(/"/g, '""');
 
-/** Descarga la planilla de la clase en Excel (también abre en Google Sheets): fórmulas protegidas, solo las notas se editan. */
+/**
+ * Descarga la planilla de la clase en Excel (también abre en Google Sheets). Cada bloque del molde del colegio trae sus casillas
+ * (las que ya existen y espacios en blanco hasta el máximo del bloque): el docente escribe el nombre, el peso y las notas, y
+ * al subirla las casillas nuevas se crean. Las fórmulas y los promedios van protegidos.
+ */
 export async function generarPlantillaNotas(
   asignacionId: string,
   periodoNumero: number,
   docente: UserDocument
 ): Promise<{ buffer: Buffer; nombreArchivo: string }> {
   const planilla = await obtenerPlanilla(asignacionId, periodoNumero, docente);
-  if (planilla.componentes.every((c) => c.origen === 'ACTIVIDADES' && c.actividades.length === 0)) {
-    throw new ApiError(409, 'Esta clase aún no tiene actividades en el periodo: programa alguna antes de descargar la planilla.');
-  }
   const rangos = [...planilla.escala.rangos].sort((x, y) => y.valor_minimo - x.valor_minimo);
+  const editable = planilla.edicion.puede_editar;
 
   // --- Columnas ---
   const columnas: Columna[] = [
     { indice: 1, tipo: 'DOCUMENTO', clave: 'documento', encabezado: 'Documento' },
     { indice: 2, tipo: 'ESTUDIANTE', clave: 'estudiante', encabezado: 'Estudiante' },
   ];
-  const bloques: Array<{ nombre: string; desde: number; hasta: number }> = [];
-  const promedioDe = new Map<string, number>();
-  const notaDeComponente = new Map<string, number>(); // clave -> columna que trae la nota del componente
-  for (const componente of planilla.componentes) {
+  const bloques: Array<{ nombre: string; clave: string; porcentaje: number; desde: number; hasta: number; primera: number; ultima: number; columnaBloque: number }> = [];
+  for (const bloque of planilla.bloques) {
     const desde = columnas.length + 1;
-    if (componente.origen === 'ACTIVIDADES') {
-      for (const a of componente.actividades) {
-        columnas.push({ indice: columnas.length + 1, tipo: 'ACTIVIDAD', clave: a._id, encabezado: a.titulo, peso: a.peso });
-      }
-      if (componente.actividades.length > 0) {
-        columnas.push({ indice: columnas.length + 1, tipo: 'PROMEDIO', clave: componente.clave, encabezado: `Promedio ${componente.nombre}`, peso: componente.porcentaje });
-        promedioDe.set(componente.clave, columnas.length);
-        notaDeComponente.set(componente.clave, columnas.length);
-      }
-    } else {
-      columnas.push({ indice: columnas.length + 1, tipo: 'DIRECTA', clave: componente.clave, encabezado: componente.nombre, peso: componente.porcentaje });
-      notaDeComponente.set(componente.clave, columnas.length);
+    for (const casilla of bloque.casillas) {
+      columnas.push({
+        indice: columnas.length + 1,
+        tipo: 'CASILLA',
+        clave: casilla.id,
+        encabezado: casilla.titulo,
+        peso: casilla.peso,
+        pesoEfectivo: casilla.peso_efectivo,
+        tituloFijo: casilla.tipo === 'ACTIVIDAD',
+      });
     }
-    if (columnas.length >= desde) bloques.push({ nombre: `${componente.nombre} (${componente.porcentaje}%)`, desde, hasta: columnas.length });
+    const enBlanco = Math.max(0, Math.min(bloque.max_casillas, MAX_CASILLAS_EN_BLANCO) - bloque.casillas.length);
+    for (let i = 0; i < enBlanco; i += 1) {
+      columnas.push({ indice: columnas.length + 1, tipo: 'NUEVA', clave: bloque.clave, encabezado: '', peso: null, pesoEfectivo: 0 });
+    }
+    const primera = desde;
+    const ultima = columnas.length;
+    columnas.push({ indice: columnas.length + 1, tipo: 'BLOQUE', clave: bloque.clave, encabezado: `Nota ${bloque.nombre}` });
+    bloques.push({ nombre: bloque.nombre, clave: bloque.clave, porcentaje: bloque.porcentaje, desde, hasta: columnas.length, primera, ultima, columnaBloque: columnas.length });
   }
   const colNota = columnas.length + 1;
   columnas.push({ indice: colNota, tipo: 'NOTA', clave: 'nota', encabezado: 'Nota de la asignatura' });
@@ -86,40 +100,76 @@ export async function generarPlantillaNotas(
   columnas.push({ indice: colNota + 2, tipo: 'ESTADO', clave: 'estado', encabezado: 'Estado' });
 
   const libro = new ExcelJS.Workbook();
-  const hoja = libro.addWorksheet(HOJA_PLANILLA, { views: [{ state: 'frozen', xSplit: 2, ySplit: FILA_PESOS }] });
+  const hoja = libro.addWorksheet(HOJA_PLANILLA, { views: [{ state: 'frozen', xSplit: 2, ySplit: FILA_EFECTIVO }] });
   const contexto = planilla.asignacion;
-  hoja.getCell('A1').value = `${contexto?.asignatura?.nombre ?? 'Asignatura'} · Grupo ${contexto?.grupo?.nomenclatura ?? ''} · Periodo ${planilla.periodo.numero} (${planilla.periodo.nombre})`;
+  const { plantilla } = planilla;
+  hoja.getCell('A1').value = `${plantilla.titulo} — ${contexto?.asignatura?.nombre ?? 'Asignatura'} · Grupo ${contexto?.grupo?.nomenclatura ?? ''} · Periodo ${planilla.periodo.numero} (${planilla.periodo.nombre})`;
   hoja.getCell('A1').font = { bold: true, size: 13 };
 
   // --- Encabezados ---
   for (const b of bloques) {
-    hoja.mergeCells(2, b.desde, 2, b.hasta);
-    const celda = hoja.getCell(2, b.desde);
-    celda.value = b.nombre;
+    const max = planilla.bloques.find((x) => x.clave === b.clave)?.max_casillas ?? 0;
+    hoja.mergeCells(FILA_BLOQUES, b.desde, FILA_BLOQUES, b.hasta);
+    const celda = hoja.getCell(FILA_BLOQUES, b.desde);
+    celda.value = `${b.nombre} (${b.porcentaje}%) — hasta ${max} casilla${max === 1 ? '' : 's'}`;
     celda.alignment = { horizontal: 'center' };
     celda.font = { bold: true };
     celda.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFEAF3FF' } };
   }
   for (const c of columnas) {
-    const celda = hoja.getCell(FILA_ENCABEZADOS, c.indice);
-    celda.value = c.encabezado;
+    const celda = hoja.getCell(FILA_NOMBRES, c.indice);
+    celda.value = c.encabezado || null;
     celda.font = { bold: true };
     celda.alignment = { wrapText: true, vertical: 'middle', horizontal: c.tipo === 'ESTUDIANTE' ? 'left' : 'center' };
-    celda.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: c.tipo === 'ACTIVIDAD' || c.tipo === 'DIRECTA' ? 'FFFFFFFF' : 'FFF1F5F9' } };
-    if (c.peso !== undefined) {
+    celda.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: c.tipo === 'CASILLA' || c.tipo === 'NUEVA' ? 'FFFFFFFF' : 'FFF1F5F9' } };
+    if (c.tipo === 'CASILLA' || c.tipo === 'NUEVA') {
+      celda.protection = { locked: !editable || Boolean(c.tituloFijo) };
       const peso = hoja.getCell(FILA_PESOS, c.indice);
-      peso.value = c.peso;
+      peso.value = c.peso ?? null;
+      peso.numFmt = '0.##';
       peso.alignment = { horizontal: 'center' };
       peso.font = { italic: true, color: { argb: 'FF788794' } };
+      peso.protection = { locked: !editable };
+      peso.dataValidation = {
+        type: 'decimal',
+        operator: 'between',
+        allowBlank: true,
+        formulae: [0, 100],
+        showErrorMessage: true,
+        errorTitle: 'Peso fuera de rango',
+        error: 'El peso es un porcentaje entre 0 y 100 (déjalo vacío para repartir en partes iguales).',
+      };
     }
     hoja.getColumn(c.indice).width = c.tipo === 'ESTUDIANTE' ? 36 : c.tipo === 'DOCUMENTO' ? 15 : c.tipo === 'DESEMPENO' || c.tipo === 'ESTADO' ? 14 : 13;
   }
-  hoja.getCell(FILA_PESOS, 2).value = 'Peso de la actividad / % del componente';
-  hoja.getCell(FILA_PESOS, 2).font = { italic: true, color: { argb: 'FF788794' } };
-  hoja.getRow(FILA_ENCABEZADOS).height = 42;
+  hoja.getCell(FILA_NOMBRES, 2).value = 'Estudiante  (escribe el nombre de cada casilla →)';
+  hoja.getCell(FILA_PESOS, 2).value = 'Peso en el bloque (%) — vacío = partes iguales';
+  hoja.getCell(FILA_EFECTIVO, 2).value = 'Peso que realmente cuenta (%)';
+  for (const fila of [FILA_PESOS, FILA_EFECTIVO]) hoja.getCell(fila, 2).font = { italic: true, color: { argb: 'FF788794' } };
+  hoja.getRow(FILA_NOMBRES).height = 42;
+
+  // --- Peso efectivo de cada casilla: lo puesto, o el resto repartido en partes iguales entre las que no tienen peso ---
+  for (const b of bloques) {
+    const nombres = `${letra(b.primera)}$${FILA_NOMBRES}:${letra(b.ultima)}$${FILA_NOMBRES}`;
+    const pesos = `${letra(b.primera)}$${FILA_PESOS}:${letra(b.ultima)}$${FILA_PESOS}`;
+    for (let col = b.primera; col <= b.ultima; col += 1) {
+      const origen = columnas[col - 1] as Columna;
+      const propio = `${letra(col)}$${FILA_NOMBRES}`;
+      const pesoPropio = `${letra(col)}$${FILA_PESOS}`;
+      const sinPeso = `SUMPRODUCT(--(${nombres}<>""),--NOT(ISNUMBER(${pesos})))`;
+      const puesto = `SUMPRODUCT(--(${nombres}<>""),${pesos})`;
+      const celda = hoja.getCell(FILA_EFECTIVO, col);
+      celda.value = {
+        formula: `IF(${propio}="",0,IF(ISNUMBER(${pesoPropio}),${pesoPropio},IF(${sinPeso}=0,0,MAX(0,100-${puesto})/${sinPeso})))`,
+        result: origen.pesoEfectivo ?? 0,
+      };
+      celda.numFmt = '0.##';
+      celda.alignment = { horizontal: 'center' };
+      celda.font = { italic: true, color: { argb: 'FF788794' } };
+    }
+  }
 
   // --- Estudiantes ---
-  const letraDe = (c: number) => letra(c);
   planilla.estudiantes.forEach((fila, i) => {
     const r = FILA_INICIAL + i;
     const cerrada = fila.estado === 'CERRADO' || fila.estado === 'DEFINITIVO';
@@ -134,13 +184,12 @@ export async function generarPlantillaNotas(
         case 'ESTUDIANTE':
           celda.value = `${fila.estudiante.apellido} ${fila.estudiante.nombre}`;
           break;
-        case 'ACTIVIDAD':
-        case 'DIRECTA': {
-          const nota = c.tipo === 'ACTIVIDAD' ? fila.notas_actividad[c.clave] : fila.notas_directas[c.clave];
-          celda.value = nota ?? null;
+        case 'CASILLA':
+        case 'NUEVA': {
+          celda.value = c.tipo === 'CASILLA' ? (fila.notas[c.clave] ?? null) : null;
           celda.numFmt = '0.0#';
           celda.alignment = { horizontal: 'center' };
-          celda.protection = { locked: cerrada };
+          celda.protection = { locked: cerrada || !editable };
           celda.dataValidation = {
             type: 'decimal',
             operator: 'between',
@@ -152,25 +201,21 @@ export async function generarPlantillaNotas(
           };
           break;
         }
-        case 'PROMEDIO': {
-          const actividades = columnas.filter((x) => x.tipo === 'ACTIVIDAD' && planilla.componentes.find((k) => k.clave === c.clave)?.actividades.some((a) => a._id === x.clave));
-          const primera = actividades[0]!.indice;
-          const ultima = actividades[actividades.length - 1]!.indice;
-          const rango = `${letraDe(primera)}${r}:${letraDe(ultima)}${r}`;
-          const pesos = `${letraDe(primera)}$${FILA_PESOS}:${letraDe(ultima)}$${FILA_PESOS}`;
+        case 'BLOQUE': {
+          const b = bloques.find((x) => x.clave === c.clave) as (typeof bloques)[number];
+          const rango = `${letra(b.primera)}${r}:${letra(b.ultima)}${r}`;
+          const efectivos = `${letra(b.primera)}$${FILA_EFECTIVO}:${letra(b.ultima)}$${FILA_EFECTIVO}`;
           celda.value = {
-            formula: `IF(COUNT(${rango})=0,"",IF(SUMPRODUCT(--ISNUMBER(${rango}),${pesos})=0,ROUND(AVERAGE(${rango}),2),ROUND(SUMPRODUCT(${rango},${pesos})/SUMPRODUCT(--ISNUMBER(${rango}),${pesos}),2)))`,
-            result: fila.componentes[c.clave] ?? '',
+            formula: `IF(COUNT(${rango})=0,"",IF(SUMPRODUCT(--ISNUMBER(${rango}),${efectivos})=0,ROUND(AVERAGE(${rango}),2),ROUND(SUMPRODUCT(${rango},${efectivos})/SUMPRODUCT(--ISNUMBER(${rango}),${efectivos}),2)))`,
+            result: fila.bloques[c.clave] ?? '',
           };
           celda.numFmt = '0.00';
           celda.alignment = { horizontal: 'center' };
+          celda.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF1F5F9' } };
           break;
         }
         case 'NOTA': {
-          const terminos = planilla.componentes.flatMap((k) => {
-            const col = notaDeComponente.get(k.clave);
-            return col ? [{ ref: `${letraDe(col)}${r}`, pct: k.porcentaje }] : [];
-          });
+          const terminos = bloques.map((b) => ({ ref: `${letra(b.columnaBloque)}${r}`, pct: b.porcentaje }));
           const numerador = terminos.map((t) => `IF(ISNUMBER(${t.ref}),${t.ref}*${t.pct},0)`).join('+');
           const denominador = terminos.map((t) => `IF(ISNUMBER(${t.ref}),${t.pct},0)`).join('+');
           celda.value = { formula: `IF((${denominador})=0,"",ROUND((${numerador})/(${denominador}),2))`, result: fila.nota_asignatura ?? '' };
@@ -181,7 +226,7 @@ export async function generarPlantillaNotas(
         }
         case 'DESEMPENO': {
           // El nivel se resuelve con la nota redondeada a la precisión de la escala, igual que en el servidor.
-          const bruta = `${letraDe(colNota)}${r}`;
+          const bruta = `${letra(colNota)}${r}`;
           const nota = `ROUND(${bruta},${planilla.escala.precision_decimales})`;
           const cadena = rangos.reduceRight((resto, rango, idx) => (idx === rangos.length - 1 ? `"${comillas(rango.etiqueta)}"` : `IF(${nota}>=${rango.valor_minimo},"${comillas(rango.etiqueta)}",${resto})`), '""');
           celda.value = { formula: `IF(${bruta}="","",${cadena})`, result: fila.desempeno?.etiqueta ?? '' };
@@ -195,6 +240,32 @@ export async function generarPlantillaNotas(
       }
     }
   });
+
+  // --- Plantilla del colegio: lo que no quiere ver se OCULTA (no se quita): la importación y las fórmulas siguen contando con esas columnas ---
+  const ocultar = (tipo: TipoColumna, oculta: boolean) => {
+    if (oculta) for (const c of columnas.filter((x) => x.tipo === tipo)) hoja.getColumn(c.indice).hidden = true;
+  };
+  ocultar('DOCUMENTO', !plantilla.columnas.documento);
+  ocultar('BLOQUE', !plantilla.columnas.promedios_componente);
+  ocultar('DESEMPENO', !plantilla.columnas.desempeno);
+  ocultar('ESTADO', !plantilla.columnas.estado);
+  // La fila de pesos puestos es de entrada y no se oculta; la que se puede esconder es la calculada.
+  if (!plantilla.columnas.pesos) hoja.getRow(FILA_EFECTIVO).hidden = true;
+
+  // Firmas y pie al final de la hoja (bloqueados, como todo lo que no es una nota).
+  const filaFinal = FILA_INICIAL + planilla.estudiantes.length + 2;
+  plantilla.firmas.forEach((firma, i) => {
+    const columna = 2 + i * 3;
+    hoja.getCell(filaFinal + 2, columna).value = '______________________________';
+    const nombre = firma.usa_docente ? (contexto?.docente ? `${contexto.docente.nombre} ${contexto.docente.apellido}` : '') : firma.nombre;
+    hoja.getCell(filaFinal + 3, columna).value = nombre;
+    hoja.getCell(filaFinal + 3, columna).font = { bold: true };
+    hoja.getCell(filaFinal + 4, columna).value = firma.cargo;
+  });
+  if (plantilla.pie) {
+    hoja.getCell(filaFinal, 2).value = plantilla.pie;
+    hoja.getCell(filaFinal, 2).font = { italic: true, color: { argb: 'FF788794' } };
+  }
 
   // --- Hoja de datos oculta: a qué clase pertenece y qué es cada columna ---
   const datos = libro.addWorksheet(HOJA_DATOS, { state: 'hidden' });
@@ -228,19 +299,41 @@ function textoDeCelda(celda: ExcelJS.Cell): string {
   return String(valor).trim();
 }
 
+/** Número de una celda: Excel en español guarda la coma decimal como texto cuando la celda no es numérica. null = vacía, NaN = no es número. */
+function numeroDeCelda(celda: ExcelJS.Cell): number | null {
+  const texto = textoDeCelda(celda);
+  if (texto === '') return null;
+  return typeof celda.value === 'number' ? celda.value : Number(texto.replace(',', '.'));
+}
+
 export interface ResultadoImportacionNotas {
   asignatura: string;
   grupo: string;
   periodo: number;
   guardadas: number;
   sin_cambios: number;
+  casillas_creadas: number;
+  casillas_renombradas: number;
+  pesos_actualizados: number;
+}
+
+const igualesPeso = (a: number | null, b: number | null): boolean => (a === null || b === null ? a === b : Math.abs(a - b) < 0.005);
+
+interface ColumnaImportada {
+  indice: number;
+  tipo: 'CASILLA' | 'NUEVA';
+  /** Id de la casilla existente, o clave del bloque si es nueva. */
+  clave: string;
+  nombre: string;
+  peso: number | null;
 }
 
 /**
- * Aplica una planilla diligenciada sin conexión. Se valida TODA antes de guardar: un documento que no es del grupo, una nota
- * no numérica o una actividad que ya no existe es error de fila y no se guarda nada. Solo cuentan las celdas de nota (las
- * columnas calculadas se ignoran) y solo viajan las que cambiaron; guardar pasa por `guardarCeldas`, o sea las mismas reglas de
- * la planilla en línea (clase del docente, periodo que admita notas, escala del año, planilla no cerrada).
+ * Aplica una planilla diligenciada sin conexión. Se valida TODA antes de escribir: un documento que no es del grupo, una nota
+ * no numérica o fuera de la escala, una casilla que ya no existe, un bloque que se pasa de sus casillas máximas o pesos que
+ * suman más de 100% es error y no se guarda nada. Solo cuentan las celdas de nota, los nombres y los pesos (las columnas
+ * calculadas se ignoran). Crear casillas, ponerles peso y guardar notas pasa por los mismos servicios de la planilla en línea,
+ * o sea las mismas reglas (clase del docente, periodo que admita notas, escala del año, planilla no cerrada).
  */
 export async function importarPlantillaNotas(archivo: Buffer, docente: UserDocument, ip?: string | null): Promise<ResultadoImportacionNotas> {
   if (archivo.length > MAX_BYTES_EXCEL_NOTAS) throw new ApiError(400, 'El archivo supera los 2 MB.');
@@ -263,6 +356,8 @@ export async function importarPlantillaNotas(archivo: Buffer, docente: UserDocum
 
   const planilla = await obtenerPlanilla(asignacionId, periodoNumero, docente);
   if (!planilla.edicion.puede_editar) throw new ApiError(409, planilla.edicion.motivo ?? 'Esta planilla no admite cambios.');
+  const nombreAsignatura = planilla.asignacion?.asignatura?.nombre ?? '';
+  const nombreGrupo = planilla.asignacion?.grupo?.nomenclatura ?? '';
 
   const llaves = new Map<number, { tipo: string; clave: string }>();
   datos.getRow(FILA_LLAVES).eachCell((celda, indice) => {
@@ -270,14 +365,43 @@ export async function importarPlantillaNotas(archivo: Buffer, docente: UserDocum
     llaves.set(indice, { tipo, clave: resto.join(':') });
   });
   const estudiantePorDocumento = new Map(planilla.estudiantes.map((f) => [f.estudiante.numero_documento, f]));
-  const actividadesVigentes = new Set(planilla.componentes.flatMap((c) => c.actividades.map((a) => a._id)));
-  const directasVigentes = new Set(planilla.componentes.filter((c) => c.origen === 'NOTA_DIRECTA').map((c) => c.clave));
+  const existentes = new Map(planilla.bloques.flatMap((b) => b.casillas.map((c) => [c.id, { ...c, bloque: b.clave }] as const)));
+  const bloquesPorClave = new Map(planilla.bloques.map((b) => [b.clave, b]));
   const columnaDocumento = [...llaves.entries()].find(([, v]) => v.tipo === 'DOCUMENTO')?.[0] ?? 1;
 
   const errores: Array<{ fila: number; documento?: string; motivo: string }> = [];
-  const celdas: CeldaPlanilla[] = [];
+
+  // --- Encabezados: nombre y peso de cada casilla ---
+  const importadas: ColumnaImportada[] = [];
+  for (const [indice, llave] of llaves) {
+    if (llave.tipo !== 'CASILLA' && llave.tipo !== 'NUEVA') continue;
+    const nombre = textoDeCelda(hoja.getCell(FILA_NOMBRES, indice));
+    const peso = numeroDeCelda(hoja.getCell(FILA_PESOS, indice));
+    if (peso !== null && (!Number.isFinite(peso) || peso < 0 || peso > 100)) {
+      errores.push({ fila: FILA_PESOS, motivo: `El peso de «${nombre || `columna ${letra(indice)}`}» debe ser un porcentaje entre 0 y 100.` });
+      continue;
+    }
+    if (llave.tipo === 'CASILLA') {
+      const existente = existentes.get(llave.clave);
+      if (!existente) {
+        errores.push({ fila: FILA_NOMBRES, motivo: 'Una columna corresponde a una casilla que ya no existe: descarga la planilla de nuevo.' });
+        continue;
+      }
+      if (existente.tipo === 'MANUAL' && nombre === '') {
+        errores.push({ fila: FILA_NOMBRES, motivo: `La casilla «${existente.titulo}» quedó sin nombre. Para quitarla elimínala desde la planilla en línea.` });
+        continue;
+      }
+    }
+    importadas.push({ indice, tipo: llave.tipo, clave: llave.clave, nombre, peso });
+  }
+  const porIndice = new Map(importadas.map((c) => [c.indice, c]));
+
+  // --- Notas ---
+  const notas: Array<{ columna: number; estudianteId: string; nota: number }> = [];
+  const conNotas = new Set<number>();
   const documentosVistos = new Set<string>();
   let sinCambios = 0;
+  const { nota_minima: minimo, nota_maxima: maximo } = planilla.escala;
 
   hoja.eachRow({ includeEmpty: false }, (row, numeroFila) => {
     if (numeroFila < FILA_INICIAL) return;
@@ -288,45 +412,99 @@ export async function importarPlantillaNotas(archivo: Buffer, docente: UserDocum
     if (documentosVistos.has(documento)) return void errores.push({ fila: numeroFila, documento, motivo: 'El documento está repetido.' });
     documentosVistos.add(documento);
 
-    for (const [indice, llave] of llaves) {
-      if (llave.tipo !== 'ACTIVIDAD' && llave.tipo !== 'DIRECTA') continue;
-      const texto = textoDeCelda(row.getCell(indice));
+    for (const columna of importadas) {
+      const celda = row.getCell(columna.indice);
+      const texto = textoDeCelda(celda);
       if (texto === '') continue;
-
-      // Excel en español guarda la coma decimal como texto cuando la celda no es numérica.
-      const nota = typeof row.getCell(indice).value === 'number' ? (row.getCell(indice).value as number) : Number(texto.replace(',', '.'));
+      const nota = numeroDeCelda(celda) as number;
       if (!Number.isFinite(nota)) return void errores.push({ fila: numeroFila, documento, motivo: `«${texto}» no es una nota numérica.` });
-      if (llave.tipo === 'ACTIVIDAD' && !actividadesVigentes.has(llave.clave)) {
-        return void errores.push({ fila: numeroFila, documento, motivo: 'Una columna corresponde a una actividad que ya no existe: descarga la planilla de nuevo.' });
+      if (nota < minimo || nota > maximo) {
+        return void errores.push({ fila: numeroFila, documento, motivo: `La nota ${nota} está fuera de la escala (${minimo} a ${maximo}).` });
       }
-      if (llave.tipo === 'DIRECTA' && !directasVigentes.has(llave.clave)) {
-        return void errores.push({ fila: numeroFila, documento, motivo: 'Una columna corresponde a un componente que ya no se digita como nota directa.' });
-      }
-
-      const actual = llave.tipo === 'ACTIVIDAD' ? fila.notas_actividad[llave.clave] : fila.notas_directas[llave.clave];
-      if (actual === nota) {
+      conNotas.add(columna.indice);
+      if (columna.tipo === 'CASILLA' && fila.notas[columna.clave] === nota) {
         sinCambios += 1;
         continue;
       }
-      celdas.push({
-        student_id: fila.estudiante._id,
-        nota,
-        ...(llave.tipo === 'ACTIVIDAD' ? { actividad_id: llave.clave } : { componente_clave: llave.clave }),
-      });
+      notas.push({ columna: columna.indice, estudianteId: fila.estudiante._id, nota });
     }
   });
 
-  if (errores.length > 0) throw new ApiError(400, `El archivo tiene ${errores.length} fila(s) con errores; no se guardó nada.`, errores);
-  if (celdas.length === 0) {
-    return { asignatura: planilla.asignacion?.asignatura?.nombre ?? '', grupo: planilla.asignacion?.grupo?.nomenclatura ?? '', periodo: periodoNumero, guardadas: 0, sin_cambios: sinCambios };
+  // --- Casillas nuevas: llevan nombre; el bloque debe tener lugar ---
+  const nuevas = importadas.filter((c) => c.tipo === 'NUEVA' && (c.nombre !== '' || conNotas.has(c.indice)));
+  for (const columna of nuevas) {
+    if (columna.nombre === '') errores.push({ fila: FILA_NOMBRES, motivo: `Hay notas en la columna ${letra(columna.indice)} pero la casilla no tiene nombre.` });
+  }
+  for (const bloque of planilla.bloques) {
+    const total = bloque.casillas.length + nuevas.filter((c) => c.clave === bloque.clave).length;
+    if (total > bloque.max_casillas) {
+      errores.push({ fila: FILA_NOMBRES, motivo: `«${bloque.nombre}» admite hasta ${bloque.max_casillas} casilla(s) y el archivo trae ${total}.` });
+    }
   }
 
-  const guardado = await guardarCeldas({ teacher_assignment_id: asignacionId, periodo_numero: periodoNumero, celdas }, docente, ip);
+  // --- Pesos: lo puesto en cada bloque no pasa de 100% ---
+  const resultanteDePesos = [
+    ...[...existentes.values()].map((e) => {
+      const importada = importadas.find((c) => c.tipo === 'CASILLA' && c.clave === e.id);
+      return { id: e.id, bloque: e.bloque, peso: importada ? importada.peso : e.peso };
+    }),
+    ...nuevas.map((c) => ({ id: `nueva-${c.indice}`, bloque: c.clave, peso: c.peso })),
+  ];
+  try {
+    exigirPesosValidos(resultanteDePesos, (clave) => bloquesPorClave.get(clave)?.nombre ?? clave);
+  } catch (err) {
+    if (err instanceof ApiError) errores.push({ fila: FILA_PESOS, motivo: err.message });
+    else throw err;
+  }
+
+  if (errores.length > 0) throw new ApiError(400, `El archivo tiene ${errores.length} fila(s) con errores; no se guardó nada.`, errores);
+
+  // --- Escritura: casillas nuevas, nombres, pesos y por último las notas ---
+  const idDeNueva = new Map<number, string>();
+  for (const columna of nuevas) {
+    const creada = await crearCasilla(
+      { teacher_assignment_id: asignacionId, periodo_numero: periodoNumero, bloque_clave: columna.clave, nombre: columna.nombre },
+      docente,
+      ip
+    );
+    idDeNueva.set(columna.indice, String(creada._id));
+  }
+
+  let renombradas = 0;
+  for (const columna of importadas) {
+    if (columna.tipo !== 'CASILLA') continue;
+    const existente = existentes.get(columna.clave);
+    if (existente?.tipo === 'MANUAL' && columna.nombre !== existente.titulo) {
+      await actualizarCasilla(columna.clave, { nombre: columna.nombre }, docente, ip);
+      renombradas += 1;
+    }
+  }
+
+  const pesos: Array<{ casilla_id: string; peso: number | null }> = [];
+  for (const columna of importadas) {
+    if (columna.tipo === 'CASILLA') {
+      const existente = existentes.get(columna.clave);
+      if (existente && !igualesPeso(existente.peso, columna.peso)) pesos.push({ casilla_id: columna.clave, peso: columna.peso });
+    } else if (columna.peso !== null && idDeNueva.has(columna.indice)) {
+      pesos.push({ casilla_id: idDeNueva.get(columna.indice) as string, peso: columna.peso });
+    }
+  }
+  if (pesos.length > 0) await establecerPesos({ teacher_assignment_id: asignacionId, periodo_numero: periodoNumero, pesos }, docente, ip);
+
+  const celdas: CeldaPlanilla[] = notas.map((n) => {
+    const columna = porIndice.get(n.columna) as ColumnaImportada;
+    return { student_id: n.estudianteId, casilla_id: columna.tipo === 'CASILLA' ? columna.clave : (idDeNueva.get(columna.indice) as string), nota: n.nota };
+  });
+  const guardado = celdas.length > 0 ? await guardarCeldas({ teacher_assignment_id: asignacionId, periodo_numero: periodoNumero, celdas }, docente, ip) : { guardadas: 0, sin_cambios: 0 };
+
   return {
-    asignatura: planilla.asignacion?.asignatura?.nombre ?? '',
-    grupo: planilla.asignacion?.grupo?.nomenclatura ?? '',
+    asignatura: nombreAsignatura,
+    grupo: nombreGrupo,
     periodo: periodoNumero,
     guardadas: guardado.guardadas,
     sin_cambios: sinCambios + guardado.sin_cambios,
+    casillas_creadas: nuevas.length,
+    casillas_renombradas: renombradas,
+    pesos_actualizados: pesos.length,
   };
 }

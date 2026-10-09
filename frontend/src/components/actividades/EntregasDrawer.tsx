@@ -6,7 +6,6 @@ import { Drawer } from '../ui/Drawer';
 import { Input } from '../ui/Field';
 import { Spinner } from '../ui/Spinner';
 import {
-  type ActividadConResumen,
   type FilaEntrega,
   descargarEntrega,
   useCalificarEntrega,
@@ -16,7 +15,8 @@ import { formatoInstante } from '../../lib/actividades';
 import type { EscalaEvaluacion } from '../../types/domain';
 
 interface EntregasDrawerProps {
-  actividad: ActividadConResumen | null;
+  /** Basta con saber cuál es: se usa desde la lista de actividades y desde la planilla de notas. */
+  actividad: { _id: string; titulo: string } | null;
   onClose: () => void;
   /** Escala del año lectivo (CU-ADM-04): acota la nota que se puede digitar; el servidor la vuelve a validar. */
   escala: EscalaEvaluacion | null;
@@ -29,13 +29,15 @@ interface EntregasDrawerProps {
 export function EntregasDrawer({ actividad, onClose, escala }: EntregasDrawerProps) {
   const entregas = useEntregasDeActividad(actividad?._id);
   const filas = entregas.data ?? [];
+  const entregadas = filas.filter((f) => f.entrega?.fecha_entrega).length;
+  const calificadas = filas.filter((f) => f.estado === 'CALIFICADA').length;
 
   return (
     <Drawer
       open={actividad !== null}
       size="lg"
       title={actividad ? `Entregas · ${actividad.titulo}` : 'Entregas'}
-      subtitle={actividad ? `${actividad.resumen.entregadas} de ${actividad.resumen.estudiantes} entregaron · ${actividad.resumen.calificadas} calificadas` : undefined}
+      subtitle={actividad && entregas.data ? `${entregadas} de ${filas.length} entregaron · ${calificadas} calificadas` : undefined}
       onClose={onClose}
     >
       {entregas.isLoading && (
@@ -56,7 +58,7 @@ export function EntregasDrawer({ actividad, onClose, escala }: EntregasDrawerPro
   );
 }
 
-function FilaEntregaEstudiante({ actividad, fila, escala }: { actividad: ActividadConResumen; fila: FilaEntrega; escala: EscalaEvaluacion | null }) {
+function FilaEntregaEstudiante({ actividad, fila, escala }: { actividad: { _id: string }; fila: FilaEntrega; escala: EscalaEvaluacion | null }) {
   const { entrega } = fila;
   const calificar = useCalificarEntrega();
   const [nota, setNota] = useState(entrega?.calificacion_numerica?.toString() ?? '');

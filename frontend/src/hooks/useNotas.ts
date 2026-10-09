@@ -2,9 +2,8 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { TipoActividad } from '../lib/actividades';
 import { api } from '../lib/apiClient';
 import type { EscalaPlanilla } from '../lib/calculoNotas';
-import type { OrigenComponente } from '../types/domain';
 import type { Desempeno } from '../types/reportCard';
-import type { ContextoAsignacion } from './useActividades';
+import type { ContextoAsignacion, EstadoActividadEstudiante } from './useActividades';
 
 // --- Tipos (espejo de las respuestas de /notas) ---
 
@@ -24,28 +23,59 @@ export const NOMBRES_ESTADO_NOTA: Record<EstadoNota, string> = {
 export interface FilaPlanilla {
   estudiante: { _id: string; nombre: string; apellido: string; numero_documento: string };
   estado: EstadoNota;
-  notas_actividad: Record<string, number | null>;
-  notas_directas: Record<string, number | null>;
-  componentes: Record<string, number | null>;
+  /** Nota de cada casilla (null = aún no tiene), por id de casilla. */
+  notas: Record<string, number | null>;
+  /** Solo de las actividades con entrega digital: si el estudiante entregó, si llegó tarde y si trae archivo. */
+  entregas: Record<string, { estado: EstadoActividadEstudiante; tiene_archivo: boolean }>;
+  /** Nota de cada bloque (promedio ponderado de sus casillas), por clave de bloque. */
+  bloques: Record<string, number | null>;
   nota_asignatura: number | null;
   parcial: boolean;
   desempeno: Desempeno | null;
   faltantes: string[];
 }
 
+/** Una casilla: una actividad de M11 o una nota suelta que crea el docente. */
+export interface CasillaPlanilla {
+  id: string;
+  tipo: 'ACTIVIDAD' | 'MANUAL';
+  titulo: string;
+  /** El % del bloque que puso el docente; null = automático. */
+  peso: number | null;
+  /** Lo que realmente pesa dentro del bloque (el puesto o el reparto de lo que queda). */
+  peso_efectivo: number;
+  tipo_actividad: TipoActividad | null;
+  fecha_entrega: string | null;
+  requiere_entrega: boolean;
+}
+
 export interface BloquePlanilla {
   clave: string;
   nombre: string;
   porcentaje: number;
-  origen: OrigenComponente;
-  actividades: Array<{ _id: string; titulo: string; tipo: TipoActividad; peso: number; fecha_entrega: string }>;
+  max_casillas: number;
+  /** Suma de los pesos que el docente puso en este bloque. */
+  pesos_puestos: number;
+  casillas: CasillaPlanilla[];
+}
+
+export interface PlantillaPlanilla {
+  titulo: string;
+  subtitulo: string;
+  pie: string;
+  mostrar_logo: boolean;
+  columnas: { documento: boolean; promedios_componente: boolean; pesos: boolean; desempeno: boolean; estado: boolean };
+  firmas: Array<{ cargo: string; nombre: string; usa_docente: boolean }>;
 }
 
 export interface Planilla {
+  /** Cómo se rotula y qué columnas calculadas lleva (plantilla del colegio, M21): no cambia ninguna nota. */
+  plantilla: PlantillaPlanilla;
   asignacion: ContextoAsignacion | null;
   periodo: { numero: number; nombre: string; estado: string };
   escala: EscalaPlanilla;
-  componentes: BloquePlanilla[];
+  /** El molde del colegio aplicado a esta clase: cada bloque con sus casillas. */
+  bloques: BloquePlanilla[];
   estudiantes: FilaPlanilla[];
   resumen: Record<EstadoNota, number>;
   edicion: {
@@ -59,8 +89,8 @@ export interface Planilla {
 
 export interface CeldaPlanilla {
   student_id: string;
-  actividad_id?: string;
-  componente_clave?: string;
+  /** El id de una actividad de M11 o de una nota suelta de la planilla. */
+  casilla_id: string;
   nota: number;
 }
 
@@ -85,6 +115,9 @@ export interface ResultadoImportacionNotas {
   periodo: number;
   guardadas: number;
   sin_cambios: number;
+  casillas_creadas: number;
+  casillas_renombradas: number;
+  pesos_actualizados: number;
 }
 
 // --- Consultas ---
@@ -162,6 +195,48 @@ export function useDeclararDefinitivas() {
   });
 }
 
+// --- Casillas y pesos: lo que el docente arma dentro del molde del colegio ---
+
+export function useCasillasMutaciones() {
+  const invalidar = useInvalidarNotas();
+  const referencia = (teacherAssignmentId: string, periodoNumero: number) => ({ teacher_assignment_id: teacherAssignmentId, periodo_numero: periodoNumero });
+  return {
+    crear: useMutation({
+      mutationFn: (input: { teacherAssignmentId: string; periodoNumero: number; bloqueClave: string; nombre: string; peso?: number | null }) =>
+        api.post<{ _id: string }>('/notas/columnas', {
+          ...referencia(input.teacherAssignmentId, input.periodoNumero),
+          bloque_clave: input.bloqueClave,
+          nombre: input.nombre,
+          peso: input.peso ?? null,
+        }),
+      onSuccess: invalidar,
+    }),
+    actualizar: useMutation({
+      mutationFn: ({ id, ...cambios }: { id: string; nombre?: string; bloque_clave?: string; peso?: number | null }) => api.patch<{ _id: string }>(`/notas/columnas/${id}`, cambios),
+      onSuccess: invalidar,
+    }),
+    eliminar: useMutation({
+      mutationFn: (id: string) => api.delete<unknown>(`/notas/columnas/${id}`),
+      onSuccess: invalidar,
+    }),
+    establecerPesos: useMutation({
+      mutationFn: (input: { teacherAssignmentId: string; periodoNumero: number; pesos: Array<{ casilla_id: string; peso: number | null }> }) =>
+        api.put<BloquePlanilla[]>('/notas/pesos', { ...referencia(input.teacherAssignmentId, input.periodoNumero), pesos: input.pesos }),
+      onSuccess: invalidar,
+    }),
+  };
+}
+
+/** Los bloques de una clase con lo usado y el máximo: para que Actividades y tareas ofrezca solo bloques con lugar. */
+export function useBloquesDeClase({ teacherAssignmentId, periodoNumero }: ReferenciaPlanilla) {
+  return useQuery({
+    queryKey: ['notas', 'bloques', teacherAssignmentId, periodoNumero],
+    queryFn: () => api.get<BloquePlanilla[]>('/notas/bloques', { teacher_assignment_id: teacherAssignmentId, periodo_numero: periodoNumero }),
+    enabled: Boolean(teacherAssignmentId && periodoNumero),
+    staleTime: 15_000,
+  });
+}
+
 // --- Excel offline (M22) ---
 
 export async function descargarExcelNotas(teacherAssignmentId: string, periodoNumero: number, nombreArchivo: string): Promise<void> {
@@ -183,4 +258,34 @@ export function useImportarExcelNotas() {
     },
     onSuccess: invalidar,
   });
+}
+
+// --- Plantilla de la planilla (M21 mínimo): presentación, la define el administrador ---
+
+export function usePlantillaPlanilla() {
+  return useQuery({
+    queryKey: ['notas', 'plantilla'],
+    queryFn: () => api.get<PlantillaPlanilla>('/notas/plantilla'),
+    staleTime: 5 * 60_000,
+  });
+}
+
+export function useActualizarPlantillaPlanilla() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (cambios: Partial<Omit<PlantillaPlanilla, 'columnas'>> & { columnas?: Partial<PlantillaPlanilla['columnas']> }) =>
+      api.put<PlantillaPlanilla>('/notas/plantilla', cambios),
+    // La plantilla viaja dentro de cada planilla: se refrescan todas.
+    onSuccess: () => void queryClient.invalidateQueries({ queryKey: ['notas'] }),
+  });
+}
+
+/** El PDF para imprimir y firmar: se baja con la sesión, nunca por URL directa. */
+export async function descargarPdfPlanilla(teacherAssignmentId: string, periodoNumero: number, nombreArchivo: string): Promise<void> {
+  const { url } = await api.downloadBlob(`/notas/planilla/pdf?teacher_assignment_id=${teacherAssignmentId}&periodo_numero=${periodoNumero}`);
+  const enlace = document.createElement('a');
+  enlace.href = url;
+  enlace.download = nombreArchivo;
+  enlace.click();
+  URL.revokeObjectURL(url);
 }

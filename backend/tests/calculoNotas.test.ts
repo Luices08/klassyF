@@ -1,25 +1,25 @@
 import { describe, expect, it } from 'vitest';
-import { calcularNotaArea, calcularNotaAsignatura, calcularPromedioGeneral, estadoAbiertoDe } from '../src/utils/calculoNotas';
+import { bloquesConPesoExcedido, calcularNotaArea, calcularNotaAsignatura, calcularPromedioGeneral, estadoAbiertoDe, pesosEfectivos } from '../src/utils/calculoNotas';
 import { claveDeComponente, componentesEfectivos, validarComponentesEvaluativos, ComponenteEvaluativo } from '../src/utils/siee';
 
-const hetero: ComponenteEvaluativo = { clave: 'HETEROEVALUACION', nombre: 'Heteroevaluación', porcentaje: 70, origen: 'ACTIVIDADES' };
-const auto: ComponenteEvaluativo = { clave: 'AUTOEVALUACION', nombre: 'Autoevaluación', porcentaje: 30, origen: 'NOTA_DIRECTA' };
-const actividades = [
-  { id: 'a1', componente: 'HETEROEVALUACION', peso: 1 },
-  { id: 'a2', componente: 'HETEROEVALUACION', peso: 3 },
+const hetero: ComponenteEvaluativo = { clave: 'HETEROEVALUACION', nombre: 'Heteroevaluación', porcentaje: 70, max_casillas: 10 };
+const auto: ComponenteEvaluativo = { clave: 'AUTOEVALUACION', nombre: 'Autoevaluación', porcentaje: 30, max_casillas: 1 };
+const casillas = [
+  { id: 'a1', bloque: 'HETEROEVALUACION', peso: 25 },
+  { id: 'a2', bloque: 'HETEROEVALUACION', peso: 75 },
+  { id: 'au', bloque: 'AUTOEVALUACION', peso: null },
 ];
-const entrada = (notasActividad: Array<[string, number]>, notasDirectas: Array<[string, number]> = []) => ({
-  componentes: [hetero, auto],
-  actividades,
-  notasActividad: new Map(notasActividad),
-  notasDirectas: new Map(notasDirectas),
+const entrada = (notas: Array<[string, number]>) => ({
+  bloques: [hetero, auto],
+  casillas,
+  notas: new Map(notas),
 });
 
 describe('calcularNotaAsignatura', () => {
-  it('promedia las actividades por su peso y pondera los componentes por su porcentaje', () => {
-    // Hetero = (4×1 + 2×3) / 4 = 2.5; nota = (2.5×70 + 5×30) / 100 = 3.25
-    const r = calcularNotaAsignatura(entrada([['a1', 4], ['a2', 2]], [['AUTOEVALUACION', 5]]));
-    expect(r.componentes).toEqual([
+  it('promedia las casillas por su peso y pondera los bloques por su porcentaje', () => {
+    // Hetero = (4×25 + 2×75) / 100 = 2.5; nota = (2.5×70 + 5×30) / 100 = 3.25
+    const r = calcularNotaAsignatura(entrada([['a1', 4], ['a2', 2], ['au', 5]]));
+    expect(r.bloques).toEqual([
       { clave: 'HETEROEVALUACION', nota: 2.5, completo: true },
       { clave: 'AUTOEVALUACION', nota: 5, completo: true },
     ]);
@@ -28,47 +28,114 @@ describe('calcularNotaAsignatura', () => {
     expect(r.faltantes).toEqual([]);
   });
 
-  it('falta de nota no es cero: es parcial, y dice qué falta', () => {
+  it('falta de nota no es cero: es parcial, y dice qué bloque falta', () => {
     const sinAuto = calcularNotaAsignatura(entrada([['a1', 4], ['a2', 2]]));
     expect(sinAuto.completa).toBe(false);
     expect(sinAuto.faltantes).toEqual(['AUTOEVALUACION']);
     expect(sinAuto.nota).toBe(2.5); // solo con lo que hay, sin tratar la autoevaluación como 0
 
-    const unaActividad = calcularNotaAsignatura(entrada([['a1', 4]], [['AUTOEVALUACION', 5]]));
-    expect(unaActividad.completa).toBe(false); // a2 sin calificar
-    expect(unaActividad.componentes[0]).toMatchObject({ nota: 4, completo: false });
+    const unaCasilla = calcularNotaAsignatura(entrada([['a1', 4], ['au', 5]]));
+    expect(unaCasilla.completa).toBe(false); // a2 sin calificar
+    expect(unaCasilla.bloques[0]).toMatchObject({ nota: 4, completo: false });
   });
 
   it('un cero es una nota', () => {
-    const r = calcularNotaAsignatura(entrada([['a1', 0], ['a2', 0]], [['AUTOEVALUACION', 0]]));
+    const r = calcularNotaAsignatura(entrada([['a1', 0], ['a2', 0], ['au', 0]]));
     expect(r.nota).toBe(0);
     expect(r.completa).toBe(true);
   });
 
-  it('sin ninguna nota no hay nota; un componente sin actividades nunca queda completo', () => {
+  it('sin ninguna nota no hay nota; un bloque sin casillas nunca queda completo', () => {
     const vacia = calcularNotaAsignatura(entrada([]));
     expect(vacia).toMatchObject({ nota: null, completa: false });
 
-    const sinActividades = calcularNotaAsignatura({ ...entrada([]), actividades: [] });
-    expect(sinActividades.componentes[0]).toEqual({ clave: 'HETEROEVALUACION', nota: null, completo: false });
+    const sinCasillas = calcularNotaAsignatura({ ...entrada([]), casillas: [] });
+    expect(sinCasillas.bloques[0]).toEqual({ clave: 'HETEROEVALUACION', nota: null, completo: false });
   });
 
   it('si todos los pesos son 0 promedia por igual en vez de dividir por cero', () => {
     const r = calcularNotaAsignatura({
-      ...entrada([['a1', 4], ['a2', 2]], [['AUTOEVALUACION', 3]]),
-      actividades: actividades.map((a) => ({ ...a, peso: 0 })),
+      ...entrada([['a1', 4], ['a2', 2], ['au', 3]]),
+      casillas: casillas.map((c) => ({ ...c, peso: 0 })),
     });
-    expect(r.componentes[0]?.nota).toBe(3);
+    expect(r.bloques[0]?.nota).toBe(3);
   });
 
   it('redondea a 2 decimales', () => {
     const r = calcularNotaAsignatura({
-      componentes: [{ ...hetero, porcentaje: 100 }],
-      actividades: [{ id: 'x', componente: 'HETEROEVALUACION', peso: 1 }, { id: 'y', componente: 'HETEROEVALUACION', peso: 2 }],
-      notasActividad: new Map([['x', 4], ['y', 3.5]]),
-      notasDirectas: new Map(),
+      bloques: [{ ...hetero, porcentaje: 100 }],
+      casillas: [{ id: 'x', bloque: 'HETEROEVALUACION', peso: 33.33 }, { id: 'y', bloque: 'HETEROEVALUACION', peso: 66.67 }],
+      notas: new Map([['x', 4], ['y', 3.5]]),
     });
     expect(r.nota).toBe(3.67);
+  });
+
+  it('sin pesos puestos todas las casillas valen lo mismo', () => {
+    const r = calcularNotaAsignatura({
+      bloques: [{ ...hetero, porcentaje: 100 }],
+      casillas: [{ id: 'x', bloque: 'HETEROEVALUACION', peso: null }, { id: 'y', bloque: 'HETEROEVALUACION', peso: null }],
+      notas: new Map([['x', 5], ['y', 3]]),
+    });
+    expect(r.nota).toBe(4);
+  });
+
+  it('una casilla sin calificar no pesa: el bloque se normaliza sobre las calificadas', () => {
+    const r = calcularNotaAsignatura({
+      bloques: [{ ...hetero, porcentaje: 100 }],
+      casillas: [{ id: 'x', bloque: 'HETEROEVALUACION', peso: 40 }, { id: 'y', bloque: 'HETEROEVALUACION', peso: null }],
+      notas: new Map([['x', 5]]),
+    });
+    expect(r.bloques[0]).toEqual({ clave: 'HETEROEVALUACION', nota: 5, completo: false });
+  });
+
+  it('ignora una casilla que pertenece a un bloque que ya no está en el molde', () => {
+    const r = calcularNotaAsignatura({ bloques: [{ ...hetero, porcentaje: 100 }], casillas: [...casillas], notas: new Map([['a1', 4], ['a2', 4], ['au', 1]]) });
+    expect(r.nota).toBe(4);
+  });
+});
+
+describe('pesosEfectivos', () => {
+  it('las casillas en automático se reparten por igual lo que queda del 100%', () => {
+    const pesos = pesosEfectivos([
+      { id: 'a', bloque: 'B', peso: 40 },
+      { id: 'b', bloque: 'B', peso: null },
+      { id: 'c', bloque: 'B', peso: null },
+    ]);
+    expect([pesos.get('a'), pesos.get('b'), pesos.get('c')]).toEqual([40, 30, 30]);
+  });
+
+  it('sin ningún peso puesto todas valen lo mismo, y cada bloque se reparte por separado', () => {
+    const pesos = pesosEfectivos([
+      { id: 'a', bloque: 'B', peso: null },
+      { id: 'b', bloque: 'B', peso: null },
+      { id: 'c', bloque: 'C', peso: null },
+    ]);
+    expect([pesos.get('a'), pesos.get('b'), pesos.get('c')]).toEqual([50, 50, 100]);
+  });
+
+  it('si lo puesto ya llena el 100%, las automáticas pesan 0', () => {
+    const pesos = pesosEfectivos([
+      { id: 'a', bloque: 'B', peso: 100 },
+      { id: 'b', bloque: 'B', peso: null },
+    ]);
+    expect(pesos.get('b')).toBe(0);
+  });
+});
+
+describe('bloquesConPesoExcedido', () => {
+  it('avisa del bloque cuyos pesos puestos pasan de 100, con su suma', () => {
+    expect(
+      bloquesConPesoExcedido([
+        { id: 'a', bloque: 'B', peso: 60 },
+        { id: 'b', bloque: 'B', peso: 50 },
+        { id: 'c', bloque: 'C', peso: 100 },
+      ])
+    ).toEqual([{ bloque: 'B', suma: 110 }]);
+  });
+
+  it('100 exactos (y los decimales de 33.3 + 33.3 + 33.4) están bien', () => {
+    expect(bloquesConPesoExcedido([{ id: 'a', bloque: 'B', peso: 60 }, { id: 'b', bloque: 'B', peso: 40 }])).toEqual([]);
+    expect(bloquesConPesoExcedido([{ id: 'a', bloque: 'B', peso: 33.3 }, { id: 'b', bloque: 'B', peso: 33.3 }, { id: 'c', bloque: 'B', peso: 33.4 }])).toEqual([]);
   });
 });
 
@@ -105,10 +172,10 @@ describe('calcularPromedioGeneral', () => {
 
 describe('componentesEfectivos', () => {
   it('sin componentes definidos rige Saber/Hacer/Ser con el respaldo 40/40/20', () => {
-    expect(componentesEfectivos({}).map((c) => [c.clave, c.porcentaje, c.origen])).toEqual([
-      ['COGNITIVO_SABER', 40, 'ACTIVIDADES'],
-      ['PROCEDIMENTAL_HACER', 40, 'ACTIVIDADES'],
-      ['ACTITUDINAL_SER', 20, 'ACTIVIDADES'],
+    expect(componentesEfectivos({}).map((c) => [c.clave, c.porcentaje, c.max_casillas])).toEqual([
+      ['COGNITIVO_SABER', 40, 10],
+      ['PROCEDIMENTAL_HACER', 40, 10],
+      ['ACTITUDINAL_SER', 20, 10],
     ]);
   });
 
@@ -131,13 +198,20 @@ describe('validarComponentesEvaluativos', () => {
     expect(validarComponentesEvaluativos([hetero, { ...auto, porcentaje: 20 }])).toMatch(/sumar exactamente 100.*90/);
   });
 
+  it('las casillas máximas de cada bloque son un entero entre 1 y 50', () => {
+    expect(validarComponentesEvaluativos([{ ...hetero, max_casillas: 0 }, auto])).toMatch(/casillas máximas/);
+    expect(validarComponentesEvaluativos([{ ...hetero, max_casillas: 51 }, auto])).toMatch(/casillas máximas/);
+    expect(validarComponentesEvaluativos([{ ...hetero, max_casillas: 2.5 }, auto])).toMatch(/casillas máximas/);
+    expect(validarComponentesEvaluativos([{ ...hetero, max_casillas: 50 }, auto])).toBeNull();
+  });
+
   it('exige claves y nombres únicos', () => {
     expect(validarComponentesEvaluativos([hetero, { ...auto, clave: 'HETEROEVALUACION' }])).toMatch(/misma clave/);
     expect(validarComponentesEvaluativos([hetero, { ...auto, nombre: ' HETEROEVALUACIÓN ' }])).toMatch(/mismo nombre/);
   });
 
-  it('exige al menos un bloque alimentado por actividades, y no admite listas vacías ni enormes', () => {
-    expect(validarComponentesEvaluativos([{ ...auto, porcentaje: 100 }])).toMatch(/alimentarse de actividades/);
+  it('un solo bloque de una casilla es un molde válido; no admite listas vacías ni enormes', () => {
+    expect(validarComponentesEvaluativos([{ ...auto, porcentaje: 100 }])).toBeNull();
     expect(validarComponentesEvaluativos([])).toMatch(/al menos un componente/);
     const nueve = Array.from({ length: 9 }, (_, i) => ({ ...hetero, clave: `C${i}X`, nombre: `C${i}`, porcentaje: 100 / 9 }));
     expect(validarComponentesEvaluativos(nueve)).toMatch(/hasta 8/);

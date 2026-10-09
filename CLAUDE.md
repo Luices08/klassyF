@@ -529,9 +529,9 @@ lee `componente_siee` y `peso_en_componente`); M11 los extendió sin romper nada
 - **Puente hacia M12:** la nota se registra con `notas.service#gradeActivity` (`PATCH /activities/:id/grade`; antes vivía en
   `activity.service`), que pasa por el mismo núcleo que la planilla de M12 (escala de M05, `assertPeriodNotLocked`, historial,
   planilla no cerrada) y marca la entrega `CALIFICADA`. `EntregasDrawer` ofrece nota + retroalimentación por estudiante sobre ese
-  endpoint; la planilla completa es M12. `Activity.componente_siee` ya no es un enum: es la **clave de un componente evaluativo del
-  año** (M12), validada al programar (existe y se alimenta de `ACTIVIDADES`); `componente_nombre` viaja en la vista. El docente no edita
-  componente/peso de lo que ya tiene notas, no programa actividades nuevas en una planilla cerrada, y no se elimina una actividad con entregas o notas. El periodo y la asignación de una actividad no se cambian (se elimina y
+  endpoint; la planilla completa es M12. `Activity.componente_siee` ya no es un enum: es la **clave de un bloque del molde de la planilla del
+  año** (M12), validada al programar (existe y aún tiene cupo de casillas: 409 si el bloque está lleno); `componente_nombre` viaja en la vista. `peso_en_componente` es un
+  % opcional del bloque (`null` = automático). El docente cambia bloque y peso mientras la planilla esté abierta, no programa actividades nuevas en una planilla cerrada, y no se elimina una actividad con entregas o notas. El periodo y la asignación de una actividad no se cambian (se elimina y
   se programa de nuevo con la planeación del otro periodo).
 - **Pruebas:** `tests/actividades.test.ts` (funciones puras), `tests/integracion/actividades.int.test.ts` (servicios con base real) y
   `actividades.http.int.test.ts` (rutas, validadores, permisos por rol y subida multipart real).
@@ -541,51 +541,88 @@ lee `componente_siee` y `peso_en_componente`); M11 los extendió sin romper nada
 
 ### M12 (Evaluación y notas) — estado: núcleo completo
 
-Backend `/notas` (modelo `CalificacionAsignatura`; servicios `notas.service`, `notasExcel.service`; motor puro `utils/calculoNotas.ts`) y
-configuración en `/academic-years/:id/componentes-evaluativos`; frontend `NotasPlanillaPage` (`/docente/notas`), `NotasGestionPage`
-(`/admin/notas`, seguimiento de coordinación) y el editor de componentes en `AnioLectivoPage`. La escala, el congelamiento y la consolidación de áreas
-**ya existían** (M05/M06) y no se rehicieron. Reglas que no se ven leyendo un solo archivo:
+Backend `/notas` (modelos `CalificacionAsignatura`, `ColumnaPlanilla`, `ConfiguracionPlanilla`; servicios `notas.service`, `columnasPlanilla.service`,
+`casillasBloque.service`, `notasExcel.service`, `planillaPdf.service`; motor puro `utils/calculoNotas.ts`) y el molde en
+`/academic-years/:id/componentes-evaluativos`; frontend `NotasPlanillaPage` (`/docente/notas`), `NotasGestionPage` (`/admin/notas`, seguimiento de
+coordinación) y `CreadorPlanillasPage` (`/admin/creador-planillas`, ADMIN). La escala, el congelamiento y la consolidación de áreas **ya existían**
+(M05/M06) y no se rehicieron. Reglas que no se ven leyendo un solo archivo:
 
-- **Componentes evaluativos configurables por año** (`AcademicYear.componentes_evaluativos`: `clave` estable, `nombre`, `porcentaje`, `origen`):
-  suman exactamente 100, hasta 8, al menos uno `ACTIVIDADES` (promedio ponderado de las actividades de M11) y los demás pueden ser
-  `NOTA_DIRECTA` (el docente la digita sin actividad: autoevaluación, coevaluación). **Sin configurar rige el respaldo** Saber/Hacer/Ser derivado
-  de `ponderacion_componentes` (`utils/siee#componentesEfectivos`), así un año anterior calcula igual sin migrar datos; `ponderacion_componentes`
-  y su endpoint quedan solo como respaldo (la UI de M05 ahora edita los componentes). Solo se editan con el año en PLANIFICACION (el congelamiento de
-  siempre, más estricto que «tras la primera nota») y no se quita ni se deja de alimentar con actividades un bloque que ya tiene actividades.
-- **«Falta nota» no es cero.** El motor devuelve `null` y una nota **parcial** (promedia solo los bloques con nota) mientras falte algo; un 0 es una nota.
-  Un bloque de actividades está completo cuando tiene al menos una y **todas** están calificadas. Nota de área y promedio general solo se calculan con todas
-  sus partes. Una sola fórmula en backend (`calculoNotas.ts`); `frontend/src/lib/calculoNotas.ts` la espeja solo para la vista en vivo de la planilla
-  (si cambia una, cambia la otra).
+- **Vocabulario: molde → bloques → casillas.** El **molde** es la plantilla de planilla de la institución: el ADMIN divide el 100% de la nota en **bloques**
+  (Heteroevaluación 70%, Autoevaluación 15%, Coevaluación 10%, Comportamiento 5%…) y fija cuántas **casillas** admite cada uno (`max_casillas`, 1–50: hetero 30,
+  auto 1). Se define una vez y rige el resto del año (y el año nuevo lo copia del más reciente que lo tenga, `academicYear.service#crearAnio`). Una **casilla** es una
+  actividad de M11 (`Activity`, bloque en `componente_siee`) o una **nota suelta** que crea el docente (`ColumnaPlanilla`: por clase+periodo, con `bloque_clave`,
+  `nombre`, `peso`, `orden`). Ya no existe el «origen» `ACTIVIDADES`/`NOTA_DIRECTA` de bloque: cualquier bloque recibe actividades y notas sueltas.
+- **Molde por año** (`AcademicYear.componentes_evaluativos`: `clave` estable, `nombre`, `porcentaje`, `max_casillas`): suman exactamente 100, hasta 8 bloques.
+  **Sin configurar rige el respaldo** Saber/Hacer/Ser 40/40/20 de `ponderacion_componentes` con `MAX_CASILLAS_POR_DEFECTO` (10) casillas
+  (`utils/siee#componentesEfectivos`). **Se congela al registrarse la primera nota del año** (`academicYear.service#evaluacionEditable`, que cubre también la escala):
+  en PLANIFICACION, o con el año vigente y ninguna nota, el ADMIN lo ajusta; la lista de años trae `evaluacion_editable`. Un año CERRADO nunca. No se quita un bloque
+  que ya tiene casillas ni se baja `max_casillas` por debajo de lo que alguna clase ya usa (409; se mide por clase+periodo, sumando actividades y notas sueltas).
+- **El máximo de casillas lo exige el servidor** (`casillasBloque.service#exigirCasillaDisponible`, 409): al programar una actividad (M11), al crear una nota suelta y al
+  mover una casilla de bloque; la pantalla solo lo refleja («usadas/máx», el selector de bloque de la actividad deshabilita los llenos).
+- **Peso de la casilla (opcional).** `peso_en_componente` (Activity) y `peso` (ColumnaPlanilla) son un **% del bloque** o `null` = automático. Las casillas sin peso se
+  reparten en partes iguales lo que queda de `100 − Σ pesos puestos`; sin ningún peso, todas valen lo mismo (`pesosEfectivos`). Lo puesto en un bloque **no puede pasar
+  de 100%** (+0.01 de tolerancia; `exigirPesosValidos`, 400, también en el Excel) y todos los cambios de peso son «todo o nada». El motor normaliza sobre las casillas **ya
+  calificadas** (un peso no se pierde por una casilla vacía) y si todos los pesos son 0 promedia por igual.
+- **«Falta nota» no es cero.** El motor devuelve `null` y una nota **parcial** (promedia solo los bloques con nota) mientras falte algo; un 0 es una nota. Un bloque está
+  completo cuando tiene al menos una casilla y **todas** están calificadas (un bloque sin casillas no se completa y bloquea el cierre). Nota de área y promedio general
+  solo se calculan con todas sus partes. Una sola fórmula en backend (`calculoNotas.ts`); `frontend/src/lib/calculoNotas.ts` la espeja solo para la vista en vivo de la
+  planilla (si cambia una, cambia la otra).
+- **Quién arma las casillas:** el docente titular, mientras el periodo admita notas (`assertPeriodNotLocked`) y la planilla no esté cerrada (`exigirPlanillaAbierta`):
+  `POST/PATCH/DELETE /notas/columnas`, `PUT /notas/pesos` (en lote) y `GET /notas/bloques` (bloques con lo usado, para M11). Una nota suelta se renombra, mueve, pesa y
+  elimina (se lleva sus notas); una actividad solo se mueve de bloque y se pesa (su título y fechas son de M11) y se elimina en M11. Auditoría: `CASILLA_PLANILLA_*`,
+  `PESOS_PLANILLA_ACTUALIZADOS`.
 - **Estados de la nota de una asignatura de un estudiante en un periodo** (`CalificacionAsignatura`, único por asignación+periodo+estudiante):
   `PENDIENTE` (faltan notas) ⇄ `BORRADOR` (completa, editable) los fija el sistema al guardar → `CERRADO` (lo cierra el docente titular, exige todas
-  las notas y **congela** `resultado` con los componentes y la nota) → `DEFINITIVO` (coordinación/ADMIN, solo si toda la clase está cerrada). Cerrada o
-  definitiva: no se califican actividades (tampoco desde M11) ni se programan nuevas (`notasEstado.service#exigirPlanillaAbierta`). **Reabrir exige motivo**
-  (queda en `reaperturas[]` y auditoría): el titular y coordinación reabren lo `CERRADO` mientras el periodo admita notas; lo `DEFINITIVO` solo el ADMIN.
-  El estado abierto que se muestra se recalcula en vivo; el guardado puede quedar desfasado si se programa/elimina una actividad después (la planilla y
-  el seguimiento no dependen de él).
-- **Registro transaccional** (`registrarNotas`): valida TODO antes de escribir (clase del titular, periodo vía `assertPeriodNotLocked`, escala del año,
-  matrícula, duplicados, planilla abierta) y escribe en una transacción. Cada cambio de nota deja `historial_notas[]` (actividad) o `historial[]` (nota
-  directa) con valor anterior/nuevo, quién y cuándo; repetir una nota no genera ruido. Las notas de actividad siguen en `ActivitySubmission` (M11); las directas
-  y el estado, en `CalificacionAsignatura`, que copia `group_id`/`subject_id` de la asignación para consultar por grupo o asignatura (M17/M30).
-- **Boletín (M17) = solo lo cerrado.** `reportCard.service` ya no mira actividades: lee `resultado` de las notas `CERRADO`/`DEFINITIVO`. Una asignatura sin
-  cerrar sale `SIN_CERRAR` con `nota: null`; el área y el promedio general solo existen con todas sus partes; `completo`/`pendientes` dicen qué falta y
-  el puesto solo se calcula entre estudiantes con boletín completo. Los componentes viajan como arreglo (`clave`, `nombre`, `porcentaje`, `nota`), no como
-  saber/hacer/ser fijos.
+  las notas y **congela** `resultado` con los bloques y la nota) → `DEFINITIVO` (coordinación/ADMIN, solo si toda la clase está cerrada). Cerrada o
+  definitiva: no se califican actividades (tampoco desde M11), no se programan nuevas, ni se tocan casillas o pesos (`notasEstado.service#exigirPlanillaAbierta`).
+  **Reabrir exige motivo** (queda en `reaperturas[]` y auditoría): el titular y coordinación reabren lo `CERRADO` mientras el periodo admita notas; lo `DEFINITIVO` solo el
+  ADMIN. El estado abierto que se muestra se recalcula en vivo; el guardado puede quedar desfasado si se agrega/elimina una casilla después (la planilla y el seguimiento
+  no dependen de él).
+- **Registro transaccional** (`registrarNotas`): valida TODO antes de escribir (clase del titular, periodo, escala del año, matrícula, casilla de esa clase, duplicados,
+  planilla abierta) y escribe en una transacción. Cada cambio deja `historial_notas[]` (actividad, en `ActivitySubmission`) o `historial[]` (nota suelta, en
+  `CalificacionAsignatura.notas_columnas[{columna_id, valor, …}]`) con valor anterior/nuevo, quién y cuándo; repetir una nota no genera ruido. La API de celdas identifica
+  toda casilla por `casilla_id` (el `_id` de la actividad o de la nota suelta).
+- **Boletín (M17) = solo lo cerrado.** `reportCard.service` no mira actividades: lee `resultado` de las notas `CERRADO`/`DEFINITIVO`. Una asignatura sin cerrar sale
+  `SIN_CERRAR` con `nota: null`; el área y el promedio general solo existen con todas sus partes; `completo`/`pendientes` dicen qué falta y el puesto solo se calcula entre
+  estudiantes con boletín completo. Los bloques viajan como arreglo (`clave`, `nombre`, `porcentaje`, `nota`), no como saber/hacer/ser fijos.
 - **Nivel cualitativo con huecos entre rangos:** la escala por defecto (1.0–2.9 | 3.0–3.9 | 4.0–4.5 | 4.6–5.0) deja huecos y un promedio de 2 decimales (3.95) no
   caía en ninguno (`resolverDesempeno` lanzaba 400). Ahora el nivel se resuelve con la nota redondeada a `precision_decimales` de la escala y, si aún queda en un
   hueco, al rango inferior; la nota mostrada no se altera. La fórmula de «Desempeño» del Excel hace lo mismo.
-- **Excel offline (M22)** (`notasExcel.service`, mismo patrón que la asistencia): `GET/POST /notas/planilla/excel`. La hoja lleva encabezados por bloque, pesos,
-  promedios/nota/desempeño como **fórmulas** (con resultado en caché), solo las casillas de nota desprotegidas (y con validación de escala; las de estudiantes
-  cerrados, bloqueadas) y una hoja `Datos` oculta que identifica clase, periodo y columnas. La protección de la hoja es una comodidad: al importar se ignoran las
-  columnas calculadas y el servidor revalida todo (toda la hoja antes de guardar, solo viajan las celdas que cambiaron, coma decimal tolerada). Google Sheets usa
-  el mismo `.xlsx`. **Las fórmulas no se probaron en Excel/Sheets** (no hay motor de hojas en el entorno de pruebas): solo su texto y el flujo de ida y vuelta.
-- **Quién ve qué:** el titular edita; ADMIN/COORDINADOR consultan (`GET /notas/planilla`), ven el seguimiento (`/notas/seguimiento`) y declaran definitivas; otro
-  docente no entra (403). `declararDefinitivas` valida el rol también en el servicio.
-- **Pruebas:** `tests/calculoNotas.test.ts` (motor, configuración y escala), `tests/integracion/notas.int.test.ts` (servicios con base real: planilla,
-  historial, cierre, definitivas, reapertura, boletín, configuración) y `notas.http.int.test.ts` (rutas, permisos y Excel de ida y vuelta).
-- **Pendiente, a propósito:** personalización de encabezados, filtros y firmas de la planilla (M21); notificaciones de cierre (M28); recuperaciones y comisiones
-  de evaluación (M18/M20); estadísticas (M30, que leerá `CalificacionAsignatura`); cierre automático de las planillas al cerrar el periodo en M05; el director de grupo
-  no consulta las planillas de las demás asignaturas de su grupo (sí en asistencia); borrar una nota ya puesta (se corrige, no se borra).
+- **Planilla en pantalla (`PlanillaNotas`)**: cada bloque con sus casillas, «usadas/máx», un «+» para agregar una nota suelta (`CasillaDrawer`) si queda cupo, el peso de
+  cada casilla editable (placeholder = lo que realmente pesa), edición **tipo hoja de cálculo** (flechas y Enter para moverse, pegar un rango copiado de Excel/Sheets,
+  Ctrl+D rellena hacia abajo, Ctrl+Z deshace los cambios sin guardar) y pie con promedio, máxima, mínima y cuántos pierden (`nota_aprobatoria`). Guardar manda primero los
+  pesos y luego las notas. Filtra por nombre/documento y «solo con notas pendientes». **La interfaz no se probó en un navegador** (solo compila: `tsc -b`, `vite build`).
+- **Creador de planillas (ADMIN, `/admin/creador-planillas`)**: pestaña «Molde de la nota» (bloques con nombre, %, casillas máx.; ejemplos de partida que solo rellenan el
+  formulario; vista previa; se bloquea al congelarse) y pestaña «Impresión y firmas» (la plantilla de presentación de abajo). Reemplaza a `/admin/plantilla-planilla` y al
+  editor de componentes de Año lectivo, que ahora solo resume el molde y enlaza al creador.
+- **Impresión de la planilla (M21 en versión mínima)** (`ConfiguracionPlanilla`, `GET/PUT /notas/plantilla`, solo ADMIN edita): título, subtítulo, pie, logo, qué columnas
+  calculadas se muestran (documento, pesos, promedio por bloque, desempeño, estado) y hasta 4 firmas (cargo, nombre fijo o «el docente de la clase»). Es **solo presentación**:
+  viaja dentro de cada planilla (`Planilla.plantilla`) y la aplican la pantalla, el Excel (las columnas se OCULTAN, no se quitan, porque las fórmulas y la importación
+  dependen de ellas) y el PDF (`GET /notas/planilla/pdf`, horizontal, leyenda N1…Nn de las casillas y espacio de firmas). **No es un constructor libre de columnas.**
+- **Excel offline (M22)** (`notasExcel.service`): `GET/POST /notas/planilla/excel`. Filas: 2 bloques, 3 nombres de casilla, 4 pesos puestos (entrada), 5 peso que realmente
+  cuenta (fórmula), estudiantes desde la 6. Cada bloque trae sus casillas y **espacios en blanco hasta su máximo** (tope de 30 en la hoja), más una columna de nota del bloque;
+  nota/desempeño van como **fórmulas** (con resultado en caché). Editables: nombre y peso de las casillas (menos el título de una actividad), y las notas (las de estudiantes
+  cerrados, bloqueadas). Una hoja `Datos` oculta identifica clase, periodo y cada columna (`CASILLA:<id>` o `NUEVA:<bloque>`). **Al importar** se valida TODO antes de escribir
+  (documento ajeno, nota no numérica o fuera de escala, casilla que ya no existe, nombre que falta, bloque pasado de su máximo, pesos > 100%) y luego se crean las casillas
+  nuevas, se renombran, se pesan y se guardan las notas por los mismos servicios de la planilla en línea (esos pasos son transacciones separadas: un fallo posterior a
+  la validación, p. ej. el periodo se cierra en medio, puede dejar aplicada la primera parte). La protección de la hoja es una comodidad. Google Sheets usa el mismo `.xlsx`.
+  **Las fórmulas no se probaron en Excel/Sheets** (no hay motor de hojas en el entorno de pruebas): solo su texto y el flujo de ida y vuelta.
+- **Quién ve qué:** el titular edita; ADMIN/COORDINADOR consultan (`GET /notas/planilla`, `GET /notas/bloques`), ven el seguimiento (`/notas/seguimiento`) y declaran definitivas;
+  otro docente no entra (403). `declararDefinitivas` valida el rol también en el servicio.
+- **Evidencias dentro de la planilla:** cada casilla de una actividad con entrega digital lleva un punto (a tiempo / con retraso / ya calificada; sin punto = no entregó) y el
+  título de la columna abre `EntregasDrawer` (descargar la evidencia, leer la respuesta, poner nota y retroalimentación) sin salir de la planilla; la misma nota se puede
+  poner en la casilla.
+- **Datos anteriores al molde:** las notas directas (`notas_directas`) y los `peso_en_componente` de la primera versión de M12 **no se migraron** (era desarrollo sin datos
+  reales): una nota directa vieja queda huérfana y un peso `3` ahora significa 3%.
+- **Pruebas:** `tests/calculoNotas.test.ts` (motor, pesos, molde y escala), `tests/integracion/notas.int.test.ts` (servicios con base real: planilla, historial, cierre,
+  definitivas, reapertura, boletín, molde, congelamiento, copia al año nuevo, casillas y pesos) y `notas.http.int.test.ts` (rutas, permisos, validadores, plantilla, PDF y Excel
+  de ida y vuelta, con alta de casillas desde el Excel). **`tests/setup.ts` hace comparable el `message` de los errores:** `toMatchObject` ignora las propiedades no enumerables
+  y `message` lo es, así que una aserción `rejects.toMatchObject({ message: /x/ })` pasaba con cualquier mensaje. Para verificar un mensaje use
+  `message: expect.stringMatching(/x/)`, nunca un regex suelto.
+- **Pendiente, a propósito:** un constructor libre de formatos (columnas propias, orden, varios moldes por nivel o área; M21 completo); notificaciones de cierre (M28); recuperaciones
+  y comisiones de evaluación (M18/M20); estadísticas (M30, que leerá `CalificacionAsignatura`); cierre automático de las planillas al cerrar el periodo en M05; el director de
+  grupo no consulta las planillas de las demás asignaturas de su grupo (sí en asistencia); borrar una nota ya puesta (se corrige, no se borra); copiar las casillas sueltas de un
+  periodo al siguiente.
 
 ### Cargas masivas por CSV (M02 usuarios, M03 estudiantes)
 

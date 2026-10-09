@@ -1,17 +1,19 @@
 import { ClientSession, Types } from 'mongoose';
-import { TipoActividad } from '../constants/actividades';
+import { EstadoActividadEstudiante, TipoActividad } from '../constants/actividades';
 import { ESTADOS_MATRICULA_ACTIVOS, NivelDesempeno } from '../constants/enums';
-import { ESTADOS_NOTA_CERRADOS, EstadoNota, OrigenComponente } from '../constants/notas';
+import { ESTADOS_NOTA_CERRADOS, EstadoNota } from '../constants/notas';
 import { ROLES } from '../constants/roles';
 import AcademicYear, { AcademicYearDocument } from '../models/academicYear.model';
 import Activity from '../models/activity.model';
 import ActivitySubmission, { ActivitySubmissionDocument } from '../models/activitySubmission.model';
 import CalificacionAsignatura, { ICalificacionAsignatura } from '../models/calificacionAsignatura.model';
+import ColumnaPlanilla from '../models/columnaPlanilla.model';
 import Enrollment from '../models/enrollment.model';
 import TeacherAssignment, { TeacherAssignmentDocument } from '../models/teacherAssignment.model';
 import { UserDocument } from '../models/user.model';
 import ApiError from '../utils/ApiError';
-import { calcularNotaAsignatura, estadoAbiertoDe, ResultadoAsignatura } from '../utils/calculoNotas';
+import { estadoDeEntrega } from '../utils/actividades';
+import { calcularNotaAsignatura, estadoAbiertoDe, pesosEfectivos, ResultadoAsignatura } from '../utils/calculoNotas';
 import { escalaEfectiva, validarNotaDentroDeEscala } from '../utils/escalaEvaluacion';
 import { ESTADO_ACTIVO } from '../utils/filtroEstado';
 import { runTransaction } from '../utils/runTransaction';
@@ -20,12 +22,21 @@ import { ActividadPlana, asignacionDelDocente } from './activity.service';
 import { ContextoAsignacion, contextosDeAsignaciones } from './actividadContexto.service';
 import { asegurarAnioNoCerrado } from './academicYear.service';
 import { registrarEvento } from './audit.service';
+import { obtenerPlantillaPlanilla, PlantillaPlanilla } from './configuracionPlanilla.service';
 import { matriculasActivas } from './attendance.service';
 import { assertPeriodNotLocked } from './periodLock.service';
 
 // --- Contexto de una planilla: una clase (asignación docente) en un periodo ---
 
-type RegistroPlano = ICalificacionAsignatura & { _id: Types.ObjectId };
+interface NotaColumnaPlana {
+  columna_id: Types.ObjectId;
+  valor: number;
+  registrado_por: Types.ObjectId;
+  fecha: Date;
+  historial: Array<{ valor_anterior: number | null; valor_nuevo: number; por: Types.ObjectId; fecha: Date }>;
+}
+
+type RegistroPlano = Omit<ICalificacionAsignatura, 'notas_columnas'> & { _id: Types.ObjectId; notas_columnas: NotaColumnaPlana[] };
 
 export interface EstudianteDePlanilla {
   _id: string;
@@ -34,16 +45,38 @@ export interface EstudianteDePlanilla {
   numero_documento: string;
 }
 
+/**
+ * Una casilla de la planilla: una actividad de M11 o una nota suelta del docente. Todas viven dentro de un bloque del molde
+ * del colegio, que limita cuántas admite.
+ */
+export interface CasillaDeClase {
+  id: string;
+  tipo: 'ACTIVIDAD' | 'MANUAL';
+  bloque: string;
+  titulo: string;
+  /** El % del bloque que puso el docente; null = automático. */
+  peso: number | null;
+  /** Solo actividades. */
+  tipo_actividad: TipoActividad | null;
+  fecha_entrega: Date | null;
+  requiere_entrega: boolean;
+}
+
 export interface ContextoPlanilla {
   asignacion: TeacherAssignmentDocument;
   anio: AcademicYearDocument;
   periodo: { numero: number; nombre: string; estado: string };
-  componentes: ComponenteEvaluativo[];
+  /** Los bloques del molde del año, con su porcentaje y su máximo de casillas. */
+  bloques: ComponenteEvaluativo[];
   actividades: ActividadPlana[];
+  /** Actividades primero (por fecha de entrega) y luego las notas sueltas (por orden de creación). */
+  casillas: CasillaDeClase[];
   estudiantes: EstudianteDePlanilla[];
   /** Notas de actividad ya calificadas: `${actividad}|${estudiante}` -> nota. */
   notasActividad: Map<string, number>;
-  /** Una por estudiante que ya tiene algo guardado (nota directa, cierre...). */
+  /** Lo que el estudiante entregó en cada actividad (M11): `${actividad}|${estudiante}` -> estado y si hay archivo. */
+  entregas: Map<string, { estado: EstadoActividadEstudiante; tiene_archivo: boolean }>;
+  /** Una por estudiante que ya tiene algo guardado (notas sueltas, cierre...). */
   registros: Map<string, RegistroPlano>;
 }
 
@@ -56,24 +89,48 @@ export async function cargarContextoPlanilla(asignacion: TeacherAssignmentDocume
   const periodo = anio.periodos.find((p) => p.numero === periodoNumero);
   if (!periodo) throw new ApiError(400, `El año lectivo ${anio.year} no tiene periodo ${periodoNumero}.`);
 
-  const [actividades, matriculas, registros] = await Promise.all([
+  const [actividades, sueltas, matriculas, registros] = await Promise.all([
     Activity.find({ teacher_assignment_id: asignacion._id, periodo_numero: periodoNumero }).sort({ fecha_entrega: 1 }).lean(),
+    ColumnaPlanilla.find({ teacher_assignment_id: asignacion._id, periodo_numero: periodoNumero }).sort({ orden: 1, createdAt: 1 }).lean(),
     matriculasActivas(asignacion.group_id),
     CalificacionAsignatura.find({ teacher_assignment_id: asignacion._id, periodo_numero: periodoNumero }).lean(),
   ]);
-  const calificadas =
+  const entregadas =
     actividades.length === 0
       ? []
-      : await ActivitySubmission.find({ activity_id: { $in: actividades.map((a) => a._id) }, calificacion_numerica: { $ne: null } })
-          .select('activity_id student_id calificacion_numerica')
+      : await ActivitySubmission.find({ activity_id: { $in: actividades.map((a) => a._id) } })
+          .select('activity_id student_id calificacion_numerica estado fecha_entrega archivo_path')
           .lean();
+  const calificadas = entregadas.filter((c) => typeof c.calificacion_numerica === 'number');
 
   return {
     asignacion,
     anio,
     periodo: { numero: periodo.numero, nombre: periodo.nombre, estado: periodo.estado },
-    componentes: componentesEfectivos(anio),
+    bloques: componentesEfectivos(anio),
     actividades: actividades as unknown as ActividadPlana[],
+    casillas: [
+      ...actividades.map((a) => ({
+        id: String(a._id),
+        tipo: 'ACTIVIDAD' as const,
+        bloque: a.componente_siee,
+        titulo: a.titulo,
+        peso: a.peso_en_componente ?? null,
+        tipo_actividad: a.tipo ?? 'TAREA',
+        fecha_entrega: a.fecha_entrega,
+        requiere_entrega: a.requiere_entrega ?? true,
+      })),
+      ...sueltas.map((c) => ({
+        id: String(c._id),
+        tipo: 'MANUAL' as const,
+        bloque: c.bloque_clave,
+        titulo: c.nombre,
+        peso: c.peso ?? null,
+        tipo_actividad: null,
+        fecha_entrega: null,
+        requiere_entrega: false,
+      })),
+    ],
     estudiantes: matriculas.map((m) => ({
       _id: String(m.student_id._id),
       nombre: m.student_id.nombre,
@@ -81,24 +138,31 @@ export async function cargarContextoPlanilla(asignacion: TeacherAssignmentDocume
       numero_documento: m.student_id.numero_documento,
     })),
     notasActividad: new Map(calificadas.map((c) => [`${String(c.activity_id)}|${String(c.student_id)}`, c.calificacion_numerica as number])),
+    entregas: new Map(
+      entregadas.map((c) => [`${String(c.activity_id)}|${String(c.student_id)}`, { estado: estadoDeEntrega(c), tiene_archivo: Boolean(c.archivo_path) }])
+    ),
     registros: new Map((registros as unknown as RegistroPlano[]).map((r) => [String(r.student_id), r])),
   };
 }
 
 const esCerrado = (registro: RegistroPlano | undefined): boolean => Boolean(registro && ESTADOS_NOTA_CERRADOS.includes(registro.estado));
 
+/** La nota que un estudiante tiene en una casilla (la de la actividad en M11 o la de la nota suelta), o null si aún no tiene. */
+export function notaDeCasilla(ctx: ContextoPlanilla, casilla: CasillaDeClase, estudianteId: string): number | null {
+  if (casilla.tipo === 'ACTIVIDAD') return ctx.notasActividad.get(`${casilla.id}|${estudianteId}`) ?? null;
+  return ctx.registros.get(estudianteId)?.notas_columnas.find((n) => String(n.columna_id) === casilla.id)?.valor ?? null;
+}
+
 function resultadoDe(ctx: ContextoPlanilla, estudianteId: string): ResultadoAsignatura {
-  const registro = ctx.registros.get(estudianteId);
-  const notasActividad = new Map<string, number>();
-  for (const a of ctx.actividades) {
-    const nota = ctx.notasActividad.get(`${String(a._id)}|${estudianteId}`);
-    if (nota !== undefined) notasActividad.set(String(a._id), nota);
+  const notas = new Map<string, number>();
+  for (const c of ctx.casillas) {
+    const nota = notaDeCasilla(ctx, c, estudianteId);
+    if (nota !== null) notas.set(c.id, nota);
   }
   return calcularNotaAsignatura({
-    componentes: ctx.componentes,
-    actividades: ctx.actividades.map((a) => ({ id: String(a._id), componente: a.componente_siee, peso: a.peso_en_componente })),
-    notasActividad,
-    notasDirectas: new Map((registro?.notas_directas ?? []).map((n) => [n.componente_clave, n.valor])),
+    bloques: ctx.bloques,
+    casillas: ctx.casillas.map((c) => ({ id: c.id, bloque: c.bloque, peso: c.peso })),
+    notas,
   });
 }
 
@@ -107,10 +171,12 @@ function resultadoDe(ctx: ContextoPlanilla, estudianteId: string): ResultadoAsig
 export interface FilaPlanilla {
   estudiante: EstudianteDePlanilla;
   estado: EstadoNota;
-  notas_actividad: Record<string, number | null>;
-  notas_directas: Record<string, number | null>;
-  /** Nota de cada componente (calculada, o la digitada si es directa). */
-  componentes: Record<string, number | null>;
+  /** Nota de cada casilla (null = aún no tiene), por id de casilla. */
+  notas: Record<string, number | null>;
+  /** Solo de las actividades con entrega digital: si el estudiante entregó, si llegó tarde y si trae archivo. */
+  entregas: Record<string, { estado: EstadoActividadEstudiante; tiene_archivo: boolean }>;
+  /** Nota de cada bloque (el promedio ponderado de sus casillas), por clave de bloque. */
+  bloques: Record<string, number | null>;
   nota_asignatura: number | null;
   /** Calculada con las notas que hay: todavía le faltan notas. */
   parcial: boolean;
@@ -118,17 +184,39 @@ export interface FilaPlanilla {
   faltantes: string[];
 }
 
+export interface BloquePlanilla {
+  clave: string;
+  nombre: string;
+  porcentaje: number;
+  max_casillas: number;
+  /** Suma de los pesos que el docente puso en este bloque (las casillas en automático se reparten lo que queda). */
+  pesos_puestos: number;
+  casillas: Array<{
+    id: string;
+    tipo: 'ACTIVIDAD' | 'MANUAL';
+    titulo: string;
+    peso: number | null;
+    peso_efectivo: number;
+    tipo_actividad: TipoActividad | null;
+    fecha_entrega: Date | null;
+    requiere_entrega: boolean;
+  }>;
+}
+
 export interface Planilla {
+  /** Cómo se rotula y se imprime (encabezado, firmas, columnas calculadas que se muestran); no cambia ninguna nota. */
+  plantilla: PlantillaPlanilla;
   asignacion: ContextoAsignacion | null;
   periodo: ContextoPlanilla['periodo'];
-  escala: { nota_minima: number; nota_maxima: number; precision_decimales: number; rangos: Array<{ nivel: NivelDesempeno; etiqueta: string; valor_minimo: number; valor_maximo: number; es_aprobatorio: boolean }> };
-  componentes: Array<{
-    clave: string;
-    nombre: string;
-    porcentaje: number;
-    origen: OrigenComponente;
-    actividades: Array<{ _id: string; titulo: string; tipo: TipoActividad; peso: number; fecha_entrega: Date }>;
-  }>;
+  escala: {
+    nota_minima: number;
+    nota_maxima: number;
+    nota_aprobatoria: number;
+    precision_decimales: number;
+    rangos: Array<{ nivel: NivelDesempeno; etiqueta: string; valor_minimo: number; valor_maximo: number; es_aprobatorio: boolean }>;
+  };
+  /** El molde del colegio aplicado a esta clase: cada bloque con sus casillas. */
+  bloques: BloquePlanilla[];
   estudiantes: FilaPlanilla[];
   resumen: Record<EstadoNota, number>;
   edicion: {
@@ -146,21 +234,21 @@ function armarFila(ctx: ContextoPlanilla, estudiante: EstudianteDePlanilla): Fil
   const cerrado = esCerrado(registro) && registro?.resultado;
 
   // Una nota cerrada se muestra tal como se congeló, no recalculada: es lo que lee el boletín.
-  const notaPorComponente = new Map(
-    cerrado && registro?.resultado
-      ? registro.resultado.componentes.map((c) => [c.clave, c.nota])
-      : resultado.componentes.map((c) => [c.clave, c.nota])
+  const notaPorBloque = new Map(
+    cerrado && registro?.resultado ? registro.resultado.componentes.map((c) => [c.clave, c.nota]) : resultado.bloques.map((b) => [b.clave, b.nota])
   );
   const nota = cerrado && registro?.resultado ? registro.resultado.nota_asignatura : resultado.nota;
 
   return {
     estudiante,
     estado: cerrado && registro ? registro.estado : estadoAbiertoDe(resultado),
-    notas_actividad: Object.fromEntries(ctx.actividades.map((a) => [String(a._id), ctx.notasActividad.get(`${String(a._id)}|${estudiante._id}`) ?? null])),
-    notas_directas: Object.fromEntries(
-      ctx.componentes.filter((c) => c.origen === 'NOTA_DIRECTA').map((c) => [c.clave, registro?.notas_directas.find((n) => n.componente_clave === c.clave)?.valor ?? null])
+    notas: Object.fromEntries(ctx.casillas.map((c) => [c.id, notaDeCasilla(ctx, c, estudiante._id)])),
+    entregas: Object.fromEntries(
+      ctx.casillas
+        .filter((c) => c.tipo === 'ACTIVIDAD' && c.requiere_entrega)
+        .map((c) => [c.id, ctx.entregas.get(`${c.id}|${estudiante._id}`) ?? { estado: 'PROGRAMADA' as const, tiene_archivo: false }])
     ),
-    componentes: Object.fromEntries(ctx.componentes.map((c) => [c.clave, notaPorComponente.get(c.clave) ?? null])),
+    bloques: Object.fromEntries(ctx.bloques.map((b) => [b.clave, notaPorBloque.get(b.clave) ?? null])),
     nota_asignatura: nota,
     parcial: !cerrado && nota !== null && !resultado.completa,
     desempeno: nota === null ? null : desempenoCualitativo(nota, ctx.anio.escala_evaluacion),
@@ -168,8 +256,33 @@ function armarFila(ctx: ContextoPlanilla, estudiante: EstudianteDePlanilla): Fil
   };
 }
 
+/** El molde del colegio aplicado a la clase: cada bloque con sus casillas, el peso que puso el docente y el que realmente pesan. */
+export function armarBloques(ctx: ContextoPlanilla): BloquePlanilla[] {
+  const efectivos = pesosEfectivos(ctx.casillas.map((c) => ({ id: c.id, bloque: c.bloque, peso: c.peso })));
+  return ctx.bloques.map((b) => {
+    const propias = ctx.casillas.filter((c) => c.bloque === b.clave);
+    return {
+      clave: b.clave,
+      nombre: b.nombre,
+      porcentaje: b.porcentaje,
+      max_casillas: b.max_casillas,
+      pesos_puestos: Math.round(propias.reduce((suma, c) => suma + (c.peso ?? 0), 0) * 100) / 100,
+      casillas: propias.map((c) => ({
+        id: c.id,
+        tipo: c.tipo,
+        titulo: c.titulo,
+        peso: c.peso,
+        peso_efectivo: Math.round((efectivos.get(c.id) ?? 0) * 100) / 100,
+        tipo_actividad: c.tipo_actividad,
+        fecha_entrega: c.fecha_entrega,
+        requiere_entrega: c.requiere_entrega,
+      })),
+    };
+  });
+}
+
 /** Docente titular edita; coordinación y administración consultan y cierran el ciclo. Otro docente, nada. */
-async function resolverAcceso(asignacionId: string, usuario: UserDocument): Promise<TeacherAssignmentDocument> {
+export async function resolverAcceso(asignacionId: string, usuario: UserDocument): Promise<TeacherAssignmentDocument> {
   if (usuario.rol === ROLES.DOCENTE) return asignacionDelDocente(asignacionId, usuario);
   const asignacion = await TeacherAssignment.findById(asignacionId);
   if (!asignacion) throw new ApiError(404, 'Asignacion academica (TeacherAssignment) no encontrada.');
@@ -204,20 +317,17 @@ export async function obtenerPlanilla(asignacionId: string, periodoNumero: numbe
   const contexto = await contextosDeAsignaciones([asignacion._id]);
   const escala = escalaEfectiva(ctx.anio.escala_evaluacion);
   return {
+    plantilla: await obtenerPlantillaPlanilla(),
     asignacion: contexto.get(String(asignacion._id)) ?? null,
     periodo: ctx.periodo,
     escala: {
       nota_minima: escala.nota_minima,
       nota_maxima: escala.nota_maxima,
+      nota_aprobatoria: escala.nota_aprobatoria,
       precision_decimales: escala.precision_decimales,
       rangos: escala.rangos.map((r) => ({ nivel: r.nivel, etiqueta: r.etiqueta, valor_minimo: r.valor_minimo, valor_maximo: r.valor_maximo, es_aprobatorio: r.es_aprobatorio })),
     },
-    componentes: ctx.componentes.map((c) => ({
-      ...c,
-      actividades: ctx.actividades
-        .filter((a) => c.origen === 'ACTIVIDADES' && a.componente_siee === c.clave)
-        .map((a) => ({ _id: String(a._id), titulo: a.titulo, tipo: a.tipo ?? 'TAREA', peso: a.peso_en_componente, fecha_entrega: a.fecha_entrega })),
-    })),
+    bloques: armarBloques(ctx),
     estudiantes: filas,
     resumen,
     edicion: {
@@ -232,17 +342,12 @@ export async function obtenerPlanilla(asignacionId: string, periodoNumero: numbe
 
 // --- Registro de notas (el núcleo transaccional) ---
 
-export interface CeldaActividad {
-  actividadId: string;
+export interface CeldaNota {
+  casillaId: string;
   estudianteId: string;
   nota: number;
+  /** Solo en casillas que son actividades: el comentario del docente al estudiante. */
   retroalimentacion?: string;
-}
-
-export interface CeldaDirecta {
-  estudianteId: string;
-  clave: string;
-  nota: number;
 }
 
 /**
@@ -250,57 +355,53 @@ export interface CeldaDirecta {
  * (PENDIENTE/BORRADOR) de cada estudiante tocado. Comparte reglas con la planilla y con la calificación desde M11:
  * clase del docente, periodo que admita notas (M05), escala del año, estudiante matriculado y planilla no cerrada.
  */
-async function registrarNotas(
+export async function registrarNotas(
   ctx: ContextoPlanilla,
   docente: UserDocument,
-  actividadesCeldas: CeldaActividad[],
-  directas: CeldaDirecta[],
+  celdas: CeldaNota[],
   ip?: string | null
 ): Promise<{ guardadas: number; sin_cambios: number }> {
   const { asignacion } = ctx;
   await assertPeriodNotLocked(asignacion.academic_year_id, asignacion.group_id as Types.ObjectId, ctx.periodo.numero, docente._id);
 
   const estudiantes = new Set(ctx.estudiantes.map((e) => e._id));
-  const actividadPorId = new Map(ctx.actividades.map((a) => [String(a._id), a]));
-  const directaPorClave = new Map(ctx.componentes.filter((c) => c.origen === 'NOTA_DIRECTA').map((c) => [c.clave, c]));
+  const casillaPorId = new Map(ctx.casillas.map((c) => [c.id, c]));
   const vistas = new Set<string>();
 
-  for (const celda of [...actividadesCeldas.map((c) => ({ ...c, id: c.actividadId })), ...directas.map((c) => ({ ...c, id: c.clave }))]) {
+  for (const celda of celdas) {
     if (!estudiantes.has(celda.estudianteId)) {
       throw new ApiError(400, `El estudiante ${celda.estudianteId} no está matriculado en el grupo de esta clase.`);
     }
-    const llave = `${celda.estudianteId}|${celda.id}`;
+    if (!casillaPorId.has(celda.casillaId)) throw new ApiError(400, 'Una de las casillas no pertenece a esta clase y periodo.');
+    const llave = `${celda.estudianteId}|${celda.casillaId}`;
     if (vistas.has(llave)) throw new ApiError(400, 'No se puede calificar dos veces al mismo estudiante en la misma solicitud.');
     vistas.add(llave);
     validarNotaDentroDeEscala(celda.nota, ctx.anio.escala_evaluacion);
   }
-  for (const celda of actividadesCeldas) {
-    if (!actividadPorId.has(celda.actividadId)) throw new ApiError(400, 'Una de las actividades no pertenece a esta clase y periodo.');
-  }
-  for (const celda of directas) {
-    if (!directaPorClave.has(celda.clave)) throw new ApiError(400, `El componente «${celda.clave}» no se digita como nota directa en este año.`);
-  }
 
-  const afectados = [...new Set([...actividadesCeldas.map((c) => c.estudianteId), ...directas.map((c) => c.estudianteId)])];
+  const afectados = [...new Set(celdas.map((c) => c.estudianteId))];
   const cerrados = afectados.filter((id) => esCerrado(ctx.registros.get(id)));
   if (cerrados.length > 0) {
     throw new ApiError(409, `La planilla de notas del periodo ${ctx.periodo.numero} está cerrada para ${cerrados.length} estudiante(s): reábrela (con motivo) para modificar sus notas.`);
   }
 
   const ahora = new Date();
-  const cambiosActividad = actividadesCeldas.filter(
-    (c) => ctx.notasActividad.get(`${c.actividadId}|${c.estudianteId}`) !== c.nota || c.retroalimentacion !== undefined
-  );
-  const cambiosDirectas = directas.filter((c) => ctx.registros.get(c.estudianteId)?.notas_directas.find((n) => n.componente_clave === c.clave)?.valor !== c.nota);
-  const sinCambios = actividadesCeldas.length + directas.length - cambiosActividad.length - cambiosDirectas.length;
-  if (cambiosActividad.length + cambiosDirectas.length === 0) return { guardadas: 0, sin_cambios: sinCambios };
+  const cambios = celdas.filter((c) => {
+    const casilla = casillaPorId.get(c.casillaId) as CasillaDeClase;
+    return notaDeCasilla(ctx, casilla, c.estudianteId) !== c.nota || (casilla.tipo === 'ACTIVIDAD' && c.retroalimentacion !== undefined);
+  });
+  const sinCambios = celdas.length - cambios.length;
+  if (cambios.length === 0) return { guardadas: 0, sin_cambios: sinCambios };
+
+  const deActividad = cambios.filter((c) => casillaPorId.get(c.casillaId)?.tipo === 'ACTIVIDAD');
+  const sueltas = cambios.filter((c) => casillaPorId.get(c.casillaId)?.tipo === 'MANUAL');
 
   await runTransaction(async (session: ClientSession) => {
-    for (const celda of cambiosActividad) {
-      const anterior = ctx.notasActividad.get(`${celda.actividadId}|${celda.estudianteId}`) ?? null;
-      const cambia = anterior !== celda.nota;
+    for (const celda of deActividad) {
+      const casilla = casillaPorId.get(celda.casillaId) as CasillaDeClase;
+      const anterior = notaDeCasilla(ctx, casilla, celda.estudianteId);
       await ActivitySubmission.findOneAndUpdate(
-        { activity_id: celda.actividadId, student_id: celda.estudianteId },
+        { activity_id: celda.casillaId, student_id: celda.estudianteId },
         {
           $set: {
             estado: 'CALIFICADA',
@@ -309,34 +410,32 @@ async function registrarNotas(
             docente_id: docente._id,
             ...(celda.retroalimentacion !== undefined ? { retroalimentacion: celda.retroalimentacion } : {}),
           },
-          ...(cambia ? { $push: { historial_notas: { valor_anterior: anterior, valor_nuevo: celda.nota, por: docente._id, fecha: ahora } } } : {}),
+          ...(anterior !== celda.nota ? { $push: { historial_notas: { valor_anterior: anterior, valor_nuevo: celda.nota, por: docente._id, fecha: ahora } } } : {}),
         },
         { upsert: true, runValidators: true, session }
       );
-      ctx.notasActividad.set(`${celda.actividadId}|${celda.estudianteId}`, celda.nota);
+      ctx.notasActividad.set(`${celda.casillaId}|${celda.estudianteId}`, celda.nota);
     }
 
-    // Las notas directas se reescriben completas por estudiante: el arreglo es pequeño y así el historial viaja con cada nota.
-    const directasPorEstudiante = new Map<string, CeldaDirecta[]>();
-    for (const c of cambiosDirectas) directasPorEstudiante.set(c.estudianteId, [...(directasPorEstudiante.get(c.estudianteId) ?? []), c]);
-    const nuevasDirectas = new Map<string, RegistroPlano['notas_directas']>();
-    for (const [estudianteId, celdas] of directasPorEstudiante) {
-      const actuales = [...(ctx.registros.get(estudianteId)?.notas_directas ?? [])] as RegistroPlano['notas_directas'];
-      for (const celda of celdas) {
-        const existente = actuales.find((n) => n.componente_clave === celda.clave);
-        const entrada = { valor_anterior: existente?.valor ?? null, valor_nuevo: celda.nota, por: docente._id, fecha: ahora };
-        if (existente) {
-          existente.valor = celda.nota;
-          existente.registrado_por = docente._id;
-          existente.fecha = ahora;
-          existente.historial.push(entrada);
-        } else {
-          actuales.push({ componente_clave: celda.clave, valor: celda.nota, registrado_por: docente._id, fecha: ahora, historial: [entrada] } as RegistroPlano['notas_directas'][number]);
-        }
+    // Las notas de las casillas sueltas se reescriben completas por estudiante: el arreglo es pequeño y así el historial viaja con cada nota.
+    const nuevasSueltas = new Map<string, NotaColumnaPlana[]>();
+    for (const celda of sueltas) {
+      const actuales = nuevasSueltas.get(celda.estudianteId) ?? [...(ctx.registros.get(celda.estudianteId)?.notas_columnas ?? [])];
+      const existente = actuales.find((n) => String(n.columna_id) === celda.casillaId);
+      const entrada = { valor_anterior: existente?.valor ?? null, valor_nuevo: celda.nota, por: docente._id, fecha: ahora };
+      if (existente) {
+        existente.valor = celda.nota;
+        existente.registrado_por = docente._id;
+        existente.fecha = ahora;
+        existente.historial = [...existente.historial, entrada];
+      } else {
+        actuales.push({ columna_id: new Types.ObjectId(celda.casillaId), valor: celda.nota, registrado_por: docente._id, fecha: ahora, historial: [entrada] });
       }
-      nuevasDirectas.set(estudianteId, actuales);
+      nuevasSueltas.set(celda.estudianteId, actuales);
+    }
+    for (const [estudianteId, notas] of nuevasSueltas) {
       const base = ctx.registros.get(estudianteId);
-      ctx.registros.set(estudianteId, { ...(base ?? ({} as RegistroPlano)), student_id: new Types.ObjectId(estudianteId), notas_directas: actuales } as RegistroPlano);
+      ctx.registros.set(estudianteId, { ...(base ?? ({} as RegistroPlano)), student_id: new Types.ObjectId(estudianteId), notas_columnas: notas } as RegistroPlano);
     }
 
     for (const estudianteId of afectados) {
@@ -344,7 +443,7 @@ async function registrarNotas(
       await CalificacionAsignatura.updateOne(
         { teacher_assignment_id: asignacion._id, periodo_numero: ctx.periodo.numero, student_id: estudianteId },
         {
-          $set: { estado, ...(nuevasDirectas.has(estudianteId) ? { notas_directas: nuevasDirectas.get(estudianteId) } : {}) },
+          $set: { estado, ...(nuevasSueltas.has(estudianteId) ? { notas_columnas: nuevasSueltas.get(estudianteId) } : {}) },
           $setOnInsert: { academic_year_id: asignacion.academic_year_id, group_id: asignacion.group_id, subject_id: asignacion.subject_id },
         },
         { upsert: true, session }
@@ -357,16 +456,16 @@ async function registrarNotas(
     accion: 'NOTAS_REGISTRADAS',
     entidad: 'TeacherAssignment',
     entidad_id: asignacion._id,
-    detalle: `Periodo ${ctx.periodo.numero}: ${cambiosActividad.length} nota(s) de actividades y ${cambiosDirectas.length} directa(s) de ${afectados.length} estudiante(s).`,
+    detalle: `Periodo ${ctx.periodo.numero}: ${deActividad.length} nota(s) de actividades y ${sueltas.length} de casillas sueltas de ${afectados.length} estudiante(s).`,
     ip,
   });
-  return { guardadas: cambiosActividad.length + cambiosDirectas.length, sin_cambios: sinCambios };
+  return { guardadas: cambios.length, sin_cambios: sinCambios };
 }
 
 export interface CeldaPlanilla {
   student_id: string;
-  actividad_id?: string;
-  componente_clave?: string;
+  /** La casilla: el id de una actividad de M11 o de una nota suelta de la planilla. */
+  casilla_id: string;
   nota: number;
 }
 
@@ -376,7 +475,7 @@ export interface GuardarCeldasInput {
   celdas: CeldaPlanilla[];
 }
 
-/** Guarda las celdas que el docente modificó en la planilla (de actividades o notas directas) y devuelve la planilla al día. */
+/** Guarda las celdas que el docente modificó en la planilla y devuelve la planilla al día. */
 export async function guardarCeldas(input: GuardarCeldasInput, docente: UserDocument, ip?: string | null) {
   const asignacion = await asignacionDelDocente(input.teacher_assignment_id, docente);
   await asegurarAnioNoCerrado(String(asignacion.academic_year_id));
@@ -385,8 +484,7 @@ export async function guardarCeldas(input: GuardarCeldasInput, docente: UserDocu
   const resultado = await registrarNotas(
     ctx,
     docente,
-    input.celdas.filter((c) => c.actividad_id).map((c) => ({ actividadId: c.actividad_id as string, estudianteId: c.student_id, nota: c.nota })),
-    input.celdas.filter((c) => c.componente_clave).map((c) => ({ estudianteId: c.student_id, clave: c.componente_clave as string, nota: c.nota })),
+    input.celdas.map((c) => ({ casillaId: c.casilla_id, estudianteId: c.student_id, nota: c.nota })),
     ip
   );
   return { ...resultado, planilla: await obtenerPlanilla(input.teacher_assignment_id, input.periodo_numero, docente) };
@@ -426,12 +524,11 @@ export async function gradeActivity(
     ctx,
     requestingUser,
     entries.map((e) => ({
-      actividadId: activityId,
+      casillaId: activityId,
       estudianteId: e.student_id,
       nota: e.calificacion_numerica,
       retroalimentacion: e.retroalimentacion ?? undefined,
     })),
-    [],
     ip
   );
   return ActivitySubmission.find({ activity_id: activityId, student_id: { $in: entries.map((e) => e.student_id) } });
@@ -455,13 +552,13 @@ export async function cerrarPlanilla(input: PlanillaRef, docente: UserDocument, 
 
   if (ctx.estudiantes.length === 0) throw new ApiError(409, 'El grupo no tiene estudiantes con matrícula activa.');
   if (ctx.estudiantes.every((e) => esCerrado(ctx.registros.get(e._id)))) throw new ApiError(409, 'La planilla ya está cerrada.');
-  if (ctx.actividades.length === 0) throw new ApiError(409, 'No hay actividades en este periodo: no hay nada que cerrar.');
+  if (ctx.casillas.length === 0) throw new ApiError(409, 'No hay casillas en esta planilla (ni actividades ni notas): no hay nada que cerrar.');
 
   const incompletos = ctx.estudiantes
     .map((e) => ({ estudiante: e, resultado: resultadoDe(ctx, e._id) }))
     .filter((x) => !x.resultado.completa);
   if (incompletos.length > 0) {
-    const nombreDe = new Map(ctx.componentes.map((c) => [c.clave, c.nombre]));
+    const nombreDe = new Map(ctx.bloques.map((b) => [b.clave, b.nombre]));
     throw new ApiError(
       409,
       `No se puede cerrar: ${incompletos.length} estudiante(s) tienen notas pendientes.`,
@@ -482,11 +579,11 @@ export async function cerrarPlanilla(input: PlanillaRef, docente: UserDocument, 
           $set: {
             estado: 'CERRADO',
             resultado: {
-              componentes: ctx.componentes.map((c) => ({
-                clave: c.clave,
-                nombre: c.nombre,
-                porcentaje: c.porcentaje,
-                nota: resultado.componentes.find((x) => x.clave === c.clave)?.nota as number,
+              componentes: ctx.bloques.map((b) => ({
+                clave: b.clave,
+                nombre: b.nombre,
+                porcentaje: b.porcentaje,
+                nota: resultado.bloques.find((x) => x.clave === b.clave)?.nota as number,
               })),
               nota_asignatura: resultado.nota as number,
             },

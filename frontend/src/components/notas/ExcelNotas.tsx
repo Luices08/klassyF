@@ -65,7 +65,7 @@ export function ExcelNotas({ teacherAssignmentId, periodoNumero, nombreArchivo, 
       <Card>
         <div className="flex flex-wrap items-center justify-between gap-3 p-4">
           <p className="max-w-xl text-sm text-muted">
-            Trabajo sin conexión: descarga la planilla en Excel, escribe las notas en las casillas blancas (los promedios y la nota se calculan solos) y súbela
+            Trabajo sin conexión: descarga la planilla en Excel con las casillas de cada bloque; escribe el nombre, el peso y las notas en las casillas blancas (los promedios y la nota se calculan solos) y súbela
             cuando recuperes la conexión. En Google Sheets, impórtala allí y descárgala de nuevo como Excel (.xlsx).
           </p>
           <div className="flex flex-wrap items-center gap-2">
@@ -93,7 +93,10 @@ export function ExcelNotas({ teacherAssignmentId, periodoNumero, nombreArchivo, 
         <Alert tone="success">
           Planilla de {importar.data.asignatura} · Grupo {importar.data.grupo} · Periodo {importar.data.periodo}:{' '}
           {importar.data.guardadas === 0 ? 'no había cambios que guardar' : `${importar.data.guardadas} nota(s) guardada(s)`}
-          {importar.data.sin_cambios > 0 ? ` (${importar.data.sin_cambios} ya estaban igual)` : ''}.
+          {importar.data.sin_cambios > 0 ? ` (${importar.data.sin_cambios} ya estaban igual)` : ''}
+          {importar.data.casillas_creadas > 0 ? ` · ${importar.data.casillas_creadas} casilla(s) nueva(s)` : ''}
+          {importar.data.casillas_renombradas > 0 ? ` · ${importar.data.casillas_renombradas} renombrada(s)` : ''}
+          {importar.data.pesos_actualizados > 0 ? ` · ${importar.data.pesos_actualizados} peso(s) actualizado(s)` : ''}.
         </Alert>
       )}
       {importar.isError && (

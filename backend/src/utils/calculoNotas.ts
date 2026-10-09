@@ -1,83 +1,113 @@
 import { MetodoCalculoEvaluacion } from '../constants/enums';
 import { EstadoNota } from '../constants/notas';
-import { ComponenteEvaluativo, round2 } from './siee';
+import { round2 } from './siee';
 
 /**
- * Motor de cálculo de M12 (funciones puras): de las notas de las actividades y las notas directas llega a la nota de la
- * asignatura, y de las asignaturas a la del área. Lo usan la planilla, el cierre y el boletín (M17): una sola fórmula.
+ * Motor de cálculo de M12 (funciones puras): de las notas de las casillas llega a la nota de la asignatura, y de las
+ * asignaturas a la del área. Lo usan la planilla, el cierre, el Excel y el boletín (M17): una sola fórmula.
+ *
+ * Vocabulario: el MOLDE del colegio divide el 100% de la nota en BLOQUES (Heteroevaluación 70%, Autoevaluación 15%...).
+ * Cada bloque tiene CASILLAS: las actividades de M11 y las notas sueltas que el docente crea. Dentro de un bloque cada
+ * casilla puede llevar un PESO (% del bloque) o dejarlo automático.
  * `null` significa «falta nota», nunca 0: un 0 es una nota.
  */
 
-export interface ActividadParaCalculo {
+export interface BloqueCalculo {
+  clave: string;
+  porcentaje: number;
+}
+
+export interface CasillaCalculo {
   id: string;
-  componente: string;
-  peso: number;
+  bloque: string;
+  /** % del bloque que decidió el docente; null = automático. */
+  peso: number | null;
 }
 
 export interface EntradaNotaAsignatura {
-  componentes: readonly ComponenteEvaluativo[];
-  actividades: readonly ActividadParaCalculo[];
-  /** Notas del estudiante en las actividades: id de actividad -> nota (solo las ya calificadas). */
-  notasActividad: ReadonlyMap<string, number>;
-  /** Notas directas del estudiante: clave del componente -> nota. */
-  notasDirectas: ReadonlyMap<string, number>;
+  bloques: readonly BloqueCalculo[];
+  casillas: readonly CasillaCalculo[];
+  /** Notas del estudiante: id de casilla -> nota (solo las ya puestas). */
+  notas: ReadonlyMap<string, number>;
 }
 
-export interface NotaComponente {
+export interface NotaBloque {
   clave: string;
   nota: number | null;
-  /** Tiene nota y, si se alimenta de actividades, todas están calificadas. */
+  /** El bloque tiene al menos una casilla y todas están calificadas. */
   completo: boolean;
 }
 
 export interface ResultadoAsignatura {
-  componentes: NotaComponente[];
-  /** Promedio ponderado de los componentes que ya tienen nota: parcial mientras `completa` sea false. */
+  bloques: NotaBloque[];
+  /** Promedio ponderado de los bloques que ya tienen nota: parcial mientras `completa` sea false. */
   nota: number | null;
   completa: boolean;
-  /** Claves de los componentes que aún no están completos. */
+  /** Claves de los bloques que aún no están completos. */
   faltantes: string[];
 }
 
+/** Tolerancia al sumar porcentajes decimales (33.3 + 33.3 + 33.4). */
+const TOLERANCIA = 0.01;
+
 /**
- * Promedio de las actividades calificadas ponderado por su peso. Si todos los pesos son 0 se promedian por igual (no se
- * divide por cero). Sin ninguna calificada no hay nota.
+ * El peso real de cada casilla dentro de su bloque: el que el docente puso o, para las que quedaron en automático, lo que
+ * queda del 100% repartido por partes iguales. Sin ningún peso puesto, todas valen lo mismo.
  */
-function promedioDeActividades(actividades: readonly ActividadParaCalculo[], notas: ReadonlyMap<string, number>): NotaComponente['nota'] {
-  const calificadas = actividades.filter((a) => notas.has(a.id));
+export function pesosEfectivos(casillas: readonly CasillaCalculo[]): Map<string, number> {
+  const pesos = new Map<string, number>();
+  const porBloque = new Map<string, CasillaCalculo[]>();
+  for (const c of casillas) porBloque.set(c.bloque, [...(porBloque.get(c.bloque) ?? []), c]);
+
+  for (const propias of porBloque.values()) {
+    const puestas = propias.filter((c) => c.peso !== null);
+    const automaticas = propias.filter((c) => c.peso === null);
+    const restante = Math.max(0, 100 - puestas.reduce((suma, c) => suma + (c.peso as number), 0));
+    for (const c of puestas) pesos.set(c.id, c.peso as number);
+    for (const c of automaticas) pesos.set(c.id, restante / automaticas.length);
+  }
+  return pesos;
+}
+
+/** Los bloques cuyos pesos puestos suman más de 100: no hay cómo repartirlos. */
+export function bloquesConPesoExcedido(casillas: readonly CasillaCalculo[]): Array<{ bloque: string; suma: number }> {
+  const sumas = new Map<string, number>();
+  for (const c of casillas) if (c.peso !== null) sumas.set(c.bloque, (sumas.get(c.bloque) ?? 0) + c.peso);
+  return [...sumas.entries()].filter(([, suma]) => suma > 100 + TOLERANCIA).map(([bloque, suma]) => ({ bloque, suma: round2(suma) }));
+}
+
+/** Promedio de las casillas calificadas de un bloque, ponderado por su peso; si todos los pesos son 0 se promedian por igual. */
+function promedioDeBloque(propias: readonly CasillaCalculo[], notas: ReadonlyMap<string, number>, pesos: ReadonlyMap<string, number>): number | null {
+  const calificadas = propias.filter((c) => notas.has(c.id));
   if (calificadas.length === 0) return null;
 
-  const sumaPesos = calificadas.reduce((suma, a) => suma + a.peso, 0);
-  if (sumaPesos === 0) return round2(calificadas.reduce((suma, a) => suma + (notas.get(a.id) as number), 0) / calificadas.length);
-  return round2(calificadas.reduce((suma, a) => suma + (notas.get(a.id) as number) * a.peso, 0) / sumaPesos);
+  const sumaPesos = calificadas.reduce((suma, c) => suma + (pesos.get(c.id) ?? 0), 0);
+  if (sumaPesos === 0) return round2(calificadas.reduce((suma, c) => suma + (notas.get(c.id) as number), 0) / calificadas.length);
+  return round2(calificadas.reduce((suma, c) => suma + (notas.get(c.id) as number) * (pesos.get(c.id) ?? 0), 0) / sumaPesos);
 }
 
 export function calcularNotaAsignatura(entrada: EntradaNotaAsignatura): ResultadoAsignatura {
-  const componentes: NotaComponente[] = entrada.componentes.map((componente) => {
-    if (componente.origen === 'NOTA_DIRECTA') {
-      const nota = entrada.notasDirectas.get(componente.clave) ?? null;
-      return { clave: componente.clave, nota, completo: nota !== null };
-    }
+  const pesos = pesosEfectivos(entrada.casillas);
 
-    const propias = entrada.actividades.filter((a) => a.componente === componente.clave);
-    const nota = promedioDeActividades(propias, entrada.notasActividad);
-    const todasCalificadas = propias.length > 0 && propias.every((a) => entrada.notasActividad.has(a.id));
-    return { clave: componente.clave, nota, completo: todasCalificadas };
+  const bloques: NotaBloque[] = entrada.bloques.map((bloque) => {
+    const propias = entrada.casillas.filter((c) => c.bloque === bloque.clave);
+    const todasConNota = propias.length > 0 && propias.every((c) => entrada.notas.has(c.id));
+    return { clave: bloque.clave, nota: promedioDeBloque(propias, entrada.notas, pesos), completo: todasConNota };
   });
 
-  const porcentajeDe = new Map(entrada.componentes.map((c) => [c.clave, c.porcentaje]));
-  const conNota = componentes.filter((c) => c.nota !== null);
-  const sumaPorcentajes = conNota.reduce((suma, c) => suma + (porcentajeDe.get(c.clave) ?? 0), 0);
+  const porcentajeDe = new Map(entrada.bloques.map((b) => [b.clave, b.porcentaje]));
+  const conNota = bloques.filter((b) => b.nota !== null);
+  const sumaPorcentajes = conNota.reduce((suma, b) => suma + (porcentajeDe.get(b.clave) ?? 0), 0);
   const nota =
     conNota.length === 0 || sumaPorcentajes === 0
       ? null
-      : round2(conNota.reduce((suma, c) => suma + (c.nota as number) * (porcentajeDe.get(c.clave) ?? 0), 0) / sumaPorcentajes);
+      : round2(conNota.reduce((suma, b) => suma + (b.nota as number) * (porcentajeDe.get(b.clave) ?? 0), 0) / sumaPorcentajes);
 
   return {
-    componentes,
+    bloques,
     nota,
-    completa: componentes.length > 0 && componentes.every((c) => c.completo),
-    faltantes: componentes.filter((c) => !c.completo).map((c) => c.clave),
+    completa: bloques.length > 0 && bloques.every((b) => b.completo),
+    faltantes: bloques.filter((b) => !b.completo).map((b) => b.clave),
   };
 }
 

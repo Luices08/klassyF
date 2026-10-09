@@ -11,6 +11,7 @@ import {
   useCrearActividad,
   useRevisionCalendario,
 } from '../../hooks/useActividades';
+import { useBloquesDeClase } from '../../hooks/useNotas';
 import {
   FORMATOS_EVIDENCIA,
   type FormatoEvidencia,
@@ -20,7 +21,7 @@ import {
   aInputInstante,
   aInstante,
 } from '../../lib/actividades';
-import type { ComponenteEvaluativo, CurricularDevelopment, DbaReferente } from '../../types/domain';
+import type { CurricularDevelopment, DbaReferente } from '../../types/domain';
 
 interface ActividadDrawerProps {
   open: boolean;
@@ -29,8 +30,6 @@ interface ActividadDrawerProps {
   periodoNumero: number;
   /** La planeación APROBADA del periodo: de ella salen los DBA y las competencias que la actividad puede evaluar. */
   planeacion: CurricularDevelopment;
-  /** Los componentes del año que se alimentan de actividades (M12): la actividad cuenta dentro de uno de ellos. */
-  componentes: ComponenteEvaluativo[];
   /** Con actividad se edita; sin ella se crea. */
   actividad: ActividadConResumen | null;
 }
@@ -51,14 +50,14 @@ interface Formulario {
   confirmar: boolean;
 }
 
-function formularioInicial(actividad: Actividad | null, componentes: ComponenteEvaluativo[]): Formulario {
+function formularioInicial(actividad: Actividad | null): Formulario {
   if (actividad) {
     return {
       tipo: actividad.tipo,
       titulo: actividad.titulo,
       descripcion: actividad.descripcion,
       componente: actividad.componente_siee,
-      peso: String(actividad.peso_en_componente),
+      peso: actividad.peso_en_componente === null ? '' : String(actividad.peso_en_componente),
       apertura: aInputInstante(actividad.fecha_apertura),
       entrega: aInputInstante(actividad.fecha_entrega),
       requiere: actividad.requiere_entrega,
@@ -73,8 +72,8 @@ function formularioInicial(actividad: Actividad | null, componentes: ComponenteE
     tipo: 'TAREA',
     titulo: '',
     descripcion: '',
-    componente: componentes[0]?.clave ?? '',
-    peso: '1',
+    componente: '',
+    peso: '',
     apertura: aInputInstante(new Date().toISOString()),
     entrega: '',
     requiere: true,
@@ -94,8 +93,10 @@ export function ActividadDrawer(props: ActividadDrawerProps) {
   return props.open ? <FormularioActividad key={props.actividad?._id ?? 'nueva'} {...props} /> : null;
 }
 
-function FormularioActividad({ onClose, teacherAssignmentId, periodoNumero, planeacion, componentes, actividad }: ActividadDrawerProps) {
-  const [f, setF] = useState<Formulario>(() => formularioInicial(actividad, componentes));
+function FormularioActividad({ onClose, teacherAssignmentId, periodoNumero, planeacion, actividad }: ActividadDrawerProps) {
+  const [f, setF] = useState<Formulario>(() => formularioInicial(actividad));
+  // Los bloques del molde del colegio con lo que ya tienen en esta clase y periodo: solo se ofrecen los que aún tienen lugar.
+  const bloques = useBloquesDeClase({ teacherAssignmentId, periodoNumero });
   const [mensaje, setMensaje] = useState<string | null>(null);
   const crear = useCrearActividad();
   const actualizar = useActualizarActividad();
@@ -135,15 +136,15 @@ function FormularioActividad({ onClose, teacherAssignmentId, periodoNumero, plan
   const hayBloqueo = alertas.some((a) => a.severidad === 'BLOQUEO');
   const hayAdvertencia = alertas.some((a) => a.severidad === 'ADVERTENCIA');
 
-  const peso = Number(f.peso);
+  const peso = f.peso.trim() === '' ? null : Number(f.peso);
+  const bloqueElegido = f.componente !== '' ? f.componente : (bloques.data?.find((b) => b.casillas.length < b.max_casillas)?.clave ?? '');
   const completo =
     f.titulo.trim() !== '' &&
     f.descripcion.trim() !== '' &&
-    f.componente !== '' &&
+    bloqueElegido !== '' &&
     f.entrega !== '' &&
     f.apertura !== '' &&
-    Number.isFinite(peso) &&
-    peso >= 0 &&
+    (peso === null || (Number.isFinite(peso) && peso >= 0 && peso <= 100)) &&
     (f.dba !== '' || f.competencia !== '');
 
   const toggleFormato = (clave: FormatoEvidencia) =>
@@ -153,7 +154,7 @@ function FormularioActividad({ onClose, teacherAssignmentId, periodoNumero, plan
     titulo: f.titulo.trim(),
     descripcion: f.descripcion.trim(),
     tipo: f.tipo,
-    componente_siee: f.componente,
+    componente_siee: bloqueElegido,
     peso_en_componente: peso,
     fecha_apertura: aInstante(f.apertura),
     fecha_entrega: aInstante(f.entrega),
@@ -258,24 +259,35 @@ function FormularioActividad({ onClose, teacherAssignmentId, periodoNumero, plan
       </fieldset>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <Select label="Componente evaluativo" value={f.componente} onChange={(e) => cambiar('componente', e.target.value)}>
-          {/* Una actividad antigua puede apuntar a un componente que el año ya no ofrece: se conserva visible. */}
-          {actividad && !componentes.some((c) => c.clave === actividad.componente_siee) && (
+        <Select
+          label="Bloque de la planilla"
+          value={bloqueElegido}
+          disabled={bloques.isLoading}
+          error={bloques.isError ? errorMessage(bloques.error) : undefined}
+          hint="El colegio define los bloques y cuántas casillas admite cada uno."
+          onChange={(e) => cambiar('componente', e.target.value)}
+        >
+          {/* Una actividad antigua puede apuntar a un bloque que el año ya no ofrece: se conserva visible. */}
+          {actividad && !bloques.data?.some((b) => b.clave === actividad.componente_siee) && (
             <option value={actividad.componente_siee}>{actividad.componente_nombre}</option>
           )}
-          {componentes.map((c) => (
-            <option key={c.clave} value={c.clave}>
-              {c.nombre} ({c.porcentaje}%)
-            </option>
-          ))}
+          {(bloques.data ?? []).map((b) => {
+            const lleno = b.casillas.length >= b.max_casillas && b.clave !== actividad?.componente_siee;
+            return (
+              <option key={b.clave} value={b.clave} disabled={lleno}>
+                {b.nombre} ({b.porcentaje}%) · {b.casillas.length}/{b.max_casillas} casillas{lleno ? ' · lleno' : ''}
+              </option>
+            );
+          })}
         </Select>
         <Input
-          label="Peso dentro del componente"
+          label="Peso dentro del bloque (%)"
           type="number"
           min={0}
-          step="0.1"
+          max={100}
+          step="0.5"
           value={f.peso}
-          hint="Frente a las demás actividades del mismo componente."
+          hint="Opcional. Vacío: las casillas sin peso se reparten en partes iguales lo que queda del bloque."
           onChange={(e) => cambiar('peso', e.target.value)}
         />
       </div>

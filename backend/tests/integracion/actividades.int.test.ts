@@ -101,12 +101,12 @@ describe('M11: actividades y entregas (con base de datos)', () => {
 
   describe('programación (CU-DOC-02)', () => {
     it('no se programa sin planeación curricular, ni con una que no está aprobada', async () => {
-      await expect(actividades.createActivity(datos(), docente)).rejects.toMatchObject({ statusCode: 409, message: /Aún no has formulado/ });
+      await expect(actividades.createActivity(datos(), docente)).rejects.toMatchObject({ statusCode: 409, message: expect.stringMatching(/Aún no has formulado/) });
 
       await aprobarPlaneacion('ENVIADO_REVISION');
       await expect(actividades.createActivity(datos(), docente)).rejects.toMatchObject({
         statusCode: 409,
-        message: /en revisión de coordinación/,
+        message: expect.stringMatching(/en revisión de coordinación/),
       });
     });
 
@@ -120,14 +120,14 @@ describe('M11: actividades y entregas (con base de datos)', () => {
       await aprobarPlaneacion();
       await expect(
         actividades.createActivity(datos({ competencia_evaluada: undefined, dba_id: undefined }), docente)
-      ).rejects.toMatchObject({ statusCode: 400, message: /DBA o competencia/ });
+      ).rejects.toMatchObject({ statusCode: 400, message: expect.stringMatching(/DBA o competencia/) });
       await expect(actividades.createActivity(datos({ competencia_evaluada: 'Baila salsa' }), docente)).rejects.toMatchObject({
         statusCode: 400,
-        message: /competencia elegida/,
+        message: expect.stringMatching(/competencia elegida/),
       });
       await expect(
         actividades.createActivity(datos({ competencia_evaluada: undefined, dba_id: String(new Types.ObjectId()) }), docente)
-      ).rejects.toMatchObject({ statusCode: 400, message: /DBA elegido/ });
+      ).rejects.toMatchObject({ statusCode: 400, message: expect.stringMatching(/DBA elegido/) });
 
       const conDba = await actividades.createActivity(datos({ competencia_evaluada: undefined, dba_id: dbaDeLaPlaneacion }), docente);
       expect(String(conDba.dba_id)).toBe(dbaDeLaPlaneacion);
@@ -139,12 +139,12 @@ describe('M11: actividades y entregas (con base de datos)', () => {
       await aprobarPlaneacion();
       await expect(
         actividades.createActivity(datos({ fecha_apertura: new Date(Date.now() - 2 * DIA_MS), fecha_entrega: new Date(Date.now() - DIA_MS) }), docente)
-      ).rejects.toMatchObject({ statusCode: 400, message: /ya pasó/ });
+      ).rejects.toMatchObject({ statusCode: 400, message: expect.stringMatching(/ya pasó/) });
 
       const finPeriodo = proximoDiaHabil(150); // el periodo 1 termina en +100
       await expect(actividades.createActivity(datos({ fecha_entrega: finPeriodo }), docente)).rejects.toMatchObject({
         statusCode: 400,
-        message: /fuera del periodo 1/,
+        message: expect.stringMatching(/fuera del periodo 1/),
       });
     });
 
@@ -158,7 +158,7 @@ describe('M11: actividades y entregas (con base de datos)', () => {
 
       await expect(actividades.createActivity(datos({ fecha_entrega: entrega }), docente)).rejects.toMatchObject({
         statusCode: 409,
-        message: /Receso de octubre/,
+        message: expect.stringMatching(/Receso de octubre/),
         details: { alertas: [{ codigo: 'DIA_NO_LECTIVO' }] },
       });
       const creada = await actividades.createActivity(datos({ fecha_entrega: entrega, confirmar_alertas: true }), docente);
@@ -208,10 +208,10 @@ describe('M11: actividades y entregas (con base de datos)', () => {
       const anio = (await AcademicYear.findOne())!;
       anio.periodos.find((p) => p.numero === 1)!.estado = 'CERRADO';
       await anio.save();
-      await expect(actividades.createActivity(datos(), docente)).rejects.toMatchObject({ statusCode: 409, message: /CERRADO/ });
+      await expect(actividades.createActivity(datos(), docente)).rejects.toMatchObject({ statusCode: 409, message: expect.stringMatching(/CERRADO/) });
     });
 
-    it('con notas no se cambia el peso; el periodo no se cambia nunca; con entregas no se elimina', async () => {
+    it('con notas el peso aún se ajusta (la planilla está abierta); el periodo no se cambia nunca; con entregas no se elimina', async () => {
       await aprobarPlaneacion();
       const actividad = await actividades.createActivity(datos(), docente);
       const id = String(actividad._id);
@@ -221,7 +221,8 @@ describe('M11: actividades y entregas (con base de datos)', () => {
       await entregas.registrarEntrega(id, {}, pdf(), e.estudiante);
       await notas.gradeActivity(id, [{ student_id: String(e.estudiante._id), calificacion_numerica: 4 }], docente);
 
-      await expect(actividades.updateActivity(id, { peso_en_componente: 2 }, docente)).rejects.toMatchObject({ statusCode: 409, message: /notas/ });
+      expect(await actividades.updateActivity(id, { peso_en_componente: 50 }, docente)).toMatchObject({ peso_en_componente: 50 });
+      await expect(actividades.updateActivity(id, { peso_en_componente: 150 }, docente)).rejects.toMatchObject({ statusCode: 400, message: expect.stringMatching(/más de 100%/) });
       await expect(actividades.updateActivity(id, { requiere_entrega: false }, docente)).rejects.toMatchObject({ statusCode: 409 });
       await expect(actividades.deleteActivity(id, docente)).rejects.toMatchObject({ statusCode: 409 });
 
@@ -274,7 +275,7 @@ describe('M11: actividades y entregas (con base de datos)', () => {
         puede_entregar: false,
         entrega: { calificacion_numerica: 4.5, retroalimentacion: 'Muy bien' },
       });
-      await expect(entregas.registrarEntrega(id, {}, pdf(), e.estudiante)).rejects.toMatchObject({ statusCode: 409, message: /ya fue calificada/ });
+      await expect(entregas.registrarEntrega(id, {}, pdf(), e.estudiante)).rejects.toMatchObject({ statusCode: 409, message: expect.stringMatching(/ya fue calificada/) });
     });
 
     it('reentregar reemplaza el archivo anterior mientras no esté calificada', async () => {
@@ -292,19 +293,19 @@ describe('M11: actividades y entregas (con base de datos)', () => {
 
     it('solo recibe los formatos que el docente permitió, comprobados por contenido', async () => {
       const id = await programar();
-      await expect(entregas.registrarEntrega(id, {}, undefined, e.estudiante)).rejects.toMatchObject({ statusCode: 400, message: /Adjunta/ });
+      await expect(entregas.registrarEntrega(id, {}, undefined, e.estudiante)).rejects.toMatchObject({ statusCode: 400, message: expect.stringMatching(/Adjunta/) });
       await expect(
         entregas.registrarEntrega(id, {}, { buffer: Buffer.from('MZ\x90 no soy pdf'), mimetype: 'application/pdf', originalname: 'virus.pdf' }, e.estudiante)
-      ).rejects.toMatchObject({ statusCode: 400, message: /no es un PDF/ });
+      ).rejects.toMatchObject({ statusCode: 400, message: expect.stringMatching(/no es un PDF/) });
       await expect(
         entregas.registrarEntrega(id, {}, { buffer: Buffer.from('89504e470d0a1a0a', 'hex'), mimetype: 'image/png', originalname: 'foto.png' }, e.estudiante)
-      ).rejects.toMatchObject({ statusCode: 400, message: /solo acepta: PDF/ });
+      ).rejects.toMatchObject({ statusCode: 400, message: expect.stringMatching(/solo acepta: PDF/) });
       expect(await ActivitySubmission.countDocuments()).toBe(0);
     });
 
     it('una actividad sin formatos se responde por escrito', async () => {
       const id = await programar({ formatos_permitidos: [] });
-      await expect(entregas.registrarEntrega(id, {}, undefined, e.estudiante)).rejects.toMatchObject({ statusCode: 400, message: /Escribe tu respuesta/ });
+      await expect(entregas.registrarEntrega(id, {}, undefined, e.estudiante)).rejects.toMatchObject({ statusCode: 400, message: expect.stringMatching(/Escribe tu respuesta/) });
       await expect(entregas.registrarEntrega(id, { texto_entrega: 'x' }, pdf(), e.estudiante)).rejects.toMatchObject({ statusCode: 400 });
       const entrega = await entregas.registrarEntrega(id, { texto_entrega: 'Mi respuesta' }, undefined, e.estudiante);
       expect(entrega).toMatchObject({ estado: 'ENTREGADA', tiene_archivo: false, texto_entrega: 'Mi respuesta' });
@@ -319,7 +320,7 @@ describe('M11: actividades y entregas (con base de datos)', () => {
       expect(mia.find((a) => a._id === cerrada)).toMatchObject({ vencida: true, puede_entregar: false });
       expect(mia.find((a) => a._id === tardia)).toMatchObject({ vencida: true, puede_entregar: true });
 
-      await expect(entregas.registrarEntrega(cerrada, {}, pdf(), e.estudiante)).rejects.toMatchObject({ statusCode: 409, message: /no recibe entregas tardías/ });
+      await expect(entregas.registrarEntrega(cerrada, {}, pdf(), e.estudiante)).rejects.toMatchObject({ statusCode: 409, message: expect.stringMatching(/no recibe entregas tardías/) });
       expect(await entregas.registrarEntrega(tardia, {}, pdf(), e.estudiante)).toMatchObject({ estado: 'ENTREGADA_TARDE', con_retraso: true });
 
       await notas.gradeActivity(tardia, [{ student_id: String(e.estudiante._id), calificacion_numerica: 3 }], docente);
@@ -336,7 +337,7 @@ describe('M11: actividades y entregas (con base de datos)', () => {
       const id = await programar({ requiere_entrega: false, formatos_permitidos: [] });
       await expect(entregas.registrarEntrega(id, { texto_entrega: 'x' }, undefined, e.estudiante)).rejects.toMatchObject({
         statusCode: 409,
-        message: /no recibe entregas digitales/,
+        message: expect.stringMatching(/no recibe entregas digitales/),
       });
     });
 

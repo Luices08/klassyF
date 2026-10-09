@@ -6,7 +6,7 @@ import {
   NIVELES_DESEMPENO,
   TIPOS_EVENTO_CALENDARIO,
 } from '../constants/enums';
-import { MAX_COMPONENTES_EVALUATIVOS, ORIGENES_COMPONENTE } from '../constants/notas';
+import { MAX_CASILLAS_BLOQUE, MAX_COMPONENTES_EVALUATIVOS } from '../constants/notas';
 import { ValidationSchema } from '../middlewares/validate.middleware';
 import { objectId } from './common.validator';
 
@@ -181,9 +181,7 @@ export const actualizarComponentesEvaluativos: ValidationSchema = {
         clave: Joi.string().pattern(/^[A-Z0-9_]{2,40}$/),
         nombre: Joi.string().trim().max(60).required(),
         porcentaje: Joi.number().min(0).max(100).required(),
-        origen: Joi.string()
-          .valid(...ORIGENES_COMPONENTE)
-          .required(),
+        max_casillas: Joi.number().integer().min(1).max(MAX_CASILLAS_BLOQUE).required(),
       })
     )
     .min(1)

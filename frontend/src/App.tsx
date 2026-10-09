@@ -22,6 +22,7 @@ import { MisAjustesPage } from './pages/MisAjustesPage';
 import { AcademicCatalogPage } from './pages/admin/AcademicCatalogPage';
 import { ActividadesGestionPage } from './pages/admin/ActividadesGestionPage';
 import { NotasGestionPage } from './pages/admin/NotasGestionPage';
+import { CreadorPlanillasPage } from './pages/admin/CreadorPlanillasPage';
 import { AdmissionRequestsPage } from './pages/admin/AdmissionRequestsPage';
 import { CasosConvivenciaPage } from './pages/admin/CasosConvivenciaPage';
 import { ComitePage } from './pages/admin/ComitePage';
@@ -63,6 +64,7 @@ export default function App() {
             <Route path="/admin/setup" element={<InstitutionSetupPage />} />
             <Route path="/admin/sedes" element={<SedesPage />} />
             <Route path="/admin/grades" element={<GradesPage />} />
+            <Route path="/admin/creador-planillas" element={<CreadorPlanillasPage />} />
           </Route>
 
           <Route element={<ProtectedRoute allowedRoles={['ADMIN', 'COORDINADOR', 'SECRETARIA']} />}>

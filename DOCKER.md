@@ -72,10 +72,30 @@ docker compose logs -f backend
 docker compose exec mongo mongodump --archive --db klassy > respaldo-$(date +%F).archive
 ```
 
-### HTTPS
+### HTTP o HTTPS: un solo comando
 
-nginx del contenedor escucha en HTTP. Para un dominio con certificado, pon delante un proxy
-(Caddy, nginx del sistema con certbot, Traefik) apuntando a `PUERTO_WEB` (por ejemplo `PUERTO_WEB=8080`).
+```bash
+./deploy/levantar.sh      # primera vez o tras cambiar .env
+./deploy/actualizar.sh    # git pull + levantar.sh
+```
+
+Con `DOMINIO` vacío en `.env` sirve por HTTP en `PUERTO_WEB` (por IP). Con `DOMINIO` definido usa HTTPS automáticamente. Para pasar de uno a otro solo se edita `.env` y se vuelve a correr `levantar.sh`.
+
+### HTTPS con dominio
+
+1. Apunta el DNS (registro A) del dominio a la IP del VPS y abre los puertos 80 y 443.
+2. En `.env`: `DOMINIO=klassy.micolegio.edu.co` y `PUERTO_WEB=8080` (queda solo en `127.0.0.1`).
+3. Corre `./deploy/levantar.sh` (Caddy obtiene y renueva el certificado solo).
+
+Requiere Docker Compose >= 2.24. Si prefieres tu propio proxy (nginx del sistema + certbot, Traefik), omite esto y apúntalo a `PUERTO_WEB`.
+
+### Respaldos
+
+```bash
+./deploy/respaldar.sh            # base + archivos subidos en ./respaldos (conserva los últimos 14)
+```
+
+Prográmalo con cron (ver el encabezado del script) y copia `respaldos/` fuera del VPS.
 
 ### Cuidado
 

@@ -31,3 +31,5 @@ backend/scripts/seedDemo*.ts
 # Paquetes .zip usados para transferir modulos entre sesiones/equipos: una vez
 # integrados sus archivos al proyecto, el .zip ya no aporta nada al repositorio.
 *.zip
+
+respaldos/

@@ -15,10 +15,12 @@ import type {
   TonoEstadoAsistencia,
 } from '../../types/domain';
 import { NOMBRES_ESTADO_ESPACIO } from '../../types/domain';
+import type { EstadoActividadEstudiante } from '../../hooks/useActividades';
 import type { EstadoCaso } from '../../hooks/useCasos';
 import type { EstadoExpediente, EstadoSolicitudApoyo } from '../../hooks/useInclusion';
 import { NOMBRES_ESTADO_EXPEDIENTE, NOMBRES_ESTADO_SOLICITUD } from '../../hooks/useInclusion';
 import type { TipoSituacion } from '../../hooks/useObservaciones';
+import { NOMBRES_TIPO_ACTIVIDAD, type TipoActividad } from '../../lib/actividades';
 import type { Desempeno } from '../../types/reportCard';
 
 export type Tone = 'blue' | 'green' | 'orange' | 'red' | 'neutral';
@@ -308,4 +310,37 @@ const SOLICITUD_APOYO_TONE: Record<EstadoSolicitudApoyo, Tone> = {
 /** Estado de una solicitud de apoyo (M16). */
 export function EstadoSolicitudApoyoBadge({ value }: { value: EstadoSolicitudApoyo }) {
   return <Chip tone={SOLICITUD_APOYO_TONE[value]}>{NOMBRES_ESTADO_SOLICITUD[value]}</Chip>;
+}
+
+const ESTADO_ACTIVIDAD_LABELS: Record<EstadoActividadEstudiante, string> = {
+  PROGRAMADA: 'Programada',
+  ENTREGADA: 'Entregada',
+  ENTREGADA_TARDE: 'Entregada con retraso',
+  CALIFICADA: 'Calificada',
+};
+
+const ESTADO_ACTIVIDAD_TONE: Record<EstadoActividadEstudiante, Tone> = {
+  PROGRAMADA: 'neutral',
+  ENTREGADA: 'green',
+  ENTREGADA_TARDE: 'orange',
+  CALIFICADA: 'blue',
+};
+
+/** Trazabilidad de una actividad para el estudiante (M11): programada -> entregada (a tiempo o con retraso) -> calificada. */
+export function EstadoEntregaBadge({ value, sinEntrega = false }: { value: EstadoActividadEstudiante; sinEntrega?: boolean }) {
+  // El docente ve "Sin entrega" donde el estudiante ve "Programada": es la misma situación vista desde el otro lado.
+  const etiqueta = sinEntrega && value === 'PROGRAMADA' ? 'Sin entrega' : ESTADO_ACTIVIDAD_LABELS[value];
+  return <Chip tone={ESTADO_ACTIVIDAD_TONE[value]}>{etiqueta}</Chip>;
+}
+
+const TIPO_ACTIVIDAD_TONE: Record<TipoActividad, Tone> = {
+  TAREA: 'blue',
+  EVALUACION: 'orange',
+  TRABAJO: 'green',
+  PROYECTO: 'neutral',
+};
+
+/** Tipo de actividad de aula (M11). */
+export function TipoActividadChip({ value }: { value: TipoActividad }) {
+  return <Chip tone={TIPO_ACTIVIDAD_TONE[value]}>{NOMBRES_TIPO_ACTIVIDAD[value]}</Chip>;
 }

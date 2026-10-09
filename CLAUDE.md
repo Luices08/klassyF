@@ -481,6 +481,51 @@ justificaciones, reportes PDF y, solo ADMIN, estados). Reglas que no se ven leye
 - **Pendiente, a propósito fuera de alcance**: la vista del acudiente (CU-ACU-02, depende de M27); umbrales de ausentismo (alertas por %), que
   serían política institucional.
 
+### M11 (Actividades y planeación de aula) — estado: núcleo completo
+
+Backend `/activities` (modelos `Activity`, `ActivitySubmission`, `ConfiguracionActividades`), frontend `ActividadesDocentePage`
+(`/docente/actividades`, CU-DOC-02), `MisActividadesPage` (`/mis-actividades`, CU-EST-03) y `ActividadesGestionPage`
+(`/admin/actividades`, supervisión de coordinación). `Activity`/`ActivitySubmission` ya existían (M12 los consume: `reportCard.service`
+lee `componente_siee` y `peso_en_componente`); M11 los extendió sin romper nada. Reglas que no se ven leyendo un solo archivo:
+
+- **La jerarquía no se copia a la actividad.** Grupo, asignatura, área, grado y docente se leen por FK desde la `TeacherAssignment`
+  (`actividadContexto.service.ts`), nunca se duplican en `Activity` (regla de oro de datos). Un docente solo programa sobre sus clases
+  `CLASE` activas (M08); coordinación y ADMIN solo consultan.
+- **Requisito M07, validado por el servidor:** no se crea una actividad sin el `CurricularDevelopment` de ese periodo en estado
+  `APROBADO` (409 con el estado actual). Cada actividad exige un `dba_id` (debe estar en `dba_seleccionados` de esa planeación) o una
+  `competencia_evaluada` (debe estar contenida en `competencias`, comparada sin tildes/mayúsculas). Guarda `desarrollo_curricular_id`.
+  Al editar, el DBA/competencia solo se revalida si se cambian (reabrir una planeación no bloquea corregir un título).
+- **Prevención de sobrecarga (M25 aún no existe):** `utils/actividades.ts#evaluarCalendarioActividad` (pura, con tests) cruza la fecha de
+  entrega —un instante; el día se calcula en hora de Colombia— con M05 (periodo efectivo de la sede, recesos/vacaciones, recuperaciones,
+  `dias_habiles` de la jornada) y con las demás actividades del grupo ese día. **BLOQUEO** (no se salta): fecha pasada con entrega
+  digital, fuera del periodo. **ADVERTENCIA** (el docente confirma con `confirmar_alertas`, si no 409 con `details.alertas`): día no
+  lectivo/no hábil, ventana de recuperación, sobrecarga. Los límites (`max_evaluaciones_por_dia`, `max_entregas_por_dia`, 0 = sin límite)
+  son de `ConfiguracionActividades` (coordinación los cambia en `/admin/actividades`), no están quemados. Cuando exista M25 este es el
+  único punto que debe leerlo (`actividadCalendario.service.ts#revisarCalendario`). `GET /activities/revision-calendario` es la alerta
+  temprana mientras se elige la fecha: es la misma revisión que repite el servidor al guardar.
+- **Reglas de entrega:** `requiere_entrega` (false = actividad de aula, el docente califica directo) y `formatos_permitidos` (PDF, Word,
+  Excel, PowerPoint, imagen; **vacío con entrega = respuesta escrita**, sin archivo). `permite_entrega_tardia`. Un solo archivo por
+  entrega, 10 MB (`MAX_BYTES_ENTREGA`; nginx en 12 MB por el multipart). El contenido se confirma por firma de bytes
+  (`utils/evidenciasActividad.ts`; los Office son ZIP: además extensión coherente y carpeta propia del paquete). Vive en
+  `uploads/actividades/<actividad>/`, nunca en Mongo, y solo se baja con sesión (`GET /activities/entregas/:id/archivo`: el propio
+  estudiante, el docente titular, coordinación, ADMIN; "no existe" = "no es tuyo" = 404 para el estudiante). La API nunca devuelve la ruta.
+- **Estados:** `PROGRAMADA` (no se guarda: es la actividad sin entrega) → `ENTREGADA` / `ENTREGADA_TARDE` → `CALIFICADA`. Los marca el
+  servidor al entregar (`evaluarVentanaEntrega`) y al calificar; `estadoDeEntrega` los deriva de lo guardado (una nota siempre es
+  CALIFICADA, también en registros anteriores a M11; sin `fecha_entrega` = nota puesta sin entrega = sigue programada). `con_retraso`
+  sobrevive a la calificación. Se puede reentregar (reemplaza el archivo) hasta que se califique; la carrera con una calificación
+  concurrente la cierra el filtro `calificacion_numerica: null` + índice único (409). Entrega exige año `EN_CURSO`, periodo no `CERRADO` y
+  sin `PeriodLock` del grupo. El estudiante no ve una actividad antes de su `fecha_apertura` (publicación): 404.
+- **Puente hacia M12:** la nota la sigue registrando `activity.service#gradeActivity` (escala de M05, `assertPeriodNotLocked`); lo único
+  que M11 le cambió es marcar la entrega `CALIFICADA`. `EntregasDrawer` solo ofrece nota + retroalimentación por estudiante sobre ese
+  endpoint; **la planilla de calificación completa es de M12**, no se hizo aquí. El docente no edita componente/peso de lo que ya tiene
+  notas, y no se elimina una actividad con entregas o notas. El periodo y la asignación de una actividad no se cambian (se elimina y
+  se programa de nuevo con la planeación del otro periodo).
+- **Pruebas:** `tests/actividades.test.ts` (funciones puras), `tests/integracion/actividades.int.test.ts` (servicios con base real) y
+  `actividades.http.int.test.ts` (rutas, validadores, permisos por rol y subida multipart real).
+- **Pendiente, a propósito:** vista del acudiente y notificaciones de actividades nuevas/por vencer (M27/M28), M25 como fuente del
+  calendario, planilla de notas (M12), varios archivos por entrega, rúbricas y ajustes razonables de M16 sobre la actividad (solo se
+  expone `GET /inclusion/grupos/:groupId/indicador`).
+
 ### Cargas masivas por CSV (M02 usuarios, M03 estudiantes)
 
 - Todo CSV subido se lee con `leerCsv` (`backend/src/utils/csv.ts`), nunca con `toString('utf-8')` + parser a mano:
@@ -603,7 +648,7 @@ nuevos para lo que ya existe aquí** — extenderlos si falta un caso, no duplic
   mapeo rol→color o estado→color en una página), `Card`/`CardHeader`, `Table`/`TableHead`/`Th`/
   `TableBody`/`Td`/`EmptyRow`, `Drawer` (formularios de creación/edición; su botón principal
   acepta `submitVariant` para casos como confirmar un borrado en rojo), `PageHeader` (título +
-  subtítulo + acción de la página), `Field` (`Input`/`Select`), `MultiSelect` (selector desplegable de selección múltiple con checkboxes, contador y badges de rol/estado; prop opcional `emptyLabel` cuando elegir es obligatorio), `Alert`, `Spinner`, `EstadoEspacioBadge` (M10), `EstadoAsistenciaChip`/`EstadoJustificacionBadge` (M13), `MallaDisponibilidad` (M09: cuadrícula de tiempo libre por clic, disponible/condicional/no disponible), `GuiaColumnas` (guía colapsable de columnas de una carga CSV), `ProgressBar` (barra de avance con tono, ej. semanas lectivas vs. el mínimo de 40), `LineaTiempo` (línea de tiempo vertical con punto, fecha, chips y contenido por registro; la usa el historial de convivencia), `EstadoCasoBadge`/`TipoSituacionBadge` (M15), `EstadoExpedienteBadge`/`EstadoSolicitudApoyoBadge` (M16), `Tabs`/`TabPanel` (navegación por pestañas con subrayado azul en la activa; reusar en vez de reinventar un switch de pestañas en otra página), `Stepper` (indicador de pasos para formularios largos por secciones, ej. el asistente de creación de estudiante en M03), e iconos SVG propios en `components/ui/icons.tsx` (no se agregó ninguna librería de iconos).
+  subtítulo + acción de la página), `Field` (`Input`/`Select`), `MultiSelect` (selector desplegable de selección múltiple con checkboxes, contador y badges de rol/estado; prop opcional `emptyLabel` cuando elegir es obligatorio), `Alert`, `Spinner`, `EstadoEspacioBadge` (M10), `EstadoAsistenciaChip`/`EstadoJustificacionBadge` (M13), `MallaDisponibilidad` (M09: cuadrícula de tiempo libre por clic, disponible/condicional/no disponible), `GuiaColumnas` (guía colapsable de columnas de una carga CSV), `ProgressBar` (barra de avance con tono, ej. semanas lectivas vs. el mínimo de 40), `LineaTiempo` (línea de tiempo vertical con punto, fecha, chips y contenido por registro; la usa el historial de convivencia), `EstadoCasoBadge`/`TipoSituacionBadge` (M15), `EstadoExpedienteBadge`/`EstadoSolicitudApoyoBadge` (M16), `EstadoEntregaBadge`/`TipoActividadChip` (M11: programada → entregada → con retraso → calificada; tipo de actividad), `Dropzone` (zona para soltar o elegir un archivo, valida extensión y tamaño en el navegador y muestra el archivo elegido; el servidor siempre confirma el contenido), `Tabs`/`TabPanel` (navegación por pestañas con subrayado azul en la activa; reusar en vez de reinventar un switch de pestañas en otra página), `Stepper` (indicador de pasos para formularios largos por secciones, ej. el asistente de creación de estudiante en M03), e iconos SVG propios en `components/ui/icons.tsx` (no se agregó ninguna librería de iconos).
 - **Contenedor global y densidad** (`components/layout/AppShell.tsx`): el `<main>` centra el
   contenido en `max-w-7xl` (no `max-w-5xl`) para que las tablas anchas (Usuarios, Grupos) no
   scrolleen antes de tiempo en pantallas grandes. Cada página usa `space-y-4` (no `space-y-6`)

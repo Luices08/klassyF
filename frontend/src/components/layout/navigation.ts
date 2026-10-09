@@ -55,8 +55,10 @@ export const NAV_ITEMS: NavItem[] = [
   { to: '/admin/teacher-assignments', label: 'Carga académica', icon: UsersIcon, roles: CURRICULUM_MANAGERS },
   { to: '/admin/horarios', label: 'Horarios', icon: ClockIcon, roles: CURRICULUM_MANAGERS },
   { to: '/admin/revision-curricular', label: 'Revisión curricular', icon: FileTextIcon, roles: CURRICULUM_MANAGERS },
+  { to: '/admin/actividades', label: 'Actividades por grupo', icon: ClipboardListIcon, roles: CURRICULUM_MANAGERS },
   { to: '/docente/mi-carga', label: 'Mi asignación', icon: ClipboardListIcon, roles: ['DOCENTE'] },
   { to: '/docente/planeacion-curricular', label: 'Planeación curricular', icon: BookIcon, roles: ['DOCENTE'] },
+  { to: '/docente/actividades', label: 'Actividades y tareas', icon: ClipboardListIcon, roles: ['DOCENTE'] },
   { to: '/docente/asistencia', label: 'Tomar asistencia', icon: ClipboardListIcon, roles: ['DOCENTE'] },
   { to: '/asistencia/gestion', label: 'Gestión de asistencia', icon: UsersIcon, roles: [...STAFF, 'DOCENTE'] },
   { to: '/admin/enrollments', label: 'Matrículas', icon: ClipboardListIcon, roles: STAFF },
@@ -70,5 +72,6 @@ export const NAV_ITEMS: NavItem[] = [
   { to: '/inclusion', label: 'Inclusión (PIAR)', icon: FolderIcon, roles: ['ADMIN', 'ORIENTADOR', 'COORDINADOR'] },
   { to: '/docente/ajustes-razonables', label: 'Estudiantes con ajustes', icon: ClipboardListIcon, roles: ['DOCENTE'] },
   { to: '/orientacion/remisiones', label: 'Remisiones a orientación', icon: InboxIcon, roles: ['ADMIN', 'ORIENTADOR'] },
+  { to: '/mis-actividades', label: 'Mis actividades', icon: ClipboardListIcon, roles: ['ESTUDIANTE'] },
   { to: '/mi-observador', label: 'Mi observador', icon: EyeIcon, roles: ['ESTUDIANTE'] },
 ];

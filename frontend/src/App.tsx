@@ -8,8 +8,10 @@ import { NotFoundPage } from './pages/NotFoundPage';
 import { ReportCardPage } from './pages/ReportCardPage';
 import { HomePage } from './pages/public/HomePage';
 import { AnioLectivoPage } from './pages/AnioLectivoPage';
+import { ActividadesDocentePage } from './pages/ActividadesDocentePage';
 import { AsistenciaPage } from './pages/AsistenciaPage';
 import { GestionAsistenciaPage } from './pages/GestionAsistenciaPage';
+import { MisActividadesPage } from './pages/MisActividadesPage';
 import { MiObservadorPage } from './pages/MiObservadorPage';
 import { ObservadorPage } from './pages/ObservadorPage';
 import { OrientacionPage } from './pages/OrientacionPage';
@@ -17,6 +19,7 @@ import { ExpedienteInclusionPage } from './pages/ExpedienteInclusionPage';
 import { InclusionPage } from './pages/InclusionPage';
 import { MisAjustesPage } from './pages/MisAjustesPage';
 import { AcademicCatalogPage } from './pages/admin/AcademicCatalogPage';
+import { ActividadesGestionPage } from './pages/admin/ActividadesGestionPage';
 import { AdmissionRequestsPage } from './pages/admin/AdmissionRequestsPage';
 import { CasosConvivenciaPage } from './pages/admin/CasosConvivenciaPage';
 import { ComitePage } from './pages/admin/ComitePage';
@@ -76,6 +79,7 @@ export default function App() {
             <Route path="/admin/academic-catalog" element={<AcademicCatalogPage />} />
             <Route path="/admin/study-plan" element={<StudyPlanPage />} />
             <Route path="/admin/revision-curricular" element={<RevisionCurricularPage />} />
+            <Route path="/admin/actividades" element={<ActividadesGestionPage />} />
           </Route>
 
           <Route element={<ProtectedRoute allowedRoles={['DOCENTE', 'ESTUDIANTE', 'ACUDIENTE']} />}>
@@ -86,6 +90,7 @@ export default function App() {
             <Route path="/docente/mi-carga" element={<MyTeacherLoadPage />} />
             <Route path="/docente/planeacion-curricular" element={<DesarrolloCurricularPage />} />
             <Route path="/docente/asistencia" element={<AsistenciaPage />} />
+            <Route path="/docente/actividades" element={<ActividadesDocentePage />} />
           </Route>
 
           <Route element={<ProtectedRoute allowedRoles={['ADMIN', 'COORDINADOR', 'SECRETARIA', 'DOCENTE']} />}>
@@ -116,6 +121,7 @@ export default function App() {
             <Route path="/docente/ajustes-razonables" element={<MisAjustesPage />} />
           </Route>
           <Route element={<ProtectedRoute allowedRoles={['ESTUDIANTE']} />}>
+            <Route path="/mis-actividades" element={<MisActividadesPage />} />
             <Route path="/mi-observador" element={<MiObservadorPage />} />
           </Route>
         </Route>

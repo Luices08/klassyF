@@ -11,6 +11,7 @@ import { PageHeader } from '../../components/ui/PageHeader';
 import { Spinner } from '../../components/ui/Spinner';
 import { EmptyRow, Table, TableBody, TableHead, Td, Th } from '../../components/ui/Table';
 import { CheckCircleIcon, FileTextIcon, UploadIcon, XCircleIcon } from '../../components/ui/icons';
+import { useAuth } from '../../context/AuthContext';
 import {
   useCambiarGrupoMatricula,
   useCargarDocumentoMatricula,
@@ -28,6 +29,7 @@ const ESTADOS_TERMINALES: EstadoMatricula[] = ['RETIRADO', 'ANULADO'];
 export function EnrollmentDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const rol = useAuth().user?.rol;
   const enrollmentQuery = useEnrollment(id);
 
   const [retirarOpen, setRetirarOpen] = useState<EstadoMatricula | null>(null);
@@ -134,6 +136,11 @@ export function EnrollmentDetailPage() {
         action={
           <div className="flex items-center gap-3">
             <EstadoMatriculaBadge value={enrollment.estado} />
+            {estudiante && (rol === 'ADMIN' || rol === 'SECRETARIA') && ['MATRICULADO_CONDICIONAL', 'MATRICULADO_DEFINITIVO'].includes(enrollment.estado) && (
+              <Button variant="outline" onClick={() => navigate(`/secretaria/certificados?estudiante=${estudiante._id}`)}>
+                Expedir constancia
+              </Button>
+            )}
             <Button variant="secondary" onClick={() => navigate('/admin/enrollments')}>
               Volver
             </Button>

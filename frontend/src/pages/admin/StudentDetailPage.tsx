@@ -106,6 +106,11 @@ export function StudentDetailPage() {
         action={
           <div className="flex items-center gap-3">
             <EstadoSelector studentId={estudiante._id} estadoActual={perfil?.estado ?? 'ACTIVO'} />
+            {(rol === 'ADMIN' || rol === 'SECRETARIA') && (
+              <Button variant="outline" onClick={() => navigate(`/secretaria/certificados?estudiante=${estudiante._id}`)}>
+                Expedir constancia
+              </Button>
+            )}
             <Button variant="secondary" onClick={() => navigate('/admin/students')}>
               Volver al directorio
             </Button>

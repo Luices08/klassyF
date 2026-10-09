@@ -6,6 +6,7 @@ export const UPLOADS_ROOT = path.join(process.cwd(), 'uploads');
 export const MATRICULAS_DIR = path.join(UPLOADS_ROOT, 'matriculas');
 export const ASISTENCIA_DIR = path.join(UPLOADS_ROOT, 'asistencia');
 export const INCLUSION_DIR = path.join(UPLOADS_ROOT, 'inclusion');
+export const CERTIFICADOS_DIR = path.join(UPLOADS_ROOT, 'certificados');
 
 /** Carpeta de una matricula puntual, para aislar sus documentos del resto. */
 export function carpetaMatricula(enrollmentId: string): string {
@@ -20,4 +21,9 @@ export function carpetaAsistencia(attendanceId: string): string {
 /** Soportes clínicos y documentos firmados de un expediente de inclusión (M16): confidenciales, solo se descargan con sesión y permiso. */
 export function carpetaInclusion(expedienteId: string): string {
   return path.join(INCLUSION_DIR, expedienteId);
+}
+
+/** Imágenes de firma y sello (M26), nombradas por su huella: no se sobrescriben, así lo ya emitido se puede reimprimir igual. */
+export function rutaImagenAutenticacion(hash: string, ext: string): string {
+  return path.join(CERTIFICADOS_DIR, 'imagenes', `${hash}${ext}`);
 }

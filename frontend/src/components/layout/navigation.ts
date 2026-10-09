@@ -61,6 +61,7 @@ export const NAV_ITEMS: NavItem[] = [
   { to: '/asistencia/gestion', label: 'Gestión de asistencia', icon: UsersIcon, roles: [...STAFF, 'DOCENTE'] },
   { to: '/admin/enrollments', label: 'Matrículas', icon: ClipboardListIcon, roles: STAFF },
   { to: '/admin/admisiones', label: 'Admisiones', icon: InboxIcon, roles: STAFF },
+  { to: '/secretaria/certificados', label: 'Certificados', icon: FileTextIcon, roles: ['ADMIN', 'SECRETARIA'] },
   { to: '/convivencia/observador', label: 'Observador', icon: EyeIcon, roles: CONVIVENCIA_REGISTRA },
   { to: '/convivencia/catalogo', label: 'Catálogo de convivencia', icon: SlidersIcon, roles: CONVIVENCIA_GESTIONA },
   { to: '/convivencia/casos', label: 'Casos de convivencia', icon: FolderIcon, roles: CONVIVENCIA_GESTIONA },

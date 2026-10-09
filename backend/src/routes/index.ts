@@ -7,6 +7,7 @@ import attendanceRoutes from './attendance.routes';
 import auditLogRoutes from './auditLog.routes';
 import authRoutes from './auth.routes';
 import campusRoutes from './campus.routes';
+import certificadoRoutes from './certificado.routes';
 import casoRoutes from './caso.routes';
 import orientacionRoutes from './orientacion.routes';
 import curricularDevelopmentRoutes from './curricularDevelopment.routes';
@@ -78,6 +79,9 @@ router.use('/orientacion', orientacionRoutes);
 
 // M16: Inclusión (PIAR, plan de apoyo pedagógico y sus documentos)
 router.use('/inclusion', inclusionRoutes);
+
+// M26: Secretaría académica — certificados y constancias con QR y huella de integridad
+router.use('/certificados', certificadoRoutes);
 
 // Prompt 3: Actividades, Calificaciones, Asistencia y Motor de Boletines
 router.use('/activities', activityRoutes);

@@ -481,6 +481,47 @@ justificaciones, reportes PDF y, solo ADMIN, estados). Reglas que no se ven leye
 - **Pendiente, a propósito fuera de alcance**: la vista del acudiente (CU-ACU-02, depende de M27); umbrales de ausentismo (alertas por %), que
   serían política institucional.
 
+### M26 (Secretaría académica — certificados y constancias) — estado: núcleo completo
+
+Backend `/certificados` (modelos `CertificadoEmitido` y `ConfiguracionCertificados`; verificación pública en `/public/certificados/verificar`), frontend
+`CertificadosPage` (`/secretaria/certificados`, ADMIN y SECRETARIA: pestañas Expedir / Historial / Firmas y sellos [solo ADMIN]) y `VerificarCertificadoPage`
+(`/verificar` y `/verificar/:token`, sin sesión; es la tarjeta «Validación de Certificados» del Home). Análisis y decisiones: `doc/Analisis_M26_Klassy.md`.
+Reglas que no se ven leyendo un solo archivo:
+
+- **Cero redundancia: el cliente solo manda ids y opciones.** Al expedir se envía `enrollment_id`, `tipo`, `destinatario` (opcional) y los switches; el
+  contenido (colegio, DANE, NIT, resolución, sede, jornada, datos del alumno, grado, grupo, folio del Libro de Matrícula) lo arma `prepararDocumento`
+  (`certificado.service.ts`) leyendo M01/M03/M04. Joi descarta cualquier otro campo (`stripUnknown`). Un dato nuevo que el sistema ya conoce **no se pide en la
+  pantalla**: se agrega al snapshot.
+- **Tipos por clave, no quemados** (`constants/certificados.ts`, `CERTIFICADOS`: prefijo del consecutivo y estados de matrícula con los que aplica):
+  `CONSTANCIA_ESTUDIO` (`CE-2026-0001`, solo matrícula activa) y `CERTIFICADO_MATRICULA` (`CM-…`, con folio; un RETIRADO conserva su asiento y el texto lo dice
+  sin dar el motivo). El texto sale de `utils/certificadoTexto.ts` desde el snapshot. Consecutivo anual sin huecos por tipo (`Counter` `CERT-<prefijo>-<año>`
+  dentro de la transacción de la expedición).
+- **Lo expedido se congela y no se borra.** `CertificadoEmitido.snapshot` es inmutable en el modelo (`pre('save')`: solo cambian `estado` y `anulacion`); el PDF
+  se dibuja **solo desde el snapshot**, así una reimpresión es el mismo documento con el mismo código. Un documento mal expedido se **anula con motivo** (solo
+  ADMIN): sigue verificándose como ANULADO y se imprime con marca «ANULADO». La auditoría (`CERTIFICADO_*`) nunca lleva el motivo.
+- **Seguridad: QR + huella, siempre (no tienen switch).** La huella es un **HMAC-SHA256** (`huellaDeCertificado`) con `CERT_HMAC_SECRET` (variable de entorno,
+  **obligatoria en producción**: sin ella responde 503; en desarrollo se deriva de `JWT_SECRET`). Quien edite la base directamente no puede recalcular una huella
+  coherente. **No cambiar el secreto después de expedir**: invalidaría la verificación de todo lo emitido. No es firma digital certificada (Ley 527/1999);
+  no se presenta como tal. El QR solo contiene `/verificar/<token>` con un token opaco de 128 bits (no el consecutivo: no se puede enumerar); la URL base es
+  `PUBLIC_URL` o el host de la petición. Sin QR se verifica con **código + clave** (los 12 primeros caracteres de la huella, impresos en el pie).
+  Reimprimir recalcula la huella y se niega si no coincide (409).
+- **Verificación pública** (`certificadoVerificacion.service.ts`, rate limit propio): responde VALIDO / ANULADO / NO_VERIFICABLE y solo muestra tipo, código,
+  fecha, institución, nombre y documento **enmascarado** (últimos 3). Nunca notas ni otros datos. «No existe» y «clave equivocada» responden igual (404).
+- **Firmas y sellos con switch al expedir.** `ConfiguracionCertificados` (una por instalación; solo el ADMIN la edita): quién firma (`rectoria` = un `User` ADMIN,
+  `secretaria` = un `User` SECRETARIA; nombre y cargo salen del usuario, no se digitan por documento), la imagen de cada firma y del sello, y la **política por
+  documento y elemento** (`OBLIGATORIO` / `OPCIONAL_ENCENDIDO` / `OPCIONAL_APAGADO` / `NO_APLICA`, valores de partida en `POLITICA_INICIAL`). La lógica del switch
+  es pura y con tests (`describirElemento` / `resolverElementos`, `utils/certificados.ts`): pedir algo que no aplica, sin imagen o sin permiso es **error**, nunca se
+  ignora; apagar un obligatorio también. **Apagado = no se estampa la imagen, pero el documento conserva la línea con nombre y cargo para firma manuscrita.**
+- **Delegación de la firma de Rectoría**: la secretaría puede estamparla mientras `permitir_firma_rectoria_a_secretaria` esté encendido (por defecto sí); el ADMIN
+  siempre puede. Las opciones elegidas, los firmantes y el hash de cada imagen quedan en el snapshot y **entran en la huella**.
+- **Imágenes versionadas e inmutables**: se guardan en `uploads/certificados/imagenes/<sha256>.<ext>` (PNG/JPG, 500 KB, validadas por firma de bytes), nunca se
+  sobrescriben ni se borran; quitar o reemplazar solo cambia lo que se ofrece a los documentos **nuevos** (lo emitido se sigue reimprimiendo con su imagen).
+- **Pruebas:** unitarias (`certificados.test.ts`: huella, token, switches, texto) y de integración con base real (`integracion/certificados.int.test.ts`).
+  Si no se puede descargar el binario de MongoDB, usar `MONGOMS_SYSTEM_BINARY=<ruta de un mongod> MONGOMS_VERSION=<su versión>`.
+- **Pendiente, a propósito (fase 2):** certificado de estudios con notas (depende de la nota definitiva anual: M17 final / M19 no existen), paz y salvo
+  (no hay módulos de cartera ni biblioteca), PDF del Libro de Matrícula, solicitud desde el portal del acudiente (M27), plantillas personalizables
+  (M21/M32), archivo general (M29) y rotación de la clave HMAC.
+
 ### Cargas masivas por CSV (M02 usuarios, M03 estudiantes)
 
 - Todo CSV subido se lee con `leerCsv` (`backend/src/utils/csv.ts`), nunca con `toString('utf-8')` + parser a mano:
@@ -603,7 +644,7 @@ nuevos para lo que ya existe aquí** — extenderlos si falta un caso, no duplic
   mapeo rol→color o estado→color en una página), `Card`/`CardHeader`, `Table`/`TableHead`/`Th`/
   `TableBody`/`Td`/`EmptyRow`, `Drawer` (formularios de creación/edición; su botón principal
   acepta `submitVariant` para casos como confirmar un borrado en rojo), `PageHeader` (título +
-  subtítulo + acción de la página), `Field` (`Input`/`Select`), `MultiSelect` (selector desplegable de selección múltiple con checkboxes, contador y badges de rol/estado; prop opcional `emptyLabel` cuando elegir es obligatorio), `Alert`, `Spinner`, `EstadoEspacioBadge` (M10), `EstadoAsistenciaChip`/`EstadoJustificacionBadge` (M13), `MallaDisponibilidad` (M09: cuadrícula de tiempo libre por clic, disponible/condicional/no disponible), `GuiaColumnas` (guía colapsable de columnas de una carga CSV), `ProgressBar` (barra de avance con tono, ej. semanas lectivas vs. el mínimo de 40), `LineaTiempo` (línea de tiempo vertical con punto, fecha, chips y contenido por registro; la usa el historial de convivencia), `EstadoCasoBadge`/`TipoSituacionBadge` (M15), `EstadoExpedienteBadge`/`EstadoSolicitudApoyoBadge` (M16), `Tabs`/`TabPanel` (navegación por pestañas con subrayado azul en la activa; reusar en vez de reinventar un switch de pestañas en otra página), `Stepper` (indicador de pasos para formularios largos por secciones, ej. el asistente de creación de estudiante en M03), e iconos SVG propios en `components/ui/icons.tsx` (no se agregó ninguna librería de iconos).
+  subtítulo + acción de la página), `Field` (`Input`/`Select`), `MultiSelect` (selector desplegable de selección múltiple con checkboxes, contador y badges de rol/estado; prop opcional `emptyLabel` cuando elegir es obligatorio), `Alert`, `Spinner`, `EstadoEspacioBadge` (M10), `EstadoAsistenciaChip`/`EstadoJustificacionBadge` (M13), `MallaDisponibilidad` (M09: cuadrícula de tiempo libre por clic, disponible/condicional/no disponible), `GuiaColumnas` (guía colapsable de columnas de una carga CSV), `ProgressBar` (barra de avance con tono, ej. semanas lectivas vs. el mínimo de 40), `LineaTiempo` (línea de tiempo vertical con punto, fecha, chips y contenido por registro; la usa el historial de convivencia), `EstadoCasoBadge`/`TipoSituacionBadge` (M15), `EstadoExpedienteBadge`/`EstadoSolicitudApoyoBadge` (M16), `Tabs`/`TabPanel` (navegación por pestañas con subrayado azul en la activa; reusar en vez de reinventar un switch de pestañas en otra página), `Stepper` (indicador de pasos para formularios largos por secciones, ej. el asistente de creación de estudiante en M03), `Switch` (interruptor encendido/apagado para decisiones al momento, con `disabledReason` como tooltip; ej. firmas y sello al expedir en M26), e iconos SVG propios en `components/ui/icons.tsx` (no se agregó ninguna librería de iconos).
 - **Contenedor global y densidad** (`components/layout/AppShell.tsx`): el `<main>` centra el
   contenido en `max-w-7xl` (no `max-w-5xl`) para que las tablas anchas (Usuarios, Grupos) no
   scrolleen antes de tiempo en pantallas grandes. Cada página usa `space-y-4` (no `space-y-6`)

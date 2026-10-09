@@ -33,3 +33,6 @@ backend/scripts/seedDemo*.ts
 *.zip
 
 respaldos/
+
+# Guia de despliegue local, no se sube
+DOCKER.md

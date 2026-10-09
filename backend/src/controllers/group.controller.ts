@@ -4,6 +4,7 @@ import { EstadoGrupo } from '../constants/enums';
 import Group from '../models/group.model';
 import { asegurarAnioNoCerrado } from '../services/academicYear.service';
 import { registrarEvento } from '../services/audit.service';
+import { obtenerFichaGrupo, obtenerHorarioDeGrupo } from '../services/grupoFicha.service';
 import { exigirEspaciosFisicos, validarAulaParaGrupo } from '../services/espacio.service';
 import ApiError from '../utils/ApiError';
 import catchAsync from '../utils/catchAsync';
@@ -169,4 +170,17 @@ export const cambiarAulaGrupo = catchAsync<CambiarAulaParams, unknown, CambiarAu
   }
 
   res.status(200).json({ success: true, data: group, advertencia });
+});
+
+interface GroupIdParams extends ParamsDictionary {
+  groupId: string;
+}
+
+// Ficha 360° del grupo (solo lectura): reúne datos de M03/M04, M06, M08, M09 y M10 sin modificar ninguno.
+export const obtenerFicha = catchAsync<GroupIdParams>(async (req, res) => {
+  res.status(200).json({ success: true, data: await obtenerFichaGrupo(req.params.groupId) });
+});
+
+export const obtenerHorarioGrupo = catchAsync<GroupIdParams>(async (req, res) => {
+  res.status(200).json({ success: true, data: await obtenerHorarioDeGrupo(req.params.groupId) });
 });

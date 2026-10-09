@@ -31,6 +31,7 @@ import { EnrollmentDetailPage } from './pages/admin/EnrollmentDetailPage';
 import { EnrollmentsPage } from './pages/admin/EnrollmentsPage';
 import { EspaciosPage } from './pages/admin/EspaciosPage';
 import { GradesPage } from './pages/admin/GradesPage';
+import { GrupoFichaPage } from './pages/admin/GrupoFichaPage';
 import { GroupsPage } from './pages/admin/GroupsPage';
 import { HorariosPage } from './pages/admin/HorariosPage';
 import { MiHorarioPage } from './pages/MiHorarioPage';
@@ -75,6 +76,7 @@ export default function App() {
 
           <Route element={<ProtectedRoute allowedRoles={['ADMIN', 'COORDINADOR']} />}>
             <Route path="/admin/groups" element={<GroupsPage />} />
+            <Route path="/admin/groups/:id" element={<GrupoFichaPage />} />
             <Route path="/admin/espacios" element={<EspaciosPage />} />
             <Route path="/admin/teacher-assignments" element={<TeacherAssignmentsPage />} />
             <Route path="/admin/horarios" element={<HorariosPage />} />

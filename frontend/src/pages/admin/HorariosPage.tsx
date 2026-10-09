@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { PanelInsumos } from '../../components/horarios/PanelInsumos';
 import { PanelTiempoLibre } from '../../components/horarios/PanelTiempoLibre';
 import { PanelVariables } from '../../components/horarios/PanelVariables';
@@ -34,10 +35,13 @@ export function HorariosPage() {
   const { anio: anioDeTrabajo, anios } = useAnioDeTrabajo();
   const grados = useGrades('activo').data ?? [];
 
-  const [anioId, setAnioId] = useState('');
-  const [sedeId, setSedeId] = useState('');
-  const [jornadaId, setJornadaId] = useState('');
-  const [pestana, setPestana] = useState('insumos');
+  // Otros módulos (la ficha de un grupo) llegan con ?anio=&sede=&jornada=&pestana= ya elegidos; sin ellos, todo igual que siempre.
+  const [parametros] = useSearchParams();
+  const [anioId, setAnioId] = useState(parametros.get('anio') ?? '');
+  const [sedeId, setSedeId] = useState(parametros.get('sede') ?? '');
+  const [jornadaId, setJornadaId] = useState(parametros.get('jornada') ?? '');
+  const pestanaDeEntrada = PESTANAS.find((p) => p.key === parametros.get('pestana'))?.key;
+  const [pestana, setPestana] = useState(pestanaDeEntrada ?? 'insumos');
 
   const anio = anios.find((a) => a._id === anioId) ?? anioDeTrabajo;
   const sede = sedes.find((s) => s._id === sedeId) ?? sedes.find((s) => s.es_principal) ?? sedes[0];

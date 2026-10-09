@@ -1,4 +1,5 @@
 import { type FormEvent, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { EspacioDrawer } from '../../components/espacios/EspacioDrawer';
 import { FranjasJornadaDrawer } from '../../components/jornadas/FranjasJornadaDrawer';
 import { MallaOcupacionEspacio } from '../../components/espacios/MallaOcupacionEspacio';
@@ -43,7 +44,9 @@ export function EspaciosPage() {
   const { anio } = useAnioDeTrabajo();
   const esVirtual = institutionQuery.data?.modalidad === 'VIRTUAL';
 
-  const [filtroSede, setFiltroSede] = useState('');
+  // La ficha de un grupo llega con ?sede=&espacio= para dejar ya filtrada la sede y abierta la malla de su aula.
+  const [parametros] = useSearchParams();
+  const [filtroSede, setFiltroSede] = useState(parametros.get('sede') ?? '');
   const [filtroTipo, setFiltroTipo] = useState<TipoEspacio | ''>('');
   const espaciosQuery = useEspacios({
     sede_id: filtroSede || undefined,
@@ -57,7 +60,7 @@ export function EspaciosPage() {
   const eliminar = useEliminarEspacio();
   const cambiarEstado = useCambiarEstadoEspacio();
 
-  const [mallaId, setMallaId] = useState('');
+  const [mallaId, setMallaId] = useState(parametros.get('espacio') ?? '');
   const espacioMalla = espacios.find((e) => e._id === mallaId) ?? espacios[0];
 
   // La malla es por espacio Y jornada: los días y las franjas salen de la jornada de la sede del espacio.

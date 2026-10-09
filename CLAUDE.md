@@ -82,6 +82,17 @@ Los 5 sub-módulos de M01 están implementados; no rehacer, solo extender si se 
    índice compuesto, `max_capacity`, `estado` ACTIVE/CLOSED). `GroupsPage` filtra por sede,
    jornada y grado.
 
+**Ficha 360° del grupo** (`GrupoFichaPage`, `/admin/groups/:id`; backend `GET /groups/:groupId/ficha` y `/ficha/horario`, `grupoFicha.service.ts`).
+Es **solo lectura y solo ADMIN/COORDINADOR** (trae el listado de estudiantes y la carga docente; `GET /groups` sigue abierto a todo rol). Junta lo que otros
+módulos son dueños de guardar y cada bloque tiene un botón al módulo de origen, nunca un formulario: aula (M10, no sale si la institución es virtual: muestra
+«Modalidad virtual»), director (M08: sale de la `DIRECCION_GRUPO`; el campo `director_grupo_id` del grupo es solo respaldo y se avisa), estudiantes con matrícula
+activa (M03/M04, enlazan a `/admin/students/:id`), plan de estudios del grado **con lo que M06 personalizó para ese grupo** (horas ajustadas, materias solo del
+grupo) y el docente de cada materia, y el horario del grupo (M09: la versión publicada de su jornada o, si no hay, el último borrador marcado como tal; solo las
+sesiones de ese grupo, y se pide al abrir la pestaña). Para que los botones lleguen con el contexto elegido, los destinos aceptan parámetros de URL
+**opcionales** (sin ellos funcionan como siempre): Carga académica `?anio=&docente=` (filtra) y `?anio=&grupo=&grado=&asignatura=&tipo=DIRECCION_GRUPO` (abre la
+asignación lista para confirmar; las horas de una clase se derivan siempre del plan, no de un "onChange"), Horarios `?anio=&sede=&jornada=&pestana=`, Espacios
+`?sede=&espacio=`. Pruebas: `tests/integracion/grupoFicha.int.test.ts`.
+
 **Dos reglas transversales que salieron de bugs reales de M01:**
 
 - **"Activo" en una consulta es `ESTADO_ACTIVO`** (`utils/filtroEstado.ts`, `{ $ne: 'inactivo' }`), nunca `{ estado: 'activo' }`.

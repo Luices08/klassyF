@@ -1,0 +1,5 @@
+{$DOMINIO} {
+	encode gzip
+	# nginx del contenedor `frontend` sirve la app y reenvia /api al backend.
+	reverse_proxy frontend:80
+}

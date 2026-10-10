@@ -98,6 +98,9 @@ export interface Institution {
   resolucion_aprobacion: string;
   administrador_id: string | null;
   logo_url: string | null;
+  /** Ciudad y departamento: los usan los documentos oficiales (certificados de M26). */
+  ciudad?: string | null;
+  departamento?: string | null;
   correo_secretaria: string | null;
   horario_atencion: string | null;
   /** Estructura de tiempo base que se carga en cada jornada (M01/M05); M09 usa las franjas resultantes. */

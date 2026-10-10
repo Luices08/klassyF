@@ -28,9 +28,10 @@ export interface StudentsPageResult {
   pages: number;
 }
 
-export function useStudentsDirectory(filter: StudentsFilter) {
+export function useStudentsDirectory(filter: StudentsFilter, enabled = true) {
   return useQuery({
     queryKey: ['students', filter],
+    enabled,
     queryFn: () =>
       api.raw<{ success: true; data: StudentDirectoryItem[]; total: number; page: number; pages: number }>(
         '/students',

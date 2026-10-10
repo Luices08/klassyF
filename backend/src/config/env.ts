@@ -8,6 +8,10 @@ export interface Env {
   mongoUri: string;
   jwtSecret: string;
   jwtExpiresIn: string;
+  /** M26: secreto de la huella (HMAC) de los certificados. Vacío en producción = no se expide ni se verifica nada. */
+  certificadosSecret: string;
+  /** M26: URL pública del sitio, para el QR de los certificados. Vacía = se toma del host de la petición. */
+  urlPublica: string;
 }
 
 const nodeEnv = process.env.NODE_ENV || 'development';
@@ -38,4 +42,6 @@ export const env: Env = {
   mongoUri,
   jwtSecret,
   jwtExpiresIn: process.env.JWT_EXPIRES_IN || '8h',
+  certificadosSecret: process.env.CERT_HMAC_SECRET || (enProduccion ? '' : `desarrollo-${jwtSecret}`),
+  urlPublica: (process.env.PUBLIC_URL || '').replace(/\/+$/, ''),
 };

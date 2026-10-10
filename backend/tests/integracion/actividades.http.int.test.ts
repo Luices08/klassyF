@@ -13,6 +13,7 @@ import { hoyColombia } from '../../src/services/attendance.service';
 import { generateToken } from '../../src/services/token.service';
 import { detenerBaseDeDatos, iniciarBaseDeDatos, limpiarBaseDeDatos } from './baseDeDatos';
 import { armarEscenario, crearUsuario, Escenario } from './escenario';
+import { UPLOADS_ROOT } from '../../src/utils/uploadPaths';
 
 const DIA_MS = 86_400_000;
 
@@ -42,7 +43,7 @@ describe('M11: actividades (capa HTTP)', () => {
   afterAll(async () => {
     await cerrar();
     await detenerBaseDeDatos();
-    await fs.rm(path.join(process.cwd(), 'uploads', 'actividades'), { recursive: true, force: true });
+    await fs.rm(path.join(UPLOADS_ROOT, 'actividades'), { recursive: true, force: true });
   });
   beforeEach(async () => {
     await limpiarBaseDeDatos();

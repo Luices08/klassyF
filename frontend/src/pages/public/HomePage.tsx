@@ -31,12 +31,6 @@ const TRAMITES_FUTUROS = [
     descripcion: 'Consulta de calificaciones, citaciones y justificación de inasistencias en línea.',
   },
   {
-    titulo: 'Validación de Certificados',
-    modulo: 'M26',
-    icon: ClipboardListIcon,
-    descripcion: 'Verificación de autenticidad de constancias y actas mediante código QR o número de folio.',
-  },
-  {
     titulo: 'Aula Virtual / Tareas',
     modulo: 'M11',
     icon: GraduationCapIcon,
@@ -47,6 +41,17 @@ const TRAMITES_FUTUROS = [
     modulo: 'M25',
     icon: BuildingIcon,
     descripcion: 'Consulta pública de jornadas pedagógicas, recesos y eventos del colegio.',
+  },
+];
+
+// Servicios ya habilitados del bloque «Trámites y servicios»: dejan de ser «Próximamente» y llevan a su pantalla.
+const TRAMITES_ACTIVOS = [
+  {
+    titulo: 'Validación de Certificados',
+    modulo: 'M26',
+    ruta: '/verificar',
+    icon: ClipboardListIcon,
+    descripcion: 'Verifica la autenticidad de una constancia o certificado con su código QR o con el código y la clave impresos.',
   },
 ];
 
@@ -176,6 +181,23 @@ export function HomePage() {
         <h2 className="text-h2 text-ink">Trámites y servicios</h2>
         <p className="mt-1 text-sm text-muted">Estos servicios se irán habilitando a medida que crece la plataforma.</p>
         <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          {TRAMITES_ACTIVOS.map((t) => (
+            <button
+              key={t.modulo}
+              type="button"
+              onClick={() => navigate(t.ruta)}
+              className="rounded-xl border border-border bg-surface p-5 text-left transition-colors hover:border-primary hover:bg-primary-soft/40"
+            >
+              <div className="flex items-center justify-between">
+                <span className="flex h-10 w-10 items-center justify-center rounded-full bg-primary-soft text-primary">
+                  <t.icon className="h-5 w-5" />
+                </span>
+                <Chip tone="green">Disponible</Chip>
+              </div>
+              <p className="mt-3 text-sm font-semibold text-ink">{t.titulo}</p>
+              <p className="mt-1 text-xs text-muted">{t.descripcion}</p>
+            </button>
+          ))}
           {TRAMITES_FUTUROS.map((t) => (
             <div key={t.modulo} className="rounded-xl border border-border bg-surface p-5 opacity-60">
               <div className="flex items-center justify-between">

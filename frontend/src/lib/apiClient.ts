@@ -137,13 +137,15 @@ async function downloadBlob(
   if (!res.ok) {
     if (res.status === 401) window.dispatchEvent(new Event(UNAUTHORIZED_EVENT));
     let message = `Error ${res.status}`;
+    let details: unknown;
     try {
       const json = (await res.json()) as ApiFailure;
       if (json?.message) message = json.message;
+      if (json && 'details' in json) details = json.details;
     } catch {
       // respuesta binaria de error sin cuerpo JSON (poco comun)
     }
-    throw new ApiError(res.status, message);
+    throw new ApiError(res.status, message, details);
   }
 
   const blob = await res.blob();

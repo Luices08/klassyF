@@ -1,4 +1,5 @@
 import { NavLink, Outlet } from 'react-router-dom';
+import { AsistenteFlotante } from '../asistente/AsistenteFlotante';
 import { RolBadge } from '../ui/Badge';
 import { LogOutIcon } from '../ui/icons';
 import { useAuth } from '../../context/AuthContext';
@@ -75,6 +76,7 @@ export function AppShell() {
           </div>
         </div>
       </div>
+      <AsistenteFlotante items={items} />
     </ForcedPasswordChangeGate>
   );
 }

@@ -268,3 +268,16 @@ export const ClockIcon = (p: IconProps) => (
     <path d="M12 7v5l3 2" />
   </Icon>
 );
+
+export const MessageCircleIcon = (p: IconProps) => (
+  <Icon {...p}>
+    <path d="M21 12a8 8 0 0 1-11.7 7.1L4 20l1-4.6A8 8 0 1 1 21 12Z" />
+    <path d="M9 11h6M9 14h4" />
+  </Icon>
+);
+
+export const SendIcon = (p: IconProps) => (
+  <Icon {...p}>
+    <path d="M22 2 11 13M22 2l-7 20-4-9-9-4Z" />
+  </Icon>
+);

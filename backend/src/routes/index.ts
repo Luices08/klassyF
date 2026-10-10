@@ -3,6 +3,7 @@ import academicYearRoutes from './academicYear.routes';
 import activityRoutes from './activity.routes';
 import admissionRequestRoutes from './admissionRequest.routes';
 import areaRoutes from './area.routes';
+import asistenteRoutes from './asistente.routes';
 import attendanceRoutes from './attendance.routes';
 import auditLogRoutes from './auditLog.routes';
 import authRoutes from './auth.routes';
@@ -35,6 +36,9 @@ const router = Router();
 
 router.use('/auth', authRoutes);
 router.use('/users', userRoutes);
+
+// Asistente flotante: orienta al usuario hacia la pantalla que busca
+router.use('/asistente', asistenteRoutes);
 router.use('/audit-logs', auditLogRoutes);
 router.use('/institution', institutionRoutes);
 router.use('/campuses', campusRoutes);

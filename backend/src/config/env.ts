@@ -8,6 +8,9 @@ export interface Env {
   mongoUri: string;
   jwtSecret: string;
   jwtExpiresIn: string;
+  /** Opcional: sin clave, el asistente responde 503 y el frontend usa su búsqueda local por palabras clave. */
+  anthropicApiKey: string;
+  asistenteModelo: string;
 }
 
 const nodeEnv = process.env.NODE_ENV || 'development';
@@ -38,4 +41,6 @@ export const env: Env = {
   mongoUri,
   jwtSecret,
   jwtExpiresIn: process.env.JWT_EXPIRES_IN || '8h',
+  anthropicApiKey: process.env.ANTHROPIC_API_KEY || '',
+  asistenteModelo: process.env.ASISTENTE_MODELO || 'claude-haiku-5-5',
 };

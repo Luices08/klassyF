@@ -619,6 +619,7 @@ Reglas que no se ven leyendo un solo archivo:
   (CU-SEC-06); solicitud desde el portal del acudiente (M27); constructor libre de formatos (M21); archivo general (M29); rotación de la clave HMAC; firma electrónica
   certificada (Ley 527/1999, Decreto 2364/2012: la imagen + huella + QR no lo es). **Quién firma está en dos sitios**: M12 guarda el nombre del rector como texto libre en las
   firmas de la planilla y M26 lo toma de un usuario; M26 es la fuente a reutilizar cuando se toque M12.
+
 ### M11 (Actividades y planeación de aula) — estado: núcleo completo
 
 Backend `/activities` (modelos `Activity`, `ActivitySubmission`, `ConfiguracionActividades`), frontend `ActividadesDocentePage`

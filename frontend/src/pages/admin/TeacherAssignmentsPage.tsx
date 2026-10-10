@@ -1,4 +1,5 @@
 import { type FormEvent, useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Alert, errorMessage } from '../../components/ui/Alert';
 import { Chip } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
@@ -74,22 +75,32 @@ function ChipCarga({ item }: { item: DocenteCargaResumen }) {
 }
 
 export function TeacherAssignmentsPage() {
+  // Otros módulos (p. ej. la ficha de un grupo) llegan aquí con el contexto ya elegido; todo es opcional y solo
+  // fija el estado inicial: ?anio=&docente= (filtra), ?grupo=&grado=&asignatura=&tipo= (abre la asignación lista para confirmar).
+  const [parametros] = useSearchParams();
+  const grupoDeEntrada = parametros.get('grupo') ?? '';
+  const tipoDeEntrada: TipoAsignacionDocente = parametros.get('tipo') === 'DIRECCION_GRUPO' ? 'DIRECCION_GRUPO' : 'CLASE';
+
   const { anio, anios } = useAnioDeTrabajo();
-  const [selectedAnioId, setSelectedAnioId] = useState<string>('');
+  const [selectedAnioId, setSelectedAnioId] = useState<string>(parametros.get('anio') ?? '');
   const anioActivoId = selectedAnioId || anio?._id || '';
   const anioActivo = anios.find((a) => a._id === anioActivoId);
   const soloLectura = anioActivo?.estado === 'CERRADO';
 
   const { data: institucion } = useInstitution();
-  const [tabActiva, setTabActiva] = useState<string>('resumen');
-  const [filtroDocente, setFiltroDocente] = useState<string>('');
+  const [tabActiva, setTabActiva] = useState<string>(parametros.get('docente') ? 'asignaciones' : 'resumen');
+  const [filtroDocente, setFiltroDocente] = useState<string>(parametros.get('docente') ?? '');
   const [filtroTipo, setFiltroTipo] = useState<string>('');
 
   // Modales y formularios
-  const [drawerAbierto, setDrawerAbierto] = useState(false);
+  const [drawerAbierto, setDrawerAbierto] = useState(Boolean(grupoDeEntrada));
   const [modalLimitesAbierto, setModalLimitesAbierto] = useState(false);
-  const [selectedGradoId, setSelectedGradoId] = useState<string>('');
-  const [form, setForm] = useState(FORM_VACIO);
+  const [selectedGradoId, setSelectedGradoId] = useState<string>(grupoDeEntrada ? (parametros.get('grado') ?? '') : '');
+  const [form, setForm] = useState(
+    grupoDeEntrada
+      ? { ...FORM_VACIO, tipo_asignacion: tipoDeEntrada, group_id: grupoDeEntrada, subject_id: tipoDeEntrada === 'CLASE' ? (parametros.get('asignatura') ?? '') : '' }
+      : FORM_VACIO
+  );
   const [formError, setFormError] = useState<string | null>(null);
   const [limitesError, setLimitesError] = useState<string | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
@@ -230,6 +241,9 @@ export function TeacherAssignmentsPage() {
   const maxDirecciones = limitesCarga?.max_direcciones_grupo_por_docente ?? 1;
   const docenteExcedeDirecciones = gruposQueYaDirigeElDocente.length >= maxDirecciones;
 
+  const horasDelForm =
+    form.tipo_asignacion === 'CLASE' ? (horasPorAsignaturaMap.get(form.subject_id) ?? form.horas_semanales) : form.horas_semanales;
+
   const handleOpenDrawer = () => {
     setSelectedGradoId('');
     setForm(FORM_VACIO);
@@ -278,7 +292,7 @@ export function TeacherAssignmentsPage() {
         setFormError('Debe seleccionar una asignatura.');
         return;
       }
-      if (!form.horas_semanales || form.horas_semanales <= 0) {
+      if (!horasDelForm || horasDelForm <= 0) {
         setFormError('La asignatura seleccionada no tiene intensidad horaria configurada en el Plan de Estudios.');
         return;
       }
@@ -324,7 +338,7 @@ export function TeacherAssignmentsPage() {
         tipo_asignacion: form.tipo_asignacion,
         group_id: esProyectoUOtro ? null : form.group_id,
         subject_id: form.tipo_asignacion === 'CLASE' ? form.subject_id : null,
-        horas_semanales: form.horas_semanales,
+        horas_semanales: horasDelForm,
         reemplazar_director: directorActualDelGrupo ? true : undefined,
         proyecto_nombre: esProyectoUOtro ? form.proyecto_nombre : undefined,
         observaciones: form.observaciones.trim() || undefined,
@@ -768,11 +782,11 @@ export function TeacherAssignmentsPage() {
               <Input
                 label="Horas Semanales (M06)"
                 type="number"
-                value={form.horas_semanales}
+                value={horasDelForm}
                 disabled
                 hint={
                   form.subject_id
-                    ? `Fijado automáticamente en ${form.horas_semanales} h/semana según el Plan de Estudios de este grupo.`
+                    ? `Fijado automáticamente en ${horasDelForm} h/semana según el Plan de Estudios de este grupo.`
                     : 'Se completará al seleccionar la asignatura.'
                 }
               />

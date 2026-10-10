@@ -4,7 +4,10 @@ import {
   CARGO_SECRETARIA_INICIAL,
   CLAVES_CERTIFICADO,
   ClaveCertificado,
+  DEPENDENCIAS_PAZ_Y_SALVO_INICIALES,
+  DependenciaPazYSalvo,
   ELEMENTOS_AUTENTICACION,
+  MAX_NOMBRE_DEPENDENCIA,
   MODOS_ELEMENTO,
   POLITICA_INICIAL,
   PoliticaDeCertificado,
@@ -27,6 +30,8 @@ export interface IConfiguracionCertificados {
   /** Si la secretaría puede estampar la firma digitalizada de rectoría al expedir (el ADMIN siempre puede). */
   permitir_firma_rectoria_a_secretaria: boolean;
   politica: Record<ClaveCertificado, PoliticaDeCertificado>;
+  /** Las dependencias que el colegio exige para el paz y salvo (cada una se confirma al expedirlo). */
+  paz_y_salvo: { dependencias: DependenciaPazYSalvo[] };
   createdAt: Date;
   updatedAt: Date;
 }
@@ -51,6 +56,15 @@ const politicaSchema = new Schema<PoliticaDeCertificado>(
   { _id: false }
 );
 
+const dependenciaSchema = new Schema<DependenciaPazYSalvo>(
+  {
+    clave: { type: String, required: true, trim: true, maxlength: 40 },
+    nombre: { type: String, required: true, trim: true, maxlength: MAX_NOMBRE_DEPENDENCIA },
+    activa: { type: Boolean, default: true },
+  },
+  { _id: false }
+);
+
 const configuracionSchema = new Schema<IConfiguracionCertificados, ConfiguracionCertificadosModel>(
   {
     institucion_id: { type: Schema.Types.ObjectId, ref: 'Institution', required: true, unique: true },
@@ -59,8 +73,16 @@ const configuracionSchema = new Schema<IConfiguracionCertificados, Configuracion
     sello: { type: new Schema({ imagen: { type: imagenSchema, default: null } }, { _id: false }), default: () => ({}) },
     permitir_firma_rectoria_a_secretaria: { type: Boolean, default: true },
     politica: {
-      type: new Schema(Object.fromEntries(CLAVES_CERTIFICADO.map((clave) => [clave, { type: politicaSchema, required: true }])), { _id: false }),
+      // Cada tipo trae su valor de partida: una configuración guardada antes de que existiera un tipo nuevo sigue siendo válida.
+      type: new Schema(
+        Object.fromEntries(CLAVES_CERTIFICADO.map((clave) => [clave, { type: politicaSchema, required: true, default: () => structuredClone(POLITICA_INICIAL[clave]) }])),
+        { _id: false }
+      ),
       default: () => structuredClone(POLITICA_INICIAL),
+    },
+    paz_y_salvo: {
+      type: new Schema({ dependencias: { type: [dependenciaSchema], default: () => structuredClone(DEPENDENCIAS_PAZ_Y_SALVO_INICIALES) } }, { _id: false }),
+      default: () => ({}),
     },
   },
   { timestamps: true }

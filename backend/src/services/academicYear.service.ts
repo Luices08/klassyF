@@ -1,6 +1,11 @@
 import { Types } from 'mongoose';
 import { TRANSICIONES_PERIODO } from '../constants/anioLectivo';
 import { Calendario, EstadoPeriodoAcademico, NivelDesempeno, Rol, TipoEventoCalendario } from '../constants/enums';
+import Activity from '../models/activity.model';
+import ActivitySubmission from '../models/activitySubmission.model';
+import ColumnaPlanilla from '../models/columnaPlanilla.model';
+import CalificacionAsignatura from '../models/calificacionAsignatura.model';
+import TeacherAssignment from '../models/teacherAssignment.model';
 import AcademicYear, {
   AcademicYearDocument,
   IPeriodo,
@@ -16,6 +21,7 @@ import ApiError from '../utils/ApiError';
 import { calcularResumenSemanas, finDelDia } from '../utils/calendarioAcademico';
 import { sugerirRangos, SugerenciaRangosInput } from '../utils/escalaEvaluacion';
 import { runTransaction } from '../utils/runTransaction';
+import { claveDeComponente, componentesEfectivos, validarComponentesEvaluativos } from '../utils/siee';
 import { registrarEvento } from './audit.service';
 
 type FechaEntrada = Date | string;
@@ -91,6 +97,8 @@ export function aDto(anio: AcademicYearDocument) {
   return {
     ...anio.toObject(),
     resumen_semanas: calcularResumenSemanas(anio.periodos, anio.eventos),
+    // Los bloques que rigen la nota (M12): los configurados o, mientras no, Saber/Hacer/Ser.
+    componentes_efectivos: componentesEfectivos(anio),
   };
 }
 export type AnioLectivoDto = ReturnType<typeof aDto>;
@@ -121,18 +129,45 @@ export async function asegurarAnioNoCerrado(id: string): Promise<void> {
   await cargarAnioEditable(id);
 }
 
-// Las bases juridicas/matematicas del SIEE (escala de evaluacion, ponderacion de componentes) se
-// congelan al activar el año: cambiarlas con el año EN_CURSO (o ya CERRADO) recalcularia
-// retroactivamente boletines ya emitidos. Solo se editan mientras el año sigue en PLANIFICACION.
-async function cargarAnioEnPlanificacion(id: string): Promise<AcademicYearDocument> {
+/**
+ * Las bases matematicas del SIEE (escala de evaluacion, componentes evaluativos) se congelan en cuanto se registra la
+ * PRIMERA NOTA del año: cambiarlas despues corromperia los promedios en curso. Mientras el año esta en PLANIFICACION, o
+ * vigente pero sin ninguna nota, se pueden ajustar. Un año CERRADO nunca.
+ */
+export async function evaluacionEditable(anio: AcademicYearDocument): Promise<boolean> {
+  if (anio.estado === 'PLANIFICACION') return true;
+  if (anio.estado === 'CERRADO') return false;
+
+  const asignaciones = await TeacherAssignment.find({ academic_year_id: anio._id }).select('_id').lean();
+  if (asignaciones.length === 0) return true;
+  const ids = asignaciones.map((a) => a._id);
+  const actividades = await Activity.find({ teacher_assignment_id: { $in: ids } }).select('_id').lean();
+  const [conNotaDeActividad, conNotaGuardada] = await Promise.all([
+    actividades.length === 0
+      ? false
+      : ActivitySubmission.exists({ activity_id: { $in: actividades.map((a) => a._id) }, calificacion_numerica: { $ne: null } }),
+    CalificacionAsignatura.exists({ academic_year_id: anio._id }),
+  ]);
+  return !conNotaDeActividad && !conNotaGuardada;
+}
+
+async function cargarAnioEvaluacionEditable(id: string): Promise<AcademicYearDocument> {
   const anio = await cargarAnio(id);
-  if (anio.estado !== 'PLANIFICACION') {
+  if (anio.estado === 'CERRADO') {
+    throw new ApiError(409, `El año lectivo ${anio.year} está cerrado y solo admite consulta.`);
+  }
+  if (!(await evaluacionEditable(anio))) {
     throw new ApiError(
       409,
-      `El año lectivo ${anio.year} ya fue activado: esta configuración queda congelada para no alterar boletines ya emitidos.`
+      `Ya se registró la primera nota del año ${anio.year}: la configuración de evaluación queda congelada para no alterar los promedios en curso.`
     );
   }
   return anio;
+}
+
+/** El año con la marca de si su configuración de evaluación todavía se puede cambiar (la UI habilita o no el editor). */
+async function aDtoConEvaluacion(anio: AcademicYearDocument) {
+  return { ...aDto(anio), evaluacion_editable: await evaluacionEditable(anio) };
 }
 
 export async function listarAnios(): Promise<AnioLectivoDto[]> {
@@ -140,17 +175,17 @@ export async function listarAnios(): Promise<AnioLectivoDto[]> {
   if (!institucion) return [];
 
   const anios = await AcademicYear.find({ institucion_id: institucion._id }).sort({ year: -1 });
-  return anios.map(aDto);
+  return Promise.all(anios.map(aDtoConEvaluacion));
 }
 
 export async function obtenerAnio(id: string): Promise<AnioLectivoDto> {
-  return aDto(await cargarAnio(id));
+  return aDtoConEvaluacion(await cargarAnio(id));
 }
 
 /** La vigencia activa de la institucion, o null si aun no se activo ninguna. */
 export async function obtenerAnioActivo(): Promise<AnioLectivoDto | null> {
   const anio = await AcademicYear.findOne({ estado: 'EN_CURSO' });
-  return anio ? aDto(anio) : null;
+  return anio ? aDtoConEvaluacion(anio) : null;
 }
 
 function mapearPeriodos(periodos: PeriodoInput[], conservar: (numero: number) => Partial<IPeriodo> = () => ({})) {
@@ -176,11 +211,27 @@ export async function crearAnio(
     const yaExiste = await AcademicYear.exists({ institucion_id: institucion._id, year: input.year }).session(session);
     if (yaExiste) throw new ApiError(409, `Ya existe el año lectivo ${input.year}.`);
 
+    // El molde de la planilla (bloques, porcentajes y máximo de casillas) es del colegio, no de un año: el año nuevo
+    // arranca con el del más reciente que lo haya definido, y el administrador lo ajusta si hace falta.
+    const anterior = await AcademicYear.findOne({
+      institucion_id: institucion._id,
+      year: { $lt: input.year },
+      'componentes_evaluativos.0': { $exists: true },
+    })
+      .sort({ year: -1 })
+      .session(session);
+
     const [anio] = await AcademicYear.create(
       [
         {
           institucion_id: institucion._id,
           year: input.year,
+          componentes_evaluativos: (anterior?.componentes_evaluativos ?? []).map((c) => ({
+            clave: c.clave,
+            nombre: c.nombre,
+            porcentaje: c.porcentaje,
+            max_casillas: c.max_casillas,
+          })),
           nombre: input.nombre?.trim() || `Año lectivo ${input.year}`,
           calendario: input.calendario,
           fecha_inicio: new Date(input.fecha_inicio),
@@ -632,13 +683,13 @@ export async function sugerirEscalaEvaluacion(id: string, input: SugerenciaRango
   return sugerirRangos(input);
 }
 
-/** Solo editable con el año en PLANIFICACION: una vez activado queda congelada (ver cargarAnioEnPlanificacion). */
+/** Editable hasta la primera nota del año: despues queda congelada (ver evaluacionEditable). */
 export async function actualizarEscalaEvaluacion(
   id: string,
   input: EscalaEvaluacionInput,
   { usuarioId, ip }: ContextoUsuario
 ): Promise<AnioLectivoDto> {
-  const anio = await cargarAnioEnPlanificacion(id);
+  const anio = await cargarAnioEvaluacionEditable(id);
 
   anio.escala_evaluacion = {
     nota_minima: input.nota_minima,
@@ -663,15 +714,15 @@ export async function actualizarEscalaEvaluacion(
 
 /**
  * Pesos de Saber/Hacer/Ser para la nota de asignatura (CU-ADM-04): la suma debe ser 1 (100%),
- * validado en el modelo (pre-validate), no aquí. Solo editable con el año en PLANIFICACION:
- * una vez activado queda congelada (ver cargarAnioEnPlanificacion).
+ * validado en el modelo (pre-validate), no aquí. Editable hasta la primera nota del año:
+ * despues queda congelada (ver evaluacionEditable).
  */
 export async function actualizarPonderacionComponentes(
   id: string,
   input: PonderacionComponentesInput,
   { usuarioId, ip }: ContextoUsuario
 ): Promise<AnioLectivoDto> {
-  const anio = await cargarAnioEnPlanificacion(id);
+  const anio = await cargarAnioEvaluacionEditable(id);
 
   anio.ponderacion_componentes = { ...input };
   await anio.save();
@@ -682,6 +733,85 @@ export async function actualizarPonderacionComponentes(
     entidad: 'AcademicYear',
     entidad_id: anio._id,
     detalle: `Año ${anio.year}: ponderación Saber ${input.COGNITIVO_SABER}, Hacer ${input.PROCEDIMENTAL_HACER}, Ser ${input.ACTITUDINAL_SER}.`,
+    ip,
+  });
+
+  return aDto(anio);
+}
+
+export interface ComponenteEvaluativoInput {
+  /** Los que ya existen conservan su clave (las actividades y casillas la referencian); los nuevos la reciben del servidor. */
+  clave?: string;
+  nombre: string;
+  porcentaje: number;
+  /** Cuántas casillas (actividades o notas sueltas) admite el bloque en la planilla de una clase y periodo. */
+  max_casillas: number;
+}
+
+/**
+ * El MOLDE de la planilla del colegio (M12): los bloques que dividen el 100% de la nota (Heteroevaluación 70%,
+ * Autoevaluación 15%...) y cuántas casillas admite cada uno. Todas las planillas de los docentes se arman sobre él. Se ajusta
+ * hasta la primera nota del año; además no se puede quitar un bloque que ya tiene casillas, ni bajar su máximo por debajo de
+ * las casillas que alguna clase ya usa.
+ */
+export async function actualizarComponentesEvaluativos(
+  id: string,
+  input: ComponenteEvaluativoInput[],
+  { usuarioId, ip }: ContextoUsuario
+): Promise<AnioLectivoDto> {
+  const anio = await cargarAnioEvaluacionEditable(id);
+
+  const usadas = new Set(input.flatMap((c) => (c.clave ? [c.clave] : [])));
+  const componentes = input.map((c) => {
+    const clave = c.clave ?? claveDeComponente(c.nombre, usadas);
+    usadas.add(clave);
+    return { clave, nombre: c.nombre.trim(), porcentaje: c.porcentaje, max_casillas: c.max_casillas };
+  });
+  const problema = validarComponentesEvaluativos(componentes);
+  if (problema) throw new ApiError(400, problema);
+
+  // Casillas que ya existen: por clase, periodo y bloque (las actividades de M11 más las notas sueltas).
+  const asignaciones = await TeacherAssignment.find({ academic_year_id: anio._id }).select('_id').lean();
+  const [deActividades, deSueltas] = await Promise.all([
+    Activity.aggregate<{ _id: { a: unknown; p: number; c: string }; n: number }>([
+      { $match: { teacher_assignment_id: { $in: asignaciones.map((a) => a._id) } } },
+      { $group: { _id: { a: '$teacher_assignment_id', p: '$periodo_numero', c: '$componente_siee' }, n: { $sum: 1 } } },
+    ]),
+    ColumnaPlanilla.aggregate<{ _id: { a: unknown; p: number; c: string }; n: number }>([
+      { $match: { academic_year_id: anio._id } },
+      { $group: { _id: { a: '$teacher_assignment_id', p: '$periodo_numero', c: '$bloque_clave' }, n: { $sum: 1 } } },
+    ]),
+  ]);
+  const porClase = new Map<string, { clave: string; n: number }>();
+  for (const fila of [...deActividades, ...deSueltas]) {
+    const llave = `${String(fila._id.a)}|${fila._id.p}|${fila._id.c}`;
+    porClase.set(llave, { clave: fila._id.c, n: (porClase.get(llave)?.n ?? 0) + fila.n });
+  }
+  const maximoUsado = new Map<string, number>();
+  for (const { clave, n } of porClase.values()) maximoUsado.set(clave, Math.max(maximoUsado.get(clave) ?? 0, n));
+
+  for (const [clave, usadasEnUnaClase] of maximoUsado) {
+    const nuevo = componentes.find((c) => c.clave === clave);
+    if (!nuevo) {
+      throw new ApiError(409, `El bloque «${clave}» ya tiene actividades o notas en alguna planilla: no se puede quitar del molde.`);
+    }
+    if (usadasEnUnaClase > nuevo.max_casillas) {
+      throw new ApiError(
+        409,
+        `El bloque «${nuevo.nombre}» ya tiene ${usadasEnUnaClase} casilla(s) en alguna planilla: su máximo no puede ser menor (pediste ${nuevo.max_casillas}).`
+      );
+    }
+  }
+
+  anio.set('componentes_evaluativos', componentes);
+  await anio.save();
+
+  await registrarEvento({
+    usuario_id: usuarioId,
+    accion: 'COMPONENTES_EVALUATIVOS_ACTUALIZADOS',
+    entidad: 'AcademicYear',
+    entidad_id: anio._id,
+    detalle: `Año ${anio.year}: ${componentes.map((c) => `${c.nombre} ${c.porcentaje}% (hasta ${c.max_casillas} casillas)`).join(', ')}.`,
     ip,
   });
 

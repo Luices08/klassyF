@@ -1,11 +1,11 @@
 import { type FormEvent, type ReactNode, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { AnioLectivoFormDrawer } from '../components/anioLectivo/AnioLectivoFormDrawer';
 import { CalendarioSedeDrawer } from '../components/anioLectivo/CalendarioSedeDrawer';
 import { CierreAnioDrawer } from '../components/anioLectivo/CierreAnioDrawer';
 import { EscalaEvaluacionDrawer } from '../components/anioLectivo/EscalaEvaluacionDrawer';
 import { EventoDrawer } from '../components/anioLectivo/EventoDrawer';
 import { PeriodoCard } from '../components/anioLectivo/PeriodoCard';
-import { PonderacionComponentesDrawer } from '../components/anioLectivo/PonderacionComponentesDrawer';
 import { ProrrogaDrawer } from '../components/anioLectivo/ProrrogaDrawer';
 import { Alert, errorMessage } from '../components/ui/Alert';
 import { Chip, EstadoAnioLectivoBadge, type Tone } from '../components/ui/Badge';
@@ -201,7 +201,6 @@ export function AnioLectivoPage() {
   const quitarCalendarioSede = useQuitarCalendarioSede();
 
   const [escalaAbierta, setEscalaAbierta] = useState(false);
-  const [ponderacionAbierta, setPonderacionAbierta] = useState(false);
 
   async function handleActivar() {
     if (!anio) return;
@@ -581,7 +580,7 @@ export function AnioLectivoPage() {
                 title="Escala de evaluación institucional (SIEE)"
                 subtitle="Decreto 1290 de 2009: escala numérica, nota aprobatoria y cortes de los 4 niveles cualitativos (CU-ADM-04)."
                 action={
-                  anio.estado === 'PLANIFICACION' ? (
+                  anio.evaluacion_editable ? (
                     <Button type="button" variant="outline" onClick={() => setEscalaAbierta(true)}>
                       <PencilIcon className="h-4 w-4" />
                       {anio.escala_evaluacion ? 'Editar' : 'Configurar'}
@@ -589,15 +588,17 @@ export function AnioLectivoPage() {
                   ) : undefined
                 }
               />
-              {!anio.escala_evaluacion && anio.estado === 'PLANIFICACION' && (
+              {!anio.escala_evaluacion && anio.evaluacion_editable && (
                 <Alert tone="warning">
-                  Aún no se ha configurado la escala de evaluación de este año. Una vez actives el año quedará
-                  congelada para no alterar boletines ya emitidos.
+                  Aún no se ha configurado la escala de evaluación de este año (rige la de respaldo 1.0 a 5.0). Se puede
+                  ajustar hasta que se registre la primera nota; después queda congelada para no alterar los promedios en curso.
                 </Alert>
               )}
-              {anio.estado !== 'PLANIFICACION' && (
+              {!anio.evaluacion_editable && (
                 <Alert tone="info">
-                  El año ya fue activado: la escala de evaluación queda congelada y solo se puede consultar.
+                  {anio.estado === 'CERRADO'
+                    ? 'El año está cerrado: la escala de evaluación solo se puede consultar.'
+                    : 'Ya se registró la primera nota del año: la escala de evaluación queda congelada y solo se puede consultar.'}
                 </Alert>
               )}
               {anio.escala_evaluacion && (
@@ -637,33 +638,31 @@ export function AnioLectivoPage() {
           {esAdmin && (
             <Card>
               <CardHeader
-                title="Ponderación de componentes del SIEE"
-                subtitle="Decreto 1290 de 2009: peso de Saber, Hacer y Ser en la nota de asignatura (CU-ADM-04)."
+                title="Molde de la planilla de notas"
+                subtitle="Cómo se divide el 100% de la nota y cuántas casillas admite cada bloque (CU-ADM-04). Se define en el Creador de planillas."
                 action={
-                  anio.estado === 'PLANIFICACION' ? (
-                    <Button type="button" variant="outline" onClick={() => setPonderacionAbierta(true)}>
+                  <Link to="/admin/creador-planillas">
+                    <Button type="button" variant="outline">
                       <PencilIcon className="h-4 w-4" />
-                      {anio.ponderacion_componentes ? 'Editar' : 'Configurar'}
+                      {anio.evaluacion_editable ? (anio.componentes_evaluativos.length > 0 ? 'Editar en el creador' : 'Configurar en el creador') : 'Ver en el creador'}
                     </Button>
-                  ) : undefined
+                  </Link>
                 }
               />
-              {anio.estado !== 'PLANIFICACION' && (
+              {!anio.evaluacion_editable && (
                 <Alert tone="info">
-                  El año ya fue activado: la ponderación de componentes queda congelada y solo se puede consultar.
+                  {anio.estado === 'CERRADO'
+                    ? 'El año está cerrado: el molde de la planilla solo se puede consultar.'
+                    : 'Ya se registró la primera nota del año: el molde queda congelado y solo se puede consultar.'}
                 </Alert>
               )}
               <div className="flex flex-wrap gap-2">
-                <Chip tone="blue">
-                  Saber {(anio.ponderacion_componentes?.COGNITIVO_SABER ?? 0.4) * 100}%
-                </Chip>
-                <Chip tone="blue">
-                  Hacer {(anio.ponderacion_componentes?.PROCEDIMENTAL_HACER ?? 0.4) * 100}%
-                </Chip>
-                <Chip tone="blue">
-                  Ser {(anio.ponderacion_componentes?.ACTITUDINAL_SER ?? 0.2) * 100}%
-                </Chip>
-                {!anio.ponderacion_componentes && <Chip tone="neutral">Respaldo por defecto (sin personalizar)</Chip>}
+                {anio.componentes_efectivos.map((c) => (
+                  <Chip key={c.clave} tone="blue">
+                    {c.nombre} {c.porcentaje}% · hasta {c.max_casillas} {c.max_casillas === 1 ? 'casilla' : 'casillas'}
+                  </Chip>
+                ))}
+                {anio.componentes_evaluativos.length === 0 && <Chip tone="neutral">Respaldo por defecto (sin personalizar)</Chip>}
               </div>
             </Card>
           )}
@@ -702,11 +701,6 @@ export function AnioLectivoPage() {
           />
           <CalendarioSedeDrawer open={sedeCalendario !== null} anio={anio} sede={sedeCalendario} onClose={() => setSedeCalendario(null)} />
           <EscalaEvaluacionDrawer open={escalaAbierta} anio={anio} onClose={() => setEscalaAbierta(false)} />
-          <PonderacionComponentesDrawer
-            open={ponderacionAbierta}
-            anio={anio}
-            onClose={() => setPonderacionAbierta(false)}
-          />
 
           <ConfirmacionDrawer
             open={activando}

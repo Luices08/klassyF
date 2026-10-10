@@ -6,6 +6,7 @@ import {
   NIVELES_DESEMPENO,
   TIPOS_EVENTO_CALENDARIO,
 } from '../constants/enums';
+import { MAX_CASILLAS_BLOQUE, MAX_COMPONENTES_EVALUATIVOS } from '../constants/notas';
 import { ValidationSchema } from '../middlewares/validate.middleware';
 import { objectId } from './common.validator';
 
@@ -169,6 +170,23 @@ export const actualizarEscalaEvaluacion: ValidationSchema = {
       .unique('nivel')
       .required(),
   }),
+};
+
+// Que sumen 100, las claves únicas y las actividades ya programadas son reglas de negocio: las valida el servicio.
+export const actualizarComponentesEvaluativos: ValidationSchema = {
+  params: Joi.object(idAnio),
+  body: Joi.array()
+    .items(
+      Joi.object({
+        clave: Joi.string().pattern(/^[A-Z0-9_]{2,40}$/),
+        nombre: Joi.string().trim().max(60).required(),
+        porcentaje: Joi.number().min(0).max(100).required(),
+        max_casillas: Joi.number().integer().min(1).max(MAX_CASILLAS_BLOQUE).required(),
+      })
+    )
+    .min(1)
+    .max(MAX_COMPONENTES_EVALUATIVOS)
+    .required(),
 };
 
 // La suma exacta a 1 (100%) es regla de negocio y se valida en el modelo (pre-validate), no aquí.

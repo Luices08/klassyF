@@ -48,6 +48,13 @@ router.get(
   ctrl.sugerirEscalaEvaluacion
 );
 router.patch('/:id/escala-evaluacion', ...soloAdmin, validate(v.actualizarEscalaEvaluacion), ctrl.actualizarEscalaEvaluacion);
+// M12: bloques evaluativos configurables por año (sustituyen a la ponderación fija Saber/Hacer/Ser).
+router.patch(
+  '/:id/componentes-evaluativos',
+  ...soloAdmin,
+  validate(v.actualizarComponentesEvaluativos),
+  ctrl.actualizarComponentesEvaluativos
+);
 router.patch(
   '/:id/ponderacion-componentes',
   ...soloAdmin,

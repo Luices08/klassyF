@@ -47,3 +47,9 @@ export const cambiarAula: ValidationSchema = {
     aula_id: objectId.allow(null).required(),
   }),
 };
+
+export const groupIdParam: ValidationSchema = {
+  params: Joi.object({
+    groupId: objectId.required(),
+  }),
+};

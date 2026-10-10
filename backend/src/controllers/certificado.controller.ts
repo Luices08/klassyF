@@ -6,6 +6,7 @@ import { env } from '../config/env';
 import * as configuracionService from '../services/certificadoConfiguracion.service';
 import * as certificadoService from '../services/certificado.service';
 import * as pdfService from '../services/certificadoPdf.service';
+import * as plantillaService from '../services/certificadoPlantilla.service';
 import * as verificacionService from '../services/certificadoVerificacion.service';
 import catchAsync from '../utils/catchAsync';
 
@@ -27,7 +28,7 @@ export const quitarImagen = catchAsync<{ elemento: ElementoAutenticacion }>(asyn
   ok(res, await configuracionService.quitarImagen(req.params.elemento, req.user!, req.ip))
 );
 export const verImagen = catchAsync<{ elemento: ElementoAutenticacion }>(async (req, res) => {
-  res.sendFile(await configuracionService.rutaImagenVigente(req.params.elemento));
+  res.sendFile(await configuracionService.rutaImagenVigente(req.params.elemento, req.user!));
 });
 
 export const matriculasDelEstudiante = catchAsync<{ studentId: string }>(async (req, res) =>
@@ -40,7 +41,7 @@ export const expedir = catchAsync(async (req, res) => {
 });
 
 export const vistaPrevia = catchAsync(async (req, res) => {
-  const buffer = await pdfService.generarVistaPreviaPdf(req.body, req.user!);
+  const buffer = await pdfService.generarVistaPreviaPdf(req.body, req.user!, req.ip);
   res.setHeader('Content-Type', 'application/pdf');
   res.setHeader('Content-Disposition', 'inline; filename="vista-previa.pdf"');
   res.send(buffer);
@@ -68,3 +69,18 @@ export const anular = catchAsync<IdParams>(async (req, res) => ok(res, await cer
 export const verificarPublico = catchAsync<unknown, unknown, unknown, ParsedQs & { token?: string; codigo?: string; clave?: string }>(async (req, res) =>
   ok(res, await verificacionService.verificarCertificado({ token: req.query.token, codigo: req.query.codigo, clave: req.query.clave }))
 );
+
+// Plantillas (solo ADMIN; el servicio lo exige).
+export const listarPlantillas = catchAsync(async (req, res) => ok(res, await plantillaService.listarPlantillas(req.user!)));
+export const versionesDePlantilla = catchAsync<{ tipo: ClaveCertificado }>(async (req, res) => ok(res, await plantillaService.versionesDePlantilla(req.params.tipo, req.user!)));
+export const publicarPlantilla = catchAsync<{ tipo: ClaveCertificado }>(async (req, res) => {
+  const { nota, ...contenido } = req.body;
+  ok(res, await plantillaService.publicarPlantilla(req.params.tipo, contenido, nota ?? '', req.user!, req.ip), 201);
+});
+export const restablecerPlantilla = catchAsync<{ tipo: ClaveCertificado }>(async (req, res) => ok(res, await plantillaService.restablecerPlantilla(req.params.tipo, req.user!, req.ip), 201));
+export const vistaPreviaPlantilla = catchAsync<{ tipo: ClaveCertificado }>(async (req, res) => {
+  const buffer = await pdfService.generarVistaPreviaDePlantillaPdf(req.params.tipo, req.body, req.user!);
+  res.setHeader('Content-Type', 'application/pdf');
+  res.setHeader('Content-Disposition', 'inline; filename="vista-previa-plantilla.pdf"');
+  res.send(buffer);
+});

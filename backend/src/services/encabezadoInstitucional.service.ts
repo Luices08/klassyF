@@ -1,5 +1,7 @@
 import PDFDocument from 'pdfkit';
 import Institution from '../models/institution.model';
+import { guardarImagenPorContenido, huellaDeImagen, imagenDesdeDataUri, existeImagen, leerImagenGuardada } from '../utils/almacenImagenes';
+import type { ImagenGuardada } from '../utils/certificados';
 
 type Documento = InstanceType<typeof PDFDocument>;
 
@@ -19,8 +21,30 @@ export interface DatosEncabezado {
 /** El logo de la institución (data URI PNG/JPEG de M01). Si falta o no se puede leer, el documento sale igual solo con texto. */
 export async function cargarLogo(): Promise<Buffer | null> {
   const institucion = await Institution.findOne().select('logo_url');
-  const coincide = /^data:image\/(png|jpe?g);base64,(.+)$/i.exec(institucion?.logo_url ?? '');
-  return coincide ? Buffer.from(coincide[2] as string, 'base64') : null;
+  return imagenDesdeDataUri(institucion?.logo_url)?.buffer ?? null;
+}
+
+/** Guarda el escudo (el logo de M01) por su huella y devuelve la referencia que queda en el documento expedido. */
+export async function congelarEscudo(logoUrl: string | null | undefined): Promise<ImagenGuardada | null> {
+  const imagen = imagenDesdeDataUri(logoUrl);
+  return imagen ? guardarImagenPorContenido(imagen.buffer, imagen.ext) : null;
+}
+
+/**
+ * El escudo con el que se expidió un documento. `undefined` = documento anterior al congelamiento (usa el logo vigente);
+ * `null` = el colegio no tenía escudo; una referencia = el congelado. Si su archivo se perdió pero el logo vigente es el mismo,
+ * se restaura solo; si el colegio cambió de logo, se avisa cómo recuperarlo.
+ */
+export async function cargarEscudoCongelado(referencia: ImagenGuardada | null | undefined): Promise<Buffer | null> {
+  if (referencia === undefined) return cargarLogo();
+  if (referencia === null) return null;
+  if (await existeImagen(referencia)) return leerImagenGuardada(referencia, 'escudo');
+  const vigente = imagenDesdeDataUri((await Institution.findOne().select('logo_url'))?.logo_url);
+  if (vigente && huellaDeImagen(vigente.buffer) === referencia.hash) {
+    await guardarImagenPorContenido(vigente.buffer, vigente.ext);
+    return vigente.buffer;
+  }
+  return leerImagenGuardada(referencia, 'escudo');
 }
 
 /**

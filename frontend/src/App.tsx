@@ -10,8 +10,12 @@ import { HomePage } from './pages/public/HomePage';
 import { VerificarCertificadoPage } from './pages/public/VerificarCertificadoPage';
 import { CertificadosPage } from './pages/admin/CertificadosPage';
 import { AnioLectivoPage } from './pages/AnioLectivoPage';
+import { ActividadesDocentePage } from './pages/ActividadesDocentePage';
+import { NotasPlanillaPage } from './pages/NotasPlanillaPage';
 import { AsistenciaPage } from './pages/AsistenciaPage';
 import { GestionAsistenciaPage } from './pages/GestionAsistenciaPage';
+import { MisActividadesPage } from './pages/MisActividadesPage';
+import { MisNotasPage } from './pages/MisNotasPage';
 import { MiObservadorPage } from './pages/MiObservadorPage';
 import { ObservadorPage } from './pages/ObservadorPage';
 import { OrientacionPage } from './pages/OrientacionPage';
@@ -19,6 +23,9 @@ import { ExpedienteInclusionPage } from './pages/ExpedienteInclusionPage';
 import { InclusionPage } from './pages/InclusionPage';
 import { MisAjustesPage } from './pages/MisAjustesPage';
 import { AcademicCatalogPage } from './pages/admin/AcademicCatalogPage';
+import { ActividadesGestionPage } from './pages/admin/ActividadesGestionPage';
+import { NotasGestionPage } from './pages/admin/NotasGestionPage';
+import { CreadorPlanillasPage } from './pages/admin/CreadorPlanillasPage';
 import { AdmissionRequestsPage } from './pages/admin/AdmissionRequestsPage';
 import { CasosConvivenciaPage } from './pages/admin/CasosConvivenciaPage';
 import { ComitePage } from './pages/admin/ComitePage';
@@ -28,6 +35,7 @@ import { EnrollmentDetailPage } from './pages/admin/EnrollmentDetailPage';
 import { EnrollmentsPage } from './pages/admin/EnrollmentsPage';
 import { EspaciosPage } from './pages/admin/EspaciosPage';
 import { GradesPage } from './pages/admin/GradesPage';
+import { GrupoFichaPage } from './pages/admin/GrupoFichaPage';
 import { GroupsPage } from './pages/admin/GroupsPage';
 import { HorariosPage } from './pages/admin/HorariosPage';
 import { MiHorarioPage } from './pages/MiHorarioPage';
@@ -61,6 +69,7 @@ export default function App() {
             <Route path="/admin/setup" element={<InstitutionSetupPage />} />
             <Route path="/admin/sedes" element={<SedesPage />} />
             <Route path="/admin/grades" element={<GradesPage />} />
+            <Route path="/admin/creador-planillas" element={<CreadorPlanillasPage />} />
           </Route>
 
           <Route element={<ProtectedRoute allowedRoles={['ADMIN', 'COORDINADOR', 'SECRETARIA']} />}>
@@ -78,12 +87,15 @@ export default function App() {
 
           <Route element={<ProtectedRoute allowedRoles={['ADMIN', 'COORDINADOR']} />}>
             <Route path="/admin/groups" element={<GroupsPage />} />
+            <Route path="/admin/groups/:id" element={<GrupoFichaPage />} />
             <Route path="/admin/espacios" element={<EspaciosPage />} />
             <Route path="/admin/teacher-assignments" element={<TeacherAssignmentsPage />} />
             <Route path="/admin/horarios" element={<HorariosPage />} />
             <Route path="/admin/academic-catalog" element={<AcademicCatalogPage />} />
             <Route path="/admin/study-plan" element={<StudyPlanPage />} />
             <Route path="/admin/revision-curricular" element={<RevisionCurricularPage />} />
+            <Route path="/admin/actividades" element={<ActividadesGestionPage />} />
+            <Route path="/admin/notas" element={<NotasGestionPage />} />
           </Route>
 
           <Route element={<ProtectedRoute allowedRoles={['DOCENTE', 'ESTUDIANTE', 'ACUDIENTE']} />}>
@@ -94,6 +106,8 @@ export default function App() {
             <Route path="/docente/mi-carga" element={<MyTeacherLoadPage />} />
             <Route path="/docente/planeacion-curricular" element={<DesarrolloCurricularPage />} />
             <Route path="/docente/asistencia" element={<AsistenciaPage />} />
+            <Route path="/docente/actividades" element={<ActividadesDocentePage />} />
+            <Route path="/docente/notas" element={<NotasPlanillaPage />} />
           </Route>
 
           <Route element={<ProtectedRoute allowedRoles={['ADMIN', 'COORDINADOR', 'SECRETARIA', 'DOCENTE']} />}>
@@ -124,6 +138,8 @@ export default function App() {
             <Route path="/docente/ajustes-razonables" element={<MisAjustesPage />} />
           </Route>
           <Route element={<ProtectedRoute allowedRoles={['ESTUDIANTE']} />}>
+            <Route path="/mis-actividades" element={<MisActividadesPage />} />
+            <Route path="/mis-notas" element={<MisNotasPage />} />
             <Route path="/mi-observador" element={<MiObservadorPage />} />
           </Route>
         </Route>

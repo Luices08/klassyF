@@ -98,6 +98,9 @@ export interface Institution {
   resolucion_aprobacion: string;
   administrador_id: string | null;
   logo_url: string | null;
+  /** Ciudad y departamento: los usan los documentos oficiales (certificados de M26). */
+  ciudad?: string | null;
+  departamento?: string | null;
   correo_secretaria: string | null;
   horario_atencion: string | null;
   /** Estructura de tiempo base que se carga en cada jornada (M01/M05); M09 usa las franjas resultantes. */
@@ -239,6 +242,16 @@ export type ComponenteSiee = (typeof COMPONENTES_SIEE)[number];
 
 export type PonderacionComponentes = Record<ComponenteSiee, number>;
 
+// M12: el molde de la planilla. Los bloques forman el 100% de la nota de una asignatura y cada uno limita cuántas casillas
+// (actividades o notas sueltas) admite; la institución los define por año lectivo.
+export interface ComponenteEvaluativo {
+  clave: string;
+  nombre: string;
+  porcentaje: number;
+  /** Cuántas casillas (actividades y notas) admite este bloque en la planilla de una clase y periodo. */
+  max_casillas: number;
+}
+
 export interface AcademicYear {
   _id: string;
   institucion_id: string;
@@ -255,6 +268,12 @@ export interface AcademicYear {
   escala_evaluacion: EscalaEvaluacion | null;
   /** SIEE (CU-ADM-04): null hasta que el ADMIN la personalice (respaldo 40/40/20). */
   ponderacion_componentes: PonderacionComponentes | null;
+  /** Los configurados por el ADMIN; vacío mientras rija el respaldo Saber/Hacer/Ser. */
+  componentes_evaluativos: ComponenteEvaluativo[];
+  /** Los que realmente rigen el cálculo (los configurados o el respaldo). */
+  componentes_efectivos: ComponenteEvaluativo[];
+  /** La escala y el molde de la planilla se pueden cambiar hasta que se registre la primera nota del año. */
+  evaluacion_editable: boolean;
   cerrado_at: string | null;
   resumen_semanas: ResumenSemanas;
 }

@@ -10,6 +10,7 @@ import {
   EscalaEvaluacionInput,
   EventoInput,
   PeriodoSedeInput,
+  ComponenteEvaluativoInput,
   PonderacionComponentesInput,
 } from '../services/academicYear.service';
 import * as prorrogaService from '../services/periodoProrroga.service';
@@ -140,6 +141,11 @@ export const sugerirEscalaEvaluacion = catchAsync<AnioParams, unknown, unknown, 
 
 export const actualizarEscalaEvaluacion = catchAsync<AnioParams, unknown, EscalaEvaluacionInput>(async (req, res) => {
   const anio = await anioService.actualizarEscalaEvaluacion(req.params.id, req.body, contexto(req));
+  res.status(200).json({ success: true, data: anio });
+});
+
+export const actualizarComponentesEvaluativos = catchAsync<AnioParams, unknown, ComponenteEvaluativoInput[]>(async (req, res) => {
+  const anio = await anioService.actualizarComponentesEvaluativos(req.params.id, req.body, contexto(req));
   res.status(200).json({ success: true, data: anio });
 });
 

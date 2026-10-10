@@ -1,16 +1,18 @@
-import { type FormEvent, useState } from 'react';
+import { type FormEvent, useEffect, useState } from 'react';
 import { Alert, errorMessage } from '../ui/Alert';
 import { Chip } from '../ui/Badge';
 import { Button } from '../ui/Button';
 import { Drawer } from '../ui/Drawer';
 import { Input, Select } from '../ui/Field';
 import { Spinner } from '../ui/Spinner';
+import { VisorDocumento } from '../ui/VisorDocumento';
 import { EmptyRow, Table, TableBody, TableHead, Td, Th } from '../ui/Table';
 import {
   ETIQUETA_ELEMENTO,
-  abrirPdfCertificado,
+  descargarPdfCertificado,
   useAnularCertificado,
   useCertificados,
+  useConfiguracionCertificados,
   useVerificarIntegridadCertificado,
   type CertificadoExpedido,
   type ClaveCertificado,
@@ -29,10 +31,21 @@ export function HistorialCertificados() {
   const [aviso, setAviso] = useState<{ tono: 'success' | 'error'; texto: string } | null>(null);
   const lista = useCertificados({ tipo: tipo || undefined, estado: estado || undefined, pagina });
   const integridad = useVerificarIntegridadCertificado();
+  const tipos = useConfiguracionCertificados().data?.tipos ?? [];
+
+  // El documento se abre en un panel sobre el historial, no en otra pestaña.
+  const [viendo, setViendo] = useState<{ url: string; certificado: CertificadoExpedido } | null>(null);
+  useEffect(() => {
+    const url = viendo?.url;
+    return () => {
+      if (url) URL.revokeObjectURL(url);
+    };
+  }, [viendo?.url]);
 
   const verPdf = async (c: CertificadoExpedido) => {
     try {
-      await abrirPdfCertificado(c._id);
+      const { url } = await descargarPdfCertificado(c._id);
+      setViendo({ url, certificado: c });
     } catch (err) {
       setAviso({ tono: 'error', texto: errorMessage(err) });
     }
@@ -52,8 +65,11 @@ export function HistorialCertificados() {
       <div className="grid gap-3 sm:grid-cols-3">
         <Select label="Documento" value={tipo} onChange={(e) => { setTipo(e.target.value as ClaveCertificado | ''); setPagina(1); }}>
           <option value="">Todos</option>
-          <option value="CONSTANCIA_ESTUDIO">Constancia de estudio</option>
-          <option value="CERTIFICADO_MATRICULA">Certificado de matrícula</option>
+          {tipos.map((t) => (
+            <option key={t.clave} value={t.clave}>
+              {t.nombre}
+            </option>
+          ))}
         </Select>
         <Select label="Estado" value={estado} onChange={(e) => { setEstado(e.target.value as EstadoCertificado | ''); setPagina(1); }}>
           <option value="">Todos</option>
@@ -111,7 +127,7 @@ export function HistorialCertificados() {
                   </Td>
                   <Td className="space-x-2 text-right">
                     <Button variant="soft-edit" className="px-3 py-1 text-xs" onClick={() => verPdf(c)}>
-                      PDF
+                      Ver
                     </Button>
                     <Button variant="secondary" className="px-3 py-1 text-xs" onClick={() => verificar(c)}>
                       Verificar
@@ -145,6 +161,9 @@ export function HistorialCertificados() {
         </>
       )}
       {anulando && <AnularDrawer certificado={anulando} onClose={() => setAnulando(null)} />}
+      <Drawer open={Boolean(viendo)} title={viendo?.certificado.nombre_tipo ?? ''} subtitle={viendo ? `${viendo.certificado.codigo} · ${viendo.certificado.estudiante}` : undefined} onClose={() => setViendo(null)} size="xl">
+        {viendo && <VisorDocumento url={viendo.url} titulo={viendo.certificado.codigo} nombreArchivo={`${viendo.certificado.codigo}.pdf`} className="h-[75vh]" />}
+      </Drawer>
     </div>
   );
 }

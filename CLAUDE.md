@@ -69,7 +69,7 @@ que ya se han dado en el proyecto para que no haya que repetirlas cada vez.
 Los 5 sub-módulos de M01 están implementados; no rehacer, solo extender si se pide algo nuevo:
 
 1. **Institución** — `Institution` (nombre, código DANE, NIT, resolución, `logo_url` como data
-   URI, `estado` activo/inactivo). `GET/PATCH /institution`, página `InstitutionSetupPage`.
+   URI —es el escudo de los documentos oficiales—, `ciudad` y `departamento` opcionales —los usan los certificados de M26—, `estado` activo/inactivo). `GET/PATCH /institution`, página `InstitutionSetupPage`.
 2. **Sedes** — `Campus` (nombre, código DANE de sede, dirección, `telefono`, `es_principal`,
    `estado`). CRUD completo en `/campuses` (crear/editar/desactivar/eliminar — eliminar solo si
    no es principal y no tiene jornadas/grupos), página `SedesPage`.
@@ -81,6 +81,17 @@ Los 5 sub-módulos de M01 están implementados; no rehacer, solo extender si se 
 5. **Grupos y cupos** — `Group` (sede+jornada+grado+nomenclatura únicos por año lectivo vía
    índice compuesto, `max_capacity`, `estado` ACTIVE/CLOSED). `GroupsPage` filtra por sede,
    jornada y grado.
+
+**Ficha 360° del grupo** (`GrupoFichaPage`, `/admin/groups/:id`; backend `GET /groups/:groupId/ficha` y `/ficha/horario`, `grupoFicha.service.ts`).
+Es **solo lectura y solo ADMIN/COORDINADOR** (trae el listado de estudiantes y la carga docente; `GET /groups` sigue abierto a todo rol). Junta lo que otros
+módulos son dueños de guardar y cada bloque tiene un botón al módulo de origen, nunca un formulario: aula (M10, no sale si la institución es virtual: muestra
+«Modalidad virtual»), director (M08: sale de la `DIRECCION_GRUPO`; el campo `director_grupo_id` del grupo es solo respaldo y se avisa), estudiantes con matrícula
+activa (M03/M04, enlazan a `/admin/students/:id`), plan de estudios del grado **con lo que M06 personalizó para ese grupo** (horas ajustadas, materias solo del
+grupo) y el docente de cada materia, y el horario del grupo (M09: la versión publicada de su jornada o, si no hay, el último borrador marcado como tal; solo las
+sesiones de ese grupo, y se pide al abrir la pestaña). Para que los botones lleguen con el contexto elegido, los destinos aceptan parámetros de URL
+**opcionales** (sin ellos funcionan como siempre): Carga académica `?anio=&docente=` (filtra) y `?anio=&grupo=&grado=&asignatura=&tipo=DIRECCION_GRUPO` (abre la
+asignación lista para confirmar; las horas de una clase se derivan siempre del plan, no de un "onChange"), Horarios `?anio=&sede=&jornada=&pestana=`, Espacios
+`?sede=&espacio=`. Pruebas: `tests/integracion/grupoFicha.int.test.ts`.
 
 **Dos reglas transversales que salieron de bugs reales de M01:**
 
@@ -133,7 +144,7 @@ solo extender si se pide algo nuevo. Reglas que no se ven leyendo un solo archiv
 - **`assertPeriodNotLocked(año, grupo, periodo, docenteId)` es el único punto que decide si se pueden digitar
   notas**: año EN_CURSO, periodo ABIERTO/EN_DIGITACION y dentro de su ventana (la de la sede del grupo si esta
   tiene calendario propio), o una prórroga vigente para ese docente/grupo; además el `PeriodLock` del grupo.
-  Todo módulo que mute notas debe pasar por ahí (hoy lo hace `gradeActivity`).
+  Todo módulo que mute notas debe pasar por ahí (hoy lo hace `notas.service#registrarNotas`, que usan la planilla y `gradeActivity`).
 - **Fechas**: las fechas de calendario se guardan a medianoche UTC. Para compararlas con "ahora" se usa
   `inicioDelDia`/`finDelDia` de `utils/calendarioAcademico.ts` (UTC-5, cierre inclusivo); en el frontend se
   formatean con `lib/fechas.ts`, nunca con `toLocaleDateString()` (mostraría el día anterior).
@@ -484,7 +495,7 @@ justificaciones, reportes PDF y, solo ADMIN, estados). Reglas que no se ven leye
 ### M26 (Secretaría académica — certificados y constancias) — estado: núcleo completo
 
 Backend `/certificados` (modelos `CertificadoEmitido` y `ConfiguracionCertificados`; verificación pública en `/public/certificados/verificar`), frontend
-`CertificadosPage` (`/secretaria/certificados`, ADMIN y SECRETARIA: pestañas Expedir / Historial / Firmas y sellos [solo ADMIN]) y `VerificarCertificadoPage`
+`CertificadosPage` (`/secretaria/certificados`, ADMIN y SECRETARIA: pestañas Expedir / Historial / Firmas y sellos [ADMIN todo; SECRETARIA su firma, el sello y, con delegación, la de Rectoría] / Plantillas [solo ADMIN]) y `VerificarCertificadoPage`
 (`/verificar` y `/verificar/:token`, sin sesión; es la tarjeta «Validación de Certificados» del Home). Análisis y decisiones: `doc/Analisis_M26_Klassy.md`.
 Reglas que no se ven leyendo un solo archivo:
 
@@ -492,10 +503,54 @@ Reglas que no se ven leyendo un solo archivo:
   contenido (colegio, DANE, NIT, resolución, sede, jornada, datos del alumno, grado, grupo, folio del Libro de Matrícula) lo arma `prepararDocumento`
   (`certificado.service.ts`) leyendo M01/M03/M04. Joi descarta cualquier otro campo (`stripUnknown`). Un dato nuevo que el sistema ya conoce **no se pide en la
   pantalla**: se agrega al snapshot.
-- **Tipos por clave, no quemados** (`constants/certificados.ts`, `CERTIFICADOS`: prefijo del consecutivo y estados de matrícula con los que aplica):
-  `CONSTANCIA_ESTUDIO` (`CE-2026-0001`, solo matrícula activa) y `CERTIFICADO_MATRICULA` (`CM-…`, con folio; un RETIRADO conserva su asiento y el texto lo dice
-  sin dar el motivo). El texto sale de `utils/certificadoTexto.ts` desde el snapshot. Consecutivo anual sin huecos por tipo (`Counter` `CERT-<prefijo>-<año>`
-  dentro de la transacción de la expedición).
+- **Tipos por clave, no quemados** (`constants/certificados.ts`, `CERTIFICADOS`: prefijo del consecutivo, estados de matrícula con los que aplica y su selector de
+  destinatario): `CONSTANCIA_ESTUDIO` (`CE-2026-0001`, solo matrícula activa), `CERTIFICADO_MATRICULA` (`CM-…`, con folio; un RETIRADO conserva su asiento y el texto
+  lo dice sin dar el motivo), `PAZ_SALVO` (`PS-…`) y `CERTIFICADO_ESTUDIOS` (`CS-…`). El texto sale de `utils/certificadoTexto.ts` desde el snapshot. Consecutivo anual
+  sin huecos por tipo (`Counter` `CERT-<prefijo>-<año>` dentro de la transacción de la expedición). Un tipo nuevo es una entrada más en `CERTIFICADOS`, su
+  política inicial en `POLITICA_INICIAL` (el modelo da a cada tipo su valor por defecto, así una configuración guardada antes sigue siendo válida) y su caso en el texto.
+- **Plantillas de los documentos (núcleo de M26, maestro: «Permitir plantillas oficiales configurables»).** El texto de cada documento **no está en el código**: vive en
+  `PlantillaCertificado` (una versión `VIGENTE` por tipo, las anteriores `ARCHIVADA`; inmutables en el modelo y con índice único parcial) y lo edita solo el ADMIN en la
+  pestaña «Plantillas». Una plantilla es una lista ordenada de **bloques** (`PREAMBULO`, `FORMULA`, `CUERPO`, `DESTACADO`, `TABLA_NOTAS`), cada uno con texto, `activo` y una
+  **condición** opcional («solo si hay / no hay» un dato), más el título, la vigencia en días, las opciones del selector de destinatario y la frase de «Otro». El texto usa
+  **variables** `{{modulo.dato}}` de un **catálogo cerrado** (`constants/variablesCertificado.ts`: cada una declara su módulo de origen; una variable nueva es una entrada ahí y
+  su valor en `contextoDeVariables`). **La plantilla nunca crea datos**: los toma de M01/M03/M04/M05; si un bloque visible necesita un dato que no existe, **no se expide** y
+  el mensaje dice cuál (409), p. ej. sin `institucion.ciudad` el cierre cae al bloque «Fecha de expedición» (condición `NO_HAY`).
+- **Qué NO es editable.** El encabezado institucional (nombre, escudo, DANE, NIT, resolución, sede, jornada, año: `encabezadoInstitucional.service`, datos de M01), la tabla
+  de valoraciones (la arma el módulo de notas y M26 solo la coloca), el QR y la huella, y el diseño del PDF. Es la versión mínima del patrón de M12 (`ConfiguracionPlanilla`, «M21 mínimo»), no un
+  constructor libre; el constructor general sigue siendo M21.
+- **No se publica una plantilla que pierde lo mínimo del documento** (`REQUISITOS_LEGALES` en `constants/plantillasCertificado.ts`, validado en `validarContenido`, que lista
+  TODOS los problemas): bloques que no se pueden quitar o desactivar (`formula`, `cuerpo`; en el certificado de estudio también `notas` y `promocion`) y variables que deben
+  aparecer (nombre, documento, grado, año, fecha; folio y fecha de matrícula; dependencias; concepto de promoción). Fuente: Decreto 180 de 1981 art. 13 (compilado en el
+  Decreto 1075 de 2015: firmas del director y el secretario, DANE, aprobación, curso y año, asignaturas con intensidad horaria y calificaciones, fecha; **si exige «en letras y números» no está confirmado ni se fija en el código**: la presentación de las notas es de cada institución) y el
+  maestro. **Validar la numeración y el texto con la norma vigente (SUIN-Juriscol).**
+- **Lo expedido guarda el texto ya resuelto** (`snapshot.contenido`: bloques con las variables reemplazadas + versión y huella de la plantilla). Publicar una versión nueva
+  solo afecta lo que se expida después. Los documentos anteriores a las plantillas no tienen `contenido` y se reimprimen con `redactarCertificado`
+  (`utils/certificadoTexto.ts`, texto histórico que no se toca). Publicar sin cambios es 409; «Restablecer» publica el texto de partida como versión nueva (la historia no se
+  pierde). Los **valores de partida** (`contenidoInicial`, `constants/plantillasCertificado.ts` y `CERTIFICADOS[].destinatarios`) son solo la semilla de la versión 1, como
+  `POLITICA_INICIAL`. Vista previa de un borrador: `POST /certificados/plantillas/:tipo/vista-previa` con un estudiante inventado y el encabezado real (no guarda nada).
+- **Destinatario o motivo = selector por documento, no texto libre** (maestro, formulario de M26). Las opciones salen de la plantilla vigente (la primera es la
+  predeterminada, «A quien interese») y «Otro (especificar…)» se agrega siempre al final; vacío o «Otro» sin texto cae en la predeterminada. El cliente envía
+  `destinatario: { clave, otro? }` y `resolverDestinatario` (`utils/certificados.ts`) lo traduce: el snapshot congela la etiqueta (`destinatario`) y la frase del cierre
+  (`destino`). Una clave que no es del tipo es 400. Los documentos anteriores al selector guardan texto libre en `destinatario` y se reimprimen igual.
+- **Datos de las constancias que ya existían en otros módulos**: nivel del grado (M01), horario de la jornada, condición de ingreso, lugar de expedición del documento y
+  acudiente principal (`StudentGuardian.es_principal`, solo el certificado de matrícula), y ciudad/departamento del colegio (**campos nuevos de M01**, `Institution.ciudad` y
+  `departamento`, editables en Configuración institucional; el escudo es el `logo_url` de M01). **No existen todavía** (no se inventan): lema del colegio y código único
+  estudiantil (M03); resoluciones estructuradas (hoy `resolucion_aprobacion` es un solo texto y debe incluir los niveles que cubre).
+- **Paz y salvo con dependencias configurables.** `ConfiguracionCertificados.paz_y_salvo.dependencias` (valores de partida: Académica, Biblioteca, Financiera /
+  Administrativa, Inventario y recursos; el ADMIN las agrega, desactiva y quita). Al expedir se confirman **todas las activas** («sin pendientes»); la lista y quién las
+  verificó (`paz_y_salvo.verificado_por`) quedan congeladas en el snapshot. Hoy la confirmación es manual: cuando existan biblioteca, cartera o inventario, cada
+  dependencia pasará a calcularse sola sin cambiar el documento (la académica podría leer M12).
+- **Certificado de estudio (con notas): se construye completo, pero solo admite vista previa hasta que exista M19.** `datosDeEstudios`
+  (`certificadoEstudios.service.ts`) lee el boletín de cada periodo (M17) y la consolidación pura `utils/certificadoEstudios.ts` pondera por el porcentaje de cada periodo
+  (M05). **Solo cuentan las notas `DEFINITIVO`** (declaradas por coordinación en M12): una nota que el docente cerró pero nadie validó cuenta como ausente, y sin todas las
+  notas no hay nota final (nunca se promedia lo que falta). **La tabla de valoraciones es un contrato genérico** (`TablaValoraciones`: columnas, filas de texto y pie) que M26 solo dibuja y congela:
+  cómo se presenta una tabla de notas (columnas, letras, áreas o asignaturas, decimales) es decisión de cada institución y el maestro lo asigna a M17 («constructor de
+  plantillas por institución») y M32. Quien la arma es `armarTablaValoraciones` (`utils/certificadoEstudios.ts`, **provisional: es el boletín final de M17**, se reemplaza sin
+  tocar M26) y hoy entrega solo lo que lista el maestro: área o asignatura, intensidad horaria semanal y anual (semanal × `semanas_lectivas` de M05), calificación final con los
+  **decimales de la escala de M05** (`precision_decimales`) y su equivalencia en la escala nacional según los rangos que la institución definió. Sin letras ni columnas por periodo. El concepto «APROBÓ / NO APROBÓ» sale de
+  `obtenerPromocion`, que hoy devuelve `null`: con `null` la expedición oficial responde 409, la vista previa sale con «Concepto de promoción: PENDIENTE» y
+  `matriculasExpedibles` lo informa en `restricciones`. **Cuando M19 guarde la decisión solo hay que implementar esa función**; el concepto no se escribe a mano (duplicaría
+  lo que M19 registra). Motivo: lo expedido se congela, así que no se emite oficial con un dato ausente.
 - **Lo expedido se congela y no se borra.** `CertificadoEmitido.snapshot` es inmutable en el modelo (`pre('save')`: solo cambian `estado` y `anulacion`); el PDF
   se dibuja **solo desde el snapshot**, así una reimpresión es el mismo documento con el mismo código. Un documento mal expedido se **anula con motivo** (solo
   ADMIN): sigue verificándose como ANULADO y se imprime con marca «ANULADO». La auditoría (`CERTIFICADO_*`) nunca lleva el motivo.
@@ -503,24 +558,188 @@ Reglas que no se ven leyendo un solo archivo:
   **obligatoria en producción**: sin ella responde 503; en desarrollo se deriva de `JWT_SECRET`). Quien edite la base directamente no puede recalcular una huella
   coherente. **No cambiar el secreto después de expedir**: invalidaría la verificación de todo lo emitido. No es firma digital certificada (Ley 527/1999);
   no se presenta como tal. El QR solo contiene `/verificar/<token>` con un token opaco de 128 bits (no el consecutivo: no se puede enumerar); la URL base es
-  `PUBLIC_URL` o el host de la petición. Sin QR se verifica con **código + clave** (los 12 primeros caracteres de la huella, impresos en el pie).
+  `PUBLIC_URL` o el host de la petición (**definir `PUBLIC_URL` en producción**: sin ella el QR depende del encabezado `Host`). Sin QR se verifica con **código + clave** (los 12 primeros caracteres de la huella, impresos en el pie).
   Reimprimir recalcula la huella y se niega si no coincide (409).
 - **Verificación pública** (`certificadoVerificacion.service.ts`, rate limit propio): responde VALIDO / ANULADO / NO_VERIFICABLE y solo muestra tipo, código,
   fecha, institución, nombre y documento **enmascarado** (últimos 3). Nunca notas ni otros datos. «No existe» y «clave equivocada» responden igual (404).
-- **Firmas y sellos con switch al expedir.** `ConfiguracionCertificados` (una por instalación; solo el ADMIN la edita): quién firma (`rectoria` = un `User` ADMIN,
+- **Firmas y sellos con switch al expedir.** `ConfiguracionCertificados` (una por instalación): quién firma (`rectoria` = un `User` ADMIN,
   `secretaria` = un `User` SECRETARIA; nombre y cargo salen del usuario, no se digitan por documento), la imagen de cada firma y del sello, y la **política por
   documento y elemento** (`OBLIGATORIO` / `OPCIONAL_ENCENDIDO` / `OPCIONAL_APAGADO` / `NO_APLICA`, valores de partida en `POLITICA_INICIAL`). La lógica del switch
-  es pura y con tests (`describirElemento` / `resolverElementos`, `utils/certificados.ts`): pedir algo que no aplica, sin imagen o sin permiso es **error**, nunca se
-  ignora; apagar un obligatorio también. **Apagado = no se estampa la imagen, pero el documento conserva la línea con nombre y cargo para firma manuscrita.**
-- **Delegación de la firma de Rectoría**: la secretaría puede estamparla mientras `permitir_firma_rectoria_a_secretaria` esté encendido (por defecto sí); el ADMIN
-  siempre puede. Las opciones elegidas, los firmantes y el hash de cada imagen quedan en el snapshot y **entran en la huella**.
-- **Imágenes versionadas e inmutables**: se guardan en `uploads/certificados/imagenes/<sha256>.<ext>` (PNG/JPG, 500 KB, validadas por firma de bytes), nunca se
-  sobrescriben ni se borran; quitar o reemplazar solo cambia lo que se ofrece a los documentos **nuevos** (lo emitido se sigue reimprimiendo con su imagen).
-- **Pruebas:** unitarias (`certificados.test.ts`: huella, token, switches, texto) y de integración con base real (`integracion/certificados.int.test.ts`).
+  es pura y con tests (`describirElemento` / `resolverElementos`, `utils/certificados.ts`): pedir algo que no aplica, sin imagen, sin firmante designado o sin
+  permiso es **error**, nunca se ignora; apagar un obligatorio también. **Apagado = no se estampa la imagen, pero el documento conserva la línea con nombre y cargo
+  para firma manuscrita.**
+- **Quién gestiona qué en «Firmas y sellos»** lo decide `permisosCertificados` (`utils/permisosCertificados.ts`, función pura con tests; el servidor lo devuelve como
+  `puede` y la pantalla solo lo refleja). **ADMIN** todo. **SECRETARIA** carga, reemplaza, quita y ve la imagen de su firma y del sello, y designa quién firma como
+  Secretaría Académica y su cargo; la imagen de la firma de **Rectoría** también, **pero solo mientras haya delegación** (la misma llave de abajo). Quién es el rector,
+  la delegación, la política por documento y las dependencias del paz y salvo son solo del ADMIN. Las rutas dejan pasar a ADMIN y SECRETARIA y el servicio aplica la
+  regla fina (403). La carga de imágenes es `POST` (como todas las del sistema: `api.upload` solo envía POST; con `PUT` la subida daba 404 y ninguna firma se cargaba).
+- **Delegación de la firma de Rectoría**: la secretaría puede estamparla y cargar su imagen mientras `permitir_firma_rectoria_a_secretaria` esté encendido (por
+  defecto sí); el ADMIN siempre puede. Las opciones elegidas, los firmantes y el hash de cada imagen quedan en el snapshot y **entran en la huella**.
+- **Imágenes: almacén por contenido, en disco** (`utils/almacenImagenes.ts`, como el resto de archivos de los módulos): firmas, sello y **escudo** se guardan en
+  `uploads/certificados/imagenes/<sha256>.<ext>` (PNG/JPG, 500 KB, firma de bytes), nunca se sobrescriben ni se borran; el documento expedido solo guarda la huella. **El escudo
+  (`Institution.logo_url`, M01) también se congela al expedir** (`encabezado.escudo`), así una reimpresión sale con el escudo de entonces aunque el colegio cambie de logo
+  (documentos anteriores: usan el logo vigente). **Si un archivo se pierde** el sistema no deja un 500: `vistaConfiguracion` marca `imagen_faltante` y no ofrece esa firma para
+  documentos nuevos, el PDF responde 409 explicando cómo recuperarlo, y **volver a cargar la misma imagen recrea exactamente el mismo archivo** (se identifica por su
+  contenido); el escudo se restaura solo si el logo vigente es el mismo. El respaldo debe cubrir `uploads/` (`deploy/respaldar.sh` ya lo hace).
+- **Alcance por sede.** SECRETARIA solo expide, ve y reimprime documentos de las sedes que tiene asignadas (`sedes_ids`); sin sedes no ve nada; ADMIN ve todas. Cada
+  certificado guarda `sede_id` (la de la matrícula); «no existe» y «no es de tu sede» responden igual (404). Certificados anteriores: `npm run migrate:certificados-sede`
+  (idempotente; mientras no se corra, solo el ADMIN los ve). La vista previa de un documento real se audita (`CERTIFICADO_VISTA_PREVIA`, sin contenido).
+- **Ver el documento al expedirlo.** Expedir y la vista previa muestran el PDF en la misma pantalla (`VisorDocumento`, con descargar, imprimir y abrir en otra pestaña);
+  el historial lo abre en un panel («Ver»). Nunca se abre una pestaña después de un `await` (los navegadores la bloquean).
+- **Pruebas:** unitarias (`certificados.test.ts`, `certificadosM26Ampliado.test.ts`, `plantillasCertificados.test.ts`: huella, switches, plantillas, variables, tabla de valoraciones) y de integración con base real (`integracion/certificados.int.test.ts`).
+  **Las pruebas usan una carpeta temporal para los archivos** (`tests/setup.ts` fija `UPLOADS_DIR`, que `uploadPaths` respeta): antes borraban `backend/uploads` real al terminar.
   Si no se puede descargar el binario de MongoDB, usar `MONGOMS_SYSTEM_BINARY=<ruta de un mongod> MONGOMS_VERSION=<su versión>`.
-- **Pendiente, a propósito (fase 2):** certificado de estudios con notas (depende de la nota definitiva anual: M17 final / M19 no existen), paz y salvo
-  (no hay módulos de cartera ni biblioteca), PDF del Libro de Matrícula, solicitud desde el portal del acudiente (M27), plantillas personalizables
-  (M21/M32), archivo general (M29) y rotación de la clave HMAC.
+- **Pendiente, a propósito:** expedir el certificado de estudio como oficial (falta el concepto de promoción, M19); que las dependencias del paz y salvo se calculen solas
+  (la académica podría leer M12: todas las asignaturas `DEFINITIVO`; cartera, biblioteca e inventario no existen); lema y código estudiantil (M01/M03); resoluciones
+  estructuradas; vigencia ya es parámetro de la plantilla; PDF del Libro de Matrícula y su trazabilidad de novedades; libros de calificaciones y actas reglamentarias
+  (CU-SEC-06); solicitud desde el portal del acudiente (M27); constructor libre de formatos (M21); archivo general (M29); rotación de la clave HMAC; firma electrónica
+  certificada (Ley 527/1999, Decreto 2364/2012: la imagen + huella + QR no lo es). **Quién firma está en dos sitios**: M12 guarda el nombre del rector como texto libre en las
+  firmas de la planilla y M26 lo toma de un usuario; M26 es la fuente a reutilizar cuando se toque M12.
+### M11 (Actividades y planeación de aula) — estado: núcleo completo
+
+Backend `/activities` (modelos `Activity`, `ActivitySubmission`, `ConfiguracionActividades`), frontend `ActividadesDocentePage`
+(`/docente/actividades`, CU-DOC-02), `MisActividadesPage` (`/mis-actividades`, CU-EST-03) y `ActividadesGestionPage`
+(`/admin/actividades`, supervisión de coordinación). `Activity`/`ActivitySubmission` ya existían (M12 los consume: `reportCard.service`
+lee `componente_siee` y `peso_en_componente`); M11 los extendió sin romper nada. Reglas que no se ven leyendo un solo archivo:
+
+- **La jerarquía no se copia a la actividad.** Grupo, asignatura, área, grado y docente se leen por FK desde la `TeacherAssignment`
+  (`actividadContexto.service.ts`), nunca se duplican en `Activity` (regla de oro de datos). Un docente solo programa sobre sus clases
+  `CLASE` activas (M08); coordinación y ADMIN solo consultan.
+- **Requisito M07, validado por el servidor:** no se crea una actividad sin el `CurricularDevelopment` de ese periodo en estado
+  `APROBADO` (409 con el estado actual). Cada actividad exige un `dba_id` (debe estar en `dba_seleccionados` de esa planeación) o una
+  `competencia_evaluada` (debe estar contenida en `competencias`, comparada sin tildes/mayúsculas). Guarda `desarrollo_curricular_id`.
+  Al editar, el DBA/competencia solo se revalida si se cambian (reabrir una planeación no bloquea corregir un título).
+- **Prevención de sobrecarga (M25 aún no existe):** `utils/actividades.ts#evaluarCalendarioActividad` (pura, con tests) cruza la fecha de
+  entrega —un instante; el día se calcula en hora de Colombia— con M05 (periodo efectivo de la sede, recesos/vacaciones, recuperaciones,
+  `dias_habiles` de la jornada) y con las demás actividades del grupo ese día. **BLOQUEO** (no se salta): fecha pasada con entrega
+  digital, fuera del periodo. **ADVERTENCIA** (el docente confirma con `confirmar_alertas`, si no 409 con `details.alertas`): día no
+  lectivo/no hábil, ventana de recuperación, sobrecarga. Los límites (`max_evaluaciones_por_dia`, `max_entregas_por_dia`, 0 = sin límite)
+  son de `ConfiguracionActividades` (coordinación los cambia en `/admin/actividades`), no están quemados. Cuando exista M25 este es el
+  único punto que debe leerlo (`actividadCalendario.service.ts#revisarCalendario`). `GET /activities/revision-calendario` es la alerta
+  temprana mientras se elige la fecha: es la misma revisión que repite el servidor al guardar.
+- **Reglas de entrega:** `requiere_entrega` (false = actividad de aula, el docente califica directo) y `formatos_permitidos` (PDF, Word,
+  Excel, PowerPoint, imagen; **vacío con entrega = respuesta escrita**, sin archivo). `permite_entrega_tardia`. Un solo archivo por
+  entrega, 10 MB (`MAX_BYTES_ENTREGA`; nginx en 12 MB por el multipart). El contenido se confirma por firma de bytes
+  (`utils/evidenciasActividad.ts`; los Office son ZIP: además extensión coherente y carpeta propia del paquete). Vive en
+  `uploads/actividades/<actividad>/`, nunca en Mongo, y solo se baja con sesión (`GET /activities/entregas/:id/archivo`: el propio
+  estudiante, el docente titular, coordinación, ADMIN; "no existe" = "no es tuyo" = 404 para el estudiante). La API nunca devuelve la ruta.
+- **Estados:** `PROGRAMADA` (no se guarda: es la actividad sin entrega) → `ENTREGADA` / `ENTREGADA_TARDE` → `CALIFICADA`. Los marca el
+  servidor al entregar (`evaluarVentanaEntrega`) y al calificar; `estadoDeEntrega` los deriva de lo guardado (una nota siempre es
+  CALIFICADA, también en registros anteriores a M11; sin `fecha_entrega` = nota puesta sin entrega = sigue programada). `con_retraso`
+  sobrevive a la calificación. Se puede reentregar (reemplaza el archivo) hasta que se califique; la carrera con una calificación
+  concurrente la cierra el filtro `calificacion_numerica: null` + índice único (409). Entrega exige año `EN_CURSO`, periodo no `CERRADO` y
+  sin `PeriodLock` del grupo. El estudiante no ve una actividad antes de su `fecha_apertura` (publicación): 404.
+- **Puente hacia M12:** la nota se registra con `notas.service#gradeActivity` (`PATCH /activities/:id/grade`; antes vivía en
+  `activity.service`), que pasa por el mismo núcleo que la planilla de M12 (escala de M05, `assertPeriodNotLocked`, historial,
+  planilla no cerrada) y marca la entrega `CALIFICADA`. `EntregasDrawer` ofrece nota + retroalimentación por estudiante sobre ese
+  endpoint; la planilla completa es M12. `Activity.componente_siee` ya no es un enum: es la **clave de un bloque del molde de la planilla del
+  año** (M12), validada al programar (existe y aún tiene cupo de casillas: 409 si el bloque está lleno); `componente_nombre` viaja en la vista. `peso_en_componente` es un
+  % opcional del bloque (`null` = automático). El docente cambia bloque y peso mientras la planilla esté abierta, no programa actividades nuevas en una planilla cerrada, y no se elimina una actividad con entregas o notas. El periodo y la asignación de una actividad no se cambian (se elimina y
+  se programa de nuevo con la planeación del otro periodo).
+- **Pruebas:** `tests/actividades.test.ts` (funciones puras), `tests/integracion/actividades.int.test.ts` (servicios con base real) y
+  `actividades.http.int.test.ts` (rutas, validadores, permisos por rol y subida multipart real).
+- **Pendiente, a propósito:** vista del acudiente y notificaciones de actividades nuevas/por vencer (M27/M28), M25 como fuente del
+  calendario, planilla de notas (M12), varios archivos por entrega, rúbricas y ajustes razonables de M16 sobre la actividad (solo se
+  expone `GET /inclusion/grupos/:groupId/indicador`).
+
+### M12 (Evaluación y notas) — estado: núcleo completo
+
+Backend `/notas` (modelos `CalificacionAsignatura`, `ColumnaPlanilla`, `ConfiguracionPlanilla`; servicios `notas.service`, `columnasPlanilla.service`,
+`casillasBloque.service`, `notasExcel.service`, `planillaPdf.service`; motor puro `utils/calculoNotas.ts`) y el molde en
+`/academic-years/:id/componentes-evaluativos`; frontend `NotasPlanillaPage` (`/docente/notas`), `NotasGestionPage` (`/admin/notas`, seguimiento de
+coordinación) y `CreadorPlanillasPage` (`/admin/creador-planillas`, ADMIN). La escala, el congelamiento y la consolidación de áreas **ya existían**
+(M05/M06) y no se rehicieron. Reglas que no se ven leyendo un solo archivo:
+
+- **Vocabulario: molde → bloques → casillas.** El **molde** es la plantilla de planilla de la institución: el ADMIN divide el 100% de la nota en **bloques**
+  (Heteroevaluación 70%, Autoevaluación 15%, Coevaluación 10%, Comportamiento 5%…) y fija cuántas **casillas** admite cada uno (`max_casillas`, 1–50: hetero 30,
+  auto 1). Se define una vez y rige el resto del año (y el año nuevo lo copia del más reciente que lo tenga, `academicYear.service#crearAnio`). Una **casilla** es una
+  actividad de M11 (`Activity`, bloque en `componente_siee`) o una **nota suelta** que crea el docente (`ColumnaPlanilla`: por clase+periodo, con `bloque_clave`,
+  `nombre`, `peso`, `orden`). Ya no existe el «origen» `ACTIVIDADES`/`NOTA_DIRECTA` de bloque: cualquier bloque recibe actividades y notas sueltas.
+- **Molde por año** (`AcademicYear.componentes_evaluativos`: `clave` estable, `nombre`, `porcentaje`, `max_casillas`): suman exactamente 100, hasta 8 bloques.
+  **Sin configurar rige el respaldo** Saber/Hacer/Ser 40/40/20 de `ponderacion_componentes` con `MAX_CASILLAS_POR_DEFECTO` (10) casillas
+  (`utils/siee#componentesEfectivos`). **Se congela al registrarse la primera nota del año** (`academicYear.service#evaluacionEditable`, que cubre también la escala):
+  en PLANIFICACION, o con el año vigente y ninguna nota, el ADMIN lo ajusta; la lista de años trae `evaluacion_editable`. Un año CERRADO nunca. No se quita un bloque
+  que ya tiene casillas ni se baja `max_casillas` por debajo de lo que alguna clase ya usa (409; se mide por clase+periodo, sumando actividades y notas sueltas).
+- **El máximo de casillas lo exige el servidor** (`casillasBloque.service#exigirCasillaDisponible`, 409): al programar una actividad (M11), al crear una nota suelta y al
+  mover una casilla de bloque; la pantalla solo lo refleja («usadas/máx», el selector de bloque de la actividad deshabilita los llenos).
+- **Peso de la casilla (opcional).** `peso_en_componente` (Activity) y `peso` (ColumnaPlanilla) son un **% del bloque** o `null` = automático. Las casillas sin peso se
+  reparten en partes iguales lo que queda de `100 − Σ pesos puestos`; sin ningún peso, todas valen lo mismo (`pesosEfectivos`). Lo puesto en un bloque **no puede pasar
+  de 100%** (+0.01 de tolerancia; `exigirPesosValidos`, 400, también en el Excel) y todos los cambios de peso son «todo o nada». El motor normaliza sobre las casillas **ya
+  calificadas** (un peso no se pierde por una casilla vacía) y si todos los pesos son 0 promedia por igual.
+- **«Falta nota» no es cero.** El motor devuelve `null` y una nota **parcial** (promedia solo los bloques con nota) mientras falte algo; un 0 es una nota. Un bloque está
+  completo cuando tiene al menos una casilla y **todas** están calificadas (un bloque sin casillas no se completa y bloquea el cierre). Nota de área y promedio general
+  solo se calculan con todas sus partes. Una sola fórmula en backend (`calculoNotas.ts`); `frontend/src/lib/calculoNotas.ts` la espeja solo para la vista en vivo de la
+  planilla (si cambia una, cambia la otra).
+- **Quién arma las casillas:** el docente titular, mientras el periodo admita notas (`assertPeriodNotLocked`) y la planilla no esté cerrada (`exigirPlanillaAbierta`):
+  `POST/PATCH/DELETE /notas/columnas`, `PUT /notas/pesos` (en lote) y `GET /notas/bloques` (bloques con lo usado, para M11). Una nota suelta se renombra, mueve, pesa y
+  elimina (se lleva sus notas); una actividad solo se mueve de bloque y se pesa (su título y fechas son de M11) y se elimina en M11. Auditoría: `CASILLA_PLANILLA_*`,
+  `PESOS_PLANILLA_ACTUALIZADOS`.
+- **Estados de la nota de una asignatura de un estudiante en un periodo** (`CalificacionAsignatura`, único por asignación+periodo+estudiante):
+  `PENDIENTE` (faltan notas) ⇄ `BORRADOR` (completa, editable) los fija el sistema al guardar → `CERRADO` (lo cierra el docente titular, exige todas
+  las notas y **congela** `resultado` con los bloques y la nota) → `DEFINITIVO` (coordinación/ADMIN, solo si toda la clase está cerrada). Cerrada o
+  definitiva: no se califican actividades (tampoco desde M11), no se programan nuevas, ni se tocan casillas o pesos (`notasEstado.service#exigirPlanillaAbierta`).
+  **Reabrir exige motivo** (queda en `reaperturas[]` y auditoría): el titular y coordinación reabren lo `CERRADO` mientras el periodo admita notas; lo `DEFINITIVO` solo el
+  ADMIN. El estado abierto que se muestra se recalcula en vivo; el guardado puede quedar desfasado si se agrega/elimina una casilla después (la planilla y el seguimiento
+  no dependen de él).
+- **Registro transaccional** (`registrarNotas`): valida TODO antes de escribir (clase del titular, periodo, escala del año, matrícula, casilla de esa clase, duplicados,
+  planilla abierta) y escribe en una transacción. Cada cambio deja `historial_notas[]` (actividad, en `ActivitySubmission`) o `historial[]` (nota suelta, en
+  `CalificacionAsignatura.notas_columnas[{columna_id, valor, …}]`) con valor anterior/nuevo, quién y cuándo; repetir una nota no genera ruido. La API de celdas identifica
+  toda casilla por `casilla_id` (el `_id` de la actividad o de la nota suelta).
+- **Boletín (M17) = solo lo cerrado.** `reportCard.service` no mira actividades: lee `resultado` de las notas `CERRADO`/`DEFINITIVO`. Una asignatura sin cerrar sale
+  `SIN_CERRAR` con `nota: null`; el área y el promedio general solo existen con todas sus partes; `completo`/`pendientes` dicen qué falta y el puesto solo se calcula entre
+  estudiantes con boletín completo. Los bloques viajan como arreglo (`clave`, `nombre`, `porcentaje`, `nota`), no como saber/hacer/ser fijos.
+- **Nivel cualitativo con huecos entre rangos:** la escala por defecto (1.0–2.9 | 3.0–3.9 | 4.0–4.5 | 4.6–5.0) deja huecos y un promedio de 2 decimales (3.95) no
+  caía en ninguno (`resolverDesempeno` lanzaba 400). Ahora el nivel se resuelve con la nota redondeada a `precision_decimales` de la escala y, si aún queda en un
+  hueco, al rango inferior; la nota mostrada no se altera. La fórmula de «Desempeño» del Excel hace lo mismo.
+- **Planilla en pantalla (`PlanillaNotas`)**: cada bloque con sus casillas, «usadas/máx», un «+» para agregar una nota suelta (`CasillaDrawer`) si queda cupo, el peso de
+  cada casilla editable (placeholder = lo que realmente pesa), edición **tipo hoja de cálculo** (flechas y Enter para moverse, pegar un rango copiado de Excel/Sheets,
+  Ctrl+D rellena hacia abajo, Ctrl+Z deshace los cambios sin guardar) y pie con promedio, máxima, mínima y cuántos pierden (`nota_aprobatoria`). Guardar manda primero los
+  pesos y luego las notas. Filtra por nombre/documento y «solo con notas pendientes». **La interfaz no se probó en un navegador** (solo compila: `tsc -b`, `vite build`).
+- **Creador de planillas (ADMIN, `/admin/creador-planillas`)**: pestaña «Molde de la nota» (bloques con nombre, %, casillas máx.; ejemplos de partida que solo rellenan el
+  formulario; vista previa; se bloquea al congelarse) y pestaña «Impresión y firmas» (la plantilla de presentación de abajo). Reemplaza a `/admin/plantilla-planilla` y al
+  editor de componentes de Año lectivo, que ahora solo resume el molde y enlaza al creador.
+- **Impresión de la planilla (M21 en versión mínima)** (`ConfiguracionPlanilla`, `GET/PUT /notas/plantilla`, solo ADMIN edita): título, subtítulo, pie, logo, qué columnas
+  calculadas se muestran (documento, pesos, promedio por bloque, desempeño, estado) y hasta 4 firmas (cargo, nombre fijo o «el docente de la clase»). Es **solo presentación**:
+  viaja dentro de cada planilla (`Planilla.plantilla`) y la aplican la pantalla, el Excel (las columnas se OCULTAN, no se quitan, porque las fórmulas y la importación
+  dependen de ellas) y el PDF (`GET /notas/planilla/pdf`, horizontal, leyenda N1…Nn de las casillas y espacio de firmas). **No es un constructor libre de columnas.**
+- **Excel offline (M22)** (`notasExcel.service`): `GET/POST /notas/planilla/excel`. Filas: 2 bloques, 3 nombres de casilla, 4 pesos puestos (entrada), 5 peso que realmente
+  cuenta (fórmula), estudiantes desde la 6. Cada bloque trae sus casillas y **espacios en blanco hasta su máximo** (tope de 30 en la hoja), más una columna de nota del bloque;
+  nota/desempeño van como **fórmulas** (con resultado en caché). Editables: nombre y peso de las casillas (menos el título de una actividad), y las notas (las de estudiantes
+  cerrados, bloqueadas). Una hoja `Datos` oculta identifica clase, periodo y cada columna (`CASILLA:<id>` o `NUEVA:<bloque>`). **Al importar** se valida TODO antes de escribir
+  (documento ajeno, nota no numérica o fuera de escala, casilla que ya no existe, nombre que falta, bloque pasado de su máximo, pesos > 100%) y luego se crean las casillas
+  nuevas, se renombran, se pesan y se guardan las notas por los mismos servicios de la planilla en línea (esos pasos son transacciones separadas: un fallo posterior a
+  la validación, p. ej. el periodo se cierra en medio, puede dejar aplicada la primera parte). La protección de la hoja es una comodidad. Google Sheets usa el mismo `.xlsx`.
+  **Las fórmulas no se probaron en Excel/Sheets** (no hay motor de hojas en el entorno de pruebas): solo su texto y el flujo de ida y vuelta.
+- **El Excel no pisa lo que cambió el sistema (conflictos)**: el archivo lleva en la hoja `Datos` una *instantánea* de lo descargado (nombre y peso de cada
+  casilla, nota de cada celda por documento; `VERSION_INSTANTANEA`). Al importar solo cuenta lo que el docente **cambió respecto a esa instantánea**: una celda
+  que no tocó se ignora aunque el sistema ya tenga otra nota (p. ej. una actividad calificada en línea mientras tanto), y si tocó una que el sistema también
+  cambió es **conflicto** (400 con la fila y «descarga de nuevo»; no se guarda nada, como el resto de errores). Igual con pesos y con el nombre de una nota suelta.
+  Lo que el Excel nunca puede romper el porcentaje: los % de los bloques no viajan en el archivo (son del molde), los pesos se validan ≤100% por bloque, las
+  casillas nuevas se miden contra el cupo vivo del bloque y la nota que se muestra después es la que calcula el servidor. Un archivo sin instantánea se rechaza.
+- **Vista previa y Excel de muestra del molde** (administración, pestaña «Vista del docente y Excel» del Creador de planillas): `GET /notas/molde/vista-previa` y
+  `/notas/molde/excel?academic_year_id=` (ADMIN/COORDINADOR; `planillaMuestra.service.ts`). Arman una `Planilla` inventada (3 estudiantes, 2 casillas por bloque) con
+  el molde y la plantilla de impresión vigentes, reusando `armarFila`/`armarBloques` y el mismo generador de Excel del docente; no tocan la base. El Excel lleva la
+  marca `MUESTRA` en vez de una clase y el importador lo rechaza.
+- **El estudiante ve sus notas** (`GET /notas/mias?periodo_numero=&academic_year_id=`, solo ESTUDIANTE, `notasEstudiante.service.ts`, página `MisNotasPage` en
+  `/mis-notas`): por asignatura, cada bloque con sus casillas y la nota de cada una; usa `armarFila` (la misma cuenta de la planilla), así que una planilla abierta
+  se muestra **provisional** (`parcial`) y una `CERRADO`/`DEFINITIVO` como nota final. Solo devuelve lo propio y de las actividades solo las ya publicadas
+  (`fecha_apertura`) o con nota. El boletín (M17) sigue leyendo solo lo cerrado.
+- **Quién ve qué:** el titular edita; ADMIN/COORDINADOR consultan (`GET /notas/planilla`, `GET /notas/bloques`), ven el seguimiento (`/notas/seguimiento`) y declaran definitivas;
+  otro docente no entra (403). `declararDefinitivas` valida el rol también en el servicio.
+- **Evidencias dentro de la planilla:** cada casilla de una actividad con entrega digital lleva un punto (a tiempo / con retraso / ya calificada; sin punto = no entregó) y el
+  título de la columna abre `EntregasDrawer` (descargar la evidencia, leer la respuesta, poner nota y retroalimentación) sin salir de la planilla; la misma nota se puede
+  poner en la casilla.
+- **Datos anteriores al molde:** las notas directas (`notas_directas`) y los `peso_en_componente` de la primera versión de M12 **no se migraron** (era desarrollo sin datos
+  reales): una nota directa vieja queda huérfana y un peso `3` ahora significa 3%.
+- **Pruebas:** `tests/calculoNotas.test.ts` (motor, pesos, molde y escala), `tests/integracion/notas.int.test.ts` (servicios con base real: planilla, historial, cierre,
+  definitivas, reapertura, boletín, molde, congelamiento, copia al año nuevo, casillas y pesos) y `notas.http.int.test.ts` (rutas, permisos, validadores, plantilla, PDF y Excel
+  de ida y vuelta, con alta de casillas desde el Excel). **`tests/setup.ts` hace comparable el `message` de los errores:** `toMatchObject` ignora las propiedades no enumerables
+  y `message` lo es, así que una aserción `rejects.toMatchObject({ message: /x/ })` pasaba con cualquier mensaje. Para verificar un mensaje use
+  `message: expect.stringMatching(/x/)`, nunca un regex suelto.
+- **Pendiente, a propósito:** un constructor libre de formatos (columnas propias, orden, varios moldes por nivel o área; M21 completo); notificaciones de cierre (M28); recuperaciones
+  y comisiones de evaluación (M18/M20); estadísticas (M30, que leerá `CalificacionAsignatura`); cierre automático de las planillas al cerrar el periodo en M05; el director de
+  grupo no consulta las planillas de las demás asignaturas de su grupo (sí en asistencia); borrar una nota ya puesta (se corrige, no se borra); copiar las casillas sueltas de un
+  periodo al siguiente.
 
 ### Cargas masivas por CSV (M02 usuarios, M03 estudiantes)
 
@@ -644,7 +863,7 @@ nuevos para lo que ya existe aquí** — extenderlos si falta un caso, no duplic
   mapeo rol→color o estado→color en una página), `Card`/`CardHeader`, `Table`/`TableHead`/`Th`/
   `TableBody`/`Td`/`EmptyRow`, `Drawer` (formularios de creación/edición; su botón principal
   acepta `submitVariant` para casos como confirmar un borrado en rojo), `PageHeader` (título +
-  subtítulo + acción de la página), `Field` (`Input`/`Select`), `MultiSelect` (selector desplegable de selección múltiple con checkboxes, contador y badges de rol/estado; prop opcional `emptyLabel` cuando elegir es obligatorio), `Alert`, `Spinner`, `EstadoEspacioBadge` (M10), `EstadoAsistenciaChip`/`EstadoJustificacionBadge` (M13), `MallaDisponibilidad` (M09: cuadrícula de tiempo libre por clic, disponible/condicional/no disponible), `GuiaColumnas` (guía colapsable de columnas de una carga CSV), `ProgressBar` (barra de avance con tono, ej. semanas lectivas vs. el mínimo de 40), `LineaTiempo` (línea de tiempo vertical con punto, fecha, chips y contenido por registro; la usa el historial de convivencia), `EstadoCasoBadge`/`TipoSituacionBadge` (M15), `EstadoExpedienteBadge`/`EstadoSolicitudApoyoBadge` (M16), `Tabs`/`TabPanel` (navegación por pestañas con subrayado azul en la activa; reusar en vez de reinventar un switch de pestañas en otra página), `Stepper` (indicador de pasos para formularios largos por secciones, ej. el asistente de creación de estudiante en M03), `Switch` (interruptor encendido/apagado para decisiones al momento, con `disabledReason` como tooltip; ej. firmas y sello al expedir en M26), e iconos SVG propios en `components/ui/icons.tsx` (no se agregó ninguna librería de iconos).
+  subtítulo + acción de la página), `Field` (`Input`/`Select`), `MultiSelect` (selector desplegable de selección múltiple con checkboxes, contador y badges de rol/estado; prop opcional `emptyLabel` cuando elegir es obligatorio), `Alert`, `Spinner`, `EstadoEspacioBadge` (M10), `EstadoAsistenciaChip`/`EstadoJustificacionBadge` (M13), `MallaDisponibilidad` (M09: cuadrícula de tiempo libre por clic, disponible/condicional/no disponible), `GuiaColumnas` (guía colapsable de columnas de una carga CSV), `ProgressBar` (barra de avance con tono, ej. semanas lectivas vs. el mínimo de 40), `LineaTiempo` (línea de tiempo vertical con punto, fecha, chips y contenido por registro; la usa el historial de convivencia), `EstadoCasoBadge`/`TipoSituacionBadge` (M15), `EstadoExpedienteBadge`/`EstadoSolicitudApoyoBadge` (M16), `EstadoNotaBadge` (M12: pendiente/borrador/cerrado/definitivo), `EstadoEntregaBadge`/`TipoActividadChip` (M11: programada → entregada → con retraso → calificada; tipo de actividad), `Dropzone` (zona para soltar o elegir un archivo, valida extensión y tamaño en el navegador y muestra el archivo elegido; el servidor siempre confirma el contenido), `VisorDocumento` (PDF dentro de la pantalla con descargar, imprimir y abrir aparte; certificados M26), `Switch` (interruptor encendido/apagado para decisiones al momento, con `disabledReason` como tooltip; ej. firmas y sello al expedir en M26), `Tabs`/`TabPanel` (navegación por pestañas con subrayado azul en la activa; reusar en vez de reinventar un switch de pestañas en otra página), `Stepper` (indicador de pasos para formularios largos por secciones, ej. el asistente de creación de estudiante en M03), e iconos SVG propios en `components/ui/icons.tsx` (no se agregó ninguna librería de iconos).
 - **Contenedor global y densidad** (`components/layout/AppShell.tsx`): el `<main>` centra el
   contenido en `max-w-7xl` (no `max-w-5xl`) para que las tablas anchas (Usuarios, Grupos) no
   scrolleen antes de tiempo en pantallas grandes. Cada página usa `space-y-4` (no `space-y-6`)
@@ -653,7 +872,7 @@ nuevos para lo que ya existe aquí** — extenderlos si falta un caso, no duplic
   `space-y-6` en una pantalla nueva sin pedirlo explícitamente, y el padding interno de
   `Table`/`Th`/`Td` no se toca por esta regla de densidad (es un ajuste del contenedor, no de
   las tablas).
-- `Drawer` acepta `size="lg"` (opcional, por defecto `md`) para formularios de varias columnas, como la
+- `Drawer` acepta `size="lg"` (y `"xl"` para tablas anchas, como la planilla de notas en solo consulta; opcional, por defecto `md`) para formularios de varias columnas, como la
   parametrización del año lectivo. Los componentes propios de M05 viven en `components/anioLectivo/`
   (`PeriodoCard`, drawers de año, cierre, prórroga, eventos y calendario por sede); las reglas de aviso de
   calendario A/B están en `lib/calendarioColombia.ts` y el formato de fechas en `lib/fechas.ts`.

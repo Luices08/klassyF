@@ -58,6 +58,8 @@ export interface UpdateInstitutionInput {
   resolucion_aprobacion: string;
   estado?: EstadoActivo;
   logo_url?: string | null;
+  ciudad?: string | null;
+  departamento?: string | null;
   correo_secretaria?: string | null;
   horario_atencion?: string | null;
   modalidad?: ModalidadInstitucion;

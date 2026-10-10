@@ -12,6 +12,8 @@ export interface ICertificadoEmitido {
   consecutivo: number;
   anio_emision: number;
   student_id: Types.ObjectId;
+  /** La sede de la matrícula: define quién (secretaría de esa sede) puede ver y reimprimir el documento. Los anteriores se completan con la migración. */
+  sede_id: Types.ObjectId | null;
   enrollment_id: Types.ObjectId;
   academic_year_id: Types.ObjectId;
   snapshot: unknown;
@@ -35,6 +37,7 @@ const certificadoSchema = new Schema<ICertificadoEmitido, CertificadoEmitidoMode
     consecutivo: { type: Number, required: true, min: 1 },
     anio_emision: { type: Number, required: true },
     student_id: { type: Schema.Types.ObjectId, ref: 'User', required: true },
+    sede_id: { type: Schema.Types.ObjectId, ref: 'Campus', default: null },
     enrollment_id: { type: Schema.Types.ObjectId, ref: 'Enrollment', required: true },
     academic_year_id: { type: Schema.Types.ObjectId, ref: 'AcademicYear', required: true },
     snapshot: { type: Schema.Types.Mixed, required: true },
@@ -59,7 +62,7 @@ const certificadoSchema = new Schema<ICertificadoEmitido, CertificadoEmitidoMode
 );
 
 // Lo expedido es inmutable en el modelo (no solo en el servicio): únicamente cambian el estado y la anulación.
-const CAMPOS_INMUTABLES = ['tipo', 'codigo', 'consecutivo', 'anio_emision', 'student_id', 'enrollment_id', 'academic_year_id', 'snapshot', 'hash', 'token_verificacion', 'emitido_por', 'fecha_emision'];
+const CAMPOS_INMUTABLES = ['tipo', 'codigo', 'consecutivo', 'anio_emision', 'student_id', 'sede_id', 'enrollment_id', 'academic_year_id', 'snapshot', 'hash', 'token_verificacion', 'emitido_por', 'fecha_emision'];
 certificadoSchema.pre('save', function protegerCertificado(next) {
   if (!this.isNew) {
     if (CAMPOS_INMUTABLES.some((campo) => this.isModified(campo))) return next(new Error('Un certificado expedido no se puede modificar: se anula y se expide uno nuevo.'));
@@ -71,6 +74,7 @@ certificadoSchema.pre('save', function protegerCertificado(next) {
 certificadoSchema.index({ codigo: 1 }, { unique: true });
 certificadoSchema.index({ token_verificacion: 1 }, { unique: true });
 certificadoSchema.index({ student_id: 1, fecha_emision: -1 });
+certificadoSchema.index({ sede_id: 1, fecha_emision: -1 });
 certificadoSchema.index({ tipo: 1, anio_emision: 1, consecutivo: 1 }, { unique: true });
 
 export const CertificadoEmitido = model<ICertificadoEmitido, CertificadoEmitidoModel>('CertificadoEmitido', certificadoSchema);

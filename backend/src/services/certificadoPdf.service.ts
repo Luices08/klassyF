@@ -1,15 +1,16 @@
-import fs from 'fs/promises';
 import PDFDocument from 'pdfkit';
 import QRCode from 'qrcode';
-import { definicionCertificado } from '../constants/certificados';
+import { ClaveCertificado, definicionCertificado } from '../constants/certificados';
+import { ContenidoPlantilla } from '../constants/plantillasCertificado';
 import { UserDocument } from '../models/user.model';
 import ApiError from '../utils/ApiError';
 import { redactarCertificado, nombreDeJornada } from '../utils/certificadoTexto';
-import { ImagenGuardada, SnapshotCertificado, claveCorta } from '../utils/certificados';
-import { rutaImagenAutenticacion } from '../utils/uploadPaths';
+import { BloqueResuelto, ImagenGuardada, SnapshotCertificado, TablaValoraciones, claveCorta } from '../utils/certificados';
+import { leerImagenGuardada } from '../utils/almacenImagenes';
 import { registrarEvento } from './audit.service';
 import { cargarCertificado, huellaActual, prepararVistaPrevia, EntradaExpedicion } from './certificado.service';
-import { COLOR, MARGEN, cargarLogo, dibujarEncabezado } from './encabezadoInstitucional.service';
+import { snapshotDeVistaPreviaDePlantilla } from './certificadoPlantilla.service';
+import { COLOR, MARGEN, cargarEscudoCongelado, dibujarEncabezado } from './encabezadoInstitucional.service';
 import User from '../models/user.model';
 
 type Documento = InstanceType<typeof PDFDocument>;
@@ -26,15 +27,7 @@ interface DatosSeguridad {
   anulado?: boolean;
 }
 
-async function leerImagen(imagen: ImagenGuardada | null, etiqueta: string): Promise<Buffer | null> {
-  if (!imagen) return null;
-  try {
-    return await fs.readFile(rutaImagenAutenticacion(imagen.hash, imagen.ext));
-  } catch {
-    // El documento dice que lleva esta imagen: imprimirlo sin ella sería un documento distinto al expedido.
-    throw new ApiError(500, `Falta el archivo de la imagen de ${etiqueta} que se estampó al expedir este documento.`);
-  }
-}
+const leerImagen = async (imagen: ImagenGuardada | null, etiqueta: string): Promise<Buffer | null> => (imagen ? leerImagenGuardada(imagen, etiqueta) : null);
 
 const fechaHora = (iso: string): string =>
   new Date(iso).toLocaleString('es-CO', { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit', timeZone: 'America/Bogota' });
@@ -60,19 +53,73 @@ function bloqueFirma(doc: Documento, x: number, ancho: number, y: number, firma:
   doc.font('Helvetica').fontSize(8.5).fillColor(COLOR.tenue).text(firma.cargo, x + 8, doc.y, { width: ancho - 16, align: 'center' });
 }
 
+/**
+ * Dibuja la tabla de valoraciones tal como la entregó quien la armó (columnas y filas ya son texto): M26 no sabe qué columnas hay ni
+ * cómo se calculan. La primera columna se lleva más ancho; las filas de área van en negrita.
+ */
+function dibujarTablaNotas(doc: Documento, tabla: TablaValoraciones, ancho: number): void {
+  const n = tabla.columnas.length;
+  if (n === 0) return;
+  const unidades = n === 1 ? 1 : 3 + (n - 1);
+  const anchos = tabla.columnas.map((_c, i) => ((i === 0 ? 3 : 1) / unidades) * ancho);
+  const alto = 15;
+  const x0 = MARGEN;
+
+  const fila = (valores: string[], opciones: { negrita?: boolean; fondo?: string } = {}) => {
+    if (doc.y > doc.page.height - 360) doc.addPage();
+    const y = doc.y;
+    if (opciones.fondo) doc.rect(x0, y, ancho, alto).fill(opciones.fondo);
+    doc.font(opciones.negrita ? 'Helvetica-Bold' : 'Helvetica').fontSize(8).fillColor(COLOR.ink);
+    let x = x0;
+    valores.forEach((v, i) => {
+      doc.text(v, x + 2, y + 4, { width: (anchos[i] as number) - 4, height: alto - 4, lineBreak: false, ellipsis: true, align: i === 0 ? 'left' : 'center' });
+      x += anchos[i] as number;
+    });
+    doc.y = y + alto;
+    doc.moveTo(x0, doc.y).lineTo(x0 + ancho, doc.y).strokeColor(COLOR.borde).lineWidth(0.4).stroke();
+  };
+
+  doc.moveDown(0.6);
+  fila(tabla.columnas, { negrita: true, fondo: COLOR.borde });
+  for (const f of tabla.filas) fila(f.nivel === 'ASIGNATURA' ? [`   ${f.celdas[0] ?? ''}`, ...f.celdas.slice(1)] : f.celdas, { negrita: f.nivel === 'AREA' });
+  if (tabla.pie) doc.font('Helvetica').fontSize(7.5).fillColor(COLOR.tenue).text(tabla.pie, x0, doc.y + 4, { width: ancho });
+}
+
+/** Dibuja los bloques que resolvió la plantilla vigente al expedir, en su orden. */
+function dibujarBloques(doc: Documento, snapshot: SnapshotCertificado, bloques: BloqueResuelto[], ancho: number): void {
+  bloques.forEach((b, i) => {
+    switch (b.estilo) {
+      case 'PREAMBULO':
+        doc.moveDown(i === 0 ? 2.5 : 1).font('Helvetica').fontSize(11).fillColor(COLOR.cuerpo).text(b.texto, MARGEN, doc.y, { width: ancho, align: 'center' });
+        break;
+      case 'FORMULA':
+        doc.moveDown(1.2).font('Helvetica-Bold').fontSize(15).fillColor(COLOR.ink).text(b.texto, MARGEN, doc.y, { width: ancho, align: 'center' });
+        break;
+      case 'DESTACADO':
+        doc.moveDown(1).font('Helvetica-Bold').fontSize(12).fillColor(COLOR.ink).text(b.texto, MARGEN, doc.y, { width: ancho, align: 'left' });
+        break;
+      case 'TABLA_NOTAS':
+        if (snapshot.estudios) dibujarTablaNotas(doc, snapshot.estudios.tabla, ancho);
+        break;
+      default:
+        doc.moveDown(1).font('Helvetica').fontSize(12).fillColor(COLOR.cuerpo).text(b.texto, MARGEN, doc.y, { width: ancho, align: 'justify', lineGap: 4 });
+    }
+  });
+}
+
 async function dibujar(snapshot: SnapshotCertificado, seguridad: DatosSeguridad): Promise<Buffer> {
   const [logo, imgRectoria, imgSecretaria, imgSello] = await Promise.all([
-    cargarLogo(),
+    cargarEscudoCongelado(snapshot.encabezado.escudo),
     leerImagen(snapshot.firmas.rectoria.imagen, 'Rectoría'),
     leerImagen(snapshot.firmas.secretaria.imagen, 'Secretaría Académica'),
     leerImagen(snapshot.firmas.sello.imagen, 'sello institucional'),
   ]);
   const qr = seguridad.urlVerificacion ? await QRCode.toBuffer(seguridad.urlVerificacion, { errorCorrectionLevel: 'M', margin: 1, width: 300 }) : null;
-  const texto = redactarCertificado(snapshot);
   const def = definicionCertificado(snapshot.tipo);
+  const titulo = snapshot.contenido?.titulo ?? def.nombre;
 
   return new Promise<Buffer>((resolve, reject) => {
-    const doc = new PDFDocument({ margin: MARGEN, info: { Title: `${def.nombre} ${seguridad.codigo ?? ''}`.trim(), Producer: 'Klassy' } });
+    const doc = new PDFDocument({ margin: MARGEN, info: { Title: `${titulo} ${seguridad.codigo ?? ''}`.trim(), Producer: 'Klassy' } });
     const trozos: Buffer[] = [];
     doc.on('data', (t) => trozos.push(t));
     doc.on('end', () => resolve(Buffer.concat(trozos)));
@@ -80,13 +127,21 @@ async function dibujar(snapshot: SnapshotCertificado, seguridad: DatosSeguridad)
 
     try {
       const e = snapshot.encabezado;
-      dibujarEncabezado(doc, { ...e, jornada: nombreDeJornada(e.jornada) }, def.nombre, seguridad.codigo ?? 'VISTA PREVIA', logo);
+      dibujarEncabezado(doc, { ...e, jornada: nombreDeJornada(e.jornada) }, titulo, seguridad.codigo ?? 'VISTA PREVIA', logo);
 
       const ancho = doc.page.width - MARGEN * 2;
-      doc.moveDown(2.5).font('Helvetica').fontSize(11).fillColor(COLOR.cuerpo).text(texto.preambulo, MARGEN, doc.y, { width: ancho, align: 'center' });
-      doc.moveDown(1.2).font('Helvetica-Bold').fontSize(15).fillColor(COLOR.ink).text(texto.formula, { width: ancho, align: 'center' });
-      doc.moveDown(1).font('Helvetica').fontSize(12).fillColor(COLOR.cuerpo).text(texto.cuerpo, { width: ancho, align: 'justify', lineGap: 4 });
-      doc.moveDown(1.2).text(texto.cierre, { width: ancho, align: 'justify', lineGap: 4 });
+      if (snapshot.contenido) {
+        dibujarBloques(doc, snapshot, snapshot.contenido.bloques, ancho);
+      } else {
+        // Documentos anteriores a las plantillas: se redactan como cuando se expidieron.
+        const texto = redactarCertificado(snapshot);
+        doc.moveDown(2.5).font('Helvetica').fontSize(11).fillColor(COLOR.cuerpo).text(texto.preambulo, MARGEN, doc.y, { width: ancho, align: 'center' });
+        doc.moveDown(1.2).font('Helvetica-Bold').fontSize(15).fillColor(COLOR.ink).text(texto.formula, { width: ancho, align: 'center' });
+        doc.moveDown(1).font('Helvetica').fontSize(12).fillColor(COLOR.cuerpo).text(texto.cuerpo, { width: ancho, align: 'justify', lineGap: 4 });
+        if (snapshot.estudios) dibujarTablaNotas(doc, snapshot.estudios.tabla, ancho);
+        if (texto.concepto) doc.moveDown(1).font('Helvetica-Bold').fontSize(12).fillColor(snapshot.estudios?.promocion ? COLOR.ink : COLOR.peligro).text(texto.concepto, MARGEN, doc.y, { width: ancho, align: 'left' });
+        doc.moveDown(1.2).font('Helvetica').fontSize(12).fillColor(COLOR.cuerpo).text(texto.cierre, MARGEN, doc.y, { width: ancho, align: 'justify', lineGap: 4 });
+      }
 
       // Firmas: con el switch apagado queda la línea con nombre y cargo para la firma manuscrita.
       if (doc.y > doc.page.height - 330) doc.addPage();
@@ -126,8 +181,17 @@ async function dibujar(snapshot: SnapshotCertificado, seguridad: DatosSeguridad)
   });
 }
 
-export async function generarVistaPreviaPdf(entrada: EntradaExpedicion, usuario: UserDocument): Promise<Buffer> {
-  return dibujar(await prepararVistaPrevia(entrada, usuario), { codigo: null });
+export async function generarVistaPreviaPdf(entrada: EntradaExpedicion, usuario: UserDocument, ip?: string | null): Promise<Buffer> {
+  const snapshot = await prepararVistaPrevia(entrada, usuario);
+  const buffer = await dibujar(snapshot, { codigo: null });
+  // Muestra datos reales de un estudiante: se audita aunque no quede nada guardado (sin contenido en el detalle).
+  await registrarEvento({ usuario_id: usuario._id, accion: 'CERTIFICADO_VISTA_PREVIA', entidad: 'Enrollment', entidad_id: entrada.enrollment_id, detalle: entrada.tipo, ip });
+  return buffer;
+}
+
+/** Vista previa de un borrador de plantilla con un estudiante inventado: sirve para ver cómo queda antes de publicarla. */
+export async function generarVistaPreviaDePlantillaPdf(tipo: ClaveCertificado, borrador: ContenidoPlantilla, usuario: UserDocument): Promise<Buffer> {
+  return dibujar(await snapshotDeVistaPreviaDePlantilla(tipo, borrador, usuario), { codigo: null });
 }
 
 /**

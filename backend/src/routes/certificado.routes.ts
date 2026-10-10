@@ -19,12 +19,21 @@ const subirImagen = multer({ storage: multer.memoryStorage(), fileFilter: soloIm
 
 router.use(authenticate);
 
-// Firmas y sellos: lo configura el ADMIN; secretaría solo lee para saber qué switches tiene disponibles.
+// Firmas y sellos: el ADMIN configura todo; secretaría carga su firma y el sello (y la de Rectoría si hay delegación). Lo fino lo decide
+// el servicio con `permisosCertificados`, así la ruta no repite la regla.
 router.get('/configuracion', checkRole(...SECRETARIA_Y_ADMIN), ctrl.obtenerConfiguracion);
-router.put('/configuracion', checkRole(ROLES.ADMIN), validate(v.actualizarConfiguracion), ctrl.actualizarConfiguracion);
-router.get('/configuracion/imagenes/:elemento', checkRole(ROLES.ADMIN), validate(v.conElemento), ctrl.verImagen);
-router.put('/configuracion/imagenes/:elemento', checkRole(ROLES.ADMIN), validate(v.conElemento), subirImagen.single('file'), ctrl.guardarImagen);
-router.delete('/configuracion/imagenes/:elemento', checkRole(ROLES.ADMIN), validate(v.conElemento), ctrl.quitarImagen);
+router.put('/configuracion', checkRole(...SECRETARIA_Y_ADMIN), validate(v.actualizarConfiguracion), ctrl.actualizarConfiguracion);
+router.get('/configuracion/imagenes/:elemento', checkRole(...SECRETARIA_Y_ADMIN), validate(v.conElemento), ctrl.verImagen);
+// POST como el resto de cargas de archivos del sistema: `api.upload` del frontend siempre envía POST.
+router.post('/configuracion/imagenes/:elemento', checkRole(...SECRETARIA_Y_ADMIN), validate(v.conElemento), subirImagen.single('file'), ctrl.guardarImagen);
+router.delete('/configuracion/imagenes/:elemento', checkRole(...SECRETARIA_Y_ADMIN), validate(v.conElemento), ctrl.quitarImagen);
+
+// Plantillas: el texto de cada documento. Solo el ADMIN las ve y las publica.
+router.get('/plantillas', checkRole(ROLES.ADMIN), ctrl.listarPlantillas);
+router.get('/plantillas/:tipo/versiones', checkRole(ROLES.ADMIN), validate(v.plantillaConTipo), ctrl.versionesDePlantilla);
+router.post('/plantillas/:tipo/vista-previa', checkRole(ROLES.ADMIN), validate(v.vistaPreviaPlantilla), ctrl.vistaPreviaPlantilla);
+router.post('/plantillas/:tipo/restablecer', checkRole(ROLES.ADMIN), validate(v.plantillaConTipo), ctrl.restablecerPlantilla);
+router.put('/plantillas/:tipo', checkRole(ROLES.ADMIN), validate(v.publicarPlantilla), ctrl.publicarPlantilla);
 
 router.get('/estudiantes/:studentId/matriculas', checkRole(...SECRETARIA_Y_ADMIN), validate(v.matriculasDelEstudiante), ctrl.matriculasDelEstudiante);
 router.post('/vista-previa', checkRole(...SECRETARIA_Y_ADMIN), validate(v.vistaPrevia), ctrl.vistaPrevia);

@@ -1,4 +1,5 @@
 import { type FormEvent, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Alert, errorMessage } from '../../components/ui/Alert';
 import { Chip, CupoBadge, EstadoGrupoBadge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
@@ -9,7 +10,7 @@ import { IconButton } from '../../components/ui/IconButton';
 import { PageHeader } from '../../components/ui/PageHeader';
 import { Spinner } from '../../components/ui/Spinner';
 import { EmptyRow, Table, TableBody, TableHead, Td, Th } from '../../components/ui/Table';
-import { BanIcon, PencilIcon, PlusIcon, RefreshIcon } from '../../components/ui/icons';
+import { BanIcon, EyeIcon, PencilIcon, PlusIcon, RefreshIcon } from '../../components/ui/icons';
 import { useAnioDeTrabajo } from '../../hooks/useAniosLectivos';
 import { useCampuses, useGrades, useJornadas } from '../../hooks/useCatalogs';
 import { useEspacios } from '../../hooks/useEspacios';
@@ -18,6 +19,7 @@ import { useInstitution } from '../../hooks/useInstitution';
 import type { Espacio, EstadoGrupo, Group } from '../../types/domain';
 
 export function GroupsPage() {
+  const navigate = useNavigate();
   const institutionQuery = useInstitution();
   const { anio: anioPorDefecto, anios, query: aniosQuery } = useAnioDeTrabajo();
   // Sin selección explícita se trabaja sobre la vigencia activa (o, si no hay, el más reciente sin cerrar).
@@ -249,7 +251,11 @@ export function GroupsPage() {
             <TableBody>
               {groupsQuery.data.map((g) => (
                 <tr key={g._id}>
-                  <Td className="font-medium text-ink">{g.nomenclatura}</Td>
+                  <Td className="font-medium">
+                    <button type="button" className="text-primary hover:underline" onClick={() => navigate(`/admin/groups/${g._id}`)}>
+                      {g.nomenclatura}
+                    </button>
+                  </Td>
                   <Td>{typeof g.grade_id === 'object' ? g.grade_id.nombre : g.grade_id}</Td>
                   <Td>
                     <Chip tone="blue">{typeof g.jornada_id === 'object' ? g.jornada_id.nombre : g.jornada_id}</Chip>
@@ -276,6 +282,7 @@ export function GroupsPage() {
                   </Td>
                   <Td>
                     <div className="flex items-center justify-end gap-1.5">
+                      <IconButton tone="neutral" label="Ver ficha del grupo" icon={<EyeIcon />} onClick={() => navigate(`/admin/groups/${g._id}`)} />
                       {usaEspacios && (
                         <IconButton
                           tone="edit"

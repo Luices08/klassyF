@@ -1,7 +1,10 @@
 import { createHmac, randomBytes } from 'crypto';
 import {
+  CLAVE_DESTINATARIO_OTRO,
   ClaveCertificado,
+  DefinicionCertificado,
   ELEMENTOS_AUTENTICACION,
+  ETIQUETA_DESTINATARIO_OTRO,
   ETIQUETA_ELEMENTO,
   ElementoAutenticacion,
   ModoElemento,
@@ -23,6 +26,45 @@ export interface FirmaPersona {
   imagen: ImagenGuardada | null;
 }
 
+export interface BloqueResuelto {
+  estilo: 'PREAMBULO' | 'FORMULA' | 'CUERPO' | 'DESTACADO' | 'TABLA_NOTAS';
+  texto: string;
+}
+
+export interface ContenidoResuelto {
+  /** Qué versión de la plantilla produjo este texto (para saber de dónde salió; el texto ya está aquí, congelado). */
+  plantilla: { version: number; hash: string };
+  titulo: string;
+  bloques: BloqueResuelto[];
+  vigencia_dias: number | null;
+}
+
+/** Una fila de la tabla de valoraciones: las celdas ya vienen como texto, M26 no interpreta su contenido. */
+export interface FilaValoracion {
+  nivel: 'AREA' | 'ASIGNATURA';
+  celdas: string[];
+}
+
+/**
+ * La tabla de valoraciones del certificado de estudio, ya armada. Cómo se presenta (qué columnas, si se ven áreas o asignaturas,
+ * los decimales) lo decide quien la entrega (el boletín final de M17 y la escala de cada institución, M05); M26 solo la dibuja y
+ * la congela en el documento.
+ */
+export interface TablaValoraciones {
+  columnas: string[];
+  filas: FilaValoracion[];
+  /** Leyenda al pie de la tabla. */
+  pie: string;
+}
+
+export interface DatosEstudios {
+  tabla: TablaValoraciones;
+  /** Todas las asignaturas tienen sus periodos definitivos. */
+  completo: boolean;
+  /** null mientras no exista la fuente (M19): sin él el documento no se expide como oficial. */
+  promocion: { concepto: 'APROBO' | 'NO_APROBO' } | null;
+}
+
 /** Lo que se congela al expedir: el PDF se dibuja SOLO desde aquí y la huella cubre todo, incluidas las firmas elegidas. */
 export interface SnapshotCertificado {
   version_formato: 1;
@@ -35,8 +77,14 @@ export interface SnapshotCertificado {
     sede: string;
     jornada: string;
     anio: number | null;
+    ciudad?: string | null;
+    departamento?: string | null;
+    /** El escudo con el que se expidió (M01 `logo_url`, guardado por su huella). Ausente en documentos anteriores. */
+    escudo?: ImagenGuardada | null;
   };
-  estudiante: { nombre: string; apellido: string; tipo_documento: string; numero_documento: string };
+  estudiante: { nombre: string; apellido: string; tipo_documento: string; numero_documento: string; lugar_expedicion?: string | null };
+  /** Responsable legal que formalizó la matrícula (M03). Solo lo lleva el certificado de matrícula. */
+  acudiente?: { nombre: string; tipo_documento: string; numero_documento: string; parentesco: string } | null;
   matricula: {
     estado: string;
     grado: string;
@@ -46,9 +94,22 @@ export interface SnapshotCertificado {
     numero_libro: number | null;
     numero_folio: number | null;
     fecha_matricula: string;
+    /** Nivel del grado (M01), condición de ingreso (M04) y horario de la jornada (M01): ausentes en documentos anteriores. */
+    nivel?: string;
+    tipo_ingreso?: string;
+    horario?: { inicio: string; fin: string };
   };
+  /** Etiqueta del destinatario o motivo elegido (texto escrito, si fue «Otro»). Los documentos anteriores al selector guardan aquí texto libre. */
   destinatario: string | null;
+  /** Cierre ya resuelto desde el selector. Ausente en documentos anteriores: el texto lo reconstruye desde `destinatario`. */
+  destino?: { clave: string; frase: string };
   fecha_expedicion: string;
+  /** El texto ya resuelto desde la plantilla vigente al expedir: el PDF se dibuja desde aquí. Ausente en documentos anteriores a las plantillas. */
+  contenido?: ContenidoResuelto;
+  /** Solo paz y salvo: las dependencias que se confirmaron sin pendientes y quién lo verificó. */
+  paz_y_salvo?: { dependencias: string[]; verificado_por: string };
+  /** Solo certificado de estudio: la malla con las valoraciones y, cuando exista M19, el concepto de promoción. */
+  estudios?: DatosEstudios;
   firmas: {
     rectoria: FirmaPersona;
     secretaria: FirmaPersona;
@@ -94,10 +155,12 @@ export interface EstadoDeElemento {
   motivo: string | null;
 }
 
-export function describirElemento(elemento: ElementoAutenticacion, modo: ModoElemento, tieneImagen: boolean, puedeAplicar: boolean): EstadoDeElemento {
+export function describirElemento(elemento: ElementoAutenticacion, modo: ModoElemento, tieneImagen: boolean, puedeAplicar: boolean, tieneFirmante = true): EstadoDeElemento {
   if (modo === 'NO_APLICA') return { valor_inicial: false, bloqueado: true, obligatorio: false, disponible: false, motivo: 'No aplica a este documento.' };
   let motivo: string | null = null;
-  if (!tieneImagen) motivo = `Falta cargar la imagen de «${ETIQUETA_ELEMENTO[elemento]}» en Firmas y sellos.`;
+  // Una firma sin firmante saldría sin nombre: primero se designa quién firma.
+  if (!tieneFirmante) motivo = `Falta designar quién firma como «${ETIQUETA_ELEMENTO[elemento]}» en Firmas y sellos.`;
+  else if (!tieneImagen) motivo = `Falta cargar la imagen de «${ETIQUETA_ELEMENTO[elemento]}» en Firmas y sellos.`;
   else if (!puedeAplicar) motivo = 'Solo el administrador puede aplicar la firma de Rectoría.';
   const disponible = motivo === null;
   const obligatorio = modo === 'OBLIGATORIO';
@@ -108,11 +171,13 @@ export interface EntradaElementos {
   politica: PoliticaDeCertificado;
   tieneImagen: Record<ElementoAutenticacion, boolean>;
   puedeAplicar: Record<ElementoAutenticacion, boolean>;
+  /** Si se omite, se asume que todos tienen firmante (el sello no tiene). */
+  tieneFirmante?: Record<ElementoAutenticacion, boolean>;
 }
 
 export function estadoDeElementos(e: EntradaElementos): Record<ElementoAutenticacion, EstadoDeElemento> {
   return Object.fromEntries(
-    ELEMENTOS_AUTENTICACION.map((el) => [el, describirElemento(el, e.politica[el], e.tieneImagen[el], e.puedeAplicar[el])])
+    ELEMENTOS_AUTENTICACION.map((el) => [el, describirElemento(el, e.politica[el], e.tieneImagen[el], e.puedeAplicar[el], e.tieneFirmante?.[el] ?? true)])
   ) as Record<ElementoAutenticacion, EstadoDeElemento>;
 }
 
@@ -145,3 +210,34 @@ export function resolverElementos(e: EntradaElementos, solicitado: Partial<Recor
   }
   return { aplicados, errores };
 }
+
+// --- Destinatario o motivo ---
+
+export interface DestinoResuelto {
+  clave: string;
+  etiqueta: string;
+  frase: string;
+}
+
+/**
+ * Convierte lo elegido en el selector en el texto que queda congelado. Sin nada, o con «Otro» sin texto, se asume la
+ * opción predeterminada del documento («A quien interese»). Una clave que no es de ese documento es un error, no se ignora.
+ */
+export function resolverDestinatario(def: Pick<DefinicionCertificado, 'nombre' | 'destinatarios' | 'frase_otro'>, solicitado: { clave?: string | null; otro?: string | null } | null | undefined): DestinoResuelto | { error: string } {
+  const predeterminada = def.destinatarios[0] as (typeof def.destinatarios)[number];
+  const clave = solicitado?.clave?.trim() || predeterminada.clave;
+  const otro = solicitado?.otro?.trim() ?? '';
+  if (clave === CLAVE_DESTINATARIO_OTRO) {
+    if (!otro) return predeterminada;
+    return { clave, etiqueta: otro, frase: def.frase_otro.replace('{texto}', otro) };
+  }
+  const opcion = def.destinatarios.find((o) => o.clave === clave);
+  if (!opcion) return { error: `«${clave}» no es un destinatario válido para «${def.nombre}».` };
+  return opcion;
+}
+
+/** Lo que ve el selector: las opciones del documento y, al final, «Otro». */
+export const opcionesDeDestinatario = (def: Pick<DefinicionCertificado, 'destinatarios'>): Array<{ clave: string; etiqueta: string }> => [
+  ...def.destinatarios.map(({ clave, etiqueta }) => ({ clave, etiqueta })),
+  { clave: CLAVE_DESTINATARIO_OTRO, etiqueta: ETIQUETA_DESTINATARIO_OTRO },
+];

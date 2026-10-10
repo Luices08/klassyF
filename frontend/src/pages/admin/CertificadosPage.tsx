@@ -3,11 +3,12 @@ import { useState } from 'react';
 import { ConfiguracionCertificadosPanel } from '../../components/certificados/ConfiguracionCertificadosPanel';
 import { ExpedirCertificado } from '../../components/certificados/ExpedirCertificado';
 import { HistorialCertificados } from '../../components/certificados/HistorialCertificados';
+import { PlantillasCertificadosPanel } from '../../components/certificados/PlantillasCertificadosPanel';
 import { PageHeader } from '../../components/ui/PageHeader';
 import { TabPanel, Tabs } from '../../components/ui/Tabs';
 import { useAuth } from '../../context/AuthContext';
 
-/** Secretaría académica (M26): expedir constancias y certificados, ver lo expedido y, solo el ADMIN, configurar firmas y sellos. */
+/** Secretaría académica (M26): expedir constancias y certificados, ver lo expedido y configurar firmas y sellos (cada rol, según lo que el servidor le permita). */
 export function CertificadosPage() {
   const { user } = useAuth();
   const [params] = useSearchParams();
@@ -15,7 +16,9 @@ export function CertificadosPage() {
   const tabs = [
     { key: 'expedir', label: 'Expedir' },
     { key: 'historial', label: 'Historial' },
-    ...(user?.rol === 'ADMIN' ? [{ key: 'firmas', label: 'Firmas y sellos' }] : []),
+    { key: 'firmas', label: 'Firmas y sellos' },
+    // El texto de los documentos lo define el administrador.
+    ...(user?.rol === 'ADMIN' ? [{ key: 'plantillas', label: 'Plantillas' }] : []),
   ];
 
   return (
@@ -30,6 +33,9 @@ export function CertificadosPage() {
       </TabPanel>
       <TabPanel active={tab} tabKey="firmas">
         <ConfiguracionCertificadosPanel />
+      </TabPanel>
+      <TabPanel active={tab} tabKey="plantillas">
+        <PlantillasCertificadosPanel />
       </TabPanel>
     </div>
   );

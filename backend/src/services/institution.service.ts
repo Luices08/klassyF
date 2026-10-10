@@ -17,6 +17,8 @@ export interface UpdateInstitutionInput {
   resolucion_aprobacion: string;
   estado?: EstadoUsuario;
   logo_url?: string | null;
+  ciudad?: string | null;
+  departamento?: string | null;
   correo_secretaria?: string | null;
   horario_atencion?: string | null;
   modalidad?: ModalidadInstitucion;
@@ -174,6 +176,8 @@ export async function updateInstitution(
   institucion.resolucion_aprobacion = input.resolucion_aprobacion;
   if (input.estado !== undefined) institucion.estado = input.estado;
   if (input.logo_url !== undefined) institucion.logo_url = input.logo_url;
+  if (input.ciudad !== undefined) institucion.ciudad = input.ciudad?.trim() || null;
+  if (input.departamento !== undefined) institucion.departamento = input.departamento?.trim() || null;
   if (input.correo_secretaria !== undefined) institucion.correo_secretaria = input.correo_secretaria;
   if (input.horario_atencion !== undefined) institucion.horario_atencion = input.horario_atencion;
   if (input.modalidad !== undefined) institucion.modalidad = input.modalidad;

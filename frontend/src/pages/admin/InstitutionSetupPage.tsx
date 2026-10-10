@@ -94,6 +94,8 @@ function InstitutionOverview({ institution }: { institution: Institution }) {
     resolucion_aprobacion: institution.resolucion_aprobacion,
     estado: institution.estado,
     logo_url: institution.logo_url,
+    ciudad: institution.ciudad ?? '',
+    departamento: institution.departamento ?? '',
     correo_secretaria: institution.correo_secretaria ?? '',
     horario_atencion: institution.horario_atencion ?? '',
     modalidad: institution.modalidad ?? 'PRESENCIAL',
@@ -111,7 +113,9 @@ function InstitutionOverview({ institution }: { institution: Institution }) {
       resolucion_aprobacion: institution.resolucion_aprobacion,
       estado: institution.estado,
       logo_url: institution.logo_url,
-      correo_secretaria: institution.correo_secretaria ?? '',
+      ciudad: institution.ciudad ?? '',
+    departamento: institution.departamento ?? '',
+    correo_secretaria: institution.correo_secretaria ?? '',
       horario_atencion: institution.horario_atencion ?? '',
       modalidad: institution.modalidad ?? 'PRESENCIAL',
       politica_aforo_aula: institution.politica_aforo_aula ?? 'BLOQUEAR',
@@ -178,6 +182,8 @@ function InstitutionOverview({ institution }: { institution: Institution }) {
             <StaticField label="Código DANE" value={institution.codigo_dane} />
             <StaticField label="NIT" value={institution.nit} />
             <StaticField label="Resolución de aprobación" value={institution.resolucion_aprobacion} />
+            <StaticField label="Ciudad" value={institution.ciudad || '—'} />
+            <StaticField label="Departamento" value={institution.departamento || '—'} />
             <StaticField label="Correo de secretaría" value={institution.correo_secretaria || '—'} />
             <StaticField label="Horario de atención" value={institution.horario_atencion || '—'} />
             <StaticField label="Modalidad" value={institution.modalidad === 'VIRTUAL' ? 'Virtual' : 'Presencial'} />
@@ -298,6 +304,16 @@ function InstitutionOverview({ institution }: { institution: Institution }) {
           <option value="inactivo">Inactiva</option>
         </Select>
 
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <Input
+            label="Ciudad / municipio (opcional)"
+            value={form.ciudad}
+            onChange={(e) => setForm((f) => ({ ...f, ciudad: e.target.value }))}
+            maxLength={80}
+            hint="Aparece en los certificados: «Dado en Bogotá D.C., …»."
+          />
+          <Input label="Departamento (opcional)" value={form.departamento} onChange={(e) => setForm((f) => ({ ...f, departamento: e.target.value }))} maxLength={80} />
+        </div>
         <Input
           label="Correo de secretaría académica (opcional)"
           type="email"

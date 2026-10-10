@@ -16,6 +16,7 @@ import { hoyColombia } from '../../src/services/attendance.service';
 import * as configuracion from '../../src/services/configuracionActividades.service';
 import { detenerBaseDeDatos, iniciarBaseDeDatos, limpiarBaseDeDatos } from './baseDeDatos';
 import { armarEscenario, crearUsuario, Escenario } from './escenario';
+import { UPLOADS_ROOT } from '../../src/utils/uploadPaths';
 
 const DIA_MS = 86_400_000;
 const pdf = (nombre = 'tarea.pdf') => ({ buffer: Buffer.from('%PDF-1.4 mi tarea'), mimetype: 'application/pdf', originalname: nombre });
@@ -37,7 +38,7 @@ describe('M11: actividades y entregas (con base de datos)', () => {
   beforeAll(iniciarBaseDeDatos, 600_000);
   afterAll(async () => {
     await detenerBaseDeDatos();
-    await fs.rm(path.join(process.cwd(), 'uploads', 'actividades'), { recursive: true, force: true });
+    await fs.rm(path.join(UPLOADS_ROOT, 'actividades'), { recursive: true, force: true });
   });
 
   beforeEach(async () => {

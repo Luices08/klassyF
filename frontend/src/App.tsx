@@ -7,6 +7,8 @@ import { MyAccountPage } from './pages/MyAccountPage';
 import { NotFoundPage } from './pages/NotFoundPage';
 import { ReportCardPage } from './pages/ReportCardPage';
 import { HomePage } from './pages/public/HomePage';
+import { VerificarCertificadoPage } from './pages/public/VerificarCertificadoPage';
+import { CertificadosPage } from './pages/admin/CertificadosPage';
 import { AnioLectivoPage } from './pages/AnioLectivoPage';
 import { ActividadesDocentePage } from './pages/ActividadesDocentePage';
 import { NotasPlanillaPage } from './pages/NotasPlanillaPage';
@@ -53,6 +55,8 @@ export default function App() {
     <Routes>
       <Route path="/" element={<HomePage />} />
       <Route path="/login" element={<LoginPage />} />
+      <Route path="/verificar" element={<VerificarCertificadoPage />} />
+      <Route path="/verificar/:token" element={<VerificarCertificadoPage />} />
 
       <Route element={<ProtectedRoute />}>
         <Route element={<AppShell />}>
@@ -75,6 +79,10 @@ export default function App() {
             <Route path="/admin/students" element={<StudentsPage />} />
             <Route path="/admin/students/:id" element={<StudentDetailPage />} />
             <Route path="/admin/admisiones" element={<AdmissionRequestsPage />} />
+          </Route>
+
+          <Route element={<ProtectedRoute allowedRoles={['ADMIN', 'SECRETARIA']} />}>
+            <Route path="/secretaria/certificados" element={<CertificadosPage />} />
           </Route>
 
           <Route element={<ProtectedRoute allowedRoles={['ADMIN', 'COORDINADOR']} />}>

@@ -69,7 +69,7 @@ que ya se han dado en el proyecto para que no haya que repetirlas cada vez.
 Los 5 sub-módulos de M01 están implementados; no rehacer, solo extender si se pide algo nuevo:
 
 1. **Institución** — `Institution` (nombre, código DANE, NIT, resolución, `logo_url` como data
-   URI, `estado` activo/inactivo). `GET/PATCH /institution`, página `InstitutionSetupPage`.
+   URI —es el escudo de los documentos oficiales—, `ciudad` y `departamento` opcionales —los usan los certificados de M26—, `estado` activo/inactivo). `GET/PATCH /institution`, página `InstitutionSetupPage`.
 2. **Sedes** — `Campus` (nombre, código DANE de sede, dirección, `telefono`, `es_principal`,
    `estado`). CRUD completo en `/campuses` (crear/editar/desactivar/eliminar — eliminar solo si
    no es principal y no tiene jornadas/grupos), página `SedesPage`.
@@ -492,6 +492,134 @@ justificaciones, reportes PDF y, solo ADMIN, estados). Reglas que no se ven leye
 - **Pendiente, a propósito fuera de alcance**: la vista del acudiente (CU-ACU-02, depende de M27); umbrales de ausentismo (alertas por %), que
   serían política institucional.
 
+### M26 (Secretaría académica — certificados y constancias) — estado: núcleo completo
+
+Backend `/certificados` (modelos `CertificadoEmitido`, `TipoCertificado`, `PlantillaCertificado` y `ConfiguracionCertificados`; verificación pública en `/public/certificados/verificar`), frontend
+`CertificadosPage` (`/secretaria/certificados`, ADMIN y SECRETARIA: pestañas Expedir / Historial / Firmas y sellos [ADMIN todo; SECRETARIA su firma, el sello y, con delegación, la de Rectoría] / Tipos de documento / Plantillas [ADMIN en todo tipo no archivado; SECRETARIA solo en borradores]) y `VerificarCertificadoPage`
+(`/verificar` y `/verificar/:token`, sin sesión; es la tarjeta «Validación de Certificados» del Home). Análisis y decisiones: `doc/Analisis_M26_Klassy.md`.
+Reglas que no se ven leyendo un solo archivo:
+
+- **Cero redundancia: el cliente solo manda ids y opciones.** Al expedir se envía `enrollment_id`, `tipo`, `destinatario` (opcional) y los switches; el
+  contenido (colegio, DANE, NIT, resolución, sede, jornada, datos del alumno, grado, grupo, folio del Libro de Matrícula) lo arma `prepararDocumento`
+  (`certificado.service.ts`) leyendo M01/M03/M04. Joi descarta cualquier otro campo (`stripUnknown`). Un dato nuevo que el sistema ya conoce **no se pide en la
+  pantalla**: se agrega al snapshot.
+- **Los tipos de documento son datos, no código** (`TipoCertificado`, `tipoCertificado.service.ts`, pestaña «Tipos de documento»). Secretaría y el ADMIN **crean, editan, archivan y
+  eliminan** tipos (nombre, descripción, prefijo del consecutivo, estados de matrícula con los que aplica, fuentes de datos, política de firmas y su texto). `TIPOS_INICIALES`
+  (`constants/certificados.ts`: constancia de estudio `CE`, certificado de matrícula `CM`, paz y salvo `PS`, certificado de estudio `CS`) son solo la semilla: se siembran **una sola
+  vez** (`ConfiguracionCertificados.tipos_sembrados`), una instalación anterior conserva su política por documento, y si el colegio elimina uno **no vuelve**. Nada del servicio ni de la
+  pantalla compara por nombre de tipo: lo que cambia el comportamiento son las **fuentes** (`FUENTES_CERTIFICADO`: `VALORACIONES` = tabla de notas + concepto de promoción, `DEPENDENCIAS` =
+  confirmación de «sin pendientes» del paz y salvo). Quien configura **enciende** una fuente; el código sabe leerla (una fuente nueva es una entrada ahí y su lectura en la expedición).
+  El responsable legal (`acudiente.*`) se lee y se congela **solo si el texto del tipo lo usa**. Consecutivo anual sin huecos por prefijo (`Counter` `CERT-<prefijo>-<año>` en la transacción).
+- **Ficha del estudiante al expedir** (`matriculasExpedibles`, `TarjetaEstudiante`; solo lectura de M01/M03/M04, la consulta se audita sin contenido): datos del estudiante, su matrícula (sede, jornada,
+  horario, folio, libro, ingreso), los acudientes **activos** con el principal primero (nombre, parentesco, documento, teléfono), la EPS (si hay autorización) y `faltantes`: lo que le
+  falta al sistema para que los documentos salgan completos (acudiente principal, lugar de expedición, ciudad del colegio, folio). Sirve para ver el problema antes de que el 409 lo anuncie.
+- **Quién solicita el documento** (`solicitante`, obligatorio al expedir y no en la vista previa; `resolverSolicitante`, función pura con tests): `ACUDIENTE` (vinculado y activo en M03),
+  `ESTUDIANTE` (solo mayor de edad, por `fecha_nacimiento`), `TERCERO` (nombre, documento, relación y confirmación de que presentó la **autorización escrita** del acudiente) o `AUTORIDAD`
+  (entidad y número de oficio). Queda en `CertificadoEmitido.solicitante` (inmutable en el modelo), se ve en el historial y **no se imprime**; la auditoría solo guarda el tipo. Existe por la
+  Ley 1581/2012 (art. 7, datos de menores) y la Ley 1098/2006: un certificado trae datos personales de un menor y saber a quién se entregó es parte de su trazabilidad.
+- **Anulación masiva por elemento comprometido** (`certificadoRevocacion.service.ts`, solo ADMIN, en «Firmas y sellos»): **cambiar el sello o una firma no anula lo ya expedido** (cada documento
+  conserva las imágenes con las que salió). Si una imagen se robó o se usó sin autorización, el ADMIN ve las imágenes usadas (huella, cuántos documentos vigentes, desde/hasta, cuál es la actual),
+  elige una, ve cuántos documentos alcanza y los anula con **motivo (que queda en cada documento) y su contraseña**; se puede acotar por tipo y fechas. Es una anulación: nada se borra.
+- **Ciclo de un tipo** (`BORRADOR` → `ACTIVO` → `ARCHIVADO`; `permisosTipo` en `utils/permisosCertificados.ts`, función pura con tests). Todo tipo nuevo **nace en borrador**: no se expide, pero
+  su vista previa sí funciona (así Secretaría prueba lo que redactó). **Secretaría** crea, edita y redacta el texto **mientras es borrador**, y archiva o elimina; **activar** (que exige
+  que el texto cumpla los mínimos), editar un tipo ya activo, la política de firmas y los datos que el texto no puede perder son del **ADMIN**. **Eliminar solo si nunca se expidió nada**
+  (se borra con sus textos); con documentos expedidos se **archiva**: deja de ofrecerse, pero lo expedido se verifica por su QR, se reimprime y conserva su nombre (por eso los tipos expedidos
+  no se borran: el código QR y el consecutivo no pueden quedar huérfanos). El prefijo y las fuentes solo cambian en borrador y sin documentos expedidos; el prefijo es único incluso entre
+  archivados. Las claves de los tipos de partida no se reutilizan. Un tipo creado arranca con un texto genérico armado con sus fuentes (`contenidoInicial`) que ya cumple los mínimos.
+- **Plantillas de los documentos (núcleo de M26, maestro: «Permitir plantillas oficiales configurables»).** El texto de cada documento **no está en el código**: vive en
+  `PlantillaCertificado` (una versión `VIGENTE` por tipo, las anteriores `ARCHIVADA`; inmutables en el modelo y con índice único parcial) y lo edita el ADMIN (en cualquier tipo no archivado) o Secretaría (solo en un tipo en borrador) en la
+  pestaña «Plantillas». Una plantilla es una lista ordenada de **bloques** (`PREAMBULO`, `FORMULA`, `CUERPO`, `DESTACADO`, `TABLA_NOTAS`), cada uno con texto, `activo` y una
+  **condición** opcional («solo si hay / no hay» un dato), más el título, la vigencia en días, las opciones del selector de destinatario y la frase de «Otro». El texto usa
+  **variables** `{{modulo.dato}}` de un **catálogo cerrado** (`constants/variablesCertificado.ts`: cada una declara su módulo de origen; una variable nueva es una entrada ahí y
+  su valor en `contextoDeVariables`). **La plantilla nunca crea datos**: los toma de M01/M03/M04/M05; si un bloque visible necesita un dato que no existe, **no se expide** y
+  el mensaje dice cuál (409), p. ej. sin `institucion.ciudad` el cierre cae al bloque «Fecha de expedición» (condición `NO_HAY`).
+- **Qué NO es editable.** El encabezado institucional (nombre, escudo, DANE, NIT, resolución, sede, jornada, año: `encabezadoInstitucional.service`, datos de M01), la tabla
+  de valoraciones (la arma el módulo de notas y M26 solo la coloca), el QR y la huella, y el diseño del PDF. Es la versión mínima del patrón de M12 (`ConfiguracionPlanilla`, «M21 mínimo»), no un
+  constructor libre; el constructor general sigue siendo M21.
+- **No se publica una plantilla que pierde lo mínimo del documento** (`requisitosDe(tipo)` en `constants/plantillasCertificado.ts`, derivado de las fuentes del tipo y validado en `validarContenido`, que lista
+  TODOS los problemas): bloques que no se pueden quitar o desactivar (`formula`, `cuerpo`; en un tipo con la fuente de valoraciones también `notas` y `promocion`) y variables que deben
+  aparecer (nombre, documento, grado, año, fecha; folio y fecha de matrícula; dependencias; concepto de promoción). Fuente: Decreto 180 de 1981 art. 13 (compilado en el
+  Decreto 1075 de 2015: firmas del director y el secretario, DANE, aprobación, curso y año, asignaturas con intensidad horaria y calificaciones, fecha; **si exige «en letras y números» no está confirmado ni se fija en el código**: la presentación de las notas es de cada institución) y el
+  maestro. **Validar la numeración y el texto con la norma vigente (SUIN-Juriscol).**
+- **Lo expedido guarda el texto ya resuelto** (`snapshot.contenido`: bloques con las variables reemplazadas + versión y huella de la plantilla). Publicar una versión nueva
+  solo afecta lo que se expida después. Los documentos anteriores a las plantillas no tienen `contenido` y se reimprimen con `redactarCertificado`
+  (`utils/certificadoTexto.ts`, texto histórico que no se toca). Publicar sin cambios es 409; «Restablecer» publica el texto de partida como versión nueva (la historia no se
+  pierde). Los **valores de partida** (`contenidoInicial`, `constants/plantillasCertificado.ts` y `CERTIFICADOS[].destinatarios`) son solo la semilla de la versión 1, como
+  `POLITICA_INICIAL`. Vista previa de un borrador: `POST /certificados/plantillas/:tipo/vista-previa` con un estudiante inventado y el encabezado real (no guarda nada).
+- **Destinatario o motivo = selector por documento, no texto libre** (maestro, formulario de M26). Las opciones salen de la plantilla vigente (la primera es la
+  predeterminada, «A quien interese») y «Otro (especificar…)» se agrega siempre al final; vacío o «Otro» sin texto cae en la predeterminada. El cliente envía
+  `destinatario: { clave, otro? }` y `resolverDestinatario` (`utils/certificados.ts`) lo traduce: el snapshot congela la etiqueta (`destinatario`) y la frase del cierre
+  (`destino`). Una clave que no es del tipo es 400. Los documentos anteriores al selector guardan texto libre en `destinatario` y se reimprimen igual.
+  **Opciones que toman la entidad de otro módulo** (`fuente_entidad`, hoy solo `EPS`): su frase lleva `{entidad}`. La opción «EPS del estudiante» lee la EPS que M03 tiene del estudiante
+  (`StudentProfile.eps`) **solo si el responsable legal dio la autorización de datos sensibles**, solo el nombre (nunca el régimen) y solo cuando esa opción se elige; sin EPS o sin
+  autorización responde 409 y la pantalla la muestra deshabilitada con el motivo («Otro» sigue disponible). Queda congelada en el snapshot, y la auditoría dice «entidad de EPS (M03)» sin el nombre.
+  M26 solo **lee** M03/M04: no se tocó ninguno de los dos.
+- **Datos de las constancias que ya existían en otros módulos**: nivel del grado (M01), horario de la jornada, condición de ingreso, lugar de expedición del documento y
+  acudiente principal (`StudentGuardian.es_principal`, solo el certificado de matrícula), y ciudad/departamento del colegio (**campos nuevos de M01**, `Institution.ciudad` y
+  `departamento`, editables en Configuración institucional; el escudo es el `logo_url` de M01). **No existen todavía** (no se inventan): lema del colegio y código único
+  estudiantil (M03); resoluciones estructuradas (hoy `resolucion_aprobacion` es un solo texto y debe incluir los niveles que cubre).
+- **Paz y salvo con dependencias configurables.** `ConfiguracionCertificados.paz_y_salvo.dependencias` (valores de partida: Académica, Biblioteca, Financiera /
+  Administrativa, Inventario y recursos; el ADMIN las agrega, desactiva y quita). Al expedir se confirman **todas las activas** («sin pendientes»); la lista y quién las
+  verificó (`paz_y_salvo.verificado_por`) quedan congeladas en el snapshot. Hoy la confirmación es manual: cuando existan biblioteca, cartera o inventario, cada
+  dependencia pasará a calcularse sola sin cambiar el documento (la académica podría leer M12).
+- **Certificado de estudio (con notas): se construye completo, pero solo admite vista previa hasta que exista M19.** `datosDeEstudios`
+  (`certificadoEstudios.service.ts`) lee el boletín de cada periodo (M17) y la consolidación pura `utils/certificadoEstudios.ts` pondera por el porcentaje de cada periodo
+  (M05). **Solo cuentan las notas `DEFINITIVO`** (declaradas por coordinación en M12): una nota que el docente cerró pero nadie validó cuenta como ausente, y sin todas las
+  notas no hay nota final (nunca se promedia lo que falta). **La tabla de valoraciones es un contrato genérico** (`TablaValoraciones`: columnas, filas de texto y pie) que M26 solo dibuja y congela:
+  cómo se presenta una tabla de notas (columnas, letras, áreas o asignaturas, decimales) es decisión de cada institución y el maestro lo asigna a M17 («constructor de
+  plantillas por institución») y M32. Quien la arma es `armarTablaValoraciones` (`utils/certificadoEstudios.ts`, **provisional: es el boletín final de M17**, se reemplaza sin
+  tocar M26) y hoy entrega solo lo que lista el maestro: área o asignatura, intensidad horaria semanal y anual (semanal × `semanas_lectivas` de M05), calificación final con los
+  **decimales de la escala de M05** (`precision_decimales`) y su equivalencia en la escala nacional según los rangos que la institución definió. Sin letras ni columnas por periodo. El concepto «APROBÓ / NO APROBÓ» sale de
+  `obtenerPromocion`, que hoy devuelve `null`: con `null` la expedición oficial responde 409, la vista previa sale con «Concepto de promoción: PENDIENTE» y
+  `matriculasExpedibles` lo informa en `restricciones`. **Cuando M19 guarde la decisión solo hay que implementar esa función**; el concepto no se escribe a mano (duplicaría
+  lo que M19 registra). Motivo: lo expedido se congela, así que no se emite oficial con un dato ausente.
+- **Lo expedido se congela y no se borra.** `CertificadoEmitido.snapshot` es inmutable en el modelo (`pre('save')`: solo cambian `estado` y `anulacion`); el PDF
+  se dibuja **solo desde el snapshot**, así una reimpresión es el mismo documento con el mismo código. Un documento mal expedido se **anula con motivo** (solo
+  ADMIN): sigue verificándose como ANULADO y se imprime con marca «ANULADO». La auditoría (`CERTIFICADO_*`) nunca lleva el motivo.
+- **Seguridad: QR + huella, siempre (no tienen switch).** La huella es un **HMAC-SHA256** (`huellaDeCertificado`) con `CERT_HMAC_SECRET` (variable de entorno,
+  **obligatoria en producción**: sin ella responde 503; en desarrollo se deriva de `JWT_SECRET`). Quien edite la base directamente no puede recalcular una huella
+  coherente. **No cambiar el secreto después de expedir**: invalidaría la verificación de todo lo emitido. No es firma digital certificada (Ley 527/1999);
+  no se presenta como tal. El QR solo contiene `/verificar/<token>` con un token opaco de 128 bits (no el consecutivo: no se puede enumerar); la URL base es
+  `PUBLIC_URL` o el host de la petición (**definir `PUBLIC_URL` en producción**: sin ella el QR depende del encabezado `Host`). Sin QR se verifica con **código + clave** (los 12 primeros caracteres de la huella, impresos en el pie).
+  Reimprimir recalcula la huella y se niega si no coincide (409).
+- **Verificación pública** (`certificadoVerificacion.service.ts`, rate limit propio): responde VALIDO / VIGENCIA_CUMPLIDA / ANULADO / NO_VERIFICABLE y solo muestra tipo, código,
+  fecha, institución, nombre y documento **enmascarado** (últimos 3). Nunca notas ni otros datos. «No existe» y «clave equivocada» responden igual (404). **La vigencia declarada
+  se aplica**: una constancia con «vigencia de 30 días» sale VÁLIDA hasta el cierre de ese último día (hora de Colombia, `vigenciaDeDocumento`) y después «vigencia cumplida»
+  (auténtico, pero vencido; no es anulado). El anulado se muestra en rojo con «no tiene validez».
+- **Firmas y sellos con switch al expedir.** `ConfiguracionCertificados` (una por instalación): quién firma (`rectoria` = un `User` ADMIN,
+  `secretaria` = un `User` SECRETARIA; nombre y cargo salen del usuario, no se digitan por documento), la imagen de cada firma y del sello, y la **política por
+  documento y elemento** (`OBLIGATORIO` / `OPCIONAL_ENCENDIDO` / `OPCIONAL_APAGADO` / `NO_APLICA`, valores de partida en `POLITICA_INICIAL`). La lógica del switch
+  es pura y con tests (`describirElemento` / `resolverElementos`, `utils/certificados.ts`): pedir algo que no aplica, sin imagen, sin firmante designado o sin
+  permiso es **error**, nunca se ignora; apagar un obligatorio también. **Apagado = no se estampa la imagen, pero el documento conserva la línea con nombre y cargo
+  para firma manuscrita.**
+- **Quién gestiona qué en «Firmas y sellos»** lo decide `permisosCertificados` (`utils/permisosCertificados.ts`, función pura con tests; el servidor lo devuelve como
+  `puede` y la pantalla solo lo refleja). **ADMIN** todo. **SECRETARIA** carga, reemplaza, quita y ve la imagen de su firma y del sello, y designa quién firma como
+  Secretaría Académica y su cargo; la imagen de la firma de **Rectoría** también, **pero solo mientras haya delegación** (la misma llave de abajo). Quién es el rector,
+  la delegación, la política por documento y las dependencias del paz y salvo son solo del ADMIN. Las rutas dejan pasar a ADMIN y SECRETARIA y el servicio aplica la
+  regla fina (403). La carga de imágenes es `POST` (como todas las del sistema: `api.upload` solo envía POST; con `PUT` la subida daba 404 y ninguna firma se cargaba).
+- **Delegación de la firma de Rectoría**: la secretaría puede estamparla y cargar su imagen mientras `permitir_firma_rectoria_a_secretaria` esté encendido (**nace apagado**: es la imagen más
+  sensible y solo el ADMIN decide compartirla; una instalación anterior conserva lo que tenía); el ADMIN siempre puede. Las opciones elegidas, los firmantes y el hash de cada imagen quedan en el snapshot y **entran en la huella**.
+- **Imágenes: almacén por contenido, en disco** (`utils/almacenImagenes.ts`, como el resto de archivos de los módulos): firmas, sello y **escudo** se guardan en
+  `uploads/certificados/imagenes/<sha256>.<ext>` (PNG/JPG, 500 KB, firma de bytes), nunca se sobrescriben ni se borran; el documento expedido solo guarda la huella. **El escudo
+  (`Institution.logo_url`, M01) también se congela al expedir** (`encabezado.escudo`), así una reimpresión sale con el escudo de entonces aunque el colegio cambie de logo
+  (documentos anteriores: usan el logo vigente). **Si un archivo se pierde** el sistema no deja un 500: `vistaConfiguracion` marca `imagen_faltante` y no ofrece esa firma para
+  documentos nuevos, el PDF responde 409 explicando cómo recuperarlo, y **volver a cargar la misma imagen recrea exactamente el mismo archivo** (se identifica por su
+  contenido); el escudo se restaura solo si el logo vigente es el mismo. El respaldo debe cubrir `uploads/` (`deploy/respaldar.sh` ya lo hace).
+- **Alcance por sede.** SECRETARIA solo expide, ve y reimprime documentos de las sedes que tiene asignadas (`sedes_ids`); sin sedes no ve nada; ADMIN ve todas. Cada
+  certificado guarda `sede_id` (la de la matrícula); «no existe» y «no es de tu sede» responden igual (404). Certificados anteriores: `npm run migrate:certificados-sede`
+  (idempotente; mientras no se corra, solo el ADMIN los ve). La vista previa de un documento real se audita (`CERTIFICADO_VISTA_PREVIA`, sin contenido).
+- **Ver el documento al expedirlo.** Expedir y la vista previa muestran el PDF en la misma pantalla (`VisorDocumento`, con descargar, imprimir y abrir en otra pestaña);
+  el historial lo abre en un panel («Ver»). Nunca se abre una pestaña después de un `await` (los navegadores la bloquean).
+- **Pruebas:** unitarias (`certificados.test.ts`, `certificadosM26Ampliado.test.ts`, `plantillasCertificados.test.ts`: huella, switches, plantillas, variables, tabla de valoraciones) y de integración con base real (`integracion/certificados.int.test.ts`, `integracion/tiposCertificado.int.test.ts`: siembra, ciclo borrador→activo→archivado, eliminar vs archivar, permisos).
+  **Las pruebas usan una carpeta temporal para los archivos** (`tests/setup.ts` fija `UPLOADS_DIR`, que `uploadPaths` respeta): antes borraban `backend/uploads` real al terminar.
+  Si no se puede descargar el binario de MongoDB, usar `MONGOMS_SYSTEM_BINARY=<ruta de un mongod> MONGOMS_VERSION=<su versión>`.
+- **Pendiente, a propósito:** expedir el certificado de estudio como oficial (falta el concepto de promoción, M19); que las dependencias del paz y salvo se calculen solas
+  (la académica podría leer M12: todas las asignaturas `DEFINITIVO`; cartera, biblioteca e inventario no existen); lema y código estudiantil (M01/M03); resoluciones
+  estructuradas; vigencia ya es parámetro de la plantilla; PDF del Libro de Matrícula y su trazabilidad de novedades; libros de calificaciones y actas reglamentarias
+  (CU-SEC-06); solicitud desde el portal del acudiente (M27); constructor libre de formatos (M21); archivo general (M29); rotación de la clave HMAC; firma electrónica
+  certificada (Ley 527/1999, Decreto 2364/2012: la imagen + huella + QR no lo es). **Quién firma está en dos sitios**: M12 guarda el nombre del rector como texto libre en las
+  firmas de la planilla y M26 lo toma de un usuario; M26 es la fuente a reutilizar cuando se toque M12.
+
 ### M11 (Actividades y planeación de aula) — estado: núcleo completo
 
 Backend `/activities` (modelos `Activity`, `ActivitySubmission`, `ConfiguracionActividades`), frontend `ActividadesDocentePage`
@@ -769,7 +897,7 @@ nuevos para lo que ya existe aquí** — extenderlos si falta un caso, no duplic
   mapeo rol→color o estado→color en una página), `Card`/`CardHeader`, `Table`/`TableHead`/`Th`/
   `TableBody`/`Td`/`EmptyRow`, `Drawer` (formularios de creación/edición; su botón principal
   acepta `submitVariant` para casos como confirmar un borrado en rojo), `PageHeader` (título +
-  subtítulo + acción de la página), `Field` (`Input`/`Select`), `MultiSelect` (selector desplegable de selección múltiple con checkboxes, contador y badges de rol/estado; prop opcional `emptyLabel` cuando elegir es obligatorio), `Alert`, `Spinner`, `EstadoEspacioBadge` (M10), `EstadoAsistenciaChip`/`EstadoJustificacionBadge` (M13), `MallaDisponibilidad` (M09: cuadrícula de tiempo libre por clic, disponible/condicional/no disponible), `GuiaColumnas` (guía colapsable de columnas de una carga CSV), `ProgressBar` (barra de avance con tono, ej. semanas lectivas vs. el mínimo de 40), `LineaTiempo` (línea de tiempo vertical con punto, fecha, chips y contenido por registro; la usa el historial de convivencia), `EstadoCasoBadge`/`TipoSituacionBadge` (M15), `EstadoExpedienteBadge`/`EstadoSolicitudApoyoBadge` (M16), `EstadoNotaBadge` (M12: pendiente/borrador/cerrado/definitivo), `EstadoEntregaBadge`/`TipoActividadChip` (M11: programada → entregada → con retraso → calificada; tipo de actividad), `Dropzone` (zona para soltar o elegir un archivo, valida extensión y tamaño en el navegador y muestra el archivo elegido; el servidor siempre confirma el contenido), `Tabs`/`TabPanel` (navegación por pestañas con subrayado azul en la activa; reusar en vez de reinventar un switch de pestañas en otra página), `Stepper` (indicador de pasos para formularios largos por secciones, ej. el asistente de creación de estudiante en M03), e iconos SVG propios en `components/ui/icons.tsx` (no se agregó ninguna librería de iconos).
+  subtítulo + acción de la página), `Field` (`Input`/`Select`), `MultiSelect` (selector desplegable de selección múltiple con checkboxes, contador y badges de rol/estado; prop opcional `emptyLabel` cuando elegir es obligatorio), `Alert`, `Spinner`, `EstadoEspacioBadge` (M10), `EstadoAsistenciaChip`/`EstadoJustificacionBadge` (M13), `MallaDisponibilidad` (M09: cuadrícula de tiempo libre por clic, disponible/condicional/no disponible), `GuiaColumnas` (guía colapsable de columnas de una carga CSV), `ProgressBar` (barra de avance con tono, ej. semanas lectivas vs. el mínimo de 40), `LineaTiempo` (línea de tiempo vertical con punto, fecha, chips y contenido por registro; la usa el historial de convivencia), `EstadoCasoBadge`/`TipoSituacionBadge` (M15), `EstadoExpedienteBadge`/`EstadoSolicitudApoyoBadge` (M16), `EstadoNotaBadge` (M12: pendiente/borrador/cerrado/definitivo), `EstadoEntregaBadge`/`TipoActividadChip` (M11: programada → entregada → con retraso → calificada; tipo de actividad), `Dropzone` (zona para soltar o elegir un archivo, valida extensión y tamaño en el navegador y muestra el archivo elegido; el servidor siempre confirma el contenido), `VisorDocumento` (PDF dentro de la pantalla con descargar, imprimir y abrir aparte; certificados M26), `Switch` (interruptor encendido/apagado para decisiones al momento, con `disabledReason` como tooltip; ej. firmas y sello al expedir en M26), `Tabs`/`TabPanel` (navegación por pestañas con subrayado azul en la activa; reusar en vez de reinventar un switch de pestañas en otra página), `EditorConVariables` (párrafo de texto con los datos del sistema como fichas en lugar de `{{llaves}}`: «Insertar dato» o «/», una ficha se borra de una vez, una sola línea, lo pegado se limpia; guarda el mismo formato `{{modulo.dato}}` de siempre; M26 plantillas), `Stepper` (indicador de pasos para formularios largos por secciones, ej. el asistente de creación de estudiante en M03), e iconos SVG propios en `components/ui/icons.tsx` (no se agregó ninguna librería de iconos).
 - **Contenedor global y densidad** (`components/layout/AppShell.tsx`): el `<main>` centra el
   contenido en `max-w-7xl` (no `max-w-5xl`) para que las tablas anchas (Usuarios, Grupos) no
   scrolleen antes de tiempo en pantallas grandes. Cada página usa `space-y-4` (no `space-y-6`)

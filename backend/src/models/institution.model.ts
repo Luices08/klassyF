@@ -33,6 +33,9 @@ export interface IInstitution {
   /** Logo institucional como data URI (base64); se muestra en boletines/certificados. */
   logo_url: string | null;
   /** Contacto y atencion presencial (home publico, M04): correo de secretaria academica. */
+  /** Ciudad y departamento del colegio: los usan los documentos oficiales («Dado en Bogotá D.C., …»). */
+  ciudad: string | null;
+  departamento: string | null;
   correo_secretaria: string | null;
   /** Horario de atencion en ventanilla (texto libre, ej. "Lunes a viernes 7:00 a 3:00 p.m."). */
   horario_atencion: string | null;
@@ -80,6 +83,8 @@ const institutionSchema = new Schema<IInstitution, InstitutionModel>(
     resolucion_aprobacion: { type: String, required: true, trim: true },
     administrador_id: { type: Schema.Types.ObjectId, ref: 'User', default: null },
     logo_url: { type: String, default: null },
+    ciudad: { type: String, default: null, trim: true, maxlength: 80 },
+    departamento: { type: String, default: null, trim: true, maxlength: 80 },
     correo_secretaria: { type: String, default: null, trim: true, lowercase: true },
     horario_atencion: { type: String, default: null, trim: true },
     plantilla_franjas: { type: [franjaPlantillaSchema], default: [] },

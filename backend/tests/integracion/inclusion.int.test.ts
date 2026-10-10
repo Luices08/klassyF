@@ -19,6 +19,7 @@ import * as expedientes from '../../src/services/expedienteInclusion.service';
 import * as solicitudes from '../../src/services/solicitudApoyo.service';
 import { detenerBaseDeDatos, iniciarBaseDeDatos, limpiarBaseDeDatos } from './baseDeDatos';
 import { armarEscenario, crearUsuario, Escenario } from './escenario';
+import { UPLOADS_ROOT } from '../../src/utils/uploadPaths';
 
 const pdfFalso = (): Express.Multer.File =>
   ({ buffer: Buffer.from('%PDF-1.4 escaneo firmado'), mimetype: 'application/pdf', size: 24, originalname: 'acta-firmada.pdf' }) as Express.Multer.File;
@@ -34,7 +35,7 @@ describe('M16: inclusión (con base de datos)', () => {
   beforeAll(iniciarBaseDeDatos, 600_000);
   afterAll(async () => {
     await detenerBaseDeDatos();
-    await fs.rm(path.join(process.cwd(), 'uploads', 'inclusion'), { recursive: true, force: true });
+    await fs.rm(path.join(UPLOADS_ROOT, 'inclusion'), { recursive: true, force: true });
   });
 
   beforeEach(async () => {

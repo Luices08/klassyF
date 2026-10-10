@@ -1,8 +1,5 @@
 import { randomBytes } from 'crypto';
 import {
-  CERTIFICADOS,
-  CLAVES_CERTIFICADO,
-  ClaveCertificado,
   DependenciaPazYSalvo,
   ELEMENTOS_AUTENTICACION,
   ETIQUETA_ELEMENTO,
@@ -14,8 +11,8 @@ import {
   PoliticaDeCertificado,
 } from '../constants/certificados';
 import { ROLES } from '../constants/roles';
-import ConfiguracionCertificados, { ConfiguracionCertificadosDocument } from '../models/configuracionCertificados.model';
-import Institution from '../models/institution.model';
+import { ConfiguracionCertificadosDocument } from '../models/configuracionCertificados.model';
+import TipoCertificado from '../models/tipoCertificado.model';
 import User, { UserDocument } from '../models/user.model';
 import ApiError from '../utils/ApiError';
 import { EntradaElementos, estadoDeElementos, opcionesDeDestinatario } from '../utils/certificados';
@@ -24,28 +21,18 @@ import { detectarFirmaArchivo } from '../utils/firmasArchivo';
 import { PermisosCertificados, permisosCertificados } from '../utils/permisosCertificados';
 import { rutaImagenAutenticacion } from '../utils/uploadPaths';
 import { registrarEvento } from './audit.service';
+import { obtenerConfiguracion } from './certificadoConfiguracionBase.service';
 import { plantillasVigentes } from './certificadoPlantilla.service';
+import { todosLosTipos } from './tipoCertificado.service';
 
-export async function obtenerConfiguracion(): Promise<ConfiguracionCertificadosDocument> {
-  const institucion = await Institution.findOne();
-  if (!institucion) throw new ApiError(409, 'Configura primero la institución antes de expedir certificados.');
-  const existente = await ConfiguracionCertificados.findOne({ institucion_id: institucion._id });
-  if (existente) return existente;
-  try {
-    return await ConfiguracionCertificados.create({ institucion_id: institucion._id });
-  } catch (err) {
-    // Dos primeras peticiones a la vez: la otra ya la creó.
-    if ((err as { code?: number }).code === 11000) return (await ConfiguracionCertificados.findOne({ institucion_id: institucion._id })) as ConfiguracionCertificadosDocument;
-    throw err;
-  }
-}
+export { obtenerConfiguracion };
 
-/** Solo el administrador (rector) aplica su firma, salvo que haya delegado en la secretaría. */
-export const puedeAplicarFirmaRectoria = (config: ConfiguracionCertificadosDocument, usuario: UserDocument): boolean =>
-  usuario.rol === ROLES.ADMIN || config.permitir_firma_rectoria_a_secretaria;
+/** Rectoría y Secretaría tienen fe pública para estampar las firmas institucionales configuradas. */
+export const puedeAplicarFirmaRectoria = (_config: ConfiguracionCertificadosDocument, usuario: UserDocument): boolean =>
+  usuario.rol === ROLES.ADMIN || usuario.rol === ROLES.SECRETARIA;
 
-export const permisosDe = (config: ConfiguracionCertificadosDocument, usuario: UserDocument): PermisosCertificados =>
-  permisosCertificados(usuario.rol, config.permitir_firma_rectoria_a_secretaria);
+export const permisosDe = (_config: ConfiguracionCertificadosDocument, usuario: UserDocument): PermisosCertificados =>
+  permisosCertificados(usuario.rol);
 
 /** Qué imágenes están configuradas Y tienen su archivo en el servidor: una firma cuyo archivo se perdió no se ofrece (saldría un PDF roto). */
 export async function presenciaDeImagenes(config: ConfiguracionCertificadosDocument): Promise<Record<ElementoAutenticacion, boolean>> {
@@ -55,12 +42,12 @@ export async function presenciaDeImagenes(config: ConfiguracionCertificadosDocum
 
 export function entradaDeElementos(
   config: ConfiguracionCertificadosDocument,
-  clave: ClaveCertificado,
+  politica: PoliticaDeCertificado,
   usuario: UserDocument,
   presencia: Record<ElementoAutenticacion, boolean>
 ): EntradaElementos {
   return {
-    politica: config.politica[clave] as PoliticaDeCertificado,
+    politica,
     tieneImagen: presencia,
     puedeAplicar: { rectoria: puedeAplicarFirmaRectoria(config, usuario), secretaria: true, sello: true },
     tieneFirmante: { rectoria: Boolean(config.rectoria.usuario_id), secretaria: Boolean(config.secretaria.usuario_id), sello: true },
@@ -72,7 +59,7 @@ const nombreCompleto = (u: { nombre: string; apellido: string } | null | undefin
 /** Lo que ve el usuario en «Firmas y sellos» y lo que la expedición necesita para pintar sus switches. */
 export async function vistaConfiguracion(usuario: UserDocument) {
   const config = await obtenerConfiguracion();
-  const [presencia, plantillas] = await Promise.all([presenciaDeImagenes(config), plantillasVigentes()]);
+  const [presencia, plantillas, tipos] = await Promise.all([presenciaDeImagenes(config), plantillasVigentes(), todosLosTipos()]);
   const [rector, secretaria] = await Promise.all([
     config.rectoria.usuario_id ? User.findById(config.rectoria.usuario_id).select('nombre apellido') : null,
     config.secretaria.usuario_id ? User.findById(config.secretaria.usuario_id).select('nombre apellido') : null,
@@ -82,18 +69,20 @@ export async function vistaConfiguracion(usuario: UserDocument) {
     secretaria: { usuario_id: config.secretaria.usuario_id ? String(config.secretaria.usuario_id) : null, nombre: nombreCompleto(secretaria), cargo: config.secretaria.cargo, tiene_imagen: Boolean(config.secretaria.imagen), imagen_faltante: Boolean(config.secretaria.imagen) && !presencia.secretaria },
     sello: { tiene_imagen: Boolean(config.sello.imagen), imagen_faltante: Boolean(config.sello.imagen) && !presencia.sello },
     permitir_firma_rectoria_a_secretaria: config.permitir_firma_rectoria_a_secretaria,
-    politica: Object.fromEntries(CLAVES_CERTIFICADO.map((c) => [c, config.politica[c]])),
+    politica: Object.fromEntries(tipos.filter((t) => t.estado !== 'ARCHIVADO').map((t) => [t.clave, t.politica])),
     paz_y_salvo: { dependencias: config.paz_y_salvo.dependencias.map((d) => ({ clave: d.clave, nombre: d.nombre, activa: d.activa })) },
     puede: permisosDe(config, usuario),
-    tipos: CERTIFICADOS.map((c) => ({
-      clave: c.clave,
-      nombre: c.nombre,
-      descripcion: c.descripcion,
-      // El selector de destinatario/motivo de este documento (la primera opción es la predeterminada).
-      destinatarios: opcionesDeDestinatario(plantillas[c.clave]),
-      requiere_promocion: Boolean(c.requiere?.includes('PROMOCION')),
+    tipos: tipos.map((t) => ({
+      clave: t.clave,
+      nombre: t.nombre,
+      descripcion: t.descripcion,
+      estado: t.estado,
+      // Las fuentes dicen qué más pide el documento al expedir (dependencias confirmadas, valoraciones, promoción).
+      fuentes: t.fuentes,
+      // El selector de destinatario/motivo de este documento (la primera opción es la predeterminada). Un tipo archivado no se ofrece.
+      destinatarios: plantillas[t.clave] ? opcionesDeDestinatario(plantillas[t.clave] as { destinatarios: Array<{ clave: string; etiqueta: string; frase: string }> }) : [],
       // Cómo quedan los switches de este documento para quien consulta (bloqueado, apagado, sin imagen…).
-      elementos: estadoDeElementos(entradaDeElementos(config, c.clave, usuario, presencia)),
+      elementos: estadoDeElementos(entradaDeElementos(config, t.politica, usuario, presencia)),
     })),
   };
 }
@@ -107,7 +96,8 @@ export interface CambiosConfiguracionCertificados {
   rectoria?: CambiosFirmante;
   secretaria?: CambiosFirmante;
   permitir_firma_rectoria_a_secretaria?: boolean;
-  politica?: Partial<Record<ClaveCertificado, Partial<Record<ElementoAutenticacion, ModoElemento>>>>;
+  /** Por clave de tipo; cada tipo recibe solo lo que cambia. */
+  politica?: Record<string, Partial<Record<ElementoAutenticacion, ModoElemento>>>;
   /** La lista completa: lo que no venga se elimina; sin `clave` es una dependencia nueva. */
   paz_y_salvo?: { dependencias: Array<{ clave?: string; nombre: string; activa: boolean }> };
 }
@@ -134,6 +124,17 @@ async function validarFirmante(usuarioId: string, rolEsperado: 'ADMIN' | 'SECRET
   if (u.rol !== rolEsperado) throw new ApiError(400, `Para ${etiqueta} se elige un usuario con rol ${rolEsperado === 'ADMIN' ? 'Administrador' : 'Secretaría'}.`);
 }
 
+/** La política por documento vive en cada tipo: se cambia ahí, solo en los tipos que existen y no están archivados. */
+async function aplicarPolitica(politica: NonNullable<CambiosConfiguracionCertificados['politica']>): Promise<void> {
+  const tipos = await todosLosTipos();
+  for (const [clave, elementos] of Object.entries(politica)) {
+    const tipo = tipos.find((t) => t.clave === clave);
+    if (!tipo || tipo.estado === 'ARCHIVADO') throw new ApiError(400, `El documento «${clave}» no existe o está archivado.`);
+    const nueva = { ...tipo.politica, ...elementos };
+    await TipoCertificado.updateOne({ clave }, { $set: { politica: nueva } });
+  }
+}
+
 /**
  * El ADMIN cambia todo. Secretaría solo designa a quien firma como Secretaría Académica y su cargo: quién es el rector,
  * la delegación, la política por documento y las dependencias son del ADMIN. No toca nada ya expedido: lo emitido conserva
@@ -150,6 +151,7 @@ export async function actualizarConfiguracion(cambios: CambiosConfiguracionCerti
 
   if (cambios.rectoria?.usuario_id) await validarFirmante(cambios.rectoria.usuario_id, 'ADMIN', 'Rectoría');
   if (cambios.secretaria?.usuario_id) await validarFirmante(cambios.secretaria.usuario_id, 'SECRETARIA', 'Secretaría Académica');
+  if (cambios.politica) await aplicarPolitica(cambios.politica);
 
   for (const [clave, firmante] of [['rectoria', cambios.rectoria], ['secretaria', cambios.secretaria]] as const) {
     if (!firmante) continue;
@@ -157,9 +159,6 @@ export async function actualizarConfiguracion(cambios: CambiosConfiguracionCerti
     if (firmante.cargo !== undefined) config.set(`${clave}.cargo`, firmante.cargo);
   }
   if (cambios.permitir_firma_rectoria_a_secretaria !== undefined) config.permitir_firma_rectoria_a_secretaria = cambios.permitir_firma_rectoria_a_secretaria;
-  for (const [clave, elementos] of Object.entries(cambios.politica ?? {})) {
-    for (const [elemento, modo] of Object.entries(elementos ?? {})) config.set(`politica.${clave}.${elemento}`, modo);
-  }
   if (cambios.paz_y_salvo) config.set('paz_y_salvo.dependencias', normalizarDependencias(cambios.paz_y_salvo.dependencias));
   await config.save();
   await registrarEvento({ usuario_id: usuario._id, accion: 'CERTIFICADOS_CONFIGURACION_ACTUALIZADA', entidad: 'ConfiguracionCertificados', entidad_id: config._id, detalle: Object.keys(cambios).join(', '), ip });

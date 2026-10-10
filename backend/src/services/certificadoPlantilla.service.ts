@@ -1,6 +1,5 @@
-import { CERTIFICADOS, CLAVES_CERTIFICADO, ClaveCertificado, definicionCertificado } from '../constants/certificados';
-import { ROLES } from '../constants/roles';
-import { ContenidoPlantilla, REQUISITOS_LEGALES, contenidoInicial } from '../constants/plantillasCertificado';
+import { ClaveCertificado, MARCA_ENTIDAD } from '../constants/certificados';
+import { ContenidoPlantilla, contenidoInicial, requisitosDe } from '../constants/plantillasCertificado';
 import { VARIABLES_CERTIFICADO } from '../constants/variablesCertificado';
 import Campus from '../models/campus.model';
 import Institution from '../models/institution.model';
@@ -8,24 +7,23 @@ import PlantillaCertificado, { PlantillaCertificadoDocument } from '../models/pl
 import User, { UserDocument } from '../models/user.model';
 import ApiError from '../utils/ApiError';
 import { snapshotDeMuestra } from '../utils/muestraCertificado';
-import { contextoDeVariables, huellaDeContenido, renderizar, validarContenido } from '../utils/plantillaCertificado';
+import { permisosTipo } from '../utils/permisosCertificados';
+import { contenidoDe, contextoDeVariables, huellaDeContenido, renderizar, validarContenido } from '../utils/plantillaCertificado';
 import { ContenidoResuelto, SnapshotCertificado } from '../utils/certificados';
 import { runTransaction } from '../utils/runTransaction';
 import { registrarEvento } from './audit.service';
 import { congelarEscudo } from './encabezadoInstitucional.service';
+import { TipoDefinido, exigirGestionDeTipos, tipoPorClave, todosLosTipos } from './tipoCertificado.service';
 
-const exigirAdmin = (usuario: UserDocument): void => {
-  if (usuario.rol !== ROLES.ADMIN) throw new ApiError(403, 'Solo el administrador edita las plantillas de los certificados.');
-};
+export { contenidoDe };
 
-/** Lo que define el contenido de una versión, sin los datos de control. */
-export const contenidoDe = (p: Pick<PlantillaCertificadoDocument, 'titulo' | 'bloques' | 'destinatarios' | 'frase_otro' | 'vigencia_dias'>): ContenidoPlantilla => ({
-  titulo: p.titulo,
-  bloques: p.bloques.map((b) => ({ id: b.id, estilo: b.estilo, texto: b.texto, condicion: b.condicion ? { variable: b.condicion.variable, tipo: b.condicion.tipo } : null, activo: b.activo })),
-  destinatarios: p.destinatarios.map((d) => ({ clave: d.clave, etiqueta: d.etiqueta, frase: d.frase })),
-  frase_otro: p.frase_otro,
-  vigencia_dias: p.vigencia_dias ?? null,
-});
+/** Redactar el texto de un tipo: el ADMIN en cualquier tipo no archivado; Secretaría solo mientras está en borrador. */
+function exigirPuedeRedactar(tipo: TipoDefinido, usuario: UserDocument): void {
+  exigirGestionDeTipos(usuario);
+  if (!permisosTipo(usuario.rol, tipo.estado).editarPlantilla) {
+    throw new ApiError(403, tipo.estado === 'ARCHIVADO' ? 'Un tipo archivado no se edita: actívalo primero.' : 'El texto de un documento activo solo lo edita el administrador.');
+  }
+}
 
 async function crearVersion(tipo: ClaveCertificado, contenido: ContenidoPlantilla, version: number, nota: string, usuarioId: UserDocument['_id'] | null, sesion?: Parameters<typeof PlantillaCertificado.create>[1]) {
   const [creada] = await PlantillaCertificado.create(
@@ -37,11 +35,11 @@ async function crearVersion(tipo: ClaveCertificado, contenido: ContenidoPlantill
 
 /** La plantilla vigente del documento. La primera vez se crea con los valores de partida (la versión 1, sin autor). */
 export async function plantillaVigente(tipo: ClaveCertificado): Promise<PlantillaCertificadoDocument> {
-  definicionCertificado(tipo);
+  const definido = await tipoPorClave(tipo);
   const existente = await PlantillaCertificado.findOne({ tipo, estado: 'VIGENTE' });
   if (existente) return existente;
   try {
-    return await crearVersion(tipo, contenidoInicial(tipo), 1, 'Valores de partida del sistema.', null);
+    return await crearVersion(tipo, contenidoInicial(definido), 1, 'Valores de partida del sistema.', null);
   } catch (err) {
     // Dos primeras peticiones a la vez: la otra ya la creó.
     if ((err as { code?: number }).code === 11000) return (await PlantillaCertificado.findOne({ tipo, estado: 'VIGENTE' })) as PlantillaCertificadoDocument;
@@ -49,8 +47,10 @@ export async function plantillaVigente(tipo: ClaveCertificado): Promise<Plantill
   }
 }
 
+/** La plantilla vigente de cada tipo que no está archivado. */
 export async function plantillasVigentes(): Promise<Record<ClaveCertificado, PlantillaCertificadoDocument>> {
-  const lista = await Promise.all(CLAVES_CERTIFICADO.map((t) => plantillaVigente(t)));
+  const tipos = (await todosLosTipos()).filter((t) => t.estado !== 'ARCHIVADO');
+  const lista = await Promise.all(tipos.map((t) => plantillaVigente(t.clave)));
   return Object.fromEntries(lista.map((p) => [p.tipo, p])) as Record<ClaveCertificado, PlantillaCertificadoDocument>;
 }
 
@@ -63,22 +63,22 @@ const vistaVersion = (p: PlantillaCertificadoDocument, por?: string | null) => (
   publicada_por: por ?? null,
 });
 
-/** Todo lo que necesita el editor: cada plantilla vigente, el catálogo de variables y lo que cada documento debe conservar. */
+/** Todo lo que necesita el editor: el texto vigente de cada tipo que este usuario puede redactar, el catálogo de variables y los mínimos de cada documento. */
 export async function listarPlantillas(usuario: UserDocument) {
-  exigirAdmin(usuario);
-  const vigentes = await plantillasVigentes();
+  exigirGestionDeTipos(usuario);
+  const tipos = (await todosLosTipos()).filter((t) => permisosTipo(usuario.rol, t.estado).editarPlantilla);
+  const vigentes = await Promise.all(tipos.map((t) => plantillaVigente(t.clave)));
   return {
-    plantillas: CERTIFICADOS.map((c) => {
-      const p = vigentes[c.clave];
-      return { tipo: c.clave, nombre: c.nombre, ...contenidoDe(p), version: p.version, nota: p.nota, publicada_at: p.publicada_at, requisitos: REQUISITOS_LEGALES[c.clave] };
+    plantillas: tipos.map((t, i) => {
+      const p = vigentes[i] as PlantillaCertificadoDocument;
+      return { tipo: t.clave, nombre: t.nombre, estado_tipo: t.estado, fuentes: t.fuentes, ...contenidoDe(p), version: p.version, nota: p.nota, publicada_at: p.publicada_at, requisitos: requisitosDe(t) };
     }),
     variables: VARIABLES_CERTIFICADO,
   };
 }
 
 export async function versionesDePlantilla(tipo: ClaveCertificado, usuario: UserDocument) {
-  exigirAdmin(usuario);
-  definicionCertificado(tipo);
+  exigirPuedeRedactar(await tipoPorClave(tipo), usuario);
   const versiones = await PlantillaCertificado.find({ tipo }).sort({ version: -1 }).limit(50);
   const autores = await User.find({ _id: { $in: versiones.map((v) => v.publicada_por).filter(Boolean) } }).select('nombre apellido');
   const nombre = new Map(autores.map((u) => [String(u._id), `${u.nombre} ${u.apellido}`]));
@@ -87,9 +87,9 @@ export async function versionesDePlantilla(tipo: ClaveCertificado, usuario: User
 
 /** Valida y, si cumple los mínimos del documento, publica una versión nueva; la vigente pasa a archivada. */
 export async function publicarPlantilla(tipo: ClaveCertificado, contenido: ContenidoPlantilla, nota: string, usuario: UserDocument, ip?: string | null) {
-  exigirAdmin(usuario);
-  definicionCertificado(tipo);
-  const errores = validarContenido(tipo, contenido);
+  const definido = await tipoPorClave(tipo);
+  exigirPuedeRedactar(definido, usuario);
+  const errores = validarContenido(definido, contenido);
   if (errores.length > 0) throw new ApiError(400, 'La plantilla no se puede publicar todavía.', errores);
 
   const creada = await runTransaction(async (session) => {
@@ -107,8 +107,9 @@ export async function publicarPlantilla(tipo: ClaveCertificado, contenido: Conte
 
 /** Vuelve a publicar los valores de partida como una versión nueva (la historia no se pierde). */
 export async function restablecerPlantilla(tipo: ClaveCertificado, usuario: UserDocument, ip?: string | null) {
+  const definido = await tipoPorClave(tipo);
   await plantillaVigente(tipo);
-  return publicarPlantilla(tipo, contenidoInicial(tipo), 'Restablecida a los valores de partida.', usuario, ip);
+  return publicarPlantilla(tipo, contenidoInicial(definido), 'Restablecida a los valores de partida.', usuario, ip);
 }
 
 /** El texto ya resuelto que se congela en el documento. Si un bloque visible necesita un dato que no existe, no se expide. */
@@ -119,17 +120,12 @@ export function resolverContenido(snapshot: SnapshotCertificado, plantilla: Pick
   return { plantilla: { version: plantilla.version, hash: plantilla.hash }, titulo: contenido.titulo, bloques, vigencia_dias: contenido.vigencia_dias };
 }
 
-/** Vista previa de un borrador de plantilla con un estudiante inventado y el encabezado real del colegio. No guarda nada. */
-export async function snapshotDeVistaPreviaDePlantilla(tipo: ClaveCertificado, borrador: ContenidoPlantilla, usuario: UserDocument): Promise<SnapshotCertificado> {
-  exigirAdmin(usuario);
-  const errores = validarContenido(tipo, borrador);
-  if (errores.length > 0) throw new ApiError(400, 'La plantilla tiene problemas que impiden mostrarla.', errores);
-
+/** Un documento de muestra con el encabezado real del colegio: el estudiante, la matrícula y las notas son inventados. El escudo solo cuando se va a dibujar el PDF. */
+async function snapshotDeMuestraDelColegio(definido: TipoDefinido, conEscudo: boolean): Promise<SnapshotCertificado> {
   const [institucion, sede] = await Promise.all([Institution.findOne(), Campus.findOne({ es_principal: true })]);
   if (!institucion) throw new ApiError(409, 'Configura primero la institución.');
-  const ahora = new Date().toISOString();
-  const base = snapshotDeMuestra(
-    tipo,
+  return snapshotDeMuestra(
+    definido,
     {
       institucion: institucion.nombre,
       codigo_dane: institucion.codigo_dane,
@@ -140,13 +136,49 @@ export async function snapshotDeVistaPreviaDePlantilla(tipo: ClaveCertificado, b
       anio: new Date().getFullYear(),
       ciudad: institucion.ciudad,
       departamento: institucion.departamento,
-      escudo: await congelarEscudo(institucion.logo_url),
+      ...(conEscudo ? { escudo: await congelarEscudo(institucion.logo_url) } : {}),
     },
-    ahora
+    new Date().toISOString()
   );
+}
+
+/** La primera opción del selector pone el cierre de muestra; una que toma la entidad de otro módulo usa un nombre de muestra: la vista previa nunca lee datos reales. */
+function conCierreDeMuestra(base: SnapshotCertificado, borrador: ContenidoPlantilla): void {
   const frase = borrador.destinatarios[0]!;
   base.destinatario = frase.etiqueta;
-  base.destino = { clave: frase.clave, frase: frase.frase };
+  base.destino = { clave: frase.clave, frase: frase.frase.replace(MARCA_ENTIDAD, 'NOMBRE DE LA ENTIDAD') };
+}
+
+/**
+ * Lo que ve el editor mientras se escribe: el texto ya resuelto con datos de muestra y, aparte, los problemas de la plantilla y los datos
+ * que faltan. A diferencia del PDF, nunca responde 400 por un borrador a medias: el editor lo muestra mientras se redacta. Es liviano
+ * (sin PDF ni imágenes) para poder pedirse cada vez que se deja de escribir, y no guarda nada.
+ */
+export async function renderizarBorrador(tipo: ClaveCertificado, borrador: ContenidoPlantilla, usuario: UserDocument) {
+  const definido = await tipoPorClave(tipo);
+  exigirPuedeRedactar(definido, usuario);
+  const base = await snapshotDeMuestraDelColegio(definido, false);
+  conCierreDeMuestra(base, borrador);
+  const { bloques, errores } = renderizar(borrador, contextoDeVariables(base, borrador.vigencia_dias));
+  return {
+    titulo: borrador.titulo,
+    encabezado: base.encabezado,
+    bloques,
+    tabla: definido.fuentes.includes('VALORACIONES') ? (base.estudios?.tabla ?? null) : null,
+    problemas: validarContenido(definido, borrador),
+    faltantes: errores,
+  };
+}
+
+/** Vista previa de un borrador de plantilla con un estudiante inventado y el encabezado real del colegio. No guarda nada. */
+export async function snapshotDeVistaPreviaDePlantilla(tipo: ClaveCertificado, borrador: ContenidoPlantilla, usuario: UserDocument): Promise<SnapshotCertificado> {
+  const definido = await tipoPorClave(tipo);
+  exigirPuedeRedactar(definido, usuario);
+  const errores = validarContenido(definido, borrador);
+  if (errores.length > 0) throw new ApiError(400, 'La plantilla tiene problemas que impiden mostrarla.', errores);
+
+  const base = await snapshotDeMuestraDelColegio(definido, true);
+  conCierreDeMuestra(base, borrador);
   const { bloques, errores: faltantes } = renderizar(borrador, contextoDeVariables(base, borrador.vigencia_dias));
   if (faltantes.length > 0) throw new ApiError(400, 'La vista previa necesita datos que el colegio aún no tiene.', faltantes);
   base.contenido = { plantilla: { version: 0, hash: huellaDeContenido(tipo, borrador) }, titulo: borrador.titulo, bloques, vigencia_dias: borrador.vigencia_dias };

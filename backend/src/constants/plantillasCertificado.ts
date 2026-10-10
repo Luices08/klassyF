@@ -4,7 +4,7 @@
  * desde el primer día, y las reglas que una plantilla debe cumplir para poder publicarse. El encabezado institucional (nombre,
  * escudo, DANE, NIT, resolución, sede, jornada, año) lo dibuja siempre el sistema con los datos de M01: no se redacta aquí.
  */
-import { CERTIFICADOS, ClaveCertificado, OpcionDestinatario } from './certificados';
+import { A_QUIEN_INTERESE, DefinicionCertificado, FRASE_OTRO_PREDETERMINADA, OpcionDestinatario, TIPOS_INICIALES } from './certificados';
 
 export const ESTILOS_BLOQUE = ['PREAMBULO', 'FORMULA', 'CUERPO', 'DESTACADO', 'TABLA_NOTAS'] as const;
 export type EstiloBloque = (typeof ESTILOS_BLOQUE)[number];
@@ -62,7 +62,7 @@ const VIGENCIA = bloque('vigencia', 'CUERPO', 'Este documento tiene una vigencia
 const LUGAR_FECHA = bloque('lugar_fecha', 'CUERPO', 'Dado en {{institucion.ciudad}}, {{fecha.textual}}.', hay('institucion.ciudad'));
 const FECHA_SIN_CIUDAD = bloque('fecha', 'CUERPO', 'Fecha de expedición: {{fecha.expedicion}}.', noHay('institucion.ciudad'));
 
-const CONTENIDO_BASE: Record<ClaveCertificado, Omit<ContenidoPlantilla, 'titulo' | 'destinatarios' | 'frase_otro'>> = {
+const CONTENIDO_BASE: Record<string, Omit<ContenidoPlantilla, 'titulo' | 'destinatarios' | 'frase_otro'>> = {
   CONSTANCIA_ESTUDIO: {
     vigencia_dias: 30,
     bloques: [
@@ -80,7 +80,7 @@ const CONTENIDO_BASE: Record<ClaveCertificado, Omit<ContenidoPlantilla, 'titulo'
     bloques: [
       PREAMBULO,
       bloque('formula', 'FORMULA', 'CERTIFICA'),
-      bloque('cuerpo', 'CUERPO', `Que {{estudiante.nombre_completo}}, identificado(a) con {{estudiante.documento_expedicion}}, {{matricula.situacion}} en esta institución en ${UBICACION}, con matrícula {{matricula.clase}} del {{matricula.fecha}}, {{matricula.registro_libro}}.`),
+      bloque('cuerpo', 'CUERPO', `Que {{estudiante.nombre_completo}}, identificado(a) con {{estudiante.documento}}, {{matricula.situacion}} en esta institución en ${UBICACION}, con matrícula {{matricula.clase}} del {{matricula.fecha}}, {{matricula.registro_libro}}.`),
       bloque('ingreso', 'CUERPO', 'Condición de ingreso: {{matricula.condicion_ingreso}}.', hay('matricula.condicion_ingreso')),
       bloque('acudiente', 'CUERPO', 'Acudiente responsable: {{acudiente.nombre}}, identificado(a) con {{acudiente.documento}} ({{acudiente.parentesco}}).', hay('acudiente.nombre')),
       bloque('retiro', 'CUERPO', '{{matricula.retiro}}', hay('matricula.retiro')),
@@ -122,10 +122,39 @@ const CONTENIDO_BASE: Record<ClaveCertificado, Omit<ContenidoPlantilla, 'titulo'
   },
 };
 
-export function contenidoInicial(clave: ClaveCertificado): ContenidoPlantilla {
-  const def = CERTIFICADOS.find((c) => c.clave === clave);
-  if (!def) throw new Error(`Tipo de certificado desconocido: ${clave}`);
-  return structuredClone({ titulo: def.nombre, destinatarios: def.destinatarios, frase_otro: def.frase_otro, ...CONTENIDO_BASE[clave] });
+/**
+ * El texto de partida de un tipo. Los tipos sembrados traen el suyo; uno creado por el colegio arranca con un texto genérico armado con
+ * sus fuentes (valoraciones, dependencias) que ya cumple los mínimos, para que se pueda ajustar y no escribir desde cero.
+ */
+const contenidoGenerico = (def: Pick<DefinicionCertificado, 'fuentes'>): Omit<ContenidoPlantilla, 'titulo' | 'destinatarios' | 'frase_otro'> => {
+  const valoraciones = def.fuentes.includes('VALORACIONES');
+  const dependencias = def.fuentes.includes('DEPENDENCIAS');
+  const verbo = valoraciones ? 'cursó en esta institución' : '{{matricula.situacion}} en esta institución en';
+  const cola = valoraciones ? ', con las siguientes valoraciones finales:' : '.';
+  return {
+    vigencia_dias: null,
+    bloques: [
+      PREAMBULO,
+      bloque('formula', 'FORMULA', 'HACE CONSTAR'),
+      bloque('cuerpo', 'CUERPO', `Que {{estudiante.nombre_completo}}, identificado(a) con {{estudiante.documento}}, ${verbo} ${UBICACION}${cola}`),
+      ...(valoraciones ? [bloque('notas', 'TABLA_NOTAS', ''), bloque('promocion', 'DESTACADO', 'Concepto de promoción: {{promocion.texto}}.')] : []),
+      ...(dependencias
+        ? [bloque('dependencias', 'CUERPO', 'Se encuentra a PAZ Y SALVO con la institución en las siguientes dependencias: {{paz_y_salvo.dependencias}}. Verificado por {{paz_y_salvo.verificado_por}}.')]
+        : []),
+      DESTINO,
+      VIGENCIA,
+      LUGAR_FECHA,
+      FECHA_SIN_CIUDAD,
+    ],
+  };
+};
+
+export function contenidoInicial(def: Pick<DefinicionCertificado, 'clave' | 'nombre' | 'fuentes'>): ContenidoPlantilla {
+  const sembrado = TIPOS_INICIALES.find((t) => t.clave === def.clave);
+  if (sembrado && CONTENIDO_BASE[def.clave]) {
+    return structuredClone({ titulo: sembrado.nombre, destinatarios: sembrado.destinatarios, frase_otro: sembrado.frase_otro, ...(CONTENIDO_BASE[def.clave] as Omit<ContenidoPlantilla, 'titulo' | 'destinatarios' | 'frase_otro'>) });
+  }
+  return structuredClone({ titulo: def.nombre, destinatarios: [A_QUIEN_INTERESE], frase_otro: FRASE_OTRO_PREDETERMINADA, ...contenidoGenerico(def) });
 }
 
 // --- Lo que una plantilla debe conservar para poder publicarse ---
@@ -143,13 +172,18 @@ const IDENTIFICACION = ['estudiante.nombre_completo', ['estudiante.documento', '
 const FECHA = [['fecha.expedicion', 'fecha.textual']];
 
 /**
- * Mínimos por documento. El DANE, la resolución de aprobación, el nombre del colegio y el escudo van siempre en el encabezado que
- * dibuja el sistema, así que no dependen de la plantilla. Decreto 180 de 1981 art. 13 (compilado en el Decreto 1075 de 2015) para el
- * certificado de estudio; el documento maestro (M26) para las demás. Validar con el texto vigente de la norma.
+ * Mínimos por documento, derivados de lo que el tipo es (no de su nombre): toda constancia lleva fórmula, cuerpo, la identificación del
+ * estudiante y la fecha; las fuentes agregan lo suyo (la tabla de valoraciones y el concepto de promoción, las dependencias) y el tipo
+ * puede exigir más variables. El DANE, la resolución de aprobación, el nombre del colegio y el escudo van siempre en el encabezado que
+ * dibuja el sistema, así que no dependen de la plantilla. Decreto 180 de 1981 art. 13 (compilado en el Decreto 1075 de 2015) para lo
+ * que certifica valoraciones; el documento maestro (M26) para el resto. Validar con el texto vigente de la norma.
  */
-export const REQUISITOS_LEGALES: Record<ClaveCertificado, RequisitosLegales> = {
-  CONSTANCIA_ESTUDIO: { variables: [...IDENTIFICACION, ...FECHA], bloques: ['formula', 'cuerpo'], fuente: 'Documento maestro, M26: constancia de estudio' },
-  CERTIFICADO_MATRICULA: { variables: [...IDENTIFICACION, 'matricula.registro_libro', 'matricula.fecha', ...FECHA], bloques: ['formula', 'cuerpo'], fuente: 'Documento maestro, M26: constancia de matrícula' },
-  PAZ_SALVO: { variables: [...IDENTIFICACION, 'paz_y_salvo.dependencias', ...FECHA], bloques: ['formula', 'cuerpo'], fuente: 'Documento maestro, M26: paz y salvo' },
-  CERTIFICADO_ESTUDIOS: { variables: [...IDENTIFICACION, 'promocion.texto', ...FECHA], bloques: ['formula', 'cuerpo', 'notas', 'promocion'], fuente: 'Decreto 180 de 1981 art. 13 (Decreto 1075 de 2015) y documento maestro, M26' },
-};
+export function requisitosDe(def: Pick<DefinicionCertificado, 'fuentes' | 'variables_obligatorias'>): RequisitosLegales {
+  const valoraciones = def.fuentes.includes('VALORACIONES');
+  const bloques = ['formula', 'cuerpo', ...(valoraciones ? ['notas', 'promocion'] : [])];
+  const variables: Array<string | string[]> = [...IDENTIFICACION, ...FECHA];
+  if (valoraciones) variables.push('promocion.texto');
+  if (def.fuentes.includes('DEPENDENCIAS')) variables.push('paz_y_salvo.dependencias');
+  for (const v of def.variables_obligatorias) if (!variables.includes(v)) variables.push(v);
+  return { variables, bloques, fuente: valoraciones ? 'Decreto 180 de 1981 art. 13 (Decreto 1075 de 2015) y documento maestro, M26' : 'Documento maestro, M26' };
+}

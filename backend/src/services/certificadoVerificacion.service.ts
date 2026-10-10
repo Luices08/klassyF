@@ -1,8 +1,8 @@
-import { definicionCertificado } from '../constants/certificados';
 import CertificadoEmitido, { CertificadoEmitidoDocument } from '../models/certificadoEmitido.model';
 import ApiError from '../utils/ApiError';
-import { SnapshotCertificado, claveCorta, compararClave, enmascararDocumento } from '../utils/certificados';
+import { SnapshotCertificado, claveCorta, compararClave, enmascararDocumento, vigenciaDeDocumento } from '../utils/certificados';
 import { huellaActual } from './certificado.service';
+import { nombresDeTipos } from './tipoCertificado.service';
 
 export interface ConsultaVerificacion {
   token?: string;
@@ -35,7 +35,7 @@ export async function verificarCertificado(consulta: ConsultaVerificacion) {
   const certificado = await buscar(consulta);
   const s = certificado.snapshot as SnapshotCertificado;
   const base = {
-    tipo: definicionCertificado(certificado.tipo).nombre,
+    tipo: (await nombresDeTipos([certificado.tipo])).get(certificado.tipo) ?? s.contenido?.titulo ?? certificado.tipo,
     codigo: certificado.codigo,
     fecha_emision: certificado.fecha_emision,
     institucion: s.encabezado.institucion,
@@ -43,8 +43,12 @@ export async function verificarCertificado(consulta: ConsultaVerificacion) {
   if (huellaActual(certificado) !== certificado.hash) {
     return { resultado: 'NO_VERIFICABLE' as const, ...base, mensaje: 'El contenido de este documento no coincide con el que se expidió. No lo acepte y comuníquese con la institución.' };
   }
+  // Un documento auténtico cuya vigencia declarada (p. ej. «30 días a partir de su expedición») ya pasó no se presenta como válido.
+  const vigencia = vigenciaDeDocumento(s);
+  const resultado = certificado.estado !== 'VIGENTE' ? ('ANULADO' as const) : vigencia.vencida ? ('VIGENCIA_CUMPLIDA' as const) : ('VALIDO' as const);
   return {
-    resultado: certificado.estado === 'VIGENTE' ? ('VALIDO' as const) : ('ANULADO' as const),
+    resultado,
+    vigencia: { dias: vigencia.dias, hasta: vigencia.hasta },
     ...base,
     estudiante: `${s.estudiante.nombre} ${s.estudiante.apellido}`.toUpperCase(),
     documento: enmascararDocumento(s.estudiante.numero_documento),

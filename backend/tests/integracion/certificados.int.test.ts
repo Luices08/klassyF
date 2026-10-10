@@ -37,7 +37,7 @@ describe('M26 certificados (con base de datos)', () => {
   let matriculaId: string;
 
   const expedir = (extra: Partial<certificados.EntradaExpedicion> = {}, quien = e.secretaria) =>
-    certificados.expedirCertificado({ enrollment_id: matriculaId, tipo: 'CONSTANCIA_ESTUDIO', ...extra }, quien);
+    certificados.expedirCertificado({ enrollment_id: matriculaId, tipo: 'CONSTANCIA_ESTUDIO', solicitante: { tipo: 'TERCERO', nombre: 'Persona Autorizada', numero_documento: '555666', detalle: 'tía', presento_autorizacion: true } as const, ...extra }, quien);
 
   beforeAll(iniciarBaseDeDatos, 600_000);
   afterAll(async () => {
@@ -93,6 +93,8 @@ describe('M26 certificados (con base de datos)', () => {
   });
 
   it('el switch decide qué se estampa y queda congelado en el documento', async () => {
+    // La firma de Rectoría nace sin delegar en la secretaría: para estamparla desde su cuenta el administrador lo permite.
+    await configuracion.actualizarConfiguracion({ permitir_firma_rectoria_a_secretaria: true }, e.admin);
     const porDefecto = (await expedir()).snapshot as { firmas: { rectoria: { aplicada: boolean }; secretaria: { aplicada: boolean }; sello: { aplicado: boolean } } };
     expect([porDefecto.firmas.rectoria.aplicada, porDefecto.firmas.secretaria.aplicada, porDefecto.firmas.sello.aplicado]).toEqual([false, true, true]);
 
@@ -100,7 +102,10 @@ describe('M26 certificados (con base de datos)', () => {
     expect([apagado.firmas.rectoria.aplicada, apagado.firmas.secretaria.aplicada, apagado.firmas.sello.aplicado]).toEqual([true, false, false]);
   });
 
-  it('la secretaría estampa la firma de rectoría solo mientras el administrador lo permita', async () => {
+  it('la firma de Rectoría nace sin delegar: la secretaría solo la estampa mientras el administrador lo permita', async () => {
+    expect((await configuracion.vistaConfiguracion(e.admin)).permitir_firma_rectoria_a_secretaria).toBe(false);
+    await expect(expedir({ firmas: { rectoria: true } })).rejects.toMatchObject({ statusCode: 409 });
+    await configuracion.actualizarConfiguracion({ permitir_firma_rectoria_a_secretaria: true }, e.admin);
     await expect(expedir({ firmas: { rectoria: true } })).resolves.toBeDefined();
     await configuracion.actualizarConfiguracion({ permitir_firma_rectoria_a_secretaria: false }, e.admin);
     await expect(expedir({ firmas: { rectoria: true } })).rejects.toMatchObject({ statusCode: 409 });
@@ -137,6 +142,8 @@ describe('M26 certificados (con base de datos)', () => {
   it('secretaría carga la firma de Rectoría solo mientras el administrador mantenga la delegación', async () => {
     const png = await QRCode.toBuffer('firma-rector', { margin: 1, width: 200 });
     const archivo = { ...imagen('rector.png'), buffer: png, size: png.length };
+    await expect(configuracion.guardarImagen('rectoria', archivo, e.secretaria)).rejects.toMatchObject({ statusCode: 403 });
+    await configuracion.actualizarConfiguracion({ permitir_firma_rectoria_a_secretaria: true }, e.admin);
     await expect(configuracion.guardarImagen('rectoria', archivo, e.secretaria)).resolves.toBeDefined();
     await configuracion.actualizarConfiguracion({ permitir_firma_rectoria_a_secretaria: false }, e.admin);
     await expect(configuracion.guardarImagen('rectoria', archivo, e.secretaria)).rejects.toMatchObject({ statusCode: 403 });
@@ -154,7 +161,7 @@ describe('M26 certificados (con base de datos)', () => {
     const delAdmin = await configuracion.vistaConfiguracion(e.admin);
     expect(delAdmin.puede.ajustes).toBe(true);
     const delaSecretaria = await configuracion.vistaConfiguracion(e.secretaria);
-    expect(delaSecretaria.puede).toEqual({ imagen: { rectoria: true, secretaria: true, sello: true }, designar: { rectoria: false, secretaria: true }, ajustes: false });
+    expect(delaSecretaria.puede).toEqual({ imagen: { rectoria: false, secretaria: true, sello: true }, designar: { rectoria: false, secretaria: true }, ajustes: false });
     expect(delaSecretaria.tipos.map((t) => t.clave)).toEqual(['CONSTANCIA_ESTUDIO', 'CERTIFICADO_MATRICULA', 'PAZ_SALVO', 'CERTIFICADO_ESTUDIOS']);
     expect(delaSecretaria.tipos[0]!.destinatarios.at(-1)).toMatchObject({ clave: 'OTRO' });
   });
@@ -183,8 +190,10 @@ describe('M26 certificados (con base de datos)', () => {
   it('el destinatario sale del selector y queda congelado con su frase', async () => {
     const porDefecto = (await expedir()).snapshot as { destinatario: string; destino: { clave: string; frase: string } };
     expect(porDefecto).toMatchObject({ destinatario: 'A quien interese', destino: { clave: 'A_QUIEN_INTERESE' } });
-    const eps = (await expedir({ destinatario: { clave: 'EPS' } })).snapshot as typeof porDefecto;
-    expect(eps.destino.frase).toContain('Entidad Promotora de Salud');
+    const caja = (await expedir({ destinatario: { clave: 'CAJA_COMPENSACION' } })).snapshot as typeof porDefecto;
+    expect(caja.destino.frase).toContain('Caja de Compensación Familiar');
+    // La opción de EPS toma el nombre de M03: sin EPS registrada no se puede elegir (ver fichaCertificado.int.test.ts).
+    await expect(expedir({ destinatario: { clave: 'EPS' } })).rejects.toMatchObject({ statusCode: 409 });
     const otro = (await expedir({ destinatario: { clave: 'OTRO', otro: 'Compensar' } })).snapshot as typeof porDefecto;
     expect(otro).toMatchObject({ destinatario: 'Compensar', destino: { frase: 'Se expide para presentar ante Compensar' } });
     await expect(expedir({ destinatario: { clave: 'RETIRO_TRASLADO' } })).rejects.toMatchObject({ statusCode: 400 });
@@ -306,6 +315,7 @@ describe('M26 certificados (con base de datos)', () => {
   });
 
   it('genera el PDF expedido (con QR) y la vista previa, sin guardar nada', async () => {
+    await configuracion.actualizarConfiguracion({ permitir_firma_rectoria_a_secretaria: true }, e.admin);
     const c = await expedir({ destinatario: { clave: 'OTRO', otro: 'la EPS' }, firmas: { rectoria: true } });
     const { buffer, nombreArchivo } = await pdf.generarPdfDeCertificado(String(c._id), 'https://colegio.test', e.secretaria);
     expect(buffer.subarray(0, 4).toString()).toBe('%PDF');
@@ -466,8 +476,10 @@ describe('M26 certificados (con base de datos)', () => {
       await expect(plantillaServicio.publicarPlantilla('PAZ_SALVO', await contenidoVigente('PAZ_SALVO'), '', e.admin)).rejects.toMatchObject({ statusCode: 409 });
     });
 
-    it('solo el administrador ve y edita las plantillas', async () => {
-      await expect(plantillaServicio.listarPlantillas(e.secretaria)).rejects.toMatchObject({ statusCode: 403 });
+    it('el texto de un documento activo solo lo ve y edita el administrador', async () => {
+      // Secretaría solo redacta borradores: de los tipos activos no ve ni publica nada.
+      expect((await plantillaServicio.listarPlantillas(e.secretaria)).plantillas).toEqual([]);
+      await expect(plantillaServicio.listarPlantillas(e.docenteDeClase)).rejects.toMatchObject({ statusCode: 403 });
       await expect(plantillaServicio.publicarPlantilla('PAZ_SALVO', await contenidoVigente('PAZ_SALVO'), '', e.secretaria)).rejects.toMatchObject({ statusCode: 403 });
       await expect(plantillaServicio.versionesDePlantilla('PAZ_SALVO', e.secretaria)).rejects.toMatchObject({ statusCode: 403 });
       await expect(plantillaServicio.restablecerPlantilla('PAZ_SALVO', e.secretaria)).rejects.toMatchObject({ statusCode: 403 });
@@ -524,6 +536,7 @@ describe('M26 certificados (con base de datos)', () => {
       invalido.bloques.find((b) => b.id === 'cuerpo')!.texto = 'Que {{estudiante.edad}}';
       await expect(pdf.generarVistaPreviaDePlantillaPdf('CONSTANCIA_ESTUDIO', invalido, e.admin)).rejects.toMatchObject({ statusCode: 400 });
       await expect(pdf.generarVistaPreviaDePlantillaPdf('CONSTANCIA_ESTUDIO', await contenidoVigente(), e.secretaria)).rejects.toMatchObject({ statusCode: 403 });
+      await expect(pdf.generarVistaPreviaDePlantillaPdf('CONSTANCIA_ESTUDIO', await contenidoVigente(), e.docenteDeClase)).rejects.toMatchObject({ statusCode: 403 });
     });
 
     it('los documentos expedidos antes de las plantillas se siguen reimprimiendo como salieron', async () => {

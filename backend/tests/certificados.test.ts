@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { CERTIFICADOS, ELEMENTOS_AUTENTICACION, POLITICA_INICIAL, PoliticaDeCertificado, codigoDeCertificado } from '../src/constants/certificados';
+import { ELEMENTOS_AUTENTICACION, PoliticaDeCertificado, TIPOS_INICIALES, codigoDeCertificado } from '../src/constants/certificados';
+
+const POLITICA_CONSTANCIA = TIPOS_INICIALES.find((t) => t.clave === 'CONSTANCIA_ESTUDIO')!.politica;
 import { redactarCertificado } from '../src/utils/certificadoTexto';
 import {
   SnapshotCertificado,
@@ -50,20 +52,20 @@ describe('token y datos mínimos', () => {
   });
 
   it('el código lleva prefijo del tipo, año y consecutivo con ceros', () => {
-    expect(codigoDeCertificado('CONSTANCIA_ESTUDIO', 2026, 7)).toBe('CE-2026-0007');
-    expect(codigoDeCertificado('CERTIFICADO_MATRICULA', 2026, 123)).toBe('CM-2026-0123');
+    expect(codigoDeCertificado('CE', 2026, 7)).toBe('CE-2026-0007');
+    expect(codigoDeCertificado('CM', 2026, 123)).toBe('CM-2026-0123');
   });
 
   it('cada tipo tiene prefijo propio y política inicial completa', () => {
-    expect(new Set(CERTIFICADOS.map((c) => c.prefijo)).size).toBe(CERTIFICADOS.length);
-    for (const c of CERTIFICADOS) expect(Object.keys(POLITICA_INICIAL[c.clave]).sort()).toEqual([...ELEMENTOS_AUTENTICACION].sort());
+    expect(new Set(TIPOS_INICIALES.map((c) => c.prefijo)).size).toBe(TIPOS_INICIALES.length);
+    for (const c of TIPOS_INICIALES) expect(Object.keys(c.politica).sort()).toEqual([...ELEMENTOS_AUTENTICACION].sort());
   });
 });
 
 describe('switches de firmas y sellos', () => {
   const todo = { rectoria: true, secretaria: true, sello: true };
   const entrada = (politica: Partial<PoliticaDeCertificado> = {}, extra: { tieneImagen?: Partial<typeof todo>; puedeAplicar?: Partial<typeof todo> } = {}) => ({
-    politica: { ...POLITICA_INICIAL.CONSTANCIA_ESTUDIO, ...politica },
+    politica: { ...POLITICA_CONSTANCIA, ...politica },
     tieneImagen: { ...todo, ...extra.tieneImagen },
     puedeAplicar: { ...todo, ...extra.puedeAplicar },
   });

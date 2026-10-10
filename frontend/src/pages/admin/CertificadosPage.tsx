@@ -4,21 +4,21 @@ import { ConfiguracionCertificadosPanel } from '../../components/certificados/Co
 import { ExpedirCertificado } from '../../components/certificados/ExpedirCertificado';
 import { HistorialCertificados } from '../../components/certificados/HistorialCertificados';
 import { PlantillasCertificadosPanel } from '../../components/certificados/PlantillasCertificadosPanel';
+import { TiposDocumentoPanel } from '../../components/certificados/TiposDocumentoPanel';
 import { PageHeader } from '../../components/ui/PageHeader';
 import { TabPanel, Tabs } from '../../components/ui/Tabs';
-import { useAuth } from '../../context/AuthContext';
 
 /** Secretaría académica (M26): expedir constancias y certificados, ver lo expedido y configurar firmas y sellos (cada rol, según lo que el servidor le permita). */
 export function CertificadosPage() {
-  const { user } = useAuth();
   const [params] = useSearchParams();
   const [tab, setTab] = useState('expedir');
   const tabs = [
     { key: 'expedir', label: 'Expedir' },
     { key: 'historial', label: 'Historial' },
     { key: 'firmas', label: 'Firmas y sellos' },
-    // El texto de los documentos lo define el administrador.
-    ...(user?.rol === 'ADMIN' ? [{ key: 'plantillas', label: 'Plantillas' }] : []),
+    // Los tipos de documento y su texto los gestionan Secretaría y el administrador (el servidor decide qué puede cada uno según el estado del tipo).
+    { key: 'tipos', label: 'Tipos de documento' },
+    { key: 'plantillas', label: 'Plantillas' },
   ];
 
   return (
@@ -33,6 +33,9 @@ export function CertificadosPage() {
       </TabPanel>
       <TabPanel active={tab} tabKey="firmas">
         <ConfiguracionCertificadosPanel />
+      </TabPanel>
+      <TabPanel active={tab} tabKey="tipos">
+        <TiposDocumentoPanel />
       </TabPanel>
       <TabPanel active={tab} tabKey="plantillas">
         <PlantillasCertificadosPanel />

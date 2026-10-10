@@ -6,6 +6,8 @@ import { Input, Select } from '../ui/Field';
 import { Spinner } from '../ui/Spinner';
 import { Switch } from '../ui/Switch';
 import { VisorDocumento } from '../ui/VisorDocumento';
+import { SolicitanteCard } from './SolicitanteCard';
+import { TarjetaEstudiante } from './TarjetaEstudiante';
 import {
   CLAVE_DESTINATARIO_OTRO,
   ELEMENTOS_AUTENTICACION,
@@ -20,8 +22,10 @@ import {
   type ClaveCertificado,
   type ElementoAutenticacion,
   type EntradaExpedicion,
+  type SolicitanteEntrada,
 } from '../../hooks/useCertificados';
 import { useStudentsDirectory } from '../../hooks/useStudents';
+import { solicitanteCompleto, solicitanteInicial } from '../../lib/solicitanteCertificado';
 
 const MIN_BUSQUEDA = 3;
 
@@ -40,6 +44,8 @@ export function ExpedirCertificado({ estudianteInicial }: { estudianteInicial?: 
   const [confirmadas, setConfirmadas] = useState<{ clave: string; dependencias: string[] }>({ clave: '', dependencias: [] });
   // Lo que el usuario tocó, atado a la matrícula y el documento elegidos: al cambiar cualquiera de los dos se vuelve a la política.
   const [manual, setManual] = useState<{ clave: string; valores: Partial<Record<ElementoAutenticacion, boolean>> }>({ clave: '', valores: {} });
+  // A quién se entrega, atado al estudiante: al cambiar de estudiante se vuelve a proponer su acudiente principal.
+  const [solicitante, setSolicitante] = useState<{ estudiante: string; valor: SolicitanteEntrada } | null>(null);
   const [expedido, setExpedido] = useState<CertificadoExpedido | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [generandoPrevia, setGenerandoPrevia] = useState(false);
@@ -69,6 +75,8 @@ export function ExpedirCertificado({ estudianteInicial }: { estudianteInicial?: 
   const matricula = matriculas.data?.matriculas.find((m) => m._id === matriculaId);
   const tipo: ClaveCertificado | '' = matricula?.tipos.includes(tipoElegido as ClaveCertificado) ? tipoElegido : (matricula?.tipos[0] ?? '');
   const configuracionDelTipo = configuracion.data?.tipos.find((t) => t.clave === tipo);
+  const ficha = matriculas.data;
+  const solicitanteActual: SolicitanteEntrada | null = ficha && estudianteId ? (solicitante?.estudiante === estudianteId ? solicitante.valor : solicitanteInicial(ficha)) : null;
 
   // Cada documento arranca con los switches que su política define.
   const claveManual = `${matriculaId}:${tipo}`;
@@ -76,9 +84,19 @@ export function ExpedirCertificado({ estudianteInicial }: { estudianteInicial?: 
   const destinoClave = destino.clave === tipo && opcionesDestino.some((o) => o.clave === destino.elegido) ? destino.elegido : (opcionesDestino[0]?.clave ?? '');
   const destinoOtro = destino.clave === tipo ? destino.otro : '';
   const restriccion = matricula && tipo ? matricula.restricciones[tipo] : undefined;
+  // La EPS viene de M03 y solo si el responsable legal autorizó su uso: se dice qué se imprimirá o por qué no se puede elegir.
+  const usaEps = opcionesDestino.find((o) => o.clave === destinoClave)?.fuente_entidad === 'EPS';
+  const hayOpcionEps = opcionesDestino.some((o) => o.fuente_entidad === 'EPS');
+  const hintDestino = usaEps
+    ? `Se imprimirá la EPS registrada en M03: ${ficha?.estudiante.eps.valor ?? '—'}.`
+    : hayOpcionEps && ficha && !ficha.estudiante.eps.disponible
+      ? `La opción de EPS no está disponible: ${ficha.estudiante.eps.motivo ?? ''}`
+      : undefined;
+  // Lo que el documento pide al expedir lo dicen las fuentes del tipo, no su nombre.
+  const usaDependencias = Boolean(configuracionDelTipo?.fuentes.includes('DEPENDENCIAS'));
   const dependenciasActivas = configuracion.data?.paz_y_salvo.dependencias.filter((d) => d.activa) ?? [];
   const dependenciasConfirmadas = confirmadas.clave === claveManual ? confirmadas.dependencias : [];
-  const faltanDependencias = tipo === 'PAZ_SALVO' && dependenciasActivas.some((d) => !dependenciasConfirmadas.includes(d.clave));
+  const faltanDependencias = usaDependencias && dependenciasActivas.some((d) => !dependenciasConfirmadas.includes(d.clave));
   const firmas: Partial<Record<ElementoAutenticacion, boolean>> = {
     ...(configuracionDelTipo ? Object.fromEntries(ELEMENTOS_AUTENTICACION.map((e) => [e, configuracionDelTipo.elementos[e].valor_inicial])) : {}),
     ...(manual.clave === claveManual ? manual.valores : {}),
@@ -90,8 +108,9 @@ export function ExpedirCertificado({ estudianteInicial }: { estudianteInicial?: 
           enrollment_id: matricula._id,
           tipo,
           destinatario: destinoClave ? { clave: destinoClave, otro: destinoClave === CLAVE_DESTINATARIO_OTRO ? destinoOtro.trim() : null } : null,
-          ...(tipo === 'PAZ_SALVO' ? { dependencias: dependenciasConfirmadas } : {}),
+          ...(usaDependencias ? { dependencias: dependenciasConfirmadas } : {}),
           firmas,
+          solicitante: solicitanteActual,
         }
       : null;
 
@@ -140,6 +159,9 @@ export function ExpedirCertificado({ estudianteInicial }: { estudianteInicial?: 
 
   return (
     <div className="space-y-4">
+      {estudianteId && matriculas.data ? (
+        <TarjetaEstudiante ficha={matriculas.data} matricula={matricula} onCambiar={() => elegirEstudiante(undefined)} />
+      ) : (
       <Card>
         <CardHeader title="Estudiante" subtitle="Busca por nombre o documento; el sistema ya conoce el resto de sus datos." />
         {!estudianteId ? (
@@ -175,20 +197,9 @@ export function ExpedirCertificado({ estudianteInicial }: { estudianteInicial?: 
               Elegir otro estudiante
             </Button>
           </div>
-        ) : (
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <p className="text-sm text-body">
-              <span className="font-semibold text-ink">
-                {matriculas.data?.estudiante.apellido} {matriculas.data?.estudiante.nombre}
-              </span>{' '}
-              · {matriculas.data?.estudiante.numero_documento}
-            </p>
-            <Button variant="secondary" onClick={() => elegirEstudiante(undefined)}>
-              Cambiar
-            </Button>
-          </div>
-        )}
+        ) : null}
       </Card>
+      )}
 
       {estudianteId && matriculas.data && (
         <Card>
@@ -217,24 +228,29 @@ export function ExpedirCertificado({ estudianteInicial }: { estudianteInicial?: 
               {configuracionDelTipo && (
                 <div className="grid gap-3 sm:grid-cols-2">
                   <Select
-                    label={tipo === 'PAZ_SALVO' ? 'Motivo de expedición' : 'Destinatario'}
+                    label={usaDependencias ? 'Motivo de expedición' : 'Destinatario'}
                     value={destinoClave}
                     onChange={(e) => setDestino({ clave: tipo, elegido: e.target.value, otro: '' })}
+                    hint={hintDestino}
                   >
-                    {opcionesDestino.map((o) => (
-                      <option key={o.clave} value={o.clave}>
-                        {o.etiqueta}
-                      </option>
-                    ))}
+                    {opcionesDestino.map((o) => {
+                      const sinEntidad = o.fuente_entidad === 'EPS' && !ficha?.estudiante.eps.disponible;
+                      return (
+                        <option key={o.clave} value={o.clave} disabled={sinEntidad}>
+                          {o.etiqueta}
+                          {sinEntidad ? ' — no disponible' : ''}
+                        </option>
+                      );
+                    })}
                   </Select>
                   {destinoClave === CLAVE_DESTINATARIO_OTRO && (
                     <Input
-                      label={tipo === 'PAZ_SALVO' ? 'Especifica el motivo' : 'Especifica el destinatario'}
+                      label={usaDependencias ? 'Especifica el motivo' : 'Especifica el destinatario'}
                       value={destinoOtro}
                       onChange={(e) => setDestino({ clave: tipo, elegido: destinoClave, otro: e.target.value })}
                       maxLength={120}
-                      placeholder={tipo === 'PAZ_SALVO' ? 'Ej. cambio de ciudad' : 'Ej. Compensar'}
-                      hint={tipo === 'PAZ_SALVO' ? 'Si lo dejas vacío, se usa el motivo predeterminado.' : 'Si lo dejas vacío, el documento dice «a quien interese».'}
+                      placeholder={usaDependencias ? 'Ej. cambio de ciudad' : 'Ej. Compensar'}
+                      hint={usaDependencias ? 'Si lo dejas vacío, se usa el motivo predeterminado.' : 'Si lo dejas vacío, el documento dice «a quien interese».'}
                     />
                   )}
                 </div>
@@ -245,7 +261,9 @@ export function ExpedirCertificado({ estudianteInicial }: { estudianteInicial?: 
         </Card>
       )}
 
-      {tipo === 'PAZ_SALVO' && matricula && (
+      {ficha && matricula && solicitanteActual && <SolicitanteCard ficha={ficha} valor={solicitanteActual} onChange={(valor) => setSolicitante({ estudiante: estudianteId as string, valor })} />}
+
+      {usaDependencias && matricula && (
         <Card>
           <CardHeader title="Dependencias" subtitle="Confirma que el estudiante no tiene pendientes en cada una. El documento queda con quién lo verificó." />
           {dependenciasActivas.length === 0 ? (
@@ -302,11 +320,12 @@ export function ExpedirCertificado({ estudianteInicial }: { estudianteInicial?: 
       {entrada && (
         <div className="flex flex-wrap items-center justify-end gap-2">
           {faltanDependencias && <p className="mr-auto text-xs text-muted">Confirma todas las dependencias para continuar.</p>}
+          {!faltanDependencias && !restriccion && !solicitanteCompleto(solicitanteActual) && <p className="mr-auto text-xs text-muted">Completa quién solicita el documento para expedirlo.</p>}
           <Button variant="secondary" onClick={verPrevia} isLoading={generandoPrevia} disabled={faltanDependencias}>
             Vista previa
           </Button>
           {!restriccion && (
-            <Button onClick={expedirDocumento} isLoading={expedir.isPending} disabled={faltanDependencias}>
+            <Button onClick={expedirDocumento} isLoading={expedir.isPending} disabled={faltanDependencias || !solicitanteCompleto(solicitanteActual)}>
               Expedir
             </Button>
           )}

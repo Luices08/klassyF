@@ -2,13 +2,17 @@ import { createHmac, randomBytes } from 'crypto';
 import {
   CLAVE_DESTINATARIO_OTRO,
   ClaveCertificado,
-  DefinicionCertificado,
   ELEMENTOS_AUTENTICACION,
   ETIQUETA_DESTINATARIO_OTRO,
   ETIQUETA_ELEMENTO,
   ElementoAutenticacion,
+  FuenteEntidad,
+  MARCA_ENTIDAD,
+  MAYORIA_DE_EDAD,
   ModoElemento,
+  OpcionDestinatario,
   PoliticaDeCertificado,
+  TipoSolicitante,
 } from '../constants/certificados';
 import { serializacionEstable } from './comiteConvivencia';
 
@@ -219,11 +223,25 @@ export interface DestinoResuelto {
   frase: string;
 }
 
+/** Por qué no se puede usar una opción que toma la entidad de otro módulo. */
+const SIN_ENTIDAD: Record<FuenteEntidad, string> = {
+  EPS: 'El estudiante no tiene una EPS registrada con la autorización de datos sensibles (M03): elige «Otro» y escribe la entidad.',
+};
+
+/** Lo que el servicio leyó de otros módulos para las opciones que toman la entidad de ahí (vacío = no hay dato o no hay autorización). */
+export type EntidadesDisponibles = Partial<Record<FuenteEntidad, string | null>>;
+
+export const motivoSinEntidad = (fuente: FuenteEntidad): string => SIN_ENTIDAD[fuente];
+
 /**
  * Convierte lo elegido en el selector en el texto que queda congelado. Sin nada, o con «Otro» sin texto, se asume la
  * opción predeterminada del documento («A quien interese»). Una clave que no es de ese documento es un error, no se ignora.
  */
-export function resolverDestinatario(def: Pick<DefinicionCertificado, 'nombre' | 'destinatarios' | 'frase_otro'>, solicitado: { clave?: string | null; otro?: string | null } | null | undefined): DestinoResuelto | { error: string } {
+export function resolverDestinatario(
+  def: { nombre: string; destinatarios: OpcionDestinatario[]; frase_otro: string },
+  solicitado: { clave?: string | null; otro?: string | null } | null | undefined,
+  entidades: EntidadesDisponibles = {}
+): DestinoResuelto | { error: string; sin_dato?: boolean } {
   const predeterminada = def.destinatarios[0] as (typeof def.destinatarios)[number];
   const clave = solicitado?.clave?.trim() || predeterminada.clave;
   const otro = solicitado?.otro?.trim() ?? '';
@@ -233,11 +251,116 @@ export function resolverDestinatario(def: Pick<DefinicionCertificado, 'nombre' |
   }
   const opcion = def.destinatarios.find((o) => o.clave === clave);
   if (!opcion) return { error: `«${clave}» no es un destinatario válido para «${def.nombre}».` };
-  return opcion;
+  if (opcion.fuente_entidad) {
+    const entidad = entidades[opcion.fuente_entidad]?.trim();
+    if (!entidad) return { error: SIN_ENTIDAD[opcion.fuente_entidad], sin_dato: true };
+    return { clave: opcion.clave, etiqueta: entidad, frase: opcion.frase.replace(MARCA_ENTIDAD, entidad) };
+  }
+  return { clave: opcion.clave, etiqueta: opcion.etiqueta, frase: opcion.frase };
 }
 
 /** Lo que ve el selector: las opciones del documento y, al final, «Otro». */
-export const opcionesDeDestinatario = (def: Pick<DefinicionCertificado, 'destinatarios'>): Array<{ clave: string; etiqueta: string }> => [
-  ...def.destinatarios.map(({ clave, etiqueta }) => ({ clave, etiqueta })),
-  { clave: CLAVE_DESTINATARIO_OTRO, etiqueta: ETIQUETA_DESTINATARIO_OTRO },
+export const opcionesDeDestinatario = (def: { destinatarios: OpcionDestinatario[] }): Array<{ clave: string; etiqueta: string; fuente_entidad: FuenteEntidad | null }> => [
+  ...def.destinatarios.map(({ clave, etiqueta, fuente_entidad }) => ({ clave, etiqueta, fuente_entidad: fuente_entidad ?? null })),
+  { clave: CLAVE_DESTINATARIO_OTRO, etiqueta: ETIQUETA_DESTINATARIO_OTRO, fuente_entidad: null },
 ];
+
+// --- Quién solicita el documento ---
+
+export interface EntradaSolicitante {
+  tipo: TipoSolicitante;
+  /** Solo acudiente: el vínculo se comprueba contra los acudientes del estudiante. */
+  guardian_id?: string | null;
+  nombre?: string | null;
+  tipo_documento?: string | null;
+  numero_documento?: string | null;
+  /** Relación con el estudiante (tercero) o número de oficio (autoridad). */
+  detalle?: string | null;
+  /** Tercero: confirma que presentó la autorización escrita y su documento de identidad. */
+  presento_autorizacion?: boolean;
+}
+
+export interface AcudienteVinculado {
+  guardian_id: string;
+  nombre: string;
+  tipo_documento: string;
+  numero_documento: string;
+  parentesco: string;
+}
+
+export interface SolicitanteResuelto {
+  tipo: TipoSolicitante;
+  nombre: string;
+  tipo_documento: string | null;
+  numero_documento: string | null;
+  detalle: string | null;
+  guardian_id: string | null;
+}
+
+/** Edad cumplida en una fecha (hora de Colombia): quien cumple 18 hoy ya es mayor de edad. */
+export function esMayorDeEdad(fechaNacimiento: Date, ahora: Date = new Date()): boolean {
+  const aCo = (f: Date) => f.toLocaleDateString('en-CA', { timeZone: 'America/Bogota' }).split('-').map(Number) as [number, number, number];
+  const [ay, am, ad] = aCo(ahora);
+  const [ny, nm, nd] = [fechaNacimiento.getUTCFullYear(), fechaNacimiento.getUTCMonth() + 1, fechaNacimiento.getUTCDate()];
+  const edad = ay - ny - (am < nm || (am === nm && ad < nd) ? 1 : 0);
+  return edad >= MAYORIA_DE_EDAD;
+}
+
+const texto = (v: string | null | undefined): string => (v ?? '').trim();
+
+/**
+ * Valida a quien se entrega el documento. Función pura: el servicio le pasa lo que leyó de M03. Cada tipo de solicitante exige lo
+ * suyo y pedir algo que no corresponde es un error, no se ignora: el acudiente tiene que estar vinculado al estudiante, el propio
+ * estudiante tiene que ser mayor de edad, un tercero presenta autorización y una autoridad, su oficio.
+ */
+export function resolverSolicitante(
+  entrada: EntradaSolicitante | null | undefined,
+  contexto: { acudientes: AcudienteVinculado[]; estudiante: { nombre: string; tipo_documento: string; numero_documento: string; mayor_de_edad: boolean } }
+): SolicitanteResuelto | { error: string } {
+  if (!entrada) return { error: 'Indica quién solicita el documento: el acudiente, el propio estudiante (si es mayor de edad), un tercero con autorización o una autoridad.' };
+  switch (entrada.tipo) {
+    case 'ACUDIENTE': {
+      const acudiente = contexto.acudientes.find((a) => a.guardian_id === entrada.guardian_id);
+      if (!acudiente) return { error: 'El acudiente elegido no está vinculado a este estudiante (o está inactivo). Si no es su acudiente, regístralo como tercero con autorización.' };
+      return { tipo: 'ACUDIENTE', nombre: acudiente.nombre, tipo_documento: acudiente.tipo_documento, numero_documento: acudiente.numero_documento, detalle: acudiente.parentesco, guardian_id: acudiente.guardian_id };
+    }
+    case 'ESTUDIANTE': {
+      if (!contexto.estudiante.mayor_de_edad) return { error: 'Un estudiante menor de edad no solicita sus propios documentos: los pide su acudiente.' };
+      const e = contexto.estudiante;
+      return { tipo: 'ESTUDIANTE', nombre: e.nombre, tipo_documento: e.tipo_documento, numero_documento: e.numero_documento, detalle: null, guardian_id: null };
+    }
+    case 'TERCERO': {
+      if (texto(entrada.nombre).length < 3 || texto(entrada.numero_documento).length < 3 || texto(entrada.detalle).length < 3) {
+        return { error: 'Un tercero se identifica con su nombre, su documento y su relación con el estudiante.' };
+      }
+      if (entrada.presento_autorizacion !== true) return { error: 'Confirma que el tercero presentó la autorización escrita del acudiente y su documento de identidad.' };
+      return { tipo: 'TERCERO', nombre: texto(entrada.nombre), tipo_documento: texto(entrada.tipo_documento) || null, numero_documento: texto(entrada.numero_documento), detalle: texto(entrada.detalle), guardian_id: null };
+    }
+    case 'AUTORIDAD': {
+      if (texto(entrada.nombre).length < 3 || texto(entrada.detalle).length < 2) return { error: 'Una autoridad se identifica con el nombre de la entidad y el número de su oficio.' };
+      return { tipo: 'AUTORIDAD', nombre: texto(entrada.nombre), tipo_documento: null, numero_documento: null, detalle: texto(entrada.detalle), guardian_id: null };
+    }
+  }
+}
+
+// --- Vigencia ---
+
+export interface VigenciaDeDocumento {
+  dias: number | null;
+  /** Último instante en que el documento está vigente (fin de ese día, hora de Colombia); null si no tiene vigencia. */
+  hasta: string | null;
+  vencida: boolean;
+}
+
+/**
+ * Hasta cuándo vale un documento que declara «vigencia de N días calendario a partir de su expedición». Los días se cuentan en hora
+ * de Colombia y el último día vale hasta su cierre. Un documento sin vigencia (o anterior a las plantillas) no vence.
+ */
+export function vigenciaDeDocumento(snapshot: Pick<SnapshotCertificado, 'fecha_expedicion' | 'contenido'>, ahora: Date = new Date()): VigenciaDeDocumento {
+  const dias = snapshot.contenido?.vigencia_dias ?? null;
+  if (!dias) return { dias: null, hasta: null, vencida: false };
+  const [y, m, d] = new Date(snapshot.fecha_expedicion).toLocaleDateString('en-CA', { timeZone: 'America/Bogota' }).split('-').map(Number) as [number, number, number];
+  // Fin del día (23:59:59.999 en UTC-5) del último día de vigencia.
+  const hasta = new Date(Date.UTC(y, m - 1, d + dias, 23, 59, 59, 999) + 5 * 60 * 60 * 1000);
+  return { dias, hasta: hasta.toISOString(), vencida: ahora.getTime() > hasta.getTime() };
+}

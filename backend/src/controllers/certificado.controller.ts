@@ -7,6 +7,8 @@ import * as configuracionService from '../services/certificadoConfiguracion.serv
 import * as certificadoService from '../services/certificado.service';
 import * as pdfService from '../services/certificadoPdf.service';
 import * as plantillaService from '../services/certificadoPlantilla.service';
+import * as revocacionService from '../services/certificadoRevocacion.service';
+import * as tipoService from '../services/tipoCertificado.service';
 import * as verificacionService from '../services/certificadoVerificacion.service';
 import catchAsync from '../utils/catchAsync';
 
@@ -32,12 +34,12 @@ export const verImagen = catchAsync<{ elemento: ElementoAutenticacion }>(async (
 });
 
 export const matriculasDelEstudiante = catchAsync<{ studentId: string }>(async (req, res) =>
-  ok(res, await certificadoService.matriculasExpedibles(req.params.studentId, req.user!))
+  ok(res, await certificadoService.matriculasExpedibles(req.params.studentId, req.user!, req.ip))
 );
 
 export const expedir = catchAsync(async (req, res) => {
   const c = await certificadoService.expedirCertificado(req.body, req.user!, req.ip);
-  ok(res, certificadoService.vistaCertificado(c), 201);
+  ok(res, await certificadoService.vistaCompleta(c), 201);
 });
 
 export const vistaPrevia = catchAsync(async (req, res) => {
@@ -65,12 +67,28 @@ export const pdf = catchAsync<IdParams>(async (req, res) => {
 export const integridad = catchAsync<IdParams>(async (req, res) => ok(res, await certificadoService.verificarIntegridad(req.params.id, req.user!)));
 export const anular = catchAsync<IdParams>(async (req, res) => ok(res, await certificadoService.anularCertificado(req.params.id, req.body.motivo, req.user!, req.ip)));
 
+// Anulación masiva por elemento comprometido (solo ADMIN; el servicio lo exige y pide la contraseña).
+export const imagenesUsadas = catchAsync(async (req, res) => ok(res, await revocacionService.imagenesUsadas(req.user!)));
+export const previaRevocacion = catchAsync(async (req, res) => ok(res, await revocacionService.previaDeRevocacion(req.body, req.user!)));
+export const revocar = catchAsync(async (req, res) => {
+  const { motivo, confirm_password, ...criterio } = req.body;
+  ok(res, await revocacionService.revocarPorElemento(criterio, motivo, confirm_password, req.user!, req.ip));
+});
+
 // Público, sin sesión.
 export const verificarPublico = catchAsync<unknown, unknown, unknown, ParsedQs & { token?: string; codigo?: string; clave?: string }>(async (req, res) =>
   ok(res, await verificacionService.verificarCertificado({ token: req.query.token, codigo: req.query.codigo, clave: req.query.clave }))
 );
 
-// Plantillas (solo ADMIN; el servicio lo exige).
+// Tipos de documento: los gestionan Secretaría y el ADMIN; el servicio aplica la regla fina por estado.
+export const listarTipos = catchAsync(async (req, res) => ok(res, await tipoService.listarTipos(req.user!)));
+export const crearTipo = catchAsync(async (req, res) => ok(res, await tipoService.crearTipo(req.body, req.user!, req.ip), 201));
+export const actualizarTipo = catchAsync<{ tipo: ClaveCertificado }>(async (req, res) => ok(res, await tipoService.actualizarTipo(req.params.tipo, req.body, req.user!, req.ip)));
+export const activarTipo = catchAsync<{ tipo: ClaveCertificado }>(async (req, res) => ok(res, await tipoService.activarTipo(req.params.tipo, req.user!, req.ip)));
+export const archivarTipo = catchAsync<{ tipo: ClaveCertificado }>(async (req, res) => ok(res, await tipoService.archivarTipo(req.params.tipo, req.user!, req.ip)));
+export const eliminarTipo = catchAsync<{ tipo: ClaveCertificado }>(async (req, res) => ok(res, await tipoService.eliminarTipo(req.params.tipo, req.user!, req.ip)));
+
+// Plantillas (ADMIN en cualquier tipo no archivado; Secretaría solo en borradores; el servicio lo exige).
 export const listarPlantillas = catchAsync(async (req, res) => ok(res, await plantillaService.listarPlantillas(req.user!)));
 export const versionesDePlantilla = catchAsync<{ tipo: ClaveCertificado }>(async (req, res) => ok(res, await plantillaService.versionesDePlantilla(req.params.tipo, req.user!)));
 export const publicarPlantilla = catchAsync<{ tipo: ClaveCertificado }>(async (req, res) => {
@@ -78,6 +96,7 @@ export const publicarPlantilla = catchAsync<{ tipo: ClaveCertificado }>(async (r
   ok(res, await plantillaService.publicarPlantilla(req.params.tipo, contenido, nota ?? '', req.user!, req.ip), 201);
 });
 export const restablecerPlantilla = catchAsync<{ tipo: ClaveCertificado }>(async (req, res) => ok(res, await plantillaService.restablecerPlantilla(req.params.tipo, req.user!, req.ip), 201));
+export const renderizarBorrador = catchAsync<{ tipo: ClaveCertificado }>(async (req, res) => ok(res, await plantillaService.renderizarBorrador(req.params.tipo, req.body, req.user!)));
 export const vistaPreviaPlantilla = catchAsync<{ tipo: ClaveCertificado }>(async (req, res) => {
   const buffer = await pdfService.generarVistaPreviaDePlantillaPdf(req.params.tipo, req.body, req.user!);
   res.setHeader('Content-Type', 'application/pdf');

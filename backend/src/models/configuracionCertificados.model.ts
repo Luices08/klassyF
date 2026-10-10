@@ -2,15 +2,9 @@ import { HydratedDocument, Model, Schema, Types, model } from 'mongoose';
 import {
   CARGO_RECTORIA_INICIAL,
   CARGO_SECRETARIA_INICIAL,
-  CLAVES_CERTIFICADO,
-  ClaveCertificado,
   DEPENDENCIAS_PAZ_Y_SALVO_INICIALES,
   DependenciaPazYSalvo,
-  ELEMENTOS_AUTENTICACION,
   MAX_NOMBRE_DEPENDENCIA,
-  MODOS_ELEMENTO,
-  POLITICA_INICIAL,
-  PoliticaDeCertificado,
 } from '../constants/certificados';
 import { ImagenGuardada } from '../utils/certificados';
 
@@ -29,7 +23,10 @@ export interface IConfiguracionCertificados {
   sello: { imagen: ImagenGuardada | null };
   /** Si la secretaría puede estampar la firma digitalizada de rectoría al expedir (el ADMIN siempre puede). */
   permitir_firma_rectoria_a_secretaria: boolean;
-  politica: Record<ClaveCertificado, PoliticaDeCertificado>;
+  /** Obsoleto: la política por documento ahora vive en cada `TipoCertificado`. Solo se lee una vez, al sembrar los tipos de una instalación anterior. */
+  politica?: unknown;
+  /** Los tipos de partida ya se sembraron: si el colegio elimina uno, no vuelve a aparecer. */
+  tipos_sembrados: boolean;
   /** Las dependencias que el colegio exige para el paz y salvo (cada una se confirma al expedirlo). */
   paz_y_salvo: { dependencias: DependenciaPazYSalvo[] };
   createdAt: Date;
@@ -51,11 +48,6 @@ const firmanteSchema = (cargoInicial: string) =>
     { _id: false }
   );
 
-const politicaSchema = new Schema<PoliticaDeCertificado>(
-  Object.fromEntries(ELEMENTOS_AUTENTICACION.map((el) => [el, { type: String, enum: MODOS_ELEMENTO, required: true }])),
-  { _id: false }
-);
-
 const dependenciaSchema = new Schema<DependenciaPazYSalvo>(
   {
     clave: { type: String, required: true, trim: true, maxlength: 40 },
@@ -71,15 +63,10 @@ const configuracionSchema = new Schema<IConfiguracionCertificados, Configuracion
     rectoria: { type: firmanteSchema(CARGO_RECTORIA_INICIAL), default: () => ({}) },
     secretaria: { type: firmanteSchema(CARGO_SECRETARIA_INICIAL), default: () => ({}) },
     sello: { type: new Schema({ imagen: { type: imagenSchema, default: null } }, { _id: false }), default: () => ({}) },
-    permitir_firma_rectoria_a_secretaria: { type: Boolean, default: true },
-    politica: {
-      // Cada tipo trae su valor de partida: una configuración guardada antes de que existiera un tipo nuevo sigue siendo válida.
-      type: new Schema(
-        Object.fromEntries(CLAVES_CERTIFICADO.map((clave) => [clave, { type: politicaSchema, required: true, default: () => structuredClone(POLITICA_INICIAL[clave]) }])),
-        { _id: false }
-      ),
-      default: () => structuredClone(POLITICA_INICIAL),
-    },
+    // Nace apagada: la imagen de la firma del rector es la más sensible y solo el ADMIN decide si la secretaría puede estamparla (una instalación anterior conserva lo que tenía).
+    permitir_firma_rectoria_a_secretaria: { type: Boolean, default: false },
+    politica: { type: Schema.Types.Mixed, default: undefined },
+    tipos_sembrados: { type: Boolean, default: false },
     paz_y_salvo: {
       type: new Schema({ dependencias: { type: [dependenciaSchema], default: () => structuredClone(DEPENDENCIAS_PAZ_Y_SALVO_INICIALES) } }, { _id: false }),
       default: () => ({}),

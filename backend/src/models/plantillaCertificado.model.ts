@@ -1,5 +1,5 @@
 import { HydratedDocument, Model, Schema, Types, model } from 'mongoose';
-import { CLAVES_CERTIFICADO, ClaveCertificado } from '../constants/certificados';
+import { ClaveCertificado, FUENTES_ENTIDAD } from '../constants/certificados';
 import { ESTILOS_BLOQUE, ContenidoPlantilla } from '../constants/plantillasCertificado';
 
 export const ESTADOS_PLANTILLA = ['VIGENTE', 'ARCHIVADA'] as const;
@@ -41,13 +41,13 @@ const bloqueSchema = new Schema(
 );
 
 const destinatarioSchema = new Schema(
-  { clave: { type: String, required: true }, etiqueta: { type: String, required: true }, frase: { type: String, required: true } },
+  { clave: { type: String, required: true }, etiqueta: { type: String, required: true }, frase: { type: String, required: true }, fuente_entidad: { type: String, enum: [...FUENTES_ENTIDAD, null], default: undefined } },
   { _id: false }
 );
 
 const plantillaSchema = new Schema<IPlantillaCertificado, PlantillaCertificadoModel>(
   {
-    tipo: { type: String, enum: CLAVES_CERTIFICADO, required: true },
+    tipo: { type: String, required: true },
     version: { type: Number, required: true, min: 1 },
     estado: { type: String, enum: ESTADOS_PLANTILLA, default: 'VIGENTE' },
     titulo: { type: String, required: true, trim: true },

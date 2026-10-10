@@ -62,10 +62,19 @@ function Resultado({ r }: { r: ResultadoVerificacion }) {
   }
   return (
     <div className="space-y-3">
-      {r.resultado === 'VALIDO' ? (
-        <Alert tone="success">Documento auténtico: fue expedido por {r.institucion} y su contenido no ha sido alterado.</Alert>
-      ) : (
-        <Alert tone="warning">Este documento fue expedido por {r.institucion}, pero fue anulado{r.anulado_el ? ` el ${formatoFechaHora(r.anulado_el)}` : ''}. No tiene validez.</Alert>
+      {r.resultado === 'VALIDO' && <Alert tone="success">Documento auténtico: fue expedido por {r.institucion} y su contenido no ha sido alterado.{r.vigencia?.hasta ? ` Vigente hasta el ${formatoFechaHora(r.vigencia.hasta)}.` : ''}</Alert>}
+      {r.resultado === 'VIGENCIA_CUMPLIDA' && (
+        <Alert tone="warning">
+          Documento auténtico expedido por {r.institucion}, pero su vigencia de {r.vigencia?.dias} días terminó{r.vigencia?.hasta ? ` el ${formatoFechaHora(r.vigencia.hasta)}` : ''}. Pide uno nuevo si la entidad que lo recibe lo exige reciente.
+        </Alert>
+      )}
+      {r.resultado === 'ANULADO' && (
+        <Alert tone="error">
+          <p className="font-bold uppercase">Documento anulado: no tiene validez.</p>
+          <p>
+            Fue expedido por {r.institucion}, pero la institución lo anuló{r.anulado_el ? ` el ${formatoFechaHora(r.anulado_el)}` : ''}. No lo acepte: solicite uno nuevo a la institución.
+          </p>
+        </Alert>
       )}
       <Card>
         <dl className="grid gap-3 text-sm sm:grid-cols-2">

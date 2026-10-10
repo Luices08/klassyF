@@ -1,11 +1,22 @@
 import { HydratedDocument, Model, Schema, Types, model } from 'mongoose';
-import { CLAVES_CERTIFICADO, ClaveCertificado, ESTADOS_CERTIFICADO, EstadoCertificado, MAX_MOTIVO_ANULACION } from '../constants/certificados';
+import { ClaveCertificado, ESTADOS_CERTIFICADO, EstadoCertificado, MAX_MOTIVO_ANULACION, TIPOS_SOLICITANTE, TipoSolicitante } from '../constants/certificados';
 
 /**
  * Un certificado o constancia expedido (M26). El contenido se CONGELA en `snapshot` y el PDF se dibuja solo desde él, así
  * una reimpresión es el mismo documento con el mismo código. `hash` es el HMAC del contenido; `token_verificacion` es lo
  * único que va dentro del QR. Nada se borra: un documento mal expedido se anula con motivo.
  */
+/** A quién se entregó el documento. Se guarda al expedir y no se edita; no se imprime en el documento. */
+export interface SolicitanteCertificado {
+  tipo: TipoSolicitante;
+  nombre: string;
+  tipo_documento: string | null;
+  numero_documento: string | null;
+  /** Parentesco (acudiente), relación con el estudiante (tercero) o número de oficio (autoridad). */
+  detalle: string | null;
+  guardian_id: Types.ObjectId | null;
+}
+
 export interface ICertificadoEmitido {
   tipo: ClaveCertificado;
   codigo: string;
@@ -23,6 +34,8 @@ export interface ICertificadoEmitido {
   anulacion: { por: Types.ObjectId; fecha: Date; motivo: string } | null;
   emitido_por: Types.ObjectId;
   fecha_emision: Date;
+  /** Los documentos anteriores a este registro no lo tienen. */
+  solicitante?: SolicitanteCertificado | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -32,7 +45,8 @@ type CertificadoEmitidoModel = Model<ICertificadoEmitido>;
 
 const certificadoSchema = new Schema<ICertificadoEmitido, CertificadoEmitidoModel>(
   {
-    tipo: { type: String, enum: CLAVES_CERTIFICADO, required: true },
+    // La clave de un TipoCertificado (dato del colegio): lo expedido la conserva aunque el tipo se archive.
+    tipo: { type: String, required: true },
     codigo: { type: String, required: true },
     consecutivo: { type: Number, required: true, min: 1 },
     anio_emision: { type: Number, required: true },
@@ -57,12 +71,26 @@ const certificadoSchema = new Schema<ICertificadoEmitido, CertificadoEmitidoMode
     },
     emitido_por: { type: Schema.Types.ObjectId, ref: 'User', required: true },
     fecha_emision: { type: Date, required: true },
+    solicitante: {
+      type: new Schema(
+        {
+          tipo: { type: String, enum: TIPOS_SOLICITANTE, required: true },
+          nombre: { type: String, required: true, trim: true, maxlength: 120 },
+          tipo_documento: { type: String, default: null, trim: true, maxlength: 10 },
+          numero_documento: { type: String, default: null, trim: true, maxlength: 30 },
+          detalle: { type: String, default: null, trim: true, maxlength: 120 },
+          guardian_id: { type: Schema.Types.ObjectId, ref: 'Guardian', default: null },
+        },
+        { _id: false }
+      ),
+      default: null,
+    },
   },
   { timestamps: true }
 );
 
 // Lo expedido es inmutable en el modelo (no solo en el servicio): únicamente cambian el estado y la anulación.
-const CAMPOS_INMUTABLES = ['tipo', 'codigo', 'consecutivo', 'anio_emision', 'student_id', 'sede_id', 'enrollment_id', 'academic_year_id', 'snapshot', 'hash', 'token_verificacion', 'emitido_por', 'fecha_emision'];
+const CAMPOS_INMUTABLES = ['tipo', 'codigo', 'consecutivo', 'anio_emision', 'student_id', 'sede_id', 'enrollment_id', 'academic_year_id', 'snapshot', 'hash', 'token_verificacion', 'emitido_por', 'fecha_emision', 'solicitante'];
 certificadoSchema.pre('save', function protegerCertificado(next) {
   if (!this.isNew) {
     if (CAMPOS_INMUTABLES.some((campo) => this.isModified(campo))) return next(new Error('Un certificado expedido no se puede modificar: se anula y se expide uno nuevo.'));

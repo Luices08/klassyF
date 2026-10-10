@@ -1,11 +1,11 @@
-import { ClaveCertificado } from '../constants/certificados';
+import { DefinicionCertificado } from '../constants/certificados';
 import { DatosEstudios, SnapshotCertificado } from './certificados';
 
 /**
  * Un documento inventado para la vista previa de una plantilla (como la planilla de muestra de M12): el encabezado es el real del
  * colegio, pero el estudiante, la matrícula y las notas son ficticios y no se guarda nada.
  */
-export function snapshotDeMuestra(tipo: ClaveCertificado, encabezado: SnapshotCertificado['encabezado'], ahoraIso: string): SnapshotCertificado {
+export function snapshotDeMuestra(tipo: Pick<DefinicionCertificado, 'clave' | 'fuentes'>, encabezado: SnapshotCertificado['encabezado'], ahoraIso: string): SnapshotCertificado {
   const estudios: DatosEstudios = {
     tabla: {
       columnas: ['Área / Asignatura', 'IHS', 'IHA', 'Calificación final', 'Escala nacional'],
@@ -22,10 +22,10 @@ export function snapshotDeMuestra(tipo: ClaveCertificado, encabezado: SnapshotCe
   };
   return {
     version_formato: 1,
-    tipo,
+    tipo: tipo.clave,
     encabezado,
     estudiante: { nombre: 'Ana María', apellido: 'Pérez Gómez', tipo_documento: 'TI', numero_documento: '1020304050', lugar_expedicion: 'Bogotá D.C.' },
-    acudiente: tipo === 'CERTIFICADO_MATRICULA' ? { nombre: 'Luis Pérez', tipo_documento: 'CC', numero_documento: '79000111', parentesco: 'PADRE' } : null,
+    acudiente: { nombre: 'Luis Pérez', tipo_documento: 'CC', numero_documento: '79000111', parentesco: 'PADRE' },
     matricula: {
       estado: 'MATRICULADO_DEFINITIVO',
       grado: 'Quinto',
@@ -41,8 +41,8 @@ export function snapshotDeMuestra(tipo: ClaveCertificado, encabezado: SnapshotCe
     },
     destinatario: null,
     fecha_expedicion: ahoraIso,
-    paz_y_salvo: tipo === 'PAZ_SALVO' ? { dependencias: ['Académica', 'Biblioteca', 'Financiera / Administrativa', 'Inventario y recursos'], verificado_por: 'Laura Gómez' } : undefined,
-    estudios: tipo === 'CERTIFICADO_ESTUDIOS' ? estudios : undefined,
+    paz_y_salvo: tipo.fuentes.includes('DEPENDENCIAS') ? { dependencias: ['Académica', 'Biblioteca', 'Financiera / Administrativa', 'Inventario y recursos'], verificado_por: 'Laura Gómez' } : undefined,
+    estudios: tipo.fuentes.includes('VALORACIONES') ? estudios : undefined,
     firmas: {
       rectoria: { aplicada: false, nombre: null, cargo: 'Rector(a)', usuario_id: null, imagen: null },
       secretaria: { aplicada: false, nombre: null, cargo: 'Secretaría Académica', usuario_id: null, imagen: null },

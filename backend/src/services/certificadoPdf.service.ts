@@ -1,6 +1,6 @@
 import PDFDocument from 'pdfkit';
 import QRCode from 'qrcode';
-import { ClaveCertificado, definicionCertificado } from '../constants/certificados';
+import { ClaveCertificado } from '../constants/certificados';
 import { ContenidoPlantilla } from '../constants/plantillasCertificado';
 import { UserDocument } from '../models/user.model';
 import ApiError from '../utils/ApiError';
@@ -11,6 +11,7 @@ import { registrarEvento } from './audit.service';
 import { cargarCertificado, huellaActual, prepararVistaPrevia, EntradaExpedicion } from './certificado.service';
 import { snapshotDeVistaPreviaDePlantilla } from './certificadoPlantilla.service';
 import { COLOR, MARGEN, cargarEscudoCongelado, dibujarEncabezado } from './encabezadoInstitucional.service';
+import { nombresDeTipos } from './tipoCertificado.service';
 import User from '../models/user.model';
 
 type Documento = InstanceType<typeof PDFDocument>;
@@ -45,7 +46,8 @@ function bloqueFirma(doc: Documento, x: number, ancho: number, y: number, firma:
     try {
       doc.image(imagen, x + 10, y - 62, { fit: [ancho - 20, 58], align: 'center', valign: 'bottom' });
     } catch {
-      throw new ApiError(500, `La imagen de la firma de ${firma.cargo} no se puede leer.`);
+      // 409 y no 500: el archivo existe pero no es una imagen legible. Se arregla volviendo a cargar la imagen original; el documento no se dibuja sin ella.
+      throw new ApiError(409, `El archivo de la imagen de la firma de ${firma.cargo} está dañado y no se puede leer. Vuelve a cargar la imagen original en «Firmas y sellos»: se identifica por su contenido y los documentos que la usaron vuelven a abrirse.`);
     }
   }
   doc.moveTo(x + 8, y).lineTo(x + ancho - 8, y).strokeColor(COLOR.tenue).lineWidth(0.7).stroke();
@@ -115,8 +117,7 @@ async function dibujar(snapshot: SnapshotCertificado, seguridad: DatosSeguridad)
     leerImagen(snapshot.firmas.sello.imagen, 'sello institucional'),
   ]);
   const qr = seguridad.urlVerificacion ? await QRCode.toBuffer(seguridad.urlVerificacion, { errorCorrectionLevel: 'M', margin: 1, width: 300 }) : null;
-  const def = definicionCertificado(snapshot.tipo);
-  const titulo = snapshot.contenido?.titulo ?? def.nombre;
+  const titulo = snapshot.contenido?.titulo ?? (await nombresDeTipos([snapshot.tipo])).get(snapshot.tipo) ?? snapshot.tipo;
 
   return new Promise<Buffer>((resolve, reject) => {
     const doc = new PDFDocument({ margin: MARGEN, info: { Title: `${titulo} ${seguridad.codigo ?? ''}`.trim(), Producer: 'Klassy' } });
@@ -151,7 +152,11 @@ async function dibujar(snapshot: SnapshotCertificado, seguridad: DatosSeguridad)
       bloqueFirma(doc, MARGEN + columna, columna, yFirma, snapshot.firmas.secretaria, imgSecretaria, 'Secretaría Académica');
       if (imgSello) {
         doc.save().opacity(0.9);
-        doc.image(imgSello, doc.page.width / 2 - 45, yFirma - 78, { fit: [90, 90], align: 'center', valign: 'center' });
+        try {
+          doc.image(imgSello, doc.page.width / 2 - 45, yFirma - 78, { fit: [90, 90], align: 'center', valign: 'center' });
+        } catch {
+          throw new ApiError(409, 'El archivo de la imagen del sello está dañado y no se puede leer. Vuelve a cargar la imagen original en «Firmas y sellos»: se identifica por su contenido y los documentos que la usaron vuelven a abrirse.');
+        }
         doc.restore();
         doc.opacity(1);
       }

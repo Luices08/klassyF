@@ -117,3 +117,29 @@ intensidad horaria semanal y anual, calificación final con los decimales de M05
 **Ciudad y departamento.** El maestro pide «Dado en [ciudad]» y «Ciudad y fecha de expedición», y ningún módulo tenía la ciudad del colegio (la sede solo tiene dirección; el municipio del
 perfil del estudiante es del estudiante). Por la regla de oro se creó en M01, como campos opcionales (`ciudad`, `departamento`); sin ciudad el cierre usa «Fecha de expedición». Ninguna plantilla
 de partida usa el departamento todavía: queda disponible como variable.
+
+## Revisión de octubre de 2026: tipos configurables, ficha, solicitante y vigencia
+
+**Los tipos de documento son datos (regla de «nada de código quemado»).** Los cuatro documentos iniciales eran una lista fija en el código (enum del modelo, validadores, `if` por nombre).
+Ahora son `TipoCertificado`: Secretaría y el ADMIN los crean, editan, archivan y eliminan; los cuatro de partida se siembran una sola vez y si se eliminan no vuelven. Lo que cambia el
+comportamiento de un tipo son sus **fuentes** (valoraciones y promoción; dependencias del paz y salvo), que quien configura enciende y el código sabe leer: el usuario no crea datos, la
+plantilla solo los coloca. Un tipo nuevo nace en **borrador** (Secretaría lo redacta y lo prueba con la vista previa) y el ADMIN lo activa. **Eliminar solo si nunca se expidió nada**: un
+documento expedido se verifica por su QR y su consecutivo no puede quedar huérfano, así que ese tipo se archiva (deja de ofrecerse; lo expedido sigue vigente y se reimprime).
+
+**Qué se aprovechó del análisis anterior y qué no.** Ya existían la persistencia de plantillas con versiones (`PlantillaCertificado`, no se creó otro modelo), «Restablecer», el visor del PDF
+en la misma pantalla (sin `window.open`) y la inmutabilidad de firmas y sellos históricos. No se aceptó que el PDF «nunca falle» omitiendo una imagen que falta: un documento reimpreso sin
+su firma o sello, bajo el mismo código y con el QR diciendo «válido», sería otro documento. Un archivo ausente o dañado responde 409 con el paso para recuperarlo (volver a cargar la misma imagen
+lo restaura). Tampoco se aceptó que la vista en vivo genere un PDF por pulsación: es un JSON liviano (`/plantillas/:tipo/render`) que se pide al dejar de escribir; el PDF queda para la fidelidad.
+
+**EPS.** La opción «EPS del estudiante» lee la EPS de M03 (no de M04), solo con la autorización de datos sensibles del responsable legal (Ley 1581/2012, art. 5 y 6), solo el nombre y solo si esa
+opción se elige; sin EPS o sin autorización la opción no se puede usar y se explica por qué. El régimen nunca se imprime.
+
+**Quién solicita.** Hasta ahora cualquier secretaria podía expedir el documento de cualquier estudiante de su sede sin dejar rastro de a quién se entregaba. Ahora es obligatorio registrar al solicitante
+(acudiente vinculado, el propio estudiante si es mayor de edad, un tercero con autorización escrita o una autoridad con oficio). No se imprime y se ve en el historial.
+
+**Vigencia y anulación.** La vigencia que declara el documento («30 días a partir de su expedición») ahora la aplica la verificación pública: pasado el plazo dice «vigencia cumplida». Cambiar el
+sello o una firma no anula lo ya expedido; si una imagen se compromete, el ADMIN puede anular de una vez los documentos que la llevan (con motivo y contraseña). La delegación de la firma de
+Rectoría a Secretaría **nace apagada**.
+
+**Pendiente, a propósito:** la solicitud desde el portal del acudiente y la descarga por el propio estudiante o acudiente (M27, que aún no existe); el editor de fichas no se ejercitó en un navegador real
+(solo la lógica y el DOM simulado); los límites por ciudad/EPS de cada región no se catalogan: la entidad se toma de M03 o se escribe con «Otro».

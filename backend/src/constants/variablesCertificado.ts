@@ -3,7 +3,7 @@
  * el dato: la plantilla nunca los crea, solo los coloca en la frase. Una variable nueva es una entrada aquí y su valor en
  * `contextoDeVariables` (`utils/plantillaCertificado.ts`); el editor y la validación la toman de este catálogo.
  */
-import { ClaveCertificado } from './certificados';
+import { FuenteCertificado } from './certificados';
 
 export interface VariableCertificado {
   clave: string;
@@ -12,8 +12,8 @@ export interface VariableCertificado {
   origen: string;
   /** Cómo se ve con datos de muestra. */
   ejemplo: string;
-  /** Si solo tiene sentido en algunos documentos. */
-  solo_en?: ClaveCertificado[];
+  /** Si solo tiene sentido en los tipos que usan esa fuente de datos (la enciende quien configura el tipo). */
+  fuente?: FuenteCertificado;
 }
 
 export const VARIABLES_CERTIFICADO: VariableCertificado[] = [
@@ -36,19 +36,19 @@ export const VARIABLES_CERTIFICADO: VariableCertificado[] = [
   { clave: 'matricula.situacion', etiqueta: '«se encuentra matriculado(a)» o «estuvo matriculado(a)»', origen: 'M04 Matrículas', ejemplo: 'se encuentra matriculado(a)' },
   { clave: 'matricula.clase', etiqueta: 'Clase de matrícula (definitiva o condicional)', origen: 'M04 Matrículas', ejemplo: 'definitiva' },
   { clave: 'matricula.fecha', etiqueta: 'Fecha de legalización de la matrícula', origen: 'M04 Matrículas', ejemplo: '20 de enero de 2026' },
-  { clave: 'matricula.registro_libro', etiqueta: 'Asiento en el Libro de Matrícula (folio, libro y número)', origen: 'M04 Matrículas', ejemplo: 'registrada en el Libro de Matrícula bajo el folio L1-F000012-2026 (libro 1, folio 12)', solo_en: ['CERTIFICADO_MATRICULA'] },
+  { clave: 'matricula.registro_libro', etiqueta: 'Asiento en el Libro de Matrícula (folio, libro y número)', origen: 'M04 Matrículas', ejemplo: 'registrada en el Libro de Matrícula bajo el folio L1-F000012-2026 (libro 1, folio 12)' },
   { clave: 'matricula.condicion_ingreso', etiqueta: 'Condición de ingreso', origen: 'M04 Matrículas', ejemplo: 'nuevo(a)' },
   { clave: 'matricula.retiro', etiqueta: 'Aviso de matrícula retirada (vacío si no lo está)', origen: 'M04 Matrículas', ejemplo: 'La matrícula fue retirada; el asiento del Libro de Matrícula se conserva.' },
-  { clave: 'acudiente.nombre', etiqueta: 'Acudiente responsable', origen: 'M03 Acudientes', ejemplo: 'LUIS PÉREZ', solo_en: ['CERTIFICADO_MATRICULA'] },
-  { clave: 'acudiente.documento', etiqueta: 'Documento del acudiente', origen: 'M03 Acudientes', ejemplo: 'cédula de ciudadanía No. 79000111', solo_en: ['CERTIFICADO_MATRICULA'] },
-  { clave: 'acudiente.parentesco', etiqueta: 'Parentesco', origen: 'M03 Acudientes', ejemplo: 'padre', solo_en: ['CERTIFICADO_MATRICULA'] },
+  { clave: 'acudiente.nombre', etiqueta: 'Acudiente responsable', origen: 'M03 Acudientes', ejemplo: 'LUIS PÉREZ' },
+  { clave: 'acudiente.documento', etiqueta: 'Documento del acudiente', origen: 'M03 Acudientes', ejemplo: 'cédula de ciudadanía No. 79000111' },
+  { clave: 'acudiente.parentesco', etiqueta: 'Parentesco', origen: 'M03 Acudientes', ejemplo: 'padre' },
   { clave: 'fecha.expedicion', etiqueta: 'Fecha de expedición', origen: 'Sistema', ejemplo: '9 de octubre de 2026' },
   { clave: 'fecha.textual', etiqueta: 'Fecha en fórmula textual', origen: 'Sistema', ejemplo: 'a los nueve (9) días del mes de octubre de 2026' },
   { clave: 'destino.frase', etiqueta: 'Frase del destinatario o motivo elegido', origen: 'Selector al expedir', ejemplo: 'Se expide para presentar ante la Caja de Compensación Familiar' },
   { clave: 'documento.vigencia', etiqueta: 'Vigencia del documento', origen: 'Parámetro de la plantilla', ejemplo: 'treinta (30) días calendario' },
-  { clave: 'paz_y_salvo.dependencias', etiqueta: 'Dependencias verificadas', origen: 'Paz y salvo', ejemplo: 'Académica, Biblioteca, Financiera / Administrativa', solo_en: ['PAZ_SALVO'] },
-  { clave: 'paz_y_salvo.verificado_por', etiqueta: 'Quién verificó', origen: 'Paz y salvo', ejemplo: 'Laura Gómez', solo_en: ['PAZ_SALVO'] },
-  { clave: 'promocion.texto', etiqueta: 'Concepto de promoción', origen: 'M19 Promoción', ejemplo: 'APROBÓ el grado Quinto', solo_en: ['CERTIFICADO_ESTUDIOS'] },
+  { clave: 'paz_y_salvo.dependencias', etiqueta: 'Dependencias verificadas', origen: 'Paz y salvo', ejemplo: 'Académica, Biblioteca, Financiera / Administrativa', fuente: 'DEPENDENCIAS' },
+  { clave: 'paz_y_salvo.verificado_por', etiqueta: 'Quién verificó', origen: 'Paz y salvo', ejemplo: 'Laura Gómez', fuente: 'DEPENDENCIAS' },
+  { clave: 'promocion.texto', etiqueta: 'Concepto de promoción', origen: 'M19 Promoción', ejemplo: 'APROBÓ el grado Quinto', fuente: 'VALORACIONES' },
 ];
 
 export const CLAVES_VARIABLES = new Set(VARIABLES_CERTIFICADO.map((v) => v.clave));

@@ -23,8 +23,7 @@ import {
 import { useUsers } from '../../hooks/useUsers';
 
 /**
- * Quién firma los certificados, con qué imágenes y qué se estampa por defecto en cada documento. El servidor decide qué puede
- * hacer cada usuario (`puede`): el ADMIN todo; secretaría carga su firma y el sello, y la de Rectoría mientras haya delegación.
+ * Quién firma los certificados, con qué imágenes y qué se estampa por defecto en cada documento.
  * Nada de esto toca lo ya expedido: cada documento conserva sus firmantes e imágenes.
  */
 export function ConfiguracionCertificadosPanel() {
@@ -41,7 +40,6 @@ export function ConfiguracionCertificadosPanel() {
       {actualizar.isError && <Alert tone="error">{errorMessage(actualizar.error)}</Alert>}
       <Alert tone="info">
         El nombre de quien firma sale de su usuario en el sistema. Las imágenes de firma y sello se guardan sin modificarse: si las reemplazas, los documentos ya expedidos siguen saliendo con la imagen que tenían.
-        {!c.puede.ajustes && ' La política por documento, la delegación y las dependencias del paz y salvo las define el administrador.'}
       </Alert>
 
       <div className="grid gap-4 lg:grid-cols-2">
@@ -52,17 +50,6 @@ export function ConfiguracionCertificadosPanel() {
       <Card>
         <CardHeader title="Sello institucional" />
         <ImagenCard elemento="sello" tieneImagen={c.sello.tiene_imagen} faltante={c.sello.imagen_faltante} puedeEditar={c.puede.imagen.sello} />
-      </Card>
-
-      <Card>
-        <Switch
-          label="La secretaría puede estampar y cargar la firma de Rectoría"
-          description="Si lo apagas, solo el administrador puede encender ese switch al expedir y cargar esa imagen. Cada uso queda registrado en el documento y en auditoría."
-          checked={c.permitir_firma_rectoria_a_secretaria}
-          onChange={(valor) => actualizar.mutate({ permitir_firma_rectoria_a_secretaria: valor })}
-          disabled={actualizar.isPending || !c.puede.ajustes}
-          disabledReason={c.puede.ajustes ? null : 'Solo el administrador cambia la delegación.'}
-        />
       </Card>
 
       <Card>
@@ -188,6 +175,8 @@ function ImagenCard({ elemento, tieneImagen, faltante, puedeEditar }: { elemento
 }
 
 function PoliticaTabla({ configuracion, onCambio, deshabilitado }: { configuracion: ConfiguracionCertificados; onCambio: (clave: string, elemento: ElementoAutenticacion, modo: ModoElemento) => void; deshabilitado: boolean }) {
+  // Un tipo archivado ya no se expide: su política no se configura.
+  const tiposConPolitica = configuracion.tipos.filter((t) => t.estado !== 'ARCHIVADO' && configuracion.politica[t.clave]);
   return (
     <Table>
       <TableHead>
@@ -199,7 +188,7 @@ function PoliticaTabla({ configuracion, onCambio, deshabilitado }: { configuraci
         </tr>
       </TableHead>
       <TableBody>
-        {configuracion.tipos.map((t) => (
+        {tiposConPolitica.map((t) => (
           <tr key={t.clave}>
             <Td className="font-semibold text-ink">{t.nombre}</Td>
             {ELEMENTOS_AUTENTICACION.map((e) => (
@@ -215,7 +204,7 @@ function PoliticaTabla({ configuracion, onCambio, deshabilitado }: { configuraci
             ))}
           </tr>
         ))}
-        {configuracion.tipos.length === 0 && <EmptyRow colSpan={4}>Sin documentos configurables.</EmptyRow>}
+        {tiposConPolitica.length === 0 && <EmptyRow colSpan={4}>Sin documentos configurables.</EmptyRow>}
       </TableBody>
     </Table>
   );

@@ -9,6 +9,7 @@ import { VisorDocumento } from '../ui/VisorDocumento';
 import { EmptyRow, Table, TableBody, TableHead, Td, Th } from '../ui/Table';
 import {
   ETIQUETA_ELEMENTO,
+  ETIQUETA_SOLICITANTE,
   descargarPdfCertificado,
   useAnularCertificado,
   useCertificados,
@@ -106,6 +107,12 @@ export function HistorialCertificados() {
                       {c.documento} · {c.grado} · {c.anio}
                     </span>
                     {c.destinatario && <span className="block text-xs text-muted">Para: {c.destinatario}</span>}
+                    {c.solicitante && (
+                      <span className="block text-xs text-muted">
+                        Entregado a: {c.solicitante.nombre} ({ETIQUETA_SOLICITANTE[c.solicitante.tipo].toLowerCase()}
+                        {c.solicitante.detalle ? `, ${c.solicitante.detalle}` : ''})
+                      </span>
+                    )}
                   </Td>
                   <Td>
                     {formatoFechaHora(c.fecha_emision)}

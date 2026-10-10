@@ -1,5 +1,5 @@
 import { createHash } from 'crypto';
-import { CLAVE_DESTINATARIO_OTRO, ClaveCertificado } from '../constants/certificados';
+import { CLAVE_DESTINATARIO_OTRO, ClaveCertificado, DefinicionCertificado, ETIQUETA_FUENTE, FUENTES_ENTIDAD, MARCA_ENTIDAD } from '../constants/certificados';
 import {
   BloquePlantilla,
   ContenidoPlantilla,
@@ -8,7 +8,7 @@ import {
   MAX_DESTINATARIOS,
   MAX_TEXTO_BLOQUE,
   MAX_VIGENCIA_DIAS,
-  REQUISITOS_LEGALES,
+  requisitosDe,
 } from '../constants/plantillasCertificado';
 import { CLAVES_VARIABLES, VARIABLES_CERTIFICADO } from '../constants/variablesCertificado';
 import { serializacionEstable } from './comiteConvivencia';
@@ -27,10 +27,11 @@ const origenDe = (clave: string): string => VARIABLES_CERTIFICADO.find((v) => v.
 
 /**
  * Revisa una plantilla antes de publicarla. Devuelve TODOS los problemas, no el primero: el editor los lista. Incluye los mínimos
- * legales del documento (`REQUISITOS_LEGALES`): una plantilla que los pierde no se publica.
+ * legales del documento (`requisitosDe`): una plantilla que los pierde no se publica.
  */
-export function validarContenido(clave: ClaveCertificado, c: ContenidoPlantilla): string[] {
+export function validarContenido(tipo: Pick<DefinicionCertificado, 'fuentes' | 'variables_obligatorias'>, c: ContenidoPlantilla): string[] {
   const errores: string[] = [];
+  const fuentes = tipo.fuentes;
   if (c.titulo.trim().length < 3 || c.titulo.length > 100) errores.push('El título del documento lleva entre 3 y 100 caracteres.');
   if (c.bloques.length === 0 || c.bloques.length > MAX_BLOQUES) errores.push(`La plantilla lleva entre 1 y ${MAX_BLOQUES} bloques.`);
 
@@ -41,7 +42,7 @@ export function validarContenido(clave: ClaveCertificado, c: ContenidoPlantilla)
     ids.add(b.id);
     if (!(ESTILOS_BLOQUE as readonly string[]).includes(b.estilo)) errores.push(`El bloque «${b.id}» tiene un estilo desconocido.`);
     if (b.estilo === 'TABLA_NOTAS') {
-      if (clave !== 'CERTIFICADO_ESTUDIOS') errores.push('La tabla de valoraciones solo existe en el certificado de estudio.');
+      if (!fuentes.includes('VALORACIONES')) errores.push('La tabla de valoraciones solo existe en los documentos que usan la fuente «Valoraciones y promoción».');
       continue;
     }
     if (b.texto.length > MAX_TEXTO_BLOQUE) errores.push(`El bloque «${b.id}» supera ${MAX_TEXTO_BLOQUE} caracteres.`);
@@ -49,9 +50,9 @@ export function validarContenido(clave: ClaveCertificado, c: ContenidoPlantilla)
     const sinVariables = b.texto.replace(PATRON_VARIABLE, '');
     if (/\{\{|\}\}/.test(sinVariables)) errores.push(`El bloque «${b.id}» tiene llaves {{ }} mal cerradas o una variable con formato inválido.`);
     for (const v of variablesDeTexto(b.texto)) {
-      const def = VARIABLES_CERTIFICADO.find((x) => x.clave === v);
-      if (!def) errores.push(`El bloque «${b.id}» usa la variable desconocida «${v}».`);
-      else if (def.solo_en && !def.solo_en.includes(clave)) errores.push(`La variable «${v}» no aplica a este documento.`);
+      const variable = VARIABLES_CERTIFICADO.find((x) => x.clave === v);
+      if (!variable) errores.push(`El bloque «${b.id}» usa la variable desconocida «${v}».`);
+      else if (variable.fuente && !fuentes.includes(variable.fuente)) errores.push(`La variable «${v}» no aplica a este documento: necesita la fuente «${ETIQUETA_FUENTE[variable.fuente].nombre}».`);
     }
   }
   if (c.bloques.filter((b) => b.estilo === 'TABLA_NOTAS').length > 1) errores.push('Solo puede haber una tabla de valoraciones.');
@@ -59,7 +60,7 @@ export function validarContenido(clave: ClaveCertificado, c: ContenidoPlantilla)
     if (b.condicion && !CLAVES_VARIABLES.has(b.condicion.variable)) errores.push(`La condición del bloque «${b.id}» usa una variable desconocida.`);
   }
 
-  const requisitos = REQUISITOS_LEGALES[clave];
+  const requisitos = requisitosDe(tipo);
   for (const id of requisitos.bloques) {
     const b = c.bloques.find((x) => x.id === id);
     if (!b || !b.activo) errores.push(`El bloque «${id}» es obligatorio en este documento (${requisitos.fuente}) y no se puede quitar ni desactivar.`);
@@ -92,10 +93,27 @@ export function validarContenido(clave: ClaveCertificado, c: ContenidoPlantilla)
     claves.add(d.clave);
     if (d.etiqueta.trim().length < 2 || d.etiqueta.length > 80) errores.push(`El nombre de la opción «${d.clave}» lleva entre 2 y 80 caracteres.`);
     if (d.frase.trim().length < 5 || d.frase.length > 200 || /\{\{|\}\}/.test(d.frase)) errores.push(`La frase de «${d.etiqueta}» lleva entre 5 y 200 caracteres y sin variables.`);
+    if (d.fuente_entidad && !(FUENTES_ENTIDAD as readonly string[]).includes(d.fuente_entidad)) errores.push(`La opción «${d.etiqueta}» toma la entidad de una fuente desconocida.`);
+    if (d.fuente_entidad && !d.frase.includes(MARCA_ENTIDAD)) errores.push(`La frase de «${d.etiqueta}» toma la entidad de otro módulo: debe llevar ${MARCA_ENTIDAD} donde va su nombre.`);
+    if (!d.fuente_entidad && d.frase.includes(MARCA_ENTIDAD)) errores.push(`La frase de «${d.etiqueta}» lleva ${MARCA_ENTIDAD} pero la opción no indica de dónde sale la entidad.`);
   }
   if (!c.frase_otro.includes('{texto}') || c.frase_otro.length > 200) errores.push('La frase de «Otro» debe contener {texto} y no pasar de 200 caracteres.');
   return errores;
 }
+
+/** Lo que define el contenido de una versión, sin los datos de control (se usa con el documento de la base y con uno armado a mano). */
+export const contenidoDe = (p: { titulo: string; bloques: BloquePlantilla[]; destinatarios: ContenidoPlantilla['destinatarios']; frase_otro: string; vigencia_dias?: number | null }): ContenidoPlantilla => ({
+  titulo: p.titulo,
+  bloques: p.bloques.map((b) => ({ id: b.id, estilo: b.estilo, texto: b.texto, condicion: b.condicion ? { variable: b.condicion.variable, tipo: b.condicion.tipo } : null, activo: b.activo })),
+  // `fuente_entidad` solo viaja cuando la opción la tiene: así la huella de una plantilla anterior no cambia.
+  destinatarios: p.destinatarios.map((d) => ({ clave: d.clave, etiqueta: d.etiqueta, frase: d.frase, ...(d.fuente_entidad ? { fuente_entidad: d.fuente_entidad } : {}) })),
+  frase_otro: p.frase_otro,
+  vigencia_dias: p.vigencia_dias ?? null,
+});
+
+/** Si algún bloque activo usa una variable con ese prefijo (`acudiente.`): así solo se leen y congelan los datos que el documento realmente pone. */
+export const usaVariablesCon = (c: Pick<ContenidoPlantilla, 'bloques'>, prefijo: string): boolean =>
+  c.bloques.some((b) => b.activo && b.estilo !== 'TABLA_NOTAS' && variablesDeTexto(b.texto).some((v) => v.startsWith(prefijo)));
 
 /** Huella del contenido de una versión: identifica qué texto exacto produjo un documento. */
 export const huellaDeContenido = (clave: ClaveCertificado, c: ContenidoPlantilla): string =>

@@ -766,6 +766,15 @@ coordinación) y `CreadorPlanillasPage` (`/admin/creador-planillas`, ADMIN). La 
   grupo no consulta las planillas de las demás asignaturas de su grupo (sí en asistencia); borrar una nota ya puesta (se corrige, no se borra); copiar las casillas sueltas de un
   periodo al siguiente.
 
+### Asistente flotante de navegación
+
+Botón flotante en `AppShell` (`components/asistente/AsistenteFlotante.tsx`) que lleva al usuario a la pantalla que busca. Reglas que no se ven leyendo un solo archivo:
+
+- **Solo ofrece pantallas que el rol puede abrir**: recibe los `items` de `NAV_ITEMS` ya filtrados por rol y modalidad. **Una pantalla nueva en el menú se suma también a `PALABRAS_CLAVE_POR_RUTA`** (`lib/asistente.ts`: descripción + palabras clave) o el asistente no la conocerá bien.
+- **Dos niveles**: `POST /asistente/orientar` (`asistente.service.ts`, Claude con una herramienta forzada que elige ruta) y, si falla o no hay `ANTHROPIC_API_KEY` (503), la búsqueda local por palabras clave (`buscarDestinos`). La salida del modelo se valida (`utils/asistente.ts#validarRespuesta`): una ruta o grado que no estaba en la lista enviada se descarta.
+- **Abrir un grado**: una pantalla con `aceptaGrado: true` en el catálogo acepta `?grado=<id>` (hoy solo Plan de estudios, que abre el nivel de ese grado y resalta su columna).
+- Variables: `ANTHROPIC_API_KEY` (opcional), `ASISTENTE_MODELO` (por defecto `claude-haiku-5-5`). Límite de 20 preguntas/min por IP.
+
 ### Cargas masivas por CSV (M02 usuarios, M03 estudiantes)
 
 - Todo CSV subido se lee con `leerCsv` (`backend/src/utils/csv.ts`), nunca con `toString('utf-8')` + parser a mano:

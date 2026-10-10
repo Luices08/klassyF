@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Alert, errorMessage } from '../../components/ui/Alert';
 import { Chip } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
@@ -125,6 +126,17 @@ export function StudyPlanPage() {
       }
     }
   }, [todosLosGrados]);
+
+  // `?grado=<id>` (lo manda el asistente): abre el nivel de ese grado y la pestaña general, donde se ven sus horas.
+  const [searchParams] = useSearchParams();
+  const gradoParam = searchParams.get('grado');
+  useEffect(() => {
+    const grado = gradoParam ? todosLosGrados.find((g) => g._id === gradoParam) : undefined;
+    if (grado) {
+      setNivel(grado.nivel);
+      setTab('general');
+    }
+  }, [gradoParam, todosLosGrados]);
 
   // Grados filtrados de forma estricta por el nivel educativo seleccionado
   const gradosDelNivel = useMemo(
@@ -419,6 +431,7 @@ function ConfiguracionGeneralNivelTab({
   maxHorasPorNivel,
   onPlanUpdated,
 }: ConfiguracionGeneralNivelTabProps) {
+  const gradoResaltado = useSearchParams()[0].get('grado');
   const configurarMultiples = useConfigurarAsignaturasMultiplesGrados();
   const configurarGrado = useConfigurarAsignaturasGrado();
   const actualizarLimites = useActualizarLimitesHorasPlan();
@@ -766,7 +779,7 @@ function ConfiguracionGeneralNivelTab({
               <Th>Asignatura</Th>
               <Th>Área</Th>
               {gradosDelNivel.map((g, idx) => (
-                <Th key={g._id} className="text-center">
+                <Th key={g._id} className={`text-center ${g._id === gradoResaltado ? 'rounded-t-lg bg-warning-soft' : ''}`}>
                   <div>
                     <span>{g.nombre}</span>
                     {modoEdicion && idx === 0 && (

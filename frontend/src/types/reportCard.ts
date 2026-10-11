@@ -33,6 +33,21 @@ export interface ReportCardAsignatura {
   desempeno: Desempeno | null;
   fallas_asignatura: number;
   componentes: ReportCardComponente[];
+  /** Descripción cualitativa del nivel (banco del colegio, Doc. 11 MEN). Vacía si el colegio no definió texto. */
+  descripcion: string;
+  /** Apoyo o mejora sugerida para ese nivel. Vacía cuando el colegio no la definió. */
+  recomendacion: string;
+  /** Lo que el docente titular escribió de este estudiante en esta asignatura y periodo. */
+  observacion_docente: string | null;
+}
+
+/** Un nivel de la escala del colegio con su equivalencia nacional (Superior/Alto/Básico/Bajo). */
+export interface ReportCardNivelEscala {
+  nivel: NivelDesempeno;
+  etiqueta: string;
+  valor_minimo: number;
+  valor_maximo: number;
+  es_aprobatorio: boolean;
 }
 
 export interface ReportCardArea {
@@ -48,17 +63,23 @@ export interface ReportCard {
     id: string;
     nombre_completo: string;
     documento: string;
+    /** Nombre del grado (ej. «Sexto»). */
+    grado: string;
     grupo: string;
     jornada: string;
     sede: string;
   };
   periodo: number;
+  nombre_periodo: string;
   academic_year: number;
+  institucion: { nombre: string; codigo_dane: string; nit: string; resolucion_aprobacion: string };
   /** Oficial cuando todas sus asignaturas están cerradas. */
   completo: boolean;
   /** Asignaturas cuya planilla aún no se cierra. */
   pendientes: string[];
   puesto_grupo: number | null;
+  /** El colegio puede decidir no mostrar el puesto. */
+  mostrar_puesto: boolean;
   total_estudiantes_grupo: number;
   promedio_general_periodo: number | null;
   desempeno_general: Desempeno | null;
@@ -68,4 +89,12 @@ export interface ReportCard {
     total_retardos: number;
   };
   areas: ReportCardArea[];
+  escala: ReportCardNivelEscala[];
+  /** Fecha de entrega del informe a las familias (ISO), si el colegio la fijó para este periodo. */
+  fecha_entrega: string | null;
+  canal_reclamaciones: string;
+  /** Nombre del director del grupo, para la firma del boletín. */
+  director_grupo: string | null;
+  /** Fecha de entrega de cada periodo del año; null = aún sin fijar. */
+  calendario_entregas: Array<{ periodo: string; fecha: string | null }>;
 }

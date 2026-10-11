@@ -29,7 +29,8 @@ export function ponderacionEfectiva(ponderacion: IPonderacionComponentes | null)
 
 /** Coherencia de la ponderación de componentes: los 3 pesos deben sumar exactamente 1 (100%). */
 export function validarPonderacionComponentes(ponderacion: IPonderacionComponentes): string | null {
-  const suma = Object.values(ponderacion).reduce((sum, peso) => sum + peso, 0);
+  // Se suman los tres pesos conocidos, no `Object.values`: guardada como subdocumento de Mongoose, la ponderación trae también campos internos y la suma daba NaN.
+  const suma = COMPONENTES_SIEE.reduce((total, clave) => total + ponderacion[clave], 0);
   // Redondeo a 3 decimales para evitar falsos negativos por precision de punto flotante.
   const sumaRedondeada = Math.round(suma * 1000) / 1000;
   if (sumaRedondeada !== 1) {

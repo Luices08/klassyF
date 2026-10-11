@@ -8,7 +8,7 @@ let servidor: MongoMemoryReplSet | null = null;
  * integración: no se instala nada fuera de `devDependencies` y nunca toca la base de la instalación.
  */
 export async function iniciarBaseDeDatos(): Promise<void> {
-  servidor = await MongoMemoryReplSet.create({ replSet: { count: 1, storageEngine: 'wiredTiger' } });
+  servidor = await MongoMemoryReplSet.create({ replSet: { count: 1, storageEngine: 'wiredTiger' }, instanceOpts: [{ launchTimeout: 90_000 }] });
   await mongoose.connect(servidor.getUri(), { dbName: 'klassy_pruebas' });
 }
 

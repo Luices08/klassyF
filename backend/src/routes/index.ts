@@ -4,6 +4,7 @@ import activityRoutes from './activity.routes';
 import admissionRequestRoutes from './admissionRequest.routes';
 import areaRoutes from './area.routes';
 import asistenteRoutes from './asistente.routes';
+import boletinRoutes from './boletin.routes';
 import attendanceRoutes from './attendance.routes';
 import auditLogRoutes from './auditLog.routes';
 import authRoutes from './auth.routes';
@@ -96,5 +97,8 @@ router.use('/attendance', attendanceRoutes);
 router.use('/notas', notasRoutes);
 router.use('/periods', periodLockRoutes);
 router.use('/reports', reportCardRoutes);
+
+// M17: Boletines — configuración del colegio, banco de textos por desempeño y observaciones del docente
+router.use('/boletines', boletinRoutes);
 
 export default router;

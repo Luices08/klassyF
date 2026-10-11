@@ -1,15 +1,24 @@
 import { type FormEvent, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { Alert, errorMessage } from '../components/ui/Alert';
 import { Button } from '../components/ui/Button';
 import { Card, CardHeader } from '../components/ui/Card';
 import { Input, Select } from '../components/ui/Field';
 import { PageHeader } from '../components/ui/PageHeader';
-import { SearchIcon } from '../components/ui/icons';
+import { FileTextIcon, SearchIcon, SlidersIcon } from '../components/ui/icons';
 import { Spinner } from '../components/ui/Spinner';
+import { VistaPreviaPdf } from '../components/ui/VistaPreviaPdf';
 import { ReportCardView } from '../components/reportCard/ReportCardView';
 import { useAuth } from '../context/AuthContext';
 import { useAnioDeTrabajo } from '../hooks/useAniosLectivos';
-import { useReportCard, type ReportCardQuery } from '../hooks/useReportCard';
+import { useGroups } from '../hooks/useGroups';
+import {
+  cargarPdfBoletin,
+  descargarPdfBoletin,
+  descargarPdfBoletinesGrupo,
+  useReportCard,
+  type ReportCardQuery,
+} from '../hooks/useReportCard';
 import { useUsers } from '../hooks/useUsers';
 
 const STAFF_ROLES = ['ADMIN', 'COORDINADOR', 'SECRETARIA', 'DOCENTE'] as const;
@@ -23,15 +32,40 @@ export function ReportCardPage() {
   const [studentId, setStudentId] = useState(isStudent ? (user?.id ?? '') : '');
   const [anioElegidoId, setAnioElegidoId] = useState('');
   const academicYearId = anioElegidoId || anioPorDefecto?._id || '';
-  const [periodo, setPeriodo] = useState(1);
+  // Los periodos son los que definió el colegio para ese año (no siempre son 4).
+  const periodos = anios.find((a) => a._id === academicYearId)?.periodos ?? [];
+  const [periodoElegido, setPeriodoElegido] = useState<number | null>(null);
+  const periodo = periodos.some((p) => p.numero === periodoElegido) ? (periodoElegido as number) : (periodos[0]?.numero ?? 1);
   const [query, setQuery] = useState<ReportCardQuery | null>(null);
+  const [grupoId, setGrupoId] = useState('');
+  const [descargando, setDescargando] = useState<'boletin' | 'grupo' | null>(null);
+  const [verVistaPrevia, setVerVistaPrevia] = useState(false);
+  const [errorPdf, setErrorPdf] = useState<string | null>(null);
 
   const studentsQuery = useUsers({ rol: 'ESTUDIANTE' }, canBrowseStudents);
   const reportCardQuery = useReportCard(query);
+  const groupsQuery = useGroups({ academic_year_id: canBrowseStudents ? academicYearId : undefined });
 
   function handleSubmit(e: FormEvent) {
     e.preventDefault();
+    setVerVistaPrevia(false);
     setQuery({ student_id: studentId, academic_year_id: academicYearId, periodo });
+  }
+
+  async function bajarPdf(tipo: 'boletin' | 'grupo') {
+    setErrorPdf(null);
+    setDescargando(tipo);
+    try {
+      if (tipo === 'boletin' && query) {
+        await descargarPdfBoletin(query, `boletin-periodo-${query.periodo}.pdf`);
+      } else if (tipo === 'grupo') {
+        await descargarPdfBoletinesGrupo({ group_id: grupoId, academic_year_id: academicYearId, periodo }, `boletines-periodo-${periodo}.pdf`);
+      }
+    } catch (error) {
+      setErrorPdf(errorMessage(error));
+    } finally {
+      setDescargando(null);
+    }
   }
 
   return (
@@ -39,6 +73,16 @@ export function ReportCardPage() {
       <PageHeader
         title="Boletín académico"
         subtitle="Consulta el boletín de un estudiante por año lectivo y periodo."
+        action={
+          (user?.rol === 'ADMIN' || user?.rol === 'COORDINADOR') ? (
+            <Link to="/admin/boletin">
+              <Button type="button" variant="outline">
+                <SlidersIcon className="h-4 w-4" />
+                Diseñar y configurar el boletín
+              </Button>
+            </Link>
+          ) : undefined
+        }
       />
 
       <Card>
@@ -73,11 +117,13 @@ export function ReportCardPage() {
             ))}
           </Select>
 
-          <Select label="Periodo" value={periodo} onChange={(e) => setPeriodo(Number(e.target.value))}>
-            <option value={1}>Periodo 1</option>
-            <option value={2}>Periodo 2</option>
-            <option value={3}>Periodo 3</option>
-            <option value={4}>Periodo 4</option>
+          <Select label="Periodo" value={periodo} onChange={(e) => setPeriodoElegido(Number(e.target.value))}>
+            {periodos.length === 0 && <option value={1}>Periodo 1</option>}
+            {periodos.map((p) => (
+              <option key={p.numero} value={p.numero}>
+                {p.nombre || `Periodo ${p.numero}`}
+              </option>
+            ))}
           </Select>
 
           <Button type="submit" isLoading={reportCardQuery.isFetching}>
@@ -87,11 +133,58 @@ export function ReportCardPage() {
         </form>
       </Card>
 
+      {canBrowseStudents && (
+        <Card>
+          <CardHeader title="Imprimir los boletines de un grupo" />
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-4 sm:items-end">
+            <div className="sm:col-span-3">
+              <Select label="Grupo" value={grupoId} onChange={(e) => setGrupoId(e.target.value)}>
+                <option value="">Selecciona...</option>
+                {(groupsQuery.data ?? []).map((g) => (
+                  <option key={g._id} value={g._id}>
+                    {typeof g.grade_id === 'object' ? g.grade_id.nombre : ''} {g.nomenclatura}
+                    {typeof g.sede_id === 'object' ? ` · ${g.sede_id.nombre}` : ''}
+                  </option>
+                ))}
+              </Select>
+            </div>
+            <Button type="button" variant="outline" disabled={!grupoId || !academicYearId} isLoading={descargando === 'grupo'} onClick={() => void bajarPdf('grupo')}>
+              <FileTextIcon className="h-4 w-4" />
+              PDF del grupo
+            </Button>
+          </div>
+          <p className="mt-2 text-xs text-muted">Un boletín por estudiante, en el periodo elegido arriba. Solo coordinación, secretaría y el director del grupo.</p>
+        </Card>
+      )}
+
       {reportCardQuery.isFetching && <Spinner label="Calculando boletín..." />}
 
       {reportCardQuery.isError && <Alert tone="error">{errorMessage(reportCardQuery.error)}</Alert>}
+      {errorPdf && <Alert tone="error">{errorPdf}</Alert>}
 
-      {reportCardQuery.data && <ReportCardView reportCard={reportCardQuery.data} />}
+      {reportCardQuery.data && (
+        <>
+          <div className="flex flex-wrap justify-end gap-2">
+            <Button type="button" variant="secondary" onClick={() => setVerVistaPrevia((v) => !v)}>
+              {verVistaPrevia ? 'Ocultar vista previa' : 'Vista previa del PDF'}
+            </Button>
+            <Button type="button" variant="outline" isLoading={descargando === 'boletin'} onClick={() => void bajarPdf('boletin')}>
+              <FileTextIcon className="h-4 w-4" />
+              Descargar PDF
+            </Button>
+          </div>
+          {verVistaPrevia && query && (
+            <VistaPreviaPdf
+              claveConsulta={['boletin', query]}
+              cargar={() => cargarPdfBoletin(query)}
+              nombreArchivo={`boletin-periodo-${query.periodo}.pdf`}
+              titulo="Vista previa del boletín"
+              onCerrar={() => setVerVistaPrevia(false)}
+            />
+          )}
+          <ReportCardView reportCard={reportCardQuery.data} />
+        </>
+      )}
     </div>
   );
 }

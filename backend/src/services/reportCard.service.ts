@@ -1,22 +1,30 @@
-import { ESTADOS_MATRICULA_ACTIVOS, MetodoCalculoEvaluacion } from '../constants/enums';
+import { TipoFraseBoletin } from '../constants/boletin';
+import { ESTADOS_MATRICULA_ACTIVOS, MetodoCalculoEvaluacion, NivelDesempeno } from '../constants/enums';
 import { ESTADOS_NOTA_CERRADOS } from '../constants/notas';
 import { ROLES } from '../constants/roles';
-import AcademicYear from '../models/academicYear.model';
+import AcademicYear, { AcademicYearDocument, IEscalaEvaluacion } from '../models/academicYear.model';
 import Area, { AreaDocument } from '../models/area.model';
 import CalificacionAsignatura from '../models/calificacionAsignatura.model';
 import { CampusDocument } from '../models/campus.model';
 import Enrollment from '../models/enrollment.model';
-import Group from '../models/group.model';
+import FraseDesempeno from '../models/fraseDesempeno.model';
+import Group, { GroupDocument } from '../models/group.model';
+import Institution from '../models/institution.model';
 import { JornadaOperativaDocument } from '../models/jornadaOperativa.model';
 import Guardian from '../models/guardian.model';
+import ObservacionBoletin from '../models/observacionBoletin.model';
 import StudentGuardian from '../models/studentGuardian.model';
 import StudyPlan from '../models/studyPlan.model';
 import Subject, { SubjectDocument } from '../models/subject.model';
+import TeacherAssignment from '../models/teacherAssignment.model';
 import User, { UserDocument } from '../models/user.model';
 import ApiError from '../utils/ApiError';
 import { calcularNotaArea, calcularPromedioGeneral } from '../utils/calculoNotas';
-import type { ResultadoDesempeno } from '../utils/escalaEvaluacion';
+import { escalaEfectiva, type ResultadoDesempeno } from '../utils/escalaEvaluacion';
+import { ESTADO_ACTIVO } from '../utils/filtroEstado';
 import { resumenAsistenciaParaBoletin } from './attendanceStats.service';
+import { leerConfiguracionBoletin } from './boletinConfig.service';
+import { exigirBoletinDisponible } from './publicacionBoletin.service';
 import { desempenoCualitativo, round2 } from '../utils/siee';
 
 export interface ReportCardParams {
@@ -42,6 +50,12 @@ export interface ReportCardAsignatura {
   desempeno: ResultadoDesempeno | null;
   fallas_asignatura: number;
   componentes: ReportCardComponente[];
+  /** Descripción cualitativa del nivel (banco del colegio, Doc. 11 MEN). Vacía si el colegio no definió texto para ese nivel o la asignatura no está cerrada. */
+  descripcion: string;
+  /** Apoyo o mejora sugerida para ese nivel (banco del colegio). Vacía cuando el colegio no la definió. */
+  recomendacion: string;
+  /** Lo que el docente titular escribió de este estudiante en esta asignatura y periodo. */
+  observacion_docente: string | null;
 }
 
 export interface ReportCardArea {
@@ -53,23 +67,37 @@ export interface ReportCardArea {
   asignaturas: ReportCardAsignatura[];
 }
 
+/** Un nivel de la escala institucional con su equivalencia nacional (`nivel`: Superior/Alto/Básico/Bajo; Decreto 1075, art. 2.3.3.3.3.5). */
+export interface ReportCardNivelEscala {
+  nivel: NivelDesempeno;
+  etiqueta: string;
+  valor_minimo: number;
+  valor_maximo: number;
+  es_aprobatorio: boolean;
+}
+
 export interface ReportCardResult {
   estudiante: {
     id: string;
     nombre_completo: string;
     documento: string;
+    /** Nombre del grado (ej. «Sexto»): la guía de boletines lo pide junto al grupo. */
+    grado: string;
     grupo: string;
     jornada: string;
     sede: string;
   };
   periodo: number;
+  nombre_periodo: string;
   academic_year: number;
+  institucion: { nombre: string; codigo_dane: string; nit: string; resolucion_aprobacion: string };
   /** El boletín es oficial cuando todas sus asignaturas están cerradas. */
   completo: boolean;
   /** Asignaturas que todavía no tienen su planilla cerrada. */
   pendientes: string[];
-  /** Solo entre los estudiantes del grupo con boletín completo; null si el de este estudiante no lo está. */
+  /** Solo entre los estudiantes del grupo con boletín completo; null si el de este estudiante no lo está o el colegio no lo muestra. */
   puesto_grupo: number | null;
+  mostrar_puesto: boolean;
   total_estudiantes_grupo: number;
   promedio_general_periodo: number | null;
   desempeno_general: ResultadoDesempeno | null;
@@ -79,6 +107,14 @@ export interface ReportCardResult {
     total_retardos: number;
   };
   areas: ReportCardArea[];
+  escala: ReportCardNivelEscala[];
+  /** Fecha de entrega del informe a las familias, si el colegio la fijó para este periodo. */
+  fecha_entrega: Date | null;
+  canal_reclamaciones: string;
+  /** Fecha de entrega de cada periodo del año (periodicidad de los informes, art. 2.3.3.3.3.4 num. 8); null = el colegio aún no la fijó. */
+  calendario_entregas: Array<{ periodo: string; fecha: Date | null }>;
+  /** Nombre del director del grupo del estudiante, para la firma del boletín. */
+  director_grupo: string | null;
 }
 
 async function assertCanViewReportCard(student: UserDocument, requestingUser: UserDocument): Promise<void> {
@@ -108,6 +144,23 @@ async function assertCanViewReportCard(student: UserDocument, requestingUser: Us
   throw new ApiError(403, 'No tiene permisos para consultar este boletín.');
 }
 
+/** El boletín de todo un grupo (lo que se imprime en lote): coordinación y secretaría, o el docente que dirige ese grupo. */
+async function assertCanViewGroupReportCards(group: GroupDocument, requestingUser: UserDocument): Promise<void> {
+  if ([ROLES.ADMIN, ROLES.COORDINADOR, ROLES.SECRETARIA].includes(requestingUser.rol)) return;
+  if (requestingUser.rol === ROLES.DOCENTE) {
+    const dirige =
+      String(group.director_grupo_id ?? '') === String(requestingUser._id) ||
+      (await TeacherAssignment.exists({
+        docente_id: requestingUser._id,
+        group_id: group._id,
+        tipo_asignacion: 'DIRECCION_GRUPO',
+        estado: ESTADO_ACTIVO,
+      }));
+    if (dirige) return;
+  }
+  throw new ApiError(403, 'Solo coordinación, secretaría o el director del grupo imprimen los boletines de un grupo.');
+}
+
 interface AreaGroup {
   area: AreaDocument;
   metodo: MetodoCalculoEvaluacion;
@@ -121,70 +174,58 @@ interface StudentComputed {
   pendientes: string[];
 }
 
+type GrupoPoblado = GroupDocument & { sede_id: CampusDocument; jornada_id: JornadaOperativaDocument; grade_id: { nombre: string } };
+
 /**
- * Genera el boletin (JSON estructurado) de un estudiante para un periodo y año lectivo. La fuente son los resultados
- * CERRADOS o DEFINITIVOS de M12 (lo que el docente cerró, congelado con el cálculo de sus componentes): una nota en
- * borrador nunca llega a un boletín. Lo que M17 calcula aquí es solo lo que M12 no guarda:
- *  - Nota de area = segun el metodo_calculo configurado en M06 para el area
- *    dentro del grado del estudiante (StudyPlan.grades[].evaluaciones_area):
- *    PONDERADO usa el porcentaje de cada asignatura, ARITMETICO promedia las
- *    asignaturas de esa area con el mismo peso. Si el area del grupo tiene su
- *    propia evaluacion personalizada (Distribucion por Grupos, RN-EVAL-02) se
- *    usa esa en vez de la del grado. Sin todas sus asignaturas cerradas, el área no se calcula.
- *  - Promedio general = promedio aritmetico simple de las notas de area (solo con todas calculadas).
- *  - Puesto de grupo = ranking por promedio general entre los estudiantes del grupo con boletín completo
- *    (ranking de competencia estandar: los empatados comparten puesto y el siguiente puesto salta la cantidad de empatados).
- *
- * Para evitar N+1 queries al calcular el ranking (que requiere el promedio de
- * TODOS los estudiantes del grupo, no solo el consultado), esta funcion trae
- * una sola vez todos los datos crudos (resultados cerrados, asistencia) del
- * grupo+periodo y hace el resto del calculo en memoria.
+ * Todo lo que se carga una sola vez por grupo y periodo (resultados cerrados, asistencia, banco de textos, observaciones,
+ * ranking) para que armar el boletín de un estudiante, o de los 40 del grupo, no repita consultas.
  */
-export async function generateReportCard(
-  params: ReportCardParams,
-  requestingUser: UserDocument
-): Promise<ReportCardResult> {
-  const student = await User.findOne({ _id: params.student_id, rol: ROLES.ESTUDIANTE });
-  if (!student) throw new ApiError(404, 'Estudiante no encontrado.');
+interface ContextoGrupo {
+  anio: AcademicYearDocument;
+  grupo: GrupoPoblado;
+  periodoNumero: number;
+  nombrePeriodo: string;
+  escala: IEscalaEvaluacion;
+  institucion: ReportCardResult['institucion'];
+  studentIds: string[];
+  calcular: (studentId: string) => StudentComputed;
+  puestoPor: Map<string, number>;
+  asistenciaTotales: Awaited<ReturnType<typeof resumenAsistenciaParaBoletin>>['porEstudiante'];
+  fraseDe: (nivel: NivelDesempeno, tipo: TipoFraseBoletin) => string;
+  observacionDe: (subjectId: string, studentId: string) => string | null;
+  fechaEntrega: Date | null;
+  canalReclamaciones: string;
+  calendarioEntregas: ReportCardResult['calendario_entregas'];
+  directorGrupo: string | null;
+  mostrarPuesto: boolean;
+  totalEstudiantes: number;
+}
 
-  await assertCanViewReportCard(student, requestingUser);
-
-  const academicYear = await AcademicYear.findById(params.academic_year_id);
-  if (!academicYear) throw new ApiError(404, 'Año lectivo no encontrado.');
-
-  // La escala del año (CU-ADM-04) se captura en una variable propia (no "academicYear.x") porque TS no reduce el tipo del
+async function cargarContextoGrupo(
+  anio: AcademicYearDocument,
+  grupo: GrupoPoblado,
+  periodoNumero: number,
+  estudianteExtraId?: string
+): Promise<ContextoGrupo> {
+  // La escala del año (CU-ADM-04) se captura en una variable propia (no "anio.x") porque TS no reduce el tipo del
   // objeto a traves de las funciones anidadas de mas abajo.
-  const escalaEvaluacion = academicYear.escala_evaluacion;
-
-  const enrollment = await Enrollment.findOne({
-    student_id: student._id,
-    academic_year_id: academicYear._id,
-    estado: { $in: ESTADOS_MATRICULA_ACTIVOS },
-  });
-  if (!enrollment) throw new ApiError(404, 'El estudiante no tiene una matricula activa en ese año lectivo.');
-
-  const group = await Group.findById(enrollment.group_id).populate<{
-    sede_id: CampusDocument;
-    jornada_id: JornadaOperativaDocument;
-  }>([
-    { path: 'sede_id', select: 'nombre' },
-    { path: 'jornada_id', select: 'nombre' },
-  ]);
-  if (!group) throw new ApiError(404, 'Grupo no encontrado.');
+  const escalaEvaluacion = anio.escala_evaluacion;
+  const periodo = anio.periodos.find((p) => p.numero === periodoNumero);
+  if (!periodo) throw new ApiError(400, `El año ${anio.year} no tiene un periodo ${periodoNumero}.`);
 
   // ---- 1. Carga cruda (una sola vez para todo el grupo) ----
 
   const groupEnrollments = await Enrollment.find({
-    group_id: group._id,
-    academic_year_id: academicYear._id,
+    group_id: grupo._id,
+    academic_year_id: anio._id,
     estado: { $in: ESTADOS_MATRICULA_ACTIVOS },
   });
   const studentIds = groupEnrollments.map((e) => String(e.student_id));
-  if (!studentIds.includes(String(student._id))) studentIds.push(String(student._id));
+  if (estudianteExtraId && !studentIds.includes(estudianteExtraId)) studentIds.push(estudianteExtraId);
 
-  const studyPlan = await StudyPlan.findOne({ academic_year_id: academicYear._id });
-  const gradoPlan = studyPlan?.grades.find((g) => String(g.grade_id) === String(group.grade_id));
-  const personalizacion = gradoPlan?.personalizaciones_grupo.find((p) => String(p.group_id) === String(group._id));
+  const studyPlan = await StudyPlan.findOne({ academic_year_id: anio._id });
+  const gradoPlan = studyPlan?.grades.find((g) => String(g.grade_id) === String(grupo.grade_id));
+  const personalizacion = gradoPlan?.personalizaciones_grupo.find((p) => String(p.group_id) === String(grupo._id));
 
   // Malla efectiva del grupo (M06): asignaturas de la Configuracion General
   // del grado mas las asignaturas especificas agregadas para este grupo en
@@ -227,16 +268,26 @@ export async function generateReportCard(
 
   // Solo lo cerrado: es la fuente oficial. Una asignatura por estudiante (una clase por asignatura y grupo en el año).
   const cerrados = await CalificacionAsignatura.find({
-    group_id: group._id,
-    academic_year_id: academicYear._id,
-    periodo_numero: params.periodo_numero,
+    group_id: grupo._id,
+    academic_year_id: anio._id,
+    periodo_numero: periodoNumero,
     estado: { $in: ESTADOS_NOTA_CERRADOS },
   }).lean();
   const cerradoPor = new Map(cerrados.map((c) => [`${String(c.subject_id)}|${String(c.student_id)}`, c]));
 
-  const { porEstudiante: asistenciaTotales, fallasPorAsignatura } = await resumenAsistenciaParaBoletin(
-    group._id,
-    params.periodo_numero
+  const { porEstudiante: asistenciaTotales, fallasPorAsignatura } = await resumenAsistenciaParaBoletin(grupo._id, periodoNumero);
+
+  const [frases, observaciones, configuracion, directorGrupo, institucion] = await Promise.all([
+    FraseDesempeno.find().lean(),
+    ObservacionBoletin.find({ group_id: grupo._id, academic_year_id: anio._id, periodo_numero: periodoNumero }).lean(),
+    leerConfiguracionBoletin(),
+    directorDelGrupo(grupo),
+    Institution.findOne().select('nombre codigo_dane nit resolucion_aprobacion').lean(),
+  ]);
+  const fraseGuardada = new Map(frases.map((f) => [`${f.nivel}|${f.tipo}`, f.texto]));
+  const observacionGuardada = new Map(observaciones.map((o) => [`${String(o.subject_id)}|${String(o.student_id)}`, o.texto]));
+  const entrega = configuracion.entregas.find(
+    (e) => String(e.academic_year_id) === String(anio._id) && e.periodo_numero === periodoNumero
   );
 
   const areaGroups = new Map<string, AreaGroup>();
@@ -269,15 +320,20 @@ export async function generateReportCard(
         const nota = registro?.resultado?.nota_asignatura ?? null;
         if (nota === null) pendientes.push(subject.nombre);
         const fallas = fallasPorAsignatura.get(`${String(subject._id)}_${studentId}`) ?? 0;
+        const desempeno = nota === null ? null : desempenoCualitativo(nota, escalaEvaluacion);
         return {
           subject_id: String(subject._id),
           nombre: subject.nombre,
           porcentaje_en_area: metodo === 'PONDERADO' ? porcentaje ?? 0 : pesoEquivalente,
           nota_asignatura: nota,
           estado: registro ? (registro.estado as 'CERRADO' | 'DEFINITIVO') : 'SIN_CERRAR',
-          desempeno: nota === null ? null : desempenoCualitativo(nota, escalaEvaluacion),
+          desempeno,
           fallas_asignatura: fallas,
           componentes: registro?.resultado?.componentes ?? [],
+          // La descripción y la recomendación dependen del nivel de una nota cerrada; la observación es del docente y no del cálculo.
+          descripcion: desempeno ? fraseGuardada.get(`${desempeno.nivel}|DESCRIPCION`) ?? '' : '',
+          recomendacion: desempeno ? fraseGuardada.get(`${desempeno.nivel}|RECOMENDACION`) ?? '' : '',
+          observacion_docente: observacionGuardada.get(`${String(subject._id)}|${studentId}`) ?? null,
         };
       });
 
@@ -298,16 +354,13 @@ export async function generateReportCard(
     return { studentId, areas: areasResult, promedio: calcularPromedioGeneral(areasResult.map((a) => a.nota_area)), pendientes };
   }
 
-  const allComputed = studentIds.map((sid) => computeStudent(sid));
-  const targetComputed = allComputed.find((r) => r.studentId === String(student._id));
-  if (!targetComputed) throw new ApiError(500, 'No se pudo calcular el boletín del estudiante.');
-
   // ---- 3. Ranking (competition ranking: empatados comparten puesto) ----
 
+  const allComputed = studentIds.map((sid) => computeStudent(sid));
   const sorted = allComputed
     .filter((r): r is StudentComputed & { promedio: number } => r.promedio !== null)
     .sort((a, b) => b.promedio - a.promedio);
-  const rankByStudent = new Map<string, number>();
+  const puestoPor = new Map<string, number>();
   let puestoActual = 0;
   let notaAnterior: number | null = null;
   sorted.forEach((entry, idx) => {
@@ -315,37 +368,180 @@ export async function generateReportCard(
       puestoActual = idx + 1;
       notaAnterior = entry.promedio;
     }
-    rankByStudent.set(entry.studentId, puestoActual);
+    puestoPor.set(entry.studentId, puestoActual);
   });
 
-  const asistenciaTarget = asistenciaTotales.get(String(student._id)) ?? {
-    justificadas: 0,
-    injustificadas: 0,
-    retardos: 0,
+  return {
+    anio,
+    grupo,
+    periodoNumero,
+    nombrePeriodo: periodo.nombre,
+    escala: escalaEfectiva(escalaEvaluacion),
+    institucion: {
+      nombre: institucion?.nombre ?? '',
+      codigo_dane: institucion?.codigo_dane ?? '',
+      nit: institucion?.nit ?? '',
+      resolucion_aprobacion: institucion?.resolucion_aprobacion ?? '',
+    },
+    studentIds,
+    calcular: (id) => allComputed.find((r) => r.studentId === id) ?? computeStudent(id),
+    puestoPor,
+    asistenciaTotales,
+    fraseDe: (nivel, tipo) => fraseGuardada.get(`${nivel}|${tipo}`) ?? '',
+    observacionDe: (subjectId, studentId) => observacionGuardada.get(`${subjectId}|${studentId}`) ?? null,
+    fechaEntrega: entrega?.fecha_entrega ?? null,
+    canalReclamaciones: configuracion.canal_reclamaciones,
+    calendarioEntregas: anio.periodos.map((p) => ({
+      periodo: p.nombre || `Periodo ${p.numero}`,
+      fecha: configuracion.entregas.find((e) => e.academic_year_id === String(anio._id) && e.periodo_numero === p.numero)?.fecha_entrega ?? null,
+    })),
+    directorGrupo,
+    mostrarPuesto: configuracion.mostrar_puesto,
+    totalEstudiantes: allComputed.length,
   };
+}
+
+function armarBoletin(ctx: ContextoGrupo, student: UserDocument): ReportCardResult {
+  const calculado = ctx.calcular(String(student._id));
+  const asistencia = ctx.asistenciaTotales.get(String(student._id)) ?? { justificadas: 0, injustificadas: 0, retardos: 0 };
 
   return {
     estudiante: {
       id: String(student._id),
       nombre_completo: `${student.nombre} ${student.apellido}`,
       documento: student.numero_documento,
-      grupo: group.nomenclatura,
-      jornada: group.jornada_id.nombre,
-      sede: group.sede_id.nombre,
+      grado: ctx.grupo.grade_id?.nombre ?? '',
+      grupo: ctx.grupo.nomenclatura,
+      jornada: ctx.grupo.jornada_id.nombre,
+      sede: ctx.grupo.sede_id.nombre,
     },
-    periodo: params.periodo_numero,
-    academic_year: academicYear.year,
-    completo: targetComputed.promedio !== null,
-    pendientes: [...new Set(targetComputed.pendientes)],
-    puesto_grupo: rankByStudent.get(String(student._id)) ?? null,
-    total_estudiantes_grupo: allComputed.length,
-    promedio_general_periodo: targetComputed.promedio,
-    desempeno_general: targetComputed.promedio === null ? null : desempenoCualitativo(targetComputed.promedio, escalaEvaluacion),
+    periodo: ctx.periodoNumero,
+    nombre_periodo: ctx.nombrePeriodo,
+    academic_year: ctx.anio.year,
+    institucion: ctx.institucion,
+    completo: calculado.promedio !== null,
+    pendientes: [...new Set(calculado.pendientes)],
+    puesto_grupo: ctx.mostrarPuesto ? ctx.puestoPor.get(String(student._id)) ?? null : null,
+    mostrar_puesto: ctx.mostrarPuesto,
+    total_estudiantes_grupo: ctx.totalEstudiantes,
+    promedio_general_periodo: calculado.promedio,
+    desempeno_general:
+      calculado.promedio === null ? null : desempenoCualitativo(calculado.promedio, ctx.anio.escala_evaluacion),
     asistencia_periodo: {
-      total_fallas_justificadas: asistenciaTarget.justificadas,
-      total_fallas_injustificadas: asistenciaTarget.injustificadas,
-      total_retardos: asistenciaTarget.retardos,
+      total_fallas_justificadas: asistencia.justificadas,
+      total_fallas_injustificadas: asistencia.injustificadas,
+      total_retardos: asistencia.retardos,
     },
-    areas: targetComputed.areas,
+    areas: calculado.areas,
+    escala: ctx.escala.rangos.map((r) => ({
+      nivel: r.nivel,
+      etiqueta: r.etiqueta,
+      valor_minimo: r.valor_minimo,
+      valor_maximo: r.valor_maximo,
+      es_aprobatorio: r.es_aprobatorio,
+    })),
+    fecha_entrega: ctx.fechaEntrega,
+    canal_reclamaciones: ctx.canalReclamaciones,
+    calendario_entregas: ctx.calendarioEntregas,
+    director_grupo: ctx.directorGrupo,
   };
+}
+
+/**
+ * El director sale de su asignación de dirección de grupo (M08), que es la fuente; el campo del grupo es solo respaldo (ver la ficha 360 del grupo).
+ */
+async function directorDelGrupo(grupo: GroupDocument): Promise<string | null> {
+  const asignacion = await TeacherAssignment.findOne({ group_id: grupo._id, tipo_asignacion: 'DIRECCION_GRUPO', estado: ESTADO_ACTIVO }).populate<{ docente_id: UserDocument | null }>('docente_id', 'nombre apellido');
+  const docente = asignacion?.docente_id ?? (grupo.director_grupo_id ? await User.findById(grupo.director_grupo_id).select('nombre apellido') : null);
+  return docente ? `${docente.nombre} ${docente.apellido}` : null;
+}
+
+async function cargarGrupoPoblado(groupId: unknown): Promise<GrupoPoblado> {
+  const group = await Group.findById(groupId).populate<{
+    sede_id: CampusDocument;
+    jornada_id: JornadaOperativaDocument;
+  }>([
+    { path: 'sede_id', select: 'nombre' },
+    { path: 'jornada_id', select: 'nombre' },
+    { path: 'grade_id', select: 'nombre' },
+  ]);
+  if (!group) throw new ApiError(404, 'Grupo no encontrado.');
+  return group as unknown as GrupoPoblado;
+}
+
+/**
+ * Genera el boletin (JSON estructurado) de un estudiante para un periodo y año lectivo. La fuente son los resultados
+ * CERRADOS o DEFINITIVOS de M12 (lo que el docente cerró, congelado con el cálculo de sus componentes): una nota en
+ * borrador nunca llega a un boletín. Lo que M17 calcula aquí es solo lo que M12 no guarda:
+ *  - Nota de area = segun el metodo_calculo configurado en M06 para el area
+ *    dentro del grado del estudiante (StudyPlan.grades[].evaluaciones_area):
+ *    PONDERADO usa el porcentaje de cada asignatura, ARITMETICO promedia las
+ *    asignaturas de esa area con el mismo peso. Si el area del grupo tiene su
+ *    propia evaluacion personalizada (Distribucion por Grupos, RN-EVAL-02) se
+ *    usa esa en vez de la del grado. Sin todas sus asignaturas cerradas, el área no se calcula.
+ *  - Promedio general = promedio aritmetico simple de las notas de area (solo con todas calculadas).
+ *  - Puesto de grupo = ranking por promedio general entre los estudiantes del grupo con boletín completo
+ *    (ranking de competencia estandar: los empatados comparten puesto y el siguiente puesto salta la cantidad de empatados).
+ *  - Descripción cualitativa y recomendación (banco del colegio por nivel de desempeño) y la observación del docente.
+ *
+ * Para evitar N+1 queries al calcular el ranking (que requiere el promedio de
+ * TODOS los estudiantes del grupo, no solo el consultado), `cargarContextoGrupo` trae
+ * una sola vez todos los datos crudos del grupo+periodo y el resto se calcula en memoria.
+ */
+export async function generateReportCard(
+  params: ReportCardParams,
+  requestingUser: UserDocument
+): Promise<ReportCardResult> {
+  const student = await User.findOne({ _id: params.student_id, rol: ROLES.ESTUDIANTE });
+  if (!student) throw new ApiError(404, 'Estudiante no encontrado.');
+
+  await assertCanViewReportCard(student, requestingUser);
+
+  const academicYear = await AcademicYear.findById(params.academic_year_id);
+  if (!academicYear) throw new ApiError(404, 'Año lectivo no encontrado.');
+
+  const enrollment = await Enrollment.findOne({
+    student_id: student._id,
+    academic_year_id: academicYear._id,
+    estado: { $in: ESTADOS_MATRICULA_ACTIVOS },
+  });
+  if (!enrollment) throw new ApiError(404, 'El estudiante no tiene una matricula activa en ese año lectivo.');
+
+  const group = await cargarGrupoPoblado(enrollment.group_id);
+
+  // El personal ve siempre el boletín; la familia solo cuando el administrador lo publicó (o la dejó pasar como excepción).
+  if (requestingUser.rol === ROLES.ESTUDIANTE || requestingUser.rol === ROLES.ACUDIENTE) {
+    await exigirBoletinDisponible(
+      { group_id: String(group._id), academic_year_id: String(academicYear._id), periodo_numero: params.periodo_numero },
+      String(student._id)
+    );
+  }
+
+  const contexto = await cargarContextoGrupo(academicYear, group, params.periodo_numero, String(student._id));
+  return armarBoletin(contexto, student);
+}
+
+export interface BoletinesDeGrupoParams {
+  group_id: string;
+  academic_year_id: string;
+  periodo_numero: number;
+}
+
+/** Los boletines de todos los estudiantes con matrícula activa del grupo, en orden alfabético por apellido. */
+export async function generarBoletinesDeGrupo(
+  params: BoletinesDeGrupoParams,
+  requestingUser: UserDocument
+): Promise<ReportCardResult[]> {
+  const group = await cargarGrupoPoblado(params.group_id);
+  await assertCanViewGroupReportCards(group, requestingUser);
+
+  const academicYear = await AcademicYear.findById(params.academic_year_id);
+  if (!academicYear) throw new ApiError(404, 'Año lectivo no encontrado.');
+  if (String(group.academic_year_id) !== String(academicYear._id)) {
+    throw new ApiError(400, 'El grupo no pertenece a ese año lectivo.');
+  }
+
+  const contexto = await cargarContextoGrupo(academicYear, group, params.periodo_numero);
+  const estudiantes = await User.find({ _id: { $in: contexto.studentIds }, rol: ROLES.ESTUDIANTE }).sort({ apellido: 1, nombre: 1 });
+  return estudiantes.map((e) => armarBoletin(contexto, e));
 }

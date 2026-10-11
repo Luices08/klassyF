@@ -12,6 +12,7 @@ import { CertificadosPage } from './pages/admin/CertificadosPage';
 import { AnioLectivoPage } from './pages/AnioLectivoPage';
 import { ActividadesDocentePage } from './pages/ActividadesDocentePage';
 import { NotasPlanillaPage } from './pages/NotasPlanillaPage';
+import { ObservacionesBoletinPage } from './pages/ObservacionesBoletinPage';
 import { AsistenciaPage } from './pages/AsistenciaPage';
 import { GestionAsistenciaPage } from './pages/GestionAsistenciaPage';
 import { MisActividadesPage } from './pages/MisActividadesPage';
@@ -26,6 +27,7 @@ import { AcademicCatalogPage } from './pages/admin/AcademicCatalogPage';
 import { ActividadesGestionPage } from './pages/admin/ActividadesGestionPage';
 import { NotasGestionPage } from './pages/admin/NotasGestionPage';
 import { CreadorPlanillasPage } from './pages/admin/CreadorPlanillasPage';
+import { ConfiguracionBoletinPage } from './pages/admin/ConfiguracionBoletinPage';
 import { AdmissionRequestsPage } from './pages/admin/AdmissionRequestsPage';
 import { CasosConvivenciaPage } from './pages/admin/CasosConvivenciaPage';
 import { ComitePage } from './pages/admin/ComitePage';
@@ -96,6 +98,7 @@ export default function App() {
             <Route path="/admin/revision-curricular" element={<RevisionCurricularPage />} />
             <Route path="/admin/actividades" element={<ActividadesGestionPage />} />
             <Route path="/admin/notas" element={<NotasGestionPage />} />
+            <Route path="/admin/boletin" element={<ConfiguracionBoletinPage />} />
           </Route>
 
           <Route element={<ProtectedRoute allowedRoles={['DOCENTE', 'ESTUDIANTE', 'ACUDIENTE']} />}>
@@ -108,6 +111,7 @@ export default function App() {
             <Route path="/docente/asistencia" element={<AsistenciaPage />} />
             <Route path="/docente/actividades" element={<ActividadesDocentePage />} />
             <Route path="/docente/notas" element={<NotasPlanillaPage />} />
+            <Route path="/docente/boletin-observaciones" element={<ObservacionesBoletinPage />} />
           </Route>
 
           <Route element={<ProtectedRoute allowedRoles={['ADMIN', 'COORDINADOR', 'SECRETARIA', 'DOCENTE']} />}>

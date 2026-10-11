@@ -34,6 +34,18 @@ const studentGuardianSchema = new Schema<IStudentGuardian, StudentGuardianModel>
 
 studentGuardianSchema.index({ student_id: 1, guardian_id: 1 }, { unique: true });
 
+// Garantiza que un estudiante tenga maximo 1 acudiente principal:
+// al marcar un vinculo como principal, cualquier otro del mismo estudiante se desmarca.
+studentGuardianSchema.pre('save', async function asegurarUnicoPrincipalHook(next) {
+  if (this.isModified('es_principal') && this.es_principal) {
+    await model('StudentGuardian').updateMany(
+      { student_id: this.student_id, _id: { $ne: this._id } },
+      { $set: { es_principal: false } }
+    );
+  }
+  next();
+});
+
 export const StudentGuardian = model<IStudentGuardian, StudentGuardianModel>(
   'StudentGuardian',
   studentGuardianSchema

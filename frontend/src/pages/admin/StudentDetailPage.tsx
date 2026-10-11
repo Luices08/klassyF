@@ -83,6 +83,7 @@ const ACUDIENTE_VACIO = {
   email: '',
   parentesco: '' as Parentesco | '',
   habilitar_portal: false,
+  es_principal: false,
 };
 
 export function StudentDetailPage() {
@@ -435,7 +436,12 @@ function NucleoFamiliarTab({
     vincular.reset();
     if (modo === 'buscar') {
       if (!form.guardian_id || !form.parentesco) return;
-      await vincular.mutateAsync({ studentId, guardian_id: form.guardian_id, parentesco: form.parentesco });
+      await vincular.mutateAsync({
+        studentId,
+        guardian_id: form.guardian_id,
+        parentesco: form.parentesco,
+        es_principal: form.es_principal,
+      });
     } else {
       if (!form.parentesco) return;
       if (form.habilitar_portal && !form.email) return;
@@ -449,6 +455,7 @@ function NucleoFamiliarTab({
         email: form.email || undefined,
         parentesco: form.parentesco,
         habilitar_portal: form.habilitar_portal,
+        es_principal: form.es_principal,
       });
     }
     cerrarDrawer();
@@ -492,14 +499,12 @@ function NucleoFamiliarTab({
               <Td>{rel.autorizado_retiro ? 'Sí' : 'No'}</Td>
               <Td>
                 <div className="flex justify-end gap-2">
-                  {!rel.es_principal && (
-                    <IconButton
-                      tone="success"
-                      label="Marcar como principal"
-                      icon={<StarIcon />}
-                      onClick={() => actualizarVinculo.mutate({ studentId, relationId: rel._id, es_principal: true })}
-                    />
-                  )}
+                  <IconButton
+                    tone={rel.es_principal ? 'edit' : 'success'}
+                    label={rel.es_principal ? 'Quitar condición de principal' : 'Marcar como principal'}
+                    icon={<StarIcon className={rel.es_principal ? 'fill-current text-primary' : ''} />}
+                    onClick={() => actualizarVinculo.mutate({ studentId, relationId: rel._id, es_principal: !rel.es_principal })}
+                  />
                   <IconButton
                     tone="danger"
                     label="Desvincular"
@@ -600,6 +605,16 @@ function NucleoFamiliarTab({
             </option>
           ))}
         </Select>
+
+        <label className="flex items-center gap-2 text-sm text-body">
+          <input
+            type="checkbox"
+            checked={form.es_principal}
+            onChange={(e) => setForm((f) => ({ ...f, es_principal: e.target.checked }))}
+            className="h-4 w-4 rounded border-border text-primary focus:ring-primary"
+          />
+          Marcar como acudiente principal (responsable legal)
+        </label>
 
         {modo === 'nuevo' && (
           <div className="space-y-2 rounded-lg border border-border bg-soft p-3">

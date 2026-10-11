@@ -38,7 +38,7 @@ import {
   type CreateUserInput,
   type UpdateUserInput,
 } from '../../hooks/useUsers';
-import { ROLES, type Rol, puedeGestionarRol } from '../../types/api';
+import { ROLES, ROLES_STAFF, type Rol, puedeGestionarRol } from '../../types/api';
 import { TIPOS_DOCUMENTO, type TipoDocumento, type User } from '../../types/domain';
 
 const DEFAULT_ROLES_FILTRO: Rol[] = ['ADMIN', 'COORDINADOR', 'COORDINADOR_CONVIVENCIA', 'ORIENTADOR', 'DOCENTE', 'SECRETARIA'];
@@ -52,7 +52,7 @@ const EMPTY_FORM: CreateUserInput = {
   email: '',
   telefono: '',
   password: '',
-  rol: 'ESTUDIANTE',
+  rol: 'DOCENTE',
   sedes_ids: [],
 };
 
@@ -153,7 +153,7 @@ export function UsersPage() {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [form, setForm] = useState<CreateUserInput>(EMPTY_FORM);
 
-  const assignableRoles = ROLES.filter((r) => currentUser && puedeGestionarRol(currentUser.rol, r));
+  const assignableRoles = ROLES_STAFF.filter((r) => currentUser && puedeGestionarRol(currentUser.rol, r));
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -246,7 +246,7 @@ export function UsersPage() {
     <div className="space-y-4">
       <PageHeader
         title="Usuarios"
-        subtitle="Crea, edita y gestiona el acceso de administradores, coordinadores, docentes, estudiantes y acudientes."
+        subtitle="Crea, edita y gestiona el acceso del personal administrativo, directivo y docente."
         action={
           <div className="flex gap-2">
             <Button variant="outline" onClick={() => setImportarOpen(true)}>

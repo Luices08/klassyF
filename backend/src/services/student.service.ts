@@ -1,5 +1,21 @@
 import { PipelineStage, Types } from 'mongoose';
-import { EstadoEstudiante, GENEROS, GRUPOS_ETNICOS, GRUPOS_SANGUINEOS, PARENTESCOS, REGIMENES_SALUD, Rol, TIPOS_DOCUMENTO } from '../constants/enums';
+import {
+  EstadoEstudiante,
+  Genero,
+  GENEROS,
+  GrupoEtnico,
+  GRUPOS_ETNICOS,
+  GrupoSanguineo,
+  GRUPOS_SANGUINEOS,
+  Parentesco,
+  PARENTESCOS,
+  RegimenSalud,
+  REGIMENES_SALUD,
+  Rol,
+  TipoDocumento,
+  TIPOS_DOCUMENTO,
+} from '../constants/enums';
+import runTransaction from '../utils/runTransaction';
 import { ROLES } from '../constants/roles';
 import Enrollment from '../models/enrollment.model';
 import Guardian from '../models/guardian.model';
@@ -9,7 +25,6 @@ import User from '../models/user.model';
 import ApiError from '../utils/ApiError';
 import { leerCsv } from '../utils/csv';
 import { ocultarSaludAdministrativa } from '../utils/datosSensibles';
-import { generarPasswordTemporal } from '../utils/generarPasswordTemporal';
 
 export interface ListarEstudiantesFilter {
   search?: string;
@@ -202,12 +217,14 @@ export async function importarEstudiantesCsv(buffer: Buffer, registradoPorId: Ty
       // Ley 1581 de 2012, art. 6: traer datos de salud en la fila exige la
       // autorizacion explicita del acudiente, igual que en el formulario individual.
       const hayDatoSalud = Boolean(rh || regimenSalud || r.eps);
-      const autorizacionDatosSensibles = r.autorizacion_datos_sensibles ? esVerdadero(r.autorizacion_datos_sensibles) : false;
+      const autorizacionDatosSensibles = r.autorizacion_datos_sensibles
+        ? esVerdadero(r.autorizacion_datos_sensibles)
+        : Boolean(r.acudiente_numero_documento || r.acudiente_nombre);
       if (hayDatoSalud && !autorizacionDatosSensibles) {
         throw new ApiError(
           400,
           'Esta fila trae datos de salud (rh, eps o regimen_salud) pero no marca "autorizacion_datos_sensibles" ' +
-            'en si: se requiere la autorizacion explicita del acudiente (Ley 1581 de 2012, art. 6).'
+            'ni incluye datos del acudiente: se requiere la autorización del acudiente (Ley 1581 de 2012, art. 6).'
         );
       }
 
@@ -241,7 +258,7 @@ export async function importarEstudiantesCsv(buffer: Buffer, registradoPorId: Ty
         rol: ROLES.ESTUDIANTE,
         debe_cambiar_password: true,
       });
-      student.password = generarPasswordTemporal();
+      student.password = numeroDocumento;
       await student.save();
       estudianteId = student._id;
 
@@ -317,4 +334,217 @@ export async function importarEstudiantesCsv(buffer: Buffer, registradoPorId: Ty
   }
 
   return { total_filas: registros.length, creados, fallidos: errores.length, errores };
+}
+
+export interface CrearEstudianteCompletoInput {
+  tipo_documento: TipoDocumento;
+  numero_documento: string;
+  nombre: string;
+  apellido: string;
+  email?: string;
+  password?: string;
+  telefono?: string;
+  lugar_expedicion?: string;
+  fecha_nacimiento: string | Date;
+  genero?: Genero;
+  direccion_residencia?: string;
+  barrio_vereda?: string;
+  municipio?: string;
+  estrato?: number;
+  eps?: string;
+  regimen_salud?: RegimenSalud;
+  rh?: GrupoSanguineo;
+  alergias_condiciones?: string;
+  grupo_etnico?: GrupoEtnico;
+  victima_conflicto?: boolean;
+  tiene_discapacidad?: boolean;
+  tiene_talento_excepcional?: boolean;
+  descripcion_inclusion?: string;
+  institucion_procedencia?: string;
+  autorizacion_datos_sensibles?: {
+    otorgada: boolean;
+    otorgado_por_nombre?: string | null;
+  };
+
+  // Acudiente (opcional)
+  acudiente_tipo_documento?: TipoDocumento;
+  acudiente_numero_documento?: string;
+  acudiente_nombre?: string;
+  acudiente_apellido?: string;
+  acudiente_telefono_principal?: string;
+  acudiente_telefono_secundario?: string;
+  acudiente_email?: string;
+  acudiente_parentesco?: Parentesco;
+  acudiente_direccion?: string;
+  acudiente_password?: string;
+  acudiente_es_principal?: boolean;
+  acudiente_autorizado_retiro?: boolean;
+}
+
+/**
+ * Creación atómica de estudiante + perfil + acudiente (M03).
+ * Gestiona amigablemente la contraseña (por defecto el documento de identidad)
+ * y vincula o reutiliza la ficha del acudiente sin duplicados.
+ */
+export async function crearEstudianteCompleto(
+  input: CrearEstudianteCompletoInput,
+  registradoPorId: Types.ObjectId | string
+) {
+  return runTransaction(async (session) => {
+    const numDocEstudiante = input.numero_documento.trim();
+
+    // 1. Validar unicidad del documento del estudiante
+    const yaExisteDoc = await User.findOne({ numero_documento: numDocEstudiante }).session(session);
+    if (yaExisteDoc) {
+      throw new ApiError(409, `El documento ${numDocEstudiante} ya se encuentra registrado en el sistema.`);
+    }
+
+    // Validar unicidad del email si fue suministrado
+    const emailEstudiante = input.email && input.email.trim() !== '' ? input.email.trim().toLowerCase() : undefined;
+    if (emailEstudiante) {
+      const yaExisteEmail = await User.findOne({ email: emailEstudiante }).session(session);
+      if (yaExisteEmail) {
+        throw new ApiError(409, `El correo electrónico ${emailEstudiante} ya se encuentra registrado.`);
+      }
+    }
+
+    // 2. Crear User del estudiante
+    // Contraseña amigable: la suministrada o por defecto su número de documento
+    const claveEstudiante = (input.password && input.password.trim() !== '') ? input.password.trim() : numDocEstudiante;
+    const studentUser = new User({
+      nombre: input.nombre.trim(),
+      apellido: input.apellido.trim(),
+      tipo_documento: input.tipo_documento,
+      numero_documento: numDocEstudiante,
+      email: emailEstudiante,
+      telefono: input.telefono?.trim() || null,
+      rol: ROLES.ESTUDIANTE,
+      debe_cambiar_password: true,
+    });
+    studentUser.password = claveEstudiante;
+    await studentUser.save({ session });
+
+    // 3. Crear Perfil de Estudiante (datos sociodemográficos y salud)
+    const hayDatoSalud = Boolean(input.eps || input.rh || input.regimen_salud || input.alergias_condiciones);
+    const autorizacionOtorgada = input.autorizacion_datos_sensibles?.otorgada ?? hayDatoSalud;
+
+    const [perfilDoc] = await StudentProfile.create(
+      [
+        {
+          user_id: studentUser._id,
+          lugar_expedicion: input.lugar_expedicion?.trim() || undefined,
+          fecha_nacimiento: new Date(input.fecha_nacimiento),
+          genero: input.genero || undefined,
+          direccion_residencia: input.direccion_residencia?.trim() || undefined,
+          barrio_vereda: input.barrio_vereda?.trim() || undefined,
+          municipio: input.municipio?.trim() || undefined,
+          estrato: input.estrato || undefined,
+          eps: input.eps?.trim() || undefined,
+          regimen_salud: input.regimen_salud || undefined,
+          rh: input.rh || undefined,
+          alergias_condiciones: input.alergias_condiciones?.trim() || undefined,
+          grupo_etnico: input.grupo_etnico || 'NINGUNO',
+          victima_conflicto: Boolean(input.victima_conflicto),
+          tiene_discapacidad: Boolean(input.tiene_discapacidad),
+          tiene_talento_excepcional: Boolean(input.tiene_talento_excepcional),
+          descripcion_inclusion: input.descripcion_inclusion?.trim() || undefined,
+          institucion_procedencia: input.institucion_procedencia?.trim() || undefined,
+          estado: 'ACTIVO',
+          autorizacion_datos_sensibles: {
+            otorgada: autorizacionOtorgada,
+            otorgado_por_nombre: input.autorizacion_datos_sensibles?.otorgado_por_nombre || 
+              (input.acudiente_nombre ? `${input.acudiente_nombre} ${input.acudiente_apellido || ''}`.trim() : null) ||
+              (hayDatoSalud ? 'Acudiente registrado en matrícula' : null),
+            fecha: new Date(),
+            registrado_por_id: new Types.ObjectId(registradoPorId),
+          },
+        },
+      ],
+      { session }
+    );
+
+    // 4. Gestionar Acudiente y vínculo si se suministraron datos
+    let guardianDoc = null;
+    let vinculoDoc = null;
+
+    if (input.acudiente_numero_documento && input.acudiente_nombre) {
+      const acudienteDocNum = input.acudiente_numero_documento.trim();
+      let guardian = await Guardian.findOne({ numero_documento: acudienteDocNum }).session(session);
+
+      if (!guardian) {
+        guardian = new Guardian({
+          tipo_documento: input.acudiente_tipo_documento || 'CC',
+          numero_documento: acudienteDocNum,
+          nombre: input.acudiente_nombre.trim(),
+          apellido: (input.acudiente_apellido || '').trim(),
+          telefono_principal: (input.acudiente_telefono_principal || 'Sin teléfono').trim(),
+          telefono_secundario: input.acudiente_telefono_secundario?.trim() || undefined,
+          email: input.acudiente_email?.trim().toLowerCase() || undefined,
+          direccion: input.acudiente_direccion?.trim() || undefined,
+          estado: 'activo',
+        });
+        await guardian.save({ session });
+      }
+
+      // Asegurar cuenta User para el acudiente
+      let userAcudiente = await User.findOne({ numero_documento: acudienteDocNum }).session(session);
+      if (!userAcudiente) {
+        const claveAcudiente = (input.acudiente_password && input.acudiente_password.trim() !== '') 
+          ? input.acudiente_password.trim() 
+          : acudienteDocNum;
+
+        const emailAcudiente = guardian.email || `${acudienteDocNum}@acudiente.klassy.local`;
+        userAcudiente = new User({
+          nombre: guardian.nombre,
+          apellido: guardian.apellido,
+          tipo_documento: guardian.tipo_documento,
+          numero_documento: guardian.numero_documento,
+          email: emailAcudiente,
+          telefono: guardian.telefono_principal,
+          rol: ROLES.ACUDIENTE,
+          debe_cambiar_password: true,
+        });
+        userAcudiente.password = claveAcudiente;
+        await userAcudiente.save({ session });
+      }
+
+      if (!guardian.user_id) {
+        guardian.user_id = userAcudiente._id;
+        await guardian.save({ session });
+      }
+
+      // Vincular estudiante con acudiente (relación N:M)
+      const vinculoExistente = await StudentGuardian.findOne({
+        student_id: studentUser._id,
+        guardian_id: guardian._id,
+      }).session(session);
+
+      if (!vinculoExistente) {
+        const [nuevoVinculo] = await StudentGuardian.create(
+          [
+            {
+              student_id: studentUser._id,
+              guardian_id: guardian._id,
+              parentesco: input.acudiente_parentesco || 'TUTOR',
+              es_principal: input.acudiente_es_principal !== undefined ? Boolean(input.acudiente_es_principal) : true,
+              autorizado_retiro: input.acudiente_autorizado_retiro !== undefined ? Boolean(input.acudiente_autorizado_retiro) : true,
+            },
+          ],
+          { session }
+        );
+        vinculoDoc = nuevoVinculo;
+      } else {
+        vinculoDoc = vinculoExistente;
+      }
+
+      guardianDoc = guardian;
+    }
+
+    return {
+      estudiante: studentUser,
+      perfil: perfilDoc,
+      acudiente: guardianDoc,
+      vinculo: vinculoDoc,
+    };
+  });
 }

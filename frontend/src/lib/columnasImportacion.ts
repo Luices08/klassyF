@@ -1,5 +1,5 @@
 import type { ColumnaGuia } from '../components/ui/GuiaColumnas';
-import { ROLES } from '../types/api';
+import { ROLES_STAFF } from '../types/api';
 import {
   GENEROS,
   GRUPOS_ETNICOS,
@@ -28,6 +28,7 @@ export const NOTAS_CSV_GENERALES = [
 
 export const NOTAS_CSV_USUARIOS = [
   ...NOTAS_CSV_GENERALES,
+  'Aplica únicamente para personal administrativo, directivo y docente (M02). Los estudiantes y acudientes se cargan desde el módulo de Estudiantes (M03).',
   'Para varias sedes en sedes_codigos sepáralas con | (barra vertical), p. ej. 111111111112|111111111113.',
   'A cada usuario creado se le asigna una contraseña temporal que deberá cambiar en su primer ingreso.',
 ];
@@ -45,7 +46,7 @@ export const COLUMNAS_USUARIOS: ColumnaGuia[] = [
   { nombre: 'nombre', obligatoria: true, formato: 'Texto', ejemplo: 'María' },
   { nombre: 'apellido', obligatoria: true, formato: 'Texto', ejemplo: 'Peña' },
   { nombre: 'email', obligatoria: true, formato: 'Correo válido. No puede repetirse.', ejemplo: 'maria@colegio.edu.co' },
-  { nombre: 'rol', obligatoria: true, formato: `${uno(ROLES)}. ADMIN solo lo importa un administrador.`, ejemplo: 'DOCENTE' },
+  { nombre: 'rol', obligatoria: true, formato: `${uno(ROLES_STAFF)}. ADMIN solo lo importa un administrador.`, ejemplo: 'DOCENTE' },
   { nombre: 'telefono', obligatoria: false, formato: 'Texto', ejemplo: '3001112233' },
   {
     nombre: 'sedes_codigos',

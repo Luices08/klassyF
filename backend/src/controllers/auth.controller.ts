@@ -1,3 +1,7 @@
+import { ROLES } from '../constants/roles';
+import Enrollment from '../models/enrollment.model';
+import Guardian from '../models/guardian.model';
+import StudentGuardian from '../models/studentGuardian.model';
 import User from '../models/user.model';
 import { registrarEvento } from '../services/audit.service';
 import { generateToken } from '../services/token.service';
@@ -47,6 +51,44 @@ export const login = catchAsync<unknown, unknown, LoginBody>(async (req, res) =>
       ip,
     });
     throw new ApiError(401, 'Credenciales invalidas.');
+  }
+
+  // Verificación de matrícula formal: preinscritos no tienen acceso al portal interno
+  if (user.rol === ROLES.ESTUDIANTE) {
+    const matriculas = await Enrollment.find({ student_id: user._id });
+    if (matriculas.length > 0) {
+      const tieneActiva = matriculas.some((m) =>
+        ['MATRICULADO_DEFINITIVO', 'MATRICULADO_CONDICIONAL'].includes(m.estado)
+      );
+      if (!tieneActiva) {
+        throw new ApiError(
+          403,
+          'Tu preinscripción está en revisión y aún no ha sido formalizada por secretaría. Puedes consultar el estado en la página pública.'
+        );
+      }
+    }
+  }
+
+  if (user.rol === ROLES.ACUDIENTE) {
+    const guardian = await Guardian.findOne({ user_id: user._id });
+    if (guardian) {
+      const vinculos = await StudentGuardian.find({ guardian_id: guardian._id });
+      const studentIds = vinculos.map((v) => v.student_id);
+      if (studentIds.length > 0) {
+        const matriculas = await Enrollment.find({ student_id: { $in: studentIds } });
+        if (matriculas.length > 0) {
+          const tieneActiva = matriculas.some((m) =>
+            ['MATRICULADO_DEFINITIVO', 'MATRICULADO_CONDICIONAL'].includes(m.estado)
+          );
+          if (!tieneActiva) {
+            throw new ApiError(
+              403,
+              'La preinscripción de tu aspirante aún no ha sido formalizada por secretaría. Puedes consultar el estado en la página pública.'
+            );
+          }
+        }
+      }
+    }
   }
 
   user.intentos_fallidos = 0;

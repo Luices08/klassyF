@@ -7,11 +7,12 @@ import AdmissionRequest, { AdmissionRequestDocument } from '../models/admissionR
 import Enrollment from '../models/enrollment.model';
 import Grade from '../models/grade.model';
 import Group from '../models/group.model';
+import Guardian from '../models/guardian.model';
+import StudentGuardian from '../models/studentGuardian.model';
 import StudentProfile from '../models/studentProfile.model';
 import User from '../models/user.model';
 import ApiError from '../utils/ApiError';
 import { ESTADO_ACTIVO } from '../utils/filtroEstado';
-import { generarPasswordTemporal } from '../utils/generarPasswordTemporal';
 import { runTransaction } from '../utils/runTransaction';
 import { buscarMatriculaDePreinscripcion, construirDetalle, PreinscripcionDetalle } from './preinscripcionPublica.service';
 import { crearDesdeMatricula } from './solicitudApoyo.service';
@@ -201,13 +202,55 @@ export async function aprobarSolicitud(
       rol: ROLES.ESTUDIANTE,
       debe_cambiar_password: true,
     });
-    student.password = generarPasswordTemporal();
+    student.password = solicitud.numero_documento;
     await student.save({ session });
 
     await StudentProfile.create(
       [{ user_id: student._id, fecha_nacimiento: solicitud.fecha_nacimiento, estado: 'ACTIVO' }],
       { session }
     );
+
+    // Guardar o vincular datos del acudiente suministrados en la preinscripción (M03)
+    const docAcudiente = `TEL-${solicitud.acudiente_telefono.trim()}`;
+    let guardian = await Guardian.findOne({
+      $or: [
+        { numero_documento: docAcudiente },
+        { email: solicitud.acudiente_email.trim().toLowerCase() },
+      ],
+    }).session(session);
+
+    if (!guardian) {
+      guardian = new Guardian({
+        tipo_documento: 'CC',
+        numero_documento: docAcudiente,
+        nombre: solicitud.acudiente_nombre.trim(),
+        apellido: solicitud.acudiente_apellido.trim(),
+        telefono_principal: solicitud.acudiente_telefono.trim(),
+        email: solicitud.acudiente_email.trim().toLowerCase(),
+        estado: 'activo',
+      });
+      await guardian.save({ session });
+    }
+
+    const vinculoExistente = await StudentGuardian.findOne({
+      student_id: student._id,
+      guardian_id: guardian._id,
+    }).session(session);
+
+    if (!vinculoExistente) {
+      await StudentGuardian.create(
+        [
+          {
+            student_id: student._id,
+            guardian_id: guardian._id,
+            parentesco: 'TUTOR',
+            es_principal: true,
+            autorizado_retiro: true,
+          },
+        ],
+        { session }
+      );
+    }
 
     const checklist = (DOCUMENTOS_REQUERIDOS_POR_NIVEL[grade.nivel] ?? []).map((tipo_documento) => ({
       tipo_documento,

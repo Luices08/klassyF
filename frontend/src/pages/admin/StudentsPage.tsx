@@ -14,12 +14,10 @@ import { Stepper } from '../../components/ui/Stepper';
 import { EmptyRow, Table, TableBody, TableHead, Td, Th } from '../../components/ui/Table';
 import { EyeIcon, PlusIcon, SearchIcon, UploadIcon } from '../../components/ui/icons';
 import { COLUMNAS_ESTUDIANTES, NOTAS_CSV_ESTUDIANTES } from '../../lib/columnasImportacion';
-import { useCreateUser } from '../../hooks/useUsers';
-import { useVincularAcudiente } from '../../hooks/useGuardians';
 import {
   useBulkImportStudents,
+  useCrearEstudianteCompleto,
   useStudentsDirectory,
-  useUpsertStudentProfile,
   type StudentsFilter,
 } from '../../hooks/useStudents';
 import {
@@ -73,6 +71,11 @@ const FORM_VACIO = {
   acudiente_telefono_principal: '',
   acudiente_email: '',
   acudiente_parentesco: '' as Parentesco | '',
+  acudiente_password: '',
+  acudiente_es_principal: true,
+  acudiente_autorizado_retiro: true,
+  autorizacion_datos_sensibles: true,
+  autorizacion_otorgado_por_nombre: '',
 };
 
 export function StudentsPage() {
@@ -115,9 +118,7 @@ export function StudentsPage() {
   const [paso, setPaso] = useState(1);
   const [form, setForm] = useState(FORM_VACIO);
 
-  const createUser = useCreateUser();
-  const upsertProfile = useUpsertStudentProfile();
-  const vincularAcudiente = useVincularAcudiente();
+  const crearEstudiante = useCrearEstudianteCompleto();
   const [errorCreacion, setErrorCreacion] = useState<string | null>(null);
 
   function cerrarDrawer() {
@@ -136,50 +137,46 @@ export function StudentsPage() {
 
     setErrorCreacion(null);
     try {
-      const nuevoUsuario = await createUser.mutateAsync({
-        nombre: form.nombre,
-        apellido: form.apellido,
+      await crearEstudiante.mutateAsync({
         tipo_documento: form.tipo_documento,
-        numero_documento: form.numero_documento,
-        email: form.email,
-        password: form.password,
-        rol: 'ESTUDIANTE',
-      });
-
-      await upsertProfile.mutateAsync({
-        userId: nuevoUsuario._id,
-        lugar_expedicion: form.lugar_expedicion || undefined,
+        numero_documento: form.numero_documento.trim(),
+        nombre: form.nombre.trim(),
+        apellido: form.apellido.trim(),
+        email: form.email.trim() || undefined,
+        password: form.password.trim() || undefined,
+        lugar_expedicion: form.lugar_expedicion.trim() || undefined,
         fecha_nacimiento: form.fecha_nacimiento,
         genero: form.genero || undefined,
-        direccion_residencia: form.direccion_residencia || undefined,
-        barrio_vereda: form.barrio_vereda || undefined,
-        municipio: form.municipio || undefined,
+        direccion_residencia: form.direccion_residencia.trim() || undefined,
+        barrio_vereda: form.barrio_vereda.trim() || undefined,
+        municipio: form.municipio.trim() || undefined,
         estrato: form.estrato ? Number(form.estrato) : undefined,
-        eps: form.eps || undefined,
+        eps: form.eps.trim() || undefined,
         regimen_salud: form.regimen_salud || undefined,
         rh: form.rh || undefined,
-        alergias_condiciones: form.alergias_condiciones || undefined,
+        alergias_condiciones: form.alergias_condiciones.trim() || undefined,
         grupo_etnico: form.grupo_etnico,
         victima_conflicto: form.victima_conflicto,
         tiene_discapacidad: form.tiene_discapacidad,
         tiene_talento_excepcional: form.tiene_talento_excepcional,
-        descripcion_inclusion: form.descripcion_inclusion || undefined,
-        institucion_procedencia: form.institucion_procedencia || undefined,
-      });
+        descripcion_inclusion: form.descripcion_inclusion.trim() || undefined,
+        institucion_procedencia: form.institucion_procedencia.trim() || undefined,
+        autorizacion_datos_sensibles: {
+          otorgada: form.autorizacion_datos_sensibles,
+          otorgado_por_nombre: form.autorizacion_otorgado_por_nombre.trim() || undefined,
+        },
 
-      if (form.acudiente_numero_documento && form.acudiente_nombre && form.acudiente_parentesco) {
-        await vincularAcudiente.mutateAsync({
-          studentId: nuevoUsuario._id,
-          tipo_documento: form.acudiente_tipo_documento,
-          numero_documento: form.acudiente_numero_documento,
-          nombre: form.acudiente_nombre,
-          apellido: form.acudiente_apellido,
-          telefono_principal: form.acudiente_telefono_principal,
-          email: form.acudiente_email || undefined,
-          parentesco: form.acudiente_parentesco,
-          es_principal: true,
-        });
-      }
+        acudiente_tipo_documento: form.acudiente_numero_documento ? form.acudiente_tipo_documento : undefined,
+        acudiente_numero_documento: form.acudiente_numero_documento.trim() || undefined,
+        acudiente_nombre: form.acudiente_nombre.trim() || undefined,
+        acudiente_apellido: form.acudiente_apellido.trim() || undefined,
+        acudiente_telefono_principal: form.acudiente_telefono_principal.trim() || undefined,
+        acudiente_email: form.acudiente_email.trim() || undefined,
+        acudiente_parentesco: form.acudiente_parentesco || undefined,
+        acudiente_password: form.acudiente_password.trim() || undefined,
+        acudiente_es_principal: form.acudiente_es_principal,
+        acudiente_autorizado_retiro: form.acudiente_autorizado_retiro,
+      });
 
       cerrarDrawer();
       void studentsQuery.refetch();
@@ -199,7 +196,7 @@ export function StudentsPage() {
     await bulkImport.mutateAsync(archivo);
   }
 
-  const guardando = createUser.isPending || upsertProfile.isPending || vincularAcudiente.isPending;
+  const guardando = crearEstudiante.isPending;
   const paginaInfo = studentsQuery.data;
 
   return (
@@ -339,10 +336,12 @@ export function StudentsPage() {
         subtitle={`Paso ${paso} de ${PASOS.length}`}
         onClose={cerrarDrawer}
         onSubmit={handleSubmit}
-        submitLabel={paso < PASOS.length ? 'Siguiente' : 'Crear estudiante'}
+        submitLabel={paso < PASOS.length ? 'Siguiente →' : 'Crear estudiante'}
+        onBack={paso > 1 ? () => setPaso((p) => p - 1) : undefined}
+        backLabel="← Atrás"
         isSubmitting={guardando}
       >
-        <Stepper steps={PASOS} current={paso} />
+        <Stepper steps={PASOS} current={paso} onStepClick={(s) => setPaso(s)} />
         {errorCreacion && <Alert tone="error">{errorCreacion}</Alert>}
 
         {paso === 1 && (
@@ -392,18 +391,15 @@ export function StudentsPage() {
               ))}
             </Select>
             <Input
-              label="Correo electrónico"
+              label="Correo electrónico (opcional)"
               type="email"
-              required
               value={form.email}
               onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
             />
             <Input
-              label="Contraseña temporal"
+              label="Contraseña inicial (opcional)"
               type="password"
-              required
-              minLength={8}
-              hint="Solo aplica si el estudiante tendrá acceso al portal. Deberá cambiarla en su primer ingreso."
+              hint="Por defecto será su número de documento. Si ingresa una personalizada, mínimo 8 caracteres."
               value={form.password}
               onChange={(e) => setForm((f) => ({ ...f, password: e.target.value }))}
             />
@@ -462,6 +458,31 @@ export function StudentsPage() {
               value={form.alergias_condiciones}
               onChange={(e) => setForm((f) => ({ ...f, alergias_condiciones: e.target.value }))}
             />
+            {Boolean(form.eps || form.rh || form.regimen_salud || form.alergias_condiciones) && (
+              <div className="space-y-2 rounded-lg border border-border bg-subtle/50 p-3">
+                <label className="flex items-center gap-2 text-sm font-medium text-ink">
+                  <input
+                    type="checkbox"
+                    checked={form.autorizacion_datos_sensibles}
+                    onChange={(e) => setForm((f) => ({ ...f, autorizacion_datos_sensibles: e.target.checked }))}
+                    className="h-4 w-4 rounded border-border text-primary focus:ring-primary"
+                  />
+                  El acudiente o responsable legal autorizó explícitamente el tratamiento de estos datos de salud
+                </label>
+                <p className="text-xs text-muted">
+                  EPS, régimen de salud, RH y alergias son datos sensibles (Ley 1581 de 2012, art. 6).
+                </p>
+                {form.autorizacion_datos_sensibles && (
+                  <Input
+                    label="Nombre de quien autoriza (opcional)"
+                    placeholder="Nombre del acudiente/responsable legal"
+                    value={form.autorizacion_otorgado_por_nombre}
+                    onChange={(e) => setForm((f) => ({ ...f, autorizacion_otorgado_por_nombre: e.target.value }))}
+                    hint="Si se deja vacío, se asocia automáticamente al acudiente registrado en el Paso 4."
+                  />
+                )}
+              </div>
+            )}
             <Select
               label="Grupo étnico"
               value={form.grupo_etnico}
@@ -571,6 +592,33 @@ export function StudentsPage() {
                 </option>
               ))}
             </Select>
+            <Input
+              label="Contraseña inicial del acudiente (opcional)"
+              type="password"
+              hint="Por defecto será su número de documento. Si ingresa una personalizada, mínimo 8 caracteres."
+              value={form.acudiente_password}
+              onChange={(e) => setForm((f) => ({ ...f, acudiente_password: e.target.value }))}
+            />
+            <div className="space-y-2 pt-2">
+              <label className="flex items-center gap-2 text-sm text-body">
+                <input
+                  type="checkbox"
+                  checked={form.acudiente_es_principal}
+                  onChange={(e) => setForm((f) => ({ ...f, acudiente_es_principal: e.target.checked }))}
+                  className="h-4 w-4 rounded border-border text-primary focus:ring-primary"
+                />
+                Acudiente principal (responsable legal de la matrícula)
+              </label>
+              <label className="flex items-center gap-2 text-sm text-body">
+                <input
+                  type="checkbox"
+                  checked={form.acudiente_autorizado_retiro}
+                  onChange={(e) => setForm((f) => ({ ...f, acudiente_autorizado_retiro: e.target.checked }))}
+                  className="h-4 w-4 rounded border-border text-primary focus:ring-primary"
+                />
+                Autorizado para retirar al estudiante
+              </label>
+            </div>
           </>
         )}
       </Drawer>

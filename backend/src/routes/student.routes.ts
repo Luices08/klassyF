@@ -1,7 +1,12 @@
 import { Router } from 'express';
 import multer from 'multer';
 import { ROLES } from '../constants/roles';
-import { bulkImportStudents, listarEstudiantes, obtenerFicha360 } from '../controllers/student.controller';
+import {
+  bulkImportStudents,
+  crearEstudianteCompleto,
+  listarEstudiantes,
+  obtenerFicha360,
+} from '../controllers/student.controller';
 import { authenticate, checkRole } from '../middlewares/auth.middleware';
 import validate from '../middlewares/validate.middleware';
 import * as studentValidator from '../validators/student.validator';
@@ -19,6 +24,13 @@ router.get(
   checkRole(...STAFF, ROLES.DOCENTE),
   validate(studentValidator.listarEstudiantes),
   listarEstudiantes
+);
+
+router.post(
+  '/',
+  checkRole(...STAFF),
+  validate(studentValidator.crearEstudianteCompleto),
+  crearEstudianteCompleto
 );
 
 router.post('/bulk-import', checkRole(...STAFF), upload.single('file'), bulkImportStudents);

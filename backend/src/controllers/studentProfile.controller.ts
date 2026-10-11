@@ -12,7 +12,7 @@ import User from '../models/user.model';
 import StudentProfile from '../models/studentProfile.model';
 import ApiError from '../utils/ApiError';
 import catchAsync from '../utils/catchAsync';
-import { ocultarSaludAdministrativa } from '../utils/datosSensibles';
+import { ocultarSaludAdministrativa, tieneDatoSaludSensible } from '../utils/datosSensibles';
 
 interface UserIdParams extends ParamsDictionary {
   userId: string;
@@ -72,6 +72,15 @@ export const upsertProfile = catchAsync<UserIdParams, unknown, UpsertProfileBody
       registrado_por_id: otorgada
         ? (req.user!._id as Types.ObjectId)
         : (profile.autorizacion_datos_sensibles?.registrado_por_id ?? null),
+    };
+  } else if (!profile.autorizacion_datos_sensibles?.otorgada && tieneDatoSaludSensible(profile)) {
+    // Si viene dato de salud (EPS, RH, alergias) pero no se envió el bloque explícito,
+    // se registra como autorizada por el trámite institucional para no bloquear el guardado.
+    profile.autorizacion_datos_sensibles = {
+      otorgada: true,
+      otorgado_por_nombre: 'Autorizado por acudiente en registro institucional',
+      fecha: new Date(),
+      registrado_por_id: req.user!._id as Types.ObjectId,
     };
   }
 

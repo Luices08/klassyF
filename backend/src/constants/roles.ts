@@ -10,6 +10,16 @@ export const ROLES = ROLES_LIST.reduce(
 
 export { ROLES_LIST };
 
+/** Roles de personal institucional (M02): solo estos se gestionan desde la vista de usuarios. */
+export const ROLES_STAFF: readonly Rol[] = [
+  ROLES.ADMIN,
+  ROLES.COORDINADOR,
+  ROLES.COORDINADOR_CONVIVENCIA,
+  ROLES.ORIENTADOR,
+  ROLES.SECRETARIA,
+  ROLES.DOCENTE,
+];
+
 /**
  * Jerarquía institucional de roles (M02).
  * Mayor valor = mayor rango jerárquico.

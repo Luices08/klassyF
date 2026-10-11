@@ -44,3 +44,18 @@ export const bulkImportStudents = catchAsync(async (req, res) => {
 
   res.status(200).json({ success: true, data: resultado });
 });
+
+export const crearEstudianteCompleto = catchAsync(async (req, res) => {
+  const resultado = await studentService.crearEstudianteCompleto(req.body, req.user!._id);
+
+  await registrarEvento({
+    usuario_id: req.user?._id,
+    accion: 'USUARIO_CREADO',
+    entidad: 'User',
+    entidad_id: resultado.estudiante._id,
+    detalle: `Estudiante creado: ${resultado.estudiante.nombre} ${resultado.estudiante.apellido} (${resultado.estudiante.numero_documento})`,
+    ip: req.ip,
+  });
+
+  res.status(201).json({ success: true, data: resultado });
+});

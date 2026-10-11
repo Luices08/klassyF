@@ -26,19 +26,87 @@ export type EstadoDocumentoMatricula = (typeof ESTADOS_DOCUMENTO_MATRICULA)[numb
 
 export const TIPOS_DOCUMENTO_MATRICULA = [
   'DOCUMENTO_IDENTIDAD',
-  'CERTIFICADO_GRADO_ANTERIOR',
   'FOTO',
   'CARNE_EPS',
   'CARNE_VACUNAS',
+  'CERTIFICADO_CRECIMIENTO_DESARROLLO',
+  'CERTIFICADO_AUDIOMETRIA_VISION',
+  'DOCUMENTO_ACUDIENTE',
+  'PAZ_Y_SALVO_SIMAT',
+  'CERTIFICADOS_NOTAS_ANTERIORES',
+  'CERTIFICADO_QUINTO_PRIMARIA',
+  'SERVICIO_SOCIAL_ESTUDIANTIL',
+  'CUSTODIA_LEGAL_O_PODER',
+  'DIAGNOSTICO_MEDICO_INCLUSION',
+  'CERTIFICADO_GRADO_ANTERIOR',
+  'OTRO_DOCUMENTO',
 ] as const;
 export type TipoDocumentoMatricula = (typeof TIPOS_DOCUMENTO_MATRICULA)[number];
 
 export const NOMBRES_DOCUMENTO_MATRICULA: Record<TipoDocumentoMatricula, string> = {
-  DOCUMENTO_IDENTIDAD: 'Documento de identidad',
+  DOCUMENTO_IDENTIDAD: 'Documento de identidad del estudiante',
+  FOTO: 'Foto reciente (3x4)',
+  CARNE_EPS: 'Certificado o carné de afiliación a EPS',
+  CARNE_VACUNAS: 'Carné de vacunas al día (PAI)',
+  CERTIFICADO_CRECIMIENTO_DESARROLLO: 'Certificado de crecimiento y desarrollo',
+  CERTIFICADO_AUDIOMETRIA_VISION: 'Certificado de tamizaje visual y auditivo',
+  DOCUMENTO_ACUDIENTE: 'Copia de documento del acudiente',
+  PAZ_Y_SALVO_SIMAT: 'Constancia de retiro / liberación de SIMAT y paz y salvo',
+  CERTIFICADOS_NOTAS_ANTERIORES: 'Certificados de notas de años anteriores (un solo PDF)',
+  CERTIFICADO_QUINTO_PRIMARIA: 'Certificado de 5° de básica primaria',
+  SERVICIO_SOCIAL_ESTUDIANTIL: 'Constancia de Servicio Social Obligatorio',
+  CUSTODIA_LEGAL_O_PODER: 'Custodia legal / patria potestad / poder especial',
+  DIAGNOSTICO_MEDICO_INCLUSION: 'Diagnóstico médico / valoración de inclusión (PIAR)',
   CERTIFICADO_GRADO_ANTERIOR: 'Certificado del grado anterior',
-  FOTO: 'Foto 3x4',
-  CARNE_EPS: 'Carné o afiliación a EPS',
-  CARNE_VACUNAS: 'Carné de vacunas',
+  OTRO_DOCUMENTO: 'Otro documento institucional',
+};
+
+export const INDICACIONES_DOCUMENTO_MATRICULA: Record<TipoDocumentoMatricula, string> = {
+  DOCUMENTO_IDENTIDAD: 'Registro civil legible (menores de 7 años), Tarjeta de Identidad ampliada al 150% (7 a 17 años) o Cédula (mayores de 18).',
+  DOCUMENTO_ACUDIENTE: 'Fotocopia legible de la cédula del padre, madre o tutor legal.',
+  FOTO: 'Fotografía reciente 3x4 en fondo blanco.',
+  CARNE_EPS: 'Certificado de afiliación vigente o carné de salud (no mayor a 30 días de expedición).',
+  CARNE_VACUNAS: 'Esquema completo del Programa Ampliado de Inmunizaciones (PAI) con refuerzo de los 5 años.',
+  CERTIFICADO_CRECIMIENTO_DESARROLLO: 'Control médico reciente emitido por la EPS o médico tratante.',
+  CERTIFICADO_AUDIOMETRIA_VISION: 'Examen preventivo de agudeza visual y tamizaje auditivo.',
+  CUSTODIA_LEGAL_O_PODER: 'Soporte legal de custodia, sentencia o poder notarial si el acudiente no es padre ni madre (opcional).',
+
+  PAZ_Y_SALVO_SIMAT: 'Constancia oficial de retiro/liberación en SIMAT y paz y salvo expedido por la institución educativa de procedencia.',
+  CERTIFICADOS_NOTAS_ANTERIORES: 'Certificados oficiales de calificaciones de cada uno de los grados cursados a la fecha (en un solo PDF consolidado).',
+  CERTIFICADO_QUINTO_PRIMARIA: 'Certificado oficial de culminación y aprobación del ciclo de Básica Primaria (5°).',
+  CERTIFICADO_GRADO_ANTERIOR: 'Certificado oficial final de notas y aprobación del grado inmediatamente anterior.',
+  SERVICIO_SOCIAL_ESTUDIANTIL: 'Constancia de horas de servicio social obligatorio cursadas en el colegio anterior (exclusivo para 11°).',
+
+  DIAGNOSTICO_MEDICO_INCLUSION: 'Diagnóstico clínico o valoración integral para el Plan Individual de Ajustes Razonables (Decreto 1421).',
+
+  OTRO_DOCUMENTO: 'Documento o soporte adicional solicitado por la institución.',
+};
+
+export type CategoriaDocumentoMatricula =
+  | 'IDENTIFICACION_SALUD'
+  | 'TRAYECTORIA_ACADEMICA'
+  | 'INCLUSION_PIAR'
+  | 'INSTITUCIONAL';
+
+export const CATEGORIAS_DOCUMENTO_MATRICULA: Record<TipoDocumentoMatricula, CategoriaDocumentoMatricula> = {
+  DOCUMENTO_IDENTIDAD: 'IDENTIFICACION_SALUD',
+  FOTO: 'IDENTIFICACION_SALUD',
+  CARNE_EPS: 'IDENTIFICACION_SALUD',
+  CARNE_VACUNAS: 'IDENTIFICACION_SALUD',
+  CERTIFICADO_CRECIMIENTO_DESARROLLO: 'IDENTIFICACION_SALUD',
+  CERTIFICADO_AUDIOMETRIA_VISION: 'IDENTIFICACION_SALUD',
+  DOCUMENTO_ACUDIENTE: 'IDENTIFICACION_SALUD',
+  CUSTODIA_LEGAL_O_PODER: 'IDENTIFICACION_SALUD',
+
+  PAZ_Y_SALVO_SIMAT: 'TRAYECTORIA_ACADEMICA',
+  CERTIFICADOS_NOTAS_ANTERIORES: 'TRAYECTORIA_ACADEMICA',
+  CERTIFICADO_QUINTO_PRIMARIA: 'TRAYECTORIA_ACADEMICA',
+  CERTIFICADO_GRADO_ANTERIOR: 'TRAYECTORIA_ACADEMICA',
+  SERVICIO_SOCIAL_ESTUDIANTIL: 'TRAYECTORIA_ACADEMICA',
+
+  DIAGNOSTICO_MEDICO_INCLUSION: 'INCLUSION_PIAR',
+
+  OTRO_DOCUMENTO: 'INSTITUCIONAL',
 };
 
 /** Activo/inactivo generico, reusado por User, Campus, Grade e Institution. */
@@ -399,6 +467,8 @@ export interface Area {
 
 export interface ChecklistItem {
   tipo_documento: TipoDocumentoMatricula;
+  nombre_personalizado?: string | null;
+  obligatorio?: boolean;
   estado: EstadoDocumentoMatricula;
   archivo_path: string | null;
   comentario: string | null;

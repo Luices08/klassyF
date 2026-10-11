@@ -1,5 +1,5 @@
 import { Types } from 'mongoose';
-import { DOCUMENTOS_REQUERIDOS_POR_NIVEL } from '../constants/matriculaChecklist';
+import { generarChecklistMatricula } from '../constants/matriculaChecklist';
 import {
   ESTADOS_MATRICULA_CON_FOLIO,
   EstadoDocumentoMatricula,
@@ -13,6 +13,8 @@ import AcademicYear from '../models/academicYear.model';
 import Enrollment, { EnrollmentDocument } from '../models/enrollment.model';
 import Grade from '../models/grade.model';
 import Group from '../models/group.model';
+import StudentGuardian from '../models/studentGuardian.model';
+import StudentProfile from '../models/studentProfile.model';
 import User from '../models/user.model';
 import ApiError from '../utils/ApiError';
 import { runTransaction } from '../utils/runTransaction';
@@ -92,8 +94,21 @@ export async function createEnrollment(
 
     const { numero_folio, folio_matricula } = await generateFolioMatricula(academicYear.year, numeroLibro, session);
 
-    const checklist = (DOCUMENTOS_REQUERIDOS_POR_NIVEL[grade.nivel] ?? []).map((tipo_documento) => ({
-      tipo_documento,
+    const profile = await StudentProfile.findOne({ user_id: student_id }).session(session);
+    const vinculoAcudiente = await StudentGuardian.findOne({ student_id, es_principal: true }).session(session);
+
+    const itemsGenerados = generarChecklistMatricula({
+      nivel: grade.nivel,
+      numeroGrado: grade.numero,
+      tipoIngreso: tipo_ingreso,
+      tieneDiscapacidad: profile?.tiene_discapacidad,
+      parentescoAcudiente: vinculoAcudiente?.parentesco,
+    });
+
+    const checklist = itemsGenerados.map((item) => ({
+      tipo_documento: item.tipo_documento,
+      nombre_personalizado: item.nombre_personalizado ?? null,
+      obligatorio: item.obligatorio,
       estado: 'PENDIENTE' as EstadoDocumentoMatricula,
       archivo_path: null,
       comentario: null,
@@ -410,7 +425,9 @@ export async function revisarDocumento(
   item.comentario = input.comentario ?? null;
   item.revisado_por = new Types.ObjectId(actor.id);
 
-  const todoAprobado = enrollment.checklist.every((c) => c.estado === 'APROBADO');
+  const todoAprobado = enrollment.checklist
+    .filter((c) => c.obligatorio !== false)
+    .every((c) => c.estado === 'APROBADO');
   let transicion = '';
   if (todoAprobado && enrollment.estado === 'MATRICULADO_CONDICIONAL') {
     enrollment.estado = 'MATRICULADO_DEFINITIVO';
@@ -426,6 +443,179 @@ export async function revisarDocumento(
     entidad: 'Enrollment',
     entidad_id: enrollment._id,
     detalle: `${tipoDocumento}: ${input.estado}${transicion}`,
+  });
+
+  return enrollment;
+}
+
+export interface AgregarDocumentoChecklistInput {
+  tipo_documento: TipoDocumentoMatricula;
+  nombre_personalizado?: string;
+  obligatorio?: boolean;
+}
+
+export async function agregarDocumentoChecklist(
+  enrollmentId: string,
+  input: AgregarDocumentoChecklistInput,
+  actor: { id: string | Types.ObjectId }
+): Promise<EnrollmentDocument> {
+  const enrollment = await Enrollment.findById(enrollmentId);
+  if (!enrollment) throw new ApiError(404, 'Matrícula no encontrada.');
+
+  if (input.tipo_documento !== 'OTRO_DOCUMENTO') {
+    const yaExiste = enrollment.checklist.some((c) => c.tipo_documento === input.tipo_documento);
+    if (yaExiste) throw new ApiError(400, 'Ese tipo de documento ya existe en el checklist de esta matrícula.');
+  }
+
+  enrollment.checklist.push({
+    tipo_documento: input.tipo_documento,
+    nombre_personalizado: input.nombre_personalizado ?? null,
+    obligatorio: input.obligatorio ?? true,
+    estado: 'PENDIENTE',
+    archivo_path: null,
+    comentario: null,
+    fecha_carga: null,
+    revisado_por: null,
+  } as unknown as (typeof enrollment.checklist)[number]);
+
+  if (enrollment.estado === 'MATRICULADO_DEFINITIVO' && input.obligatorio !== false) {
+    enrollment.estado = 'MATRICULADO_CONDICIONAL';
+  }
+
+  await enrollment.save();
+
+  await registrarEvento({
+    usuario_id: actor.id,
+    accion: 'DOCUMENTO_CHECKLIST_AGREGADO',
+    entidad: 'Enrollment',
+    entidad_id: enrollment._id,
+    detalle: input.nombre_personalizado || input.tipo_documento,
+  });
+
+  return enrollment;
+}
+
+export async function eliminarDocumentoChecklist(
+  enrollmentId: string,
+  tipoDocumento: TipoDocumentoMatricula,
+  actor: { id: string | Types.ObjectId }
+): Promise<EnrollmentDocument> {
+  const enrollment = await Enrollment.findById(enrollmentId);
+  if (!enrollment) throw new ApiError(404, 'Matrícula no encontrada.');
+
+  const idx = enrollment.checklist.findIndex((c) => c.tipo_documento === tipoDocumento);
+  if (idx === -1) throw new ApiError(404, 'Documento no encontrado en el checklist.');
+
+  enrollment.checklist.splice(idx, 1);
+
+  const todoAprobado = enrollment.checklist
+    .filter((c) => c.obligatorio !== false)
+    .every((c) => c.estado === 'APROBADO');
+
+  if (todoAprobado && enrollment.estado === 'MATRICULADO_CONDICIONAL') {
+    enrollment.estado = 'MATRICULADO_DEFINITIVO';
+    enrollment.fecha_limite_compromiso = null;
+  }
+
+  await enrollment.save();
+
+  await registrarEvento({
+    usuario_id: actor.id,
+    accion: 'DOCUMENTO_CHECKLIST_ELIMINADO',
+    entidad: 'Enrollment',
+    entidad_id: enrollment._id,
+    detalle: tipoDocumento,
+  });
+
+  return enrollment;
+}
+
+export async function sincronizarRequisitosMatricula(
+  enrollmentId: string,
+  actor: { id: string | Types.ObjectId }
+): Promise<EnrollmentDocument> {
+  const enrollment = await Enrollment.findById(enrollmentId);
+  if (!enrollment) throw new ApiError(404, 'Matrícula no encontrada.');
+
+  const group = await Group.findById(enrollment.group_id);
+  if (!group) throw new ApiError(404, 'Grupo no encontrado.');
+
+  const grade = await Grade.findById(group.grade_id);
+  if (!grade) throw new ApiError(404, 'Grado no encontrado.');
+
+  const profile = await StudentProfile.findOne({ user_id: enrollment.student_id });
+  const vinculoAcudiente = await StudentGuardian.findOne({ student_id: enrollment.student_id, es_principal: true });
+
+  const itemsEsperados = generarChecklistMatricula({
+    nivel: grade.nivel,
+    numeroGrado: grade.numero,
+    tipoIngreso: enrollment.tipo_ingreso,
+    tieneDiscapacidad: profile?.tiene_discapacidad,
+    parentescoAcudiente: vinculoAcudiente?.parentesco,
+  });
+
+  let agregados = 0;
+  for (const item of itemsEsperados) {
+    const yaExiste = enrollment.checklist.some((c) => c.tipo_documento === item.tipo_documento);
+    if (!yaExiste) {
+      enrollment.checklist.push({
+        tipo_documento: item.tipo_documento,
+        nombre_personalizado: item.nombre_personalizado ?? null,
+        obligatorio: item.obligatorio,
+        estado: 'PENDIENTE',
+        archivo_path: null,
+        comentario: null,
+        fecha_carga: null,
+        revisado_por: null,
+      } as unknown as (typeof enrollment.checklist)[number]);
+      agregados++;
+    }
+  }
+
+  if (agregados > 0) {
+    const todoAprobado = enrollment.checklist
+      .filter((c) => c.obligatorio !== false)
+      .every((c) => c.estado === 'APROBADO');
+
+    if (!todoAprobado && enrollment.estado === 'MATRICULADO_DEFINITIVO') {
+      enrollment.estado = 'MATRICULADO_CONDICIONAL';
+    }
+
+    await enrollment.save();
+
+    await registrarEvento({
+      usuario_id: actor.id,
+      accion: 'MATRICULA_REQUISITOS_SINCRONIZADOS',
+      entidad: 'Enrollment',
+      entidad_id: enrollment._id,
+      detalle: `Se incorporaron ${agregados} documentos faltantes según normativa del grado.`,
+    });
+  }
+
+  return enrollment;
+}
+
+export async function actualizarComentarioDocumento(
+  enrollmentId: string,
+  tipoDocumento: TipoDocumentoMatricula,
+  comentario: string | null,
+  actor: { id: string | Types.ObjectId }
+): Promise<EnrollmentDocument> {
+  const enrollment = await Enrollment.findById(enrollmentId);
+  if (!enrollment) throw new ApiError(404, 'Matricula no encontrada.');
+
+  const item = enrollment.checklist.find((c) => c.tipo_documento === tipoDocumento);
+  if (!item) throw new ApiError(400, 'Ese tipo de documento no aplica para el checklist de esta matrícula.');
+
+  item.comentario = comentario && comentario.trim() ? comentario.trim() : null;
+  await enrollment.save();
+
+  await registrarEvento({
+    usuario_id: actor.id,
+    accion: 'OBSERVACION_CHECKLIST_ACTUALIZADA',
+    entidad: 'Enrollment',
+    entidad_id: enrollment._id,
+    detalle: `${tipoDocumento}: observación actualizada -> ${item.comentario || '(vacía)'}`,
   });
 
   return enrollment;

@@ -97,3 +97,35 @@ export const descargarDocumento: ValidationSchema = {
 export const descargarActa: ValidationSchema = {
   params: Joi.object({ id: objectId.required() }),
 };
+
+export const agregarDocumentoChecklist: ValidationSchema = {
+  params: Joi.object({ id: objectId.required() }),
+  body: Joi.object({
+    tipo_documento: Joi.string()
+      .valid(...TIPOS_DOCUMENTO_MATRICULA)
+      .required(),
+    nombre_personalizado: Joi.string().trim().max(100).allow('', null),
+    obligatorio: Joi.boolean().default(true),
+  }),
+};
+
+export const eliminarDocumentoChecklist: ValidationSchema = {
+  params: Joi.object({
+    id: objectId.required(),
+    tipoDocumento: Joi.string()
+      .valid(...TIPOS_DOCUMENTO_MATRICULA)
+      .required(),
+  }),
+};
+
+export const actualizarComentario: ValidationSchema = {
+  params: Joi.object({
+    id: objectId.required(),
+    tipoDocumento: Joi.string()
+      .valid(...TIPOS_DOCUMENTO_MATRICULA)
+      .required(),
+  }),
+  body: Joi.object({
+    comentario: Joi.string().trim().max(500).allow('', null).optional(),
+  }),
+};

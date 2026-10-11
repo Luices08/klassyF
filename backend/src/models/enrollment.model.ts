@@ -13,6 +13,8 @@ import {
 
 export interface IChecklistItem {
   tipo_documento: TipoDocumentoMatricula;
+  nombre_personalizado?: string | null;
+  obligatorio?: boolean;
   estado: EstadoDocumentoMatricula;
   archivo_path: string | null;
   comentario: string | null;
@@ -47,6 +49,8 @@ type EnrollmentModel = Model<IEnrollment>;
 const checklistItemSchema = new Schema<IChecklistItem>(
   {
     tipo_documento: { type: String, enum: TIPOS_DOCUMENTO_MATRICULA, required: true },
+    nombre_personalizado: { type: String, default: null },
+    obligatorio: { type: Boolean, default: true },
     estado: { type: String, enum: ESTADOS_DOCUMENTO_MATRICULA, default: 'PENDIENTE' },
     archivo_path: { type: String, default: null },
     comentario: { type: String, default: null },

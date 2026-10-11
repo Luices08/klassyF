@@ -68,6 +68,8 @@ export const crearEstudianteCompleto: ValidationSchema = {
     acudiente_parentesco: Joi.string().valid(...PARENTESCOS).allow('', null).optional(),
     acudiente_direccion: Joi.string().trim().allow('', null).optional(),
     acudiente_password: Joi.string().min(4).allow('', null).optional(),
+    acudiente_habilitar_portal: Joi.boolean().default(false),
     acudiente_es_principal: Joi.boolean().default(true),
+    acudiente_autorizado_retiro: Joi.boolean().default(true),
   }),
 };

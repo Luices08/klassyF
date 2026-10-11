@@ -70,6 +70,7 @@ const FORM_VACIO = {
   expres_acudiente_email: '',
   expres_acudiente_parentesco: 'MADRE' as Parentesco,
   expres_acudiente_password: '',
+  expres_acudiente_habilitar_portal: false,
   expres_acudiente_es_principal: true,
 };
 
@@ -157,7 +158,8 @@ export function EnrollmentsPage() {
           acudiente_telefono_principal: form.expres_acudiente_telefono_principal.trim(),
           acudiente_email: form.expres_acudiente_email.trim() || undefined,
           acudiente_parentesco: form.expres_acudiente_parentesco,
-          acudiente_password: form.expres_acudiente_password.trim() || undefined,
+          acudiente_password: form.expres_acudiente_habilitar_portal ? form.expres_acudiente_password.trim() || undefined : undefined,
+          acudiente_habilitar_portal: form.expres_acudiente_habilitar_portal,
           acudiente_es_principal: form.expres_acudiente_es_principal,
         });
 
@@ -539,30 +541,54 @@ export function EnrollmentsPage() {
                   ))}
                 </Select>
               </div>
-              <div className="grid grid-cols-2 gap-2">
-                <Input
-                  label="Correo acudiente (opcional)"
-                  type="email"
-                  value={form.expres_acudiente_email}
-                  onChange={(e) => setForm((f) => ({ ...f, expres_acudiente_email: e.target.value }))}
-                />
-                <Input
-                  label="Contraseña acudiente (opcional)"
-                  type="password"
-                  hint="Por defecto su cédula"
-                  value={form.expres_acudiente_password}
-                  onChange={(e) => setForm((f) => ({ ...f, expres_acudiente_password: e.target.value }))}
-                />
+              <Input
+                label="Correo acudiente (opcional)"
+                type="email"
+                value={form.expres_acudiente_email}
+                onChange={(e) => setForm((f) => ({ ...f, expres_acudiente_email: e.target.value }))}
+              />
+              <div className="space-y-2 pt-1">
+                <label className="flex items-center gap-2 text-xs text-body">
+                  <input
+                    type="checkbox"
+                    checked={form.expres_acudiente_es_principal}
+                    onChange={(e) => setForm((f) => ({ ...f, expres_acudiente_es_principal: e.target.checked }))}
+                    className="h-4 w-4 rounded border-border text-primary focus:ring-primary"
+                  />
+                  Acudiente principal (responsable legal de la matrícula)
+                </label>
+
+                <div className="rounded-lg border border-border bg-soft p-2.5 space-y-1.5">
+                  <label className="flex items-center gap-2 text-xs font-medium text-ink">
+                    <input
+                      type="checkbox"
+                      checked={form.expres_acudiente_habilitar_portal}
+                      onChange={(e) => setForm((f) => ({ ...f, expres_acudiente_habilitar_portal: e.target.checked }))}
+                      className="h-4 w-4 rounded border-border text-primary focus:ring-primary"
+                    />
+                    Habilitar acceso a la plataforma (Portal de Familias)
+                  </label>
+                  <p className="text-[11px] text-muted leading-tight">
+                    Crea un usuario para que pueda consultar notas y boletines. Si se desmarca (ej. abuelo o contacto de retiro), solo queda como contacto sin acceso.
+                  </p>
+                  {form.expres_acudiente_habilitar_portal && (
+                    <div className="pt-1 space-y-1">
+                      <Input
+                        label="Contraseña acudiente (opcional)"
+                        type="password"
+                        hint="Por defecto su número de documento"
+                        value={form.expres_acudiente_password}
+                        onChange={(e) => setForm((f) => ({ ...f, expres_acudiente_password: e.target.value }))}
+                      />
+                      {!form.expres_acudiente_email && (
+                        <p className="text-[11px] font-medium text-amber-600">
+                          ⚠️ Para habilitar el acceso a la plataforma, ingresa el correo del acudiente.
+                        </p>
+                      )}
+                    </div>
+                  )}
+                </div>
               </div>
-              <label className="flex items-center gap-2 pt-1 text-xs text-body">
-                <input
-                  type="checkbox"
-                  checked={form.expres_acudiente_es_principal}
-                  onChange={(e) => setForm((f) => ({ ...f, expres_acudiente_es_principal: e.target.checked }))}
-                  className="h-4 w-4 rounded border-border text-primary focus:ring-primary"
-                />
-                Acudiente principal (responsable legal de la matrícula)
-              </label>
             </div>
           </div>
         )}

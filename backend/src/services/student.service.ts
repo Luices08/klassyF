@@ -377,6 +377,7 @@ export interface CrearEstudianteCompletoInput {
   acudiente_parentesco?: Parentesco;
   acudiente_direccion?: string;
   acudiente_password?: string;
+  acudiente_habilitar_portal?: boolean;
   acudiente_es_principal?: boolean;
   acudiente_autorizado_retiro?: boolean;
 }
@@ -486,31 +487,44 @@ export async function crearEstudianteCompleto(
         await guardian.save({ session });
       }
 
-      // Asegurar cuenta User para el acudiente
-      let userAcudiente = await User.findOne({ numero_documento: acudienteDocNum }).session(session);
-      if (!userAcudiente) {
-        const claveAcudiente = (input.acudiente_password && input.acudiente_password.trim() !== '') 
-          ? input.acudiente_password.trim() 
-          : acudienteDocNum;
+      // Asegurar cuenta User para el acudiente SOLO si se solicita habilitar acceso al portal
+      if (input.acudiente_habilitar_portal) {
+        let userAcudiente = await User.findOne({ numero_documento: acudienteDocNum }).session(session);
+        if (!userAcudiente) {
+          if (!guardian.email) {
+            throw new ApiError(400, 'Para habilitar el acceso a la plataforma el acudiente debe tener un correo electrónico registrado.');
+          }
+          if (await User.exists({ email: guardian.email }).session(session)) {
+            throw new ApiError(409, 'Ya existe un usuario con ese correo electrónico; usa otro correo para el acudiente.');
+          }
 
-        const emailAcudiente = guardian.email || `${acudienteDocNum}@acudiente.klassy.local`;
-        userAcudiente = new User({
-          nombre: guardian.nombre,
-          apellido: guardian.apellido,
-          tipo_documento: guardian.tipo_documento,
-          numero_documento: guardian.numero_documento,
-          email: emailAcudiente,
-          telefono: guardian.telefono_principal,
-          rol: ROLES.ACUDIENTE,
-          debe_cambiar_password: true,
-        });
-        userAcudiente.password = claveAcudiente;
-        await userAcudiente.save({ session });
-      }
+          const claveAcudiente = (input.acudiente_password && input.acudiente_password.trim() !== '') 
+            ? input.acudiente_password.trim() 
+            : acudienteDocNum;
 
-      if (!guardian.user_id) {
-        guardian.user_id = userAcudiente._id;
-        await guardian.save({ session });
+          userAcudiente = new User({
+            nombre: guardian.nombre,
+            apellido: guardian.apellido,
+            tipo_documento: guardian.tipo_documento,
+            numero_documento: guardian.numero_documento,
+            email: guardian.email,
+            telefono: guardian.telefono_principal,
+            rol: ROLES.ACUDIENTE,
+            debe_cambiar_password: true,
+          });
+          userAcudiente.password = claveAcudiente;
+          await userAcudiente.save({ session });
+        } else if (userAcudiente.rol !== ROLES.ACUDIENTE) {
+          throw new ApiError(
+            409,
+            `El documento ${guardian.numero_documento} ya pertenece a un usuario con rol ${userAcudiente.rol}; no se puede habilitar como acudiente.`
+          );
+        }
+
+        if (!guardian.user_id) {
+          guardian.user_id = userAcudiente._id;
+          await guardian.save({ session });
+        }
       }
 
       // Vincular estudiante con acudiente (relación N:M)

@@ -54,6 +54,7 @@ export const actualizarVinculo: ValidationSchema = {
     parentesco: Joi.string().valid(...PARENTESCOS),
     es_principal: Joi.boolean(),
     autorizado_retiro: Joi.boolean(),
+    habilitar_portal: Joi.boolean(),
   }).min(1),
 };
 

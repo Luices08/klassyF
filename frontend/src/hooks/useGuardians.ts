@@ -61,6 +61,7 @@ export function useActualizarVinculo() {
       parentesco?: Parentesco;
       es_principal?: boolean;
       autorizado_retiro?: boolean;
+      habilitar_portal?: boolean;
     }) => api.patch<StudentGuardianRelation>(`/users/${studentId}/guardians/${relationId}`, patch),
     onSuccess: (_data, variables) => {
       void queryClient.invalidateQueries({ queryKey: ['students', variables.studentId, 'guardians'] });

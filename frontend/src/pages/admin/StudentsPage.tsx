@@ -72,6 +72,7 @@ const FORM_VACIO = {
   acudiente_email: '',
   acudiente_parentesco: '' as Parentesco | '',
   acudiente_password: '',
+  acudiente_habilitar_portal: false,
   acudiente_es_principal: true,
   acudiente_autorizado_retiro: true,
   autorizacion_datos_sensibles: true,
@@ -173,7 +174,8 @@ export function StudentsPage() {
         acudiente_telefono_principal: form.acudiente_telefono_principal.trim() || undefined,
         acudiente_email: form.acudiente_email.trim() || undefined,
         acudiente_parentesco: form.acudiente_parentesco || undefined,
-        acudiente_password: form.acudiente_password.trim() || undefined,
+        acudiente_password: form.acudiente_habilitar_portal ? form.acudiente_password.trim() || undefined : undefined,
+        acudiente_habilitar_portal: form.acudiente_habilitar_portal,
         acudiente_es_principal: form.acudiente_es_principal,
         acudiente_autorizado_retiro: form.acudiente_autorizado_retiro,
       });
@@ -592,13 +594,6 @@ export function StudentsPage() {
                 </option>
               ))}
             </Select>
-            <Input
-              label="Contraseña inicial del acudiente (opcional)"
-              type="password"
-              hint="Por defecto será su número de documento. Si ingresa una personalizada, mínimo 8 caracteres."
-              value={form.acudiente_password}
-              onChange={(e) => setForm((f) => ({ ...f, acudiente_password: e.target.value }))}
-            />
             <div className="space-y-2 pt-2">
               <label className="flex items-center gap-2 text-sm text-body">
                 <input
@@ -618,6 +613,37 @@ export function StudentsPage() {
                 />
                 Autorizado para retirar al estudiante
               </label>
+
+              <div className="mt-3 rounded-lg border border-border bg-soft p-3 space-y-2">
+                <label className="flex items-center gap-2 text-sm font-medium text-ink">
+                  <input
+                    type="checkbox"
+                    checked={form.acudiente_habilitar_portal}
+                    onChange={(e) => setForm((f) => ({ ...f, acudiente_habilitar_portal: e.target.checked }))}
+                    className="h-4 w-4 rounded border-border text-primary focus:ring-primary"
+                  />
+                  Habilitar acceso a la plataforma (Portal de Familias)
+                </label>
+                <p className="text-xs text-muted">
+                  Crea un usuario para que este acudiente pueda iniciar sesión y consultar boletines, observador y citaciones. Si no se marca (ej. abuelo o contacto de emergencia), solo se guardará como contacto sin acceso.
+                </p>
+                {form.acudiente_habilitar_portal && (
+                  <div className="pt-2 space-y-2">
+                    <Input
+                      label="Contraseña inicial del acudiente (opcional)"
+                      type="password"
+                      hint="Por defecto será su número de documento. Si ingresa una personalizada, mínimo 8 caracteres."
+                      value={form.acudiente_password}
+                      onChange={(e) => setForm((f) => ({ ...f, acudiente_password: e.target.value }))}
+                    />
+                    {!form.acudiente_email && (
+                      <p className="text-xs font-medium text-amber-600">
+                        ⚠️ Para habilitar el acceso a la plataforma, debes ingresar el correo del acudiente.
+                      </p>
+                    )}
+                  </div>
+                )}
+              </div>
             </div>
           </>
         )}

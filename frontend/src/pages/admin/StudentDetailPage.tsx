@@ -14,7 +14,7 @@ import { PageHeader } from '../../components/ui/PageHeader';
 import { Spinner } from '../../components/ui/Spinner';
 import { TabPanel, Tabs } from '../../components/ui/Tabs';
 import { EmptyRow, Table, TableBody, TableHead, Td, Th } from '../../components/ui/Table';
-import { PlusIcon, RefreshIcon, StarIcon, TrashIcon } from '../../components/ui/icons';
+import { KeyIcon, PlusIcon, RefreshIcon, StarIcon, TrashIcon } from '../../components/ui/icons';
 import { useAuth } from '../../context/AuthContext';
 import {
   useActualizarVinculo,
@@ -479,6 +479,7 @@ function NucleoFamiliarTab({
           <Th>Teléfono</Th>
           <Th>Principal</Th>
           <Th>Retiro autorizado</Th>
+          <Th>Acceso al portal</Th>
           <Th />
         </TableHead>
         <TableBody>
@@ -498,7 +499,43 @@ function NucleoFamiliarTab({
               </Td>
               <Td>{rel.autorizado_retiro ? 'Sí' : 'No'}</Td>
               <Td>
+                {rel.guardian_id.user_id ? (
+                  <Chip tone="green">Activo</Chip>
+                ) : (
+                  <Chip tone="neutral">Sin acceso</Chip>
+                )}
+              </Td>
+              <Td>
                 <div className="flex justify-end gap-2">
+                  {!rel.guardian_id.user_id && (
+                    <IconButton
+                      tone="neutral"
+                      label={
+                        rel.guardian_id.email
+                          ? 'Habilitar acceso al portal institucional'
+                          : 'Para habilitar el portal el acudiente debe tener un correo registrado'
+                      }
+                      icon={<KeyIcon />}
+                      disabled={!rel.guardian_id.email || actualizarVinculo.isPending}
+                      onClick={() => {
+                        if (!rel.guardian_id.email) {
+                          alert('Para habilitar el acceso al portal, el acudiente debe tener un correo registrado.');
+                          return;
+                        }
+                        if (
+                          window.confirm(
+                            `¿Habilitar acceso a la plataforma para ${rel.guardian_id.nombre} ${rel.guardian_id.apellido}? Se creará su cuenta de usuario con su documento como contraseña temporal.`
+                          )
+                        ) {
+                          actualizarVinculo.mutate({
+                            studentId,
+                            relationId: rel._id,
+                            habilitar_portal: true,
+                          });
+                        }
+                      }}
+                    />
+                  )}
                   <IconButton
                     tone={rel.es_principal ? 'edit' : 'success'}
                     label={rel.es_principal ? 'Quitar condición de principal' : 'Marcar como principal'}
@@ -515,7 +552,7 @@ function NucleoFamiliarTab({
               </Td>
             </tr>
           ))}
-          {acudientes.length === 0 && <EmptyRow colSpan={6}>Este estudiante aún no tiene acudientes registrados.</EmptyRow>}
+          {acudientes.length === 0 && <EmptyRow colSpan={7}>Este estudiante aún no tiene acudientes registrados.</EmptyRow>}
         </TableBody>
       </Table>
 

@@ -10,6 +10,8 @@ interface DrawerProps {
   onSubmit?: (e: FormEvent) => void;
   submitLabel?: string;
   submitVariant?: ComponentProps<typeof Button>['variant'];
+  onBack?: () => void;
+  backLabel?: string;
   isSubmitting?: boolean;
   submitDisabled?: boolean;
   /** 'lg' para formularios con varias columnas (p. ej. periodos del año lectivo); 'xl' para tablas anchas (p. ej. la planilla de notas); por defecto 'md'. */
@@ -29,6 +31,8 @@ export function Drawer({
   onSubmit,
   submitLabel = 'Guardar',
   submitVariant = 'primary',
+  onBack,
+  backLabel = '← Atrás',
   isSubmitting,
   submitDisabled,
   size = 'md',
@@ -67,13 +71,22 @@ export function Drawer({
         {onSubmit ? (
           <form onSubmit={onSubmit} className="flex flex-1 flex-col overflow-hidden">
             {body}
-            <div className="flex items-center justify-end gap-3 border-t border-border px-6 py-4">
-              <Button type="button" variant="secondary" onClick={onClose}>
-                Cancelar
-              </Button>
-              <Button type="submit" variant={submitVariant} isLoading={isSubmitting} disabled={submitDisabled}>
-                {submitLabel}
-              </Button>
+            <div className="flex items-center justify-between gap-3 border-t border-border px-6 py-4">
+              <div>
+                {onBack && (
+                  <Button type="button" variant="secondary" onClick={onBack}>
+                    {backLabel}
+                  </Button>
+                )}
+              </div>
+              <div className="flex items-center gap-3">
+                <Button type="button" variant="secondary" onClick={onClose}>
+                  Cancelar
+                </Button>
+                <Button type="submit" variant={submitVariant} isLoading={isSubmitting} disabled={submitDisabled}>
+                  {submitLabel}
+                </Button>
+              </div>
             </div>
           </form>
         ) : (

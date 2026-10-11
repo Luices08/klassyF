@@ -48,6 +48,12 @@ interface CreateUserBody {
 }
 
 export const createUser = catchAsync<unknown, unknown, CreateUserBody>(async (req, res) => {
+  if (req.body.rol === ROLES.ESTUDIANTE || req.body.rol === ROLES.ACUDIENTE) {
+    throw new ApiError(
+      400,
+      'Los estudiantes y acudientes no se crean desde esta vista. Se gestionan desde el módulo escolar (Estudiantes y Matrículas).'
+    );
+  }
   if (!req.user || !puedeGestionarRol(req.user.rol, req.body.rol)) {
     throw new ApiError(403, `Tu rol (${req.user?.rol}) no tiene permisos para crear usuarios con rol ${req.body.rol}.`);
   }
@@ -438,6 +444,12 @@ export const bulkImportUsers = catchAsync(async (req, res) => {
       }
       if (!(ROLES as Record<string, string>)[rol]) {
         throw new ApiError(400, `Rol "${registro.rol}" no es valido. Usa: ${ROLES_LIST.join(', ')}.`);
+      }
+      if (rol === ROLES.ESTUDIANTE || rol === ROLES.ACUDIENTE) {
+        throw new ApiError(
+          400,
+          `El rol ${rol} no se importa desde Usuarios. Usa la carga masiva en el módulo de Estudiantes.`
+        );
       }
       if (!req.user || !puedeGestionarRol(req.user.rol, rol as Rol)) {
         throw new ApiError(403, `Tu rol (${req.user?.rol}) no tiene permisos para importar usuarios con rol ${rol}.`);

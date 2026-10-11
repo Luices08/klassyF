@@ -87,9 +87,14 @@ async function obtenerEstudiante(studentId: string) {
 }
 
 /** Si `es_principal` es true, quita el flag a cualquier otro acudiente del mismo estudiante. */
-async function asegurarUnicoPrincipal(studentId: string, exceptoRelacionId?: Types.ObjectId): Promise<void> {
+async function asegurarUnicoPrincipal(studentId: string | Types.ObjectId, exceptoRelacionId?: Types.ObjectId | string): Promise<void> {
+  const sId = typeof studentId === 'string' ? new Types.ObjectId(studentId) : studentId;
+  const excId = exceptoRelacionId
+    ? (typeof exceptoRelacionId === 'string' ? new Types.ObjectId(exceptoRelacionId) : exceptoRelacionId)
+    : undefined;
+
   await StudentGuardian.updateMany(
-    { student_id: studentId, _id: { $ne: exceptoRelacionId } },
+    { student_id: sId, ...(excId ? { _id: { $ne: excId } } : {}) },
     { $set: { es_principal: false } }
   );
 }
@@ -174,7 +179,11 @@ export async function vincularAcudiente(
     }
 
     if (input.es_principal) {
-      await StudentGuardian.updateMany({ student_id: studentId }, { $set: { es_principal: false } }, { session });
+      await StudentGuardian.updateMany(
+        { student_id: new Types.ObjectId(studentId) },
+        { $set: { es_principal: false } },
+        { session }
+      );
     }
 
     const [relacion] = await StudentGuardian.create(

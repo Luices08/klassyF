@@ -10,7 +10,7 @@ export interface IUser {
   apellido: string;
   tipo_documento: TipoDocumento;
   numero_documento: string;
-  email: string;
+  email?: string | null;
   telefono: string | null;
   foto_url: string | null;
   password_hash: string;
@@ -48,8 +48,9 @@ const userSchema = new Schema<IUser, UserModel, IUserMethods>(
     numero_documento: { type: String, required: true, unique: true, trim: true },
     email: {
       type: String,
-      required: true,
+      required: false,
       unique: true,
+      sparse: true,
       trim: true,
       lowercase: true,
       match: [/^[^\s@]+@[^\s@]+\.[^\s@]+$/, 'El email no tiene un formato valido.'],
@@ -94,6 +95,9 @@ userSchema
 // password_hash corre ANTES de los hooks de save, asi que el hash debe
 // existir para cuando Mongoose valide el documento.
 userSchema.pre('validate', async function hashPassword(this: UserDocument, next) {
+  if (!this.email || this.email.trim() === '') {
+    this.email = undefined;
+  }
   if (!this._plainPassword) return next();
   this.password_hash = await bcrypt.hash(this._plainPassword, SALT_ROUNDS);
   next();

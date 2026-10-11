@@ -31,6 +31,16 @@ export class ApiError extends Error {
 export const ROLES = ['ADMIN', 'COORDINADOR', 'COORDINADOR_CONVIVENCIA', 'ORIENTADOR', 'DOCENTE', 'SECRETARIA', 'ESTUDIANTE', 'ACUDIENTE'] as const;
 export type Rol = (typeof ROLES)[number];
 
+/** Roles de personal institucional (M02): solo estos se gestionan desde la vista de usuarios. */
+export const ROLES_STAFF: readonly Rol[] = [
+  'ADMIN',
+  'COORDINADOR',
+  'COORDINADOR_CONVIVENCIA',
+  'ORIENTADOR',
+  'SECRETARIA',
+  'DOCENTE',
+];
+
 /**
  * Jerarquía institucional de roles (M02).
  * Nivel numérico mayor = mayor rango jerárquico.

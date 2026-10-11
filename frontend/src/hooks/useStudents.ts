@@ -6,10 +6,14 @@ import type {
   Genero,
   GrupoEtnico,
   GrupoSanguineo,
+  Guardian,
+  Parentesco,
   RegimenSalud,
   StudentDirectoryItem,
   StudentFicha360,
   StudentProfile,
+  TipoDocumento,
+  User,
 } from '../types/domain';
 
 export interface StudentsFilter {
@@ -112,6 +116,71 @@ export function useActualizarEstadoPerfil() {
     onSuccess: (_data, variables) => {
       void queryClient.invalidateQueries({ queryKey: ['students'] });
       void queryClient.invalidateQueries({ queryKey: ['students', 'ficha360', variables.userId] });
+    },
+  });
+}
+
+export interface CrearEstudianteCompletoInput {
+  tipo_documento: TipoDocumento;
+  numero_documento: string;
+  nombre: string;
+  apellido: string;
+  email?: string;
+  password?: string;
+  telefono?: string;
+  lugar_expedicion?: string;
+  fecha_nacimiento: string;
+  genero?: Genero;
+  direccion_residencia?: string;
+  barrio_vereda?: string;
+  municipio?: string;
+  estrato?: number;
+  eps?: string;
+  regimen_salud?: RegimenSalud;
+  rh?: GrupoSanguineo;
+  alergias_condiciones?: string;
+  grupo_etnico?: GrupoEtnico;
+  victima_conflicto?: boolean;
+  tiene_discapacidad?: boolean;
+  tiene_talento_excepcional?: boolean;
+  descripcion_inclusion?: string;
+  institucion_procedencia?: string;
+  autorizacion_datos_sensibles?: Pick<AutorizacionDatosSensibles, 'otorgada' | 'otorgado_por_nombre'>;
+
+  // Acudiente (opcional)
+  acudiente_tipo_documento?: TipoDocumento;
+  acudiente_numero_documento?: string;
+  acudiente_nombre?: string;
+  acudiente_apellido?: string;
+  acudiente_telefono_principal?: string;
+  acudiente_telefono_secundario?: string;
+  acudiente_email?: string;
+  acudiente_parentesco?: Parentesco;
+  acudiente_direccion?: string;
+  acudiente_password?: string;
+  acudiente_es_principal?: boolean;
+  acudiente_autorizado_retiro?: boolean;
+}
+
+export interface CrearEstudianteCompletoResult {
+  estudiante: User;
+  perfil: StudentProfile;
+  acudiente: Guardian | null;
+  vinculo: unknown | null;
+}
+
+export function useCrearEstudianteCompleto() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: CrearEstudianteCompletoInput) =>
+      api.post<CrearEstudianteCompletoResult>(
+        '/students',
+        input
+      ),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['students'] });
+      void queryClient.invalidateQueries({ queryKey: ['users'] });
+      void queryClient.invalidateQueries({ queryKey: ['guardians'] });
     },
   });
 }

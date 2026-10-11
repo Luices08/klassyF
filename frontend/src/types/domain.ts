@@ -557,10 +557,18 @@ export interface PersonalizacionGrupo {
   evaluaciones_area_personalizadas: EvaluacionArea[];
 }
 
+export interface PersonalizacionJornada {
+  jornada_id: string;
+  intensidades_personalizadas: AsignaturaPersonalizadaGrupo[];
+  asignaturas_agregadas: AsignaturaPersonalizadaGrupo[];
+  evaluaciones_area_personalizadas?: EvaluacionArea[];
+}
+
 export interface GradoPlan {
   grade_id: string;
   asignaturas: AsignaturaGrado[];
   evaluaciones_area: EvaluacionArea[];
+  jornadas_personalizadas?: PersonalizacionJornada[];
   personalizaciones_grupo: PersonalizacionGrupo[];
 }
 

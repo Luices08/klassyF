@@ -81,6 +81,37 @@ export const configurarDistribucionGrupo: ValidationSchema = {
   }),
 };
 
+export const configurarDistribucionJornada: ValidationSchema = {
+  body: Joi.object({
+    institucion_id: objectId.required(),
+    academic_year_id: objectId.required(),
+    grade_id: objectId.required(),
+    jornada_id: objectId.required(),
+    intensidades_personalizadas: Joi.array().items(asignaturaPersonalizadaSchema).default([]),
+    asignaturas_agregadas: Joi.array().items(asignaturaPersonalizadaSchema).default([]),
+    motivo,
+  }),
+};
+
+export const configurarEvaluacionAreaGrupo: ValidationSchema = {
+  body: Joi.object({
+    institucion_id: objectId.required(),
+    academic_year_id: objectId.required(),
+    grade_id: objectId.required(),
+    group_id: objectId.required(),
+    area_id: objectId.required(),
+    metodo_calculo: Joi.string()
+      .valid(...METODOS_CALCULO_EVALUACION)
+      .required(),
+    asignaturas: Joi.when('metodo_calculo', {
+      is: 'PONDERADO',
+      then: Joi.array().items(ponderacionAsignaturaSchema).min(1).required(),
+      otherwise: Joi.array().items(ponderacionAsignaturaSchema).default([]),
+    }),
+    motivo,
+  }),
+};
+
 export const crearPlanDesdeAnioAnterior: ValidationSchema = {
   body: Joi.object({
     institucion_id: objectId.required(),

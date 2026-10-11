@@ -105,6 +105,14 @@ export function useJornadas(sedeId: string | undefined) {
   });
 }
 
+export function useTodasLasJornadas() {
+  return useQuery({
+    queryKey: ['jornadas', 'todas'],
+    queryFn: () => api.get<JornadaOperativa[]>('/shifts'),
+    staleTime: 5 * 60_000,
+  });
+}
+
 export interface CrearJornadaInput {
   sede_id: string;
   nombre: Jornada;

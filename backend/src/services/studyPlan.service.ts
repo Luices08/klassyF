@@ -3,12 +3,14 @@ import AcademicYear, { AcademicYearDocument } from '../models/academicYear.model
 import Area from '../models/area.model';
 import Grade, { GradeDocument } from '../models/grade.model';
 import Group from '../models/group.model';
+import JornadaOperativa from '../models/jornadaOperativa.model';
 import StudyPlan, {
   IAsignaturaGrado,
   IAsignaturaPersonalizadaGrupo,
   IEvaluacionArea,
   IGradoPlan,
   IPersonalizacionGrupo,
+  IPersonalizacionJornada,
   IPonderacionAsignatura,
   StudyPlanDocument,
 } from '../models/studyPlan.model';
@@ -17,7 +19,11 @@ import { MetodoCalculoEvaluacion, NivelEducativo } from '../constants/enums';
 import ApiError from '../utils/ApiError';
 import { registrarEvento } from './audit.service';
 import { getLimitesHorasPlan } from './institution.service';
-import { horasSemanalesDelGrupo } from '../utils/horasPlanEstudios';
+import {
+  capacidadPeriodosSemanaJornada,
+  horasSemanalesDeJornada,
+  horasSemanalesDelGrupo,
+} from '../utils/horasPlanEstudios';
 import {
   AlcancePlan,
   areasDeAsignaturas,
@@ -174,14 +180,44 @@ async function exigirTopeDeHoras(grado: IGradoPlan, grade: { nombre: string; niv
     );
   }
 
+  // Verificar extensiones de jornada si las hay
+  for (const personalizacionJornada of grado.jornadas_personalizadas ?? []) {
+    const totalJornada = horasSemanalesDeJornada(grado, personalizacionJornada);
+    const jornada = await JornadaOperativa.findById(personalizacionJornada.jornada_id).select('nombre dias_habiles franjas');
+    const capacidad = capacidadPeriodosSemanaJornada(jornada);
+    if (capacidad > 0 && totalJornada > capacidad) {
+      throw new ApiError(
+        400,
+        `La jornada "${jornada?.nombre ?? personalizacionJornada.jornada_id}" sumaría ${totalJornada} h semanales y solo dispone de ${capacidad} periodos de clase semanales.`
+      );
+    }
+  }
+
   for (const personalizacion of grado.personalizaciones_grupo) {
-    const totalGrupo = horasSemanalesDelGrupo(grado, personalizacion);
-    if (totalGrupo > tope) {
-      const grupo = await Group.findById(personalizacion.group_id).select('nomenclatura');
+    const grupo = await Group.findById(personalizacion.group_id).select('nomenclatura jornada_id');
+    const jornada = grupo?.jornada_id
+      ? await JornadaOperativa.findById(grupo.jornada_id).select('nombre dias_habiles franjas')
+      : null;
+    const personalizacionJornada = grado.jornadas_personalizadas?.find(
+      (j) => String(j.jornada_id) === String(grupo?.jornada_id)
+    );
+    const totalGrupo = horasSemanalesDelGrupo(grado, personalizacion, personalizacionJornada);
+
+    const capacidad = capacidadPeriodosSemanaJornada(jornada);
+    if (capacidad > 0 && totalGrupo > capacidad) {
       throw new ApiError(
         400,
         `Con este cambio el grupo ${grupo?.nomenclatura ?? personalizacion.group_id} del grado "${grade.nombre}" ` +
-          `sumaría ${totalGrupo} h semanales y el tope del nivel ${grade.nivel} es ${tope} h. Ajusta su distribución primero.`
+          `sumaría ${totalGrupo} h semanales y su jornada operativa "${jornada?.nombre}" solo tiene ${capacidad} periodos semanales de clase. Ajusta su distribución primero.`
+      );
+    }
+
+    const topeNormativoEfectivo = jornada?.nombre === 'UNICA' ? Math.max(tope, 35) : tope;
+    if (totalGrupo > topeNormativoEfectivo) {
+      throw new ApiError(
+        400,
+        `Con este cambio el grupo ${grupo?.nomenclatura ?? personalizacion.group_id} del grado "${grade.nombre}" ` +
+          `sumaría ${totalGrupo} h semanales y el tope del nivel ${grade.nivel} es ${topeNormativoEfectivo} h. Ajusta su distribución primero.`
       );
     }
   }
@@ -190,7 +226,13 @@ async function exigirTopeDeHoras(grado: IGradoPlan, grade: { nombre: string; niv
 function obtenerOCrearGrado(plan: StudyPlanDocument, grade_id: string): IGradoPlan {
   let grado = plan.grades.find((g) => String(g.grade_id) === grade_id);
   if (!grado) {
-    grado = { grade_id: oid(grade_id), asignaturas: [], evaluaciones_area: [], personalizaciones_grupo: [] };
+    grado = {
+      grade_id: oid(grade_id),
+      asignaturas: [],
+      evaluaciones_area: [],
+      jornadas_personalizadas: [],
+      personalizaciones_grupo: [],
+    };
     plan.grades.push(grado);
   }
   return grado;
@@ -580,12 +622,26 @@ export async function configurarDistribucionGrupo(
     evaluaciones_area_personalizadas: personalizacionExistente?.evaluaciones_area_personalizadas ?? [],
   };
 
+  const jornada = await JornadaOperativa.findById(group.jornada_id).select('nombre dias_habiles franjas');
+  const capacidadJornada = capacidadPeriodosSemanaJornada(jornada);
   const topeDelNivel = (await getLimitesHorasPlan())[grade.nivel];
-  const totalGrupo = horasSemanalesDelGrupo(grado, nuevaPersonalizacion);
-  if (totalGrupo > topeDelNivel) {
+  const personalizacionJornada = grado.jornadas_personalizadas?.find(
+    (j) => String(j.jornada_id) === String(group.jornada_id)
+  );
+  const totalGrupo = horasSemanalesDelGrupo(grado, nuevaPersonalizacion, personalizacionJornada);
+
+  if (capacidadJornada > 0 && totalGrupo > capacidadJornada) {
     throw new ApiError(
       400,
-      `El grupo ${group.nomenclatura} sumaría ${totalGrupo} h semanales y el tope configurado para el nivel ${grade.nivel} es ${topeDelNivel} h.`
+      `El grupo ${group.nomenclatura} sumaría ${totalGrupo} h semanales y su jornada operativa "${jornada?.nombre}" solo dispone de ${capacidadJornada} periodos semanales de clase configurados. Reduce horas en otra asignatura para equilibrar el horario.`
+    );
+  }
+
+  const topeNormativoEfectivo = jornada?.nombre === 'UNICA' ? Math.max(topeDelNivel, 35) : topeDelNivel;
+  if (totalGrupo > topeNormativoEfectivo) {
+    throw new ApiError(
+      400,
+      `El grupo ${group.nomenclatura} sumaría ${totalGrupo} h semanales y el tope normativo configurado para el nivel ${grade.nivel} es ${topeNormativoEfectivo} h.`
     );
   }
 
@@ -606,6 +662,179 @@ export async function configurarDistribucionGrupo(
       motivo,
       sincronizadas
     ),
+    ip,
+  });
+  return plan;
+}
+
+// ---------------------------------------------------------------------------
+// 2.2b Distribucion por Jornadas: extension de una jornada completa sobre el grado.
+// ---------------------------------------------------------------------------
+
+export interface ConfigurarDistribucionJornadaInput {
+  institucion_id: string;
+  academic_year_id: string;
+  grade_id: string;
+  jornada_id: string;
+  intensidades_personalizadas: AsignaturaPersonalizadaInput[];
+  asignaturas_agregadas: AsignaturaPersonalizadaInput[];
+  motivo?: string;
+}
+
+export async function configurarDistribucionJornada(
+  input: ConfigurarDistribucionJornadaInput,
+  { usuarioId, ip }: ContextoActor
+): Promise<StudyPlanDocument> {
+  const jornada = await JornadaOperativa.findById(input.jornada_id);
+  if (!jornada) throw new ApiError(404, 'Jornada operativa no encontrada.');
+
+  const grade = await Grade.findById(input.grade_id);
+  if (!grade) throw new ApiError(404, 'Grado no encontrado.');
+  if (grade.estado !== 'activo') throw new ApiError(400, 'El grado está inactivo.');
+
+  const { plan, anio } = await obtenerOCrearStudyPlan(input.institucion_id, input.academic_year_id);
+  const motivo = exigirMotivoSiAnioEnCurso(anio, input.motivo);
+  const grado = plan.grades.find((g) => String(g.grade_id) === input.grade_id);
+  if (!grado) {
+    throw new ApiError(
+      400,
+      'Este grado no tiene Configuración General definida todavía. Configure primero las asignaturas del grado.'
+    );
+  }
+  const subjectIdsDelGrado = new Set(grado.asignaturas.map((a) => String(a.subject_id)));
+
+  const idsPersonalizados = input.intensidades_personalizadas.map((a) => a.subject_id);
+  if (new Set(idsPersonalizados).size !== idsPersonalizados.length) {
+    throw new ApiError(400, 'No se puede repetir una asignatura en las intensidades personalizadas.');
+  }
+  const faltaEnGrado = idsPersonalizados.find((id) => !subjectIdsDelGrado.has(id));
+  if (faltaEnGrado) {
+    throw new ApiError(
+      400,
+      'Solo se puede personalizar la intensidad horaria de una asignatura que ya esté en la Configuración General del grado.'
+    );
+  }
+
+  const idsAgregados = input.asignaturas_agregadas.map((a) => a.subject_id);
+  if (new Set(idsAgregados).size !== idsAgregados.length) {
+    throw new ApiError(400, 'No se puede agregar dos veces la misma asignatura a una jornada.');
+  }
+  const yaEstaEnElGrado = idsAgregados.find((id) => subjectIdsDelGrado.has(id));
+  if (yaEstaEnElGrado) {
+    throw new ApiError(
+      400,
+      'Una asignatura agregada a una jornada no puede ser una que el grado ya tenga en su Configuración General.'
+    );
+  }
+  await validarSubjectsDelNivel(idsAgregados, grade.nivel);
+
+  const mapear = (items: AsignaturaPersonalizadaInput[]): IAsignaturaPersonalizadaGrupo[] =>
+    items.map((a) => ({
+      subject_id: oid(a.subject_id),
+      intensidad_horaria_semanal: a.intensidad_horaria_semanal,
+      observacion: a.observacion,
+    }));
+
+  if (!grado.jornadas_personalizadas) grado.jornadas_personalizadas = [];
+  const idx = grado.jornadas_personalizadas.findIndex((j) => String(j.jornada_id) === input.jornada_id);
+  const personalizacionExistente = idx >= 0 ? grado.jornadas_personalizadas[idx] : null;
+
+  const nuevaPersonalizacion: IPersonalizacionJornada = {
+    jornada_id: oid(input.jornada_id),
+    intensidades_personalizadas: mapear(input.intensidades_personalizadas),
+    asignaturas_agregadas: mapear(input.asignaturas_agregadas),
+    evaluaciones_area_personalizadas: personalizacionExistente?.evaluaciones_area_personalizadas ?? [],
+  };
+
+  const capacidadJornada = capacidadPeriodosSemanaJornada(jornada);
+  const totalJornada = horasSemanalesDeJornada(grado, nuevaPersonalizacion);
+  if (capacidadJornada > 0 && totalJornada > capacidadJornada) {
+    throw new ApiError(
+      400,
+      `La jornada "${jornada.nombre}" sumaría ${totalJornada} h semanales y solo dispone de ${capacidadJornada} periodos semanales de clase configurados.`
+    );
+  }
+
+  if (idx >= 0) grado.jornadas_personalizadas[idx] = nuevaPersonalizacion;
+  else grado.jornadas_personalizadas.push(nuevaPersonalizacion);
+
+  await plan.save();
+  const sincronizadas = await sincronizarHorasDeAsignaciones(plan, [input.grade_id]);
+
+  await registrarEvento({
+    usuario_id: usuarioId,
+    accion: 'PLAN_DISTRIBUCION_JORNADA_ACTUALIZADA',
+    entidad: 'StudyPlan',
+    entidad_id: plan._id,
+    detalle: detalleDelCambio(
+      `Jornada ${jornada.nombre}: ${nuevaPersonalizacion.intensidades_personalizadas.length} intensidad(es) personalizada(s), ${nuevaPersonalizacion.asignaturas_agregadas.length} asignatura(s) agregada(s).`,
+      motivo,
+      sincronizadas
+    ),
+    ip,
+  });
+  return plan;
+}
+
+// ---------------------------------------------------------------------------
+// 2.3b Configuracion de Evaluacion por Grupo o Jornada.
+// ---------------------------------------------------------------------------
+
+export interface ConfigurarEvaluacionAreaGrupoInput {
+  institucion_id: string;
+  academic_year_id: string;
+  grade_id: string;
+  group_id: string;
+  area_id: string;
+  metodo_calculo: MetodoCalculoEvaluacion;
+  asignaturas: Array<{ subject_id: string; porcentaje: number }>;
+  motivo?: string;
+}
+
+export async function configurarEvaluacionAreaGrupo(
+  input: ConfigurarEvaluacionAreaGrupoInput,
+  { usuarioId, ip }: ContextoActor
+): Promise<StudyPlanDocument> {
+  const group = await Group.findById(input.group_id);
+  if (!group) throw new ApiError(404, 'Grupo no encontrado.');
+  const grade = await Grade.findById(input.grade_id);
+  if (!grade) throw new ApiError(404, 'Grado no encontrado.');
+  const area = await Area.findById(input.area_id);
+  if (!area) throw new ApiError(404, 'Área no encontrada.');
+
+  const { plan, anio } = await obtenerOCrearStudyPlan(input.institucion_id, input.academic_year_id);
+  const motivo = exigirMotivoSiAnioEnCurso(anio, input.motivo);
+  const grado = plan.grades.find((g) => String(g.grade_id) === input.grade_id);
+  if (!grado) throw new ApiError(400, 'Grado no configurado en el plan.');
+
+  let personalizacion = grado.personalizaciones_grupo.find((p) => String(p.group_id) === input.group_id);
+  if (!personalizacion) {
+    personalizacion = {
+      group_id: oid(input.group_id),
+      intensidades_personalizadas: [],
+      asignaturas_agregadas: [],
+      evaluaciones_area_personalizadas: [],
+    };
+    grado.personalizaciones_grupo.push(personalizacion);
+  }
+
+  const nuevaEvaluacion: IEvaluacionArea = {
+    area_id: oid(input.area_id),
+    metodo_calculo: input.metodo_calculo,
+    asignaturas: input.asignaturas.map((a) => ({ subject_id: oid(a.subject_id), porcentaje: a.porcentaje })),
+  };
+
+  const idxArea = personalizacion.evaluaciones_area_personalizadas.findIndex((e) => String(e.area_id) === input.area_id);
+  if (idxArea >= 0) personalizacion.evaluaciones_area_personalizadas[idxArea] = nuevaEvaluacion;
+  else personalizacion.evaluaciones_area_personalizadas.push(nuevaEvaluacion);
+
+  await plan.save();
+  await registrarEvento({
+    usuario_id: usuarioId,
+    accion: 'PLAN_EVALUACION_AREA_GRUPO_ACTUALIZADA',
+    entidad: 'StudyPlan',
+    entidad_id: plan._id,
+    detalle: detalleDelCambio(`Grupo ${group.nomenclatura}: Área "${area.nombre}" método ${input.metodo_calculo}.`, motivo, 0),
     ip,
   });
   return plan;

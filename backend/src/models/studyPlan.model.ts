@@ -63,10 +63,19 @@ export interface IPersonalizacionGrupo {
   evaluaciones_area_personalizadas: IEvaluacionArea[];
 }
 
+// --- Distribucion por Jornadas: extensiones/ajustes de una jornada completa sobre el grado ---
+export interface IPersonalizacionJornada {
+  jornada_id: Types.ObjectId;
+  intensidades_personalizadas: IAsignaturaPersonalizadaGrupo[];
+  asignaturas_agregadas: IAsignaturaPersonalizadaGrupo[];
+  evaluaciones_area_personalizadas: IEvaluacionArea[];
+}
+
 export interface IGradoPlan {
   grade_id: Types.ObjectId;
   asignaturas: IAsignaturaGrado[];
   evaluaciones_area: IEvaluacionArea[];
+  jornadas_personalizadas?: IPersonalizacionJornada[];
   personalizaciones_grupo: IPersonalizacionGrupo[];
 }
 
@@ -142,11 +151,22 @@ const personalizacionGrupoSchema = new Schema<IPersonalizacionGrupo>(
   { _id: false }
 );
 
+const personalizacionJornadaSchema = new Schema<IPersonalizacionJornada>(
+  {
+    jornada_id: { type: Schema.Types.ObjectId, ref: 'JornadaOperativa', required: true },
+    intensidades_personalizadas: { type: [asignaturaPersonalizadaGrupoSchema], default: [] },
+    asignaturas_agregadas: { type: [asignaturaPersonalizadaGrupoSchema], default: [] },
+    evaluaciones_area_personalizadas: { type: [evaluacionAreaSchema], default: [] },
+  },
+  { _id: false }
+);
+
 const gradoPlanSchema = new Schema<IGradoPlan>(
   {
     grade_id: { type: Schema.Types.ObjectId, ref: 'Grade', required: true },
     asignaturas: { type: [asignaturaGradoSchema], default: [] },
     evaluaciones_area: { type: [evaluacionAreaSchema], default: [] },
+    jornadas_personalizadas: { type: [personalizacionJornadaSchema], default: [] },
     personalizaciones_grupo: { type: [personalizacionGrupoSchema], default: [] },
   },
   { _id: false }
@@ -232,6 +252,44 @@ gradoPlanSchema.pre('validate', function validarIntegridadGrado(this: IGradoPlan
     const idsEvaluacionPersonalizada = personalizacion.evaluaciones_area_personalizadas.map((e) => e.area_id);
     if (!idsUnicos(idsEvaluacionPersonalizada)) {
       return next(errorDeValidacion('No se puede repetir un area en la evaluacion personalizada de un mismo grupo.'));
+    }
+  }
+
+  const jornadaIds = (this.jornadas_personalizadas ?? []).map((j) => j.jornada_id);
+  if (!idsUnicos(jornadaIds)) {
+    return next(errorDeValidacion('No se puede repetir una jornada en las personalizaciones de jornada de un mismo grado.'));
+  }
+
+  for (const personalizacion of this.jornadas_personalizadas ?? []) {
+    const idsPersonalizados = personalizacion.intensidades_personalizadas.map((i) => i.subject_id);
+    if (!idsUnicos(idsPersonalizados)) {
+      return next(errorDeValidacion('No se puede repetir una asignatura en las intensidades personalizadas de una jornada.'));
+    }
+    const noPerteneceAlGrado = idsPersonalizados.find((id) => !subjectIdsDelGrado.has(String(id)));
+    if (noPerteneceAlGrado) {
+      return next(
+        errorDeValidacion(
+          'Solo se puede personalizar la intensidad horaria de una asignatura que ya este en la Configuracion General del grado.'
+        )
+      );
+    }
+
+    const idsAgregados = personalizacion.asignaturas_agregadas.map((a) => a.subject_id);
+    if (!idsUnicos(idsAgregados)) {
+      return next(errorDeValidacion('No se puede agregar dos veces la misma asignatura especifica a una jornada.'));
+    }
+    const yaEstaEnElGrado = idsAgregados.find((id) => subjectIdsDelGrado.has(String(id)));
+    if (yaEstaEnElGrado) {
+      return next(
+        errorDeValidacion(
+          'Una asignatura especifica agregada a una jornada no puede ser una que el grado ya tenga en su Configuracion General.'
+        )
+      );
+    }
+
+    const idsEvaluacionPersonalizada = personalizacion.evaluaciones_area_personalizadas.map((e) => e.area_id);
+    if (!idsUnicos(idsEvaluacionPersonalizada)) {
+      return next(errorDeValidacion('No se puede repetir un area en la evaluacion personalizada de una misma jornada.'));
     }
   }
 

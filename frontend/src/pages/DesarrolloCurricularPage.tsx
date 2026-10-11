@@ -224,9 +224,13 @@ export function DesarrolloCurricularPage() {
               {clases.map((c) => {
                 const grp = typeof c.group_id === 'object' ? c.group_id : null;
                 const sub = typeof c.subject_id === 'object' ? c.subject_id : null;
+                const sNom = grp && typeof grp.sede_id === 'object' && grp.sede_id ? grp.sede_id.nombre : '';
+                const jNom = grp && typeof grp.jornada_id === 'object' && grp.jornada_id ? grp.jornada_id.nombre : '';
+                const contextText = [sNom, jNom].filter(Boolean).join(' · ');
                 return (
                   <option key={c._id} value={c._id}>
                     {sub ? sub.nombre : 'Clase'} · Grupo {grp ? grp.nomenclatura : '—'}
+                    {contextText ? ` (${contextText})` : ''}
                   </option>
                 );
               })}

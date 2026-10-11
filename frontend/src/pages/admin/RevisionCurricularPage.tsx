@@ -170,6 +170,7 @@ export function RevisionCurricularPage() {
                   const grp = asg && typeof asg.group_id === 'object' ? asg.group_id : null;
                   const sub = asg && typeof asg.subject_id === 'object' ? asg.subject_id : null;
                   const sede = grp && typeof grp.sede_id === 'object' ? grp.sede_id : null;
+                  const jornada = grp && typeof grp.jornada_id === 'object' ? grp.jornada_id : null;
                   const grado = grp && typeof grp.grade_id === 'object' ? grp.grade_id : null;
 
                   return (
@@ -186,6 +187,7 @@ export function RevisionCurricularPage() {
                             <strong>Grupo {grp.nomenclatura}</strong>
                             {grado ? ` · ${grado.nombre}` : ''}
                             {sede ? ` · ${sede.nombre}` : ''}
+                            {jornada ? ` · ${jornada.nombre}` : ''}
                           </span>
                         ) : (
                           '—'

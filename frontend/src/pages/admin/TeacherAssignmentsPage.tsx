@@ -171,6 +171,26 @@ export function TeacherAssignmentsPage() {
     }
 
     if (form.group_id) {
+      const grupoDoc = grupos.find((g) => g._id === form.group_id);
+      const jornadaId =
+        typeof grupoDoc?.jornada_id === 'object' && grupoDoc.jornada_id
+          ? grupoDoc.jornada_id._id
+          : grupoDoc?.jornada_id;
+
+      if (jornadaId && gradoConfig.jornadas_personalizadas) {
+        const personalizacionJornada = gradoConfig.jornadas_personalizadas.find(
+          (j) => String(j.jornada_id) === String(jornadaId)
+        );
+        if (personalizacionJornada) {
+          for (const ov of personalizacionJornada.intensidades_personalizadas) {
+            map.set(String(ov.subject_id), ov.intensidad_horaria_semanal);
+          }
+          for (const ag of personalizacionJornada.asignaturas_agregadas) {
+            map.set(String(ag.subject_id), ag.intensidad_horaria_semanal);
+          }
+        }
+      }
+
       const personalizacion = gradoConfig.personalizaciones_grupo.find(
         (p) => String(p.group_id) === String(form.group_id)
       );
@@ -624,10 +644,26 @@ export function TeacherAssignmentsPage() {
                         </Td>
                         <Td className="text-body">
                           {grp ? (
-                            <span>
-                              <strong>{grp.nomenclatura}</strong>
-                              {grado ? ` (${grado.nombre})` : ''}
-                            </span>
+                            <div className="flex flex-col gap-0.5">
+                              <div className="flex items-center gap-1.5 flex-wrap">
+                                <strong className="text-ink">{grp.nomenclatura}</strong>
+                                {grado ? <span className="text-xs text-muted font-normal">({grado.nombre})</span> : null}
+                              </div>
+                              {(grp.sede_id || grp.jornada_id) && (
+                                <div className="flex items-center gap-1 flex-wrap mt-0.5">
+                                  {grp.sede_id && (
+                                    <Chip tone="neutral">
+                                      {typeof grp.sede_id === 'object' ? grp.sede_id.nombre : 'Sede'}
+                                    </Chip>
+                                  )}
+                                  {grp.jornada_id && (
+                                    <Chip tone="blue">
+                                      {typeof grp.jornada_id === 'object' ? grp.jornada_id.nombre : 'Jornada'}
+                                    </Chip>
+                                  )}
+                                </div>
+                              )}
+                            </div>
                           ) : (
                             <span className="text-muted italic">Institucional</span>
                           )}
@@ -745,11 +781,16 @@ export function TeacherAssignmentsPage() {
                 <option value="">
                   {selectedGradoId ? 'Seleccione el grupo...' : 'Primero seleccione un grado'}
                 </option>
-                {gruposDelGrado.map((g) => (
-                  <option key={g._id} value={g._id}>
-                    Grupo {g.nomenclatura}
-                  </option>
-                ))}
+                {gruposDelGrado.map((g) => {
+                  const sNom = typeof g.sede_id === 'object' && g.sede_id ? g.sede_id.nombre : '';
+                  const jNom = typeof g.jornada_id === 'object' && g.jornada_id ? g.jornada_id.nombre : '';
+                  const contextText = [sNom, jNom].filter(Boolean).join(' — ');
+                  return (
+                    <option key={g._id} value={g._id}>
+                      Grupo {g.nomenclatura}{contextText ? ` — ${contextText}` : ''}
+                    </option>
+                  );
+                })}
               </Select>
 
               {/* Paso 3: Asignaturas registradas en M06 para ese grupo */}
@@ -823,11 +864,16 @@ export function TeacherAssignmentsPage() {
                 <option value="">
                   {selectedGradoId ? 'Seleccione el grupo...' : 'Primero seleccione un grado'}
                 </option>
-                {gruposDelGrado.map((g) => (
-                  <option key={g._id} value={g._id}>
-                    Grupo {g.nomenclatura}
-                  </option>
-                ))}
+                {gruposDelGrado.map((g) => {
+                  const sNom = typeof g.sede_id === 'object' && g.sede_id ? g.sede_id.nombre : '';
+                  const jNom = typeof g.jornada_id === 'object' && g.jornada_id ? g.jornada_id.nombre : '';
+                  const contextText = [sNom, jNom].filter(Boolean).join(' — ');
+                  return (
+                    <option key={g._id} value={g._id}>
+                      Grupo {g.nomenclatura}{contextText ? ` — ${contextText}` : ''}
+                    </option>
+                  );
+                })}
               </Select>
               <Input
                 label="Horas semanales que suma al tope del docente"

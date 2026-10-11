@@ -109,9 +109,16 @@ export async function sincronizarHorasDeAsignaciones(plan: StudyPlanDocument, gr
       group_id: { $in: grupos },
     });
 
+    const gruposDocs = await Group.find({
+      academic_year_id: plan.academic_year_id,
+      _id: { $in: grupos },
+    }).select('_id jornada_id');
+    const jornadaDeGrupo = new Map(gruposDocs.map((g) => [String(g._id), String(g.jornada_id)]));
+
     const operaciones = [];
     for (const a of asignaciones) {
-      const horas = horasDeAsignaturaEnGrupo(grado, String(a.group_id), String(a.subject_id));
+      const jId = jornadaDeGrupo.get(String(a.group_id));
+      const horas = horasDeAsignaturaEnGrupo(grado, String(a.group_id), String(a.subject_id), jId);
       if (horas !== undefined && horas !== a.horas_semanales) {
         operaciones.push({ updateOne: { filter: { _id: a._id }, update: { $set: { horas_semanales: horas } } } });
       }

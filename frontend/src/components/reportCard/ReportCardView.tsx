@@ -1,14 +1,34 @@
 import { Alert } from '../ui/Alert';
 import { Chip, DesempenoBadge } from '../ui/Badge';
 import { Card } from '../ui/Card';
+import { Table, TableBody, TableHead, Td, Th } from '../ui/Table';
+import { formatoFechaCalendario } from '../../lib/fechas';
+import type { NivelDesempeno } from '../../types/domain';
 import type { ReportCard, ReportCardArea, ReportCardAsignatura } from '../../types/reportCard';
 import { ComponentBar } from './ComponentBar';
+
+const NIVEL_NACIONAL: Record<NivelDesempeno, string> = {
+  SUPERIOR: 'Desempeño Superior',
+  ALTO: 'Desempeño Alto',
+  BASICO: 'Desempeño Básico',
+  BAJO: 'Desempeño Bajo',
+};
 
 function ordinal(n: number): string {
   return `${n}°`;
 }
 
+function Detalle({ rotulo, texto }: { rotulo: string; texto: string }) {
+  return (
+    <p className="text-xs text-body">
+      <span className="font-semibold text-muted">{rotulo}: </span>
+      {texto}
+    </p>
+  );
+}
+
 function AsignaturaRow({ asignatura }: { asignatura: ReportCardAsignatura }) {
+  const tieneTexto = asignatura.descripcion || asignatura.recomendacion || asignatura.observacion_docente;
   return (
     <div className="rounded-lg border border-border p-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -35,6 +55,13 @@ function AsignaturaRow({ asignatura }: { asignatura: ReportCardAsignatura }) {
           {asignatura.componentes.map((c) => (
             <ComponentBar key={c.clave} label={`${c.nombre} ${c.porcentaje}%`} value={c.nota} />
           ))}
+        </div>
+      )}
+      {tieneTexto && (
+        <div className="mt-3 space-y-1 border-t border-border pt-2">
+          {asignatura.descripcion && <Detalle rotulo="Descripción" texto={asignatura.descripcion} />}
+          {asignatura.recomendacion && <Detalle rotulo="Recomendación" texto={asignatura.recomendacion} />}
+          {asignatura.observacion_docente && <Detalle rotulo="Observación del docente" texto={asignatura.observacion_docente} />}
         </div>
       )}
     </div>
@@ -68,6 +95,7 @@ function AreaSection({ area }: { area: ReportCardArea }) {
 
 export function ReportCardView({ reportCard }: { reportCard: ReportCard }) {
   const { estudiante, asistencia_periodo: asistencia } = reportCard;
+  const escala = [...reportCard.escala].sort((a, b) => b.valor_minimo - a.valor_minimo);
 
   return (
     <div className="space-y-4">
@@ -80,24 +108,30 @@ export function ReportCardView({ reportCard }: { reportCard: ReportCard }) {
       <Card>
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
+            {reportCard.institucion.nombre && (
+              <p className="text-xs font-medium uppercase tracking-wide text-muted">{reportCard.institucion.nombre}</p>
+            )}
             <h1 className="text-h3 text-ink">{estudiante.nombre_completo}</h1>
             <p className="text-sm text-muted">Documento: {estudiante.documento}</p>
             <div className="mt-2 flex flex-wrap gap-2">
+              {estudiante.grado && <Chip>{estudiante.grado}</Chip>}
               <Chip>{estudiante.grupo}</Chip>
               <Chip>{estudiante.jornada}</Chip>
               <Chip>{estudiante.sede}</Chip>
               <Chip>
-                Periodo {reportCard.periodo} · {reportCard.academic_year}
+                {reportCard.nombre_periodo || `Periodo ${reportCard.periodo}`} · {reportCard.academic_year}
               </Chip>
             </div>
           </div>
-          <div className="text-right">
-            <p className="text-xs font-medium uppercase tracking-wide text-muted">Puesto en el grupo</p>
-            <p className="text-2xl font-extrabold text-primary">
-              {reportCard.puesto_grupo === null ? '—' : ordinal(reportCard.puesto_grupo)}{' '}
-              <span className="text-sm font-medium text-muted">de {reportCard.total_estudiantes_grupo}</span>
-            </p>
-          </div>
+          {reportCard.mostrar_puesto && (
+            <div className="text-right">
+              <p className="text-xs font-medium uppercase tracking-wide text-muted">Puesto en el grupo</p>
+              <p className="text-2xl font-extrabold text-primary">
+                {reportCard.puesto_grupo === null ? '—' : ordinal(reportCard.puesto_grupo)}{' '}
+                <span className="text-sm font-medium text-muted">de {reportCard.total_estudiantes_grupo}</span>
+              </p>
+            </div>
+          )}
         </div>
       </Card>
 
@@ -145,6 +179,47 @@ export function ReportCardView({ reportCard }: { reportCard: ReportCard }) {
           </div>
         )}
       </Card>
+
+      {escala.length > 0 && (
+        <div className="space-y-2">
+          <h2 className="text-h3 text-ink">Escala de valoración</h2>
+          <Table>
+            <TableHead>
+              <Th>Escala del colegio</Th>
+              <Th>Rango</Th>
+              <Th>Equivale a (nacional)</Th>
+            </TableHead>
+            <TableBody>
+              {escala.map((n) => (
+                <tr key={n.nivel}>
+                  <Td>{n.etiqueta}</Td>
+                  <Td>
+                    {n.valor_minimo.toFixed(1)} – {n.valor_maximo.toFixed(1)}
+                  </Td>
+                  <Td>{NIVEL_NACIONAL[n.nivel]}</Td>
+                </tr>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+      )}
+
+      {(reportCard.fecha_entrega || reportCard.canal_reclamaciones) && (
+        <Card>
+          {reportCard.fecha_entrega && (
+            <div className="mb-3">
+              <p className="text-xs font-medium uppercase tracking-wide text-muted">Entrega del informe</p>
+              <p className="text-sm text-body">Fecha de entrega a las familias: {formatoFechaCalendario(reportCard.fecha_entrega)}.</p>
+            </div>
+          )}
+          {reportCard.canal_reclamaciones && (
+            <div>
+              <p className="text-xs font-medium uppercase tracking-wide text-muted">Aclaraciones y reclamaciones</p>
+              <p className="whitespace-pre-line text-sm text-body">{reportCard.canal_reclamaciones}</p>
+            </div>
+          )}
+        </Card>
+      )}
     </div>
   );
 }

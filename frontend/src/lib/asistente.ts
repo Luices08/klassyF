@@ -6,7 +6,7 @@ export const PALABRAS_CLAVE_POR_RUTA: Record<string, { descripcion: string; clav
   '/panel': { descripcion: 'Resumen general de tu sesión.', claves: ['inicio', 'panel', 'resumen', 'principal'] },
   '/report-card': {
     descripcion: 'Boletín con las notas cerradas del periodo.',
-    claves: ['boletin', 'informe academico', 'notas finales', 'calificaciones del periodo', 'puesto'],
+    claves: ['boletin', 'boletines', 'informe academico', 'informe de evaluacion', 'notas finales', 'calificaciones del periodo', 'puesto', 'imprimir boletin', 'pdf del boletin'],
   },
   '/mi-horario': { descripcion: 'Tu horario de clases publicado.', claves: ['mi horario', 'horario de clases', 'que clase tengo'] },
   '/mi-cuenta': {
@@ -86,6 +86,14 @@ export const PALABRAS_CLAVE_POR_RUTA: Record<string, { descripcion: string; clav
   '/admin/creador-planillas': {
     descripcion: 'Molde de la nota (bloques y porcentajes) e impresión de planillas.',
     claves: ['creador de planillas', 'molde', 'bloques', 'casillas', 'porcentajes de la nota', 'formato de planilla', 'firmas'],
+  },
+  '/admin/boletin': {
+    descripcion: 'Diseño del boletín (escudo, secciones, firmas), textos por desempeño, entrega, reclamaciones y quién ve el boletín.',
+    claves: ['diseno del boletin', 'disenar boletin', 'escudo del boletin', 'logo del boletin', 'cambiar escudo', 'posicion del escudo', 'marca de agua', 'firmas del boletin', 'titulo del boletin', 'publicar boletin', 'quien ve el boletin', 'acceso al boletin', 'bloquear boletin', 'vista previa del boletin', 'boletin de muestra', 'configuracion del boletin', 'textos del boletin', 'descripcion del desempeno', 'recomendaciones', 'fecha de entrega', 'reclamaciones', 'canal de reclamaciones', 'mostrar puesto', 'siee'],
+  },
+  '/docente/boletin-observaciones': {
+    descripcion: 'Comentarios por estudiante que salen en el boletín de tu asignatura.',
+    claves: ['observaciones del boletin', 'observaciones para el boletin', 'comentarios del boletin', 'escribir observacion', 'comentario por estudiante'],
   },
   '/docente/mi-carga': { descripcion: 'Tus asignaturas y grupos asignados.', claves: ['mi asignacion', 'mi carga', 'mis clases', 'mis grupos'] },
   '/docente/planeacion-curricular': {

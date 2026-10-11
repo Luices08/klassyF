@@ -156,7 +156,11 @@ describe('M12: notas (capa HTTP)', () => {
     const definitivas = await json('POST', '/notas/definitivas', e.coordAcademico, { academic_year_id: n.anioId, periodo_numero: 1 });
     expect(definitivas.cuerpo.data).toEqual({ definitivas: 1, omitidas: [] });
 
-    const boletin = await json('GET', `/reports/report-card?student_id=${String(e.estudiante._id)}&academic_year_id=${n.anioId}&periodo=1`, e.estudiante);
+    // La familia solo ve el boletín cuando el administrador lo publica.
+    const urlBoletin = `/reports/report-card?student_id=${String(e.estudiante._id)}&academic_year_id=${n.anioId}&periodo=1`;
+    expect((await json('GET', urlBoletin, e.estudiante)).estado).toBe(403);
+    expect((await json('PUT', '/boletines/publicacion', e.admin, { group_id: n.grupoId, academic_year_id: n.anioId, periodo_numero: 1, publicado: true })).estado).toBe(200);
+    const boletin = await json('GET', urlBoletin, e.estudiante);
     expect(boletin.cuerpo.data).toMatchObject({ completo: true, promedio_general_periodo: 3.25 });
     expect(boletin.cuerpo.data.areas[0].asignaturas[0]).toMatchObject({ estado: 'DEFINITIVO', nota_asignatura: 3.25 });
 

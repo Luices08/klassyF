@@ -59,6 +59,28 @@ export const configurarDistribucionGrupo = catchAsync<unknown, unknown, Configur
   }
 );
 
+export const configurarDistribucionJornada = catchAsync<unknown, unknown, studyPlanService.ConfigurarDistribucionJornadaInput>(
+  async (req, res) => {
+    if (!req.user) throw new ApiError(401, 'Usuario no autenticado.');
+    const plan = await studyPlanService.configurarDistribucionJornada(req.body, {
+      usuarioId: req.user._id,
+      ip: req.ip ?? null,
+    });
+    res.status(200).json({ success: true, data: plan });
+  }
+);
+
+export const configurarEvaluacionAreaGrupo = catchAsync<unknown, unknown, studyPlanService.ConfigurarEvaluacionAreaGrupoInput>(
+  async (req, res) => {
+    if (!req.user) throw new ApiError(401, 'Usuario no autenticado.');
+    const plan = await studyPlanService.configurarEvaluacionAreaGrupo(req.body, {
+      usuarioId: req.user._id,
+      ip: req.ip ?? null,
+    });
+    res.status(200).json({ success: true, data: plan });
+  }
+);
+
 export const crearPlanDesdeAnioAnterior = catchAsync<unknown, unknown, CrearPlanDesdeAnioAnteriorInput>(
   async (req, res) => {
     if (!req.user) throw new ApiError(401, 'Usuario no autenticado.');

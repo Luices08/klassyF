@@ -118,6 +118,10 @@ export async function createTeacherAssignment(
       const personalizacionGrupo = gradoConfig.personalizaciones_grupo.find(
         (p) => String(p.group_id) === String(group._id)
       );
+      const personalizacionJornada = gradoConfig.jornadas_personalizadas?.find(
+        (j) => String(j.jornada_id) === String(group.jornada_id)
+      );
+
       const asgAgregada = personalizacionGrupo?.asignaturas_agregadas.find(
         (a) => String(a.subject_id) === String(input.subject_id)
       );
@@ -125,18 +129,29 @@ export async function createTeacherAssignment(
         (a) => String(a.subject_id) === String(input.subject_id)
       );
 
-      if (!asgGrado && !asgAgregada) {
+      const asgJornadaAgregada = personalizacionJornada?.asignaturas_agregadas.find(
+        (a) => String(a.subject_id) === String(input.subject_id)
+      );
+      const overrideHorasJornada = personalizacionJornada?.intensidades_personalizadas.find(
+        (a) => String(a.subject_id) === String(input.subject_id)
+      );
+
+      if (!asgGrado && !asgAgregada && !asgJornadaAgregada) {
         throw new ApiError(
           400,
           `La asignatura "${subject.nombre}" no hace parte del plan de estudios aprobado para este grado/grupo.`
         );
       }
 
-      // Fijar exactamente la intensidad horaria semanal configurada en M06
+      // Fijar exactamente la intensidad horaria semanal configurada en M06 (prioridad: grupo > jornada > grado base)
       if (overrideHoras) {
         input.horas_semanales = overrideHoras.intensidad_horaria_semanal;
       } else if (asgAgregada) {
         input.horas_semanales = asgAgregada.intensidad_horaria_semanal;
+      } else if (overrideHorasJornada) {
+        input.horas_semanales = overrideHorasJornada.intensidad_horaria_semanal;
+      } else if (asgJornadaAgregada) {
+        input.horas_semanales = asgJornadaAgregada.intensidad_horaria_semanal;
       } else if (asgGrado) {
         input.horas_semanales = asgGrado.intensidad_horaria_semanal;
       }

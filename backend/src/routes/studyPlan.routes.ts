@@ -4,7 +4,9 @@ import {
   configurarAsignaturasGrado,
   configurarAsignaturasMultiplesGrados,
   configurarDistribucionGrupo,
+  configurarDistribucionJornada,
   configurarEvaluacionArea,
+  configurarEvaluacionAreaGrupo,
   crearPlanDesdeAnioAnterior,
   obtenerStudyPlan,
 } from '../controllers/studyPlan.controller';
@@ -57,6 +59,22 @@ router.post(
   checkRole(ROLES.ADMIN, ROLES.COORDINADOR),
   validate(studyPlanValidator.configurarDistribucionGrupo),
   configurarDistribucionGrupo
+);
+
+// 2.2b Distribucion por Jornadas: extension de una jornada completa sobre el grado.
+router.post(
+  '/distribucion-jornada',
+  checkRole(ROLES.ADMIN, ROLES.COORDINADOR),
+  validate(studyPlanValidator.configurarDistribucionJornada),
+  configurarDistribucionJornada
+);
+
+// 2.3b Configuracion de Evaluacion por Grupo: ponderacion de area para un grupo especifico.
+router.post(
+  '/evaluacion-area-grupo',
+  checkRole(ROLES.ADMIN, ROLES.COORDINADOR),
+  validate(studyPlanValidator.configurarEvaluacionAreaGrupo),
+  configurarEvaluacionAreaGrupo
 );
 
 export default router;

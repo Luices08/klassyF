@@ -100,6 +100,45 @@ export function useConfigurarDistribucionGrupo() {
   });
 }
 
+export interface ConfigurarDistribucionJornadaInput {
+  institucion_id: string;
+  academic_year_id: string;
+  grade_id: string;
+  jornada_id: string;
+  intensidades_personalizadas: AsignaturaPersonalizadaGrupo[];
+  asignaturas_agregadas: AsignaturaPersonalizadaGrupo[];
+  motivo?: string;
+}
+
+export function useConfigurarDistribucionJornada() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: ConfigurarDistribucionJornadaInput) =>
+      api.post<StudyPlan>('/curriculum/study-plan/distribucion-jornada', input),
+    onSuccess: () => invalidateStudyPlan(queryClient),
+  });
+}
+
+export interface ConfigurarEvaluacionAreaGrupoInput {
+  institucion_id: string;
+  academic_year_id: string;
+  grade_id: string;
+  group_id: string;
+  area_id: string;
+  metodo_calculo: MetodoCalculoEvaluacion;
+  asignaturas: PonderacionAsignatura[];
+  motivo?: string;
+}
+
+export function useConfigurarEvaluacionAreaGrupo() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: ConfigurarEvaluacionAreaGrupoInput) =>
+      api.post<StudyPlan>('/curriculum/study-plan/evaluacion-area-grupo', input),
+    onSuccess: () => invalidateStudyPlan(queryClient),
+  });
+}
+
 export interface CrearPlanDesdeAnioAnteriorInput {
   institucion_id: string;
   academic_year_id: string;

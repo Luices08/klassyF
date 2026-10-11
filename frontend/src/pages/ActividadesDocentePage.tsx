@@ -84,9 +84,13 @@ export function ActividadesDocentePage() {
               {clases.map((c) => {
                 const g = typeof c.group_id === 'object' ? c.group_id : null;
                 const s = typeof c.subject_id === 'object' ? c.subject_id : null;
+                const sNom = g && typeof g.sede_id === 'object' && g.sede_id ? g.sede_id.nombre : '';
+                const jNom = g && typeof g.jornada_id === 'object' && g.jornada_id ? g.jornada_id.nombre : '';
+                const contextText = [sNom, jNom].filter(Boolean).join(' · ');
                 return (
                   <option key={c._id} value={c._id}>
                     {s?.nombre ?? 'Clase'} · Grupo {g?.nomenclatura ?? '—'}
+                    {contextText ? ` (${contextText})` : ''}
                   </option>
                 );
               })}

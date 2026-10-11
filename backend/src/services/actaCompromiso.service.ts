@@ -23,7 +23,7 @@ export async function generarActaCompromisoPdf(enrollment: EnrollmentDocument): 
   const vinculo = await StudentGuardian.findOne({ student_id: student._id, es_principal: true }).populate('guardian_id');
   const acudiente = vinculo?.guardian_id as unknown as InstanceType<typeof Guardian> | undefined;
 
-  const pendientes = enrollment.checklist.filter((c) => c.estado !== 'APROBADO');
+  const pendientes = enrollment.checklist.filter((c) => c.obligatorio !== false && c.estado !== 'APROBADO');
 
   return new Promise((resolve, reject) => {
     const doc = new PDFDocument({ margin: 50 });
@@ -54,7 +54,8 @@ export async function generarActaCompromisoPdf(enrollment: EnrollmentDocument): 
     } else {
       pendientes.forEach((c) => {
         const estado = c.estado === 'RECHAZADO' ? ` (rechazado: ${c.comentario ?? 'sin comentario'})` : '';
-        doc.text(`• ${NOMBRES_DOCUMENTO_MATRICULA[c.tipo_documento]}${estado}`);
+        const nombreDoc = c.nombre_personalizado || NOMBRES_DOCUMENTO_MATRICULA[c.tipo_documento] || c.tipo_documento;
+        doc.text(`• ${nombreDoc}${estado}`);
       });
     }
 

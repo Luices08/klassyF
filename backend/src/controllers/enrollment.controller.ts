@@ -114,3 +114,38 @@ export const descargarActa = catchAsync<EnrollmentParams>(async (req, res) => {
   res.setHeader('Content-Disposition', `inline; filename="acta-compromiso-${enrollment.folio_matricula ?? enrollment.id}.pdf"`);
   res.send(pdf);
 });
+
+export const agregarDocumentoChecklist = catchAsync<EnrollmentParams, unknown, enrollmentService.AgregarDocumentoChecklistInput>(
+  async (req, res) => {
+    const enrollment = await enrollmentService.agregarDocumentoChecklist(req.params.id, req.body, {
+      id: req.user!._id,
+    });
+    res.status(200).json({ success: true, data: enrollment });
+  }
+);
+
+export const eliminarDocumentoChecklist = catchAsync<ChecklistParams>(async (req, res) => {
+  const enrollment = await enrollmentService.eliminarDocumentoChecklist(req.params.id, req.params.tipoDocumento, {
+    id: req.user!._id,
+  });
+  res.status(200).json({ success: true, data: enrollment });
+});
+
+export const sincronizarRequisitos = catchAsync<EnrollmentParams>(async (req, res) => {
+  const enrollment = await enrollmentService.sincronizarRequisitosMatricula(req.params.id, {
+    id: req.user!._id,
+  });
+  res.status(200).json({ success: true, data: enrollment });
+});
+
+export const actualizarComentarioDocumento = catchAsync<ChecklistParams, unknown, { comentario?: string | null }>(
+  async (req, res) => {
+    const enrollment = await enrollmentService.actualizarComentarioDocumento(
+      req.params.id,
+      req.params.tipoDocumento,
+      req.body.comentario ?? null,
+      { id: req.user!._id }
+    );
+    res.status(200).json({ success: true, data: enrollment });
+  }
+);

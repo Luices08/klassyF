@@ -1,6 +1,6 @@
 import { ClientSession, Types } from 'mongoose';
 import { Jornada, TipoDocumento } from '../constants/enums';
-import { DIAS_PLAZO_LEGALIZACION, DOCUMENTOS_REQUERIDOS_POR_NIVEL } from '../constants/matriculaChecklist';
+import { DIAS_PLAZO_LEGALIZACION, generarChecklistMatricula } from '../constants/matriculaChecklist';
 import { ROLES } from '../constants/roles';
 import AcademicYear from '../models/academicYear.model';
 import AdmissionRequest, { AdmissionRequestDocument } from '../models/admissionRequest.model';
@@ -252,8 +252,17 @@ export async function aprobarSolicitud(
       );
     }
 
-    const checklist = (DOCUMENTOS_REQUERIDOS_POR_NIVEL[grade.nivel] ?? []).map((tipo_documento) => ({
-      tipo_documento,
+    const itemsGenerados = generarChecklistMatricula({
+      nivel: grade.nivel,
+      numeroGrado: grade.numero,
+      tipoIngreso: 'NUEVO',
+      parentescoAcudiente: 'TUTOR',
+    });
+
+    const checklist = itemsGenerados.map((item) => ({
+      tipo_documento: item.tipo_documento,
+      nombre_personalizado: item.nombre_personalizado ?? null,
+      obligatorio: item.obligatorio,
       estado: 'PENDIENTE' as const,
       archivo_path: null,
       comentario: null,

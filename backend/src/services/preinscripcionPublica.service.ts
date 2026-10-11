@@ -22,6 +22,7 @@ const ESTADOS_QUE_ADMITEN_DOCUMENTOS: EstadoMatricula[] = ['PREINSCRITO', 'MATRI
 export interface DocumentoPreinscripcion {
   tipo_documento: TipoDocumentoMatricula;
   nombre: string;
+  obligatorio?: boolean;
   estado: EstadoDocumentoMatricula;
   /** Motivo del rechazo, para que el acudiente sepa que corregir. */
   comentario: string | null;
@@ -62,7 +63,8 @@ export function construirDetalle(enrollment: EnrollmentDocument): Preinscripcion
     folio_matricula: enrollment.folio_matricula,
     documentos: enrollment.checklist.map((c) => ({
       tipo_documento: c.tipo_documento,
-      nombre: NOMBRES_DOCUMENTO_MATRICULA[c.tipo_documento],
+      nombre: c.nombre_personalizado || NOMBRES_DOCUMENTO_MATRICULA[c.tipo_documento] || c.tipo_documento,
+      obligatorio: c.obligatorio !== false,
       estado: c.estado,
       comentario: c.estado === 'RECHAZADO' ? c.comentario : null,
     })),

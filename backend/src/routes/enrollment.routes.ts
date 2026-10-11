@@ -3,14 +3,18 @@ import multer, { FileFilterCallback } from 'multer';
 import { Rol } from '../constants/enums';
 import { ROLES } from '../constants/roles';
 import {
+  actualizarComentarioDocumento,
+  agregarDocumentoChecklist,
   cambiarGrupo,
   cargarDocumento,
   createEnrollment,
   descargarActa,
   descargarDocumento,
+  eliminarDocumentoChecklist,
   getEnrollment,
   listEnrollments,
   revisarDocumento,
+  sincronizarRequisitos,
   updateStatus,
 } from '../controllers/enrollment.controller';
 import { authenticate, checkRole } from '../middlewares/auth.middleware';
@@ -71,5 +75,33 @@ router.get(
 );
 
 router.get('/:id/acta-compromiso.pdf', checkRole(...STAFF_MATRICULAS), validate(enrollmentValidator.descargarActa), descargarActa);
+
+router.post(
+  '/:id/checklist',
+  checkRole(...STAFF_MATRICULAS),
+  validate(enrollmentValidator.agregarDocumentoChecklist),
+  agregarDocumentoChecklist
+);
+
+router.delete(
+  '/:id/checklist/:tipoDocumento',
+  checkRole(...STAFF_MATRICULAS),
+  validate(enrollmentValidator.eliminarDocumentoChecklist),
+  eliminarDocumentoChecklist
+);
+
+router.post(
+  '/:id/sincronizar-requisitos',
+  checkRole(...STAFF_MATRICULAS),
+  validate(enrollmentValidator.getEnrollment),
+  sincronizarRequisitos
+);
+
+router.patch(
+  '/:id/checklist/:tipoDocumento/comentario',
+  checkRole(...STAFF_MATRICULAS),
+  validate(enrollmentValidator.actualizarComentario),
+  actualizarComentarioDocumento
+);
 
 export default router;

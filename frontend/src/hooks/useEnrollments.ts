@@ -123,3 +123,63 @@ export function useRevisarDocumentoMatricula() {
     },
   });
 }
+
+export function useAgregarDocumentoChecklist() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      id,
+      tipo_documento,
+      nombre_personalizado,
+      obligatorio,
+    }: {
+      id: string;
+      tipo_documento: TipoDocumentoMatricula;
+      nombre_personalizado?: string;
+      obligatorio?: boolean;
+    }) => api.post<Enrollment>(`/enrollments/${id}/checklist`, { tipo_documento, nombre_personalizado, obligatorio }),
+    onSuccess: (_data, variables) => {
+      void queryClient.invalidateQueries({ queryKey: ['enrollments', variables.id] });
+    },
+  });
+}
+
+export function useEliminarDocumentoChecklist() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, tipoDocumento }: { id: string; tipoDocumento: TipoDocumentoMatricula }) =>
+      api.delete<Enrollment>(`/enrollments/${id}/checklist/${tipoDocumento}`),
+    onSuccess: (_data, variables) => {
+      void queryClient.invalidateQueries({ queryKey: ['enrollments', variables.id] });
+    },
+  });
+}
+
+export function useSincronizarRequisitosMatricula() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => api.post<Enrollment>(`/enrollments/${id}/sincronizar-requisitos`, {}),
+    onSuccess: (_data, id) => {
+      void queryClient.invalidateQueries({ queryKey: ['enrollments', id] });
+    },
+  });
+}
+
+export function useActualizarComentarioDocumento() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      id,
+      tipoDocumento,
+      comentario,
+    }: {
+      id: string;
+      tipoDocumento: TipoDocumentoMatricula;
+      comentario: string | null;
+    }) =>
+      api.patch<Enrollment>(`/enrollments/${id}/checklist/${tipoDocumento}/comentario`, { comentario }),
+    onSuccess: (_data, variables) => {
+      void queryClient.invalidateQueries({ queryKey: ['enrollments', variables.id] });
+    },
+  });
+}

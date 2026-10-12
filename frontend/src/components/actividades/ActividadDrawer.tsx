@@ -21,7 +21,7 @@ import {
   aInputInstante,
   aInstante,
 } from '../../lib/actividades';
-import type { CurricularDevelopment, DbaReferente } from '../../types/domain';
+import type { CurricularDevelopment, ReferenteCurricular } from '../../types/domain';
 
 interface ActividadDrawerProps {
   open: boolean;
@@ -104,8 +104,11 @@ function FormularioActividad({ onClose, teacherAssignmentId, periodoNumero, plan
 
   const cambiar = <K extends keyof Formulario>(campo: K, valor: Formulario[K]) => setF((prev) => ({ ...prev, [campo]: valor }));
 
-  const dbas = useMemo(
-    () => (planeacion.dba_seleccionados as Array<DbaReferente | string>).filter((d): d is DbaReferente => typeof d === 'object'),
+  const referentes = useMemo(
+    () =>
+      (planeacion.dba_seleccionados as Array<ReferenteCurricular | string>).filter(
+        (d): d is ReferenteCurricular => typeof d === 'object'
+      ),
     [planeacion]
   );
   const competencias = useMemo(
@@ -240,13 +243,37 @@ function FormularioActividad({ onClose, teacherAssignmentId, periodoNumero, plan
       <fieldset className="space-y-3 rounded-lg border border-border p-3">
         <legend className="px-1 text-label text-body">¿Qué evalúa esta actividad?</legend>
         <p className="text-xs text-muted">Se elige de tu planeación curricular aprobada de este periodo. Basta con uno de los dos.</p>
-        <Select label="DBA de tu planeación" value={f.dba} onChange={(e) => cambiar('dba', e.target.value)}>
-          <option value="">{dbas.length === 0 ? 'Tu planeación no seleccionó DBA' : 'Ninguno'}</option>
-          {dbas.map((d) => (
-            <option key={d._id} value={d._id}>
-              DBA {d.numero_dba} · {recortar(d.enunciado, 90)}
-            </option>
-          ))}
+        <Select label="Referente curricular de tu planeación" value={f.dba} onChange={(e) => cambiar('dba', e.target.value)}>
+          <option value="">{referentes.length === 0 ? 'Tu planeación no tiene referentes' : 'Ninguno'}</option>
+          {referentes.map((d) => {
+            const tipo = d.tipo_referente;
+            let etiqueta = tipo as string;
+            let cuerpo = '';
+            if (tipo === 'DBA') {
+              etiqueta = `DBA ${d.numero_dba}`;
+              cuerpo = d.enunciado;
+            } else if (tipo === 'EBC') {
+              etiqueta = `EBC (${d.grupo_grados})`;
+              cuerpo = `${d.competencia}: ${d.enunciado}`;
+            } else if (tipo === 'MATRIZ_ICFES') {
+              etiqueta = 'Saber ICFES';
+              cuerpo = d.afirmacion;
+            } else if (tipo === 'REFERENTE_INSTITUCIONAL') {
+              etiqueta = 'PEI';
+              cuerpo = `${d.titulo}: ${d.descripcion}`;
+            } else if (tipo === 'DIMENSION_EXPERIENCIA') {
+              etiqueta = `Dimensión ${d.dimension}`;
+              cuerpo = d.descripcion;
+            } else if (tipo === 'LINEAMIENTO') {
+              etiqueta = 'Lineamiento';
+              cuerpo = d.titulo;
+            }
+            return (
+              <option key={d._id} value={d._id}>
+                {etiqueta} · {recortar(cuerpo, 90)}
+              </option>
+            );
+          })}
         </Select>
         <Select label="Competencia de tu planeación" value={f.competencia} onChange={(e) => cambiar('competencia', e.target.value)}>
           <option value="">Ninguna</option>

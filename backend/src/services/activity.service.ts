@@ -7,7 +7,7 @@ import AcademicYear, { AcademicYearDocument } from '../models/academicYear.model
 import ActivitySubmission from '../models/activitySubmission.model';
 import CurricularDevelopment, { CurricularDevelopmentDocument } from '../models/curricularDevelopment.model';
 import Enrollment from '../models/enrollment.model';
-import { Dba } from '../models/referenteCurricular.model';
+import ReferenteCurricular from '../models/referenteCurricular.model';
 import TeacherAssignment, { TeacherAssignmentDocument } from '../models/teacherAssignment.model';
 import { UserDocument } from '../models/user.model';
 import ApiError from '../utils/ApiError';
@@ -43,7 +43,14 @@ export interface VistaActividad {
   permite_entrega_tardia: boolean;
   desarrollo_curricular_id: string | null;
   dba_id: string | null;
-  dba: { _id: string; numero_dba: number; enunciado: string } | null;
+  dba: {
+    _id: string;
+    tipo_referente?: string;
+    numero_dba?: number | null;
+    enunciado: string;
+    competencia?: string | null;
+    titulo?: string | null;
+  } | null;
   competencia_evaluada: string | null;
   publicada: boolean;
   vencida: boolean;
@@ -58,11 +65,23 @@ export async function armarVistas(actividades: ActividadPlana[], ahora = new Dat
   if (actividades.length === 0) return [];
 
   const dbaIds = actividades.map((a) => a.dba_id).filter((id): id is Types.ObjectId => Boolean(id));
-  const [contextos, dbas] = await Promise.all([
+  const [contextos, referentes] = await Promise.all([
     contextosDeAsignaciones([...new Set(actividades.map((a) => String(a.teacher_assignment_id)))]),
-    dbaIds.length > 0 ? Dba.find({ _id: { $in: dbaIds } }).select('numero_dba enunciado').lean() : Promise.resolve([]),
+    dbaIds.length > 0 ? ReferenteCurricular.find({ _id: { $in: dbaIds } }).lean() : Promise.resolve([]),
   ]);
-  const dbaPorId = new Map(dbas.map((d) => [String(d._id), { _id: String(d._id), numero_dba: d.numero_dba, enunciado: d.enunciado }]));
+  const dbaPorId = new Map(
+    referentes.map((r: any) => [
+      String(r._id),
+      {
+        _id: String(r._id),
+        tipo_referente: r.tipo_referente,
+        numero_dba: r.numero_dba ?? null,
+        enunciado: r.enunciado || r.descripcion || r.afirmacion || r.contenido || '',
+        competencia: r.competencia || r.organizador || null,
+        titulo: r.titulo || null,
+      },
+    ])
+  );
 
   const aniosIds = [...new Set([...contextos.values()].map((c) => c.academic_year_id))];
   const anios = await AcademicYear.find({ _id: { $in: aniosIds } }).select('componentes_evaluativos ponderacion_componentes');
@@ -143,14 +162,14 @@ async function planeacionAprobada(asignacion: TeacherAssignmentDocument, periodo
   return planeacion;
 }
 
-/** Toda actividad mide algo de la planeación aprobada: un DBA suyo o una de sus competencias. */
+/** Toda actividad mide algo de la planeación aprobada: un referente suyo o una de sus competencias. */
 function validarReferente(planeacion: CurricularDevelopmentDocument, dbaId: string | null | undefined, competencia: string | null | undefined): void {
   const competenciaLimpia = competencia?.trim();
   if (!dbaId && !competenciaLimpia) {
-    throw new ApiError(400, 'Indica qué DBA o competencia de tu planeación aprobada evalúa esta actividad.');
+    throw new ApiError(400, 'Indica qué referente curricular o competencia de tu planeación aprobada evalúa esta actividad.');
   }
   if (dbaId && !planeacion.dba_seleccionados.some((d) => String(d) === String(dbaId))) {
-    throw new ApiError(400, 'El DBA elegido no hace parte de tu planeación aprobada de este periodo.');
+    throw new ApiError(400, 'El referente curricular elegido no hace parte de tu planeación aprobada de este periodo.');
   }
   if (competenciaLimpia && !normalizarTexto(planeacion.competencias).includes(normalizarTexto(competenciaLimpia))) {
     throw new ApiError(400, 'La competencia elegida no hace parte de tu planeación aprobada de este periodo.');

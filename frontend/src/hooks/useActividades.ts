@@ -35,7 +35,7 @@ export interface Actividad {
   permite_entrega_tardia: boolean;
   desarrollo_curricular_id: string | null;
   dba_id: string | null;
-  dba: { _id: string; numero_dba: number; enunciado: string } | null;
+  dba: { _id: string; tipo_referente?: string; numero_dba?: number | null; enunciado: string; competencia?: string | null; titulo?: string | null } | null;
   competencia_evaluada: string | null;
   publicada: boolean;
   vencida: boolean;

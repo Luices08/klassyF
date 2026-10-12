@@ -166,7 +166,15 @@ export function ActividadesDocentePage() {
                       <TipoActividadChip value={a.tipo} />
                     </div>
                     <p className="mt-0.5 text-xs text-muted">
-                      {a.dba ? `DBA ${a.dba.numero_dba}` : ''}
+                      {a.dba
+                        ? a.dba.tipo_referente === 'DBA' || (!a.dba.tipo_referente && typeof a.dba.numero_dba === 'number')
+                          ? `DBA ${a.dba.numero_dba}`
+                          : a.dba.tipo_referente === 'EBC'
+                            ? 'EBC'
+                            : a.dba.tipo_referente === 'REFERENTE_INSTITUCIONAL'
+                              ? (a.dba.titulo || 'Logro PEI')
+                              : (a.dba.tipo_referente || 'Referente')
+                        : ''}
                       {a.dba && a.competencia_evaluada ? ' · ' : ''}
                       {a.competencia_evaluada ?? ''}
                     </p>

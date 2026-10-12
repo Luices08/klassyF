@@ -19,7 +19,7 @@ import {
   type FilaAjuste,
 } from '../../hooks/useInclusion';
 import { useReferentes } from '../../hooks/useReferentesCurriculares';
-import type { DbaReferente } from '../../types/domain';
+import type { ReferenteCurricular } from '../../types/domain';
 import {} from './campos';
 import { formatoFechaLocal } from '../../lib/fechas';
 
@@ -108,8 +108,8 @@ function AjusteDrawer({ exp, fila, gradeId, onClose }: { exp: Expediente; fila: 
     categorias_ajuste: a?.categorias_ajuste ?? [],
     recursos: a?.recursos ?? '',
   });
-  const referentes = useReferentes({ grade_id: gradeId, area_id: fila.area_id, tipo_referente: 'DBA' });
-  const dbas = (referentes.data ?? []) as DbaReferente[];
+  const referentes = useReferentes({ grade_id: gradeId, area_id: fila.area_id });
+  const listaReferentes = (referentes.data ?? []) as ReferenteCurricular[];
 
   const alternar = (campo: 'dba_ids' | 'tipos_barrera' | 'categorias_ajuste', valor: string) =>
     setForm((f) => ({ ...f, [campo]: f[campo].includes(valor) ? f[campo].filter((x) => x !== valor) : [...f[campo], valor] }));
@@ -126,20 +126,30 @@ function AjusteDrawer({ exp, fila, gradeId, onClose }: { exp: Expediente; fila: 
       {exp.estado === 'ACTIVO' && !soloLectura && <Alert tone="info">El acta ya está firmada: guardar un cambio crea una nueva versión del expediente y exige emitir de nuevo los documentos.</Alert>}
 
       <div>
-        <p className="mb-1 text-sm font-semibold text-ink">Objetivos del grado (DBA)</p>
+        <p className="mb-1 text-sm font-semibold text-ink">Objetivos del grado (DBA / Referentes Curriculares)</p>
         {referentes.isLoading && <Spinner />}
         <ul className="max-h-48 space-y-1 overflow-y-auto rounded-lg border border-border p-2">
-          {dbas.map((d) => (
-            <li key={d._id}>
-              <label className="flex items-start gap-2 text-sm text-body">
-                <input type="checkbox" disabled={soloLectura} checked={form.dba_ids.includes(d._id)} onChange={() => alternar('dba_ids', d._id)} className="mt-0.5 h-4 w-4 rounded border-border text-primary focus:ring-primary" />
-                <span>
-                  <span className="font-semibold">DBA {d.numero_dba}.</span> {d.enunciado}
-                </span>
-              </label>
-            </li>
-          ))}
-          {!referentes.isLoading && dbas.length === 0 && <li className="text-sm text-muted">El banco no tiene DBA para este grado y área; describe el objetivo abajo.</li>}
+          {listaReferentes.map((r) => {
+            const labelTipo =
+              r.tipo_referente === 'DBA' ? `DBA ${(r as any).numero_dba ?? ''}` :
+              r.tipo_referente === 'EBC' ? `EBC ${(r as any).factor_ebc || (r as any).competencia || ''}` :
+              r.tipo_referente === 'MATRIZ_ICFES' ? `Saber ICFES (${(r as any).componente_icfes || 'Competencia'})` :
+              r.tipo_referente === 'DIMENSION_EXPERIENCIA' ? `Dimensión (${(r as any).dimension || 'Desarrollo'})` :
+              r.tipo_referente;
+            const texto = (r as any).enunciado || (r as any).descripcion || (r as any).competencia || (r as any).titulo || '';
+
+            return (
+              <li key={r._id}>
+                <label className="flex items-start gap-2 text-sm text-body">
+                  <input type="checkbox" disabled={soloLectura} checked={form.dba_ids.includes(r._id)} onChange={() => alternar('dba_ids', r._id)} className="mt-0.5 h-4 w-4 rounded border-border text-primary focus:ring-primary" />
+                  <span>
+                    <span className="font-semibold text-primary">{labelTipo}:</span> {texto}
+                  </span>
+                </label>
+              </li>
+            );
+          })}
+          {!referentes.isLoading && listaReferentes.length === 0 && <li className="text-sm text-muted">El banco no tiene referentes curriculares para este grado y área; describe el objetivo abajo.</li>}
         </ul>
       </div>
       <Textarea label="Objetivo o propósito flexibilizado" disabled={soloLectura} value={form.objetivo_flexibilizado} onChange={(e) => setForm((f) => ({ ...f, objetivo_flexibilizado: e.target.value }))} maxLength={4000} hint="Los mismos objetivos del grado, con las oportunidades de acceso que el estudiante necesita." />

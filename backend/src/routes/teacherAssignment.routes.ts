@@ -4,6 +4,8 @@ import {
   createTeacherAssignment,
   deleteTeacherAssignment,
   getDocentesResumen,
+  guardarCargaDocenteLote,
+  guardarMallaGrupoLote,
   listTeacherAssignments,
   myLoad,
 } from '../controllers/teacherAssignment.controller';
@@ -15,12 +17,28 @@ const router = Router();
 
 router.use(authenticate);
 
-// 1. Asignar carga académica a un docente
+// 1. Asignar carga académica a un docente (atómica)
 router.post(
   '/',
   checkRole(ROLES.ADMIN, ROLES.COORDINADOR),
   validate(teacherAssignmentValidator.createTeacherAssignment),
   createTeacherAssignment
+);
+
+// 1.1 Guardar carga masiva/integral de un docente (Ficha del Docente)
+router.post(
+  '/docente-carga',
+  checkRole(ROLES.ADMIN, ROLES.COORDINADOR),
+  validate(teacherAssignmentValidator.guardarCargaDocenteLote),
+  guardarCargaDocenteLote
+);
+
+// 1.2 Guardar malla curricular completa de un grupo (Matriz por Curso)
+router.post(
+  '/grupo-carga',
+  checkRole(ROLES.ADMIN, ROLES.COORDINADOR),
+  validate(teacherAssignmentValidator.guardarMallaGrupoLote),
+  guardarMallaGrupoLote
 );
 
 // 2. Listado filtrado de asignaciones (para Coordinación / Admin)

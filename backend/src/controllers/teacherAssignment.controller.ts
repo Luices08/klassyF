@@ -57,3 +57,22 @@ export const deleteTeacherAssignment = catchAsync<IdParams>(async (req, res) => 
   await teacherAssignmentService.deleteTeacherAssignment(req.params.id, { id: req.user._id, ip: req.ip });
   res.status(200).json({ success: true, message: 'Asignación académica eliminada correctamente.' });
 });
+
+export const guardarCargaDocenteLote = catchAsync(async (req, res) => {
+  if (!req.user) throw new ApiError(401, 'No autenticado.');
+  const resultado = await teacherAssignmentService.guardarCargaDocenteLote(req.body, {
+    id: req.user._id,
+    ip: req.ip,
+  });
+  res.status(200).json({ success: true, data: resultado });
+});
+
+export const guardarMallaGrupoLote = catchAsync(async (req, res) => {
+  if (!req.user) throw new ApiError(401, 'No autenticado.');
+  const resultado = await teacherAssignmentService.guardarMallaGrupoLote(req.body, {
+    id: req.user._id,
+    ip: req.ip,
+  });
+  res.status(200).json({ success: true, data: resultado });
+});
+

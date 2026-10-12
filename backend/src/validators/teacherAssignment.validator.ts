@@ -68,3 +68,48 @@ export const idParam: ValidationSchema = {
     id: objectId.required(),
   }),
 };
+
+export const guardarCargaDocenteLote: ValidationSchema = {
+  body: Joi.object({
+    docente_id: objectId.required(),
+    academic_year_id: objectId.required(),
+    direccion_grupo_id: objectId.allow(null, '').optional(),
+    horas_direccion: Joi.number().integer().min(0).max(50).default(0),
+    clases: Joi.array()
+      .items(
+        Joi.object({
+          group_id: objectId.required(),
+          subject_id: objectId.required(),
+          observaciones: Joi.string().allow('', null).optional(),
+        })
+      )
+      .default([]),
+    proyectos: Joi.array()
+      .items(
+        Joi.object({
+          proyecto_nombre: Joi.string().trim().min(1).required(),
+          horas_semanales: Joi.number().integer().min(1).max(50).required(),
+          observaciones: Joi.string().allow('', null).optional(),
+        })
+      )
+      .default([]),
+  }),
+};
+
+export const guardarMallaGrupoLote: ValidationSchema = {
+  body: Joi.object({
+    group_id: objectId.required(),
+    academic_year_id: objectId.required(),
+    director_grupo_id: objectId.allow(null, '').optional(),
+    horas_direccion: Joi.number().integer().min(0).max(50).default(0),
+    asignaciones: Joi.array()
+      .items(
+        Joi.object({
+          subject_id: objectId.required(),
+          docente_id: objectId.allow(null, '').optional(),
+        })
+      )
+      .required(),
+  }),
+};
+

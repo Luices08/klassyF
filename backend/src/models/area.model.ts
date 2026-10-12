@@ -1,11 +1,17 @@
 import { HydratedDocument, Model, Schema, Types, model } from 'mongoose';
-import { ESTADOS_AREA, EstadoArea } from '../constants/enums';
+import {
+  ESTADOS_AREA,
+  EstadoArea,
+  TIPOS_ESTRUCTURA_CURRICULAR,
+  TipoEstructuraCurricular,
+} from '../constants/enums';
 
 export interface IArea {
   institucion_id: Types.ObjectId;
   nombre: string;
   descripcion: string;
   codigo: string;
+  tipo_estructura: TipoEstructuraCurricular;
   estado: EstadoArea;
   createdAt: Date;
   updatedAt: Date;
@@ -20,6 +26,11 @@ const areaSchema = new Schema<IArea, AreaModel>(
     nombre: { type: String, required: true, trim: true },
     descripcion: { type: String, required: true, trim: true },
     codigo: { type: String, required: true, trim: true, uppercase: true },
+    tipo_estructura: {
+      type: String,
+      enum: TIPOS_ESTRUCTURA_CURRICULAR,
+      default: 'AREA_DISCIPLINAR',
+    },
     estado: { type: String, enum: ESTADOS_AREA, default: 'activo' },
   },
   { timestamps: true }

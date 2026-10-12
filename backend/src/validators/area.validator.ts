@@ -1,5 +1,5 @@
 import Joi from 'joi';
-import { ESTADOS_AREA } from '../constants/enums';
+import { ESTADOS_AREA, TIPOS_ESTRUCTURA_CURRICULAR } from '../constants/enums';
 import { ValidationSchema } from '../middlewares/validate.middleware';
 import { objectId } from './common.validator';
 
@@ -10,6 +10,9 @@ export const createArea: ValidationSchema = {
     nombre: Joi.string().required(),
     descripcion: Joi.string().required(),
     codigo: Joi.string().required(),
+    tipo_estructura: Joi.string()
+      .valid(...TIPOS_ESTRUCTURA_CURRICULAR)
+      .default('AREA_DISCIPLINAR'),
   }),
 };
 
@@ -17,6 +20,7 @@ export const listAreas: ValidationSchema = {
   query: Joi.object({
     institucion_id: objectId,
     estado: Joi.string().valid(...ESTADOS_AREA),
+    tipo_estructura: Joi.string().valid(...TIPOS_ESTRUCTURA_CURRICULAR),
   }),
 };
 
@@ -28,6 +32,7 @@ export const actualizarArea: ValidationSchema = {
     nombre: Joi.string(),
     descripcion: Joi.string(),
     codigo: Joi.string(),
+    tipo_estructura: Joi.string().valid(...TIPOS_ESTRUCTURA_CURRICULAR),
   }).min(1),
 };
 

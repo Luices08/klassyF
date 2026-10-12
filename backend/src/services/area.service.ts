@@ -1,5 +1,5 @@
 import { Types } from 'mongoose';
-import { EstadoArea } from '../constants/enums';
+import { EstadoArea, TipoEstructuraCurricular } from '../constants/enums';
 import Area, { AreaDocument } from '../models/area.model';
 import Institution from '../models/institution.model';
 import Subject from '../models/subject.model';
@@ -24,6 +24,7 @@ export interface CrearAreaInput {
   nombre: string;
   descripcion: string;
   codigo: string;
+  tipo_estructura?: TipoEstructuraCurricular;
 }
 
 export async function crearArea(input: CrearAreaInput, { usuarioId, ip }: ContextoActor): Promise<AreaDocument> {
@@ -33,6 +34,7 @@ export async function crearArea(input: CrearAreaInput, { usuarioId, ip }: Contex
     nombre: input.nombre,
     descripcion: input.descripcion,
     codigo: input.codigo,
+    tipo_estructura: input.tipo_estructura || 'AREA_DISCIPLINAR',
   });
 
   await registrarEvento({
@@ -40,7 +42,7 @@ export async function crearArea(input: CrearAreaInput, { usuarioId, ip }: Contex
     accion: 'AREA_CREADA',
     entidad: 'Area',
     entidad_id: area._id,
-    detalle: `${area.nombre} (${area.codigo})`,
+    detalle: `${area.nombre} (${area.codigo}) [${area.tipo_estructura}]`,
     ip,
   });
   return area;
@@ -48,11 +50,13 @@ export async function crearArea(input: CrearAreaInput, { usuarioId, ip }: Contex
 
 export interface ListarAreasFilter {
   estado?: EstadoArea;
+  tipo_estructura?: TipoEstructuraCurricular;
 }
 
 export async function listarAreas(filter: ListarAreasFilter): Promise<AreaDocument[]> {
   const query: Record<string, unknown> = {};
   if (filter.estado) query.estado = filtroPorEstado(filter.estado);
+  if (filter.tipo_estructura) query.tipo_estructura = filter.tipo_estructura;
   return Area.find(query).sort({ nombre: 1 });
 }
 
@@ -60,6 +64,7 @@ export interface ActualizarAreaInput {
   nombre?: string;
   descripcion?: string;
   codigo?: string;
+  tipo_estructura?: TipoEstructuraCurricular;
 }
 
 export async function actualizarArea(

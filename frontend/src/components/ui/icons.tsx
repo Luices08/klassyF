@@ -281,3 +281,17 @@ export const SendIcon = (p: IconProps) => (
     <path d="M22 2 11 13M22 2l-7 20-4-9-9-4Z" />
   </Icon>
 );
+
+export const PrinterIcon = (p: IconProps) => (
+  <Icon {...p}>
+    <polyline points="6 9 6 2 18 2 18 9" />
+    <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2" />
+    <rect x="6" y="14" width="12" height="8" />
+  </Icon>
+);
+
+export const DownloadIcon = (p: IconProps) => (
+  <Icon {...p}>
+    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3" />
+  </Icon>
+);

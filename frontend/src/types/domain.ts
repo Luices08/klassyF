@@ -502,6 +502,12 @@ export interface Enrollment {
 export const NIVELES_EDUCATIVOS = ['PREESCOLAR', 'PRIMARIA', 'SECUNDARIA', 'MEDIA'] as const;
 export type NivelEducativo = (typeof NIVELES_EDUCATIVOS)[number];
 
+export const TIPOS_ESTRUCTURA_CURRICULAR = ['AREA_DISCIPLINAR', 'DIMENSION_DESARROLLO'] as const;
+export type TipoEstructuraCurricular = (typeof TIPOS_ESTRUCTURA_CURRICULAR)[number];
+
+export const ACTIVIDADES_RECTORAS_PREESCOLAR = ['JUEGO', 'ARTE', 'LITERATURA', 'EXPLORACION_MEDIO'] as const;
+export type ActividadRectorPreescolar = (typeof ACTIVIDADES_RECTORAS_PREESCOLAR)[number];
+
 export const TIPOS_ASIGNATURA = ['OBLIGATORIA', 'OPTATIVA'] as const;
 export type TipoAsignatura = (typeof TIPOS_ASIGNATURA)[number];
 
@@ -515,6 +521,7 @@ export interface Area {
   descripcion: string;
   codigo: string;
   estado: EstadoActivo;
+  tipo_estructura?: TipoEstructuraCurricular;
 }
 
 export interface Subject {
@@ -773,14 +780,22 @@ export interface AdmissionRequest {
 // sembrarlo. DBA, EBC y LINEAMIENTO tienen su propio contrato (discriminado
 // por tipo_referente), sin campos nulos "por si acaso" de un diseño anterior.
 
-export const TIPOS_REFERENTE = ['DBA', 'EBC', 'MATRIZ_ICFES', 'LINEAMIENTO'] as const;
+export const TIPOS_REFERENTE = [
+  'DBA',
+  'EBC',
+  'LINEAMIENTO',
+  'MATRIZ_ICFES',
+  'REFERENTE_INSTITUCIONAL',
+  'DIMENSION_EXPERIENCIA',
+] as const;
 export type TipoReferente = (typeof TIPOS_REFERENTE)[number];
 
 export const GRUPOS_GRADOS_EBC = ['1-3', '4-5', '6-7', '8-9', '10-11'] as const;
 export type GrupoGradosEbc = (typeof GRUPOS_GRADOS_EBC)[number];
 
-interface ReferenteBase {
+export interface ReferenteBase {
   _id: string;
+  institucion_id?: string | null;
   // Solo es null en un Lineamiento transversal (marco general, no propio de un área).
   area_id: { _id: string; nombre: string; codigo: string } | string | null;
   etiquetas: string[];
@@ -819,7 +834,37 @@ export interface LineamientoReferente extends ReferenteBase {
   orden: number;
 }
 
-export type ReferenteCurricular = DbaReferente | EbcReferente | LineamientoReferente;
+export interface MatrizIcfesReferente extends ReferenteBase {
+  tipo_referente: 'MATRIZ_ICFES';
+  grade_id: { _id: string; nombre: string; numero: number; nivel: string } | string;
+  competencia: string;
+  afirmacion: string;
+  evidencias_aprendizaje: string[];
+}
+
+export interface ReferenteInstitucional extends ReferenteBase {
+  tipo_referente: 'REFERENTE_INSTITUCIONAL';
+  grade_id?: { _id: string; nombre: string; numero: number; nivel: string } | string | null;
+  titulo: string;
+  descripcion: string;
+  evidencias_aprendizaje?: string[];
+}
+
+export interface DimensionExperienciaReferente extends ReferenteBase {
+  tipo_referente: 'DIMENSION_EXPERIENCIA';
+  dimension: string;
+  actividades_rectoras: ActividadRectorPreescolar[];
+  descripcion: string;
+  evidencias_desarrollo: string[];
+}
+
+export type ReferenteCurricular =
+  | DbaReferente
+  | EbcReferente
+  | LineamientoReferente
+  | MatrizIcfesReferente
+  | ReferenteInstitucional
+  | DimensionExperienciaReferente;
 
 // --- M08: Gestor de Docentes y Carga Académica ---
 
@@ -860,7 +905,7 @@ export interface TeacherAssignment {
     _id: string;
     nombre: string;
     abreviatura: string;
-    area_id?: { _id: string; nombre: string; codigo: string } | string;
+    area_id?: { _id: string; nombre: string; codigo: string; tipo_estructura?: TipoEstructuraCurricular } | string;
     tipo?: string;
   } | string | null;
   horas_semanales: number;
@@ -916,10 +961,19 @@ export interface VersionSnapshot {
   fecha: string;
   modificado_por: { _id: string; nombre: string; apellido: string } | string;
   dba_seleccionados: string[];
+  evidencias_seleccionadas?: string[];
   competencias: string;
   contenidos_tematicos: string[];
   actividades_propuestas: string;
   criterios_evaluacion: string;
+  fase_inicio?: string;
+  fase_desarrollo?: string;
+  fase_cierre?: string;
+  es_preescolar?: boolean;
+  nombre_proyecto?: string;
+  dimensiones_articuladas?: string[];
+  actividades_rectoras?: string[];
+  experiencias_significativas?: string;
   estado: EstadoDesarrolloCurricular;
 }
 
@@ -927,7 +981,8 @@ export interface CurricularDevelopment {
   _id: string;
   teacher_assignment_id: TeacherAssignment | string;
   periodo_numero: number;
-  dba_seleccionados: DbaReferente[] | string[];
+  dba_seleccionados: ReferenteCurricular[] | string[];
+  evidencias_seleccionadas?: string[];
   competencias: string;
   contenidos_tematicos: string[];
   ejes_tematicos: string[];
@@ -935,6 +990,14 @@ export interface CurricularDevelopment {
   metodologia_y_recursos: string;
   criterios_evaluacion: string;
   semanas_estimadas: number;
+  fase_inicio?: string;
+  fase_desarrollo?: string;
+  fase_cierre?: string;
+  es_preescolar?: boolean;
+  nombre_proyecto?: string;
+  dimensiones_articuladas?: string[];
+  actividades_rectoras?: ActividadRectorPreescolar[];
+  experiencias_significativas?: string;
   estado: EstadoDesarrolloCurricular;
   version: number;
   historial_revisiones: RevisionHistorial[];

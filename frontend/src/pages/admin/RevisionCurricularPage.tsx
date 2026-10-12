@@ -17,7 +17,7 @@ import {
 } from '../../hooks/useCurricularDevelopments';
 import { useAuth } from '../../context/AuthContext';
 import { formatoFechaHora } from '../../lib/fechas';
-import type { CurricularDevelopment, DbaReferente, EstadoDesarrolloCurricular } from '../../types/domain';
+import type { CurricularDevelopment, EstadoDesarrolloCurricular, ReferenteCurricular } from '../../types/domain';
 
 export function RevisionCurricularPage() {
   const { user } = useAuth();
@@ -244,34 +244,128 @@ export function RevisionCurricularPage() {
               </p>
             </div>
 
-            {/* DBA Seleccionados */}
+            {/* Preescolar: Banner de Proyecto Lúdico-Pedagógico */}
+            {desarrolloSeleccionado.es_preescolar && (
+              <div className="p-3.5 rounded-lg border border-indigo-200 bg-indigo-50/70 text-xs space-y-2">
+                <span className="font-bold text-indigo-900 block text-sm">
+                  🎨 Proyecto Lúdico-Pedagógico (Preescolar - Dec. 2247)
+                </span>
+                <div>
+                  <span className="font-semibold text-indigo-950 block">Nombre del Proyecto:</span>
+                  <p className="text-body font-medium">{desarrolloSeleccionado.nombre_proyecto || 'Sin registrar'}</p>
+                </div>
+                {desarrolloSeleccionado.dimensiones_articuladas && desarrolloSeleccionado.dimensiones_articuladas.length > 0 && (
+                  <div>
+                    <span className="font-semibold text-indigo-950 block mb-1">Dimensiones del Desarrollo:</span>
+                    <div className="flex flex-wrap gap-1">
+                      {desarrolloSeleccionado.dimensiones_articuladas.map((dim, idx) => (
+                        <span key={idx} className="bg-indigo-100 text-indigo-800 px-2 py-0.5 rounded-full text-[11px] font-medium">
+                          {dim}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {desarrolloSeleccionado.actividades_rectoras && desarrolloSeleccionado.actividades_rectoras.length > 0 && (
+                  <div>
+                    <span className="font-semibold text-indigo-950 block mb-1">Actividades Rectoras:</span>
+                    <div className="flex flex-wrap gap-1">
+                      {desarrolloSeleccionado.actividades_rectoras.map((act, idx) => (
+                        <span key={idx} className="bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full text-[11px] font-medium">
+                          {act}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {desarrolloSeleccionado.experiencias_significativas && (
+                  <div className="pt-1.5 border-t border-indigo-200">
+                    <span className="font-semibold text-indigo-950 block mb-0.5">Experiencias y Rincones:</span>
+                    <p className="text-body whitespace-pre-line leading-relaxed">{desarrolloSeleccionado.experiencias_significativas}</p>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Referentes Seleccionados */}
             <div className="space-y-2">
               <h4 className="text-xs font-bold uppercase tracking-wider text-muted">
-                Referentes del MEN Seleccionados ({desarrolloSeleccionado.dba_seleccionados.length})
+                Referentes Curriculares Articulados ({desarrolloSeleccionado.dba_seleccionados.length})
               </h4>
-              <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
+              <div className="space-y-2 max-h-52 overflow-y-auto pr-1">
                 {desarrolloSeleccionado.dba_seleccionados.map((d, idx) => {
-                  const dba = typeof d === 'object' ? (d as DbaReferente) : null;
+                  if (typeof d !== 'object' || !d) {
+                    return (
+                      <div key={idx} className="p-2.5 rounded-lg border border-border bg-surface text-xs">
+                        <p className="text-body">{String(d)}</p>
+                      </div>
+                    );
+                  }
+                  const ref = d as ReferenteCurricular;
+                  const tipo = ref.tipo_referente;
+                  let etiqueta = tipo as string;
+                  let titulo = '';
+                  let cuerpo = '';
+                  if (tipo === 'DBA') {
+                    etiqueta = `DBA #${ref.numero_dba}`;
+                    titulo = ref.organizador ? `[${ref.organizador}]` : '';
+                    cuerpo = ref.enunciado;
+                  } else if (tipo === 'EBC') {
+                    etiqueta = `EBC (${ref.grupo_grados})`;
+                    titulo = ref.competencia;
+                    cuerpo = ref.enunciado;
+                  } else if (tipo === 'MATRIZ_ICFES') {
+                    etiqueta = 'Pruebas Saber ICFES';
+                    titulo = ref.competencia;
+                    cuerpo = ref.afirmacion;
+                  } else if (tipo === 'REFERENTE_INSTITUCIONAL') {
+                    etiqueta = 'PEI Institucional';
+                    titulo = ref.titulo;
+                    cuerpo = ref.descripcion;
+                  } else if (tipo === 'DIMENSION_EXPERIENCIA') {
+                    etiqueta = `Dimensión ${ref.dimension}`;
+                    titulo = ref.actividades_rectoras?.join(', ') || '';
+                    cuerpo = ref.descripcion;
+                  } else if (tipo === 'LINEAMIENTO') {
+                    etiqueta = 'Lineamiento';
+                    titulo = ref.titulo;
+                    cuerpo = ref.contenido;
+                  }
+
                   return (
                     <div key={idx} className="p-2.5 rounded-lg border border-border bg-surface text-xs space-y-1">
-                      <div className="flex items-center justify-between">
-                        <span className="font-bold text-primary">DBA #{dba?.numero_dba || idx + 1}</span>
-                        {dba?.organizador && (
-                          <span className="text-[10px] bg-primary-soft text-primary px-1.5 py-0.5 rounded-full">
-                            {dba.organizador}
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="font-bold text-primary">{etiqueta}</span>
+                        {titulo && (
+                          <span className="text-[10px] bg-primary-soft text-primary px-1.5 py-0.5 rounded-full font-medium">
+                            {titulo}
                           </span>
                         )}
                       </div>
-                      <p className="text-body">{dba ? dba.enunciado : String(d)}</p>
+                      <p className="text-body leading-relaxed">{cuerpo}</p>
                     </div>
                   );
                 })}
               </div>
             </div>
 
+            {/* Evidencias seleccionadas */}
+            {desarrolloSeleccionado.evidencias_seleccionadas && desarrolloSeleccionado.evidencias_seleccionadas.length > 0 && (
+              <div className="space-y-1.5 p-2.5 rounded-lg border border-border bg-soft/40 text-xs">
+                <span className="font-bold text-ink block">
+                  Evidencias de Aprendizaje Priorizadas ({desarrolloSeleccionado.evidencias_seleccionadas.length}):
+                </span>
+                <ul className="list-disc pl-4 space-y-0.5 text-body text-[11px]">
+                  {desarrolloSeleccionado.evidencias_seleccionadas.map((ev, idx) => (
+                    <li key={idx}>{ev}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
             {/* Contenidos y Competencias */}
             <div className="space-y-2">
-              <h4 className="text-xs font-bold uppercase tracking-wider text-muted">Contenidos Temáticos</h4>
+              <h4 className="text-xs font-bold uppercase tracking-wider text-muted">Contenidos Temáticos / Ejes</h4>
               <ul className="list-disc pl-5 text-sm text-body space-y-0.5">
                 {desarrolloSeleccionado.contenidos_tematicos.map((c, idx) => (
                   <li key={idx}>{c}</li>
@@ -280,30 +374,55 @@ export function RevisionCurricularPage() {
             </div>
 
             <div className="space-y-1">
-              <h4 className="text-xs font-bold uppercase tracking-wider text-muted">Competencias a Desarrollar</h4>
+              <h4 className="text-xs font-bold uppercase tracking-wider text-muted">Competencias / Propósitos de Desarrollo</h4>
               <p className="text-sm text-body bg-soft/50 p-2.5 rounded-lg border border-border">
                 {desarrolloSeleccionado.competencias}
               </p>
             </div>
 
+            {/* Secuencia Didáctica (Básica y Media) */}
+            {(desarrolloSeleccionado.fase_inicio || desarrolloSeleccionado.fase_desarrollo || desarrolloSeleccionado.fase_cierre) ? (
+              <div className="space-y-2">
+                <h4 className="text-xs font-bold uppercase tracking-wider text-muted">Secuencia Didáctica de Aula</h4>
+                <div className="space-y-2 text-xs">
+                  {desarrolloSeleccionado.fase_inicio && (
+                    <div className="border-l-2 border-amber-500 pl-3 py-1 bg-amber-50/50 rounded-r">
+                      <span className="font-bold text-amber-900 block mb-0.5">1. Exploración / Inicio:</span>
+                      <p className="text-body whitespace-pre-line">{desarrolloSeleccionado.fase_inicio}</p>
+                    </div>
+                  )}
+                  {desarrolloSeleccionado.fase_desarrollo && (
+                    <div className="border-l-2 border-blue-500 pl-3 py-1 bg-blue-50/50 rounded-r">
+                      <span className="font-bold text-blue-900 block mb-0.5">2. Estructuración y Práctica / Desarrollo:</span>
+                      <p className="text-body whitespace-pre-line">{desarrolloSeleccionado.fase_desarrollo}</p>
+                    </div>
+                  )}
+                  {desarrolloSeleccionado.fase_cierre && (
+                    <div className="border-l-2 border-emerald-500 pl-3 py-1 bg-emerald-50/50 rounded-r">
+                      <span className="font-bold text-emerald-900 block mb-0.5">3. Transferencia y Valoración / Cierre:</span>
+                      <p className="text-body whitespace-pre-line">{desarrolloSeleccionado.fase_cierre}</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            ) : desarrolloSeleccionado.actividades_propuestas ? (
+              <div className="space-y-1">
+                <h4 className="text-xs font-bold uppercase tracking-wider text-muted">Actividades de Aprendizaje</h4>
+                <p className="text-sm text-body bg-soft/50 p-2.5 rounded-lg border border-border whitespace-pre-line">
+                  {desarrolloSeleccionado.actividades_propuestas}
+                </p>
+              </div>
+            ) : null}
+
             <div className="space-y-1">
-              <h4 className="text-xs font-bold uppercase tracking-wider text-muted">Metodología y Recursos</h4>
+              <h4 className="text-xs font-bold uppercase tracking-wider text-muted">Metodología y Recursos Didácticos</h4>
               <p className="text-sm text-body bg-soft/50 p-2.5 rounded-lg border border-border">
                 {desarrolloSeleccionado.metodologia_y_recursos}
               </p>
             </div>
 
-            {desarrolloSeleccionado.actividades_propuestas && (
-              <div className="space-y-1">
-                <h4 className="text-xs font-bold uppercase tracking-wider text-muted">Actividades de Aprendizaje</h4>
-                <p className="text-sm text-body bg-soft/50 p-2.5 rounded-lg border border-border">
-                  {desarrolloSeleccionado.actividades_propuestas}
-                </p>
-              </div>
-            )}
-
             <div className="space-y-1">
-              <h4 className="text-xs font-bold uppercase tracking-wider text-muted">Criterios de Evaluación</h4>
+              <h4 className="text-xs font-bold uppercase tracking-wider text-muted">Criterios de Evaluación y Valoración (SIEE / Dec. 2247)</h4>
               <p className="text-sm text-body bg-soft/50 p-2.5 rounded-lg border border-border">
                 {desarrolloSeleccionado.criterios_evaluacion}
               </p>

@@ -1,5 +1,7 @@
 import { HydratedDocument, Model, Schema, Types, model } from 'mongoose';
 import {
+  ACTIVIDADES_RECTORAS_PREESCOLAR,
+  ActividadRectorPreescolar,
   ESTADOS_USUARIO,
   EstadoUsuario,
   GRUPOS_GRADOS_EBC,
@@ -21,6 +23,8 @@ import {
 
 export interface IReferenteCurricular {
   tipo_referente: TipoReferente;
+  // Si institucion_id es null, es un referente nacional oficial del MEN/ICFES; si tiene ID, es institucional (PEI).
+  institucion_id?: Types.ObjectId | null;
   // Solo es null en un Lineamiento transversal (marco general, no propio de
   // un area) — DBA y EBC siempre lo exigen (lo valida el pre('validate') de
   // cada discriminador, ver abajo).
@@ -28,7 +32,7 @@ export interface IReferenteCurricular {
   etiquetas: string[];
   version: string;
   fuente: string;
-  // activo = Vigente, inactivo = Historico (una version del MEN que ya no se ofrece para seleccion, se conserva por trazabilidad).
+  // activo = Vigente, inactivo = Historico (una version del MEN o PEI que ya no se ofrece para seleccion, se conserva por trazabilidad).
   estado: EstadoUsuario;
   createdAt: Date;
   updatedAt: Date;
@@ -46,6 +50,7 @@ function errorDeValidacion(mensaje: string): Error & { statusCode: number } {
 const referenteCurricularSchema = new Schema<IReferenteCurricular, ReferenteCurricularModel>(
   {
     tipo_referente: { type: String, enum: TIPOS_REFERENTE, required: true },
+    institucion_id: { type: Schema.Types.ObjectId, ref: 'Institution', default: null },
     area_id: { type: Schema.Types.ObjectId, ref: 'Area', default: null },
     etiquetas: { type: [String], default: [] },
     version: { type: String, default: 'V1', trim: true },
@@ -55,7 +60,7 @@ const referenteCurricularSchema = new Schema<IReferenteCurricular, ReferenteCurr
   { discriminatorKey: 'tipo_referente', timestamps: true }
 );
 
-referenteCurricularSchema.index({ tipo_referente: 1, area_id: 1 });
+referenteCurricularSchema.index({ tipo_referente: 1, area_id: 1, institucion_id: 1 });
 referenteCurricularSchema.index({ etiquetas: 1 });
 
 export const ReferenteCurricular = model<IReferenteCurricular, ReferenteCurricularModel>(
@@ -150,5 +155,105 @@ const lineamientoSchema = new Schema<ILineamiento>({
 lineamientoSchema.index({ area_id: 1, orden: 1 });
 
 export const Lineamiento = ReferenteCurricular.discriminator<ILineamiento>('LINEAMIENTO', lineamientoSchema);
+
+// --- Matriz de Referencia ICFES (Saber 3°, 5°, 9°, 11°) -------------------
+
+export interface IMatrizIcfes extends IReferenteCurricular {
+  area_id: Types.ObjectId;
+  grade_id: Types.ObjectId;
+  componente: string;
+  competencia: string;
+  aprendizaje: string;
+  enunciado: string;
+  evidencias_aprendizaje: string[];
+}
+
+const matrizIcfesSchema = new Schema<IMatrizIcfes>({
+  grade_id: { type: Schema.Types.ObjectId, ref: 'Grade', required: true },
+  componente: { type: String, required: true, trim: true },
+  competencia: { type: String, required: true, trim: true },
+  aprendizaje: { type: String, required: true, trim: true },
+  enunciado: { type: String, required: true, trim: true },
+  evidencias_aprendizaje: { type: [String], default: [] },
+});
+
+matrizIcfesSchema.pre('validate', function requiereArea(this: IMatrizIcfes, next) {
+  if (!this.area_id) return next(errorDeValidacion('Una Matriz ICFES debe pertenecer a un área.'));
+  next();
+});
+
+matrizIcfesSchema.index({ area_id: 1, grade_id: 1, componente: 1 });
+
+export const MatrizIcfes = ReferenteCurricular.discriminator<IMatrizIcfes>('MATRIZ_ICFES', matrizIcfesSchema);
+
+// --- Referente Institucional (Autonomía Escolar - Ley 115 Art. 77) --------
+
+export interface IReferenteInstitucional extends IReferenteCurricular {
+  area_id: Types.ObjectId;
+  grade_id?: Types.ObjectId | null;
+  grupo_grados?: GrupoGradosEbc | null;
+  codigo?: string;
+  organizador?: string;
+  competencia?: string;
+  enunciado: string;
+  evidencias_aprendizaje: string[];
+}
+
+const referenteInstitucionalSchema = new Schema<IReferenteInstitucional>({
+  grade_id: { type: Schema.Types.ObjectId, ref: 'Grade', default: null },
+  grupo_grados: { type: String, enum: GRUPOS_GRADOS_EBC, default: null },
+  codigo: { type: String, trim: true, default: '' },
+  organizador: { type: String, trim: true, default: '' },
+  competencia: { type: String, trim: true, default: '' },
+  enunciado: { type: String, required: true, trim: true },
+  evidencias_aprendizaje: { type: [String], default: [] },
+});
+
+referenteInstitucionalSchema.pre('validate', function requiereArea(this: IReferenteInstitucional, next) {
+  if (!this.area_id) return next(errorDeValidacion('Un referente institucional debe pertenecer a un área o dimensión.'));
+  next();
+});
+
+referenteInstitucionalSchema.index({ institucion_id: 1, area_id: 1, grade_id: 1 });
+
+export const ReferenteInstitucional = ReferenteCurricular.discriminator<IReferenteInstitucional>(
+  'REFERENTE_INSTITUCIONAL',
+  referenteInstitucionalSchema
+);
+
+// --- Dimensión del Desarrollo / Experiencias en Preescolar (Decreto 2247 de 1997) ---
+
+export interface IDimensionExperiencia extends IReferenteCurricular {
+  area_id: Types.ObjectId; // Representa la Dimensión del Desarrollo
+  grade_id: Types.ObjectId; // Grado de preescolar (Pre-jardín, Jardín, Transición)
+  actividad_rectora: ActividadRectorPreescolar;
+  enunciado: string;
+  evidencias_aprendizaje: string[];
+  ejemplo?: string;
+}
+
+const dimensionExperienciaSchema = new Schema<IDimensionExperiencia>({
+  grade_id: { type: Schema.Types.ObjectId, ref: 'Grade', required: true },
+  actividad_rectora: {
+    type: String,
+    enum: ACTIVIDADES_RECTORAS_PREESCOLAR,
+    required: true,
+  },
+  enunciado: { type: String, required: true, trim: true },
+  evidencias_aprendizaje: { type: [String], default: [] },
+  ejemplo: { type: String, trim: true, default: '' },
+});
+
+dimensionExperienciaSchema.pre('validate', function requiereArea(this: IDimensionExperiencia, next) {
+  if (!this.area_id) return next(errorDeValidacion('Una experiencia de preescolar debe pertenecer a una dimensión.'));
+  next();
+});
+
+dimensionExperienciaSchema.index({ area_id: 1, grade_id: 1, actividad_rectora: 1 });
+
+export const DimensionExperiencia = ReferenteCurricular.discriminator<IDimensionExperiencia>(
+  'DIMENSION_EXPERIENCIA',
+  dimensionExperienciaSchema
+);
 
 export default ReferenteCurricular;

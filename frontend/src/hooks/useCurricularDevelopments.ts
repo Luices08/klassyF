@@ -44,6 +44,7 @@ export interface GuardarBorradorInput {
   teacher_assignment_id: string;
   periodo_numero: number;
   dba_seleccionados: string[];
+  evidencias_seleccionadas?: string[];
   competencias: string;
   contenidos_tematicos: string[];
   ejes_tematicos?: string[];
@@ -51,6 +52,14 @@ export interface GuardarBorradorInput {
   metodologia_y_recursos: string;
   criterios_evaluacion: string;
   semanas_estimadas?: number;
+  fase_inicio?: string;
+  fase_desarrollo?: string;
+  fase_cierre?: string;
+  es_preescolar?: boolean;
+  nombre_proyecto?: string;
+  dimensiones_articuladas?: string[];
+  actividades_rectoras?: string[];
+  experiencias_significativas?: string;
 }
 
 export function useGuardarBorradorCurricular() {

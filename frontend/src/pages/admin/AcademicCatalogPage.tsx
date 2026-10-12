@@ -24,10 +24,12 @@ import { useInstitution } from '../../hooks/useInstitution';
 import {
   NIVELES_EDUCATIVOS,
   TIPOS_ASIGNATURA,
+  TIPOS_ESTRUCTURA_CURRICULAR,
   type Area,
   type NivelEducativo,
   type Subject,
   type TipoAsignatura,
+  type TipoEstructuraCurricular,
 } from '../../types/domain';
 
 const NIVEL_LABELS: Record<NivelEducativo, string> = {
@@ -39,7 +41,24 @@ const NIVEL_LABELS: Record<NivelEducativo, string> = {
 
 const TIPO_LABELS: Record<TipoAsignatura, string> = { OBLIGATORIA: 'Obligatoria', OPTATIVA: 'Optativa' };
 
-const AREA_VACIA = { nombre: '', descripcion: '', codigo: '' };
+const ESTRUCTURA_LABELS: Record<TipoEstructuraCurricular, string> = {
+  AREA_DISCIPLINAR: 'Área Disciplinar (Básica y Media)',
+  DIMENSION_DESARROLLO: 'Dimensión del Desarrollo (Preescolar)',
+};
+
+interface AreaForm {
+  nombre: string;
+  descripcion: string;
+  codigo: string;
+  tipo_estructura: TipoEstructuraCurricular;
+}
+
+const AREA_VACIA: AreaForm = {
+  nombre: '',
+  descripcion: '',
+  codigo: '',
+  tipo_estructura: 'AREA_DISCIPLINAR',
+};
 
 interface SubjectForm {
   area_id: string;
@@ -70,9 +89,9 @@ export function AcademicCatalogPage() {
   const actualizarEstadoArea = useActualizarEstadoArea();
 
   const [drawerAreaOpen, setDrawerAreaOpen] = useState(false);
-  const [formArea, setFormArea] = useState(AREA_VACIA);
+  const [formArea, setFormArea] = useState<AreaForm>(AREA_VACIA);
   const [areaEditando, setAreaEditando] = useState<Area | null>(null);
-  const [formEditarArea, setFormEditarArea] = useState(AREA_VACIA);
+  const [formEditarArea, setFormEditarArea] = useState<AreaForm>(AREA_VACIA);
 
   async function handleCrearArea(e: FormEvent) {
     e.preventDefault();
@@ -85,7 +104,12 @@ export function AcademicCatalogPage() {
   function abrirEditarArea(area: Area) {
     actualizarArea.reset();
     setAreaEditando(area);
-    setFormEditarArea({ nombre: area.nombre, descripcion: area.descripcion, codigo: area.codigo });
+    setFormEditarArea({
+      nombre: area.nombre,
+      descripcion: area.descripcion,
+      codigo: area.codigo,
+      tipo_estructura: area.tipo_estructura || 'AREA_DISCIPLINAR',
+    });
   }
 
   async function handleActualizarArea(e: FormEvent) {
@@ -187,6 +211,7 @@ export function AcademicCatalogPage() {
           <Table>
             <TableHead>
               <Th>Nombre</Th>
+              <Th>Tipo de Estructura</Th>
               <Th>Descripción</Th>
               <Th>Código</Th>
               <Th>Estado</Th>
@@ -196,6 +221,13 @@ export function AcademicCatalogPage() {
               {areasQuery.data.map((a) => (
                 <tr key={a._id}>
                   <Td className="font-medium text-ink">{a.nombre}</Td>
+                  <Td>
+                    {a.tipo_estructura === 'DIMENSION_DESARROLLO' ? (
+                      <Chip tone="orange">Dimensión (Preescolar)</Chip>
+                    ) : (
+                      <Chip tone="blue">Área Disciplinar</Chip>
+                    )}
+                  </Td>
                   <Td>{a.descripcion}</Td>
                   <Td>{a.codigo}</Td>
                   <Td>
@@ -215,7 +247,7 @@ export function AcademicCatalogPage() {
                   </Td>
                 </tr>
               ))}
-              {areasQuery.data.length === 0 && <EmptyRow colSpan={5}>Sin áreas registradas.</EmptyRow>}
+              {areasQuery.data.length === 0 && <EmptyRow colSpan={6}>Sin áreas registradas.</EmptyRow>}
             </TableBody>
           </Table>
         )}
@@ -309,14 +341,32 @@ export function AcademicCatalogPage() {
       {/* Crear área */}
       <Drawer
         open={drawerAreaOpen}
-        title="Nueva área"
+        title="Nueva área o dimensión"
         onClose={() => setDrawerAreaOpen(false)}
         onSubmit={handleCrearArea}
-        submitLabel="Crear área"
+        submitLabel="Crear estructura"
         isSubmitting={crearArea.isPending}
       >
         {crearArea.isError && <Alert tone="error">{errorMessage(crearArea.error)}</Alert>}
-        <Input label="Nombre" required value={formArea.nombre} onChange={(e) => setFormArea((f) => ({ ...f, nombre: e.target.value }))} />
+        <Select
+          label="Tipo de Estructura Curricular"
+          required
+          value={formArea.tipo_estructura}
+          onChange={(e) => setFormArea((f) => ({ ...f, tipo_estructura: e.target.value as TipoEstructuraCurricular }))}
+        >
+          {TIPOS_ESTRUCTURA_CURRICULAR.map((t) => (
+            <option key={t} value={t}>
+              {ESTRUCTURA_LABELS[t]}
+            </option>
+          ))}
+        </Select>
+        <Input
+          label="Nombre"
+          required
+          placeholder={formArea.tipo_estructura === 'DIMENSION_DESARROLLO' ? 'Ej. Dimensión Comunicativa' : 'Ej. Ciencias Naturales'}
+          value={formArea.nombre}
+          onChange={(e) => setFormArea((f) => ({ ...f, nombre: e.target.value }))}
+        />
         <Input
           label="Descripción"
           required
@@ -329,13 +379,25 @@ export function AcademicCatalogPage() {
       {/* Editar área */}
       <Drawer
         open={areaEditando !== null}
-        title="Editar área"
+        title="Editar área o dimensión"
         onClose={() => setAreaEditando(null)}
         onSubmit={handleActualizarArea}
         submitLabel="Guardar cambios"
         isSubmitting={actualizarArea.isPending}
       >
         {actualizarArea.isError && <Alert tone="error">{errorMessage(actualizarArea.error)}</Alert>}
+        <Select
+          label="Tipo de Estructura Curricular"
+          required
+          value={formEditarArea.tipo_estructura}
+          onChange={(e) => setFormEditarArea((f) => ({ ...f, tipo_estructura: e.target.value as TipoEstructuraCurricular }))}
+        >
+          {TIPOS_ESTRUCTURA_CURRICULAR.map((t) => (
+            <option key={t} value={t}>
+              {ESTRUCTURA_LABELS[t]}
+            </option>
+          ))}
+        </Select>
         <Input
           label="Nombre"
           required

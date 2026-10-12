@@ -2,7 +2,17 @@ import { Types } from 'mongoose';
 import { grupoGradosDeNumero, TipoReferente } from '../constants/enums';
 import Area from '../models/area.model';
 import Grade from '../models/grade.model';
-import { Dba, Ebc, IEbc, ILineamiento, Lineamiento, ReferenteCurricular } from '../models/referenteCurricular.model';
+import {
+  Dba,
+  DimensionExperiencia,
+  Ebc,
+  IEbc,
+  ILineamiento,
+  Lineamiento,
+  MatrizIcfes,
+  ReferenteCurricular,
+  ReferenteInstitucional,
+} from '../models/referenteCurricular.model';
 import ApiError from '../utils/ApiError';
 import { ESTADO_ACTIVO, filtroPorEstado } from '../utils/filtroEstado';
 import { runTransaction } from '../utils/runTransaction';
@@ -19,14 +29,23 @@ function escapeRegex(texto: string): string {
   return texto.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
-/** Valida las llaves foraneas de un item antes de crearlo: area_id, grade_id (DBA) y dba_relacionados (EBC). */
+/** Valida las llaves foraneas de un item antes de crearlo. */
 async function validarForaneos(item: ReferenteItemInput): Promise<void> {
   if (item.area_id) {
     const area = await Area.findById(item.area_id as string);
     if (!area) throw new ApiError(400, `area_id '${item.area_id}' no corresponde a un área existente.`);
   }
 
-  if (item.tipo_referente === 'DBA') {
+  if (
+    item.tipo_referente === 'DBA' ||
+    item.tipo_referente === 'MATRIZ_ICFES' ||
+    item.tipo_referente === 'DIMENSION_EXPERIENCIA'
+  ) {
+    const grade = await Grade.findById(item.grade_id as string);
+    if (!grade) throw new ApiError(400, `grade_id '${item.grade_id}' no corresponde a un grado existente.`);
+  }
+
+  if (item.tipo_referente === 'REFERENTE_INSTITUCIONAL' && item.grade_id) {
     const grade = await Grade.findById(item.grade_id as string);
     if (!grade) throw new ApiError(400, `grade_id '${item.grade_id}' no corresponde a un grado existente.`);
   }
@@ -42,7 +61,7 @@ async function validarForaneos(item: ReferenteItemInput): Promise<void> {
   }
 }
 
-/** Crea un solo referente o una carga masiva; cada item se enruta a su discriminador (DBA/EBC/LINEAMIENTO). */
+/** Crea un solo referente o una carga masiva; cada item se enruta a su discriminador. */
 export async function createReferentes(
   rawItems: ReferenteItemInput | ReferenteItemInput[],
   { usuarioId, ip }: ContextoActor
@@ -66,8 +85,17 @@ export async function createReferentes(
         case 'LINEAMIENTO':
           resultado.push((await Lineamiento.create([item], { session }))[0]);
           break;
+        case 'MATRIZ_ICFES':
+          resultado.push((await MatrizIcfes.create([item], { session }))[0]);
+          break;
+        case 'REFERENTE_INSTITUCIONAL':
+          resultado.push((await ReferenteInstitucional.create([item], { session }))[0]);
+          break;
+        case 'DIMENSION_EXPERIENCIA':
+          resultado.push((await DimensionExperiencia.create([item], { session }))[0]);
+          break;
         default:
-          throw new ApiError(400, `tipo_referente '${item.tipo_referente}' no admite carga directa (aun sin fuente).`);
+          throw new ApiError(400, `tipo_referente '${(item as { tipo_referente: string }).tipo_referente}' no soportado.`);
       }
     }
     return resultado;
@@ -96,6 +124,8 @@ export interface ListReferentesQuery {
   tipo_referente?: string;
   grupo_grados?: string;
   organizador?: string;
+  actividad_rectora?: string;
+  institucion_id?: string;
   q?: string;
   estado?: string;
 }
@@ -106,7 +136,13 @@ export async function listReferentes(query: ListReferentesQuery) {
   if (query.area_id) filter.area_id = query.area_id;
   if (query.tipo_referente) filter.tipo_referente = query.tipo_referente;
   if (query.grupo_grados) filter.grupo_grados = query.grupo_grados;
+  if (query.actividad_rectora) filter.actividad_rectora = query.actividad_rectora;
   filter.estado = filtroPorEstado(query.estado || 'activo');
+
+  if (query.institucion_id) {
+    // Retorna tanto los nacionales oficiales (institucion_id == null) como los propios de la institucion
+    filter.$or = [{ institucion_id: null }, { institucion_id: query.institucion_id }];
+  }
 
   const condiciones: Record<string, unknown>[] = [];
   if (query.organizador) {
@@ -121,11 +157,18 @@ export async function listReferentes(query: ListReferentesQuery) {
         { contenido: regex },
         { competencia: regex },
         { organizador: regex },
+        { aprendizaje: regex },
         { etiquetas: regex },
       ],
     });
   }
-  if (condiciones.length > 0) filter.$and = condiciones;
+  if (condiciones.length > 0) {
+    if (filter.$and) {
+      (filter.$and as unknown[]).push(...condiciones);
+    } else {
+      filter.$and = condiciones;
+    }
+  }
 
   return ReferenteCurricular.find(filter)
     .populate('grade_id', 'nombre numero nivel')

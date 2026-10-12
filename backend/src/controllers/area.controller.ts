@@ -1,5 +1,5 @@
 import { ParamsDictionary } from 'express-serve-static-core';
-import { EstadoArea } from '../constants/enums';
+import { EstadoArea, TipoEstructuraCurricular } from '../constants/enums';
 import * as areaService from '../services/area.service';
 import ApiError from '../utils/ApiError';
 import catchAsync from '../utils/catchAsync';
@@ -8,6 +8,7 @@ interface CreateAreaBody {
   nombre: string;
   descripcion: string;
   codigo: string;
+  tipo_estructura?: TipoEstructuraCurricular;
 }
 
 export const createArea = catchAsync<unknown, unknown, CreateAreaBody>(async (req, res) => {
@@ -18,6 +19,7 @@ export const createArea = catchAsync<unknown, unknown, CreateAreaBody>(async (re
 
 interface ListAreasQuery {
   estado?: EstadoArea;
+  tipo_estructura?: TipoEstructuraCurricular;
 }
 
 export const listAreas = catchAsync<unknown, unknown, unknown, ListAreasQuery>(async (req, res) => {
@@ -33,6 +35,7 @@ interface ActualizarAreaBody {
   nombre?: string;
   descripcion?: string;
   codigo?: string;
+  tipo_estructura?: TipoEstructuraCurricular;
 }
 
 // Edita los datos descriptivos del area. No permite cambiar institucion_id

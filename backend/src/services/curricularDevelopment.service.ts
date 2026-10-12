@@ -1,11 +1,12 @@
 import AcademicYear from '../models/academicYear.model';
 import CurricularDevelopment, { CurricularDevelopmentDocument } from '../models/curricularDevelopment.model';
-import { Dba } from '../models/referenteCurricular.model';
+import Grade from '../models/grade.model';
+import ReferenteCurricular from '../models/referenteCurricular.model';
 import Group from '../models/group.model';
 import Subject from '../models/subject.model';
 import TeacherAssignment, { TeacherAssignmentDocument } from '../models/teacherAssignment.model';
 import { UserDocument } from '../models/user.model';
-import { EstadoDesarrolloCurricular } from '../constants/enums';
+import { EstadoDesarrolloCurricular, grupoGradosDeNumero } from '../constants/enums';
 import { ROLES } from '../constants/roles';
 import { asegurarAnioNoCerrado } from './academicYear.service';
 import { registrarEvento } from './audit.service';
@@ -24,13 +25,22 @@ export interface UpsertDraftInput {
   teacher_assignment_id: string;
   periodo_numero: number;
   dba_seleccionados?: string[];
-  competencias: string;
+  evidencias_seleccionadas?: string[];
+  competencias?: string;
   contenidos_tematicos?: string[];
   ejes_tematicos?: string[];
   actividades_propuestas?: string;
-  metodologia_y_recursos: string;
-  criterios_evaluacion: string;
+  metodologia_y_recursos?: string;
+  criterios_evaluacion?: string;
   semanas_estimadas?: number;
+  fase_inicio?: string;
+  fase_desarrollo?: string;
+  fase_cierre?: string;
+  es_preescolar?: boolean;
+  nombre_proyecto?: string;
+  dimensiones_articuladas?: string[];
+  actividades_rectoras?: string[];
+  experiencias_significativas?: string;
 }
 
 export interface ReviewInput {
@@ -79,21 +89,32 @@ async function validateDbaSeleccionados(
   if (!group) throw new ApiError(404, 'Grupo de la asignación académica no encontrado.');
   if (!subject) throw new ApiError(404, 'Asignatura de la asignación académica no encontrada.');
 
-  // Solo DBA vigentes (estado activo): uno Histórico ya no se ofrece para seleccion (ver
-  // referenteCurricular.model.ts), aunque siga existiendo por trazabilidad de planeaciones viejas.
-  const dbas = await Dba.find({ _id: { $in: dbaIds }, estado: ESTADO_ACTIVO });
-  if (dbas.length !== new Set(dbaIds).size) {
-    throw new ApiError(400, 'Uno o más dba_seleccionados no existen en el banco de DBA o ya no están vigentes.');
+  const grade = await Grade.findById(group.grade_id);
+  if (!grade) throw new ApiError(404, 'Grado del grupo no encontrado.');
+  const grupoGrados = grupoGradosDeNumero(grade.numero);
+
+  // Acepta cualquier referente curricular vigente (DBA, EBC, Lineamiento, Matriz ICFES, Institucional, Dimensión Preescolar)
+  const referentes = await ReferenteCurricular.find({ _id: { $in: dbaIds }, estado: ESTADO_ACTIVO });
+  if (referentes.length !== new Set(dbaIds).size) {
+    throw new ApiError(400, 'Uno o más referentes seleccionados no existen en el banco o ya no están vigentes.');
   }
 
-  const inconsistente = dbas.some(
-    (d) => String(d.grade_id) !== String(group.grade_id) || String(d.area_id) !== String(subject.area_id)
-  );
-  if (inconsistente) {
-    throw new ApiError(
-      400,
-      'Uno o más DBA seleccionados no corresponden al grado/área de esta asignación académica.'
-    );
+  for (const ref of referentes) {
+    const raw = ref.toObject() as Record<string, unknown>;
+    // Validacion de area o dimension (los lineamientos transversales pueden tener area_id null)
+    if (raw.area_id && String(raw.area_id) !== String(subject.area_id)) {
+      throw new ApiError(400, 'Uno o más referentes seleccionados no corresponden al área/dimensión de esta clase.');
+    }
+
+    // Validacion de grado si el referente esta acotado a un grade_id especifico
+    if (raw.grade_id && String(raw.grade_id) !== String(group.grade_id)) {
+      throw new ApiError(400, 'Uno o más referentes seleccionados no corresponden al grado de esta clase.');
+    }
+
+    // Validacion de grupo de grados si el referente esta acotado por ciclo (ej. EBC o institucional)
+    if (raw.grupo_grados && raw.grupo_grados !== grupoGrados) {
+      throw new ApiError(400, 'Uno o más referentes seleccionados no corresponden al grupo de grados de esta clase.');
+    }
   }
 }
 
@@ -128,14 +149,23 @@ export async function upsertDraft(
   }
 
   const fields = {
-    competencias: input.competencias,
+    dba_seleccionados: input.dba_seleccionados ?? [],
+    evidencias_seleccionadas: input.evidencias_seleccionadas ?? [],
+    competencias: input.competencias ?? '',
     contenidos_tematicos: input.contenidos_tematicos ?? [],
     ejes_tematicos: input.ejes_tematicos ?? [],
     actividades_propuestas: input.actividades_propuestas ?? '',
-    metodologia_y_recursos: input.metodologia_y_recursos,
-    criterios_evaluacion: input.criterios_evaluacion,
+    metodologia_y_recursos: input.metodologia_y_recursos ?? '',
+    criterios_evaluacion: input.criterios_evaluacion ?? '',
     semanas_estimadas: input.semanas_estimadas ?? 10,
-    dba_seleccionados: input.dba_seleccionados ?? [],
+    fase_inicio: input.fase_inicio ?? '',
+    fase_desarrollo: input.fase_desarrollo ?? '',
+    fase_cierre: input.fase_cierre ?? '',
+    es_preescolar: input.es_preescolar ?? false,
+    nombre_proyecto: input.nombre_proyecto ?? '',
+    dimensiones_articuladas: input.dimensiones_articuladas ?? [],
+    actividades_rectoras: input.actividades_rectoras ?? [],
+    experiencias_significativas: input.experiencias_significativas ?? '',
   };
 
   let doc: CurricularDevelopmentDocument;
@@ -186,14 +216,13 @@ export async function submitForReview(
     throw new ApiError(409, `No se puede enviar a revisión un desarrollo curricular en estado ${doc.estado}.`);
   }
 
-  // Guardar snapshot de versión histórica antes de la transición (RN-CUR-04): todo el contenido
-  // editable, no solo una parte — si no, un cambio entre versiones en los campos que faltaban
-  // (metodologia_y_recursos, ejes_tematicos, semanas_estimadas) no quedaba trazado.
+  // Guardar snapshot de versión histórica antes de la transición (RN-CUR-04)
   doc.historial_versiones.push({
     version: doc.version,
     fecha: new Date(),
     modificado_por: requestingUser._id,
     dba_seleccionados: doc.dba_seleccionados,
+    evidencias_seleccionadas: doc.evidencias_seleccionadas ?? [],
     competencias: doc.competencias,
     contenidos_tematicos: doc.contenidos_tematicos,
     ejes_tematicos: doc.ejes_tematicos,
@@ -201,6 +230,14 @@ export async function submitForReview(
     metodologia_y_recursos: doc.metodologia_y_recursos,
     criterios_evaluacion: doc.criterios_evaluacion,
     semanas_estimadas: doc.semanas_estimadas,
+    fase_inicio: doc.fase_inicio ?? '',
+    fase_desarrollo: doc.fase_desarrollo ?? '',
+    fase_cierre: doc.fase_cierre ?? '',
+    es_preescolar: doc.es_preescolar ?? false,
+    nombre_proyecto: doc.nombre_proyecto ?? '',
+    dimensiones_articuladas: doc.dimensiones_articuladas ?? [],
+    actividades_rectoras: doc.actividades_rectoras ?? [],
+    experiencias_significativas: doc.experiencias_significativas ?? '',
     estado: doc.estado,
   });
 

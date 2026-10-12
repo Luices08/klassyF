@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../lib/apiClient';
-import type { Area, EstadoActivo, NivelEducativo, Subject, TipoAsignatura } from '../types/domain';
+import type { Area, EstadoActivo, NivelEducativo, Subject, TipoAsignatura, TipoEstructuraCurricular } from '../types/domain';
 
 /** Áreas académicas (M06): una sola institución por instalación, no hace falta filtrar por institucion_id. */
 export function useAreas() {
@@ -15,6 +15,7 @@ export interface CrearAreaInput {
   nombre: string;
   descripcion: string;
   codigo: string;
+  tipo_estructura?: TipoEstructuraCurricular;
 }
 
 export function useCrearArea() {
@@ -32,6 +33,7 @@ export interface ActualizarAreaInput {
   nombre: string;
   descripcion: string;
   codigo: string;
+  tipo_estructura?: TipoEstructuraCurricular;
 }
 
 export function useActualizarArea() {

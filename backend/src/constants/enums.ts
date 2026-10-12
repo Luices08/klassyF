@@ -129,6 +129,14 @@ export type GrupoSanguineo = (typeof GRUPOS_SANGUINEOS)[number];
 export const ESTADOS_AREA = ['activo', 'inactivo'] as const;
 export type EstadoArea = (typeof ESTADOS_AREA)[number];
 
+// Tipo de estructura curricular (M06): Área tradicional para Básica y Media vs Dimensión del Desarrollo para Preescolar (Decreto 2247 de 1997).
+export const TIPOS_ESTRUCTURA_CURRICULAR = ['AREA_DISCIPLINAR', 'DIMENSION_DESARROLLO'] as const;
+export type TipoEstructuraCurricular = (typeof TIPOS_ESTRUCTURA_CURRICULAR)[number];
+
+// Actividades rectoras de la educacion inicial y preescolar (Lineamientos MEN y Politica de Cero a Siempre).
+export const ACTIVIDADES_RECTORAS_PREESCOLAR = ['JUEGO', 'ARTE', 'LITERATURA', 'EXPLORACION_MEDIO'] as const;
+export type ActividadRectorPreescolar = (typeof ACTIVIDADES_RECTORAS_PREESCOLAR)[number];
+
 // Tipo de asignatura dentro del catalogo academico (M06).
 export const TIPOS_ASIGNATURA = ['OBLIGATORIA', 'OPTATIVA'] as const;
 export type TipoAsignatura = (typeof TIPOS_ASIGNATURA)[number];
@@ -145,10 +153,15 @@ export const ESTADOS_DESARROLLO_CURRICULAR = [
 ] as const;
 export type EstadoDesarrolloCurricular = (typeof ESTADOS_DESARROLLO_CURRICULAR)[number];
 
-// M07: Banco de Referentes Curriculares Oficiales (MEN / ICFES)
-// MATRIZ_ICFES queda reservado en el enum: aun no hay documento fuente para
-// sembrarlo (ver analisis M07); DBA, EBC y LINEAMIENTO si tienen banco poblado.
-export const TIPOS_REFERENTE = ['DBA', 'EBC', 'MATRIZ_ICFES', 'LINEAMIENTO'] as const;
+// M07: Banco de Referentes Curriculares Oficiales e Institucionales (MEN / ICFES / PEI)
+export const TIPOS_REFERENTE = [
+  'DBA',
+  'EBC',
+  'LINEAMIENTO',
+  'MATRIZ_ICFES',
+  'REFERENTE_INSTITUCIONAL',
+  'DIMENSION_EXPERIENCIA',
+] as const;
 export type TipoReferente = (typeof TIPOS_REFERENTE)[number];
 
 // M07: grupos de grados oficiales del documento de Estandares Basicos de

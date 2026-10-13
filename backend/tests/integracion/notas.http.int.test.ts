@@ -4,7 +4,9 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import Activity from '../../src/models/activity.model';
 import ActivitySubmission from '../../src/models/activitySubmission.model';
 import CalificacionAsignatura from '../../src/models/calificacionAsignatura.model';
+import AuditLog from '../../src/models/auditLog.model';
 import ColumnaPlanilla from '../../src/models/columnaPlanilla.model';
+import ImportacionNotas from '../../src/models/importacionNotas.model';
 import { UserDocument } from '../../src/models/user.model';
 import { generateToken } from '../../src/services/token.service';
 import { detenerBaseDeDatos, iniciarBaseDeDatos, limpiarBaseDeDatos } from './baseDeDatos';
@@ -558,6 +560,83 @@ describe('M12: notas (capa HTTP)', () => {
       expect(hoja.getCell(3, 5).protection?.locked ?? true).toBe(true);
       expect(hoja.getCell(4, 3).protection?.locked ?? true).toBe(true);
       expect(hoja.getCell(6, 12).value).toBe('CERRADO');
+    });
+
+    describe('registro de las importaciones', () => {
+      const bajar = async () => {
+        const { buffer } = await descargarExcel(e.docenteDeClase);
+        const libro = new ExcelJS.Workbook();
+        await libro.xlsx.load(buffer as unknown as ArrayBuffer);
+        return libro;
+      };
+      const subir = async (libro: ExcelJS.Workbook, nombre = 'mis-notas.xlsx') => subirExcel(e.docenteDeClase, Buffer.from(await libro.xlsx.writeBuffer()), nombre);
+      const registros = async (usuario: UserDocument = e.docenteDeClase) => (await json('GET', `/notas/planilla/excel/importaciones?${consulta()}`, usuario)).cuerpo.data as any[];
+
+      it('deja constancia de lo aplicado: quién, el archivo (solo su huella) y qué produjo', async () => {
+        const libro = await bajar();
+        libro.getWorksheet('Planilla')!.getCell(6, 3).value = 4;
+        expect((await subir(libro)).estado).toBe(200);
+
+        const lista = await registros();
+        expect(lista).toHaveLength(1);
+        expect(lista[0]).toMatchObject({
+          resultado: 'APLICADA',
+          archivo_nombre: 'mis-notas.xlsx',
+          hash: expect.stringMatching(/^[0-9a-f]{64}$/),
+          notas_guardadas: 1,
+          total_errores: 0,
+          total_conflictos: 0,
+          periodo_numero: 1,
+          usuario_id: { nombre: e.docenteDeClase.nombre, apellido: e.docenteDeClase.apellido },
+        });
+        expect(lista[0].descargado_en).toEqual(expect.any(String));
+        const auditoria = await AuditLog.findOne({ accion: 'NOTAS_EXCEL_IMPORTADO' });
+        expect(auditoria?.detalle).toMatch(/sha256 [0-9a-f]{64}/);
+      });
+
+      it('un archivo rechazado también queda: con los errores de fila y marcando cuáles son conflictos', async () => {
+        const libro = await bajar();
+        const hoja = libro.getWorksheet('Planilla')!;
+        hoja.getCell(6, 3).value = 'excelente';
+        const malo = await subir(libro, 'con-errores.xlsx');
+        expect(malo.estado).toBe(400);
+
+        const conflicto = await bajar();
+        await json('PUT', '/notas/planilla', e.docenteDeClase, { teacher_assignment_id: asignacionId(), periodo_numero: 1, celdas: [{ student_id: String(e.estudiante._id), casilla_id: a1, nota: 5 }] });
+        const fila = [6, 7, 8].find((r) => conflicto.getWorksheet('Planilla')!.getCell(r, 1).value === e.estudiante.numero_documento)!;
+        conflicto.getWorksheet('Planilla')!.getCell(fila, 3).value = 3;
+        expect((await subir(conflicto, 'conflicto.xlsx')).estado).toBe(400);
+
+        const lista = await registros(); // el más reciente primero
+        expect(lista.map((r) => r.archivo_nombre)).toEqual(['conflicto.xlsx', 'con-errores.xlsx']);
+        expect(lista[0]).toMatchObject({ resultado: 'RECHAZADA', total_errores: 1, total_conflictos: 1, notas_guardadas: 0 });
+        expect(lista[0].errores[0]).toMatchObject({ conflicto: true, motivo: expect.stringMatching(/cambió en el sistema/) });
+        expect(lista[1]).toMatchObject({ resultado: 'RECHAZADA', total_errores: 1, total_conflictos: 0 });
+        expect(lista[1].errores[0]).toMatchObject({ conflicto: false, motivo: expect.stringMatching(/no es una nota numérica/) });
+        expect(await AuditLog.countDocuments({ accion: 'NOTAS_EXCEL_RECHAZADO' })).toBe(2);
+      });
+
+      it('un archivo que no es de Klassy se registra sin clase; una planilla cerrada, con su motivo', async () => {
+        expect((await subirExcel(e.docenteDeClase, 'esto no es un excel')).estado).toBe(400);
+        expect(await ImportacionNotas.countDocuments({ teacher_assignment_id: null, resultado: 'RECHAZADA' })).toBe(1);
+        expect(await registros()).toHaveLength(0); // no pertenece a ninguna clase, así que no sale en el historial de una
+
+        const { buffer } = await descargarExcel(e.docenteDeClase);
+        await json('PUT', '/notas/planilla', e.docenteDeClase, { teacher_assignment_id: asignacionId(), periodo_numero: 1, celdas: todas() });
+        await json('POST', '/notas/planilla/cerrar', e.docenteDeClase, { teacher_assignment_id: asignacionId(), periodo_numero: 1 });
+        expect((await subirExcel(e.docenteDeClase, buffer)).estado).toBe(409);
+        const lista = await registros();
+        expect(lista).toHaveLength(1);
+        expect(lista[0]).toMatchObject({ resultado: 'RECHAZADA', mensaje: expect.stringMatching(/cerrada/) });
+      });
+
+      it('solo lo ve el docente de la clase y coordinación', async () => {
+        const ruta = `/notas/planilla/excel/importaciones?${consulta()}`;
+        expect((await json('GET', ruta, e.docenteAjeno)).estado).toBe(403);
+        expect((await json('GET', ruta, e.estudiante)).estado).toBe(403);
+        expect((await json('GET', ruta, null)).estado).toBe(401);
+        expect((await json('GET', ruta, e.coordAcademico)).estado).toBe(200);
+      });
     });
 
     describe('conflictos con lo que cambió en el sistema mientras el docente trabajaba sin conexión', () => {

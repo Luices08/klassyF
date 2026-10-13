@@ -163,11 +163,18 @@ export async function generarPdfPlanilla(
   };
 
   let y = dibujarEncabezadoTabla(doc.y);
+  // El borde exterior se cierra página por página: con más filas de las que caben, un solo rectángulo calculado al final quedaba fuera de la hoja.
+  let inicioFilas = y;
+  const cerrarBordePagina = () => {
+    if (y > inicioFilas) doc.rect(MARGEN, inicioFilas, anchoTabla, y - inicioFilas).lineWidth(0.5).stroke(COLOR.borde);
+  };
   const limite = doc.page.height - 36 - ALTO_FILA;
   planilla.estudiantes.forEach((fila, indice) => {
     if (y > limite) {
+      cerrarBordePagina();
       doc.addPage();
       y = dibujarEncabezadoTabla(MARGEN);
+      inicioFilas = y;
     }
     let x = MARGEN;
     columnas.forEach((c, k) => {
@@ -179,7 +186,7 @@ export async function generarPdfPlanilla(
     doc.moveTo(MARGEN, y + ALTO_FILA).lineTo(MARGEN + anchoTabla, y + ALTO_FILA).lineWidth(0.4).stroke(COLOR.borde);
     y += ALTO_FILA;
   });
-  doc.rect(MARGEN, y - ALTO_FILA * planilla.estudiantes.length, anchoTabla, ALTO_FILA * planilla.estudiantes.length).lineWidth(0.5).stroke(COLOR.borde);
+  cerrarBordePagina();
 
   // --- Leyenda, pie y firmas ---
   doc.x = MARGEN;

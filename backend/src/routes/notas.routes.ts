@@ -15,6 +15,7 @@ import {
   eliminarCasilla,
   establecerPesos,
   guardarCeldas,
+  importacionesExcel,
   importarExcel,
   misNotas,
   obtenerBloques,
@@ -74,6 +75,8 @@ router.get('/planilla/pdf', checkRole(ROLES.DOCENTE, ...GESTION), validate(notas
 // Trabajo sin conexión (M22): la misma planilla en Excel, con fórmulas protegidas.
 router.get('/planilla/excel', checkRole(ROLES.DOCENTE), validate(notasValidator.obtenerPlanilla), descargarExcel);
 router.post('/planilla/excel', checkRole(ROLES.DOCENTE), uploadExcel.single('file'), importarExcel);
+// Registro de cada archivo subido (quién, cuándo, qué se aplicó, errores y conflictos).
+router.get('/planilla/excel/importaciones', checkRole(ROLES.DOCENTE, ...GESTION), validate(notasValidator.obtenerPlanilla), importacionesExcel);
 
 // Ciclo de estados: el docente cierra, coordinación declara definitivas, se reabre con motivo.
 router.post('/planilla/cerrar', checkRole(ROLES.DOCENTE), validate(notasValidator.cerrarPlanilla), cerrarPlanilla);

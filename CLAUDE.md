@@ -741,6 +741,13 @@ coordinación) y `CreadorPlanillasPage` (`/admin/creador-planillas`, ADMIN). La 
   cambió es **conflicto** (400 con la fila y «descarga de nuevo»; no se guarda nada, como el resto de errores). Igual con pesos y con el nombre de una nota suelta.
   Lo que el Excel nunca puede romper el porcentaje: los % de los bloques no viajan en el archivo (son del molde), los pesos se validan ≤100% por bloque, las
   casillas nuevas se miden contra el cupo vivo del bloque y la nota que se muestra después es la que calcula el servidor. Un archivo sin instantánea se rechaza.
+- **Registro de importaciones del Excel (M22)** (`ImportacionNotas`, `notasExcel.service#importarPlantillaNotas`, `GET /notas/planilla/excel/importaciones`, DOCENTE de la clase y
+  ADMIN/COORDINADOR): cada archivo subido deja un registro, aplicado o no: usuario, nombre, **huella SHA-256** (el archivo no se conserva), cuándo se descargó, `resultado` (`APLICADA`;
+  `RECHAZADA` = validación fallida, no se guardó nada; `INTERRUMPIDA` = pasó la validación y la escritura falló, puede haber quedado a medias), conteos y hasta 100 errores de fila con
+  `conflicto: true` cuando lo cambió el sistema después de la descarga. Un archivo que ni se reconoce como planilla de Klassy se guarda sin clase (no sale en el historial de ninguna). Registrar
+  nunca cambia la respuesta al docente (si falla, solo se deja en consola). Auditoría: `NOTAS_EXCEL_IMPORTADO` / `NOTAS_EXCEL_RECHAZADO`, sin notas ni nombres en el `detalle`. La respuesta de
+  error al docente conserva su forma (`conflicto` solo vive en el registro). En pantalla: `HistorialImportacionesExcel` bajo el Excel de la planilla. Un archivo que no es `.xlsx` lo corta
+  multer antes del servicio y no se registra. **Pendiente:** registrar también las descargas, y ver el historial desde el seguimiento de coordinación.
 - **Vista previa y Excel de muestra del molde** (administración, pestaña «Vista del docente y Excel» del Creador de planillas): `GET /notas/molde/vista-previa` y
   `/notas/molde/excel?academic_year_id=` (ADMIN/COORDINADOR; `planillaMuestra.service.ts`). Arman una `Planilla` inventada (3 estudiantes, 2 casillas por bloque) con
   el molde y la plantilla de impresión vigentes, reusando `armarFila`/`armarBloques` y el mismo generador de Excel del docente; no tocan la base. El Excel lleva la

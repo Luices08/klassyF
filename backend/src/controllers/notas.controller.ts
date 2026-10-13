@@ -79,7 +79,12 @@ export const descargarExcel = catchAsync<unknown, unknown, unknown, ConsultaPlan
 
 export const importarExcel = catchAsync(async (req, res) => {
   if (!req.file) throw new ApiError(400, 'Debes adjuntar un archivo en el campo "file".');
-  res.status(200).json({ success: true, data: await excelService.importarPlantillaNotas(req.file.buffer, req.user!, req.ip) });
+  res.status(200).json({ success: true, data: await excelService.importarPlantillaNotas(req.file.buffer, req.user!, req.ip, req.file.originalname) });
+});
+
+export const importacionesExcel = catchAsync<unknown, unknown, unknown, ConsultaPlanilla>(async (req, res) => {
+  const registros = await excelService.listarImportacionesDeNotas(req.query.teacher_assignment_id, Number(req.query.periodo_numero), req.user!);
+  res.status(200).json({ success: true, count: registros.length, data: registros });
 });
 
 // --- Plantilla de la planilla (presentación) y PDF ---

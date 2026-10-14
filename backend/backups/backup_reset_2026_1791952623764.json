@@ -1,0 +1,100 @@
+{
+  "fecha": "2026-10-14T04:37:03.760Z",
+  "academicYearOriginal": {
+    "_id": "6ab96dd10c0e12f29a63d65f",
+    "institucion_id": "6ab96dd10c0e12f29a63d65b",
+    "year": 2026,
+    "calendario": "A",
+    "estado": "PLANIFICACION",
+    "periodos": [
+      {
+        "numero": 1,
+        "nombre": "Periodo 1",
+        "porcentaje": 34,
+        "fecha_inicio": "2026-01-21T00:00:00.000Z",
+        "fecha_fin": "2026-04-17T00:00:00.000Z",
+        "fecha_apertura_notas": null,
+        "fecha_cierre_notas": null,
+        "estado": "PROGRAMADO",
+        "_id": "6ab96dd10c0e12f29a63d660"
+      },
+      {
+        "numero": 2,
+        "nombre": "Periodo 2",
+        "porcentaje": 33,
+        "fecha_inicio": "2026-04-20T00:00:00.000Z",
+        "fecha_fin": "2026-08-14T00:00:00.000Z",
+        "fecha_apertura_notas": null,
+        "fecha_cierre_notas": null,
+        "estado": "PROGRAMADO",
+        "_id": "6ab96dd10c0e12f29a63d661"
+      },
+      {
+        "numero": 3,
+        "nombre": "Periodo 3",
+        "porcentaje": 33,
+        "fecha_inicio": "2026-08-17T00:00:00.000Z",
+        "fecha_fin": "2026-12-01T00:00:00.000Z",
+        "fecha_apertura_notas": null,
+        "fecha_cierre_notas": null,
+        "estado": "PROGRAMADO",
+        "_id": "6ab96dd10c0e12f29a63d662"
+      }
+    ],
+    "createdAt": "2026-09-27T19:26:09.191Z",
+    "updatedAt": "2026-10-14T04:24:43.126Z",
+    "__v": 1,
+    "calendarios_sede": [],
+    "eventos": [],
+    "fecha_fin": "2026-12-01T00:00:00.000Z",
+    "fecha_inicio": "2026-01-21T00:00:00.000Z",
+    "nombre": "2026",
+    "escala_evaluacion": {
+      "nota_minima": 1,
+      "nota_maxima": 5,
+      "nota_aprobatoria": 3,
+      "precision_decimales": 1,
+      "rangos": [
+        {
+          "nivel": "BAJO",
+          "etiqueta": "Bajo",
+          "valor_minimo": 1,
+          "valor_maximo": 2.9,
+          "es_aprobatorio": false
+        },
+        {
+          "nivel": "BASICO",
+          "etiqueta": "Básico",
+          "valor_minimo": 3,
+          "valor_maximo": 3.6,
+          "es_aprobatorio": true
+        },
+        {
+          "nivel": "ALTO",
+          "etiqueta": "Alto",
+          "valor_minimo": 3.7,
+          "valor_maximo": 4.2,
+          "es_aprobatorio": true
+        },
+        {
+          "nivel": "SUPERIOR",
+          "etiqueta": "Superior",
+          "valor_minimo": 4.3,
+          "valor_maximo": 5,
+          "es_aprobatorio": true
+        }
+      ]
+    },
+    "ponderacion_componentes": {
+      "COGNITIVO_SABER": 0.4,
+      "PROCEDIMENTAL_HACER": 0.4,
+      "ACTITUDINAL_SER": 0.2
+    },
+    "cerrado_at": null
+  },
+  "actividades": [],
+  "entregas": [],
+  "asistencias": [],
+  "prorrogas": [],
+  "columnas": []
+}

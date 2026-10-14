@@ -356,7 +356,6 @@ export interface Seguimiento {
 }
 
 export interface AjusteAsignatura {
-  dba_ids: string[];
   objetivo_flexibilizado: string;
   barrera_asignatura: string;
   tipos_barrera: string[];
@@ -610,7 +609,6 @@ export function useAjustes(id: string | undefined) {
 }
 
 export interface DatosAjuste {
-  dba_ids?: string[];
   objetivo_flexibilizado?: string;
   barrera_asignatura?: string;
   tipos_barrera?: string[];

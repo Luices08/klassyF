@@ -28,9 +28,6 @@ export const createActivity: ValidationSchema = {
     requiere_entrega: Joi.boolean(),
     formatos_permitidos: formatos,
     permite_entrega_tardia: Joi.boolean(),
-    // Al menos uno de los dos: lo exige el servicio (necesita la planeación aprobada para validarlos).
-    dba_id: objectId.allow(null),
-    competencia_evaluada: Joi.string().trim().max(600).allow('', null),
     confirmar_alertas: Joi.boolean(),
   }),
 };
@@ -48,8 +45,6 @@ export const updateActivity: ValidationSchema = {
     requiere_entrega: Joi.boolean(),
     formatos_permitidos: formatos,
     permite_entrega_tardia: Joi.boolean(),
-    dba_id: objectId.allow(null),
-    competencia_evaluada: Joi.string().trim().max(600).allow('', null),
     confirmar_alertas: Joi.boolean(),
   }).min(1),
 };

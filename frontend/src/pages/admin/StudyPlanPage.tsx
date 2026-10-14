@@ -36,7 +36,6 @@ import {
   useConfigurarAsignaturasGrado,
   useConfigurarAsignaturasMultiplesGrados,
   useConfigurarDistribucionGrupo,
-  useConfigurarDistribucionJornada,
   useConfigurarEvaluacionArea,
   useConfigurarEvaluacionAreaGrupo,
   type GradoExcedido,
@@ -112,9 +111,47 @@ function getJornadaNombre(g: Group | null | undefined, jornadaMap?: Map<string, 
   return (jornadaMap && typeof g.jornada_id === 'string' ? jornadaMap.get(g.jornada_id)?.nombre : '') || '';
 }
 
+function resolverGradoPlan(
+  studyPlan: ReturnType<typeof useStudyPlan>['data'],
+  gradeId: string,
+  sedeId?: string | null,
+  jornadaId?: string | null
+) {
+  if (!studyPlan?.grades || studyPlan.grades.length === 0) return undefined;
+  const sId = sedeId ? String(sedeId) : null;
+  const jId = jornadaId ? String(jornadaId) : null;
+
+  // 1. Coincidencia exacta: (grade_id, sede_id, jornada_id)
+  if (sId && jId) {
+    const exacto = studyPlan.grades.find(
+      (g) => g.grade_id === gradeId && (g.sede_id || null) === sId && (g.jornada_id || null) === jId
+    );
+    if (exacto) return exacto;
+  }
+
+  // 2. Coincidencia por jornada (todas las sedes): (grade_id, null, jornada_id)
+  if (jId) {
+    const porJornada = studyPlan.grades.find(
+      (g) => g.grade_id === gradeId && !g.sede_id && (g.jornada_id || null) === jId
+    );
+    if (porJornada) return porJornada;
+  }
+
+  // 3. Coincidencia por sede (todas las jornadas): (grade_id, sede_id, null)
+  if (sId) {
+    const porSede = studyPlan.grades.find(
+      (g) => g.grade_id === gradeId && (g.sede_id || null) === sId && !g.jornada_id
+    );
+    if (porSede) return porSede;
+  }
+
+  // 4. Base general institucional: (grade_id, null, null)
+  return studyPlan.grades.find((g) => g.grade_id === gradeId && !g.sede_id && !g.jornada_id);
+}
+
 const TABS = [
   { key: 'general', label: 'Configuración General (por Nivel)', icon: <BookIcon className="h-4 w-4" /> },
-  { key: 'grupos', label: 'Distribución por Grupos y Jornadas', icon: <UsersIcon className="h-4 w-4" /> },
+  { key: 'grupos', label: 'Personalización por Grupos (Casos Especiales)', icon: <UsersIcon className="h-4 w-4" /> },
   { key: 'evaluacion', label: 'Configuración de Evaluación', icon: <SlidersIcon className="h-4 w-4" /> },
 ];
 
@@ -140,7 +177,9 @@ export function StudyPlanPage() {
   const studyPlanQuery = useStudyPlan(institucionId || undefined, academicYearId || undefined);
   const crearDesdeAnioAnterior = useCrearPlanDesdeAnioAnterior();
 
-  // 5. Nivel educativo como filtro global superior
+  // Filtros superiores contextuales: Sede, Jornada y Nivel Educativo
+  const [sedeId, setSedeId] = useState('');
+  const [jornadaId, setJornadaId] = useState('');
   const [nivel, setNivel] = useState<NivelEducativo>('MEDIA');
   const gradesQuery = useGrades('activo');
   const todosLosGrados = useMemo(() => gradesQuery.data ?? [], [gradesQuery.data]);
@@ -197,9 +236,30 @@ export function StudyPlanPage() {
 
   const campusesQuery = useCampuses(institucionId || undefined);
   const todasLasSedes = useMemo(() => campusesQuery.data ?? [], [campusesQuery.data]);
+  const campusMap = useMemo(() => new Map(todasLasSedes.map((c) => [c._id, c])), [todasLasSedes]);
 
   const jornadasQuery = useTodasLasJornadas();
   const todasLasJornadas = useMemo(() => jornadasQuery.data ?? [], [jornadasQuery.data]);
+
+  const jornadasParaSelect = useMemo(() => {
+    if (!sedeId) return todasLasJornadas;
+    return todasLasJornadas.filter((j) => {
+      const sId = typeof j.sede_id === 'object' && j.sede_id ? j.sede_id._id : j.sede_id;
+      return String(sId) === String(sedeId);
+    });
+  }, [todasLasJornadas, sedeId]);
+
+  useEffect(() => {
+    if (sedeId && jornadaId) {
+      const pertenece = todasLasJornadas.some((j) => {
+        const sId = typeof j.sede_id === 'object' && j.sede_id ? j.sede_id._id : j.sede_id;
+        return j._id === jornadaId && String(sId) === String(sedeId);
+      });
+      if (!pertenece) {
+        setJornadaId('');
+      }
+    }
+  }, [sedeId, jornadaId, todasLasJornadas]);
 
   const limitesHorasQuery = useLimitesHorasPlan();
 
@@ -236,17 +296,17 @@ export function StudyPlanPage() {
         <Alert tone="info">Aún no hay una institución configurada. Completa primero &quot;Configuración institucional&quot;.</Alert>
       )}
 
-      {/* 5. Barra Superior Global: Año Lectivo + Nivel Educativo Global */}
+      {/* Barra Superior Global: Año Lectivo + Sede + Jornada + Nivel Educativo */}
       <div className="flex flex-wrap items-center justify-between gap-4 rounded-xl border border-border bg-surface p-4 shadow-sm">
-        <div className="flex flex-wrap items-center gap-6">
+        <div className="flex flex-wrap items-center gap-4">
           <div className="flex items-center gap-2">
             <CalendarIcon className="h-4 w-4 text-muted" />
-            <span className="text-xs font-semibold text-ink">Año lectivo:</span>
+            <span className="text-xs font-semibold text-ink">Año:</span>
             <Select
               label=""
               value={academicYearId}
               onChange={(e) => setAcademicYearId(e.target.value)}
-              className="w-44 text-sm"
+              className="w-36 text-sm"
             >
               {academicYears.map((a) => (
                 <option key={a._id} value={a._id}>
@@ -276,8 +336,58 @@ export function StudyPlanPage() {
           <div className="h-6 w-px bg-border hidden sm:block" />
 
           <div className="flex items-center gap-2">
+            <BuildingIcon className="h-4 w-4 text-muted" />
+            <span className="text-xs font-semibold text-ink">Sede:</span>
+            <Select
+              label=""
+              value={sedeId}
+              onChange={(e) => setSedeId(e.target.value)}
+              className="w-48 text-sm"
+            >
+              <option value="">Todas las sedes</option>
+              {todasLasSedes.map((s) => (
+                <option key={s._id} value={s._id}>
+                  {s.nombre}
+                </option>
+              ))}
+            </Select>
+          </div>
+
+          <div className="h-6 w-px bg-border hidden sm:block" />
+
+          <div className="flex items-center gap-2">
+            <ClockIcon className="h-4 w-4 text-muted" />
+            <span className="text-xs font-semibold text-ink">Jornada:</span>
+            <Select
+              label=""
+              value={jornadaId}
+              onChange={(e) => setJornadaId(e.target.value)}
+              className="w-56 text-sm"
+            >
+              <option value="">Todas las jornadas (Base general)</option>
+              {jornadasParaSelect.map((j) => {
+                const sNom =
+                  typeof j.sede_id === 'object' && j.sede_id
+                    ? j.sede_id.nombre
+                    : campusMap.get(typeof j.sede_id === 'string' ? j.sede_id : '')?.nombre;
+                const cap = calcularCapacidadJornada(j);
+                const etiqueta = sedeId
+                  ? `${j.nombre} ${cap > 0 ? `(${cap} h/sem)` : ''}`
+                  : `${j.nombre} — ${sNom || 'Sin sede'} ${cap > 0 ? `(${cap} h/sem)` : ''}`;
+                return (
+                  <option key={j._id} value={j._id}>
+                    {etiqueta}
+                  </option>
+                );
+              })}
+            </Select>
+          </div>
+
+          <div className="h-6 w-px bg-border hidden sm:block" />
+
+          <div className="flex items-center gap-2">
             <BookIcon className="h-4 w-4 text-muted" />
-            <span className="text-xs font-semibold text-ink">Nivel educativo:</span>
+            <span className="text-xs font-semibold text-ink">Nivel:</span>
             <Select
               label=""
               value={nivel}
@@ -380,6 +490,10 @@ export function StudyPlanPage() {
               academicYearId={academicYearId}
               anioYear={anioActual?.year}
               nivel={nivel}
+              sedeId={sedeId}
+              jornadaId={jornadaId}
+              sedes={todasLasSedes}
+              jornadas={todasLasJornadas}
               gradosDelNivel={gradosDelNivel}
               subjects={todosLosSubjects}
               areaById={areaById}
@@ -415,6 +529,8 @@ export function StudyPlanPage() {
               institucionId={institucionId}
               academicYearId={academicYearId}
               nivel={nivel}
+              sedeId={sedeId}
+              jornadaId={jornadaId}
               gradosDelNivel={gradosDelNivel}
               subjectById={subjectById}
               areas={todasLasAreas}
@@ -446,6 +562,10 @@ interface ConfiguracionGeneralNivelTabProps {
   academicYearId: string;
   anioYear?: number;
   nivel: NivelEducativo;
+  sedeId: string;
+  jornadaId: string;
+  sedes: Campus[];
+  jornadas: JornadaOperativa[];
   gradosDelNivel: Grade[];
   subjects: Subject[];
   areaById: Map<string, { nombre: string }>;
@@ -461,6 +581,10 @@ function ConfiguracionGeneralNivelTab({
   academicYearId,
   anioYear,
   nivel,
+  sedeId,
+  jornadaId,
+  sedes,
+  jornadas,
   gradosDelNivel,
   subjects,
   areaById,
@@ -475,7 +599,14 @@ function ConfiguracionGeneralNivelTab({
   const configurarGrado = useConfigurarAsignaturasGrado();
   const actualizarLimites = useActualizarLimitesHorasPlan();
 
-  const MAX_HORAS_SEMANALES = maxHorasPorNivel?.[nivel] ?? 30;
+  const selectedSede = useMemo(() => sedes.find((s) => s._id === sedeId), [sedes, sedeId]);
+  const selectedJornada = useMemo(() => jornadas.find((j) => j._id === jornadaId), [jornadas, jornadaId]);
+  const capacidadJornada = calcularCapacidadJornada(selectedJornada);
+
+  // El tope se adapta automáticamente: si se selecciona una jornada con periodos configurados (ej. 20h para nocturna),
+  // se utiliza su capacidad; en caso contrario, se aplica el tope normativo del nivel (ej. 30h).
+  const MAX_HORAS_SEMANALES =
+    capacidadJornada > 0 ? capacidadJornada : (maxHorasPorNivel?.[nivel] ?? 30);
 
   const [filtroArea, setFiltroArea] = useState('');
 
@@ -518,17 +649,22 @@ function ConfiguracionGeneralNivelTab({
   }
 
   // 1. CARGA DIRECTA: asignaturas activas del catálogo para este nivel, más cualquiera que ya
-  // tenga horas configuradas en algún grado de este nivel aunque se haya inactivado o le hayan
-  // quitado el nivel después en el Catálogo Académico — si no, el guardado masivo la borraría
-  // del plan en silencio por el simple hecho de no aparecer en esta lista.
+  // tenga horas configuradas en algún grado de este contexto específico (sede + jornada)
   const idsConHorasEnNivel = useMemo(() => {
     const ids = new Set<string>();
+    const sId = sedeId || null;
+    const jId = jornadaId || null;
     for (const grado of gradosDelNivel) {
-      const gradoPlan = studyPlan?.grades.find((g) => g.grade_id === grado._id);
+      const gradoPlan = studyPlan?.grades.find(
+        (g) =>
+          g.grade_id === grado._id &&
+          (g.sede_id || null) === sId &&
+          (g.jornada_id || null) === jId
+      );
       for (const a of gradoPlan?.asignaturas ?? []) ids.add(a.subject_id);
     }
     return ids;
-  }, [gradosDelNivel, studyPlan]);
+  }, [gradosDelNivel, studyPlan, sedeId, jornadaId]);
 
   const asignaturasDelNivel = useMemo(() => {
     return subjects
@@ -548,11 +684,18 @@ function ConfiguracionGeneralNivelTab({
       .sort((a, b) => a.nombre.localeCompare(b.nombre));
   }, [asignaturasDelNivel, areaById]);
 
-  // Mapa de horas actuales en base de datos: Map<subjectId, Map<gradeId, number>>
+  // Mapa de horas actuales en base de datos para este contexto: Map<subjectId, Map<gradeId, number>>
   const horasActualesBD = useMemo(() => {
     const mapa = new Map<string, Map<string, number>>();
+    const sId = sedeId || null;
+    const jId = jornadaId || null;
     for (const grado of gradosDelNivel) {
-      const gradoPlan = studyPlan?.grades.find((g) => g.grade_id === grado._id);
+      const gradoPlan = studyPlan?.grades.find(
+        (g) =>
+          g.grade_id === grado._id &&
+          (g.sede_id || null) === sId &&
+          (g.jornada_id || null) === jId
+      );
       if (!gradoPlan) continue;
       for (const asig of gradoPlan.asignaturas) {
         if (!mapa.has(asig.subject_id)) {
@@ -562,15 +705,15 @@ function ConfiguracionGeneralNivelTab({
       }
     }
     return mapa;
-  }, [gradosDelNivel, studyPlan]);
+  }, [gradosDelNivel, studyPlan, sedeId, jornadaId]);
 
-  // Al cambiar de nivel, reseteamos el modo de edición
+  // Al cambiar de nivel, sede o jornada, reseteamos el modo de edición
   useEffect(() => {
     setModoEdicion(false);
     setHorasEdicion({});
-  }, [nivel]);
+  }, [nivel, sedeId, jornadaId]);
 
-  // 4. Iniciar edición masiva: precarga las horas de todas las asignaturas
+  // Iniciar edición masiva: precarga las horas ya configuradas para este contexto
   function iniciarEdicionMasiva() {
     const mapa: Record<string, Record<string, number | ''>> = {};
     for (const sub of asignaturasDelNivel) {
@@ -587,6 +730,22 @@ function ConfiguracionGeneralNivelTab({
   function cancelarEdicionMasiva() {
     setModoEdicion(false);
     setHorasEdicion({});
+  }
+
+  // Copia las horas de la base general institucional (sin sede ni jornada) como borrador inicial
+  function handleCopiarBorradorBaseGeneral() {
+    const mapa: Record<string, Record<string, number | ''>> = {};
+    for (const sub of asignaturasDelNivel) {
+      mapa[sub._id] = {};
+      for (const g of gradosDelNivel) {
+        const basePlan = studyPlan?.grades.find(
+          (planG) => planG.grade_id === g._id && !planG.sede_id && !planG.jornada_id
+        );
+        const asig = basePlan?.asignaturas.find((a) => a.subject_id === sub._id);
+        mapa[sub._id][g._id] = asig ? asig.intensidad_horaria_semanal : '';
+      }
+    }
+    setHorasEdicion(mapa);
   }
 
   // 7. Modificar input: Si se edita el primer grado del nivel, se propaga hacia la derecha
@@ -614,6 +773,8 @@ function ConfiguracionGeneralNivelTab({
   // 3. Cálculo de horas semanales totales por grado (en lectura o en edición)
   const totalHorasPorGrado = useMemo(() => {
     const totales: Record<string, number> = {};
+    const sId = sedeId || null;
+    const jId = jornadaId || null;
     for (const grado of gradosDelNivel) {
       if (modoEdicion) {
         let suma = 0;
@@ -625,7 +786,12 @@ function ConfiguracionGeneralNivelTab({
         }
         totales[grado._id] = suma;
       } else {
-        const gradoPlan = studyPlan?.grades.find((g) => g.grade_id === grado._id);
+        const gradoPlan = studyPlan?.grades.find(
+          (g) =>
+            g.grade_id === grado._id &&
+            (g.sede_id || null) === sId &&
+            (g.jornada_id || null) === jId
+        );
         totales[grado._id] = (gradoPlan?.asignaturas ?? []).reduce(
           (sum, a) => sum + (a.intensidad_horaria_semanal || 0),
           0
@@ -633,14 +799,14 @@ function ConfiguracionGeneralNivelTab({
       }
     }
     return totales;
-  }, [gradosDelNivel, modoEdicion, asignaturasDelNivel, horasEdicion, studyPlan]);
+  }, [gradosDelNivel, modoEdicion, asignaturasDelNivel, horasEdicion, studyPlan, sedeId, jornadaId]);
 
-  // 3. Grados que exceden el límite de horas semanales configurado para este nivel
+  // 3. Grados que exceden el límite de horas semanales configurado para este nivel/jornada
   const gradosExcedidos = useMemo(() => {
     return gradosDelNivel.filter((g) => (totalHorasPorGrado[g._id] || 0) > MAX_HORAS_SEMANALES);
   }, [gradosDelNivel, totalHorasPorGrado, MAX_HORAS_SEMANALES]);
 
-  // 4. Guardar cambios masivos de todo el nivel educativo
+  // 4. Guardar cambios masivos de todo el nivel educativo para la sede y jornada seleccionadas
   async function handleGuardarEdicionMasiva() {
     if (gradosExcedidos.length > 0) return;
 
@@ -669,6 +835,8 @@ function ConfiguracionGeneralNivelTab({
     await configurarMultiples.mutateAsync({
       institucion_id: institucionId,
       academic_year_id: academicYearId,
+      sede_id: sedeId || null,
+      jornada_id: jornadaId || null,
       grados: nuevosGrados,
       motivo,
     });
@@ -680,7 +848,14 @@ function ConfiguracionGeneralNivelTab({
   async function handleConfirmarDesvincularGrado() {
     if (!desvinculandoGrado) return;
     const { subject, grade } = desvinculandoGrado;
-    const gradoPlan = studyPlan?.grades.find((g) => g.grade_id === grade._id);
+    const sId = sedeId || null;
+    const jId = jornadaId || null;
+    const gradoPlan = studyPlan?.grades.find(
+      (g) =>
+        g.grade_id === grade._id &&
+        (g.sede_id || null) === sId &&
+        (g.jornada_id || null) === jId
+    );
     const nuevasAsignaturas = (gradoPlan?.asignaturas ?? []).filter((a) => a.subject_id !== subject._id);
 
     const motivo = pedirMotivoDelCambio(exigeMotivo);
@@ -691,6 +866,8 @@ function ConfiguracionGeneralNivelTab({
       institucion_id: institucionId,
       academic_year_id: academicYearId,
       grade_id: grade._id,
+      sede_id: sId,
+      jornada_id: jId,
       asignaturas: nuevasAsignaturas,
       motivo,
     });
@@ -702,9 +879,16 @@ function ConfiguracionGeneralNivelTab({
   async function handleConfirmarDesvincularNivel() {
     if (!desvinculandoNivel) return;
     const subjectId = desvinculandoNivel._id;
+    const sId = sedeId || null;
+    const jId = jornadaId || null;
 
     const nuevosGrados = gradosDelNivel.map((grado) => {
-      const gradoPlan = studyPlan?.grades.find((g) => g.grade_id === grado._id);
+      const gradoPlan = studyPlan?.grades.find(
+        (g) =>
+          g.grade_id === grado._id &&
+          (g.sede_id || null) === sId &&
+          (g.jornada_id || null) === jId
+      );
       const asignaturasActuales = (gradoPlan?.asignaturas ?? []).filter((a) => a.subject_id !== subjectId);
       return {
         grade_id: grado._id,
@@ -719,6 +903,8 @@ function ConfiguracionGeneralNivelTab({
     await configurarMultiples.mutateAsync({
       institucion_id: institucionId,
       academic_year_id: academicYearId,
+      sede_id: sId,
+      jornada_id: jId,
       grados: nuevosGrados,
       motivo,
     });
@@ -728,16 +914,48 @@ function ConfiguracionGeneralNivelTab({
 
   return (
     <div className="space-y-4">
+      {/* Contexto Activo: Sede + Jornada + Nivel */}
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-soft/40 px-4 py-2.5 text-xs">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="font-semibold text-ink">Matriz activa:</span>
+          <Chip tone={sedeId ? 'blue' : 'neutral'}>
+            Sede: {selectedSede ? selectedSede.nombre : 'Todas las sedes'}
+          </Chip>
+          <Chip tone={selectedJornada ? 'orange' : 'neutral'}>
+            Jornada: {selectedJornada ? selectedJornada.nombre : 'Todas las jornadas (Base)'}
+          </Chip>
+          <Chip tone="green">
+            Nivel: {NIVEL_LABELS[nivel]}
+          </Chip>
+        </div>
+        <div className="flex items-center gap-2 text-body">
+          <span>Límite máximo por grado:</span>
+          <Chip tone={capacidadJornada > 0 && capacidadJornada < 30 ? 'orange' : 'neutral'}>
+            {MAX_HORAS_SEMANALES} h/semana
+          </Chip>
+        </div>
+      </div>
+
       <Card>
         <CardHeader
           title={`Configuración General: ${NIVEL_LABELS[nivel]}`}
-          subtitle={`Define la intensidad horaria semanal de cada asignatura para los grados de este nivel. La carga horaria no debe superar ${MAX_HORAS_SEMANALES} horas semanales por grado.`}
+          subtitle={`Define la intensidad horaria semanal de cada asignatura para este contexto. La carga horaria no debe superar ${MAX_HORAS_SEMANALES} horas semanales por grado.`}
           action={
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <Button type="button" variant="outline" onClick={abrirDrawerLimites}>
                 <SlidersIcon className="h-4 w-4" />
                 Gestionar límites de horas
               </Button>
+              {modoEdicion && (sedeId || jornadaId) && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={handleCopiarBorradorBaseGeneral}
+                  title="Copia las intensidades de la base general para editarlas aquí como punto de partida"
+                >
+                  Importar base general
+                </Button>
+              )}
               {modoEdicion ? (
                 <>
                   <Button
@@ -779,7 +997,7 @@ function ConfiguracionGeneralNivelTab({
             <Alert tone="error">
               Atención: Los grados{' '}
               <strong>{gradosExcedidos.map((g) => `${g.nombre} (${totalHorasPorGrado[g._id]} h)`).join(', ')}</strong>{' '}
-              superan el límite máximo permitido de {MAX_HORAS_SEMANALES} horas semanales. Ajusta las intensidades antes de guardar.
+              superan el límite máximo permitido de {MAX_HORAS_SEMANALES} horas semanales para esta jornada/nivel. Ajusta las intensidades antes de guardar.
             </Alert>
           </div>
         )}
@@ -1144,13 +1362,9 @@ function DistribucionGruposTab({
   maxHoras,
   onPlanUpdated,
 }: DistribucionGruposTabProps) {
-  const [subTab, setSubTab] = useState<'grupos' | 'jornadas'>('grupos');
   const campusMap = useMemo(() => new Map(sedes.map((c) => [c._id, c])), [sedes]);
   const jornadaMap = useMemo(() => new Map(jornadas.map((j) => [j._id, j])), [jornadas]);
 
-  // ---------------------------------------------------------------------------
-  // SUB-MODO A: Personalización por Grupo Específico
-  // ---------------------------------------------------------------------------
   const [gradeId, setGradeId] = useState(gradosDelNivel[0]?._id ?? '');
   useEffect(() => {
     if (gradosDelNivel.length > 0 && !gradosDelNivel.some((g) => g._id === gradeId)) {
@@ -1195,10 +1409,15 @@ function DistribucionGruposTab({
   const selectedGroup = useMemo(() => gruposDelGrado.find((g) => g._id === groupId), [gruposDelGrado, groupId]);
   const sedeNomGrupo = getSedeNombre(selectedGroup, campusMap);
   const jornadaNomGrupo = getJornadaNombre(selectedGroup, jornadaMap);
+  const sedeIdStrGrupo =
+    typeof selectedGroup?.sede_id === 'object' && selectedGroup.sede_id
+      ? selectedGroup.sede_id._id
+      : (selectedGroup?.sede_id ?? null);
   const jornadaIdStrGrupo =
     typeof selectedGroup?.jornada_id === 'object' && selectedGroup.jornada_id
       ? selectedGroup.jornada_id._id
-      : (selectedGroup?.jornada_id ?? '');
+      : (selectedGroup?.jornada_id ?? null);
+
   const jornadaDocGrupo = useMemo(
     () => jornadas.find((j) => j._id === jornadaIdStrGrupo),
     [jornadas, jornadaIdStrGrupo]
@@ -1207,12 +1426,20 @@ function DistribucionGruposTab({
   const limiteEfectivoGrupo =
     capacidadJornadaGrupo > 0 ? Math.min(maxHoras, capacidadJornadaGrupo) : maxHoras;
 
-  const gradoPlan = studyPlan?.grades.find((g) => g.grade_id === gradeId);
+  // Resolver el plan de estudios base efectivo para este grupo según su sede y jornada
+  const gradoPlan = useMemo(
+    () => resolverGradoPlan(studyPlan, gradeId, sedeIdStrGrupo, jornadaIdStrGrupo),
+    [studyPlan, gradeId, sedeIdStrGrupo, jornadaIdStrGrupo]
+  );
   const asignaturasDelGrado = gradoPlan?.asignaturas ?? [];
   const personalizacionJornada = gradoPlan?.jornadas_personalizadas?.find(
     (j) => String(j.jornada_id) === String(jornadaIdStrGrupo)
   );
-  const personalizacionActual = gradoPlan?.personalizaciones_grupo.find((p) => p.group_id === groupId);
+  const personalizacionActual =
+    gradoPlan?.personalizaciones_grupo.find((p) => p.group_id === groupId) ??
+    studyPlan?.grades
+      .find((g) => g.grade_id === gradeId && g.personalizaciones_grupo?.some((p) => p.group_id === groupId))
+      ?.personalizaciones_grupo.find((p) => p.group_id === groupId);
 
   const [intensidades, setIntensidades] = useState<Record<string, { intensidad: number; observacion: string }>>({});
   const [agregadas, setAgregadas] = useState<Record<string, { intensidad: number; observacion: string }>>({});
@@ -1271,7 +1498,7 @@ function DistribucionGruposTab({
       const grpOv = intensidades[a.subject_id];
       suma += grpOv ? grpOv.intensidad : shiftOv ? shiftOv.intensidad_horaria_semanal : a.intensidad_horaria_semanal;
     }
-    // 2. Materias agregadas en la jornada
+    // 2. Materias agregadas en la jornada (legado)
     for (const sa of asignaturasAgregadasJornada) {
       if (asignaturasDelGrado.some((a) => a.subject_id === sa.subject_id)) continue;
       const grpOv = intensidades[sa.subject_id];
@@ -1327,1018 +1554,461 @@ function DistribucionGruposTab({
     setNuevaAgregadaId('');
   }
 
-  // ---------------------------------------------------------------------------
-  // SUB-MODO B: Extensión por Jornada Operativa
-  // ---------------------------------------------------------------------------
-  const [jornadaGradeId, setJornadaGradeId] = useState(gradosDelNivel[0]?._id ?? '');
-  useEffect(() => {
-    if (gradosDelNivel.length > 0 && !gradosDelNivel.some((g) => g._id === jornadaGradeId)) {
-      setJornadaGradeId(gradosDelNivel[0]._id);
-    }
-  }, [gradosDelNivel, jornadaGradeId]);
-
-  const [filtroSedeJornada, setFiltroSedeJornada] = useState('');
-  const jornadasFiltradas = useMemo(() => {
-    if (!filtroSedeJornada) return jornadas;
-    return jornadas.filter((j) => {
-      const sId = typeof j.sede_id === 'object' && j.sede_id ? j.sede_id._id : j.sede_id;
-      return sId === filtroSedeJornada;
-    });
-  }, [jornadas, filtroSedeJornada]);
-
-  const [jornadaId, setJornadaId] = useState(jornadasFiltradas[0]?._id ?? '');
-  useEffect(() => {
-    if (jornadasFiltradas.length > 0 && !jornadasFiltradas.some((j) => j._id === jornadaId)) {
-      setJornadaId(jornadasFiltradas[0]._id);
-    } else if (jornadasFiltradas.length === 0) {
-      setJornadaId('');
-    }
-  }, [jornadasFiltradas, jornadaId]);
-
-  const selectedJornada = useMemo(() => jornadas.find((j) => j._id === jornadaId), [jornadas, jornadaId]);
-  const capacidadJornadaExt = calcularCapacidadJornada(selectedJornada);
-  const limiteEfectivoJornada =
-    capacidadJornadaExt > 0 ? Math.min(maxHoras, capacidadJornadaExt) : maxHoras;
-
-  const gradoPlanJornada = studyPlan?.grades.find((g) => g.grade_id === jornadaGradeId);
-  const asignaturasBaseJornada = gradoPlanJornada?.asignaturas ?? [];
-  const personalizacionJornadaActual = gradoPlanJornada?.jornadas_personalizadas?.find(
-    (j) => String(j.jornada_id) === String(jornadaId)
-  );
-
-  const [intensidadesJornada, setIntensidadesJornada] = useState<
-    Record<string, { intensidad: number; observacion: string }>
-  >({});
-  const [agregadasJornada, setAgregadasJornada] = useState<
-    Record<string, { intensidad: number; observacion: string }>
-  >({});
-  const [drawerAgregarJornadaOpen, setDrawerAgregarJornadaOpen] = useState(false);
-  const [nuevaJornadaSubId, setNuevaJornadaSubId] = useState('');
-  const [nuevaJornadaSubIntensidad, setNuevaJornadaSubIntensidad] = useState(3);
-  const [nuevaJornadaSubObservacion, setNuevaJornadaSubObservacion] = useState('Extensión curricular de la jornada');
-
-  useEffect(() => {
-    setIntensidadesJornada(
-      Object.fromEntries(
-        (personalizacionJornadaActual?.intensidades_personalizadas ?? []).map((i) => [
-          i.subject_id,
-          { intensidad: i.intensidad_horaria_semanal, observacion: i.observacion },
-        ])
-      )
-    );
-    setAgregadasJornada(
-      Object.fromEntries(
-        (personalizacionJornadaActual?.asignaturas_agregadas ?? []).map((a) => [
-          a.subject_id,
-          { intensidad: a.intensidad_horaria_semanal, observacion: a.observacion },
-        ])
-      )
-    );
-  }, [personalizacionJornadaActual]);
-
-  const gradoSeleccionadoJornada = gradosDelNivel.find((g) => g._id === jornadaGradeId);
-  const idsPresentesEnJornada = useMemo(() => {
-    const ids = new Set<string>();
-    for (const a of asignaturasBaseJornada) ids.add(a.subject_id);
-    for (const id of Object.keys(agregadasJornada)) ids.add(id);
-    return ids;
-  }, [asignaturasBaseJornada, agregadasJornada]);
-
-  const asignaturasDisponiblesParaJornada = useMemo(() => {
-    if (!gradoSeleccionadoJornada) return [];
-    return subjects.filter(
-      (s) =>
-        s.estado === 'activo' &&
-        s.niveles_educativos.includes(gradoSeleccionadoJornada.nivel) &&
-        !idsPresentesEnJornada.has(s._id)
-    );
-  }, [subjects, gradoSeleccionadoJornada, idsPresentesEnJornada]);
-
-  const totalHorasJornada = useMemo(() => {
-    let suma = 0;
-    for (const a of asignaturasBaseJornada) {
-      const ov = intensidadesJornada[a.subject_id];
-      suma += ov ? ov.intensidad : a.intensidad_horaria_semanal;
-    }
-    for (const v of Object.values(agregadasJornada)) {
-      suma += v.intensidad;
-    }
-    return suma;
-  }, [asignaturasBaseJornada, intensidadesJornada, agregadasJornada]);
-
-  const jornadaExcedeTope = totalHorasJornada > limiteEfectivoJornada;
-
-  const mutationJornada = useConfigurarDistribucionJornada();
-
-  async function handleGuardarJornada() {
-    if (!jornadaId) return;
-    const motivo = pedirMotivoDelCambio(exigeMotivo);
-    if (motivo === null) return;
-    mutationJornada.reset();
-    await mutationJornada.mutateAsync({
-      motivo,
-      institucion_id: institucionId,
-      academic_year_id: academicYearId,
-      grade_id: jornadaGradeId,
-      jornada_id: jornadaId,
-      intensidades_personalizadas: Object.entries(intensidadesJornada).map(([subject_id, v]) => ({
-        subject_id,
-        intensidad_horaria_semanal: v.intensidad,
-        observacion: v.observacion,
-      })),
-      asignaturas_agregadas: Object.entries(agregadasJornada).map(([subject_id, v]) => ({
-        subject_id,
-        intensidad_horaria_semanal: v.intensidad,
-        observacion: v.observacion,
-      })),
-    });
-    onPlanUpdated();
-  }
-
-  function handleAgregarEspecificaJornada(e: FormEvent) {
-    e.preventDefault();
-    if (!nuevaJornadaSubId) return;
-    setAgregadasJornada((prev) => ({
-      ...prev,
-      [nuevaJornadaSubId]: {
-        intensidad: nuevaJornadaSubIntensidad,
-        observacion: nuevaJornadaSubObservacion,
-      },
-    }));
-    setDrawerAgregarJornadaOpen(false);
-    setNuevaJornadaSubId('');
-  }
-
   return (
     <Card>
       <CardHeader
-        title={`Distribución por Grupos y Jornadas: ${NIVEL_LABELS[nivel]}`}
-        subtitle="Administra extensiones horarias por jornada completa o personalizaciones exclusivas para grupos con énfasis especial."
+        title={`Personalización por Grupos (Casos Especiales): ${NIVEL_LABELS[nivel]}`}
+        subtitle="Administra excepciones curriculares exclusivas para grupos con énfasis especial, especialidades técnicas (10° y 11°) o adaptaciones rurales."
         action={
-          subTab === 'grupos' ? (
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => setDrawerAgregarOpen(true)}
-              disabled={soloLectura || !groupId || asignaturasDisponiblesParaGrupo.length === 0}
-            >
-              Agregar asignatura al grupo
-            </Button>
-          ) : (
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => setDrawerAgregarJornadaOpen(true)}
-              disabled={soloLectura || !jornadaId || asignaturasDisponiblesParaJornada.length === 0}
-            >
-              Agregar asignatura a la jornada
-            </Button>
-          )
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => setDrawerAgregarOpen(true)}
+            disabled={soloLectura || !groupId || asignaturasDisponiblesParaGrupo.length === 0}
+          >
+            Agregar asignatura al grupo
+          </Button>
         }
       />
 
-      {/* Selector de Ámbito: Grupos vs Jornadas */}
-      <div className="flex items-center gap-2 border-b border-border pb-3">
-        <button
-          type="button"
-          onClick={() => setSubTab('grupos')}
-          className={`inline-flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-sm font-semibold transition-colors ${
-            subTab === 'grupos'
-              ? 'bg-primary text-white shadow-sm'
-              : 'text-body hover:bg-soft hover:text-ink'
-          }`}
-        >
-          <UsersIcon className="h-4 w-4" />
-          Personalización por Grupo
-        </button>
-        <button
-          type="button"
-          onClick={() => setSubTab('jornadas')}
-          className={`inline-flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-sm font-semibold transition-colors ${
-            subTab === 'jornadas'
-              ? 'bg-primary text-white shadow-sm'
-              : 'text-body hover:bg-soft hover:text-ink'
-          }`}
-        >
-          <ClockIcon className="h-4 w-4" />
-          Extensión por Jornada Operativa
-        </button>
-      </div>
-
-      {/* ------------------------------------------------------------------ */}
-      {/* VISTA 1: PERSONALIZACIÓN POR GRUPO                                */}
-      {/* ------------------------------------------------------------------ */}
-      {subTab === 'grupos' && (
-        <div className="space-y-4 pt-3">
-          {/* Filtros de selección */}
-          <div className="flex flex-wrap items-center gap-3 border-b border-border pb-4">
-            <Select
-              label="Grado del nivel"
-              value={gradeId}
-              onChange={(e) => setGradeId(e.target.value)}
-              className="w-44"
-            >
-              {gradosDelNivel.map((g) => (
-                <option key={g._id} value={g._id}>
-                  {g.nombre}
-                </option>
-              ))}
-            </Select>
-
-            <Select
-              label="Filtrar por Sede"
-              value={filtroSede}
-              onChange={(e) => setFiltroSede(e.target.value)}
-              className="w-48"
-            >
-              <option value="">Todas las sedes</option>
-              {sedes.map((s) => (
-                <option key={s._id} value={s._id}>
-                  {s.nombre}
-                </option>
-              ))}
-            </Select>
-
-            <Select
-              label="Filtrar por Jornada"
-              value={filtroJornada}
-              onChange={(e) => setFiltroJornada(e.target.value)}
-              className="w-44"
-            >
-              <option value="">Todas las jornadas</option>
-              {Array.from(new Set(jornadas.map((j) => j.nombre))).map((nom) => (
-                <option key={nom} value={nom}>
-                  {nom}
-                </option>
-              ))}
-            </Select>
-
-            <Select
-              label="Grupo"
-              value={groupId}
-              onChange={(e) => setGroupId(e.target.value)}
-              className="min-w-[280px]"
-              disabled={gruposFiltrados.length === 0}
-            >
-              <option value="">
-                {gruposFiltrados.length > 0 ? 'Selecciona un grupo...' : 'Sin grupos con estos filtros'}
+      <div className="space-y-4 pt-3">
+        {/* Filtros de selección */}
+        <div className="flex flex-wrap items-center gap-3 border-b border-border pb-4">
+          <Select
+            label="Grado del nivel"
+            value={gradeId}
+            onChange={(e) => setGradeId(e.target.value)}
+            className="w-44"
+          >
+            {gradosDelNivel.map((g) => (
+              <option key={g._id} value={g._id}>
+                {g.nombre}
               </option>
-              {gruposFiltrados.map((g) => {
-                const sNom = getSedeNombre(g, campusMap);
-                const jNom = getJornadaNombre(g, jornadaMap);
-                const jId = typeof g.jornada_id === 'object' && g.jornada_id ? g.jornada_id._id : g.jornada_id;
-                const jDoc = jornadas.find((j) => j._id === jId);
-                const cap = calcularCapacidadJornada(jDoc);
-                return (
-                  <option key={g._id} value={g._id}>
-                    Grupo {g.nomenclatura} — {sNom || 'Sin sede'} — {jNom || 'Sin jornada'}{' '}
-                    {cap > 0 ? `(${cap} h/sem)` : ''}
-                  </option>
-                );
-              })}
-            </Select>
-          </div>
+            ))}
+          </Select>
 
-          {!groupId && (
-            <p className="py-6 text-center text-sm text-muted">
-              Selecciona un grupo para consultar o personalizar su distribución horaria.
-            </p>
-          )}
+          <Select
+            label="Filtrar por Sede"
+            value={filtroSede}
+            onChange={(e) => setFiltroSede(e.target.value)}
+            className="w-48"
+          >
+            <option value="">Todas las sedes</option>
+            {sedes.map((s) => (
+              <option key={s._id} value={s._id}>
+                {s.nombre}
+              </option>
+            ))}
+          </Select>
 
-          {groupId && selectedGroup && (
-            <div className="space-y-4">
-              {mutationGrupo.isError && <Alert tone="error">{errorMessage(mutationGrupo.error)}</Alert>}
-              {mutationGrupo.isSuccess && (
-                <Alert tone="success">Distribución del grupo guardada correctamente.</Alert>
-              )}
+          <Select
+            label="Filtrar por Jornada"
+            value={filtroJornada}
+            onChange={(e) => setFiltroJornada(e.target.value)}
+            className="w-44"
+          >
+            <option value="">Todas las jornadas</option>
+            {Array.from(new Set(jornadas.map((j) => j.nombre))).map((nom) => (
+              <option key={nom} value={nom}>
+                {nom}
+              </option>
+            ))}
+          </Select>
 
-              {/* Ficha contextual del grupo y su jornada */}
-              <div className="rounded-xl border border-border bg-soft/30 p-3.5 flex flex-wrap items-center justify-between gap-3 text-xs">
-                <div className="flex flex-wrap items-center gap-3">
-                  <span className="font-semibold text-ink text-sm">
-                    Grupo <strong className="text-primary">{selectedGroup.nomenclatura}</strong>
-                  </span>
-                  <span className="text-muted">|</span>
-                  <span className="text-body flex items-center gap-1">
-                    <BuildingIcon className="h-3.5 w-3.5 text-muted" />
-                    Sede: <strong>{sedeNomGrupo || 'Sin sede'}</strong>
-                  </span>
-                  <span className="text-muted">|</span>
-                  <span className="text-body flex items-center gap-1">
-                    <ClockIcon className="h-3.5 w-3.5 text-muted" />
-                    Jornada: <strong>{jornadaNomGrupo || 'Sin jornada'}</strong>
-                  </span>
-                  {capacidadJornadaGrupo > 0 && (
-                    <>
-                      <span className="text-muted">|</span>
-                      <span className="text-body">
-                        Capacidad franjas jornada: <strong>{capacidadJornadaGrupo} periodos/sem</strong>
-                      </span>
-                    </>
-                  )}
-                  <span className="text-muted">|</span>
-                  <span className="text-body">
-                    Tope normativo nivel: <strong>{maxHoras} h/sem</strong>
-                  </span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="text-muted font-medium">Límite operativo:</span>
-                  <Chip tone={capacidadJornadaGrupo > 0 && capacidadJornadaGrupo < maxHoras ? 'orange' : 'neutral'}>
-                    {limiteEfectivoGrupo} h/semana
-                  </Chip>
-                </div>
-              </div>
+          <Select
+            label="Grupo"
+            value={groupId}
+            onChange={(e) => setGroupId(e.target.value)}
+            className="min-w-[280px]"
+            disabled={gruposFiltrados.length === 0}
+          >
+            <option value="">
+              {gruposFiltrados.length > 0 ? 'Selecciona un grupo...' : 'Sin grupos con estos filtros'}
+            </option>
+            {gruposFiltrados.map((g) => {
+              const sNom = getSedeNombre(g, campusMap);
+              const jNom = getJornadaNombre(g, jornadaMap);
+              const jId = typeof g.jornada_id === 'object' && g.jornada_id ? g.jornada_id._id : g.jornada_id;
+              const jDoc = jornadas.find((j) => j._id === jId);
+              const cap = calcularCapacidadJornada(jDoc);
+              return (
+                <option key={g._id} value={g._id}>
+                  Grupo {g.nomenclatura} — {sNom || 'Sin sede'} — {jNom || 'Sin jornada'}{' '}
+                  {cap > 0 ? `(${cap} h/sem)` : ''}
+                </option>
+              );
+            })}
+          </Select>
+        </div>
 
-              {/* Aviso si hereda extensión de jornada */}
-              {personalizacionJornada && (
-                <div className="flex items-center gap-2 text-xs text-primary bg-primary-soft/40 px-3 py-2 rounded-lg border border-primary/20">
-                  <InfoIcon className="h-4 w-4 flex-shrink-0" />
-                  <span>
-                    Este grupo hereda la extensión de la jornada <strong>{jornadaNomGrupo}</strong> (
-                    {personalizacionJornada.intensidades_personalizadas.length} materias con intensidad ajustada,{' '}
-                    {personalizacionJornada.asignaturas_agregadas.length} asignaturas exclusivas de jornada).
-                  </span>
-                </div>
-              )}
+        {!groupId && (
+          <p className="py-6 text-center text-sm text-muted">
+            Selecciona un grupo para consultar o personalizar su distribución horaria.
+          </p>
+        )}
 
-              {/* Semáforo y Monitor de Balance Horario (Doble Candado) */}
-              <div
-                className={`rounded-xl border p-3.5 flex flex-col sm:flex-row items-center justify-between gap-3 text-sm ${
-                  grupoExcedeTope
-                    ? 'border-danger/30 bg-danger-soft/20 text-danger'
-                    : totalHorasGrupo === limiteEfectivoGrupo
-                    ? 'border-success/30 bg-success-soft/20 text-success'
-                    : 'border-border bg-soft/40 text-body'
-                }`}
-              >
-                <div className="flex items-center gap-2">
-                  {grupoExcedeTope ? (
-                    <AlertTriangleIcon className="h-5 w-5 text-danger flex-shrink-0" />
-                  ) : totalHorasGrupo === limiteEfectivoGrupo ? (
-                    <CheckCircleIcon className="h-5 w-5 text-success flex-shrink-0" />
-                  ) : (
-                    <InfoIcon className="h-5 w-5 text-muted flex-shrink-0" />
-                  )}
-                  <div>
-                    <span className="font-bold">
-                      {grupoExcedeTope
-                        ? '¡Exceso de horas en el grupo!'
-                        : totalHorasGrupo === limiteEfectivoGrupo
-                        ? 'Balance exacto de horas'
-                        : 'Distribución horaria en curso'}
+        {groupId && selectedGroup && (
+          <div className="space-y-4">
+            {mutationGrupo.isError && <Alert tone="error">{errorMessage(mutationGrupo.error)}</Alert>}
+            {mutationGrupo.isSuccess && (
+              <Alert tone="success">Distribución del grupo guardada correctamente.</Alert>
+            )}
+
+            {/* Ficha contextual del grupo y su jornada */}
+            <div className="rounded-xl border border-border bg-soft/30 p-3.5 flex flex-wrap items-center justify-between gap-3 text-xs">
+              <div className="flex flex-wrap items-center gap-3">
+                <span className="font-semibold text-ink text-sm">
+                  Grupo <strong className="text-primary">{selectedGroup.nomenclatura}</strong>
+                </span>
+                <span className="text-muted">|</span>
+                <span className="text-body flex items-center gap-1">
+                  <BuildingIcon className="h-3.5 w-3.5 text-muted" />
+                  Sede: <strong>{sedeNomGrupo || 'Sin sede'}</strong>
+                </span>
+                <span className="text-muted">|</span>
+                <span className="text-body flex items-center gap-1">
+                  <ClockIcon className="h-3.5 w-3.5 text-muted" />
+                  Jornada: <strong>{jornadaNomGrupo || 'Sin jornada'}</strong>
+                </span>
+                {capacidadJornadaGrupo > 0 && (
+                  <>
+                    <span className="text-muted">|</span>
+                    <span className="text-body">
+                      Capacidad franjas jornada: <strong>{capacidadJornadaGrupo} periodos/sem</strong>
                     </span>
-                    <p className="text-xs mt-0.5">
-                      {grupoExcedeTope
-                        ? `El grupo acumula ${totalHorasGrupo} h semanales y supera el límite de ${limiteEfectivoGrupo} h permitidas (${
-                            capacidadJornadaGrupo > 0 && capacidadJornadaGrupo < maxHoras
-                              ? `capacidad de franjas de la jornada "${jornadaNomGrupo}": ${capacidadJornadaGrupo} periodos`
-                              : `tope institucional del nivel: ${maxHoras} h`
-                          }). Debe reducir ${totalHorasGrupo - limiteEfectivoGrupo} h para guardar.`
-                        : totalHorasGrupo === limiteEfectivoGrupo
-                        ? `El grupo cumple con las ${limiteEfectivoGrupo} h semanales exactas requeridas para su jornada y nivel educativo.`
-                        : `El grupo acumula ${totalHorasGrupo} de ${limiteEfectivoGrupo} h semanales. Quedan ${
-                            limiteEfectivoGrupo - totalHorasGrupo
-                          } h disponibles.`}
-                    </p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-2 flex-shrink-0">
-                  <span className="text-xs font-semibold">Total actual:</span>
-                  <span
-                    className={`text-base font-extrabold ${
-                      grupoExcedeTope
-                        ? 'text-danger'
-                        : totalHorasGrupo === limiteEfectivoGrupo
-                        ? 'text-success'
-                        : 'text-ink'
-                    }`}
-                  >
-                    {totalHorasGrupo} / {limiteEfectivoGrupo} h
-                  </span>
-                </div>
+                  </>
+                )}
+                <span className="text-muted">|</span>
+                <span className="text-body">
+                  Tope normativo nivel: <strong>{maxHoras} h/sem</strong>
+                </span>
               </div>
-
-              {/* Tabla de Asignaturas del Grupo */}
-              <Table>
-                <TableHead>
-                  <Th>Asignatura</Th>
-                  <Th>Horas base grado</Th>
-                  <Th>Horas jornada</Th>
-                  <Th>Horas para este grupo</Th>
-                  <Th>Observación</Th>
-                  <Th className="text-right">Acciones</Th>
-                </TableHead>
-                <TableBody>
-                  {/* 1. Asignaturas base del grado */}
-                  {asignaturasDelGrado.map((a) => {
-                    const sub = subjectById.get(a.subject_id);
-                    const shiftOv = personalizacionJornada?.intensidades_personalizadas.find(
-                      (p) => p.subject_id === a.subject_id
-                    );
-                    const grpOv = intensidades[a.subject_id];
-
-                    return (
-                      <tr key={a.subject_id}>
-                        <Td className="font-medium text-ink">
-                          <div>
-                            <span>{sub?.nombre ?? a.subject_id}</span>
-                            <div className="mt-0.5 flex flex-wrap gap-1">
-                              <Chip tone={sub?.tipo === 'OBLIGATORIA' ? 'blue' : 'orange'}>
-                                {sub?.tipo === 'OBLIGATORIA' ? 'Obligatoria' : 'Optativa'}
-                              </Chip>
-                              {grpOv && <Chip tone="blue">Personalizada en grupo</Chip>}
-                              {!grpOv && shiftOv && <Chip tone="green">Ajustada por jornada</Chip>}
-                            </div>
-                          </div>
-                        </Td>
-                        <Td className="text-sm text-body">{a.intensidad_horaria_semanal} h</Td>
-                        <Td className="text-sm text-body">
-                          {shiftOv ? (
-                            <span className="font-semibold text-teal-700">{shiftOv.intensidad_horaria_semanal} h</span>
-                          ) : (
-                            <span className="text-muted">—</span>
-                          )}
-                        </Td>
-                        <Td>
-                          <input
-                            type="number"
-                            min={1}
-                            max={limiteEfectivoGrupo}
-                            placeholder={String(shiftOv ? shiftOv.intensidad_horaria_semanal : a.intensidad_horaria_semanal)}
-                            value={grpOv?.intensidad ?? ''}
-                            onChange={(e) =>
-                              setIntensidades((s) => ({
-                                ...s,
-                                ...(e.target.value === ''
-                                  ? (() => {
-                                      const { [a.subject_id]: _omit, ...rest } = s;
-                                      return rest;
-                                    })()
-                                  : {
-                                      [a.subject_id]: {
-                                        intensidad: Number(e.target.value),
-                                        observacion:
-                                          s[a.subject_id]?.observacion || 'Ajuste de intensidad horaria para este grupo',
-                                      },
-                                    }),
-                              }))
-                            }
-                            className="w-20 rounded-md border-0 py-1 px-2 text-sm ring-1 ring-inset ring-border focus:ring-2 focus:ring-primary"
-                          />
-                        </Td>
-                        <Td>
-                          <input
-                            type="text"
-                            disabled={!grpOv}
-                            value={grpOv?.observacion ?? ''}
-                            placeholder={
-                              grpOv
-                                ? 'Motivo del cambio'
-                                : shiftOv
-                                ? 'Hereda horas de la jornada'
-                                : 'Hereda horas del grado'
-                            }
-                            onChange={(e) =>
-                              setIntensidades((s) => ({
-                                ...s,
-                                [a.subject_id]: {
-                                  intensidad:
-                                    grpOv?.intensidad ??
-                                    (shiftOv ? shiftOv.intensidad_horaria_semanal : a.intensidad_horaria_semanal),
-                                  observacion: e.target.value,
-                                },
-                              }))
-                            }
-                            className="w-full rounded-md border-0 py-1 px-2 text-sm ring-1 ring-inset ring-border focus:ring-2 focus:ring-primary disabled:bg-transparent disabled:text-muted"
-                          />
-                        </Td>
-                        <Td className="text-right">
-                          {grpOv && (
-                            <IconButton
-                              tone="danger"
-                              label="Restablecer a horas heredadas"
-                              icon={<TrashIcon />}
-                              onClick={() =>
-                                setIntensidades((s) => {
-                                  const { [a.subject_id]: _omit, ...rest } = s;
-                                  return rest;
-                                })
-                              }
-                            />
-                          )}
-                        </Td>
-                      </tr>
-                    );
-                  })}
-
-                  {/* 2. Asignaturas agregadas por la jornada */}
-                  {asignaturasAgregadasJornada.map((sa) => {
-                    if (asignaturasDelGrado.some((a) => a.subject_id === sa.subject_id)) return null;
-                    const sub = subjectById.get(sa.subject_id);
-                    const grpOv = intensidades[sa.subject_id];
-
-                    return (
-                      <tr key={sa.subject_id}>
-                        <Td className="font-medium text-ink">
-                          <div>
-                            <span>{sub?.nombre ?? sa.subject_id}</span>
-                            <div className="mt-0.5 flex flex-wrap gap-1">
-                              <Chip tone="green">Exclusiva de jornada ({jornadaNomGrupo})</Chip>
-                              {grpOv && <Chip tone="blue">Personalizada en grupo</Chip>}
-                            </div>
-                          </div>
-                        </Td>
-                        <Td className="text-sm text-muted">—</Td>
-                        <Td className="text-sm font-semibold text-teal-700">{sa.intensidad_horaria_semanal} h</Td>
-                        <Td>
-                          <input
-                            type="number"
-                            min={1}
-                            max={limiteEfectivoGrupo}
-                            placeholder={String(sa.intensidad_horaria_semanal)}
-                            value={grpOv?.intensidad ?? ''}
-                            onChange={(e) =>
-                              setIntensidades((s) => ({
-                                ...s,
-                                ...(e.target.value === ''
-                                  ? (() => {
-                                      const { [sa.subject_id]: _omit, ...rest } = s;
-                                      return rest;
-                                    })()
-                                  : {
-                                      [sa.subject_id]: {
-                                        intensidad: Number(e.target.value),
-                                        observacion:
-                                          s[sa.subject_id]?.observacion || 'Ajuste de materia de jornada para este grupo',
-                                      },
-                                    }),
-                              }))
-                            }
-                            className="w-20 rounded-md border-0 py-1 px-2 text-sm ring-1 ring-inset ring-border focus:ring-2 focus:ring-primary"
-                          />
-                        </Td>
-                        <Td>
-                          <input
-                            type="text"
-                            disabled={!grpOv}
-                            value={grpOv?.observacion ?? ''}
-                            placeholder={grpOv ? 'Motivo del cambio' : 'Hereda horas de la jornada'}
-                            onChange={(e) =>
-                              setIntensidades((s) => ({
-                                ...s,
-                                [sa.subject_id]: {
-                                  intensidad: grpOv?.intensidad ?? sa.intensidad_horaria_semanal,
-                                  observacion: e.target.value,
-                                },
-                              }))
-                            }
-                            className="w-full rounded-md border-0 py-1 px-2 text-sm ring-1 ring-inset ring-border focus:ring-2 focus:ring-primary disabled:bg-transparent disabled:text-muted"
-                          />
-                        </Td>
-                        <Td className="text-right">
-                          {grpOv && (
-                            <IconButton
-                              tone="danger"
-                              label="Restablecer a horas de jornada"
-                              icon={<TrashIcon />}
-                              onClick={() =>
-                                setIntensidades((s) => {
-                                  const { [sa.subject_id]: _omit, ...rest } = s;
-                                  return rest;
-                                })
-                              }
-                            />
-                          )}
-                        </Td>
-                      </tr>
-                    );
-                  })}
-
-                  {/* 3. Asignaturas exclusivas añadidas solo al grupo */}
-                  {Object.entries(agregadas).map(([subjectId, v]) => {
-                    const sub = subjectById.get(subjectId);
-
-                    return (
-                      <tr key={subjectId}>
-                        <Td className="font-medium text-ink">
-                          <div>
-                            <span>{sub?.nombre ?? subjectId}</span>
-                            <div className="mt-0.5">
-                              <Chip tone="orange">Exclusiva del grupo</Chip>
-                            </div>
-                          </div>
-                        </Td>
-                        <Td className="text-sm text-muted">—</Td>
-                        <Td className="text-sm text-muted">—</Td>
-                        <Td>
-                          <input
-                            type="number"
-                            min={1}
-                            max={limiteEfectivoGrupo}
-                            value={v.intensidad}
-                            onChange={(e) =>
-                              setAgregadas((s) => ({
-                                ...s,
-                                [subjectId]: { ...v, intensidad: Number(e.target.value) },
-                              }))
-                            }
-                            className="w-20 rounded-md border-0 py-1 px-2 text-sm ring-1 ring-inset ring-border focus:ring-2 focus:ring-primary"
-                          />
-                        </Td>
-                        <Td>
-                          <input
-                            type="text"
-                            value={v.observacion}
-                            onChange={(e) =>
-                              setAgregadas((s) => ({
-                                ...s,
-                                [subjectId]: { ...v, observacion: e.target.value },
-                              }))
-                            }
-                            className="w-full rounded-md border-0 py-1 px-2 text-sm ring-1 ring-inset ring-border focus:ring-2 focus:ring-primary"
-                          />
-                        </Td>
-                        <Td className="text-right">
-                          <IconButton
-                            tone="danger"
-                            label="Quitar asignatura exclusiva"
-                            icon={<TrashIcon />}
-                            onClick={() =>
-                              setAgregadas((s) => {
-                                const { [subjectId]: _omit, ...rest } = s;
-                                return rest;
-                              })
-                            }
-                          />
-                        </Td>
-                      </tr>
-                    );
-                  })}
-
-                  {asignaturasDelGrado.length === 0 &&
-                    asignaturasAgregadasJornada.length === 0 &&
-                    Object.keys(agregadas).length === 0 && (
-                      <EmptyRow colSpan={6}>
-                        Este grado aún no tiene asignaturas en su Configuración General.
-                      </EmptyRow>
-                    )}
-                </TableBody>
-              </Table>
-
-              <div className="flex justify-end pt-2">
-                <Button
-                  onClick={handleGuardarGrupo}
-                  isLoading={mutationGrupo.isPending}
-                  disabled={soloLectura || grupoExcedeTope}
-                >
-                  Guardar Distribución por Grupos
-                </Button>
+              <div className="flex items-center gap-2">
+                <span className="text-muted font-medium">Límite operativo:</span>
+                <Chip tone={capacidadJornadaGrupo > 0 && capacidadJornadaGrupo < maxHoras ? 'orange' : 'neutral'}>
+                  {limiteEfectivoGrupo} h/semana
+                </Chip>
               </div>
             </div>
-          )}
-        </div>
-      )}
 
-      {/* ------------------------------------------------------------------ */}
-      {/* VISTA 2: EXTENSIÓN POR JORNADA OPERATIVA                          */}
-      {/* ------------------------------------------------------------------ */}
-      {subTab === 'jornadas' && (
-        <div className="space-y-4 pt-3">
-          <div className="flex flex-wrap items-center gap-3 border-b border-border pb-4">
-            <Select
-              label="Grado del nivel"
-              value={jornadaGradeId}
-              onChange={(e) => setJornadaGradeId(e.target.value)}
-              className="w-44"
+            {/* Semáforo y Monitor de Balance Horario (Doble Candado) */}
+            <div
+              className={`rounded-xl border p-3.5 flex flex-col sm:flex-row items-center justify-between gap-3 text-sm ${
+                grupoExcedeTope
+                  ? 'border-danger/30 bg-danger-soft/20 text-danger'
+                  : totalHorasGrupo === limiteEfectivoGrupo
+                  ? 'border-success/30 bg-success-soft/20 text-success'
+                  : 'border-border bg-soft/40 text-body'
+              }`}
             >
-              {gradosDelNivel.map((g) => (
-                <option key={g._id} value={g._id}>
-                  {g.nombre}
-                </option>
-              ))}
-            </Select>
-
-            <Select
-              label="Filtrar por Sede"
-              value={filtroSedeJornada}
-              onChange={(e) => setFiltroSedeJornada(e.target.value)}
-              className="w-48"
-            >
-              <option value="">Todas las sedes</option>
-              {sedes.map((s) => (
-                <option key={s._id} value={s._id}>
-                  {s.nombre}
-                </option>
-              ))}
-            </Select>
-
-            <Select
-              label="Jornada Operativa"
-              value={jornadaId}
-              onChange={(e) => setJornadaId(e.target.value)}
-              className="min-w-[280px]"
-              disabled={jornadasFiltradas.length === 0}
-            >
-              <option value="">
-                {jornadasFiltradas.length > 0 ? 'Selecciona una jornada...' : 'Sin jornadas con estos filtros'}
-              </option>
-              {jornadasFiltradas.map((j) => {
-                const sNom =
-                  typeof j.sede_id === 'object' && j.sede_id
-                    ? j.sede_id.nombre
-                    : campusMap.get(typeof j.sede_id === 'string' ? j.sede_id : '')?.nombre ?? '';
-                const cap = calcularCapacidadJornada(j);
-                return (
-                  <option key={j._id} value={j._id}>
-                    {j.nombre} — {sNom || 'Sin sede'} {cap > 0 ? `(${cap} periodos/sem)` : ''}
-                  </option>
-                );
-              })}
-            </Select>
-          </div>
-
-          {!jornadaId && (
-            <p className="py-6 text-center text-sm text-muted">
-              Selecciona una jornada operativa para configurar su extensión horaria o materias exclusivas.
-            </p>
-          )}
-
-          {jornadaId && selectedJornada && (
-            <div className="space-y-4">
-              {mutationJornada.isError && <Alert tone="error">{errorMessage(mutationJornada.error)}</Alert>}
-              {mutationJornada.isSuccess && (
-                <Alert tone="success">Extensión de la jornada guardada correctamente.</Alert>
-              )}
-
-              {/* Ficha de la Jornada */}
-              <div className="rounded-xl border border-border bg-soft/30 p-3.5 flex flex-wrap items-center justify-between gap-3 text-xs">
-                <div className="flex flex-wrap items-center gap-3">
-                  <span className="font-semibold text-ink text-sm">
-                    Jornada <strong className="text-primary">{selectedJornada.nombre}</strong>
+              <div className="flex items-center gap-2">
+                {grupoExcedeTope ? (
+                  <AlertTriangleIcon className="h-5 w-5 text-danger flex-shrink-0" />
+                ) : totalHorasGrupo === limiteEfectivoGrupo ? (
+                  <CheckCircleIcon className="h-5 w-5 text-success flex-shrink-0" />
+                ) : (
+                  <InfoIcon className="h-5 w-5 text-muted flex-shrink-0" />
+                )}
+                <div>
+                  <span className="font-bold">
+                    {grupoExcedeTope
+                      ? '¡Exceso de horas en el grupo!'
+                      : totalHorasGrupo === limiteEfectivoGrupo
+                      ? 'Balance exacto de horas'
+                      : 'Distribución horaria en curso'}
                   </span>
-                  <span className="text-muted">|</span>
-                  <span className="text-body flex items-center gap-1">
-                    <BuildingIcon className="h-3.5 w-3.5 text-muted" />
-                    Sede:{' '}
-                    <strong>
-                      {typeof selectedJornada.sede_id === 'object' && selectedJornada.sede_id
-                        ? selectedJornada.sede_id.nombre
-                        : campusMap.get(typeof selectedJornada.sede_id === 'string' ? selectedJornada.sede_id : '')
-                            ?.nombre || 'Sin sede'}
-                    </strong>
-                  </span>
-                  <span className="text-muted">|</span>
-                  <span className="text-body">
-                    Días hábiles: <strong>{selectedJornada.dias_habiles?.length ?? 0} días/sem</strong>
-                  </span>
-                  <span className="text-muted">|</span>
-                  <span className="text-body">
-                    Franjas de clase diarias:{' '}
-                    <strong>{selectedJornada.franjas?.filter((f) => f.tipo === 'CLASE').length ?? 0}</strong>
-                  </span>
-                  <span className="text-muted">|</span>
-                  <span className="text-body">
-                    Capacidad máxima franjas: <strong>{capacidadJornadaExt} periodos/sem</strong>
-                  </span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="text-muted font-medium">Límite efectivo:</span>
-                  <Chip tone={capacidadJornadaExt > 0 && capacidadJornadaExt < maxHoras ? 'orange' : 'neutral'}>
-                    {limiteEfectivoJornada} h/semana
-                  </Chip>
+                  <p className="text-xs mt-0.5">
+                    {grupoExcedeTope
+                      ? `El grupo acumula ${totalHorasGrupo} h semanales y supera el límite de ${limiteEfectivoGrupo} h permitidas (${
+                          capacidadJornadaGrupo > 0 && capacidadJornadaGrupo < maxHoras
+                            ? `capacidad de franjas de la jornada "${jornadaNomGrupo}": ${capacidadJornadaGrupo} periodos`
+                            : `tope institucional del nivel: ${maxHoras} h`
+                        }). Debe reducir ${totalHorasGrupo - limiteEfectivoGrupo} h para guardar.`
+                      : totalHorasGrupo === limiteEfectivoGrupo
+                      ? `El grupo cumple con las ${limiteEfectivoGrupo} h semanales exactas requeridas para su jornada y nivel educativo.`
+                      : `El grupo acumula ${totalHorasGrupo} de ${limiteEfectivoGrupo} h semanales. Quedan ${
+                          limiteEfectivoGrupo - totalHorasGrupo
+                        } h disponibles.`}
+                  </p>
                 </div>
               </div>
-
-              {/* Semáforo de Balance para la Jornada */}
-              <div
-                className={`rounded-xl border p-3.5 flex flex-col sm:flex-row items-center justify-between gap-3 text-sm ${
-                  jornadaExcedeTope
-                    ? 'border-danger/30 bg-danger-soft/20 text-danger'
-                    : totalHorasJornada === limiteEfectivoJornada
-                    ? 'border-success/30 bg-success-soft/20 text-success'
-                    : 'border-border bg-soft/40 text-body'
-                }`}
-              >
-                <div className="flex items-center gap-2">
-                  {jornadaExcedeTope ? (
-                    <AlertTriangleIcon className="h-5 w-5 text-danger flex-shrink-0" />
-                  ) : totalHorasJornada === limiteEfectivoJornada ? (
-                    <CheckCircleIcon className="h-5 w-5 text-success flex-shrink-0" />
-                  ) : (
-                    <InfoIcon className="h-5 w-5 text-muted flex-shrink-0" />
-                  )}
-                  <div>
-                    <span className="font-bold">
-                      {jornadaExcedeTope
-                        ? '¡Exceso de horas en la jornada!'
-                        : totalHorasJornada === limiteEfectivoJornada
-                        ? 'Balance exacto de la jornada'
-                        : 'Extensión horaria en curso'}
-                    </span>
-                    <p className="text-xs mt-0.5">
-                      {jornadaExcedeTope
-                        ? `La jornada acumula ${totalHorasJornada} h semanales y supera los ${limiteEfectivoJornada} periodos de clase configurados en su horario. Debe reducir ${
-                            totalHorasJornada - limiteEfectivoJornada
-                          } h para guardar.`
-                        : totalHorasJornada === limiteEfectivoJornada
-                        ? `La jornada suma exactamente los ${limiteEfectivoJornada} periodos semanales de clase disponibles.`
-                        : `La jornada acumula ${totalHorasJornada} de ${limiteEfectivoJornada} h semanales. Quedan ${
-                            limiteEfectivoJornada - totalHorasJornada
-                          } h disponibles.`}
-                    </p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-2 flex-shrink-0">
-                  <span className="text-xs font-semibold">Total jornada:</span>
-                  <span
-                    className={`text-base font-extrabold ${
-                      jornadaExcedeTope
-                        ? 'text-danger'
-                        : totalHorasJornada === limiteEfectivoJornada
-                        ? 'text-success'
-                        : 'text-ink'
-                    }`}
-                  >
-                    {totalHorasJornada} / {limiteEfectivoJornada} h
-                  </span>
-                </div>
+              <div className="flex items-center gap-2 flex-shrink-0">
+                <span className="text-xs font-semibold">Total actual:</span>
+                <span
+                  className={`text-base font-extrabold ${
+                    grupoExcedeTope
+                      ? 'text-danger'
+                      : totalHorasGrupo === limiteEfectivoGrupo
+                      ? 'text-success'
+                      : 'text-ink'
+                  }`}
+                >
+                  {totalHorasGrupo} / {limiteEfectivoGrupo} h
+                </span>
               </div>
+            </div>
 
-              {/* Tabla de Asignaturas de la Jornada */}
-              <Table>
-                <TableHead>
-                  <Th>Asignatura</Th>
-                  <Th>Horas base grado</Th>
-                  <Th>Horas para esta jornada</Th>
-                  <Th>Observación / Justificación</Th>
-                  <Th className="text-right">Acciones</Th>
-                </TableHead>
-                <TableBody>
-                  {/* Materias base del grado */}
-                  {asignaturasBaseJornada.map((a) => {
-                    const sub = subjectById.get(a.subject_id);
-                    const ov = intensidadesJornada[a.subject_id];
+            {/* Tabla de Asignaturas del Grupo */}
+            <Table>
+              <TableHead>
+                <Th>Asignatura</Th>
+                <Th>Horas base régimen</Th>
+                <Th>Horas para este grupo</Th>
+                <Th>Observación</Th>
+                <Th className="text-right">Acciones</Th>
+              </TableHead>
+              <TableBody>
+                {/* 1. Asignaturas base del grado */}
+                {asignaturasDelGrado.map((a) => {
+                  const sub = subjectById.get(a.subject_id);
+                  const shiftOv = personalizacionJornada?.intensidades_personalizadas.find(
+                    (p) => p.subject_id === a.subject_id
+                  );
+                  const horasBase = shiftOv ? shiftOv.intensidad_horaria_semanal : a.intensidad_horaria_semanal;
+                  const grpOv = intensidades[a.subject_id];
 
-                    return (
-                      <tr key={a.subject_id}>
-                        <Td className="font-medium text-ink">
-                          <div>
-                            <span>{sub?.nombre ?? a.subject_id}</span>
-                            <div className="mt-0.5 flex flex-wrap gap-1">
-                              <Chip tone={sub?.tipo === 'OBLIGATORIA' ? 'blue' : 'orange'}>
-                                {sub?.tipo === 'OBLIGATORIA' ? 'Obligatoria' : 'Optativa'}
-                              </Chip>
-                              {ov && <Chip tone="green">Intensidad modificada</Chip>}
-                            </div>
+                  return (
+                    <tr key={a.subject_id}>
+                      <Td className="font-medium text-ink">
+                        <div>
+                          <span>{sub?.nombre ?? a.subject_id}</span>
+                          <div className="mt-0.5 flex flex-wrap gap-1">
+                            <Chip tone={sub?.tipo === 'OBLIGATORIA' ? 'blue' : 'orange'}>
+                              {sub?.tipo === 'OBLIGATORIA' ? 'Obligatoria' : 'Optativa'}
+                            </Chip>
+                            {grpOv && <Chip tone="blue">Personalizada en grupo</Chip>}
                           </div>
-                        </Td>
-                        <Td className="text-sm text-body">{a.intensidad_horaria_semanal} h</Td>
-                        <Td>
-                          <input
-                            type="number"
-                            min={1}
-                            max={limiteEfectivoJornada}
-                            placeholder={String(a.intensidad_horaria_semanal)}
-                            value={ov?.intensidad ?? ''}
-                            onChange={(e) =>
-                              setIntensidadesJornada((s) => ({
-                                ...s,
-                                ...(e.target.value === ''
-                                  ? (() => {
-                                      const { [a.subject_id]: _omit, ...rest } = s;
-                                      return rest;
-                                    })()
-                                  : {
-                                      [a.subject_id]: {
-                                        intensidad: Number(e.target.value),
-                                        observacion:
-                                          s[a.subject_id]?.observacion ||
-                                          'Ajuste de intensidad horaria para la jornada',
-                                      },
-                                    }),
-                              }))
-                            }
-                            className="w-20 rounded-md border-0 py-1 px-2 text-sm ring-1 ring-inset ring-border focus:ring-2 focus:ring-primary"
-                          />
-                        </Td>
-                        <Td>
-                          <input
-                            type="text"
-                            disabled={!ov}
-                            value={ov?.observacion ?? ''}
-                            placeholder={ov ? 'Justificación de la variación' : 'Hereda horas del grado base'}
-                            onChange={(e) =>
-                              setIntensidadesJornada((s) => ({
-                                ...s,
-                                [a.subject_id]: {
-                                  intensidad: ov?.intensidad ?? a.intensidad_horaria_semanal,
-                                  observacion: e.target.value,
-                                },
-                              }))
-                            }
-                            className="w-full rounded-md border-0 py-1 px-2 text-sm ring-1 ring-inset ring-border focus:ring-2 focus:ring-primary disabled:bg-transparent disabled:text-muted"
-                          />
-                        </Td>
-                        <Td className="text-right">
-                          {ov && (
-                            <IconButton
-                              tone="danger"
-                              label="Restablecer a horas base del grado"
-                              icon={<TrashIcon />}
-                              onClick={() =>
-                                setIntensidadesJornada((s) => {
-                                  const { [a.subject_id]: _omit, ...rest } = s;
-                                  return rest;
-                                })
-                              }
-                            />
-                          )}
-                        </Td>
-                      </tr>
-                    );
-                  })}
-
-                  {/* Materias exclusivas añadidas a la jornada */}
-                  {Object.entries(agregadasJornada).map(([subjectId, v]) => {
-                    const sub = subjectById.get(subjectId);
-
-                    return (
-                      <tr key={subjectId}>
-                        <Td className="font-medium text-ink">
-                          <div>
-                            <span>{sub?.nombre ?? subjectId}</span>
-                            <div className="mt-0.5">
-                              <Chip tone="green">Exclusiva de la jornada</Chip>
-                            </div>
-                          </div>
-                        </Td>
-                        <Td className="text-sm text-muted">—</Td>
-                        <Td>
-                          <input
-                            type="number"
-                            min={1}
-                            max={limiteEfectivoJornada}
-                            value={v.intensidad}
-                            onChange={(e) =>
-                              setAgregadasJornada((s) => ({
-                                ...s,
-                                [subjectId]: { ...v, intensidad: Number(e.target.value) },
-                              }))
-                            }
-                            className="w-20 rounded-md border-0 py-1 px-2 text-sm ring-1 ring-inset ring-border focus:ring-2 focus:ring-primary"
-                          />
-                        </Td>
-                        <Td>
-                          <input
-                            type="text"
-                            value={v.observacion}
-                            onChange={(e) =>
-                              setAgregadasJornada((s) => ({
-                                ...s,
-                                [subjectId]: { ...v, observacion: e.target.value },
-                              }))
-                            }
-                            className="w-full rounded-md border-0 py-1 px-2 text-sm ring-1 ring-inset ring-border focus:ring-2 focus:ring-primary"
-                          />
-                        </Td>
-                        <Td className="text-right">
+                        </div>
+                      </Td>
+                      <Td className="text-sm text-body">{horasBase} h</Td>
+                      <Td>
+                        <input
+                          type="number"
+                          min={1}
+                          max={limiteEfectivoGrupo}
+                          placeholder={String(horasBase)}
+                          value={grpOv?.intensidad ?? ''}
+                          onChange={(e) =>
+                            setIntensidades((s) => ({
+                              ...s,
+                              ...(e.target.value === ''
+                                ? (() => {
+                                    const { [a.subject_id]: _omit, ...rest } = s;
+                                    return rest;
+                                  })()
+                                : {
+                                    [a.subject_id]: {
+                                      intensidad: Number(e.target.value),
+                                      observacion:
+                                        s[a.subject_id]?.observacion || 'Ajuste de intensidad horaria para este grupo',
+                                    },
+                                  }),
+                            }))
+                          }
+                          className="w-20 rounded-md border-0 py-1 px-2 text-sm ring-1 ring-inset ring-border focus:ring-2 focus:ring-primary"
+                        />
+                      </Td>
+                      <Td>
+                        <input
+                          type="text"
+                          disabled={!grpOv}
+                          value={grpOv?.observacion ?? ''}
+                          placeholder={grpOv ? 'Motivo del cambio' : 'Hereda horas del régimen'}
+                          onChange={(e) =>
+                            setIntensidades((s) => ({
+                              ...s,
+                              [a.subject_id]: {
+                                intensidad: grpOv?.intensidad ?? horasBase,
+                                observacion: e.target.value,
+                              },
+                            }))
+                          }
+                          className="w-full rounded-md border-0 py-1 px-2 text-sm ring-1 ring-inset ring-border focus:ring-2 focus:ring-primary disabled:bg-transparent disabled:text-muted"
+                        />
+                      </Td>
+                      <Td className="text-right">
+                        {grpOv && (
                           <IconButton
                             tone="danger"
-                            label="Quitar asignatura de la jornada"
+                            label="Restablecer a horas heredadas"
                             icon={<TrashIcon />}
                             onClick={() =>
-                              setAgregadasJornada((s) => {
-                                const { [subjectId]: _omit, ...rest } = s;
+                              setIntensidades((s) => {
+                                const { [a.subject_id]: _omit, ...rest } = s;
                                 return rest;
                               })
                             }
                           />
-                        </Td>
-                      </tr>
-                    );
-                  })}
+                        )}
+                      </Td>
+                    </tr>
+                  );
+                })}
 
-                  {asignaturasBaseJornada.length === 0 && Object.keys(agregadasJornada).length === 0 && (
+                {/* 2. Asignaturas agregadas por la jornada (legado) */}
+                {asignaturasAgregadasJornada.map((sa) => {
+                  if (asignaturasDelGrado.some((a) => a.subject_id === sa.subject_id)) return null;
+                  const sub = subjectById.get(sa.subject_id);
+                  const grpOv = intensidades[sa.subject_id];
+
+                  return (
+                    <tr key={sa.subject_id}>
+                      <Td className="font-medium text-ink">
+                        <div>
+                          <span>{sub?.nombre ?? sa.subject_id}</span>
+                          <div className="mt-0.5 flex flex-wrap gap-1">
+                            <Chip tone="green">Exclusiva de jornada ({jornadaNomGrupo})</Chip>
+                            {grpOv && <Chip tone="blue">Personalizada en grupo</Chip>}
+                          </div>
+                        </div>
+                      </Td>
+                      <Td className="text-sm text-body">{sa.intensidad_horaria_semanal} h</Td>
+                      <Td>
+                        <input
+                          type="number"
+                          min={1}
+                          max={limiteEfectivoGrupo}
+                          placeholder={String(sa.intensidad_horaria_semanal)}
+                          value={grpOv?.intensidad ?? ''}
+                          onChange={(e) =>
+                            setIntensidades((s) => ({
+                              ...s,
+                              ...(e.target.value === ''
+                                ? (() => {
+                                    const { [sa.subject_id]: _omit, ...rest } = s;
+                                    return rest;
+                                  })()
+                                : {
+                                    [sa.subject_id]: {
+                                      intensidad: Number(e.target.value),
+                                      observacion:
+                                        s[sa.subject_id]?.observacion || 'Ajuste de materia de jornada para este grupo',
+                                    },
+                                  }),
+                            }))
+                          }
+                          className="w-20 rounded-md border-0 py-1 px-2 text-sm ring-1 ring-inset ring-border focus:ring-2 focus:ring-primary"
+                        />
+                      </Td>
+                      <Td>
+                        <input
+                          type="text"
+                          disabled={!grpOv}
+                          value={grpOv?.observacion ?? ''}
+                          placeholder={grpOv ? 'Motivo del cambio' : 'Hereda horas de la jornada'}
+                          onChange={(e) =>
+                            setIntensidades((s) => ({
+                              ...s,
+                              [sa.subject_id]: {
+                                intensidad: grpOv?.intensidad ?? sa.intensidad_horaria_semanal,
+                                observacion: e.target.value,
+                              },
+                            }))
+                          }
+                          className="w-full rounded-md border-0 py-1 px-2 text-sm ring-1 ring-inset ring-border focus:ring-2 focus:ring-primary disabled:bg-transparent disabled:text-muted"
+                        />
+                      </Td>
+                      <Td className="text-right">
+                        {grpOv && (
+                          <IconButton
+                            tone="danger"
+                            label="Restablecer a horas de jornada"
+                            icon={<TrashIcon />}
+                            onClick={() =>
+                              setIntensidades((s) => {
+                                const { [sa.subject_id]: _omit, ...rest } = s;
+                                return rest;
+                              })
+                            }
+                          />
+                        )}
+                      </Td>
+                    </tr>
+                  );
+                })}
+
+                {/* 3. Asignaturas exclusivas añadidas solo al grupo */}
+                {Object.entries(agregadas).map(([subjectId, v]) => {
+                  const sub = subjectById.get(subjectId);
+
+                  return (
+                    <tr key={subjectId}>
+                      <Td className="font-medium text-ink">
+                        <div>
+                          <span>{sub?.nombre ?? subjectId}</span>
+                          <div className="mt-0.5">
+                            <Chip tone="orange">Exclusiva del grupo</Chip>
+                          </div>
+                        </div>
+                      </Td>
+                      <Td className="text-sm text-muted">—</Td>
+                      <Td>
+                        <input
+                          type="number"
+                          min={1}
+                          max={limiteEfectivoGrupo}
+                          value={v.intensidad}
+                          onChange={(e) =>
+                            setAgregadas((s) => ({
+                              ...s,
+                              [subjectId]: { ...v, intensidad: Number(e.target.value) },
+                            }))
+                          }
+                          className="w-20 rounded-md border-0 py-1 px-2 text-sm ring-1 ring-inset ring-border focus:ring-2 focus:ring-primary"
+                        />
+                      </Td>
+                      <Td>
+                        <input
+                          type="text"
+                          value={v.observacion}
+                          onChange={(e) =>
+                            setAgregadas((s) => ({
+                              ...s,
+                              [subjectId]: { ...v, observacion: e.target.value },
+                            }))
+                          }
+                          className="w-full rounded-md border-0 py-1 px-2 text-sm ring-1 ring-inset ring-border focus:ring-2 focus:ring-primary"
+                        />
+                      </Td>
+                      <Td className="text-right">
+                        <IconButton
+                          tone="danger"
+                          label="Quitar asignatura exclusiva"
+                          icon={<TrashIcon />}
+                          onClick={() =>
+                            setAgregadas((s) => {
+                              const { [subjectId]: _omit, ...rest } = s;
+                              return rest;
+                            })
+                          }
+                        />
+                      </Td>
+                    </tr>
+                  );
+                })}
+
+                {asignaturasDelGrado.length === 0 &&
+                  asignaturasAgregadasJornada.length === 0 &&
+                  Object.keys(agregadas).length === 0 && (
                     <EmptyRow colSpan={5}>
-                      Este grado aún no tiene asignaturas en su Configuración General.
+                      Este grado aún no tiene asignaturas en su Configuración General para esta jornada/sede.
                     </EmptyRow>
                   )}
-                </TableBody>
-              </Table>
+              </TableBody>
+            </Table>
 
-              <div className="flex justify-end pt-2">
-                <Button
-                  onClick={handleGuardarJornada}
-                  isLoading={mutationJornada.isPending}
-                  disabled={soloLectura || jornadaExcedeTope}
-                >
-                  Guardar Extensión por Jornada
-                </Button>
-              </div>
+            <div className="flex justify-end pt-2">
+              <Button
+                onClick={handleGuardarGrupo}
+                isLoading={mutationGrupo.isPending}
+                disabled={soloLectura || grupoExcedeTope}
+              >
+                Guardar Personalización del Grupo
+              </Button>
             </div>
-          )}
-        </div>
-      )}
+          </div>
+        )}
+      </div>
 
       {/* Drawer: Agregar asignatura exclusiva al grupo */}
       <Drawer
@@ -2383,50 +2053,6 @@ function DistribucionGruposTab({
           required
         />
       </Drawer>
-
-      {/* Drawer: Agregar asignatura a la jornada */}
-      <Drawer
-        open={drawerAgregarJornadaOpen}
-        title="Agregar asignatura exclusiva a la jornada"
-        subtitle={`Jornada: ${selectedJornada?.nombre ?? ''}`}
-        onClose={() => setDrawerAgregarJornadaOpen(false)}
-        onSubmit={handleAgregarEspecificaJornada}
-        submitLabel="Agregar a la jornada"
-        submitDisabled={!nuevaJornadaSubId}
-      >
-        <Select
-          label="Asignatura"
-          value={nuevaJornadaSubId}
-          onChange={(e) => setNuevaJornadaSubId(e.target.value)}
-          required
-        >
-          <option value="">Selecciona una asignatura del catálogo...</option>
-          {asignaturasDisponiblesParaJornada.map((s) => (
-            <option key={s._id} value={s._id}>
-              {s.nombre} ({s.tipo})
-            </option>
-          ))}
-        </Select>
-
-        <Input
-          label="Intensidad horaria semanal"
-          type="number"
-          min={1}
-          max={limiteEfectivoJornada}
-          value={nuevaJornadaSubIntensidad}
-          onChange={(e) => setNuevaJornadaSubIntensidad(Number(e.target.value))}
-          required
-        />
-
-        <Input
-          label="Observación o justificación"
-          type="text"
-          value={nuevaJornadaSubObservacion}
-          onChange={(e) => setNuevaJornadaSubObservacion(e.target.value)}
-          placeholder="Ej: Extensión curricular Jornada Única"
-          required
-        />
-      </Drawer>
     </Card>
   );
 }
@@ -2440,6 +2066,8 @@ interface ConfiguracionEvaluacionTabProps {
   institucionId: string;
   academicYearId: string;
   nivel: NivelEducativo;
+  sedeId: string;
+  jornadaId: string;
   gradosDelNivel: Grade[];
   subjectById: Map<string, Subject>;
   areas: { _id: string; nombre: string }[];
@@ -2456,6 +2084,8 @@ function ConfiguracionEvaluacionTab({
   institucionId,
   academicYearId,
   nivel,
+  sedeId,
+  jornadaId,
   gradosDelNivel,
   subjectById,
   areas,
@@ -2480,10 +2110,6 @@ function ConfiguracionEvaluacionTab({
     }
   }, [gradosDelNivel, gradeId]);
 
-  const gradoPlan = studyPlan?.grades.find((g) => g.grade_id === gradeId);
-  const asignaturasDelGrado = gradoPlan?.asignaturas ?? [];
-  const evaluacionesActualesGrado = gradoPlan?.evaluaciones_area ?? [];
-
   // Grupos del grado seleccionado
   const gruposDelGrado = useMemo(
     () => (gruposDelAnio ?? []).filter((g) => getGradeId(g.grade_id) === gradeId),
@@ -2499,14 +2125,40 @@ function ConfiguracionEvaluacionTab({
   }, [gruposDelGrado, groupId]);
 
   const selectedGroup = useMemo(() => gruposDelGrado.find((g) => g._id === groupId), [gruposDelGrado, groupId]);
-  const jornadaIdStrGrupo =
-    typeof selectedGroup?.jornada_id === 'object' && selectedGroup.jornada_id
-      ? selectedGroup.jornada_id._id
-      : (selectedGroup?.jornada_id ?? '');
-  const personalizacionJornada = gradoPlan?.jornadas_personalizadas?.find(
-    (j) => String(j.jornada_id) === String(jornadaIdStrGrupo)
+
+  const sedeIdEfectivo =
+    ambito === 'GRUPO'
+      ? (typeof selectedGroup?.sede_id === 'object' && selectedGroup?.sede_id
+          ? selectedGroup.sede_id._id
+          : typeof selectedGroup?.sede_id === 'string'
+          ? selectedGroup.sede_id
+          : null)
+      : (sedeId || null);
+
+  const jornadaIdEfectiva =
+    ambito === 'GRUPO'
+      ? (typeof selectedGroup?.jornada_id === 'object' && selectedGroup?.jornada_id
+          ? selectedGroup.jornada_id._id
+          : typeof selectedGroup?.jornada_id === 'string'
+          ? selectedGroup.jornada_id
+          : null)
+      : (jornadaId || null);
+
+  const gradoPlan = useMemo(
+    () => resolverGradoPlan(studyPlan, gradeId, sedeIdEfectivo, jornadaIdEfectiva),
+    [studyPlan, gradeId, sedeIdEfectivo, jornadaIdEfectiva]
   );
-  const personalizacionGrupo = gradoPlan?.personalizaciones_grupo.find((p) => p.group_id === groupId);
+  const asignaturasDelGrado = gradoPlan?.asignaturas ?? [];
+  const evaluacionesActualesGrado = gradoPlan?.evaluaciones_area ?? [];
+
+  const personalizacionJornada = gradoPlan?.jornadas_personalizadas?.find(
+    (j) => String(j.jornada_id) === String(jornadaIdEfectiva)
+  );
+  const personalizacionGrupo =
+    gradoPlan?.personalizaciones_grupo.find((p) => p.group_id === groupId) ??
+    studyPlan?.grades
+      .find((g) => g.grade_id === gradeId && g.personalizaciones_grupo?.some((p) => p.group_id === groupId))
+      ?.personalizaciones_grupo.find((p) => p.group_id === groupId);
 
   // Asignaturas efectivas presentes en el grupo (base + agregadas jornada + agregadas grupo)
   const asignaturasDelGrupoEfectivas = useMemo(() => {
@@ -2593,6 +2245,8 @@ function ConfiguracionEvaluacionTab({
         institucion_id: institucionId,
         academic_year_id: academicYearId,
         grade_id: gradeId,
+        sede_id: sedeId || null,
+        jornada_id: jornadaId || null,
         area_id: areaId,
         metodo_calculo: metodo,
         asignaturas:
@@ -2727,7 +2381,17 @@ function ConfiguracionEvaluacionTab({
         </Select>
       </div>
 
-      {/* Badges de estado en modo grupo */}
+      {/* Badges de estado en modo grado o grupo */}
+      {ambito === 'GRADO' && (sedeId || jornadaId) && (
+        <div className="flex items-center gap-2 pt-2">
+          <Chip tone="blue">
+            Evaluando para:{' '}
+            {jornadaId ? `Jornada ${jornadas.find((j) => j._id === jornadaId)?.nombre ?? ''}` : 'Todas las jornadas'}{' '}
+            — {sedeId ? `Sede ${sedes.find((s) => s._id === sedeId)?.nombre ?? ''}` : 'Todas las sedes'}
+          </Chip>
+        </div>
+      )}
+
       {ambito === 'GRUPO' && groupId && areaId && (
         <div className="flex items-center gap-2 pt-2">
           {evaluacionGrupoPersonalizada ? (

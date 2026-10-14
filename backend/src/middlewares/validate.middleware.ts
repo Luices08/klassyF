@@ -3,8 +3,8 @@ import Joi, { Schema } from 'joi';
 import ApiError from '../utils/ApiError';
 
 type Segment = 'body' | 'query' | 'params';
-// `body` puede no ser un objeto (ej. un array para cargas masivas como el
-// banco de DBA), por eso se tipa con el `Schema` base de Joi y no `ObjectSchema`.
+// `body` puede no ser un objeto (ej. un array para cargas masivas), por eso se
+// tipa con el `Schema` base de Joi y no `ObjectSchema`.
 export type ValidationSchema = Partial<Record<Segment, Schema>>;
 
 const SEGMENTS: Segment[] = ['body', 'query', 'params'];

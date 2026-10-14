@@ -23,6 +23,7 @@ import {
   capacidadPeriodosSemanaJornada,
   horasSemanalesDeJornada,
   horasSemanalesDelGrupo,
+  obtenerGradoPlanEfectivo,
 } from '../utils/horasPlanEstudios';
 import {
   AlcancePlan,
@@ -169,14 +170,37 @@ async function validarCoberturaPonderaciones(grado: IGradoPlan): Promise<void> {
  * pantalla: una llamada directa a la API no debe poder guardar un grado (ni un grupo) que lo exceda.
  * Al cambiar la base de un grado también se revisan sus grupos personalizados, que heredan esas horas.
  */
-async function exigirTopeDeHoras(grado: IGradoPlan, grade: { nombre: string; nivel: NivelEducativo }): Promise<void> {
-  const tope = (await getLimitesHorasPlan())[grade.nivel];
+async function exigirTopeDeHoras(
+  grado: IGradoPlan,
+  grade: { nombre: string; nivel: NivelEducativo },
+  jornada_id?: string | null
+): Promise<void> {
+  const limites = await getLimitesHorasPlan();
+  const topeNormativoNivel = limites[grade.nivel] ?? 30;
 
-  const totalGrado = horasSemanalesDelGrupo(grado);
-  if (totalGrado > tope) {
+  const effectiveJornadaId = jornada_id || (grado.jornada_id ? String(grado.jornada_id) : null);
+  let topeEfectivo = topeNormativoNivel;
+  let nombreJornada = '';
+
+  if (effectiveJornadaId) {
+    const jornada = await JornadaOperativa.findById(effectiveJornadaId).select('nombre dias_habiles franjas');
+    if (jornada) {
+      nombreJornada = jornada.nombre;
+      const capacidad = capacidadPeriodosSemanaJornada(jornada);
+      if (capacidad > 0) {
+        topeEfectivo = capacidad;
+      }
+    }
+  }
+
+  const totalGrado = grado.asignaturas.reduce((sum, a) => sum + (a.intensidad_horaria_semanal || 0), 0);
+  if (totalGrado > topeEfectivo) {
+    const razon = nombreJornada
+      ? `la jornada "${nombreJornada}" (${topeEfectivo} periodos semanales de clase)`
+      : `el nivel ${grade.nivel} (${topeEfectivo} h semanales)`;
     throw new ApiError(
       400,
-      `El grado "${grade.nombre}" suma ${totalGrado} h semanales y el tope configurado para el nivel ${grade.nivel} es ${tope} h.`
+      `El grado "${grade.nombre}" suma ${totalGrado} h semanales y supera el tope permitido para ${razon}.`
     );
   }
 
@@ -212,7 +236,7 @@ async function exigirTopeDeHoras(grado: IGradoPlan, grade: { nombre: string; niv
       );
     }
 
-    const topeNormativoEfectivo = jornada?.nombre === 'UNICA' ? Math.max(tope, 35) : tope;
+    const topeNormativoEfectivo = jornada?.nombre === 'UNICA' ? Math.max(topeNormativoNivel, 35) : topeNormativoNivel;
     if (totalGrupo > topeNormativoEfectivo) {
       throw new ApiError(
         400,
@@ -223,11 +247,26 @@ async function exigirTopeDeHoras(grado: IGradoPlan, grade: { nombre: string; niv
   }
 }
 
-function obtenerOCrearGrado(plan: StudyPlanDocument, grade_id: string): IGradoPlan {
-  let grado = plan.grades.find((g) => String(g.grade_id) === grade_id);
+function obtenerOCrearGrado(
+  plan: StudyPlanDocument,
+  grade_id: string,
+  sede_id?: string | null,
+  jornada_id?: string | null
+): IGradoPlan {
+  const sId = sede_id ? String(sede_id) : null;
+  const jId = jornada_id ? String(jornada_id) : null;
+
+  let grado = plan.grades.find(
+    (g) =>
+      String(g.grade_id) === grade_id &&
+      (g.sede_id ? String(g.sede_id) : null) === sId &&
+      (g.jornada_id ? String(g.jornada_id) : null) === jId
+  );
   if (!grado) {
     grado = {
       grade_id: oid(grade_id),
+      sede_id: sId ? oid(sId) : null,
+      jornada_id: jId ? oid(jId) : null,
       asignaturas: [],
       evaluaciones_area: [],
       jornadas_personalizadas: [],
@@ -251,6 +290,8 @@ export interface ConfigurarAsignaturasGradoInput {
   institucion_id: string;
   academic_year_id: string;
   grade_id: string;
+  sede_id?: string | null;
+  jornada_id?: string | null;
   asignaturas: AsignaturaGradoInput[];
   motivo?: string;
 }
@@ -279,7 +320,7 @@ export async function configurarAsignaturasGrado(
 
   const { plan, anio } = await obtenerOCrearStudyPlan(input.institucion_id, input.academic_year_id);
   const motivo = exigirMotivoSiAnioEnCurso(anio, input.motivo);
-  const grado = obtenerOCrearGrado(plan, input.grade_id);
+  const grado = obtenerOCrearGrado(plan, input.grade_id, input.sede_id, input.jornada_id);
   const previas = new Set(grado.asignaturas.map((a) => String(a.subject_id)));
   grado.asignaturas = input.asignaturas.map(
     (a): IAsignaturaGrado => ({
@@ -288,7 +329,7 @@ export async function configurarAsignaturasGrado(
     })
   );
   await validarCambioDeMalla(anio, { grade_id: input.grade_id }, previas, new Set(subjectIds));
-  await exigirTopeDeHoras(grado, grade);
+  await exigirTopeDeHoras(grado, grade, input.jornada_id);
   await validarCoberturaPonderaciones(grado);
 
   await plan.save();
@@ -317,6 +358,8 @@ export interface ConfigurarAsignaturasGradosItemInput {
 export interface ConfigurarAsignaturasMultiplesGradosInput {
   institucion_id: string;
   academic_year_id: string;
+  sede_id?: string | null;
+  jornada_id?: string | null;
   grados: ConfigurarAsignaturasGradosItemInput[];
   motivo?: string;
 }
@@ -355,7 +398,7 @@ export async function configurarAsignaturasMultiplesGrados(
   const { plan, anio } = await obtenerOCrearStudyPlan(input.institucion_id, input.academic_year_id);
   const motivo = exigirMotivoSiAnioEnCurso(anio, input.motivo);
   for (const item of input.grados) {
-    const grado = obtenerOCrearGrado(plan, item.grade_id);
+    const grado = obtenerOCrearGrado(plan, item.grade_id, input.sede_id, input.jornada_id);
     const previas = new Set(grado.asignaturas.map((a) => String(a.subject_id)));
     grado.asignaturas = item.asignaturas.map(
       (a): IAsignaturaGrado => ({
@@ -369,7 +412,7 @@ export async function configurarAsignaturasMultiplesGrados(
       previas,
       new Set(item.asignaturas.map((a) => a.subject_id))
     );
-    await exigirTopeDeHoras(grado, gradePorId.get(item.grade_id) as GradeDocument);
+    await exigirTopeDeHoras(grado, gradePorId.get(item.grade_id) as GradeDocument, input.jornada_id);
     await validarCoberturaPonderaciones(grado);
   }
 
@@ -404,6 +447,8 @@ export interface ConfigurarEvaluacionAreaInput {
   institucion_id: string;
   academic_year_id: string;
   grade_id: string;
+  sede_id?: string | null;
+  jornada_id?: string | null;
   area_id: string;
   metodo_calculo: MetodoCalculoEvaluacion;
   // Solo se exige (y se valida que sume 100%) cuando metodo_calculo es PONDERADO.
@@ -420,11 +465,21 @@ export async function configurarEvaluacionArea(
 
   const { plan, anio } = await obtenerOCrearStudyPlan(input.institucion_id, input.academic_year_id);
   const motivo = exigirMotivoSiAnioEnCurso(anio, input.motivo);
-  const grado = plan.grades.find((g) => String(g.grade_id) === input.grade_id);
+  const sId = input.sede_id ? String(input.sede_id) : null;
+  const jId = input.jornada_id ? String(input.jornada_id) : null;
+  let grado = plan.grades.find(
+    (g) =>
+      String(g.grade_id) === input.grade_id &&
+      (g.sede_id ? String(g.sede_id) : null) === sId &&
+      (g.jornada_id ? String(g.jornada_id) : null) === jId
+  );
+  if (!grado) {
+    grado = obtenerGradoPlanEfectivo(plan, input.grade_id, input.sede_id, input.jornada_id);
+  }
   if (!grado) {
     throw new ApiError(
       400,
-      'Este grado no tiene Configuracion General definida todavia. Configure primero las asignaturas del grado.'
+      'Este grado no tiene Configuracion General definida todavia para el contexto seleccionado. Configure primero las asignaturas del grado.'
     );
   }
   if (anio.estado === 'EN_CURSO') {
@@ -541,7 +596,9 @@ export async function configurarDistribucionGrupo(
 
   const { plan, anio } = await obtenerOCrearStudyPlan(input.institucion_id, input.academic_year_id);
   const motivo = exigirMotivoSiAnioEnCurso(anio, input.motivo);
-  const grado = plan.grades.find((g) => String(g.grade_id) === input.grade_id);
+  const grado =
+    obtenerGradoPlanEfectivo(plan, input.grade_id, group.sede_id, group.jornada_id) ??
+    plan.grades.find((g) => String(g.grade_id) === input.grade_id);
   if (!grado) {
     throw new ApiError(
       400,
@@ -804,7 +861,9 @@ export async function configurarEvaluacionAreaGrupo(
 
   const { plan, anio } = await obtenerOCrearStudyPlan(input.institucion_id, input.academic_year_id);
   const motivo = exigirMotivoSiAnioEnCurso(anio, input.motivo);
-  const grado = plan.grades.find((g) => String(g.grade_id) === input.grade_id);
+  const grado =
+    obtenerGradoPlanEfectivo(plan, input.grade_id, group.sede_id, group.jornada_id) ??
+    plan.grades.find((g) => String(g.grade_id) === input.grade_id);
   if (!grado) throw new ApiError(400, 'Grado no configurado en el plan.');
 
   let personalizacion = grado.personalizaciones_grupo.find((p) => String(p.group_id) === input.group_id);
@@ -937,7 +996,14 @@ export async function crearPlanDesdeAnioAnterior(
         asignaturas: e.asignaturas.map((a) => ({ subject_id: a.subject_id, porcentaje: a.porcentaje })),
       }));
 
-    gradosCopiados.push({ grade_id: grado.grade_id, asignaturas, evaluaciones_area, personalizaciones_grupo: [] });
+    gradosCopiados.push({
+      grade_id: grado.grade_id,
+      sede_id: grado.sede_id ?? null,
+      jornada_id: grado.jornada_id ?? null,
+      asignaturas,
+      evaluaciones_area,
+      personalizaciones_grupo: [],
+    });
   }
 
   const nuevoPlan = new StudyPlan({

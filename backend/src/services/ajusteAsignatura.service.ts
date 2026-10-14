@@ -1,10 +1,7 @@
-import { Types } from 'mongoose';
 import { CategoriaAjuste, EfectividadAjuste, TipoBarrera } from '../constants/inclusion';
 import { ROLES } from '../constants/roles';
 import AcademicYear from '../models/academicYear.model';
 import AjusteAsignatura, { AjusteAsignaturaDocument } from '../models/ajusteAsignatura.model';
-import ReferenteCurricular from '../models/referenteCurricular.model';
-import Subject from '../models/subject.model';
 import { User, UserDocument } from '../models/user.model';
 import ApiError from '../utils/ApiError';
 import { ajusteCompleto } from '../utils/inclusion';
@@ -14,7 +11,6 @@ import { cargarConPermiso, exigirEditable, guardarCambio } from './expedienteInc
 import { asignaturasEsperadas, comoUsuarioInclusion, docenteDictaAsignatura, noEncontrado, obtenerConfiguracion } from './inclusionContexto.service';
 
 export interface GuardarAjusteInput {
-  dba_ids?: string[];
   objetivo_flexibilizado?: string;
   barrera_asignatura?: string;
   tipos_barrera?: TipoBarrera[];
@@ -25,7 +21,6 @@ export interface GuardarAjusteInput {
 }
 
 const vistaAjuste = (a: AjusteAsignaturaDocument) => ({
-  dba_ids: a.dba_ids.map(String),
   objetivo_flexibilizado: a.objetivo_flexibilizado,
   barrera_asignatura: a.barrera_asignatura,
   tipos_barrera: a.tipos_barrera,
@@ -44,7 +39,6 @@ const vistaAjuste = (a: AjusteAsignaturaDocument) => ({
   })),
   ultima_edicion: a.ediciones.at(-1) ?? null,
   completo: ajusteCompleto({
-    dba_ids: a.dba_ids.map(String),
     objetivo_flexibilizado: a.objetivo_flexibilizado,
     barrera_asignatura: a.barrera_asignatura,
     ajuste_metodologico: a.ajuste_metodologico,
@@ -89,18 +83,6 @@ export async function listarAjustes(expedienteId: string, usuario: UserDocument)
   return { seguimientos_minimos: configuracion.seguimientos_minimos_anio, estado_expediente: exp.estado, grade_id: String(ctx.grupo.grade_id), filas };
 }
 
-async function validarReferentes(ids: string[], subjectId: string, gradeId: Types.ObjectId): Promise<void> {
-  if (ids.length === 0) return;
-  const asignatura = await Subject.findById(subjectId).select('area_id');
-  const referentes = await ReferenteCurricular.find({ _id: { $in: ids } }).select('area_id tipo_referente grade_id');
-  const validos = referentes.filter((r) => {
-    if (String(r.area_id) !== String(asignatura?.area_id)) return false;
-    // Un DBA es de un grado concreto; un EBC cubre un grupo de grados, así que solo se exige el área.
-    return r.tipo_referente !== 'DBA' || String((r as unknown as { grade_id?: Types.ObjectId }).grade_id) === String(gradeId);
-  });
-  if (validos.length !== new Set(ids).size) throw new ApiError(400, 'Algún referente no existe o no corresponde al área de la asignatura y al grado del estudiante.');
-}
-
 /** El docente de la asignatura (o orientación/ADMIN) guarda su fila. Con el expediente ACTIVO sube la versión; con el aprobado lo devuelve a construcción. */
 export async function guardarAjuste(expedienteId: string, subjectId: string, datos: GuardarAjusteInput, usuario: UserDocument, ip?: string | null) {
   const { exp, ctx } = await cargarConPermiso(expedienteId, usuario, 'VER_FICHA_PEDAGOGICA');
@@ -115,13 +97,11 @@ export async function guardarAjuste(expedienteId: string, subjectId: string, dat
   await exigirEditable(exp);
   if (exp.estado === 'BORRADOR') throw new ApiError(409, 'Orientación debe iniciar la construcción del expediente antes de diligenciar los ajustes.');
   if (exp.tipo !== 'PIAR') throw new ApiError(409, 'Los ajustes por asignatura son del PIAR.');
-  await validarReferentes(datos.dba_ids ?? [], subjectId, ctx.grupo.grade_id);
 
   const ajuste = (await AjusteAsignatura.findOne({ expediente_id: exp._id, subject_id: subjectId })) ?? new AjusteAsignatura({ expediente_id: exp._id, subject_id: subjectId });
   for (const campo of ['objetivo_flexibilizado', 'barrera_asignatura', 'ajuste_metodologico', 'ajuste_evaluativo', 'recursos', 'tipos_barrera', 'categorias_ajuste'] as const) {
     if (datos[campo] !== undefined) ajuste.set(campo, datos[campo]);
   }
-  if (datos.dba_ids !== undefined) ajuste.set('dba_ids', [...new Set(datos.dba_ids)]);
 
   // La versión nueva (si el expediente ya estaba firmado) se calcula antes de guardar para que la edición la registre.
   const versionNueva = exp.estado === 'ACTIVO' || exp.estado === 'LISTO_PARA_ACUERDO' ? exp.version + 1 : exp.version;

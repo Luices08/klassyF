@@ -179,6 +179,7 @@ export function TeacherAssignmentsPage() {
 
   const { data: institucion } = useInstitution();
   const { data: campuses = [] } = useCampuses(institucion?._id);
+  const campusMap = useMemo(() => new Map(campuses.map((c) => [c._id, c])), [campuses]);
   const { data: jornadas = [] } = useTodasLasJornadas();
 
   const [tabActiva, setTabActiva] = useState<string>(
@@ -234,6 +235,22 @@ export function TeacherAssignmentsPage() {
   const [docenteProyectos, setDocenteProyectos] = useState<Array<{ id: string; proyecto_nombre: string; horas_semanales: number }>>([]);
   const [docenteFeedback, setDocenteFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
+  // Jornadas disponibles filtradas según la sede seleccionada en Ficha del Docente
+  const jornadasDocenteDisponibles = useMemo(() => {
+    if (!docenteFiltroSede) return jornadas;
+    return jornadas.filter((j) => {
+      const sId = typeof j.sede_id === 'object' && j.sede_id ? j.sede_id._id : j.sede_id;
+      return String(sId) === String(docenteFiltroSede);
+    });
+  }, [jornadas, docenteFiltroSede]);
+
+  useEffect(() => {
+    if (docenteFiltroSede && docenteFiltroJornada) {
+      const pertenece = jornadasDocenteDisponibles.some((j) => j._id === docenteFiltroJornada);
+      if (!pertenece) setDocenteFiltroJornada('');
+    }
+  }, [docenteFiltroSede, docenteFiltroJornada, jornadasDocenteDisponibles]);
+
   // Asignador rápido multi-grupo para Ficha del Docente
   const [multiGradoId, setMultiGradoId] = useState<string>('');
   const [multiSubjectId, setMultiSubjectId] = useState<string>('');
@@ -247,6 +264,25 @@ export function TeacherAssignmentsPage() {
   const [cursoDirectorHoras, setCursoDirectorHoras] = useState<number>(0);
   const [cursoMallaMap, setCursoMallaMap] = useState<Record<string, string>>({});
   const [cursoFeedback, setCursoFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+
+  // Jornadas disponibles filtradas según la sede seleccionada en Malla por Curso
+  const jornadasCursoDisponibles = useMemo(() => {
+    if (!cursoSedeId) return jornadas;
+    return jornadas.filter((j) => {
+      const sId = typeof j.sede_id === 'object' && j.sede_id ? j.sede_id._id : j.sede_id;
+      return String(sId) === String(cursoSedeId);
+    });
+  }, [jornadas, cursoSedeId]);
+
+  useEffect(() => {
+    if (cursoSedeId && cursoJornadaId) {
+      const pertenece = jornadasCursoDisponibles.some((j) => j._id === cursoJornadaId);
+      if (!pertenece) {
+        setCursoJornadaId('');
+        setCursoGroupId('');
+      }
+    }
+  }, [cursoSedeId, cursoJornadaId, jornadasCursoDisponibles]);
 
   // Sincronizar Ficha del Docente cuando cambia el docente seleccionado o las asignaciones
   useEffect(() => {
@@ -737,7 +773,7 @@ export function TeacherAssignmentsPage() {
   const handleEliminar = async (asg: TeacherAssignment) => {
     const msg =
       asg.tipo_asignacion === 'CLASE'
-        ? '¿Está seguro de revocar esta asignación de clase? No se puede si ya tiene actividades/notas registradas o una planeación curricular aprobada; si tiene borradores de planeación (M07) sin aprobar, se eliminarán también.'
+        ? '¿Está seguro de revocar esta asignación de clase? No se puede si ya tiene actividades/notas registradas. Los planes de aula que el docente ya cargó no se borran: quedan archivados.'
         : '¿Está seguro de eliminar esta responsabilidad docente?';
     if (!window.confirm(msg)) return;
 
@@ -866,7 +902,10 @@ export function TeacherAssignmentsPage() {
               <Select
                 label="Sede de Vinculación (Filtro)"
                 value={docenteFiltroSede}
-                onChange={(e) => setDocenteFiltroSede(e.target.value)}
+                onChange={(e) => {
+                  setDocenteFiltroSede(e.target.value);
+                  setDocenteFiltroJornada('');
+                }}
               >
                 <option value="">Todas las Sedes</option>
                 {campuses.map((c) => (
@@ -882,11 +921,18 @@ export function TeacherAssignmentsPage() {
                 onChange={(e) => setDocenteFiltroJornada(e.target.value)}
               >
                 <option value="">Todas las Jornadas</option>
-                {jornadas.map((j) => (
-                  <option key={j._id} value={j._id}>
-                    {j.nombre}
-                  </option>
-                ))}
+                {jornadasDocenteDisponibles.map((j) => {
+                  const sNom =
+                    typeof j.sede_id === 'object' && j.sede_id
+                      ? j.sede_id.nombre
+                      : campusMap.get(typeof j.sede_id === 'string' ? j.sede_id : '')?.nombre;
+                  const etiqueta = docenteFiltroSede ? j.nombre : `${j.nombre} — ${sNom || 'Sin sede'}`;
+                  return (
+                    <option key={j._id} value={j._id}>
+                      {etiqueta}
+                    </option>
+                  );
+                })}
               </Select>
 
               <Select
@@ -1285,11 +1331,18 @@ export function TeacherAssignmentsPage() {
                 }}
               >
                 <option value="">Todas las Jornadas</option>
-                {jornadas.map((j) => (
-                  <option key={j._id} value={j._id}>
-                    {j.nombre}
-                  </option>
-                ))}
+                {jornadasCursoDisponibles.map((j) => {
+                  const sNom =
+                    typeof j.sede_id === 'object' && j.sede_id
+                      ? j.sede_id.nombre
+                      : campusMap.get(typeof j.sede_id === 'string' ? j.sede_id : '')?.nombre;
+                  const etiqueta = cursoSedeId ? j.nombre : `${j.nombre} — ${sNom || 'Sin sede'}`;
+                  return (
+                    <option key={j._id} value={j._id}>
+                      {etiqueta}
+                    </option>
+                  );
+                })}
               </Select>
 
               <Select

@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import type { IGradoPlan } from '../src/models/studyPlan.model';
-import { capacidadPeriodosSemanaJornada, horasDeAsignaturaEnGrupo, horasSemanalesDelGrupo } from '../src/utils/horasPlanEstudios';
+import {
+  capacidadPeriodosSemanaJornada,
+  horasDeAsignaturaEnGrupo,
+  horasSemanalesDelGrupo,
+  obtenerGradoPlanEfectivo,
+} from '../src/utils/horasPlanEstudios';
 
 const asignatura = (subject_id: string, intensidad_horaria_semanal: number) => ({ subject_id, intensidad_horaria_semanal });
 const grado = (...asignaturas: ReturnType<typeof asignatura>[]) =>
@@ -131,5 +136,82 @@ describe('capacidadPeriodosSemanaJornada', () => {
   it('devuelve 0 si la jornada no tiene franjas o es nula', () => {
     expect(capacidadPeriodosSemanaJornada(null)).toBe(0);
     expect(capacidadPeriodosSemanaJornada({ dias_habiles: [1, 2, 3, 4, 5], franjas: [] })).toBe(0);
+  });
+});
+
+describe('obtenerGradoPlanEfectivo', () => {
+  const plan = {
+    grades: [
+      // 1. Grado 6° Base general institucional (todas las sedes, todas las jornadas)
+      {
+        grade_id: 'g6' as any,
+        sede_id: null,
+        jornada_id: null,
+        asignaturas: [asignatura('mat', 5), asignatura('len', 5)] as any,
+        evaluaciones_area: [],
+        personalizaciones_grupo: [],
+      },
+      // 2. Grado 6° Malla Nocturna (todas las sedes, jornada nocturna: 20h condensada)
+      {
+        grade_id: 'g6' as any,
+        sede_id: null,
+        jornada_id: 'j_nocturna' as any,
+        asignaturas: [asignatura('mat', 4), asignatura('len', 4)] as any,
+        evaluaciones_area: [],
+        personalizaciones_grupo: [],
+      },
+      // 3. Grado 6° Sede Rural (sede rural, todas las jornadas)
+      {
+        grade_id: 'g6' as any,
+        sede_id: 's_rural' as any,
+        jornada_id: null,
+        asignaturas: [asignatura('agro', 6)] as any,
+        evaluaciones_area: [],
+        personalizaciones_grupo: [],
+      },
+      // 4. Grado 6° Sede Norte Mañana (coincidencia exacta)
+      {
+        grade_id: 'g6' as any,
+        sede_id: 's_norte' as any,
+        jornada_id: 'j_manana' as any,
+        asignaturas: [asignatura('ingles', 8)] as any,
+        evaluaciones_area: [],
+        personalizaciones_grupo: [],
+      },
+    ] as IGradoPlan[],
+  };
+
+  it('resuelve coincidencia exacta si existe (sede + jornada)', () => {
+    const res = obtenerGradoPlanEfectivo(plan, 'g6', 's_norte', 'j_manana');
+    expect(res).toBeDefined();
+    expect(res?.asignaturas[0].subject_id).toBe('ingles');
+  });
+
+  it('resuelve coincidencia por jornada cuando no hay match exacto de sede (ej. nocturna institucional)', () => {
+    const res = obtenerGradoPlanEfectivo(plan, 'g6', 's_principal', 'j_nocturna');
+    expect(res).toBeDefined();
+    expect(res?.jornada_id).toBe('j_nocturna');
+    expect(res?.asignaturas[0].subject_id).toBe('mat');
+    expect(res?.asignaturas[0].intensidad_horaria_semanal).toBe(4);
+  });
+
+  it('resuelve coincidencia por sede cuando no hay match de jornada (ej. sede rural unitaria)', () => {
+    const res = obtenerGradoPlanEfectivo(plan, 'g6', 's_rural', 'j_tarde');
+    expect(res).toBeDefined();
+    expect(res?.sede_id).toBe('s_rural');
+    expect(res?.asignaturas[0].subject_id).toBe('agro');
+  });
+
+  it('resuelve base general institucional cuando no hay personalización de sede ni jornada', () => {
+    const res = obtenerGradoPlanEfectivo(plan, 'g6', 's_principal', 'j_tarde');
+    expect(res).toBeDefined();
+    expect(res?.sede_id).toBeNull();
+    expect(res?.jornada_id).toBeNull();
+    expect(res?.asignaturas[0].intensidad_horaria_semanal).toBe(5);
+  });
+
+  it('devuelve undefined si el grado no existe en el plan', () => {
+    const res = obtenerGradoPlanEfectivo(plan, 'g11', 's_principal', 'j_nocturna');
+    expect(res).toBeUndefined();
   });
 });

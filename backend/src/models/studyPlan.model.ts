@@ -73,6 +73,8 @@ export interface IPersonalizacionJornada {
 
 export interface IGradoPlan {
   grade_id: Types.ObjectId;
+  sede_id?: Types.ObjectId | null;
+  jornada_id?: Types.ObjectId | null;
   asignaturas: IAsignaturaGrado[];
   evaluaciones_area: IEvaluacionArea[];
   jornadas_personalizadas?: IPersonalizacionJornada[];
@@ -164,6 +166,8 @@ const personalizacionJornadaSchema = new Schema<IPersonalizacionJornada>(
 const gradoPlanSchema = new Schema<IGradoPlan>(
   {
     grade_id: { type: Schema.Types.ObjectId, ref: 'Grade', required: true },
+    sede_id: { type: Schema.Types.ObjectId, ref: 'Campus', default: null },
+    jornada_id: { type: Schema.Types.ObjectId, ref: 'JornadaOperativa', default: null },
     asignaturas: { type: [asignaturaGradoSchema], default: [] },
     evaluaciones_area: { type: [evaluacionAreaSchema], default: [] },
     jornadas_personalizadas: { type: [personalizacionJornadaSchema], default: [] },
@@ -327,9 +331,11 @@ studyPlanSchema.pre('validate', async function validarInstitucionDelAnioLectivo(
 });
 
 studyPlanSchema.pre('validate', function validarGradosUnicos(this: IStudyPlan, next) {
-  const gradeIds = this.grades.map((g) => g.grade_id);
-  if (!idsUnicos(gradeIds)) {
-    return next(errorDeValidacion('No se puede repetir un grado dentro del mismo plan de estudios.'));
+  const claves = this.grades.map(
+    (g) => `${String(g.grade_id)}_${g.sede_id ? String(g.sede_id) : 'null'}_${g.jornada_id ? String(g.jornada_id) : 'null'}`
+  );
+  if (!idsUnicos(claves)) {
+    return next(errorDeValidacion('No se puede repetir la configuración de un grado para la misma sede y jornada.'));
   }
   next();
 });

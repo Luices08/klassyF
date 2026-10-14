@@ -250,8 +250,18 @@ const academicYearSchema = new Schema<IAcademicYear, AcademicYearModel>(
   { timestamps: true }
 );
 
-// Un año lectivo es unico por institucion.
-academicYearSchema.index({ institucion_id: 1, year: 1 }, { unique: true });
+// Un mismo año calendario solo tiene un año lectivo sin cerrar: los CERRADOS son historico y no cuentan, asi se
+// puede abrir otro 2026 despues de cerrar el primero (p. ej. para repetir pruebas). Reemplaza al indice unico
+// institucion+year de antes: `npm run migrate:anio-repetible` lo retira en bases existentes.
+export const INDICE_ANIO_SIN_CERRAR = 'anio_sin_cerrar_unico';
+academicYearSchema.index(
+  { institucion_id: 1, year: 1 },
+  {
+    unique: true,
+    name: INDICE_ANIO_SIN_CERRAR,
+    partialFilterExpression: { estado: { $in: ['PLANIFICACION', 'EN_CURSO'] } },
+  }
+);
 
 // Vigencia activa unica: la base de datos misma impide dos años EN_CURSO en la
 // institucion, aunque dos activaciones lleguen a la vez.

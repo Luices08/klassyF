@@ -26,7 +26,7 @@ function exigirConvivencia(usuario: UserDocument) {
 async function resolverAnio(anioId?: string) {
   const anio = anioId
     ? await AcademicYear.findById(anioId)
-    : ((await AcademicYear.findOne({ estado: 'EN_CURSO' })) ?? (await AcademicYear.findOne().sort({ year: -1 })));
+    : ((await AcademicYear.findOne({ estado: 'EN_CURSO' })) ?? (await AcademicYear.findOne().sort({ year: -1, createdAt: -1 })));
   if (!anio) throw new ApiError(409, 'No hay un año lectivo configurado.');
   return anio;
 }

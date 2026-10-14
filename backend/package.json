@@ -17,6 +17,7 @@
     "migrate:certificados-sede": "tsx scripts/migrateCertificadosSede.ts",
     "migrate:retirar-banco-curricular": "tsx scripts/migrateRetirarBancoCurricular.ts",
     "migrate:lideres-de-area": "tsx scripts/migrateLideresDeArea.ts",
+    "migrate:anio-repetible": "tsx scripts/migrateAnioRepetible.ts",
     "reset-admin-password": "tsx scripts/resetAdminPassword.ts",
     "reset:planificacion": "tsx scripts/resetYearToPlanificacion.ts",
     "typecheck": "tsc --noEmit",

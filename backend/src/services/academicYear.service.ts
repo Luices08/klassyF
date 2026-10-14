@@ -175,7 +175,7 @@ export async function listarAnios(): Promise<AnioLectivoDto[]> {
   const institucion = await Institution.findOne();
   if (!institucion) return [];
 
-  const anios = await AcademicYear.find({ institucion_id: institucion._id }).sort({ year: -1 });
+  const anios = await AcademicYear.find({ institucion_id: institucion._id }).sort({ year: -1, createdAt: -1 });
   return Promise.all(anios.map(aDtoConEvaluacion));
 }
 
@@ -218,17 +218,23 @@ export async function crearAnio(
   const institucion = await obtenerInstitucion();
 
   const resultado = await runTransaction(async (session) => {
-    const yaExiste = await AcademicYear.exists({ institucion_id: institucion._id, year: input.year }).session(session);
-    if (yaExiste) throw new ApiError(409, `Ya existe el año lectivo ${input.year}.`);
+    // Un año del mismo número solo bloquea si sigue abierto: los cerrados son histórico.
+    const mismoNumero = await AcademicYear.find({ institucion_id: institucion._id, year: input.year })
+      .select('estado')
+      .session(session)
+      .lean();
+    if (mismoNumero.some((a) => a.estado !== 'CERRADO')) {
+      throw new ApiError(409, `Ya existe el año lectivo ${input.year} sin cerrar: ciérralo antes de crear otro del mismo año.`);
+    }
 
     // El molde de la planilla (bloques, porcentajes y máximo de casillas) es del colegio, no de un año: el año nuevo
     // arranca con el del más reciente que lo haya definido, y el administrador lo ajusta si hace falta.
     const anterior = await AcademicYear.findOne({
       institucion_id: institucion._id,
-      year: { $lt: input.year },
+      year: { $lte: input.year },
       'componentes_evaluativos.0': { $exists: true },
     })
-      .sort({ year: -1 })
+      .sort({ year: -1, createdAt: -1 })
       .session(session);
 
     const [anio] = await AcademicYear.create(
@@ -242,7 +248,10 @@ export async function crearAnio(
             porcentaje: c.porcentaje,
             max_casillas: c.max_casillas,
           })),
-          nombre: input.nombre?.trim() || `Año lectivo ${input.year}`,
+          // Sin nombre propio, el repetido se distingue del cerrado en los selectores.
+          nombre:
+            input.nombre?.trim() ||
+            (mismoNumero.length > 0 ? `Año lectivo ${input.year} (${mismoNumero.length + 1})` : `Año lectivo ${input.year}`),
           calendario: input.calendario,
           fecha_inicio: new Date(input.fecha_inicio),
           fecha_fin: new Date(input.fecha_fin),

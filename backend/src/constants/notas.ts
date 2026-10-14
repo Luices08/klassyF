@@ -19,6 +19,12 @@ export const MAX_COMPONENTES_EVALUATIVOS = 8;
 
 export const MAX_BYTES_EXCEL_NOTAS = 2 * 1024 * 1024;
 
+/** APLICADA: se guardó. RECHAZADA: no se guardó nada. INTERRUMPIDA: pasó la validación pero la escritura falló y pudo quedar a medias. */
+export const RESULTADOS_IMPORTACION_NOTAS = ['APLICADA', 'RECHAZADA', 'INTERRUMPIDA'] as const;
+export type ResultadoImportacionNotasRegistro = (typeof RESULTADOS_IMPORTACION_NOTAS)[number];
+/** Cuántos errores de fila se conservan por importación; el total real se guarda aparte. */
+export const MAX_ERRORES_REGISTRADOS = 100;
+
 export const MAX_FIRMAS_PLANILLA = 4;
 
 /** Lo que trae la plantilla de la planilla mientras el colegio no la personalice. */

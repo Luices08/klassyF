@@ -136,6 +136,11 @@ solo extender si se pide algo nuevo. Reglas que no se ven leyendo un solo archiv
 - **Estados del año**: `PLANIFICACION` → `EN_CURSO` (la vigencia activa, única por institución: lo garantiza
   un índice único parcial además del chequeo del servicio) → `CERRADO` (histórico de solo lectura, no se
   reactiva). Crear un año nuevo puede copiar los grupos ACTIVOS del anterior (grupos nuevos, sin matrículas).
+- **Un mismo número de año puede repetirse si los anteriores están CERRADOS** (p. ej. otro 2026 para seguir probando):
+  el índice único institución+year es parcial (solo PLANIFICACION/EN_CURSO, `anio_sin_cerrar_unico`) y `crearAnio` responde 409
+  solo si hay uno sin cerrar. Todo lo de un año cuelga de su `_id`; los consecutivos por número (folios, casos, actas,
+  certificados) siguen corriendo, no se reinician. Lo que busque «el más reciente» ordena por `year` y luego `createdAt`.
+  Bases anteriores: `npm run migrate:anio-repetible` (retira el índice único viejo).
 - **Semáforo del periodo**: `PROGRAMADO` → `ABIERTO` → `EN_DIGITACION` → `CERRADO` (tabla
   `TRANSICIONES_PERIODO` en `constants/anioLectivo.ts`); reabrir uno CERRADO solo lo hace ADMIN y con motivo.
   `ESTADOS_PERIODO` (ABIERTO/CERRADO) es otra cosa: el cierre de un periodo *para un grupo* (`PeriodLock`).
@@ -879,6 +884,8 @@ Botón flotante en `AppShell` (`components/asistente/AsistenteFlotante.tsx`) que
 - **Solo ofrece pantallas que el rol puede abrir**: recibe los `items` de `NAV_ITEMS` ya filtrados por rol y modalidad. **Una pantalla nueva en el menú se suma también a `PALABRAS_CLAVE_POR_RUTA`** (`lib/asistente.ts`: descripción + palabras clave) o el asistente no la conocerá bien.
 - **Dos niveles**: `POST /asistente/orientar` (`asistente.service.ts`, Claude con una herramienta forzada que elige ruta) y, si falla o no hay `ANTHROPIC_API_KEY` (503), la búsqueda local por palabras clave (`buscarDestinos`). La salida del modelo se valida (`utils/asistente.ts#validarRespuesta`): una ruta o grado que no estaba en la lista enviada se descarta.
 - **Abrir un grado**: una pantalla con `aceptaGrado: true` en el catálogo acepta `?grado=<id>` (hoy solo Plan de estudios, que abre el nivel de ese grado y resalta su columna).
+- **El botón se arrastra** (mouse o dedo, `useBotonArrastrable`): queda dentro de la ventana, la posición se recuerda en el navegador
+  (`localStorage`, solo comodidad) y un movimiento menor a 5 px es un clic. El chat sigue al botón y se cierra con clic fuera, Escape o la X.
 - Variables: `ANTHROPIC_API_KEY` (opcional), `ASISTENTE_MODELO` (por defecto `claude-haiku-5-5`). Límite de 20 preguntas/min por IP.
 
 ### Cargas masivas por CSV (M02 usuarios, M03 estudiantes)

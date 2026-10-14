@@ -934,7 +934,8 @@ export async function crearPlanDesdeAnioAnterior(
 
   const academicYearAnterior = await AcademicYear.findById(input.academic_year_id_anterior);
   if (!academicYearAnterior) throw new ApiError(404, 'El año lectivo anterior seleccionado no existe.');
-  if (academicYearAnterior.year >= academicYearNuevo.year) {
+  // Del mismo número sirve si es otro año (uno cerrado: el nuevo es el único abierto de ese número).
+  if (academicYearAnterior._id.equals(academicYearNuevo._id) || academicYearAnterior.year > academicYearNuevo.year) {
     throw new ApiError(
       400,
       `El año lectivo ${academicYearAnterior.year} no es anterior a ${academicYearNuevo.year}: elige un año lectivo previo del cual copiar.`

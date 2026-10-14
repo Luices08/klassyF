@@ -16,6 +16,8 @@ export const configurarAsignaturasGrado: ValidationSchema = {
     institucion_id: objectId.required(),
     academic_year_id: objectId.required(),
     grade_id: objectId.required(),
+    sede_id: objectId.allow(null).optional(),
+    jornada_id: objectId.allow(null).optional(),
     asignaturas: Joi.array().items(asignaturaGradoSchema).default([]),
     motivo,
   }),
@@ -25,6 +27,8 @@ export const configurarAsignaturasMultiplesGrados: ValidationSchema = {
   body: Joi.object({
     institucion_id: objectId.required(),
     academic_year_id: objectId.required(),
+    sede_id: objectId.allow(null).optional(),
+    jornada_id: objectId.allow(null).optional(),
     grados: Joi.array()
       .items(
         Joi.object({
@@ -48,6 +52,8 @@ export const configurarEvaluacionArea: ValidationSchema = {
     institucion_id: objectId.required(),
     academic_year_id: objectId.required(),
     grade_id: objectId.required(),
+    sede_id: objectId.allow(null).optional(),
+    jornada_id: objectId.allow(null).optional(),
     area_id: objectId.required(),
     metodo_calculo: Joi.string()
       .valid(...METODOS_CALCULO_EVALUACION)

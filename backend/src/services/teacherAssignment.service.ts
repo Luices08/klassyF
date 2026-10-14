@@ -2,7 +2,6 @@ import { Types } from 'mongoose';
 import Activity from '../models/activity.model';
 import Counter from '../models/counter.model';
 import AcademicYear from '../models/academicYear.model';
-import CurricularDevelopment from '../models/curricularDevelopment.model';
 import Group from '../models/group.model';
 import StudyPlan from '../models/studyPlan.model';
 import Subject from '../models/subject.model';
@@ -16,7 +15,7 @@ import { getLimitesCarga } from './institution.service';
 import ApiError from '../utils/ApiError';
 import { resumirCargaDocente } from '../utils/cargaDocente';
 import { ESTADO_ACTIVO, filtroPorEstado } from '../utils/filtroEstado';
-import { horasDeAsignaturaEnGrupo } from '../utils/horasPlanEstudios';
+import { horasDeAsignaturaEnGrupo, obtenerGradoPlanEfectivo } from '../utils/horasPlanEstudios';
 import { runTransaction } from '../utils/runTransaction';
 
 export interface ActorAsignacion {
@@ -106,7 +105,13 @@ export async function createTeacherAssignment(
           'Este año lectivo todavía no tiene un Plan de Estudios configurado (M06). Configúralo antes de asignar clases.'
         );
       }
-      const gradoConfig = studyPlan.grades.find((g) => String(g.grade_id) === String(group.grade_id));
+      const gradoConfig =
+        obtenerGradoPlanEfectivo(
+          studyPlan,
+          String(group.grade_id),
+          group.sede_id ? String(group.sede_id) : null,
+          group.jornada_id ? String(group.jornada_id) : null
+        ) ?? studyPlan.grades.find((g) => String(g.grade_id) === String(group.grade_id));
       if (!gradoConfig) {
         throw new ApiError(
           400,
@@ -401,9 +406,10 @@ export async function deleteTeacherAssignment(id: string, actor: ActorAsignacion
 
   // Una CLASE con actividades/notas registradas (M12) no se elimina: borrarla haria desaparecer
   // esas notas del boletin, y es ademas la unica forma de "cambiar de docente" que tiene la UI,
-  // lo que destruiria el historial de una materia a mitad de año. Se preserva (ver tambien el
-  // bloqueo por planeacion APROBADA mas abajo), igual que subject.service.ts bloquea inactivar
-  // una asignatura con asignaciones activas.
+  // lo que destruiria el historial de una materia a mitad de año. Se preserva, igual que
+  // subject.service.ts bloquea inactivar una asignatura con asignaciones activas.
+  // Los planes de aula (M07) no cuelgan de la asignación sino de (docente, asignatura, grado,
+  // periodo): al retirar al docente quedan archivados y no impiden el cambio.
   const tieneActividades = await Activity.exists({ teacher_assignment_id: id });
   if (tieneActividades) {
     throw new ApiError(
@@ -413,32 +419,17 @@ export async function deleteTeacherAssignment(id: string, actor: ActorAsignacion
   }
 
   await runTransaction(async (session) => {
-    // Una asignacion puede tener hasta una planeacion por periodo (1-4): revisar todas, no solo
-    // la primera que encuentre, o una ya APROBADA en otro periodo se borraria sin bloquear nada.
-    const devs = await CurricularDevelopment.find({ teacher_assignment_id: id }).session(session);
-    if (devs.some((dev) => dev.estado === 'APROBADO')) {
-      throw new ApiError(
-        409,
-        'No se puede eliminar la asignación académica porque ya cuenta con una planeación curricular aprobada.'
-      );
-    }
-
     // Si era dirección de grupo y sigue siendo el director vigente del grupo, limpiar el campo
     // (si ya fue reemplazado por otro docente, esta asignacion esta inactiva y no debe tocar al
     // director actual — ver createTeacherAssignment). Nunca se "conserva via estado" como
     // DIRECCION_GRUPO: una CLASE siempre se borra fisicamente si llega hasta aqui (sin
-    // actividades ni planeacion aprobada, no hay nada que preservar).
+    // actividades, no hay nada que preservar).
     if (assignment.tipo_asignacion === 'DIRECCION_GRUPO' && assignment.group_id) {
       await Group.updateOne(
         { _id: assignment.group_id, director_grupo_id: assignment.docente_id },
         { $unset: { director_grupo_id: 1 } },
         { session }
       );
-    }
-
-    // Ninguna quedó APROBADA (ya se validó arriba): se pueden borrar todos los borradores/envíos.
-    if (devs.length > 0) {
-      await CurricularDevelopment.deleteMany({ teacher_assignment_id: id }).session(session);
     }
 
     await TeacherAssignment.findByIdAndDelete(id).session(session);
@@ -630,16 +621,6 @@ export async function guardarCargaDocenteLote(
             'No se puede retirar una asignatura que ya cuenta con actividades o notas registradas (M12).'
           );
         }
-        const devs = await CurricularDevelopment.find({ teacher_assignment_id: actual._id }).session(session);
-        if (devs.some((d) => d.estado === 'APROBADO')) {
-          throw new ApiError(
-            409,
-            'No se puede retirar una asignatura que ya cuenta con planeación curricular aprobada (M07).'
-          );
-        }
-        if (devs.length > 0) {
-          await CurricularDevelopment.deleteMany({ teacher_assignment_id: actual._id }).session(session);
-        }
         await TeacherAssignment.findByIdAndDelete(actual._id).session(session);
       }
     }
@@ -652,7 +633,13 @@ export async function guardarCargaDocenteLote(
         throw new ApiError(400, `El grupo ${group.nomenclatura} está cerrado.`);
       }
 
-      const gradoConfig = studyPlan.grades.find((g) => String(g.grade_id) === String(group.grade_id));
+      const gradoConfig =
+        obtenerGradoPlanEfectivo(
+          studyPlan,
+          String(group.grade_id),
+          group.sede_id ? String(group.sede_id) : null,
+          group.jornada_id ? String(group.jornada_id) : null
+        ) ?? studyPlan.grades.find((g) => String(g.grade_id) === String(group.grade_id));
       if (!gradoConfig) {
         throw new ApiError(400, `El grado de ${group.nomenclatura} no está configurado en el Plan de Estudios (M06).`);
       }
@@ -781,7 +768,13 @@ export async function guardarMallaGrupoLote(
     );
   }
 
-  const gradoConfig = studyPlan.grades.find((g) => String(g.grade_id) === String(group.grade_id));
+  const gradoConfig =
+    obtenerGradoPlanEfectivo(
+      studyPlan,
+      String(group.grade_id),
+      group.sede_id ? String(group.sede_id) : null,
+      group.jornada_id ? String(group.jornada_id) : null
+    ) ?? studyPlan.grades.find((g) => String(g.grade_id) === String(group.grade_id));
   if (!gradoConfig) {
     throw new ApiError(400, `El grado de ${group.nomenclatura} no está configurado en el Plan de Estudios (M06).`);
   }
@@ -894,17 +887,6 @@ export async function guardarMallaGrupoLote(
                 `No se puede cambiar el docente de "${sub?.nombre ?? 'la asignatura'}": ya tiene notas o actividades registradas (M12).`
               );
             }
-            const devs = await CurricularDevelopment.find({ teacher_assignment_id: actual._id }).session(session);
-            if (devs.some((d) => d.estado === 'APROBADO')) {
-              const sub = await Subject.findById(subId).session(session);
-              throw new ApiError(
-                409,
-                `No se puede cambiar el docente de "${sub?.nombre ?? 'la asignatura'}": ya tiene planeación curricular aprobada (M07).`
-              );
-            }
-            if (devs.length > 0) {
-              await CurricularDevelopment.deleteMany({ teacher_assignment_id: actual._id }).session(session);
-            }
             await TeacherAssignment.findByIdAndDelete(actual._id).session(session);
 
             const docenteValido = await User.findOne({ _id: targetDocenteId, rol: ROLES.DOCENTE }).session(session);
@@ -956,17 +938,6 @@ export async function guardarMallaGrupoLote(
             409,
             `No se puede desasignar "${sub?.nombre ?? 'la asignatura'}": ya tiene notas o actividades registradas (M12).`
           );
-        }
-        const devs = await CurricularDevelopment.find({ teacher_assignment_id: actual._id }).session(session);
-        if (devs.some((d) => d.estado === 'APROBADO')) {
-          const sub = await Subject.findById(subId).session(session);
-          throw new ApiError(
-            409,
-            `No se puede desasignar "${sub?.nombre ?? 'la asignatura'}": ya tiene planeación curricular aprobada (M07).`
-          );
-        }
-        if (devs.length > 0) {
-          await CurricularDevelopment.deleteMany({ teacher_assignment_id: actual._id }).session(session);
         }
         await TeacherAssignment.findByIdAndDelete(actual._id).session(session);
       }

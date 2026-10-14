@@ -69,6 +69,8 @@ export function useCrearTeacherAssignment() {
       // Un solo prefijo ['teacher-assignments'] ya cubre el listado, el resumen y "mi carga".
       void queryClient.invalidateQueries({ queryKey: ['teacher-assignments'] });
       void queryClient.invalidateQueries({ queryKey: ['groups'] });
+      // Las tarjetas de planeación del docente y la cobertura de coordinación (M07) salen de estas asignaciones.
+      void queryClient.invalidateQueries({ queryKey: ['planes-aula'] });
     },
   });
 }
@@ -80,9 +82,7 @@ export function useEliminarTeacherAssignment() {
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['teacher-assignments'] });
       void queryClient.invalidateQueries({ queryKey: ['groups'] });
-      // Eliminar una asignación cascada borra sus planeaciones no aprobadas (M07): sin esto, una
-      // pantalla de M07 ya abierta seguía mostrándolas hasta que venciera el staleTime.
-      void queryClient.invalidateQueries({ queryKey: ['curricular-developments'] });
+      void queryClient.invalidateQueries({ queryKey: ['planes-aula'] });
     },
   });
 }
@@ -158,6 +158,7 @@ export function useGuardarCargaDocenteLote() {
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['teacher-assignments'] });
       void queryClient.invalidateQueries({ queryKey: ['groups'] });
+      void queryClient.invalidateQueries({ queryKey: ['planes-aula'] });
     },
   });
 }
@@ -170,6 +171,7 @@ export function useGuardarMallaGrupoLote() {
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['teacher-assignments'] });
       void queryClient.invalidateQueries({ queryKey: ['groups'] });
+      void queryClient.invalidateQueries({ queryKey: ['planes-aula'] });
     },
   });
 }

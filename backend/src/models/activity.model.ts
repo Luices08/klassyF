@@ -24,10 +24,6 @@ export interface IActivity {
   /** Vacío con `requiere_entrega` = respuesta escrita en línea, sin archivo. */
   formatos_permitidos: FormatoEvidencia[];
   permite_entrega_tardia: boolean;
-  /** Planeación M07 APROBADA con la que se programó; los DBA y la competencia se validan contra ella. */
-  desarrollo_curricular_id: Types.ObjectId | null;
-  dba_id: Types.ObjectId | null;
-  competencia_evaluada: string | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -50,9 +46,6 @@ const activitySchema = new Schema<IActivity, ActivityModel>(
     requiere_entrega: { type: Boolean, default: true },
     formatos_permitidos: { type: [{ type: String, enum: CLAVES_FORMATO_EVIDENCIA }], default: [] },
     permite_entrega_tardia: { type: Boolean, default: false },
-    desarrollo_curricular_id: { type: Schema.Types.ObjectId, ref: 'CurricularDevelopment', default: null },
-    dba_id: { type: Schema.Types.ObjectId, ref: 'ReferenteCurricular', default: null },
-    competencia_evaluada: { type: String, trim: true, maxlength: 600, default: null },
   },
   { timestamps: true }
 );

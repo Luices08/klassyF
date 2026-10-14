@@ -48,9 +48,10 @@ import { StudentsPage } from './pages/admin/StudentsPage';
 import { StudyPlanPage } from './pages/admin/StudyPlanPage';
 import { TeacherAssignmentsPage } from './pages/admin/TeacherAssignmentsPage';
 import { MyTeacherLoadPage } from './pages/MyTeacherLoadPage';
-import { DesarrolloCurricularPage } from './pages/DesarrolloCurricularPage';
-import { RevisionCurricularPage } from './pages/admin/RevisionCurricularPage';
 import { UsersPage } from './pages/admin/UsersPage';
+import { DocumentosReferenciaPage } from './pages/admin/DocumentosReferenciaPage';
+import { RevisionPlaneacionPage } from './pages/admin/RevisionPlaneacionPage';
+import { PlaneacionDocentePage } from './pages/PlaneacionDocentePage';
 
 export default function App() {
   return (
@@ -95,7 +96,8 @@ export default function App() {
             <Route path="/admin/horarios" element={<HorariosPage />} />
             <Route path="/admin/academic-catalog" element={<AcademicCatalogPage />} />
             <Route path="/admin/study-plan" element={<StudyPlanPage />} />
-            <Route path="/admin/revision-curricular" element={<RevisionCurricularPage />} />
+            <Route path="/admin/documentos-referencia" element={<DocumentosReferenciaPage />} />
+            <Route path="/admin/revision-planeacion" element={<RevisionPlaneacionPage />} />
             <Route path="/admin/actividades" element={<ActividadesGestionPage />} />
             <Route path="/admin/notas" element={<NotasGestionPage />} />
             <Route path="/admin/boletin" element={<ConfiguracionBoletinPage />} />
@@ -107,7 +109,7 @@ export default function App() {
 
           <Route element={<ProtectedRoute allowedRoles={['DOCENTE']} />}>
             <Route path="/docente/mi-carga" element={<MyTeacherLoadPage />} />
-            <Route path="/docente/planeacion-curricular" element={<DesarrolloCurricularPage />} />
+            <Route path="/docente/planeacion" element={<PlaneacionDocentePage />} />
             <Route path="/docente/asistencia" element={<AsistenciaPage />} />
             <Route path="/docente/actividades" element={<ActividadesDocentePage />} />
             <Route path="/docente/notas" element={<NotasPlanillaPage />} />

@@ -10,6 +10,8 @@ interface DropzoneProps {
   /** Texto de ayuda bajo el título, p. ej. los formatos que acepta. */
   hint?: string;
   disabled?: boolean;
+  /** Nombre accesible del selector de archivo; por defecto el de las entregas de M11. */
+  etiqueta?: string;
 }
 
 function tamano(bytes: number): string {
@@ -20,7 +22,7 @@ function tamano(bytes: number): string {
  * Zona para soltar (o elegir) un archivo. Solo valida lo que se ve en el navegador (extensión y tamaño) para avisar
  * antes de subir; el contenido real lo confirma siempre el servidor.
  */
-export function Dropzone({ extensiones, maxBytes, file, onFile, hint, disabled }: DropzoneProps) {
+export function Dropzone({ extensiones, maxBytes, file, onFile, hint, disabled, etiqueta = 'Archivo de la entrega' }: DropzoneProps) {
   const entrada = useRef<HTMLInputElement>(null);
   const [arrastrando, setArrastrando] = useState(false);
   const [problema, setProblema] = useState<string | null>(null);
@@ -77,7 +79,7 @@ export function Dropzone({ extensiones, maxBytes, file, onFile, hint, disabled }
           type="file"
           accept={extensiones.join(',')}
           className="hidden"
-          aria-label="Archivo de la entrega"
+          aria-label={etiqueta}
           disabled={disabled}
           onChange={(e) => {
             recibir(e.target.files?.[0]);

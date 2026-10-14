@@ -23,6 +23,7 @@ import { sugerirRangos, SugerenciaRangosInput } from '../utils/escalaEvaluacion'
 import { runTransaction } from '../utils/runTransaction';
 import { claveDeComponente, componentesEfectivos, validarComponentesEvaluativos } from '../utils/siee';
 import { registrarEvento } from './audit.service';
+import { exigirPlanesDeAreaAprobados } from './planeacionCompuertas.service';
 
 type FechaEntrada = Date | string;
 
@@ -188,6 +189,15 @@ export async function obtenerAnioActivo(): Promise<AnioLectivoDto | null> {
   return anio ? aDtoConEvaluacion(anio) : null;
 }
 
+// Editar el año reconstruye cada periodo: la ventana de entrega de planes de aula (M07) no viaja en ese formulario,
+// así que se conserva aquí o se perdería (y volvería a la sugerida) en cada edición.
+function ventanaPlanesAulaDe(previo: IPeriodo | undefined): Partial<IPeriodo> {
+  return {
+    fecha_apertura_planes_aula: previo?.fecha_apertura_planes_aula ?? null,
+    fecha_limite_planes_aula: previo?.fecha_limite_planes_aula ?? null,
+  };
+}
+
 function mapearPeriodos(periodos: PeriodoInput[], conservar: (numero: number) => Partial<IPeriodo> = () => ({})) {
   return periodos.map((p) => ({
     numero: p.numero,
@@ -317,7 +327,11 @@ export async function actualizarAnio(
   if (anio.estado === 'PLANIFICACION') {
     periodos = mapearPeriodos(input.periodos, (numero) => {
       const previo = anio.periodos.find((p) => p.numero === numero);
-      return { ...(previo ? { _id: previo._id } : {}), estado: 'PROGRAMADO' as EstadoPeriodoAcademico };
+      return {
+        ...(previo ? { _id: previo._id } : {}),
+        ...ventanaPlanesAulaDe(previo),
+        estado: 'PROGRAMADO' as EstadoPeriodoAcademico,
+      };
     });
   } else {
     const mismosNumeros =
@@ -346,7 +360,7 @@ export async function actualizarAnio(
 
     periodos = mapearPeriodos(input.periodos, (numero) => {
       const previo = anio.periodos.find((p) => p.numero === numero) as IPeriodo & { _id: Types.ObjectId };
-      return { _id: previo._id, estado: previo.estado };
+      return { _id: previo._id, ...ventanaPlanesAulaDe(previo), estado: previo.estado };
     });
   }
 
@@ -382,6 +396,9 @@ export async function activarAnio(id: string, { usuarioId, ip }: ContextoUsuario
       `El año lectivo ${vigente.year} sigue vigente. Ciérralo antes de activar el ${anio.year}: solo puede haber una vigencia activa.`
     );
   }
+
+  // M07: el año no arranca con áreas obligatorias sin plan de área aprobado.
+  await exigirPlanesDeAreaAprobados(anio);
 
   let activado: AcademicYearDocument | null;
   try {

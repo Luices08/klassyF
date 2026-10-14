@@ -6,7 +6,7 @@ import Subject from '../models/subject.model';
 import TeacherAssignment from '../models/teacherAssignment.model';
 import ApiError from '../utils/ApiError';
 import { ESTADO_ACTIVO } from '../utils/filtroEstado';
-import { horasDeAsignaturaEnGrupo } from '../utils/horasPlanEstudios';
+import { horasDeAsignaturaEnGrupo, obtenerGradoPlanEfectivo } from '../utils/horasPlanEstudios';
 
 /**
  * Qué datos de otros módulos dependen del plan de estudios (M06). Con el año EN_CURSO el plan no se
@@ -112,13 +112,16 @@ export async function sincronizarHorasDeAsignaciones(plan: StudyPlanDocument, gr
     const gruposDocs = await Group.find({
       academic_year_id: plan.academic_year_id,
       _id: { $in: grupos },
-    }).select('_id jornada_id');
-    const jornadaDeGrupo = new Map(gruposDocs.map((g) => [String(g._id), String(g.jornada_id)]));
+    }).select('_id sede_id jornada_id');
+    const grupoPorId = new Map(gruposDocs.map((g) => [String(g._id), g]));
 
     const operaciones = [];
     for (const a of asignaciones) {
-      const jId = jornadaDeGrupo.get(String(a.group_id));
-      const horas = horasDeAsignaturaEnGrupo(grado, String(a.group_id), String(a.subject_id), jId);
+      const gDoc = grupoPorId.get(String(a.group_id));
+      const sId = gDoc?.sede_id ? String(gDoc.sede_id) : null;
+      const jId = gDoc?.jornada_id ? String(gDoc.jornada_id) : null;
+      const gradoEfectivo = obtenerGradoPlanEfectivo(plan, gradeId, sId, jId) ?? grado;
+      const horas = horasDeAsignaturaEnGrupo(gradoEfectivo, String(a.group_id), String(a.subject_id), jId ?? undefined);
       if (horas !== undefined && horas !== a.horas_semanales) {
         operaciones.push({ updateOne: { filter: { _id: a._id }, update: { $set: { horas_semanales: horas } } } });
       }

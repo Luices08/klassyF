@@ -1,11 +1,12 @@
 import { Types } from 'mongoose';
+import { EstadoPlan } from '../../src/constants/planeacion';
 import AcademicYear from '../../src/models/academicYear.model';
 import Activity from '../../src/models/activity.model';
 import Area from '../../src/models/area.model';
 import ColumnaPlanilla from '../../src/models/columnaPlanilla.model';
-import CurricularDevelopment from '../../src/models/curricularDevelopment.model';
 import Group from '../../src/models/group.model';
 import Institution from '../../src/models/institution.model';
+import PlanAula from '../../src/models/planAula.model';
 import StudyPlan from '../../src/models/studyPlan.model';
 import Subject from '../../src/models/subject.model';
 import TeacherAssignment, { TeacherAssignmentDocument } from '../../src/models/teacherAssignment.model';
@@ -90,16 +91,39 @@ export async function definirComponentes(
   await anio.save();
 }
 
-export async function aprobarPlaneacion(asignacion: TeacherAssignmentDocument, periodo = 1): Promise<void> {
-  await CurricularDevelopment.create({
-    teacher_assignment_id: asignacion._id,
+/**
+ * El plan de aula del docente de esa clase para el periodo, en el estado indicado, creado directo en la base (la radicación, la
+ * revisión y la adopción tienen sus propias pruebas). El plan es por (docente, asignatura, grado), no por asignación.
+ */
+export async function crearPlanAula(asignacion: TeacherAssignmentDocument, periodo = 1, estado: EstadoPlan = 'APROBADO') {
+  const grupo = (await Group.findById(asignacion.group_id))!;
+  const ahora = new Date();
+  return PlanAula.create({
+    academic_year_id: asignacion.academic_year_id,
     periodo_numero: periodo,
-    dba_seleccionados: [],
-    competencias: 'Resuelve problemas con fracciones.',
-    metodologia_y_recursos: 'Trabajo en equipo',
-    criterios_evaluacion: 'Rúbrica',
-    estado: 'APROBADO',
+    subject_id: asignacion.subject_id,
+    grade_id: grupo.grade_id,
+    docente_id: asignacion.docente_id,
+    estado,
+    radicacion: { fecha: ahora, fecha_limite: null, fuera_de_plazo: false },
+    versiones: [
+      {
+        numero: 1,
+        titulo: 'Plan de aula',
+        descripcion: 'Plan de aula de prueba',
+        archivo: { nombre: 'plan.pdf', ruta: 'uploads/planeacion/prueba.pdf', bytes: 10, sha256: 'a'.repeat(64) },
+        origen: 'CARGADA',
+        adoptado_de: null,
+        subido_por: asignacion.docente_id,
+        fecha: ahora,
+      },
+    ],
   });
+}
+
+/** El plan de aula aprobado: lo que M11 exige para programar actividades. */
+export async function aprobarPlaneacion(asignacion: TeacherAssignmentDocument, periodo = 1): Promise<void> {
+  await crearPlanAula(asignacion, periodo, 'APROBADO');
 }
 
 /** Una actividad ya programada (sin pasar por las reglas de programación de M11, que tienen sus propias pruebas). `peso` null = automático. */

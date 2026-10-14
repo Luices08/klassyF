@@ -7,6 +7,7 @@ import { EscalaEvaluacionDrawer } from '../components/anioLectivo/EscalaEvaluaci
 import { EventoDrawer } from '../components/anioLectivo/EventoDrawer';
 import { PeriodoCard } from '../components/anioLectivo/PeriodoCard';
 import { ProrrogaDrawer } from '../components/anioLectivo/ProrrogaDrawer';
+import { VentanaPlanesDrawer } from '../components/anioLectivo/VentanaPlanesDrawer';
 import { Alert, errorMessage } from '../components/ui/Alert';
 import { Chip, EstadoAnioLectivoBadge, type Tone } from '../components/ui/Badge';
 import { Button } from '../components/ui/Button';
@@ -31,16 +32,38 @@ import {
 } from '../hooks/useAniosLectivos';
 import { useCampuses } from '../hooks/useCatalogs';
 import { useInstitution } from '../hooks/useInstitution';
+import { useVentanasPlanes } from '../hooks/useVentanasPlanes';
 import { formatoFechaCalendario, formatoFechaHora, formatoRangoCalendario } from '../lib/fechas';
+import { ApiError } from '../types/api';
 import {
   NOMBRES_TIPO_EVENTO,
   type AcademicYear,
   type Campus,
   type EstadoPeriodoAcademico,
   type EventoCalendario,
+  type MotivoAreaPendiente,
   type Periodo,
   type TipoEventoCalendario,
+  type VentanaPeriodo,
 } from '../types/domain';
+
+interface AreaPendienteParaActivar {
+  /** Un área puede aparecer varias veces: una por líder cuyo plan falta y una por lo que ningún líder cubre. */
+  clave: string;
+  area_id: string;
+  nombre: string;
+  /** Qué parte del área es: «Secundaria, Media · Diurna · Todas las sedes». */
+  alcance: string;
+  motivo: MotivoAreaPendiente;
+  detalle: string;
+}
+
+/** El 409 de activar un año trae las áreas obligatorias que aún no tienen su plan de área aprobado (M07). */
+function areasPendientesDe(error: unknown): AreaPendienteParaActivar[] {
+  if (!(error instanceof ApiError) || typeof error.details !== 'object' || error.details === null) return [];
+  const lista = (error.details as { areas_pendientes?: unknown }).areas_pendientes;
+  return Array.isArray(lista) ? (lista as AreaPendienteParaActivar[]) : [];
+}
 
 const TONO_EVENTO: Record<TipoEventoCalendario, Tone> = {
   RECESO: 'neutral',
@@ -135,7 +158,12 @@ function ConfirmacionDrawer({
 }: ConfirmacionDrawerProps) {
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
-    await onConfirm();
+    try {
+      await onConfirm();
+    } catch {
+      // El rechazo (p. ej. la compuerta de activación) ya se muestra en el drawer por `error`: sigue abierto y no es una excepción sin atender.
+      return;
+    }
     onClose();
   }
 
@@ -202,6 +230,12 @@ export function AnioLectivoPage() {
 
   const [escalaAbierta, setEscalaAbierta] = useState(false);
 
+  // Entrega de planes de aula (M07): coordinación y administración la ajustan por periodo, sin tocar las fechas del periodo.
+  const ventanasQuery = useVentanasPlanes(anio?._id, puedeControlarPeriodos || user?.rol === 'DOCENTE');
+  const ventanas = ventanasQuery.data?.periodos ?? [];
+  const [ventanaEditando, setVentanaEditando] = useState<VentanaPeriodo | null>(null);
+  const areasPendientes = areasPendientesDe(activar.error);
+
   async function handleActivar() {
     if (!anio) return;
     activar.reset();
@@ -216,11 +250,12 @@ export function AnioLectivoPage() {
   }
 
   function accionesDe(periodo: Periodo): ReactNode {
-    if (!anio || !enCurso) return null;
+    if (!anio) return null;
     const estado = periodo.estado ?? 'PROGRAMADO';
-    const transiciones = puedeControlarPeriodos
+    const transiciones = puedeControlarPeriodos && enCurso
       ? ACCIONES_PERIODO[estado].filter((a) => !a.soloAdmin || esAdmin)
       : [];
+    const ventana = ventanas.find((v) => v.numero === periodo.numero);
 
     return (
       <>
@@ -229,9 +264,14 @@ export function AnioLectivoPage() {
             {a.etiqueta}
           </Button>
         ))}
-        {puedeControlarPeriodos && estado !== 'PROGRAMADO' && (
+        {puedeControlarPeriodos && enCurso && estado !== 'PROGRAMADO' && (
           <Button type="button" variant="secondary" onClick={() => setProrrogaDrawer({ periodo: periodo.numero })}>
             Prórroga
+          </Button>
+        )}
+        {puedeControlarPeriodos && !soloLectura && ventana && (
+          <Button type="button" variant="secondary" onClick={() => setVentanaEditando(ventana)}>
+            Entrega de planes
           </Button>
         )}
       </>
@@ -382,6 +422,7 @@ export function AnioLectivoPage() {
                   key={p.numero}
                   periodo={p}
                   semanas={resumen?.semanas_por_periodo.find((s) => s.numero === p.numero)?.semanas}
+                  ventanaPlanes={ventanas.find((v) => v.numero === p.numero)}
                   acciones={accionesDe(p)}
                 />
               ))}
@@ -710,10 +751,39 @@ export function AnioLectivoPage() {
             isPending={activar.isPending}
             error={activar.error}
             tone="info"
-            mensaje={`Este pasa a ser la vigencia actual: solo puede haber un año vigente a la vez y los docentes calificarán en él. Si ya hay otro vigente, primero debes cerrarlo.`}
+            mensaje={`Este pasa a ser la vigencia actual: solo puede haber un año vigente a la vez y los docentes calificarán en él. Si ya hay otro vigente, primero debes cerrarlo. Antes, cada área obligatoria debe tener su plan de área aprobado.`}
             onConfirm={handleActivar}
             onClose={() => setActivando(false)}
-          />
+          >
+            {areasPendientes.length > 0 && (
+              <div className="space-y-2">
+                <p className="text-sm font-semibold text-ink">Áreas obligatorias sin plan de área aprobado</p>
+                <ul className="space-y-1.5 text-sm text-body">
+                  {areasPendientes.map((a) => (
+                    <li key={a.clave} className="flex flex-wrap items-center gap-2 rounded-lg bg-soft px-3 py-2">
+                      <span className="font-semibold text-ink">{a.nombre}</span>
+                      {a.alcance && <Chip tone="blue">{a.alcance}</Chip>}
+                      <span className="text-muted">{a.detalle}</span>
+                    </li>
+                  ))}
+                </ul>
+                <p className="text-sm text-muted">
+                  Se resuelve en{' '}
+                  <Link to="/admin/revision-planeacion" className="font-semibold text-primary hover:underline">
+                    Revisión de planeación
+                  </Link>{' '}
+                  y, para designar al líder, en{' '}
+                  <Link to="/admin/academic-catalog" className="font-semibold text-primary hover:underline">
+                    Catálogo académico
+                  </Link>
+                  .
+                </p>
+              </div>
+            )}
+          </ConfirmacionDrawer>
+          {ventanaEditando && (
+            <VentanaPlanesDrawer key={`${anio._id}-${ventanaEditando.numero}`} ventana={ventanaEditando} anio={anio} onClose={() => setVentanaEditando(null)} />
+          )}
 
           <ConfirmacionDrawer
             open={cambio !== null}

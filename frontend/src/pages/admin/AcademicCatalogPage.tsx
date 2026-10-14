@@ -9,7 +9,8 @@ import { IconButton } from '../../components/ui/IconButton';
 import { PageHeader } from '../../components/ui/PageHeader';
 import { Spinner } from '../../components/ui/Spinner';
 import { EmptyRow, Table, TableBody, TableHead, Td, Th } from '../../components/ui/Table';
-import { BanIcon, PencilIcon, PlusIcon, RefreshIcon } from '../../components/ui/icons';
+import { BanIcon, PencilIcon, PlusIcon, RefreshIcon, UserIcon } from '../../components/ui/icons';
+import { LideresAreaDrawer } from '../../components/planeacion/LideresAreaDrawer';
 import {
   useActualizarArea,
   useActualizarEstadoArea,
@@ -21,14 +22,19 @@ import {
   useSubjects,
 } from '../../hooks/useCatalogoAcademico';
 import { useInstitution } from '../../hooks/useInstitution';
+import { useLideresArea } from '../../hooks/useLideresArea';
 import {
   NIVELES_EDUCATIVOS,
   TIPOS_ASIGNATURA,
   type Area,
+  type LiderArea,
   type NivelEducativo,
   type Subject,
   type TipoAsignatura,
 } from '../../types/domain';
+
+/** Cubre todos los niveles, jornadas y sedes: el caso del colegio con un solo jefe por área. */
+const esAlcanceCompleto = (l: LiderArea) => l.niveles.length === 0 && l.jornada === 'TODAS' && l.sedes.length === 0;
 
 const NIVEL_LABELS: Record<NivelEducativo, string> = {
   PREESCOLAR: 'Preescolar',
@@ -100,6 +106,11 @@ export function AcademicCatalogPage() {
     actualizarEstadoArea.reset();
     await actualizarEstadoArea.mutateAsync({ id: area._id, estado: area.estado === 'activo' ? 'inactivo' : 'activo' });
   }
+
+  // Líderes del área (M07): uno solo para toda la institución, o varios por nivel, jornada o sede. Cada uno carga el plan de área de lo que cubre.
+  const lideresQuery = useLideresArea();
+  const lideresDe = (areaId: string) => (lideresQuery.data ?? []).filter((l) => l.area_id === areaId);
+  const [areaLideres, setAreaLideres] = useState<Area | null>(null);
 
   // ---- Asignaturas ----
   const [areaFiltro, setAreaFiltro] = useState('');
@@ -189,6 +200,7 @@ export function AcademicCatalogPage() {
               <Th>Nombre</Th>
               <Th>Descripción</Th>
               <Th>Código</Th>
+              <Th>Líderes del área</Th>
               <Th>Estado</Th>
               <Th />
             </TableHead>
@@ -199,11 +211,32 @@ export function AcademicCatalogPage() {
                   <Td>{a.descripcion}</Td>
                   <Td>{a.codigo}</Td>
                   <Td>
+                    {lideresDe(a._id).length === 0 ? (
+                      <span className="text-muted">Sin líder</span>
+                    ) : (
+                      <ul className="space-y-1">
+                        {lideresDe(a._id).map((l) => (
+                          <li key={l._id}>
+                            <span className="text-ink">{l.docente ? `${l.docente.nombre} ${l.docente.apellido}` : '—'}</span>
+                            <span className="block text-xs text-muted">{esAlcanceCompleto(l) ? 'Toda la institución' : l.alcance_texto}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </Td>
+                  <Td>
                     <EstadoUsuarioBadge value={a.estado} />
                   </Td>
                   <Td>
                     <div className="flex justify-end gap-2">
                       <IconButton tone="edit" label="Editar área" icon={<PencilIcon />} onClick={() => abrirEditarArea(a)} />
+                      <IconButton
+                        tone="success"
+                        label="Líderes del área"
+                        icon={<UserIcon />}
+                        disabled={a.estado !== 'activo'}
+                        onClick={() => setAreaLideres(a)}
+                      />
                       <IconButton
                         tone={a.estado === 'activo' ? 'neutral' : 'success'}
                         label={a.estado === 'activo' ? 'Inactivar área' : 'Activar área'}
@@ -215,7 +248,7 @@ export function AcademicCatalogPage() {
                   </Td>
                 </tr>
               ))}
-              {areasQuery.data.length === 0 && <EmptyRow colSpan={5}>Sin áreas registradas.</EmptyRow>}
+              {areasQuery.data.length === 0 && <EmptyRow colSpan={6}>Sin áreas registradas.</EmptyRow>}
             </TableBody>
           </Table>
         )}
@@ -355,6 +388,9 @@ export function AcademicCatalogPage() {
           onChange={(e) => setFormEditarArea((f) => ({ ...f, codigo: e.target.value }))}
         />
       </Drawer>
+
+      {/* Líderes del área (M07) */}
+      <LideresAreaDrawer area={areaLideres} onClose={() => setAreaLideres(null)} />
 
       {/* Crear asignatura */}
       <Drawer

@@ -17,7 +17,7 @@ router.post(
 );
 
 // Lectura abierta a cualquier rol autenticado (docentes/coordinacion necesitan
-// listar areas para elegir area_id al crear asignaturas, DBA o malla).
+// listar areas para elegir area_id al crear asignaturas, malla o documentos de apoyo).
 router.get('/', validate(areaValidator.listAreas), listAreas);
 
 router.patch(

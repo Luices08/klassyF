@@ -16,6 +16,7 @@ const ajustes = Array.from({ length: 9 }, (_, i) => ({
   area: i < 4 ? 'Matemáticas' : 'Humanidades',
   asignatura: `Asignatura ${i + 1}`,
   docente: `Docente ${i + 1}`,
+  // Ya no se genera (se retiró el banco de DBA), pero un PIAR emitido antes lo trae congelado y debe reimprimirse igual.
   objetivos_referentes: ['DBA 3: Interpreta fracciones'],
   objetivo_flexibilizado: textoLargo,
   barreras: textoLargo,

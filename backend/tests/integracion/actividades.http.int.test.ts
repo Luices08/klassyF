@@ -6,13 +6,14 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import AcademicYear from '../../src/models/academicYear.model';
 import ActivitySubmission from '../../src/models/activitySubmission.model';
 import Activity from '../../src/models/activity.model';
-import CurricularDevelopment from '../../src/models/curricularDevelopment.model';
+import PlanAula from '../../src/models/planAula.model';
 import TeacherAssignment from '../../src/models/teacherAssignment.model';
 import { UserDocument } from '../../src/models/user.model';
 import { hoyColombia } from '../../src/services/attendance.service';
 import { generateToken } from '../../src/services/token.service';
 import { detenerBaseDeDatos, iniciarBaseDeDatos, limpiarBaseDeDatos } from './baseDeDatos';
 import { armarEscenario, crearUsuario, Escenario } from './escenario';
+import { crearPlanAula } from './escenarioNotas';
 import { UPLOADS_ROOT } from '../../src/utils/uploadPaths';
 
 const DIA_MS = 86_400_000;
@@ -74,14 +75,7 @@ describe('M11: actividades (capa HTTP)', () => {
 
     const asignacion = (await TeacherAssignment.findOne({ docente_id: e.docenteDeClase._id }))!;
     asignacionId = String(asignacion._id);
-    await CurricularDevelopment.create({
-      teacher_assignment_id: asignacion._id,
-      periodo_numero: 1,
-      competencias: 'Resuelve problemas con fracciones.',
-      metodologia_y_recursos: 'Trabajo en equipo',
-      criterios_evaluacion: 'Rúbrica',
-      estado: 'APROBADO',
-    });
+    await crearPlanAula(asignacion, 1, 'APROBADO');
   }, 60_000);
 
   const encabezado = (usuario: UserDocument | null): Record<string, string> => (usuario ? { Authorization: `Bearer ${generateToken(usuario)}` } : {});
@@ -115,7 +109,6 @@ describe('M11: actividades (capa HTTP)', () => {
     fecha_entrega: proximoDiaHabil(3).toISOString(),
     requiere_entrega: true,
     formatos_permitidos: ['PDF'],
-    competencia_evaluada: 'Resuelve problemas con fracciones',
     ...extra,
   });
 
@@ -145,6 +138,22 @@ describe('M11: actividades (capa HTTP)', () => {
     expect((await json('POST', '/activities', e.docenteDeClase, nueva({ formatos_permitidos: ['EXE'] }))).estado).toBe(400);
     expect((await json('POST', '/activities', e.docenteDeClase, nueva({ fecha_entrega: 'mañana' }))).estado).toBe(400);
     expect((await json('PUT', '/activities/configuracion', e.coordAcademico, {})).estado).toBe(400);
+  });
+
+  it('sin plan de aula aprobado la API no deja programar: 409 con el motivo; con el plan aprobado, sí', async () => {
+    await PlanAula.deleteMany({});
+    const sinPlan = await json('POST', '/activities', e.docenteDeClase, nueva());
+    expect(sinPlan.estado).toBe(409);
+    expect(sinPlan.cuerpo.message).toMatch(/plan de aula/);
+
+    const asignacion = (await TeacherAssignment.findById(asignacionId))!;
+    await crearPlanAula(asignacion, 1, 'DEVUELTO');
+    const devuelto = await json('POST', '/activities', e.docenteDeClase, nueva());
+    expect(devuelto.estado).toBe(409);
+    expect(devuelto.cuerpo.message).toMatch(/devuelto con comentarios/);
+
+    await PlanAula.updateMany({}, { $set: { estado: 'APROBADO' } });
+    expect((await json('POST', '/activities', e.docenteDeClase, nueva())).estado).toBe(201);
   });
 
   it('flujo completo por la API: programar, entregar un PDF, revisar, descargar y calificar', async () => {
@@ -223,7 +232,7 @@ describe('M11: actividades (capa HTTP)', () => {
 
   it('el docente lista, consulta, edita, califica en lote y elimina por la API (lo mismo que envía el frontend)', async () => {
     const anioId = String((await AcademicYear.findOne())!._id);
-    const creada = await json('POST', '/activities', e.docenteDeClase, nueva({ dba_id: null, formatos_permitidos: [], competencia_evaluada: 'Resuelve problemas con fracciones', confirmar_alertas: false }));
+    const creada = await json('POST', '/activities', e.docenteDeClase, nueva({ formatos_permitidos: [], confirmar_alertas: false }));
     expect(creada.estado).toBe(201);
     const id = creada.cuerpo.data._id as string;
 
@@ -239,7 +248,6 @@ describe('M11: actividades (capa HTTP)', () => {
     expect(editada.estado).toBe(200);
     expect(editada.cuerpo.data.titulo).toBe('Taller v2');
     expect((await json('PATCH', `/activities/${id}`, e.docenteDeClase, {})).estado).toBe(400);
-    expect((await json('PATCH', `/activities/${id}`, e.docenteDeClase, { dba_id: String(new Types.ObjectId()) })).estado).toBe(400);
 
     // Actividad de aula: sin entregas digitales, calificada en lote.
     const aula = (await json('POST', '/activities', e.docenteDeClase, nueva({ titulo: 'Participación', requiere_entrega: false, formatos_permitidos: [], tipo: 'TRABAJO' }))).cuerpo.data._id as string;

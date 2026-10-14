@@ -4,7 +4,6 @@ import AjusteAsignatura from '../models/ajusteAsignatura.model';
 import { ExpedienteInclusionDocument } from '../models/expedienteInclusion.model';
 import Guardian from '../models/guardian.model';
 import Institution from '../models/institution.model';
-import ReferenteCurricular from '../models/referenteCurricular.model';
 import StudentGuardian from '../models/studentGuardian.model';
 import { UserDocument } from '../models/user.model';
 import ApiError from '../utils/ApiError';
@@ -50,24 +49,10 @@ async function acudientesDe(studentId: ExpedienteInclusionDocument['student_id']
     .sort((a, b) => Number(b.es_principal) - Number(a.es_principal));
 }
 
-/** Texto de cada referente del banco (M07): se congela el texto al emitir, así el documento no cambia si el banco se actualiza. */
-async function textoDeReferentes(ids: string[]) {
-  if (ids.length === 0) return new Map<string, string>();
-  const referentes = await ReferenteCurricular.find({ _id: { $in: ids } }).lean();
-  return new Map(
-    referentes.map((r) => {
-      const x = r as unknown as { _id: unknown; tipo_referente: string; numero_dba?: number; enunciado?: string; competencia?: string; titulo?: string };
-      const etiqueta = x.tipo_referente === 'DBA' ? `DBA ${x.numero_dba ?? ''}` : x.tipo_referente;
-      return [String(x._id), `${etiqueta}: ${x.enunciado ?? x.competencia ?? x.titulo ?? ''}`.trim()] as const;
-    })
-  );
-}
-
 async function filasDeAjustes(exp: ExpedienteInclusionDocument, ctx: ContextoEstudianteInclusion) {
   const [esperadas, ajustes] = await Promise.all([asignaturasEsperadas(ctx.grupo), AjusteAsignatura.find({ expediente_id: exp._id })]);
   const docentes = await User.find({ _id: { $in: esperadas.map((e) => e.docente_id).filter(Boolean) } }).select('nombre apellido');
   const nombreDocente = new Map(docentes.map((d) => [String(d._id), `${d.nombre} ${d.apellido}`]));
-  const referentes = await textoDeReferentes([...new Set(ajustes.flatMap((a) => a.dba_ids.map(String)))]);
   const porAsignatura = new Map(ajustes.map((a) => [String(a.subject_id), a]));
 
   return esperadas.map((e) => {
@@ -76,7 +61,6 @@ async function filasDeAjustes(exp: ExpedienteInclusionDocument, ctx: ContextoEst
       area: e.area,
       asignatura: e.nombre,
       docente: e.docente_id ? (nombreDocente.get(e.docente_id) ?? '') : '',
-      objetivos_referentes: a ? a.dba_ids.map((id) => referentes.get(String(id)) ?? '').filter(Boolean) : [],
       objetivo_flexibilizado: a?.objetivo_flexibilizado ?? '',
       barreras: a?.barrera_asignatura ?? '',
       tipos_barrera: a?.tipos_barrera ?? [],

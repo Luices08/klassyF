@@ -143,6 +143,9 @@ export interface Periodo {
   fecha_fin: string;
   fecha_apertura_notas?: string | null;
   fecha_cierre_notas?: string | null;
+  /** Ventana de entrega de planes de aula (M07): null = la sugerida. La ventana efectiva se lee con `useVentanasPlanes`. */
+  fecha_apertura_planes_aula?: string | null;
+  fecha_limite_planes_aula?: string | null;
   estado?: EstadoPeriodoAcademico;
 }
 
@@ -566,6 +569,8 @@ export interface PersonalizacionJornada {
 
 export interface GradoPlan {
   grade_id: string;
+  sede_id?: string | null;
+  jornada_id?: string | null;
   asignaturas: AsignaturaGrado[];
   evaluaciones_area: EvaluacionArea[];
   jornadas_personalizadas?: PersonalizacionJornada[];
@@ -768,59 +773,6 @@ export interface AdmissionRequest {
   createdAt: string;
 }
 
-// --- M07: Banco de Referentes Curriculares Oficiales (MEN) ---
-// MATRIZ_ICFES queda reservado en el enum: aun no hay documento fuente para
-// sembrarlo. DBA, EBC y LINEAMIENTO tienen su propio contrato (discriminado
-// por tipo_referente), sin campos nulos "por si acaso" de un diseño anterior.
-
-export const TIPOS_REFERENTE = ['DBA', 'EBC', 'MATRIZ_ICFES', 'LINEAMIENTO'] as const;
-export type TipoReferente = (typeof TIPOS_REFERENTE)[number];
-
-export const GRUPOS_GRADOS_EBC = ['1-3', '4-5', '6-7', '8-9', '10-11'] as const;
-export type GrupoGradosEbc = (typeof GRUPOS_GRADOS_EBC)[number];
-
-interface ReferenteBase {
-  _id: string;
-  // Solo es null en un Lineamiento transversal (marco general, no propio de un área).
-  area_id: { _id: string; nombre: string; codigo: string } | string | null;
-  etiquetas: string[];
-  version: string;
-  fuente: string;
-  // activo = Vigente, inactivo = Histórico.
-  estado: EstadoActivo;
-  createdAt: string;
-}
-
-export interface DbaReferente extends ReferenteBase {
-  tipo_referente: 'DBA';
-  grade_id: { _id: string; nombre: string; numero: number; nivel: string } | string;
-  numero_dba: number;
-  // Pensamiento (Matemáticas) / Factor (Lenguaje) / Entorno (C. Naturales) / Eje (C. Sociales).
-  organizador: string;
-  enunciado: string;
-  evidencias_aprendizaje: string[];
-  ejemplo?: string;
-}
-
-export interface EbcReferente extends ReferenteBase {
-  tipo_referente: 'EBC';
-  grupo_grados: GrupoGradosEbc;
-  organizador: string;
-  competencia: string;
-  enunciado: string;
-  evidencias_aprendizaje: string[];
-  dba_relacionados: DbaReferente[] | string[];
-}
-
-export interface LineamientoReferente extends ReferenteBase {
-  tipo_referente: 'LINEAMIENTO';
-  titulo: string;
-  contenido: string;
-  orden: number;
-}
-
-export type ReferenteCurricular = DbaReferente | EbcReferente | LineamientoReferente;
-
 // --- M08: Gestor de Docentes y Carga Académica ---
 
 export const TIPOS_ASIGNACION_DOCENTE = [
@@ -892,57 +844,303 @@ export interface DocenteCargaResumen {
   asignaciones: TeacherAssignment[];
 }
 
-// --- M07: Desarrollo Curricular y Workflow ---
+// --- M07: Planeación documental (plan de área anual y plan de aula por periodo, ambos en PDF) ---
 
-export const ESTADOS_DESARROLLO_CURRICULAR = [
-  'BORRADOR',
-  'ENVIADO_REVISION',
-  'DEVUELTO_OBSERVACIONES',
-  'APROBADO',
-] as const;
-export type EstadoDesarrolloCurricular = (typeof ESTADOS_DESARROLLO_CURRICULAR)[number];
+export const ESTADOS_PLAN = ['EN_REVISION', 'APROBADO', 'DEVUELTO'] as const;
+export type EstadoPlan = (typeof ESTADOS_PLAN)[number];
+/** A los tres estados guardados se suma «sin cargar», que no existe como documento. */
+export type EstadoPlanVista = EstadoPlan | 'SIN_CARGAR';
 
-export interface RevisionHistorial {
-  _id?: string;
-  observacion: string;
-  coordinador_id: { _id: string; nombre: string; apellido: string; email?: string } | string;
-  fecha: string;
-  estado_resultante: EstadoDesarrolloCurricular;
-}
+export const NOMBRES_ESTADO_PLAN: Record<EstadoPlanVista, string> = {
+  SIN_CARGAR: 'Sin cargar',
+  EN_REVISION: 'En revisión',
+  APROBADO: 'Aprobado',
+  DEVUELTO: 'Devuelto con comentarios',
+};
 
-export interface VersionSnapshot {
-  _id?: string;
-  version: number;
-  fecha: string;
-  modificado_por: { _id: string; nombre: string; apellido: string } | string;
-  dba_seleccionados: string[];
-  competencias: string;
-  contenidos_tematicos: string[];
-  actividades_propuestas: string;
-  criterios_evaluacion: string;
-  estado: EstadoDesarrolloCurricular;
-}
-
-export interface CurricularDevelopment {
+export interface PersonaPlaneacion {
   _id: string;
-  teacher_assignment_id: TeacherAssignment | string;
-  periodo_numero: number;
-  dba_seleccionados: DbaReferente[] | string[];
-  competencias: string;
-  contenidos_tematicos: string[];
-  ejes_tematicos: string[];
-  actividades_propuestas: string;
-  metodologia_y_recursos: string;
-  criterios_evaluacion: string;
-  semanas_estimadas: number;
-  estado: EstadoDesarrolloCurricular;
+  nombre: string;
+  apellido: string;
+}
+
+export type AccionRevisionPlan = 'APROBADO' | 'DEVUELTO' | 'REABIERTO';
+
+export interface RevisionPlan {
+  accion: AccionRevisionPlan;
+  /** Versión del documento que se revisó. */
   version: number;
-  historial_revisiones: RevisionHistorial[];
-  historial_versiones: VersionSnapshot[];
+  comentario: string;
+  fecha: string;
+  /** Aprobación heredada de una adopción: no la dio una persona al revisar. */
+  automatica: boolean;
+  revisor: PersonaPlaneacion | null;
+}
+
+export interface VersionPlan {
+  numero: number;
+  titulo: string;
+  descripcion: string;
+  archivo: { nombre: string; bytes: number };
+  origen: 'CARGADA' | 'ADOPTADA';
+  adoptado_de: { docente: PersonaPlaneacion | null; version: number } | null;
+  subido_por: PersonaPlaneacion | null;
+  /** Instante de la radicación, con fecha y hora. */
+  fecha: string;
+}
+
+export interface ResumenPlan {
+  _id: string;
+  estado: EstadoPlan;
+  version_actual: number;
+  titulo: string;
+  descripcion: string;
+  archivo_nombre: string;
+  radicado_en: string | null;
+  origen: 'CARGADA' | 'ADOPTADA';
+  adoptado_de: { docente: PersonaPlaneacion | null } | null;
+  ultima_revision: RevisionPlan | null;
+}
+
+export interface PermisosPlanArea {
+  cargar: boolean;
+  revisar: boolean;
+  reabrir: boolean;
+  ver_archivo: boolean;
+}
+
+export type MotivoAreaPendiente = 'SIN_LIDER' | 'SIN_CARGAR' | 'EN_REVISION' | 'DEVUELTO';
+
+export interface AreaResumida {
+  _id: string;
+  nombre: string;
+  codigo?: string;
+}
+
+/** «Diurna» y «nocturna» agrupan las jornadas operativas (mañana, tarde y única; nocturna y sabatina). */
+export const ALCANCES_JORNADA = ['TODAS', 'DIURNA', 'NOCTURNA'] as const;
+export type AlcanceJornada = (typeof ALCANCES_JORNADA)[number];
+
+export const NOMBRES_ALCANCE_JORNADA: Record<AlcanceJornada, string> = { TODAS: 'Todas las jornadas', DIURNA: 'Diurna', NOCTURNA: 'Nocturna' };
+
+export const NOMBRES_NIVEL_EDUCATIVO: Record<NivelEducativo, string> = {
+  PREESCOLAR: 'Preescolar',
+  PRIMARIA: 'Primaria',
+  SECUNDARIA: 'Secundaria',
+  MEDIA: 'Media',
+};
+
+/** Qué parte de la institución cubre un líder de área: niveles (vacío = todos), jornada y sedes (vacío = todas). */
+export interface AlcanceLiderArea {
+  niveles: NivelEducativo[];
+  jornada: AlcanceJornada;
+  sedes: Array<{ _id: string; nombre: string }>;
+  /** Ya armado por el servidor: «Primaria · Diurna · Todas las sedes». */
+  texto: string;
+}
+
+/** Un líder de área (docente + lo que cubre). El plan de área anual es suyo y de nadie más. */
+export interface LiderArea {
+  _id: string;
+  area_id: string;
+  docente: { _id: string; nombre: string; apellido: string; estado?: EstadoActivo } | null;
+  niveles: NivelEducativo[];
+  jornada: AlcanceJornada;
+  sedes: Array<{ _id: string; nombre: string }>;
+  alcance_texto: string;
+  estado: EstadoActivo;
+  /** Ya cargó planes de área: quitarlo lo desactiva en vez de borrarlo. */
+  tiene_planes: boolean;
+}
+
+export interface DatosLiderArea {
+  docente_id: string;
+  niveles: NivelEducativo[];
+  jornada: AlcanceJornada;
+  sedes_ids: string[];
+}
+
+export interface FilaPlanArea {
+  /** El líder, o `area:sin-lider` en la fila que avisa lo que ningún líder cubre. */
+  clave: string;
+  lider_area_id: string | null;
+  area: AreaResumida & { codigo: string };
+  /** null en la fila «sin líder». */
+  alcance: AlcanceLiderArea | null;
+  /** Solo en la fila «sin líder»: las partes (nivel, jornada, sede) que nadie cubre; vacío si el área no tiene líder y aún no se sabe dónde se dicta. */
+  sin_cubrir: string[] | null;
+  lider: PersonaPlaneacion | null;
+  /** false = ya no lidera (se conserva porque dejó planes). */
+  vigente: boolean;
+  soy_lider: boolean;
+  /** Tiene al menos una asignatura obligatoria en el plan de estudios del año: sin su plan aprobado no se activa el año. */
+  obligatoria: boolean;
+  estado: EstadoPlanVista;
+  plan: ResumenPlan | null;
+  pendiente_para_activar: MotivoAreaPendiente | null;
+  puede: PermisosPlanArea;
+}
+
+export interface DetallePlanArea extends ResumenPlan {
+  area: AreaResumida & { codigo: string };
+  lider_area_id: string;
+  alcance: AlcanceLiderArea;
+  lider: PersonaPlaneacion | null;
+  academic_year_id: string;
+  anio: number | null;
+  versiones: VersionPlan[];
+  revisiones: RevisionPlan[];
+  puede: PermisosPlanArea;
+}
+
+export interface DocumentoReferencia {
+  _id: string;
+  titulo: string;
+  descripcion: string;
+  area: (AreaResumida & { codigo: string }) | null;
+  grados: Array<{ _id: string; nombre: string; numero: number }>;
+  archivo: { nombre: string; bytes: number };
+  subido_por: PersonaPlaneacion | null;
   createdAt: string;
   updatedAt: string;
 }
 
+export type EstadoVentanaEntrega = 'NO_ABIERTA' | 'ABIERTA' | 'VENCIDA';
+
+export interface VentanaEntrega {
+  /** Días de calendario (medianoche UTC): se muestran con `lib/fechas`, nunca con `toLocaleDateString`. */
+  apertura: string;
+  limite: string;
+  estado: EstadoVentanaEntrega | null;
+}
+
+/** La primera radicación del plan de aula: de ahí sale la etiqueta «entregado fuera de plazo». */
+export interface RadicacionPlanAula {
+  fecha: string;
+  fecha_limite: string | null;
+  fuera_de_plazo: boolean;
+}
+
+export interface ResumenPlanAula extends ResumenPlan {
+  periodo_numero: number;
+  radicacion: RadicacionPlanAula;
+}
+
+export interface PlanAdoptable {
+  plan_id: string;
+  docente: PersonaPlaneacion | null;
+  titulo: string;
+  descripcion: string;
+  aprobado_en: string | null;
+}
+
+export type CodigoBloqueoCarga = 'ANIO_CERRADO' | 'PLAN_AREA_PENDIENTE' | 'EN_REVISION' | 'APROBADO' | 'VENTANA_NO_ABIERTA';
+
+export interface PeriodoTarjetaPlanAula {
+  numero: number;
+  nombre: string;
+  ventana: VentanaEntrega | null;
+  estado: EstadoPlanVista;
+  plan: ResumenPlanAula | null;
+  puede_cargar: boolean;
+  /** Si el docente radica hoy por primera vez, ¿quedaría marcado «entregado fuera de plazo»? Lo decide el servidor con su misma regla. */
+  radicaria_fuera_de_plazo: boolean;
+  bloqueo: { codigo: CodigoBloqueoCarga; mensaje: string } | null;
+  /** Planes aprobados de un docente anterior que se pueden adoptar en este periodo. */
+  adoptables: PlanAdoptable[];
+}
+
+/** Una tarjeta por asignatura y grado que dicta el docente (el plan de aula es por grado, no por grupo). */
+export interface TarjetaPlanAula {
+  area: AreaResumida;
+  asignatura: AreaResumida;
+  grado: { _id: string; nombre: string; numero: number };
+  grupos: string[];
+  /** El plan de área que aplica a esta clase (el del líder que cubre su nivel, jornada y sede); casi siempre un solo plan aprobado. */
+  plan_area: { area_id: string; estado: EstadoPlanVista; planes_aprobados_ids: string[]; detalle: string | null };
+  periodos: PeriodoTarjetaPlanAula[];
+}
+
+export interface AnioPlaneacion {
+  _id: string;
+  year: number;
+  estado: EstadoAnioLectivo;
+}
+
+export interface MisPlanesAula {
+  anio: AnioPlaneacion;
+  tarjetas: TarjetaPlanAula[];
+}
+
+export interface FilaBandejaPlanAula {
+  clave: string;
+  docente: PersonaPlaneacion | null;
+  area: AreaResumida;
+  asignatura: AreaResumida;
+  grado: { _id: string; nombre: string; numero: number };
+  grupos: string[];
+  periodo_numero: number;
+  periodo_nombre: string;
+  ventana: VentanaEntrega | null;
+  estado: EstadoPlanVista;
+  plan: ResumenPlanAula | null;
+  /** El docente ya no dicta esa asignatura en ese grado: el plan quedó en el histórico del periodo. */
+  archivado: boolean;
+  puede: { revisar: boolean; reabrir: boolean };
+}
+
+export interface BandejaPlanesAula {
+  anio: AnioPlaneacion;
+  resumen: {
+    esperados: number;
+    sin_cargar: number;
+    en_revision: number;
+    aprobados: number;
+    devueltos: number;
+    fuera_de_plazo: number;
+    archivados: number;
+  };
+  filas: FilaBandejaPlanAula[];
+}
+
+export interface DetallePlanAula extends ResumenPlanAula {
+  academic_year_id: string;
+  anio: number;
+  docente: PersonaPlaneacion | null;
+  area: AreaResumida | null;
+  asignatura: AreaResumida | null;
+  grado: { _id: string; nombre: string; numero: number } | null;
+  archivado: boolean;
+  versiones: VersionPlan[];
+  revisiones: RevisionPlan[];
+  puede: { revisar: boolean; reabrir: boolean; ver_archivo: boolean };
+}
+
+/** El plan de aula de una clase en un periodo, para el visor del formulario de actividades. */
+export interface PlanDeAsignacion {
+  periodo_numero: number;
+  estado: EstadoPlanVista;
+  aprobado: boolean;
+  plan: ResumenPlanAula | null;
+}
+
+export interface VentanaPeriodo {
+  numero: number;
+  nombre: string;
+  estado_periodo: EstadoPeriodoAcademico;
+  fecha_inicio: string;
+  fecha_fin: string;
+  apertura: string;
+  limite: string;
+  apertura_personalizada: boolean;
+  limite_personalizado: boolean;
+  estado: EstadoVentanaEntrega;
+}
+
+export interface VentanasAnio {
+  anio: AnioPlaneacion;
+  periodos: VentanaPeriodo[];
+}
 
 // --- M13: Asistencia ---
 

@@ -5,7 +5,7 @@ Monorepo del proyecto Klassy (ver `doc/Idea_Klassy_Gestor_Academico_Administrati
 ## Paquetes
 
 - **`backend/`** — Node.js + TypeScript + Express + MongoDB/Mongoose. Núcleo institucional, RBAC, matrículas,
-  malla curricular, banco de DBA, planeación pedagógica, actividades, calificaciones, asistencia y motor de
+  malla curricular, planeación documental (planes de área y de aula en PDF), actividades, calificaciones, asistencia y motor de
   boletines (Decreto 1290). Ver `backend/README.md`.
 - **`frontend/`** — React + TypeScript + Vite. Autenticación, configuración institucional básica, y el
   visor de boletín académico. Ver `frontend/README.md`.

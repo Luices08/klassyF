@@ -224,7 +224,6 @@ describe('M12: evaluación y notas (con base de datos)', () => {
             peso_en_componente: 1,
             fecha_apertura: new Date(),
             fecha_entrega: proximoDiaHabil(4),
-            competencia_evaluada: 'Resuelve problemas con fracciones',
           },
           docente
         )
@@ -468,7 +467,6 @@ describe('M12: evaluación y notas (con base de datos)', () => {
         peso_en_componente: null,
         fecha_apertura: new Date(),
         fecha_entrega: proximoDiaHabil(4),
-        competencia_evaluada: 'Resuelve problemas con fracciones',
       };
       await expect(actividades.createActivity({ ...base, componente_siee: 'INVENTADO' }, docente)).rejects.toMatchObject({ statusCode: 400, message: expect.stringMatching(/no existe/) });
       // La autoevaluación admite una sola casilla y ya la ocupa la nota suelta.

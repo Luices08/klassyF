@@ -176,6 +176,7 @@ function piarAjustes(doc: Documento, s: Obj) {
 
   seccion(doc, '2. Ajustes razonables por área y asignatura');
   const filas = lista(s.ajustes);
+  // `objetivos_referentes` ya no se genera (se retiró el banco de DBA), pero lo emitido antes lo trae congelado y debe reimprimirse igual.
   tabla(
     doc,
     [{ titulo: 'Área / asignatura', ancho: 2 }, { titulo: 'Objetivos / propósitos', ancho: 3 }, { titulo: 'Barreras', ancho: 2.5 }, { titulo: 'Ajustes razonables', ancho: 3 }, { titulo: 'Evaluación de los ajustes', ancho: 3 }],

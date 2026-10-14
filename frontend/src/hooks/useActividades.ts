@@ -33,10 +33,6 @@ export interface Actividad {
   requiere_entrega: boolean;
   formatos_permitidos: FormatoEvidencia[];
   permite_entrega_tardia: boolean;
-  desarrollo_curricular_id: string | null;
-  dba_id: string | null;
-  dba: { _id: string; numero_dba: number; enunciado: string } | null;
-  competencia_evaluada: string | null;
   publicada: boolean;
   vencida: boolean;
   asignacion: ContextoAsignacion | null;
@@ -161,8 +157,6 @@ export interface DatosActividad {
   requiere_entrega: boolean;
   formatos_permitidos: FormatoEvidencia[];
   permite_entrega_tardia: boolean;
-  dba_id: string | null;
-  competencia_evaluada: string | null;
   confirmar_alertas: boolean;
 }
 

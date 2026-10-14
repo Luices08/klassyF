@@ -3,7 +3,6 @@ import type { Rol } from '../../types/api';
 import type {
   EstadoActivo,
   EstadoAnioLectivo,
-  EstadoDesarrolloCurricular,
   EstadoDocumentoMatricula,
   EstadoEspacio,
   EstadoEstudiante,
@@ -11,10 +10,13 @@ import type {
   EstadoJustificacion,
   EstadoMatricula,
   EstadoPeriodoAcademico,
+  EstadoPlanVista,
+  EstadoVentanaEntrega,
   NivelDesempeno,
   TonoEstadoAsistencia,
 } from '../../types/domain';
-import { NOMBRES_ESTADO_ESPACIO } from '../../types/domain';
+import { NOMBRES_ESTADO_ESPACIO, NOMBRES_ESTADO_PLAN } from '../../types/domain';
+import { formatoFechaHora } from '../../lib/fechas';
 import type { EstadoActividadEstudiante } from '../../hooks/useActividades';
 import type { EstadoNota } from '../../hooks/useNotas';
 import { NOMBRES_ESTADO_NOTA } from '../../hooks/useNotas';
@@ -208,28 +210,46 @@ export function EstadoEspacioBadge({ value }: { value: EstadoEspacio }) {
   return <Chip tone={ESPACIO_TONE[value]}>{NOMBRES_ESTADO_ESPACIO[value]}</Chip>;
 }
 
-const DESARROLLO_CURRICULAR_LABELS: Record<EstadoDesarrolloCurricular, string> = {
-  BORRADOR: 'Borrador',
-  ENVIADO_REVISION: 'Enviado a revisión',
-  DEVUELTO_OBSERVACIONES: 'Devuelto con observaciones',
-  APROBADO: 'Aprobado',
-};
-
-const DESARROLLO_CURRICULAR_TONE: Record<EstadoDesarrolloCurricular, Tone> = {
-  BORRADOR: 'blue',
-  ENVIADO_REVISION: 'orange',
-  DEVUELTO_OBSERVACIONES: 'red',
+const PLAN_TONE: Record<EstadoPlanVista, Tone> = {
+  SIN_CARGAR: 'neutral',
+  EN_REVISION: 'orange',
   APROBADO: 'green',
+  DEVUELTO: 'red',
 };
 
-/** Estado del workflow de planeación pedagógica (M07): borrador -> enviado -> aprobado/devuelto. */
-export function EstadoDesarrolloCurricularBadge({ value }: { value: EstadoDesarrolloCurricular }) {
-  return <Chip tone={DESARROLLO_CURRICULAR_TONE[value]}>{DESARROLLO_CURRICULAR_LABELS[value]}</Chip>;
+/** Estado de un plan de área o de aula (M07): sin cargar, en revisión, aprobado o devuelto con comentarios. */
+export function EstadoPlanBadge({ value }: { value: EstadoPlanVista }) {
+  return <Chip tone={PLAN_TONE[value]}>{NOMBRES_ESTADO_PLAN[value]}</Chip>;
 }
 
-/** Vigente/Histórico de un referente del banco M07 (DBA/EBC/Lineamiento): mismo campo `estado` activo/inactivo, otra etiqueta. */
-export function EstadoVigenciaReferenteBadge({ value }: { value: EstadoActivo }) {
-  return <Chip tone={value === 'activo' ? 'green' : 'neutral'}>{value === 'activo' ? 'Vigente' : 'Histórico'}</Chip>;
+const VENTANA_TONE: Record<EstadoVentanaEntrega, Tone> = {
+  NO_ABIERTA: 'neutral',
+  ABIERTA: 'green',
+  VENCIDA: 'orange',
+};
+
+const VENTANA_LABELS: Record<EstadoVentanaEntrega, string> = {
+  NO_ABIERTA: 'Aún no abre',
+  ABIERTA: 'Entrega abierta',
+  VENCIDA: 'Plazo vencido',
+};
+
+/** Dónde va la ventana de entrega de planes de aula de un periodo (M07): aún no abre, abierta o con el plazo vencido. */
+export function EstadoVentanaBadge({ value }: { value: EstadoVentanaEntrega }) {
+  return <Chip tone={VENTANA_TONE[value]}>{VENTANA_LABELS[value]}</Chip>;
+}
+
+/**
+ * La etiqueta en rojo que el sistema estampa a un plan de aula radicado después de su fecha límite, con la fecha y la hora de la
+ * radicación (M07). Va en dos líneas, con el mismo tono rojo de `Chip`, para no desbordar las tarjetas angostas.
+ */
+export function FueraDePlazoChip({ fecha }: { fecha: string }) {
+  return (
+    <span className={`inline-flex max-w-full flex-col rounded-2xl px-2.5 py-1 text-xs font-semibold ${TONE_CLASSES.red}`}>
+      <span>ENTREGADO FUERA DE PLAZO</span>
+      <span className="font-medium">{formatoFechaHora(fecha)}</span>
+    </span>
+  );
 }
 
 // Los estados de asistencia (M13) los parametriza cada institución; el tono viene guardado con el estado y es

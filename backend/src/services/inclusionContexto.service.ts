@@ -13,6 +13,7 @@ import TeacherAssignment from '../models/teacherAssignment.model';
 import { UserDocument } from '../models/user.model';
 import ApiError from '../utils/ApiError';
 import { ESTADO_ACTIVO } from '../utils/filtroEstado';
+import { obtenerGradoPlanEfectivo } from '../utils/horasPlanEstudios';
 import { AccionInclusion, ContextoInclusion, UsuarioInclusion, permisoInclusion } from '../utils/permisosInclusion';
 
 /** "No existe" y "no autorizado" responden igual (IDOR): nunca se revela qué estudiantes tienen apoyo. */
@@ -103,7 +104,13 @@ export interface AsignaturaEsperadaDetalle {
  */
 export async function asignaturasEsperadas(grupo: HydratedDocument<IGroup>): Promise<AsignaturaEsperadaDetalle[]> {
   const plan = await StudyPlan.findOne({ academic_year_id: grupo.academic_year_id });
-  const gradoPlan = plan?.grades.find((g) => String(g.grade_id) === String(grupo.grade_id));
+  const gradoPlan =
+    obtenerGradoPlanEfectivo(
+      plan,
+      String(grupo.grade_id),
+      grupo.sede_id ? String(grupo.sede_id) : null,
+      grupo.jornada_id ? String(grupo.jornada_id) : null
+    ) ?? plan?.grades.find((g) => String(g.grade_id) === String(grupo.grade_id));
   if (!gradoPlan) return [];
   const personalizacion = gradoPlan.personalizaciones_grupo.find((p) => String(p.group_id) === String(grupo._id));
   const ids = [...new Set([...gradoPlan.asignaturas.map((a) => String(a.subject_id)), ...(personalizacion?.asignaturas_agregadas.map((a) => String(a.subject_id)) ?? [])])];

@@ -236,13 +236,12 @@ export function StudyPlanPage() {
 
   const campusesQuery = useCampuses(institucionId || undefined);
   const todasLasSedes = useMemo(() => campusesQuery.data ?? [], [campusesQuery.data]);
-  const campusMap = useMemo(() => new Map(todasLasSedes.map((c) => [c._id, c])), [todasLasSedes]);
 
   const jornadasQuery = useTodasLasJornadas();
   const todasLasJornadas = useMemo(() => jornadasQuery.data ?? [], [jornadasQuery.data]);
 
   const jornadasParaSelect = useMemo(() => {
-    if (!sedeId) return todasLasJornadas;
+    if (!sedeId) return [];
     return todasLasJornadas.filter((j) => {
       const sId = typeof j.sede_id === 'object' && j.sede_id ? j.sede_id._id : j.sede_id;
       return String(sId) === String(sedeId);
@@ -341,10 +340,13 @@ export function StudyPlanPage() {
             <Select
               label=""
               value={sedeId}
-              onChange={(e) => setSedeId(e.target.value)}
+              onChange={(e) => {
+                setSedeId(e.target.value);
+                setJornadaId('');
+              }}
               className="w-48 text-sm"
             >
-              <option value="">Todas las sedes</option>
+              <option value="">Todas las sedes (base general)</option>
               {todasLasSedes.map((s) => (
                 <option key={s._id} value={s._id}>
                   {s.nombre}
@@ -362,21 +364,16 @@ export function StudyPlanPage() {
               label=""
               value={jornadaId}
               onChange={(e) => setJornadaId(e.target.value)}
+              disabled={!sedeId}
+              title={sedeId ? undefined : 'Elige primero una sede: cada jornada pertenece a una sola sede'}
               className="w-56 text-sm"
             >
-              <option value="">Todas las jornadas (Base general)</option>
+              <option value="">{sedeId ? 'Todas las jornadas de la sede' : 'Elige una sede primero'}</option>
               {jornadasParaSelect.map((j) => {
-                const sNom =
-                  typeof j.sede_id === 'object' && j.sede_id
-                    ? j.sede_id.nombre
-                    : campusMap.get(typeof j.sede_id === 'string' ? j.sede_id : '')?.nombre;
                 const cap = calcularCapacidadJornada(j);
-                const etiqueta = sedeId
-                  ? `${j.nombre} ${cap > 0 ? `(${cap} h/sem)` : ''}`
-                  : `${j.nombre} — ${sNom || 'Sin sede'} ${cap > 0 ? `(${cap} h/sem)` : ''}`;
                 return (
                   <option key={j._id} value={j._id}>
-                    {etiqueta}
+                    {`${j.nombre} ${cap > 0 ? `(${cap} h/sem)` : ''}`}
                   </option>
                 );
               })}
@@ -492,6 +489,10 @@ export function StudyPlanPage() {
               nivel={nivel}
               sedeId={sedeId}
               jornadaId={jornadaId}
+              onElegirContexto={(sede, jornada) => {
+                setSedeId(sede);
+                setJornadaId(jornada);
+              }}
               sedes={todasLasSedes}
               jornadas={todasLasJornadas}
               gradosDelNivel={gradosDelNivel}
@@ -564,6 +565,7 @@ interface ConfiguracionGeneralNivelTabProps {
   nivel: NivelEducativo;
   sedeId: string;
   jornadaId: string;
+  onElegirContexto: (sedeId: string, jornadaId: string) => void;
   sedes: Campus[];
   jornadas: JornadaOperativa[];
   gradosDelNivel: Grade[];
@@ -583,6 +585,7 @@ function ConfiguracionGeneralNivelTab({
   nivel,
   sedeId,
   jornadaId,
+  onElegirContexto,
   sedes,
   jornadas,
   gradosDelNivel,
@@ -780,6 +783,35 @@ function ConfiguracionGeneralNivelTab({
     return totales;
   }, [gradosDelNivel, modoEdicion, asignaturasDelNivel, horasEdicion, studyPlan, sedeId, jornadaId]);
 
+  // Dónde hay plan guardado para este nivel: sin esto, un plan hecho en «Sede + Jornada» parece perdido al volver a «Todas».
+  const ambitosConPlan = useMemo(() => {
+    const idsGrados = new Set(gradosDelNivel.map((g) => g._id));
+    const porClave = new Map<string, { sede: string; jornada: string; etiqueta: string; grados: number }>();
+    for (const g of studyPlan?.grades ?? []) {
+      if (!idsGrados.has(g.grade_id) || g.asignaturas.length === 0) continue;
+      const jornadaDoc = g.jornada_id ? jornadas.find((j) => j._id === g.jornada_id) : undefined;
+      // Un plan de jornada sin sede guardado antes se ubica en la sede dueña de esa jornada.
+      const sedeDeJornada = jornadaDoc
+        ? typeof jornadaDoc.sede_id === 'object' && jornadaDoc.sede_id
+          ? jornadaDoc.sede_id._id
+          : String(jornadaDoc.sede_id)
+        : '';
+      const sede = g.sede_id || sedeDeJornada;
+      const jornada = g.jornada_id || '';
+      const clave = `${sede}|${jornada}`;
+      const nombreSede = sedes.find((s) => s._id === sede)?.nombre;
+      const etiqueta = !sede
+        ? 'Base general'
+        : jornadaDoc
+          ? `${nombreSede ?? 'Sede'} · ${jornadaDoc.nombre}`
+          : `${nombreSede ?? 'Sede'} · todas las jornadas`;
+      const actual = porClave.get(clave);
+      if (actual) actual.grados += 1;
+      else porClave.set(clave, { sede, jornada, etiqueta, grados: 1 });
+    }
+    return Array.from(porClave.values()).sort((a, b) => a.etiqueta.localeCompare(b.etiqueta));
+  }, [studyPlan, gradosDelNivel, jornadas, sedes]);
+
   // Grados sin plan propio en la sede/jornada elegida: rige el de la base general (lo mismo que resuelve el backend)
   const gradosHeredados = useMemo(() => {
     const sId = sedeId || null;
@@ -916,6 +948,29 @@ function ConfiguracionGeneralNivelTab({
         </div>
       </div>
 
+      {/* Ámbitos donde ya hay plan para este nivel: un clic lleva a ese contexto */}
+      {ambitosConPlan.length > 0 && (
+        <div className="flex flex-wrap items-center gap-2 rounded-xl border border-border bg-surface px-4 py-2.5 text-xs">
+          <span className="font-semibold text-ink">Planes guardados para {NIVEL_LABELS[nivel]}:</span>
+          {ambitosConPlan.map((a) => {
+            const activo = a.sede === (sedeId || '') && a.jornada === (jornadaId || '');
+            return (
+              <button
+                key={`${a.sede}|${a.jornada}`}
+                type="button"
+                onClick={() => onElegirContexto(a.sede, a.jornada)}
+                title="Ver este plan"
+                className="rounded-full focus:outline-none focus:ring-2 focus:ring-primary"
+              >
+                <Chip tone={activo ? 'blue' : 'neutral'}>
+                  {a.etiqueta} ({a.grados} {a.grados === 1 ? 'grado' : 'grados'})
+                </Chip>
+              </button>
+            );
+          })}
+        </div>
+      )}
+
       <Card>
         <CardHeader
           title={`Configuración General: ${NIVEL_LABELS[nivel]}`}
@@ -974,11 +1029,21 @@ function ConfiguracionGeneralNivelTab({
         {/* 3. Alerta de validación si algún grado excede el tope de horas semanales del nivel */}
         {gradosExcedidos.length > 0 && (
           <div className="mb-4">
-            <Alert tone="error">
-              Atención: Los grados{' '}
-              <strong>{gradosExcedidos.map((g) => `${g.nombre} (${totalHorasPorGrado[g._id]} h)`).join(', ')}</strong>{' '}
-              superan el límite máximo permitido de {MAX_HORAS_SEMANALES} horas semanales para esta jornada/nivel. Ajusta las intensidades antes de guardar.
-            </Alert>
+            {modoEdicion ? (
+              <Alert tone="error">
+                Atención: Los grados{' '}
+                <strong>{gradosExcedidos.map((g) => `${g.nombre} (${totalHorasPorGrado[g._id]} h)`).join(', ')}</strong>{' '}
+                superan el límite máximo permitido de {MAX_HORAS_SEMANALES} horas semanales para esta jornada/nivel. Ajusta las intensidades antes de guardar.
+              </Alert>
+            ) : (
+              <Alert tone="warning">
+                No se perdió nada: los grados{' '}
+                <strong>{gradosExcedidos.map((g) => `${g.nombre} (${totalHorasPorGrado[g._id]} h)`).join(', ')}</strong>{' '}
+                tienen ese plan guardado, pero {selectedJornada ? `la jornada ${selectedJornada.nombre} solo tiene` : 'este contexto solo admite'}{' '}
+                {MAX_HORAS_SEMANALES} horas semanales y el horario no lo podrá acomodar. Pulsa «Editar intensidades del nivel» y ajústalo a{' '}
+                {MAX_HORAS_SEMANALES} h: se guarda como plan propio de esta jornada y la base general queda igual.
+              </Alert>
+            )}
           </div>
         )}
 

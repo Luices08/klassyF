@@ -273,8 +273,11 @@ function obtenerOCrearGrado(
       personalizaciones_grupo: [],
     };
     plan.grades.push(grado);
+    // `push` copia el objeto a un subdocumento nuevo: hay que devolver ese, no el literal, o lo que se asigne
+    // después no se guarda (el primer guardado de un grado nuevo quedaba vacío y solo el segundo funcionaba).
+    grado = plan.grades[plan.grades.length - 1];
   }
-  return grado;
+  return grado as IGradoPlan;
 }
 
 // ---------------------------------------------------------------------------

@@ -59,6 +59,7 @@ export const NAV_ITEMS: NavItem[] = [
   { to: '/admin/notas', label: 'Seguimiento de notas', icon: FileTextIcon, roles: CURRICULUM_MANAGERS },
   { to: '/admin/creador-planillas', label: 'Creador de planillas', icon: SlidersIcon, roles: STRUCTURAL_ADMINS },
   { to: '/admin/boletin', label: 'Configuración del boletín', icon: FileTextIcon, roles: CURRICULUM_MANAGERS },
+  { to: '/recuperaciones', label: 'Recuperaciones', icon: ClipboardListIcon, roles: ['ADMIN', 'COORDINADOR', 'DOCENTE'] },
   { to: '/docente/mi-carga', label: 'Mi asignación', icon: ClipboardListIcon, roles: ['DOCENTE'] },
   { to: '/docente/planeacion-curricular', label: 'Planeación curricular', icon: BookIcon, roles: ['DOCENTE'] },
   { to: '/docente/actividades', label: 'Actividades y tareas', icon: ClipboardListIcon, roles: ['DOCENTE'] },

@@ -28,7 +28,7 @@ function Detalle({ rotulo, texto }: { rotulo: string; texto: string }) {
 }
 
 function AsignaturaRow({ asignatura }: { asignatura: ReportCardAsignatura }) {
-  const tieneTexto = asignatura.descripcion || asignatura.recomendacion || asignatura.observacion_docente;
+  const tieneTexto = asignatura.descripcion || asignatura.recomendacion || asignatura.observacion_docente || asignatura.recuperacion;
   return (
     <div className="rounded-lg border border-border p-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -59,6 +59,16 @@ function AsignaturaRow({ asignatura }: { asignatura: ReportCardAsignatura }) {
       )}
       {tieneTexto && (
         <div className="mt-3 space-y-1 border-t border-border pt-2">
+          {asignatura.recuperacion && (
+            <Detalle
+              rotulo="Recuperación"
+              texto={
+                asignatura.recuperacion.cuenta
+                  ? `Nota del periodo ${asignatura.recuperacion.nota_original.toFixed(2)}, con la recuperación ${asignatura.recuperacion.nota_resultante.toFixed(2)}.`
+                  : `Presentada (${asignatura.recuperacion.nota_resultante.toFixed(2)}); la nota del periodo se conserva en ${asignatura.recuperacion.nota_original.toFixed(2)}.`
+              }
+            />
+          )}
           {asignatura.descripcion && <Detalle rotulo="Descripción" texto={asignatura.descripcion} />}
           {asignatura.recomendacion && <Detalle rotulo="Recomendación" texto={asignatura.recomendacion} />}
           {asignatura.observacion_docente && <Detalle rotulo="Observación del docente" texto={asignatura.observacion_docente} />}

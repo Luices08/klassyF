@@ -26,6 +26,7 @@ import notasRoutes from './notas.routes';
 import observacionRoutes from './observacion.routes';
 import periodLockRoutes from './periodLock.routes';
 import publicRoutes from './public.routes';
+import recuperacionRoutes from './recuperacion.routes';
 import referenteCurricularRoutes from './referenteCurricular.routes';
 import reportCardRoutes from './reportCard.routes';
 import studentRoutes from './student.routes';
@@ -100,5 +101,8 @@ router.use('/reports', reportCardRoutes);
 
 // M17: Boletines — configuración del colegio, banco de textos por desempeño y observaciones del docente
 router.use('/boletines', boletinRoutes);
+
+// M18: Recuperaciones — política del colegio (por periodo y de fin de año), candidatos y registro de intentos
+router.use('/recuperaciones', recuperacionRoutes);
 
 export default router;

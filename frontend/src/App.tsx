@@ -12,6 +12,7 @@ import { CertificadosPage } from './pages/admin/CertificadosPage';
 import { AnioLectivoPage } from './pages/AnioLectivoPage';
 import { ActividadesDocentePage } from './pages/ActividadesDocentePage';
 import { NotasPlanillaPage } from './pages/NotasPlanillaPage';
+import { RecuperacionesPage } from './pages/RecuperacionesPage';
 import { ObservacionesBoletinPage } from './pages/ObservacionesBoletinPage';
 import { AsistenciaPage } from './pages/AsistenciaPage';
 import { GestionAsistenciaPage } from './pages/GestionAsistenciaPage';
@@ -103,6 +104,10 @@ export default function App() {
 
           <Route element={<ProtectedRoute allowedRoles={['DOCENTE', 'ESTUDIANTE', 'ACUDIENTE']} />}>
             <Route path="/mi-horario" element={<MiHorarioPage />} />
+          </Route>
+
+          <Route element={<ProtectedRoute allowedRoles={['ADMIN', 'COORDINADOR', 'DOCENTE']} />}>
+            <Route path="/recuperaciones" element={<RecuperacionesPage />} />
           </Route>
 
           <Route element={<ProtectedRoute allowedRoles={['DOCENTE']} />}>

@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { ActividadDrawer } from '../components/actividades/ActividadDrawer';
 import { EntregasDrawer } from '../components/actividades/EntregasDrawer';
 import { Alert, errorMessage } from '../components/ui/Alert';
-import { EstadoDesarrolloCurricularBadge, EstadoPeriodoBadge, TipoActividadChip } from '../components/ui/Badge';
+import { EstadoPeriodoBadge, EstadoPlanBadge, TipoActividadChip } from '../components/ui/Badge';
 import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
 import { Select } from '../components/ui/Field';
@@ -14,14 +14,14 @@ import { EmptyRow, Table, TableBody, TableHead, Td, Th } from '../components/ui/
 import { EyeIcon, PencilIcon, PlusIcon, TrashIcon } from '../components/ui/icons';
 import { type ActividadConResumen, useActividades, useEliminarActividad } from '../hooks/useActividades';
 import { useAnioDeTrabajo } from '../hooks/useAniosLectivos';
-import { useCurricularDevelopment } from '../hooks/useCurricularDevelopments';
+import { usePlanDeAsignacion } from '../hooks/usePlanesAula';
 import { useMyTeacherLoad } from '../hooks/useTeacherAssignments';
 import { formatoInstante, hoyColombia } from '../lib/actividades';
 import { aInputFecha } from '../lib/fechas';
 
 /**
  * CU-DOC-02: el docente programa tareas, evaluaciones, trabajos y proyectos de SUS clases (Carga académica, M08), con la
- * planeación curricular APROBADA del periodo (M07) como requisito y el calendario (M05) como guarda contra choques.
+ * plan de aula APROBADO del periodo (M07) como requisito y el calendario (M05) como guarda contra choques.
  */
 export function ActividadesDocentePage() {
   const { anio } = useAnioDeTrabajo();
@@ -40,16 +40,16 @@ export function ActividadesDocentePage() {
   const periodoVigente = periodos.find((p) => aInputFecha(p.fecha_inicio) <= hoy && hoy <= aInputFecha(p.fecha_fin)) ?? periodos[0];
   const periodo = periodos.find((p) => p.numero === periodoElegido) ?? periodoVigente;
 
-  const planeacion = useCurricularDevelopment(asignacion?._id, periodo?.numero);
+  const plan = usePlanDeAsignacion(asignacion?._id, periodo?.numero);
   const lista = useActividades(
     { academic_year_id: anio?._id, teacher_assignment_id: asignacion?._id, periodo: periodo?.numero },
     Boolean(anio && asignacion && periodo)
   );
   const eliminar = useEliminarActividad();
 
-  const planeacionAprobada = planeacion.data?.estado === 'APROBADO';
+  const planAulaAprobado = plan.data?.aprobado === true;
   const periodoCerrado = periodo?.estado === 'CERRADO';
-  const puedeProgramar = planeacionAprobada && !periodoCerrado && anio?.estado !== 'CERRADO';
+  const puedeProgramar = planAulaAprobado && !periodoCerrado && anio?.estado !== 'CERRADO';
 
   const grupo = typeof asignacion?.group_id === 'object' ? asignacion.group_id : null;
   const asignatura = typeof asignacion?.subject_id === 'object' ? asignacion.subject_id : null;
@@ -112,7 +112,7 @@ export function ActividadesDocentePage() {
           </div>
           <div className="flex items-center gap-2 pb-1">
             {periodo?.estado && <EstadoPeriodoBadge value={periodo.estado} />}
-            {planeacion.data ? <EstadoDesarrolloCurricularBadge value={planeacion.data.estado} /> : null}
+            {plan.data ? <EstadoPlanBadge value={plan.data.estado} /> : null}
           </div>
         </div>
       </Card>
@@ -121,16 +121,18 @@ export function ActividadesDocentePage() {
         <Alert tone="info">No tienes clases asignadas en el año lectivo vigente. Coordinación las asigna en Carga académica.</Alert>
       )}
 
-      {asignacion && periodo && !planeacion.isLoading && !planeacionAprobada && (
+      {asignacion && periodo && !plan.isLoading && !planAulaAprobado && (
         <Alert tone="warning">
           <p>
-            {planeacion.data
-              ? 'Tu planeación curricular de este periodo todavía no está aprobada por coordinación.'
-              : 'Aún no has formulado la planeación curricular de este periodo.'}{' '}
-            Para programar actividades necesitas tenerla <strong>aprobada</strong>: cada actividad mide un DBA o una competencia de esa planeación.
+            {plan.data?.estado === 'EN_REVISION'
+              ? 'Tu plan de aula de este periodo está en revisión de coordinación.'
+              : plan.data?.estado === 'DEVUELTO'
+                ? 'Coordinación devolvió tu plan de aula de este periodo con comentarios: respóndelos para poder programar.'
+                : 'Aún no has radicado tu plan de aula de este periodo.'}{' '}
+            Para programar actividades necesitas tenerlo <strong>aprobado</strong>.
           </p>
-          <Link to="/docente/planeacion-curricular" className="mt-1 inline-block font-semibold underline">
-            Ir a Planeación curricular
+          <Link to="/docente/planeacion" className="mt-1 inline-block font-semibold underline">
+            Ir a Planeación
           </Link>
         </Alert>
       )}
@@ -165,11 +167,7 @@ export function ActividadesDocentePage() {
                       <span className="font-semibold text-ink">{a.titulo}</span>
                       <TipoActividadChip value={a.tipo} />
                     </div>
-                    <p className="mt-0.5 text-xs text-muted">
-                      {a.dba ? `DBA ${a.dba.numero_dba}` : ''}
-                      {a.dba && a.competencia_evaluada ? ' · ' : ''}
-                      {a.competencia_evaluada ?? ''}
-                    </p>
+                    <p className="mt-0.5 text-xs text-muted">{a.componente_nombre}</p>
                   </Td>
                   <Td>
                     <p className="text-xs text-muted">Se publica {formatoInstante(a.fecha_apertura)}</p>
@@ -208,13 +206,13 @@ export function ActividadesDocentePage() {
         )
       )}
 
-      {asignacion && periodo && planeacion.data && (
+      {asignacion && periodo && (
         <ActividadDrawer
           open={editando !== null}
           onClose={() => setEditando(null)}
           teacherAssignmentId={asignacion._id}
           periodoNumero={periodo.numero}
-          planeacion={planeacion.data}
+          planAula={planAulaAprobado ? (plan.data?.plan ?? null) : null}
           actividad={editando === 'nueva' ? null : editando}
         />
       )}

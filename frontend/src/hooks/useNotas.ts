@@ -99,6 +99,7 @@ export interface FilaSeguimiento {
   asignacion: ContextoAsignacion | null;
   estudiantes: number;
   actividades: number;
+  casillas: number;
   cerradas: number;
   definitivas: number;
   estado: 'ABIERTA' | 'CERRADA' | 'DEFINITIVA';
@@ -246,6 +247,36 @@ export async function descargarExcelNotas(teacherAssignmentId: string, periodoNu
   enlace.download = nombreArchivo;
   enlace.click();
   URL.revokeObjectURL(url);
+}
+
+export type ResultadoRegistroImportacion = 'APLICADA' | 'RECHAZADA' | 'INTERRUMPIDA';
+
+export interface RegistroImportacionNotas {
+  _id: string;
+  usuario_id: { nombre: string; apellido: string } | null;
+  archivo_nombre: string;
+  hash: string;
+  descargado_en: string | null;
+  resultado: ResultadoRegistroImportacion;
+  mensaje: string | null;
+  notas_guardadas: number;
+  sin_cambios: number;
+  casillas_creadas: number;
+  casillas_renombradas: number;
+  pesos_actualizados: number;
+  total_errores: number;
+  total_conflictos: number;
+  errores: Array<{ fila: number; documento: string | null; motivo: string; conflicto: boolean }>;
+  createdAt: string;
+}
+
+/** Los últimos Excel que se subieron para esa clase y periodo (aplicados o rechazados). Se refresca solo al importar: cuelga de ['notas']. */
+export function useImportacionesExcelNotas({ teacherAssignmentId, periodoNumero, enabled }: ReferenciaPlanilla & { enabled: boolean }) {
+  return useQuery({
+    queryKey: ['notas', 'importaciones', teacherAssignmentId, periodoNumero],
+    queryFn: () => api.get<RegistroImportacionNotas[]>('/notas/planilla/excel/importaciones', { teacher_assignment_id: teacherAssignmentId, periodo_numero: periodoNumero }),
+    enabled: enabled && Boolean(teacherAssignmentId && periodoNumero),
+  });
 }
 
 export function useImportarExcelNotas() {

@@ -78,14 +78,9 @@ export function NotasGestionPage() {
         action={
           <div className="flex flex-wrap gap-2">
             {esAdmin && (
-              <>
-                <Button type="button" variant="secondary" onClick={() => navigate('/anio-lectivo')}>
-                  Componentes evaluativos
-                </Button>
-                <Button type="button" variant="secondary" onClick={() => navigate('/admin/plantilla-planilla')}>
-                  Plantilla de la planilla
-                </Button>
-              </>
+              <Button type="button" variant="secondary" onClick={() => navigate('/admin/creador-planillas')}>
+                Creador de planillas
+              </Button>
             )}
             <Button type="button" disabled={!hayCerradas} isLoading={definitivas.isPending} onClick={() => void declarar()}>
               <CheckIcon className="h-4 w-4" />
@@ -140,7 +135,7 @@ export function NotasGestionPage() {
                 <Td>
                   <p className="font-semibold text-ink">{f.asignacion?.asignatura?.nombre ?? '—'}</p>
                   <p className="text-xs text-muted">
-                    Grupo {f.asignacion?.grupo?.nomenclatura ?? '—'} · {f.actividades} actividad(es)
+                    Grupo {f.asignacion?.grupo?.nomenclatura ?? '—'} · {f.casillas} casilla(s)
                   </p>
                 </Td>
                 <Td>{f.asignacion?.docente ? `${f.asignacion.docente.nombre} ${f.asignacion.docente.apellido}` : '—'}</Td>

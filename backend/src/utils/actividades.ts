@@ -192,13 +192,3 @@ export function evaluarCalendarioActividad(entrada: EntradaCalendario): AlertaCa
 
   return alertas.sort((a, b) => Number(b.severidad === 'BLOQUEO') - Number(a.severidad === 'BLOQUEO'));
 }
-
-/** Para comparar la competencia elegida con el texto libre de la planeación sin que importen tildes, mayúsculas ni espacios. */
-export function normalizarTexto(texto: string): string {
-  return texto
-    .normalize('NFD')
-    .replace(/[̀-ͯ]/g, '')
-    .toLowerCase()
-    .replace(/\s+/g, ' ')
-    .trim();
-}

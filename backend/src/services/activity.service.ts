@@ -1,17 +1,15 @@
 import { Types } from 'mongoose';
 import { FormatoEvidencia, TipoActividad } from '../constants/actividades';
-import { ESTADOS_MATRICULA_ACTIVOS, EstadoDesarrolloCurricular } from '../constants/enums';
+import { ESTADOS_MATRICULA_ACTIVOS } from '../constants/enums';
 import { ROLES } from '../constants/roles';
 import Activity, { ActivityDocument, IActivity } from '../models/activity.model';
 import AcademicYear, { AcademicYearDocument } from '../models/academicYear.model';
 import ActivitySubmission from '../models/activitySubmission.model';
-import CurricularDevelopment, { CurricularDevelopmentDocument } from '../models/curricularDevelopment.model';
 import Enrollment from '../models/enrollment.model';
-import { Dba } from '../models/referenteCurricular.model';
 import TeacherAssignment, { TeacherAssignmentDocument } from '../models/teacherAssignment.model';
 import { UserDocument } from '../models/user.model';
 import ApiError from '../utils/ApiError';
-import { estadoDeEntrega, evaluarVentanaEntrega, normalizarTexto } from '../utils/actividades';
+import { estadoDeEntrega, evaluarVentanaEntrega } from '../utils/actividades';
 import { finDelDia, inicioDelDia } from '../utils/calendarioAcademico';
 import { componentesEfectivos } from '../utils/siee';
 import { ContextoAsignacion, contextosDeAsignaciones } from './actividadContexto.service';
@@ -21,6 +19,7 @@ import { registrarEvento } from './audit.service';
 import { fechaDeClase } from './attendance.service';
 import { casillasDeClase, exigirCasillaDisponible, exigirPesosValidos } from './casillasBloque.service';
 import { exigirPlanillaAbierta } from './notasEstado.service';
+import { exigirPlanAulaAprobado } from './planeacionCompuertas.service';
 
 export type ActividadPlana = IActivity & { _id: Types.ObjectId };
 
@@ -41,10 +40,6 @@ export interface VistaActividad {
   requiere_entrega: boolean;
   formatos_permitidos: FormatoEvidencia[];
   permite_entrega_tardia: boolean;
-  desarrollo_curricular_id: string | null;
-  dba_id: string | null;
-  dba: { _id: string; numero_dba: number; enunciado: string } | null;
-  competencia_evaluada: string | null;
   publicada: boolean;
   vencida: boolean;
   asignacion: ContextoAsignacion | null;
@@ -57,12 +52,7 @@ export interface VistaActividad {
 export async function armarVistas(actividades: ActividadPlana[], ahora = new Date()): Promise<VistaActividad[]> {
   if (actividades.length === 0) return [];
 
-  const dbaIds = actividades.map((a) => a.dba_id).filter((id): id is Types.ObjectId => Boolean(id));
-  const [contextos, dbas] = await Promise.all([
-    contextosDeAsignaciones([...new Set(actividades.map((a) => String(a.teacher_assignment_id)))]),
-    dbaIds.length > 0 ? Dba.find({ _id: { $in: dbaIds } }).select('numero_dba enunciado').lean() : Promise.resolve([]),
-  ]);
-  const dbaPorId = new Map(dbas.map((d) => [String(d._id), { _id: String(d._id), numero_dba: d.numero_dba, enunciado: d.enunciado }]));
+  const contextos = await contextosDeAsignaciones([...new Set(actividades.map((a) => String(a.teacher_assignment_id)))]);
 
   const aniosIds = [...new Set([...contextos.values()].map((c) => c.academic_year_id))];
   const anios = await AcademicYear.find({ _id: { $in: aniosIds } }).select('componentes_evaluativos ponderacion_componentes');
@@ -91,10 +81,6 @@ export async function armarVistas(actividades: ActividadPlana[], ahora = new Dat
       requiere_entrega: a.requiere_entrega ?? true,
       formatos_permitidos: a.formatos_permitidos ?? [],
       permite_entrega_tardia: a.permite_entrega_tardia ?? false,
-      desarrollo_curricular_id: a.desarrollo_curricular_id ? String(a.desarrollo_curricular_id) : null,
-      dba_id: a.dba_id ? String(a.dba_id) : null,
-      dba: a.dba_id ? (dbaPorId.get(String(a.dba_id)) ?? null) : null,
-      competencia_evaluada: a.competencia_evaluada ?? null,
       publicada: ventana.publicada,
       vencida: ventana.vencida,
       asignacion: contextos.get(String(a.teacher_assignment_id)) ?? null,
@@ -102,7 +88,7 @@ export async function armarVistas(actividades: ActividadPlana[], ahora = new Dat
   });
 }
 
-// --- Contexto del docente (M08) y planeación aprobada (M07) ---
+// --- Contexto del docente (M08) ---
 
 /** Filtro de identidad: un docente solo programa actividades de las clases que tiene asignadas (M08). */
 export async function asignacionDelDocente(id: string | Types.ObjectId, docente: UserDocument): Promise<TeacherAssignmentDocument> {
@@ -116,45 +102,6 @@ export async function asignacionDelDocente(id: string | Types.ObjectId, docente:
   }
   if (asignacion.estado === 'inactivo') throw new ApiError(400, 'Esta asignación académica ya no está activa.');
   return asignacion;
-}
-
-const NOMBRE_ESTADO_PLANEACION: Record<EstadoDesarrolloCurricular, string> = {
-  BORRADOR: 'en borrador',
-  ENVIADO_REVISION: 'en revisión de coordinación',
-  DEVUELTO_OBSERVACIONES: 'devuelta con observaciones',
-  APROBADO: 'aprobada',
-};
-
-/** Prerrequisito de M11: no se programa una actividad sin la planeación del periodo APROBADA por coordinación. */
-async function planeacionAprobada(asignacion: TeacherAssignmentDocument, periodo: number): Promise<CurricularDevelopmentDocument> {
-  const planeacion = await CurricularDevelopment.findOne({ teacher_assignment_id: asignacion._id, periodo_numero: periodo });
-  if (!planeacion) {
-    throw new ApiError(
-      409,
-      `Aún no has formulado la planeación curricular del periodo ${periodo}. Constrúyela en «Planeación curricular» y espera la aprobación de coordinación para programar actividades.`
-    );
-  }
-  if (planeacion.estado !== 'APROBADO') {
-    throw new ApiError(
-      409,
-      `La planeación curricular del periodo ${periodo} está ${NOMBRE_ESTADO_PLANEACION[planeacion.estado]}: coordinación debe aprobarla antes de programar actividades.`
-    );
-  }
-  return planeacion;
-}
-
-/** Toda actividad mide algo de la planeación aprobada: un DBA suyo o una de sus competencias. */
-function validarReferente(planeacion: CurricularDevelopmentDocument, dbaId: string | null | undefined, competencia: string | null | undefined): void {
-  const competenciaLimpia = competencia?.trim();
-  if (!dbaId && !competenciaLimpia) {
-    throw new ApiError(400, 'Indica qué DBA o competencia de tu planeación aprobada evalúa esta actividad.');
-  }
-  if (dbaId && !planeacion.dba_seleccionados.some((d) => String(d) === String(dbaId))) {
-    throw new ApiError(400, 'El DBA elegido no hace parte de tu planeación aprobada de este periodo.');
-  }
-  if (competenciaLimpia && !normalizarTexto(planeacion.competencias).includes(normalizarTexto(competenciaLimpia))) {
-    throw new ApiError(400, 'La competencia elegida no hace parte de tu planeación aprobada de este periodo.');
-  }
 }
 
 function exigirPeriodoAbierto(anio: AcademicYearDocument, periodo: number): void {
@@ -207,8 +154,6 @@ export interface CreateActivityInput {
   requiere_entrega?: boolean;
   formatos_permitidos?: FormatoEvidencia[];
   permite_entrega_tardia?: boolean;
-  dba_id?: string | null;
-  competencia_evaluada?: string | null;
   confirmar_alertas?: boolean;
 }
 
@@ -222,9 +167,8 @@ export async function createActivity(input: CreateActivityInput, docente: UserDo
   validarComponente(anio, input.componente_siee);
   await exigirPlanillaAbierta(asignacion._id, input.periodo_numero, 'programar nuevas actividades');
   await validarCasilla(anio, asignacion, input.periodo_numero, input.componente_siee, input.peso_en_componente ?? null);
-
-  const planeacion = await planeacionAprobada(asignacion, input.periodo_numero);
-  validarReferente(planeacion, input.dba_id, input.competencia_evaluada);
+  // M07: sin plan de aula aprobado de ese periodo no se programa nada.
+  await exigirPlanAulaAprobado(asignacion, input.periodo_numero);
 
   const requiereEntrega = input.requiere_entrega ?? true;
   const fechaEntrega = new Date(input.fecha_entrega);
@@ -249,9 +193,6 @@ export async function createActivity(input: CreateActivityInput, docente: UserDo
     requiere_entrega: requiereEntrega,
     formatos_permitidos: requiereEntrega ? (input.formatos_permitidos ?? []) : [],
     permite_entrega_tardia: input.permite_entrega_tardia ?? false,
-    desarrollo_curricular_id: planeacion._id,
-    dba_id: input.dba_id ?? null,
-    competencia_evaluada: input.competencia_evaluada?.trim() || null,
   });
 
   await registrarEvento({
@@ -276,13 +217,11 @@ export interface UpdateActivityInput {
   requiere_entrega?: boolean;
   formatos_permitidos?: FormatoEvidencia[];
   permite_entrega_tardia?: boolean;
-  dba_id?: string | null;
-  competencia_evaluada?: string | null;
   confirmar_alertas?: boolean;
 }
 
 /**
- * El periodo y la asignación no se cambian (una actividad de otro periodo exige otra planeación aprobada: se elimina
+ * El periodo y la asignación no se cambian (una actividad de otro periodo exige otro plan de aula aprobado: se elimina
  * y se programa de nuevo). Lo que ya tiene notas no cambia de componente ni de peso: eso es de M12.
  */
 export async function updateActivity(
@@ -314,17 +253,9 @@ export async function updateActivity(
   if (cambios.requiere_entrega === false && (actividad.requiere_entrega ?? true) && hayEntregas) {
     throw new ApiError(409, 'Ya hay estudiantes que entregaron: la actividad no puede pasar a no recibir entregas.');
   }
-
-  const dbaCambia = cambios.dba_id !== undefined;
-  const competenciaCambia = cambios.competencia_evaluada !== undefined;
-  if (dbaCambia || competenciaCambia) {
-    const planeacion = await planeacionAprobada(asignacion, actividad.periodo_numero);
-    validarReferente(
-      planeacion,
-      dbaCambia ? cambios.dba_id : (actividad.dba_id && String(actividad.dba_id)),
-      competenciaCambia ? cambios.competencia_evaluada : actividad.competencia_evaluada
-    );
-    actividad.desarrollo_curricular_id = planeacion._id;
+  // La fecha de apertura es la publicación: moverla también exige el plan de aula aprobado. Corregir un título no.
+  if (cambios.fecha_apertura !== undefined && new Date(cambios.fecha_apertura).getTime() !== actividad.fecha_apertura.getTime()) {
+    await exigirPlanAulaAprobado(asignacion, actividad.periodo_numero);
   }
 
   const fechaCambia = cambios.fecha_entrega !== undefined;
@@ -341,10 +272,8 @@ export async function updateActivity(
     exigirAlertasResueltas(revision.alertas, cambios.confirmar_alertas ?? false);
   }
 
-  const { confirmar_alertas: _confirmar, dba_id, competencia_evaluada, ...resto } = cambios;
+  const { confirmar_alertas: _confirmar, ...resto } = cambios;
   actividad.set(resto);
-  if (dbaCambia) actividad.dba_id = dba_id ? new Types.ObjectId(dba_id) : null;
-  if (competenciaCambia) actividad.competencia_evaluada = competencia_evaluada?.trim() || null;
   if (!requiereEntrega) actividad.formatos_permitidos = [];
   await actividad.save();
 
@@ -353,7 +282,7 @@ export async function updateActivity(
     accion: 'ACTIVIDAD_ACTUALIZADA',
     entidad: 'Activity',
     entidad_id: actividad._id,
-    detalle: Object.keys(resto).concat(dbaCambia ? ['dba_id'] : [], competenciaCambia ? ['competencia_evaluada'] : []).join(', '),
+    detalle: Object.keys(resto).join(', '),
     ip,
   });
   return actividad;

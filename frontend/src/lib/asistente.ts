@@ -23,7 +23,21 @@ export const PALABRAS_CLAVE_POR_RUTA: Record<string, { descripcion: string; clav
   },
   '/anio-lectivo': {
     descripcion: 'Año lectivo, periodos, calendario, prórrogas y cierre.',
-    claves: ['anio lectivo', 'periodo', 'periodos', 'calendario', 'vacaciones', 'receso', 'prorroga', 'cierre del anio', 'fechas'],
+    claves: [
+      'anio lectivo',
+      'periodo',
+      'periodos',
+      'calendario',
+      'vacaciones',
+      'receso',
+      'prorroga',
+      'cierre del anio',
+      'fechas',
+      'entrega de planes',
+      'fecha limite de planes',
+      'ventana de entrega',
+      'activar anio',
+    ],
   },
   '/admin/grades': {
     descripcion: 'Catálogo de grados que ofrece la institución.',
@@ -46,8 +60,8 @@ export const PALABRAS_CLAVE_POR_RUTA: Record<string, { descripcion: string; clav
     claves: ['espacios', 'aulas', 'salon', 'salones', 'laboratorio', 'aforo', 'capacidad del salon'],
   },
   '/admin/academic-catalog': {
-    descripcion: 'Áreas y asignaturas del colegio.',
-    claves: ['catalogo academico', 'areas', 'area', 'asignaturas', 'asignatura', 'materias', 'materia'],
+    descripcion: 'Áreas y asignaturas del colegio, y los docentes líderes de cada área.',
+    claves: ['catalogo academico', 'areas', 'area', 'asignaturas', 'asignatura', 'materias', 'materia', 'lider', 'lideres', 'jefe de area', 'jefes de area', 'coordinador de area'],
   },
   '/admin/study-plan': {
     aceptaGrado: true,
@@ -71,9 +85,25 @@ export const PALABRAS_CLAVE_POR_RUTA: Record<string, { descripcion: string; clav
     descripcion: 'Generar, ajustar y publicar los horarios; restricciones y tiempo libre de docentes.',
     claves: ['horarios', 'generar horario', 'publicar horario', 'restricciones', 'tiempo libre', 'disponibilidad', 'cruce de horarios', 'conflictos'],
   },
-  '/admin/revision-curricular': {
-    descripcion: 'Revisión de las planeaciones curriculares de los docentes.',
-    claves: ['revision curricular', 'planeaciones', 'aprobar planeacion', 'dba', 'ebc', 'lineamientos'],
+  '/admin/revision-planeacion': {
+    descripcion: 'Revisión de planes de área y planes de aula: aprobar, devolver con comentarios y ver quién falta por radicar.',
+    claves: [
+      'revision de planeacion',
+      'planeacion',
+      'planes de aula',
+      'plan de aula',
+      'plan de area',
+      'planes de area',
+      'aprobar plan',
+      'devolver plan',
+      'fuera de plazo',
+      'cobertura de planes',
+      'quien no ha subido el plan',
+    ],
+  },
+  '/admin/documentos-referencia': {
+    descripcion: 'PDF de apoyo (DBA, estándares, lineamientos) asignados a un área y a los grados donde aplican.',
+    claves: ['documentos de apoyo', 'documentos de referencia', 'dba', 'estandares', 'lineamientos curriculares', 'pdf de apoyo', 'subir documento'],
   },
   '/admin/actividades': {
     descripcion: 'Supervisión de actividades por grupo y límites de carga diaria.',
@@ -96,9 +126,9 @@ export const PALABRAS_CLAVE_POR_RUTA: Record<string, { descripcion: string; clav
     claves: ['observaciones del boletin', 'observaciones para el boletin', 'comentarios del boletin', 'escribir observacion', 'comentario por estudiante'],
   },
   '/docente/mi-carga': { descripcion: 'Tus asignaturas y grupos asignados.', claves: ['mi asignacion', 'mi carga', 'mis clases', 'mis grupos'] },
-  '/docente/planeacion-curricular': {
-    descripcion: 'Planeación curricular por periodo.',
-    claves: ['planeacion', 'planeacion curricular', 'contenidos', 'metodologia', 'dba'],
+  '/docente/planeacion': {
+    descripcion: 'Tu plan de aula de cada periodo y, si lideras un área, el plan de área anual (PDF).',
+    claves: ['planeacion', 'plan de aula', 'plan de area', 'cargar plan', 'subir plan', 'radicar plan', 'adoptar plan', 'plan curricular', 'docente anterior'],
   },
   '/docente/actividades': {
     descripcion: 'Programar actividades y revisar entregas.',

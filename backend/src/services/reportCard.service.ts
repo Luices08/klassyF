@@ -24,6 +24,7 @@ import { calcularNotaArea, calcularPromedioGeneral } from '../utils/calculoNotas
 import { escalaEfectiva, type ResultadoDesempeno } from '../utils/escalaEvaluacion';
 import { ESTADO_ACTIVO } from '../utils/filtroEstado';
 import { integracionDe } from '../utils/integracionRecuperacion';
+import { obtenerGradoPlanEfectivo } from '../utils/horasPlanEstudios';
 import { resumenAsistenciaParaBoletin } from './attendanceStats.service';
 import { leerConfiguracionBoletin } from './boletinConfig.service';
 import { exigirBoletinDisponible } from './publicacionBoletin.service';
@@ -228,7 +229,13 @@ async function cargarContextoGrupo(
   if (estudianteExtraId && !studentIds.includes(estudianteExtraId)) studentIds.push(estudianteExtraId);
 
   const studyPlan = await StudyPlan.findOne({ academic_year_id: anio._id });
-  const gradoPlan = studyPlan?.grades.find((g) => String(g.grade_id) === String(grupo.grade_id));
+  const gradoPlan =
+    obtenerGradoPlanEfectivo(
+      studyPlan,
+      String(grupo.grade_id),
+      grupo.sede_id ? String(grupo.sede_id) : null,
+      grupo.jornada_id ? String(grupo.jornada_id) : null
+    ) ?? studyPlan?.grades.find((g) => String(g.grade_id) === String(grupo.grade_id));
   const personalizacion = gradoPlan?.personalizaciones_grupo.find((p) => String(p.group_id) === String(grupo._id));
 
   // Malla efectiva del grupo (M06): asignaturas de la Configuracion General

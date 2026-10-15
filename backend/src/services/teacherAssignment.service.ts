@@ -2,7 +2,6 @@ import { Types } from 'mongoose';
 import Activity from '../models/activity.model';
 import Counter from '../models/counter.model';
 import AcademicYear from '../models/academicYear.model';
-import CurricularDevelopment from '../models/curricularDevelopment.model';
 import Group from '../models/group.model';
 import StudyPlan from '../models/studyPlan.model';
 import Subject from '../models/subject.model';
@@ -16,6 +15,7 @@ import { getLimitesCarga } from './institution.service';
 import ApiError from '../utils/ApiError';
 import { resumirCargaDocente } from '../utils/cargaDocente';
 import { ESTADO_ACTIVO, filtroPorEstado } from '../utils/filtroEstado';
+import { horasDeAsignaturaEnGrupo, obtenerGradoPlanEfectivo } from '../utils/horasPlanEstudios';
 import { runTransaction } from '../utils/runTransaction';
 
 export interface ActorAsignacion {
@@ -105,7 +105,13 @@ export async function createTeacherAssignment(
           'Este año lectivo todavía no tiene un Plan de Estudios configurado (M06). Configúralo antes de asignar clases.'
         );
       }
-      const gradoConfig = studyPlan.grades.find((g) => String(g.grade_id) === String(group.grade_id));
+      const gradoConfig =
+        obtenerGradoPlanEfectivo(
+          studyPlan,
+          String(group.grade_id),
+          group.sede_id ? String(group.sede_id) : null,
+          group.jornada_id ? String(group.jornada_id) : null
+        ) ?? studyPlan.grades.find((g) => String(g.grade_id) === String(group.grade_id));
       if (!gradoConfig) {
         throw new ApiError(
           400,
@@ -400,9 +406,10 @@ export async function deleteTeacherAssignment(id: string, actor: ActorAsignacion
 
   // Una CLASE con actividades/notas registradas (M12) no se elimina: borrarla haria desaparecer
   // esas notas del boletin, y es ademas la unica forma de "cambiar de docente" que tiene la UI,
-  // lo que destruiria el historial de una materia a mitad de año. Se preserva (ver tambien el
-  // bloqueo por planeacion APROBADA mas abajo), igual que subject.service.ts bloquea inactivar
-  // una asignatura con asignaciones activas.
+  // lo que destruiria el historial de una materia a mitad de año. Se preserva, igual que
+  // subject.service.ts bloquea inactivar una asignatura con asignaciones activas.
+  // Los planes de aula (M07) no cuelgan de la asignación sino de (docente, asignatura, grado,
+  // periodo): al retirar al docente quedan archivados y no impiden el cambio.
   const tieneActividades = await Activity.exists({ teacher_assignment_id: id });
   if (tieneActividades) {
     throw new ApiError(
@@ -412,32 +419,17 @@ export async function deleteTeacherAssignment(id: string, actor: ActorAsignacion
   }
 
   await runTransaction(async (session) => {
-    // Una asignacion puede tener hasta una planeacion por periodo (1-4): revisar todas, no solo
-    // la primera que encuentre, o una ya APROBADA en otro periodo se borraria sin bloquear nada.
-    const devs = await CurricularDevelopment.find({ teacher_assignment_id: id }).session(session);
-    if (devs.some((dev) => dev.estado === 'APROBADO')) {
-      throw new ApiError(
-        409,
-        'No se puede eliminar la asignación académica porque ya cuenta con una planeación curricular aprobada.'
-      );
-    }
-
     // Si era dirección de grupo y sigue siendo el director vigente del grupo, limpiar el campo
     // (si ya fue reemplazado por otro docente, esta asignacion esta inactiva y no debe tocar al
     // director actual — ver createTeacherAssignment). Nunca se "conserva via estado" como
     // DIRECCION_GRUPO: una CLASE siempre se borra fisicamente si llega hasta aqui (sin
-    // actividades ni planeacion aprobada, no hay nada que preservar).
+    // actividades, no hay nada que preservar).
     if (assignment.tipo_asignacion === 'DIRECCION_GRUPO' && assignment.group_id) {
       await Group.updateOne(
         { _id: assignment.group_id, director_grupo_id: assignment.docente_id },
         { $unset: { director_grupo_id: 1 } },
         { session }
       );
-    }
-
-    // Ninguna quedó APROBADA (ya se validó arriba): se pueden borrar todos los borradores/envíos.
-    if (devs.length > 0) {
-      await CurricularDevelopment.deleteMany({ teacher_assignment_id: id }).session(session);
     }
 
     await TeacherAssignment.findByIdAndDelete(id).session(session);
@@ -486,3 +478,481 @@ export async function getMyLoad(docenteId: string | Types.ObjectId, academicYear
     .populate('academic_year_id', 'year calendario estado')
     .sort({ createdAt: -1 });
 }
+
+export interface ClaseLoteInput {
+  group_id: string;
+  subject_id: string;
+  observaciones?: string;
+}
+
+export interface ProyectoLoteInput {
+  proyecto_nombre: string;
+  horas_semanales: number;
+  observaciones?: string;
+}
+
+export interface GuardarCargaDocenteLoteInput {
+  docente_id: string;
+  academic_year_id: string;
+  direccion_grupo_id?: string | null;
+  horas_direccion?: number;
+  clases: ClaseLoteInput[];
+  proyectos?: ProyectoLoteInput[];
+}
+
+export async function guardarCargaDocenteLote(
+  input: GuardarCargaDocenteLoteInput,
+  actor: ActorAsignacion
+) {
+  const docente = await User.findOne({ _id: input.docente_id, rol: ROLES.DOCENTE });
+  if (!docente) throw new ApiError(404, 'El usuario no existe o no tiene rol DOCENTE.');
+  if (docente.estado === 'inactivo') throw new ApiError(409, 'El docente se encuentra inactivo.');
+
+  await asegurarAnioNoCerrado(input.academic_year_id);
+
+  const studyPlan = await StudyPlan.findOne({ academic_year_id: input.academic_year_id });
+  if (!studyPlan) {
+    throw new ApiError(
+      400,
+      'Este año lectivo todavía no tiene un Plan de Estudios configurado (M06). Configúralo antes de asignar clases.'
+    );
+  }
+
+  return runTransaction(async (session) => {
+    const asignacionesActuales = await TeacherAssignment.find({
+      docente_id: docente._id,
+      academic_year_id: input.academic_year_id,
+      estado: ESTADO_ACTIVO,
+    }).session(session);
+
+    const clasesActuales = asignacionesActuales.filter((a) => a.tipo_asignacion === 'CLASE');
+    const direccionesActuales = asignacionesActuales.filter((a) => a.tipo_asignacion === 'DIRECCION_GRUPO');
+    const proyectosActuales = asignacionesActuales.filter(
+      (a) => a.tipo_asignacion === 'PROYECTO_TRANSVERSAL' || a.tipo_asignacion === 'OTRO'
+    );
+
+    // Dirección de grupo
+    const targetDirGroupId = input.direccion_grupo_id ? String(input.direccion_grupo_id) : null;
+    const currentDir = direccionesActuales[0] || null;
+    const currentDirGroupId = currentDir?.group_id ? String(currentDir.group_id) : null;
+
+    if (targetDirGroupId && targetDirGroupId !== currentDirGroupId) {
+      const nuevoGrupo = await Group.findById(targetDirGroupId).session(session);
+      if (!nuevoGrupo) throw new ApiError(404, 'Grupo para dirección de grupo no encontrado.');
+      if (String(nuevoGrupo.academic_year_id) !== String(input.academic_year_id)) {
+        throw new ApiError(400, 'El grupo seleccionado no pertenece al año lectivo indicado.');
+      }
+      if (nuevoGrupo.estado !== 'ACTIVE') {
+        throw new ApiError(400, `El grupo ${nuevoGrupo.nomenclatura} está cerrado.`);
+      }
+
+      for (const d of direccionesActuales) {
+        if (d.group_id) {
+          await Group.updateOne(
+            { _id: d.group_id, director_grupo_id: docente._id },
+            { $unset: { director_grupo_id: 1 } },
+            { session }
+          );
+        }
+        await TeacherAssignment.updateOne({ _id: d._id }, { $set: { estado: 'inactivo' } }, { session });
+      }
+
+      const directorAnteriorAsg = await TeacherAssignment.find({
+        group_id: nuevoGrupo._id,
+        tipo_asignacion: 'DIRECCION_GRUPO',
+        estado: ESTADO_ACTIVO,
+      }).session(session);
+      if (directorAnteriorAsg.length > 0) {
+        await TeacherAssignment.updateMany(
+          { _id: { $in: directorAnteriorAsg.map((a) => a._id) } },
+          { $set: { estado: 'inactivo' } },
+          { session }
+        );
+      }
+
+      nuevoGrupo.director_grupo_id = docente._id;
+      await nuevoGrupo.save({ session });
+
+      await TeacherAssignment.create(
+        [
+          {
+            docente_id: docente._id,
+            academic_year_id: input.academic_year_id,
+            tipo_asignacion: 'DIRECCION_GRUPO',
+            group_id: nuevoGrupo._id,
+            horas_semanales: input.horas_direccion ?? 0,
+            estado: 'activo',
+          },
+        ],
+        { session }
+      );
+    } else if (targetDirGroupId && targetDirGroupId === currentDirGroupId && currentDir) {
+      if (currentDir.horas_semanales !== (input.horas_direccion ?? 0)) {
+        currentDir.horas_semanales = input.horas_direccion ?? 0;
+        await currentDir.save({ session });
+      }
+    } else if (!targetDirGroupId && direccionesActuales.length > 0) {
+      for (const d of direccionesActuales) {
+        if (d.group_id) {
+          await Group.updateOne(
+            { _id: d.group_id, director_grupo_id: docente._id },
+            { $unset: { director_grupo_id: 1 } },
+            { session }
+          );
+        }
+        await TeacherAssignment.updateOne({ _id: d._id }, { $set: { estado: 'inactivo' } }, { session });
+      }
+    }
+
+    // Clases
+    const clasesObjetivoMap = new Map<string, ClaseLoteInput>();
+    for (const c of input.clases) {
+      const key = `${c.group_id}:${c.subject_id}`;
+      clasesObjetivoMap.set(key, c);
+    }
+
+    for (const actual of clasesActuales) {
+      const key = `${actual.group_id}:${actual.subject_id}`;
+      if (!clasesObjetivoMap.has(key)) {
+        const tieneActividades = await Activity.exists({ teacher_assignment_id: actual._id }).session(session);
+        if (tieneActividades) {
+          throw new ApiError(
+            409,
+            'No se puede retirar una asignatura que ya cuenta con actividades o notas registradas (M12).'
+          );
+        }
+        await TeacherAssignment.findByIdAndDelete(actual._id).session(session);
+      }
+    }
+
+    for (const [key, c] of clasesObjetivoMap.entries()) {
+      const actual = clasesActuales.find((a) => `${a.group_id}:${a.subject_id}` === key);
+      const group = await Group.findById(c.group_id).session(session);
+      if (!group) throw new ApiError(404, `Grupo no encontrado.`);
+      if (group.estado !== 'ACTIVE') {
+        throw new ApiError(400, `El grupo ${group.nomenclatura} está cerrado.`);
+      }
+
+      const gradoConfig =
+        obtenerGradoPlanEfectivo(
+          studyPlan,
+          String(group.grade_id),
+          group.sede_id ? String(group.sede_id) : null,
+          group.jornada_id ? String(group.jornada_id) : null
+        ) ?? studyPlan.grades.find((g) => String(g.grade_id) === String(group.grade_id));
+      if (!gradoConfig) {
+        throw new ApiError(400, `El grado de ${group.nomenclatura} no está configurado en el Plan de Estudios (M06).`);
+      }
+
+      const horas = horasDeAsignaturaEnGrupo(
+        gradoConfig,
+        String(group._id),
+        String(c.subject_id),
+        group.jornada_id ? String(group.jornada_id) : undefined
+      );
+      if (horas === undefined) {
+        const sub = await Subject.findById(c.subject_id).session(session);
+        throw new ApiError(
+          400,
+          `La asignatura "${sub?.nombre ?? c.subject_id}" no hace parte del plan de estudios de ${group.nomenclatura}.`
+        );
+      }
+
+      if (actual) {
+        if (actual.horas_semanales !== horas || actual.observaciones !== (c.observaciones ?? '')) {
+          actual.horas_semanales = horas;
+          actual.observaciones = c.observaciones ?? '';
+          await actual.save({ session });
+        }
+      } else {
+        const ocupada = await TeacherAssignment.findOne({
+          academic_year_id: input.academic_year_id,
+          group_id: c.group_id,
+          subject_id: c.subject_id,
+          tipo_asignacion: 'CLASE',
+          estado: ESTADO_ACTIVO,
+        }).session(session);
+        if (ocupada) {
+          const sub = await Subject.findById(c.subject_id).session(session);
+          throw new ApiError(
+            409,
+            `La asignatura "${sub?.nombre ?? 'seleccionada'}" en ${group.nomenclatura} ya está asignada a otro docente.`
+          );
+        }
+
+        await TeacherAssignment.create(
+          [
+            {
+              docente_id: docente._id,
+              academic_year_id: input.academic_year_id,
+              tipo_asignacion: 'CLASE',
+              group_id: c.group_id,
+              subject_id: c.subject_id,
+              horas_semanales: horas,
+              observaciones: c.observaciones ?? '',
+              estado: 'activo',
+            },
+          ],
+          { session }
+        );
+      }
+    }
+
+    // Proyectos
+    for (const p of proyectosActuales) {
+      await TeacherAssignment.findByIdAndDelete(p._id).session(session);
+    }
+    for (const p of input.proyectos ?? []) {
+      await TeacherAssignment.create(
+        [
+          {
+            docente_id: docente._id,
+            academic_year_id: input.academic_year_id,
+            tipo_asignacion: 'PROYECTO_TRANSVERSAL',
+            proyecto_nombre: p.proyecto_nombre,
+            horas_semanales: p.horas_semanales,
+            observaciones: p.observaciones ?? '',
+            estado: 'activo',
+          },
+        ],
+        { session }
+      );
+    }
+
+    await registrarEvento({
+      usuario_id: actor.id,
+      accion: 'CARGA_DOCENTE_SINCRONIZADA_LOTE',
+      entidad: 'TeacherAssignment',
+      entidad_id: docente._id,
+      detalle: `Carga sincronizada: ${clasesObjetivoMap.size} clases, dir: ${targetDirGroupId ? 'sí' : 'no'}, ${input.proyectos?.length ?? 0} proyectos.`,
+      ip: actor.ip,
+    });
+
+    return { success: true };
+  });
+}
+
+export interface AsignaturaDocenteGrupoInput {
+  subject_id: string;
+  docente_id?: string | null;
+}
+
+export interface GuardarMallaGrupoLoteInput {
+  group_id: string;
+  academic_year_id: string;
+  director_grupo_id?: string | null;
+  horas_direccion?: number;
+  asignaciones: AsignaturaDocenteGrupoInput[];
+}
+
+export async function guardarMallaGrupoLote(
+  input: GuardarMallaGrupoLoteInput,
+  actor: ActorAsignacion
+) {
+  await asegurarAnioNoCerrado(input.academic_year_id);
+
+  const group = await Group.findById(input.group_id);
+  if (!group) throw new ApiError(404, 'Grupo no encontrado.');
+  if (String(group.academic_year_id) !== String(input.academic_year_id)) {
+    throw new ApiError(400, 'El grupo no pertenece al año lectivo indicado.');
+  }
+  if (group.estado !== 'ACTIVE') {
+    throw new ApiError(400, `El grupo ${group.nomenclatura} está cerrado.`);
+  }
+
+  const studyPlan = await StudyPlan.findOne({ academic_year_id: input.academic_year_id });
+  if (!studyPlan) {
+    throw new ApiError(
+      400,
+      'Este año lectivo todavía no tiene un Plan de Estudios configurado (M06).'
+    );
+  }
+
+  const gradoConfig =
+    obtenerGradoPlanEfectivo(
+      studyPlan,
+      String(group.grade_id),
+      group.sede_id ? String(group.sede_id) : null,
+      group.jornada_id ? String(group.jornada_id) : null
+    ) ?? studyPlan.grades.find((g) => String(g.grade_id) === String(group.grade_id));
+  if (!gradoConfig) {
+    throw new ApiError(400, `El grado de ${group.nomenclatura} no está configurado en el Plan de Estudios (M06).`);
+  }
+
+  return runTransaction(async (session) => {
+    // Dirección de Grupo
+    const targetDirDocenteId = input.director_grupo_id ? String(input.director_grupo_id) : null;
+    const currentDirDocenteId = group.director_grupo_id ? String(group.director_grupo_id) : null;
+
+    if (targetDirDocenteId && targetDirDocenteId !== currentDirDocenteId) {
+      const nuevoDocente = await User.findOne({ _id: targetDirDocenteId, rol: ROLES.DOCENTE }).session(session);
+      if (!nuevoDocente || nuevoDocente.estado === 'inactivo') {
+        throw new ApiError(400, 'El docente seleccionado para dirección de grupo no es válido o está inactivo.');
+      }
+
+      const dirAnt = await TeacherAssignment.find({
+        group_id: group._id,
+        tipo_asignacion: 'DIRECCION_GRUPO',
+        estado: ESTADO_ACTIVO,
+      }).session(session);
+      if (dirAnt.length > 0) {
+        await TeacherAssignment.updateMany(
+          { _id: { $in: dirAnt.map((a) => a._id) } },
+          { $set: { estado: 'inactivo' } },
+          { session }
+        );
+      }
+
+      group.director_grupo_id = nuevoDocente._id;
+      await group.save({ session });
+
+      await TeacherAssignment.create(
+        [
+          {
+            docente_id: nuevoDocente._id,
+            academic_year_id: input.academic_year_id,
+            tipo_asignacion: 'DIRECCION_GRUPO',
+            group_id: group._id,
+            horas_semanales: input.horas_direccion ?? 0,
+            estado: 'activo',
+          },
+        ],
+        { session }
+      );
+    } else if (targetDirDocenteId && targetDirDocenteId === currentDirDocenteId) {
+      const dirAsg = await TeacherAssignment.findOne({
+        group_id: group._id,
+        tipo_asignacion: 'DIRECCION_GRUPO',
+        estado: ESTADO_ACTIVO,
+      }).session(session);
+      if (dirAsg && dirAsg.horas_semanales !== (input.horas_direccion ?? 0)) {
+        dirAsg.horas_semanales = input.horas_direccion ?? 0;
+        await dirAsg.save({ session });
+      }
+    } else if (!targetDirDocenteId && currentDirDocenteId) {
+      const dirAnt = await TeacherAssignment.find({
+        group_id: group._id,
+        tipo_asignacion: 'DIRECCION_GRUPO',
+        estado: ESTADO_ACTIVO,
+      }).session(session);
+      if (dirAnt.length > 0) {
+        await TeacherAssignment.updateMany(
+          { _id: { $in: dirAnt.map((a) => a._id) } },
+          { $set: { estado: 'inactivo' } },
+          { session }
+        );
+      }
+      group.director_grupo_id = null as unknown as Types.ObjectId;
+      await group.save({ session });
+    }
+
+    // Malla de Asignaturas
+    const clasesActuales = await TeacherAssignment.find({
+      group_id: group._id,
+      academic_year_id: input.academic_year_id,
+      tipo_asignacion: 'CLASE',
+      estado: ESTADO_ACTIVO,
+    }).session(session);
+
+    const actualPorSub = new Map(clasesActuales.map((a) => [String(a.subject_id), a]));
+
+    for (const item of input.asignaciones) {
+      const subId = String(item.subject_id);
+      const horas = horasDeAsignaturaEnGrupo(
+        gradoConfig,
+        String(group._id),
+        subId,
+        group.jornada_id ? String(group.jornada_id) : undefined
+      );
+      if (horas === undefined) {
+        throw new ApiError(400, `La asignatura ${subId} no hace parte del plan de estudios de este grupo.`);
+      }
+
+      const actual = actualPorSub.get(subId);
+      const targetDocenteId = item.docente_id ? String(item.docente_id) : null;
+
+      if (targetDocenteId) {
+        if (actual) {
+          if (String(actual.docente_id) === targetDocenteId) {
+            if (actual.horas_semanales !== horas) {
+              actual.horas_semanales = horas;
+              await actual.save({ session });
+            }
+          } else {
+            const tieneActividades = await Activity.exists({ teacher_assignment_id: actual._id }).session(session);
+            if (tieneActividades) {
+              const sub = await Subject.findById(subId).session(session);
+              throw new ApiError(
+                409,
+                `No se puede cambiar el docente de "${sub?.nombre ?? 'la asignatura'}": ya tiene notas o actividades registradas (M12).`
+              );
+            }
+            await TeacherAssignment.findByIdAndDelete(actual._id).session(session);
+
+            const docenteValido = await User.findOne({ _id: targetDocenteId, rol: ROLES.DOCENTE }).session(session);
+            if (!docenteValido || docenteValido.estado === 'inactivo') {
+              throw new ApiError(400, 'El docente seleccionado está inactivo o no existe.');
+            }
+
+            await TeacherAssignment.create(
+              [
+                {
+                  docente_id: docenteValido._id,
+                  academic_year_id: input.academic_year_id,
+                  tipo_asignacion: 'CLASE',
+                  group_id: group._id,
+                  subject_id: subId,
+                  horas_semanales: horas,
+                  estado: 'activo',
+                },
+              ],
+              { session }
+            );
+          }
+        } else {
+          const docenteValido = await User.findOne({ _id: targetDocenteId, rol: ROLES.DOCENTE }).session(session);
+          if (!docenteValido || docenteValido.estado === 'inactivo') {
+            throw new ApiError(400, 'El docente seleccionado está inactivo o no existe.');
+          }
+
+          await TeacherAssignment.create(
+            [
+              {
+                docente_id: docenteValido._id,
+                academic_year_id: input.academic_year_id,
+                tipo_asignacion: 'CLASE',
+                group_id: group._id,
+                subject_id: subId,
+                horas_semanales: horas,
+                estado: 'activo',
+              },
+            ],
+            { session }
+          );
+        }
+      } else if (!targetDocenteId && actual) {
+        const tieneActividades = await Activity.exists({ teacher_assignment_id: actual._id }).session(session);
+        if (tieneActividades) {
+          const sub = await Subject.findById(subId).session(session);
+          throw new ApiError(
+            409,
+            `No se puede desasignar "${sub?.nombre ?? 'la asignatura'}": ya tiene notas o actividades registradas (M12).`
+          );
+        }
+        await TeacherAssignment.findByIdAndDelete(actual._id).session(session);
+      }
+    }
+
+    await registrarEvento({
+      usuario_id: actor.id,
+      accion: 'MALLA_GRUPO_SINCRONIZADA_LOTE',
+      entidad: 'Group',
+      entidad_id: group._id,
+      detalle: `Malla de grupo ${group.nomenclatura} sincronizada: ${input.asignaciones.length} materias procesadas.`,
+      ip: actor.ip,
+    });
+
+    return { success: true };
+  });
+}
+

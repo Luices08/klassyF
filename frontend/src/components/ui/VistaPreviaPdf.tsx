@@ -16,6 +16,8 @@ interface VistaPreviaPdfProps {
   onCerrar?: () => void;
   /** Aviso o texto que se muestra sobre el visor. */
   nota?: ReactNode;
+  /** Alto del visor (clase de Tailwind); por defecto 75% de la pantalla. Un panel lateral usa uno menor. */
+  altoVisor?: string;
 }
 
 /**
@@ -24,7 +26,7 @@ interface VistaPreviaPdfProps {
  * El blob es lo que se guarda en la consulta; el blob URL se crea y se libera dentro de un mismo efecto. Así sobrevive al doble montaje de
  * React en desarrollo (que ejecuta el efecto, lo limpia y lo vuelve a ejecutar): liberar un URL guardado dejaba el visor en blanco.
  */
-export function VistaPreviaPdf({ claveConsulta, cargar, nombreArchivo, titulo = 'Vista previa', onCerrar, nota }: VistaPreviaPdfProps) {
+export function VistaPreviaPdf({ claveConsulta, cargar, nombreArchivo, titulo = 'Vista previa', onCerrar, nota, altoVisor = 'h-[75vh]' }: VistaPreviaPdfProps) {
   const consulta = useQuery({
     queryKey: ['vista-previa-pdf', ...claveConsulta],
     queryFn: async () => {
@@ -81,7 +83,7 @@ export function VistaPreviaPdf({ claveConsulta, cargar, nombreArchivo, titulo = 
       {nota}
       {consulta.isLoading && <Spinner label="Preparando la vista previa..." />}
       {consulta.isError && <Alert tone="error">{errorMessage(consulta.error)}</Alert>}
-      {url && <iframe src={`${url}#view=FitH`} title={titulo} className="h-[75vh] w-full rounded-lg border border-border bg-soft" />}
+      {url && <iframe src={`${url}#view=FitH`} title={titulo} className={`${altoVisor} w-full rounded-lg border border-border bg-soft`} />}
     </Card>
   );
 }

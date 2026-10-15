@@ -743,6 +743,8 @@ export interface FilaSeguimiento {
   asignacion: ContextoAsignacion | null;
   estudiantes: number;
   actividades: number;
+  /** Actividades más notas sueltas: todo lo que el docente puso en la planilla. */
+  casillas: number;
   cerradas: number;
   definitivas: number;
   estado: 'ABIERTA' | 'CERRADA' | 'DEFINITIVA';
@@ -760,7 +762,7 @@ export async function seguimiento(query: SeguimientoQuery): Promise<FilaSeguimie
   if (asignaciones.length === 0) return [];
   const ids = asignaciones.map((a) => a._id);
 
-  const [contextos, registros, matriculas, actividades] = await Promise.all([
+  const [contextos, registros, matriculas, actividades, sueltas] = await Promise.all([
     contextosDeAsignaciones(ids),
     CalificacionAsignatura.aggregate<{ _id: { a: Types.ObjectId; e: EstadoNota }; n: number }>([
       { $match: { teacher_assignment_id: { $in: ids }, periodo_numero: query.periodo_numero } },
@@ -774,9 +776,14 @@ export async function seguimiento(query: SeguimientoQuery): Promise<FilaSeguimie
       { $match: { teacher_assignment_id: { $in: ids }, periodo_numero: query.periodo_numero } },
       { $group: { _id: '$teacher_assignment_id', n: { $sum: 1 } } },
     ]),
+    ColumnaPlanilla.aggregate<{ _id: Types.ObjectId; n: number }>([
+      { $match: { teacher_assignment_id: { $in: ids }, periodo_numero: query.periodo_numero } },
+      { $group: { _id: '$teacher_assignment_id', n: { $sum: 1 } } },
+    ]),
   ]);
   const estudiantesDe = new Map(matriculas.map((m) => [String(m._id), m.n]));
   const actividadesDe = new Map(actividades.map((a) => [String(a._id), a.n]));
+  const sueltasDe = new Map(sueltas.map((a) => [String(a._id), a.n]));
   const cuenta = (id: Types.ObjectId, estado: EstadoNota) => registros.find((r) => String(r._id.a) === String(id) && r._id.e === estado)?.n ?? 0;
 
   return asignaciones
@@ -790,6 +797,7 @@ export async function seguimiento(query: SeguimientoQuery): Promise<FilaSeguimie
         asignacion: contextos.get(String(a._id)) ?? null,
         estudiantes,
         actividades: actividadesDe.get(String(a._id)) ?? 0,
+        casillas: (actividadesDe.get(String(a._id)) ?? 0) + (sueltasDe.get(String(a._id)) ?? 0),
         cerradas,
         definitivas,
         estado: completa ? (definitivas >= estudiantes ? ('DEFINITIVA' as const) : ('CERRADA' as const)) : ('ABIERTA' as const),

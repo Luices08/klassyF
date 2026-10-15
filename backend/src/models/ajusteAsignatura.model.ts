@@ -33,8 +33,6 @@ export interface IEdicionAjuste {
 export interface IAjusteAsignatura {
   expediente_id: Types.ObjectId;
   subject_id: Types.ObjectId;
-  /** Objetivos del grado (M07): se eligen del banco por `_id`, el docente no escribe un DBA. */
-  dba_ids: Types.ObjectId[];
   objetivo_flexibilizado: string;
   barrera_asignatura: string;
   tipos_barrera: TipoBarrera[];
@@ -57,7 +55,6 @@ const ajusteSchema = new Schema<IAjusteAsignatura, AjusteAsignaturaModel>(
   {
     expediente_id: { type: Schema.Types.ObjectId, ref: 'ExpedienteInclusion', required: true },
     subject_id: { type: Schema.Types.ObjectId, ref: 'Subject', required: true },
-    dba_ids: { type: [{ type: Schema.Types.ObjectId, ref: 'ReferenteCurricular' }], default: [] },
     objetivo_flexibilizado: largo,
     barrera_asignatura: largo,
     tipos_barrera: { type: [{ type: String, enum: TIPOS_BARRERA }], default: [] },

@@ -9,6 +9,7 @@ export const ASISTENCIA_DIR = path.join(UPLOADS_ROOT, 'asistencia');
 export const INCLUSION_DIR = path.join(UPLOADS_ROOT, 'inclusion');
 export const CERTIFICADOS_DIR = path.join(UPLOADS_ROOT, 'certificados');
 export const ACTIVIDADES_DIR = path.join(UPLOADS_ROOT, 'actividades');
+export const PLANEACION_DIR = path.join(UPLOADS_ROOT, 'planeacion');
 
 /** Carpeta de una matricula puntual, para aislar sus documentos del resto. */
 export function carpetaMatricula(enrollmentId: string): string {
@@ -23,6 +24,21 @@ export function carpetaAsistencia(attendanceId: string): string {
 /** Evidencias que los estudiantes entregan en una actividad (M11), una carpeta por actividad. */
 export function carpetaActividad(activityId: string): string {
   return path.join(ACTIVIDADES_DIR, activityId);
+}
+
+/** PDF de apoyo (DBA, estándares, lineamientos) que coordinación carga por área y grados (M07). */
+export function carpetaDocumentoReferencia(documentoId: string): string {
+  return path.join(PLANEACION_DIR, 'documentos-referencia', documentoId);
+}
+
+/** Cada versión del plan de área anual (M07) conserva su PDF, una carpeta por plan. */
+export function carpetaPlanArea(planId: string): string {
+  return path.join(PLANEACION_DIR, 'planes-area', planId);
+}
+
+/** Cada versión del plan de aula de un periodo (M07) conserva su PDF, una carpeta por plan. */
+export function carpetaPlanAula(planId: string): string {
+  return path.join(PLANEACION_DIR, 'planes-aula', planId);
 }
 
 /** Soportes clínicos y documentos firmados de un expediente de inclusión (M16): confidenciales, solo se descargan con sesión y permiso. */

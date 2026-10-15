@@ -12,6 +12,7 @@ import TeacherAssignment from '../models/teacherAssignment.model';
 import User from '../models/user.model';
 import ApiError from '../utils/ApiError';
 import { ESTADO_ACTIVO } from '../utils/filtroEstado';
+import { obtenerGradoPlanEfectivo } from '../utils/horasPlanEstudios';
 import { obtenerHorario } from './horario.service';
 
 /**
@@ -110,7 +111,12 @@ export async function obtenerFichaGrupo(groupId: string): Promise<FichaGrupo> {
   ]);
 
   // --- Plan de estudios del grado (M06) con lo que este grupo personalizó ---
-  const gradoPlan = plan?.grades.find((g) => String(g.grade_id) === String(grupo.grade_id?._id));
+  const gradoIdStr = String(grupo.grade_id?._id ?? grupo.grade_id);
+  const sedeIdStr = grupo.sede_id ? String(typeof grupo.sede_id === 'object' && '_id' in grupo.sede_id ? grupo.sede_id._id : grupo.sede_id) : null;
+  const jornadaIdStr = grupo.jornada_id ? String(typeof grupo.jornada_id === 'object' && '_id' in grupo.jornada_id ? grupo.jornada_id._id : grupo.jornada_id) : null;
+  const gradoPlan =
+    obtenerGradoPlanEfectivo(plan, gradoIdStr, sedeIdStr, jornadaIdStr) ??
+    plan?.grades.find((g) => String(g.grade_id) === gradoIdStr);
   const personalizacion = gradoPlan?.personalizaciones_grupo.find((p) => String(p.group_id) === String(grupo._id));
   const horas = new Map<string, { horas: number; origen: 'GRADO' | 'GRUPO'; personalizada: boolean }>();
   for (const a of gradoPlan?.asignaturas ?? []) {

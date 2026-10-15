@@ -158,6 +158,7 @@ export interface CrearEstudianteCompletoInput {
   acudiente_parentesco?: Parentesco;
   acudiente_direccion?: string;
   acudiente_password?: string;
+  acudiente_habilitar_portal?: boolean;
   acudiente_es_principal?: boolean;
   acudiente_autorizado_retiro?: boolean;
 }

@@ -18,14 +18,12 @@ import {
   type Expediente,
   type FilaAjuste,
 } from '../../hooks/useInclusion';
-import { useReferentes } from '../../hooks/useReferentesCurriculares';
-import type { DbaReferente } from '../../types/domain';
 import {} from './campos';
 import { formatoFechaLocal } from '../../lib/fechas';
 
 /**
  * Anexo 2: una fila por asignatura del plan de estudios del grupo. Cada docente diligencia solo la suya (el servidor lo
- * comprueba con su asignación); orientación puede apoyar. Los objetivos se eligen del banco curricular (DBA), no se escriben.
+ * comprueba con su asignación); orientación puede apoyar. El objetivo flexibilizado lo escribe el docente de la asignatura.
  */
 export function AjustesPanel({ exp }: { exp: Expediente }) {
   const ajustes = useAjustes(exp._id);
@@ -35,7 +33,7 @@ export function AjustesPanel({ exp }: { exp: Expediente }) {
   if (ajustes.isLoading) return <Spinner />;
   if (ajustes.isError) return <Alert tone="error">{errorMessage(ajustes.error)}</Alert>;
   if (!ajustes.data) return null;
-  const { filas, grade_id, seguimientos_minimos } = ajustes.data;
+  const { filas, seguimientos_minimos } = ajustes.data;
   const activo = exp.estado === 'ACTIVO';
 
   return (
@@ -88,18 +86,17 @@ export function AjustesPanel({ exp }: { exp: Expediente }) {
           {filas.length === 0 && <EmptyRow colSpan={5}>Sin asignaturas.</EmptyRow>}
         </TableBody>
       </Table>
-      {editando && <AjusteDrawer exp={exp} fila={editando} gradeId={grade_id} onClose={() => setEditando(null)} />}
+      {editando && <AjusteDrawer exp={exp} fila={editando} onClose={() => setEditando(null)} />}
       {evaluando && <SeguimientoDrawer exp={exp} fila={evaluando} onClose={() => setEvaluando(null)} />}
     </div>
   );
 }
 
-function AjusteDrawer({ exp, fila, gradeId, onClose }: { exp: Expediente; fila: FilaAjuste; gradeId: string; onClose: () => void }) {
+function AjusteDrawer({ exp, fila, onClose }: { exp: Expediente; fila: FilaAjuste; onClose: () => void }) {
   const guardar = useGuardarAjuste(exp._id);
   const soloLectura = !fila.puede_editar || !exp.editable;
   const a = fila.ajuste;
   const [form, setForm] = useState({
-    dba_ids: a?.dba_ids ?? [],
     objetivo_flexibilizado: a?.objetivo_flexibilizado ?? '',
     barrera_asignatura: a?.barrera_asignatura ?? '',
     tipos_barrera: a?.tipos_barrera ?? [],
@@ -108,10 +105,8 @@ function AjusteDrawer({ exp, fila, gradeId, onClose }: { exp: Expediente; fila: 
     categorias_ajuste: a?.categorias_ajuste ?? [],
     recursos: a?.recursos ?? '',
   });
-  const referentes = useReferentes({ grade_id: gradeId, area_id: fila.area_id, tipo_referente: 'DBA' });
-  const dbas = (referentes.data ?? []) as DbaReferente[];
 
-  const alternar = (campo: 'dba_ids' | 'tipos_barrera' | 'categorias_ajuste', valor: string) =>
+  const alternar = (campo: 'tipos_barrera' | 'categorias_ajuste', valor: string) =>
     setForm((f) => ({ ...f, [campo]: f[campo].includes(valor) ? f[campo].filter((x) => x !== valor) : [...f[campo], valor] }));
 
   const enviar = async (e: FormEvent) => {
@@ -125,23 +120,6 @@ function AjusteDrawer({ exp, fila, gradeId, onClose }: { exp: Expediente; fila: 
       {guardar.isError && <Alert tone="error">{errorMessage(guardar.error)}</Alert>}
       {exp.estado === 'ACTIVO' && !soloLectura && <Alert tone="info">El acta ya está firmada: guardar un cambio crea una nueva versión del expediente y exige emitir de nuevo los documentos.</Alert>}
 
-      <div>
-        <p className="mb-1 text-sm font-semibold text-ink">Objetivos del grado (DBA)</p>
-        {referentes.isLoading && <Spinner />}
-        <ul className="max-h-48 space-y-1 overflow-y-auto rounded-lg border border-border p-2">
-          {dbas.map((d) => (
-            <li key={d._id}>
-              <label className="flex items-start gap-2 text-sm text-body">
-                <input type="checkbox" disabled={soloLectura} checked={form.dba_ids.includes(d._id)} onChange={() => alternar('dba_ids', d._id)} className="mt-0.5 h-4 w-4 rounded border-border text-primary focus:ring-primary" />
-                <span>
-                  <span className="font-semibold">DBA {d.numero_dba}.</span> {d.enunciado}
-                </span>
-              </label>
-            </li>
-          ))}
-          {!referentes.isLoading && dbas.length === 0 && <li className="text-sm text-muted">El banco no tiene DBA para este grado y área; describe el objetivo abajo.</li>}
-        </ul>
-      </div>
       <Textarea label="Objetivo o propósito flexibilizado" disabled={soloLectura} value={form.objetivo_flexibilizado} onChange={(e) => setForm((f) => ({ ...f, objetivo_flexibilizado: e.target.value }))} maxLength={4000} hint="Los mismos objetivos del grado, con las oportunidades de acceso que el estudiante necesita." />
 
       <div>

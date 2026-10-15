@@ -136,6 +136,11 @@ solo extender si se pide algo nuevo. Reglas que no se ven leyendo un solo archiv
 - **Estados del año**: `PLANIFICACION` → `EN_CURSO` (la vigencia activa, única por institución: lo garantiza
   un índice único parcial además del chequeo del servicio) → `CERRADO` (histórico de solo lectura, no se
   reactiva). Crear un año nuevo puede copiar los grupos ACTIVOS del anterior (grupos nuevos, sin matrículas).
+- **Un mismo número de año puede repetirse si los anteriores están CERRADOS** (p. ej. otro 2026 para seguir probando):
+  el índice único institución+year es parcial (solo PLANIFICACION/EN_CURSO, `anio_sin_cerrar_unico`) y `crearAnio` responde 409
+  solo si hay uno sin cerrar. Todo lo de un año cuelga de su `_id`; los consecutivos por número (folios, casos, actas,
+  certificados) siguen corriendo, no se reinician. Lo que busque «el más reciente» ordena por `year` y luego `createdAt`.
+  Bases anteriores: `npm run migrate:anio-repetible` (retira el índice único viejo).
 - **Semáforo del periodo**: `PROGRAMADO` → `ABIERTO` → `EN_DIGITACION` → `CERRADO` (tabla
   `TRANSICIONES_PERIODO` en `constants/anioLectivo.ts`); reabrir uno CERRADO solo lo hace ADMIN y con motivo.
   `ESTADOS_PERIODO` (ABIERTO/CERRADO) es otra cosa: el cierre de un periodo *para un grupo* (`PeriodLock`).
@@ -152,6 +157,10 @@ solo extender si se pide algo nuevo. Reglas que no se ven leyendo un solo archiv
   desarrollo institucional; las semanas lectivas (mínimo 40) se calculan con las mismas reglas.
 - **Cierre de vigencia en dos pasos**: `GET /:id/cierre` (verificación) y `POST /:id/cerrar` (contraseña del
   ADMIN + escribir el año). Revoca las prórrogas pendientes. Todo cambio queda en auditoría (M31).
+- **Dos piezas de M07 viven aquí** (ver M07): cada periodo guarda la ventana de entrega de los planes de aula
+  (`fecha_apertura_planes_aula`/`fecha_limite_planes_aula`, `null` = la sugerida; la configuran ADMIN y COORDINADOR por
+  `/planeacion/ventanas` sin tocar las fechas del periodo, y `actualizarAnio` las conserva), y `activarAnio` exige que cada área
+  obligatoria tenga su plan de área aprobado (409 con `details.areas_pendientes`).
 - Años creados antes de M05: `npm run migrate:m05-anio-lectivo` (idempotente).
 - **Pendiente, a propósito fuera de alcance**: la verificación de cierre no revisa las comisiones de evaluación
   (M20, aún no existe); M13 aplica las mismas reglas de calendario pero con los días hábiles de la jornada (ver M13), no con `esDiaLectivo`, que es solo lunes a viernes; matrículas y admisiones no se bloquean en un
@@ -169,46 +178,91 @@ solo extender si se pide algo nuevo. Reglas que no se ven leyendo un solo archiv
   guarda con `PATCH /shifts/:id/horario`, ADMIN o COORDINADOR). Si la plantilla no cabe en la jornada da 409, no recorta en silencio;
   cambiar la plantilla no toca las jornadas ya configuradas. **M09 debe leer `JornadaOperativa.franjas`, no definir su propia estructura.**
 
-### M07 (Currículo — Banco de Referentes y Desarrollo Curricular) — estado: núcleo completo
+### M07 (Planeación documental — plan de área y plan de aula en PDF) — estado: núcleo completo
 
-Backend `/curriculum/referentes` (modelo `ReferenteCurricular` con discriminadores `Dba`/`Ebc`/
-`Lineamiento`) y `/curricular-developments` (modelo `CurricularDevelopment`), frontend
-`DesarrolloCurricularPage` (docente) y `RevisionCurricularPage` (`/admin/...`, coordinador).
-Reglas que no se ven leyendo un solo archivo:
+Backend `/planeacion/documentos-referencia`, `/planeacion/planes-area`, `/planeacion/planes-aula` y `/planeacion/ventanas` (modelos
+`DocumentoReferencia`, `LiderArea`, `PlanArea`, `PlanAula`), `/planeacion/lideres-area`, frontend `PlaneacionDocentePage` (`/docente/planeacion`),
+`RevisionPlaneacionPage` (`/admin/revision-planeacion`) y `DocumentosReferenciaPage` (`/admin/documentos-referencia`). **Reemplaza** al
+banco de referentes (DBA/EBC/lineamientos) y al desarrollo curricular estructurado: ya no hay catálogo de competencias, estándares ni DBA
+en la base de datos, y ninguna actividad, nota ni boletín depende de uno. Las colecciones viejas se retiran con
+`npm run migrate:retirar-banco-curricular` (por defecto solo **simula**; `--aplicar` borra `referentecurriculars` y
+`curriculardevelopments` y limpia `activities` y `ajusteasignaturas`: hacer respaldo de Mongo antes). Reglas que no se ven leyendo un solo archivo:
 
-- **Un banco, tres contratos.** `ReferenteCurricular` es una sola colección Mongo con
-  discriminador por `tipo_referente` (`DBA`/`EBC`/`LINEAMIENTO`; `MATRIZ_ICFES` queda reservado
-  en el enum sin discriminador propio hasta que se aporte esa fuente): así `Activity.dba_id`
-  (M12) y `CurricularDevelopment.dba_seleccionados` (M07) siguen apuntando a la misma colección
-  por `_id` sin importar el tipo, pero cada tipo tiene su propio contrato estricto (`Dba` exige
-  `grade_id`+`numero_dba`+`organizador`; `Ebc` exige `grupo_grados`+`competencia`; `Lineamiento`
-  exige `titulo`+`contenido`, y su `area_id` es el único que puede ser `null` — un lineamiento
-  transversal, no propio de un área).
-- **El área del banco es la del Plan de Estudios (M06), nunca una nueva.**
-  `scripts/seedReferentesCurriculares.ts` no crea `Area` — resuelve las 4 áreas troncales
-  (Matemáticas, Lengua Castellana, Ciencias Naturales, Ciencias Sociales) buscando, entre las
-  `Subject` que la institución ya creó en M06, una cuyo nombre calce (ej. "Lengua Castellana") y
-  reutiliza su `area_id`, sea cual sea el área a la que esa asignatura pertenezca (ej.
-  "Humanidades..."). Si esa asignatura todavía no existe en M06, esa parte del banco no se
-  siembra — nunca se inventa un área nueva para forzarlo (regla de oro de datos de la sección 3).
-- **`estado` (activo/inactivo) se muestra como Vigente/Histórico** en este módulo
-  (`EstadoVigenciaReferenteBadge`), mismo campo/enum genérico que el resto del sistema — no es un
-  enum nuevo.
-- **EBC↔DBA no es un cruce oficial del MEN.** `dba_relacionados` de cada EBC se calcula al
-  sembrar por área + organizador (normalizado, exacto o por contención) + grado dentro de su
-  `grupo_grados` — es una heurística razonable, documentada como tal en el modelo y en el seed,
-  no una tabla que el MEN publique.
-- **El docente nunca escribe un DBA.** Elige Grado+Área+Periodo (vía su `TeacherAssignment`), el
-  banco se filtra solo por ese grado/área (`GET /curriculum/referentes`), y un panel de apoyo
-  aparte (`GET /curriculum/referentes/apoyo`) le muestra los EBC de su grupo de grados y los
-  Lineamientos del área (más los transversales) — nunca los selecciona, solo los consulta. Todo
-  lo demás (contenidos, actividades, metodología, criterios) es texto libre suyo.
-- **Banco poblado**: 343 DBA + 188 EBC (Matemáticas, Lenguaje, Ciencias Naturales, Ciencias
-  Sociales, grados 1°-11°; ninguno de los 4 documentos DBA del MEN entregados incluye Transición
-  pese a mencionarla en su introducción) + 3 Lineamientos transversales (el documento de
-  Lineamientos entregado es el marco general 2024 "Un viaje curricular", no los lineamientos
-  clásicos de 1998 por área — se usa como tal). Matriz ICFES: sin documento fuente todavía,
-  estructura lista pero banco vacío. `npm run seed:referentes` es idempotente.
+- **Todo es un PDF con título y descripción**, revisado por coordinación. Coordinación/ADMIN cargan los **documentos de apoyo**
+  (`DocumentoReferencia`: DBA, estándares, lineamientos) y los asignan a un área y a los grados donde aplican; es solo consulta (nada se
+  liga a ellos por llave, así que editarlos o quitarlos no deja datos colgando). Los docentes los leen en un panel lateral
+  (`PanelDocumentosPdf`) al armar su plan.
+- **Uno o varios líderes por área, segmentados** (`LiderArea`, `/planeacion/lideres-area`; cualquier docente activo; se designan en el Catálogo
+  académico, botón «Líderes del área»). Un colegio pequeño tiene **un jefe para toda la institución** (el alcance por defecto: todos los niveles,
+  todas las jornadas, todas las sedes); uno grande separa por **nivel educativo** (`niveles`, vacío = todos) y por **jornada diurna / nocturna**
+  (`jornada`: `TODAS` | `DIURNA` | `NOCTURNA`; `TIPO_DE_JORNADA` en `constants/planeacion.ts` decide que mañana, tarde y única son diurnas y
+  nocturna y sabatina, nocturnas). La **sede es opcional** (`sedes_ids`, vacío = «Todas las sedes»: no se obliga a un líder por sede). Dos líderes
+  activos de la misma área **no se solapan** (`alcancesSeSolapan`, 409 que dice quién ya cubre qué). Cada líder es el **único** que carga el **plan de
+  área anual de lo que cubre** (`PlanArea`, único por año+líder, ligado a `lider_area_id`): ni el ADMIN ni el COORDINADOR lo suben en su nombre.
+  El plan cuelga del registro del líder, no de la persona: cambiar al docente no lo toca. Quitar a un líder que ya cargó planes lo **desactiva**
+  (`estado: inactivo`, el plan se conserva); sin planes se elimina. Toda la lógica de «a quién le toca esto» es pura y con tests
+  (`utils/liderArea.ts`: `alcanceCubre`, `rebanadasSinCubrir`, `planAreaDeClase`). **Qué plan de área aplica a una clase** lo decide el nivel de su
+  grado y la jornada y sede de **los grupos donde se dicta** (`ClaseAgrupada.ubicaciones`): si cae bajo varios líderes (p. ej. un grupo diurno y uno
+  nocturno), el plan de aula solo se habilita cuando **todos** tienen su plan aprobado, y si no hay líder que cubra ese pedazo se dice cuál.
+  `Area.lider_id` ya no existe (se migra con `npm run migrate:lideres-de-area`, que por defecto solo simula).
+- **Estados por tabla** (`TRANSICIONES_PLAN`, `constants/planeacion.ts`; la comparte el plan de área y el de aula): `EN_REVISION` →
+  `APROBADO` | `DEVUELTO` (con **comentario obligatorio**, exigido en el servicio, el validador y el modelo) → nueva versión → `EN_REVISION`.
+  «Sin cargar» no se guarda: se deriva. Cada versión conserva su PDF y el historial de decisiones queda en `revisiones[]`. Las transiciones
+  son atómicas (el filtro por estado cierra la carrera entre dos revisores o dos envíos). Reabrir un aprobado es **solo del ADMIN y con
+  motivo**; el resto de lo que hace coordinación (documentos, líder, ventana, revisar) lo puede hacer también el ADMIN (`checkRole` no hereda:
+  cada ruta nombra los dos). La matriz es `permisoPlaneacion` (`utils/permisosPlaneacion.ts`, pura, con tests); el servidor devuelve `puede` y la
+  pantalla solo lo refleja.
+- **Compuerta de la activación del año** (`exigirPlanesDeAreaAprobados`, `planeacionCompuertas.service.ts`, la llama `activarAnio` de M05): no
+  se activa un año si un área **obligatoria** no tiene su plan de área aprobado **en cada parte de la institución donde se dicta**. «Obligatoria»
+  no es un campo: se deriva grado por grado (área activa con al menos una asignatura `OBLIGATORIA` activa en el plan de estudios M06 de ese grado,
+  incluidas las que agrega un grupo o una jornada, a propósito sin distinguir cuál: es conservador). Lo que se pide son «rebanadas» nivel + jornada +
+  sede (`demandaDelAnio`, `planeacionCobertura.service.ts`): el nivel sale del grado y la jornada y la sede de sus grupos activos; un grado aún sin
+  grupos exige su nivel con jornada y sede sin definir. Cada rebanada necesita un líder que la cubra y cada líder necesario, su plan aprobado; un
+  líder cuyo docente ya no está activo solo cuenta si dejó el plan aprobado. El 409 trae `details.areas_pendientes` con una entrada por caso
+  (`clave`, `area_id`, `nombre`, `alcance`, `motivo`: sin líder / sin cargar / en revisión / devuelto) y `AnioLectivoPage` la lista. Un área solo
+  optativa, o un líder que no cubre nada que el año dicte, no bloquea.
+- **El plan de aula es del docente y por grado, no de la asignación.** Llave única `(año, periodo, asignatura, grado, docente)`: quien dicta la
+  misma asignatura en 6A y 6B radica **un** plan. **No cuelga de `TeacherAssignment`** porque M08 elimina físicamente la CLASE al cambiar de docente
+  (y antes borraba la planeación en borrador): retirar o reemplazar a un docente no borra su plan, que queda **archivado** en el histórico del
+  periodo. «Archivado» se **calcula** (el dueño ya no tiene clase activa en esa asignatura y grado: `clavesConClaseActiva`), no se marca, así
+  cubre eliminar, carga en lote y malla de grupo. Solo se carga con el **plan de área aprobado** (409 con el nombre del área si no).
+- **Adoptar el plan del docente anterior.** A quien llega a una asignatura se le ofrece, por periodo, «Adoptar el plan de aula del docente
+  anterior» o «Subir un nuevo plan ajustado». Adoptar (`adoptarPlanDeAula`) crea un plan **`APROBADO` al instante**, con una revisión
+  `automatica` («no requiere nueva revisión»), el rastro `adoptado_de`, una **copia** del PDF y sin consumir el original (varios docentes nuevos
+  pueden adoptar el mismo). Solo se adopta un plan **aprobado** de un docente **archivado** (nunca el de un colega que sigue dictando esa
+  asignatura en ese grado: rompería «cada docente radica el suyo») y también exige el plan de área aprobado. Subir uno ajustado sigue el camino normal.
+- **Ventana de entrega por periodo** (`AcademicYear.periodos[].fecha_apertura_planes_aula` / `fecha_limite_planes_aula`; `null` = la sugerida):
+  la configuran ADMIN y COORDINADOR en `AnioLectivoPage` (`PUT /planeacion/ventanas/:anio/periodos/:n`) sin tocar las fechas del periodo. **Sugerida**
+  (`ventanaDeEntrega`, pura): abre 14 días antes de que termine el periodo previo y cierra el día anterior al inicio del periodo; el Periodo 1, que no
+  tiene previo, abre 14 días antes de su cierre y su límite **debe** ser anterior al inicio de clases (`validarVentana`). Se guarda solo lo que se
+  tocó, así lo sugerido sigue las fechas del periodo si estas cambian, y `actualizarAnio` (M05) **conserva** estos campos al reconstruir los periodos.
+  Antes de abrir la entrega no se radica por primera vez (409 con la fecha).
+- **Vencida la fecha límite el formulario NO se cierra.** El docente rezagado entrega igual y el servidor estampa **ENTREGADO FUERA DE PLAZO**
+  (`FueraDePlazoChip`) con la fecha y la hora, comparando contra el último instante del día límite en hora de Colombia. La etiqueta se decide **una
+  sola vez, en la primera radicación** (`PlanAula.radicacion`, que guarda también el límite que regía: cambiar la ventana después no reescribe la
+  historia); corregir un plan devuelto no la cambia. **No cuenta contra quien fue asignado después del cierre** (un reemplazo): su
+  `TeacherAssignment.createdAt` es posterior al límite. El PDF del docente no se modifica: la etiqueta es un dato, no un sello sobre el archivo.
+- **Un plan devuelto siempre se puede corregir**, haya vencido o no la ventana, hasta llegar a `APROBADO`; en revisión o aprobado no se reemplaza.
+- **Compuerta de actividades** (`exigirPlanAulaAprobado`, la llama `createActivity` de M11 y `updateActivity` si cambia `fecha_apertura`, que es
+  «publicar»): sin el plan de aula **aprobado** de ese docente, asignatura, grado y periodo no se programa ni se publica (409 que dice si falta,
+  está en revisión o fue devuelto). Reabrir un plan después no oculta actividades ya creadas; solo frena las nuevas y mover la publicación.
+  El formulario de actividades muestra al lado el PDF del plan aprobado (`GET /planeacion/planes-aula/de-asignacion`).
+- **Archivos**: `uploads/planeacion/{documentos-referencia,planes-area,planes-aula}/<id>/`, solo PDF verificado por firma de bytes (`%PDF`), hasta
+  **25 MB** (los del MEN llegan a ~16 MB; `frontend/nginx.conf` sube el tope a 27 MB solo para `/api/v1/planeacion/`). La API **nunca devuelve la
+  ruta**: se baja con sesión y permiso por `…/archivo[?version=n]` (un plan que no puedes ver responde 404). Como toda subida del sistema, la de un
+  archivo es `POST` (`api.upload`): los datos de un documento se editan por `PATCH` en JSON y su PDF se reemplaza por `POST …/:id/archivo`.
+  El respaldo debe cubrir `uploads/` (`deploy/respaldar.sh` ya lo hace).
+- **Retirar el banco tocó otros módulos solo en lo mecánico:** `Activity` ya no guarda `dba_id`, `competencia_evaluada` ni
+  `desarrollo_curricular_id` (M11); `AjusteAsignatura.dba_ids` desapareció y el Anexo 2 queda con el objetivo flexibilizado en texto libre (M16; los
+  PIAR ya emitidos conservan `objetivos_referentes` congelado y se imprimen igual); y se quitaron las 4 guardas de M08 que impedían retirar un
+  docente con planeación aprobada. M12 y M17 no tenían vínculo estructural (la nota usa el bloque del molde) y no cambiaron.
+- **Pruebas:** unitarias (`planeacion.test.ts`: ventana, plazo, bloqueos, transiciones, adoptables; `permisosPlaneacion.test.ts`) y de integración
+  con base real (`integracion/planeacion.int.test.ts`: servicios; `planeacion.http.int.test.ts`: rutas, roles, multipart real con PDF de 16 MB y
+  rechazo de 26 MB). `escenarioNotas.ts#crearPlanAula` crea un plan directo para las pruebas que solo necesitan la compuerta.
+- **Pendiente, a propósito:** avisos al docente nuevo o a coordinación (M28: hoy la oferta de adopción se ve al entrar a «Planeación»);
+  comparar versiones lado a lado; plantillas de plan; ventana distinta por sede con calendario propio (la ventana es institucional); sembrar los
+  PDF del MEN de `doc/` como documentos de apoyo (se cargan desde `/admin/documentos-referencia`); reemplazo a mitad de año de un docente que ya
+  tiene actividades o notas: M08 sigue bloqueando eliminar esa asignación (es una limitación de M08/M12, no de M07).
 
 ### M14 (Observaciones y convivencia — Observador) — estado: núcleo completo
 
@@ -345,7 +399,8 @@ Backend `/inclusion` (modelos `SolicitudApoyo`, `ExpedienteInclusion`, `AjusteAs
   **opcional**: no condiciona la atención pedagógica (sí el reporte a SIMAT); la categoría puede quedar `POR_CONFIRMAR`.
 - **Anexo 2 por asignatura** (`AjusteAsignatura`, único por expediente+asignatura, ligado a la asignatura y no al docente porque el docente se reemplaza):
   las filas esperadas salen del **plan de estudios del grupo** (M06) y el docente de cada una de `TeacherAssignment` (M08); nunca se inventan filas. Los
-  objetivos se **eligen del banco curricular** (DBA, M07, por `_id`; el docente no escribe un DBA). Seguimiento por ajuste y periodo (mínimo configurable,
+  objetivo flexibilizado lo **escribe el docente de la asignatura** (texto libre: el banco de DBA ya no existe; los PIAR emitidos antes conservan los objetivos
+  congelados en su snapshot y se reimprimen igual). Seguimiento por ajuste y periodo (mínimo configurable,
   3 por defecto según el formato/SIEE) solo con el expediente ACTIVO y un periodo iniciado y no cerrado (M05).
 - **Versionado.** Cada cambio con el expediente aprobado o firmado sube `version` y devuelve lo aprobado a construcción; un documento emitido con una
   versión anterior queda «desactualizado» y **no se puede firmar** (hay que emitirlo de nuevo). Las ediciones quedan en `ediciones[]` del ajuste.
@@ -419,6 +474,9 @@ Backend `/espacios` (modelo `Espacio`), frontend `/admin/espacios` (`EspaciosPag
 - **Asignar una dirección a un grupo que ya tiene director exige `reemplazar_director: true`** (409 si falta); el anterior queda
   inactivo (historial) y se audita `ASIGNACION_DOCENTE_REEMPLAZADA`. El límite de direcciones por docente se protege de la
   concurrencia con un contador común dentro de la transacción (`DIR-<año>-<docente>`).
+- **Quitar o cambiar a un docente de una clase solo lo frena M12** (actividades o notas ya registradas); el plan de aula (M07) ya no lo
+  impide ni se borra: queda archivado y el docente que llega puede adoptarlo. Una CLASE se elimina físicamente (no queda «inactiva»), por eso
+  el plan de aula guarda su propia llave y no cuelga de la asignación.
 
 ### M09 (Horarios) — estado: completo (motor, API y pantallas)
 
@@ -630,10 +688,10 @@ lee `componente_siee` y `peso_en_componente`); M11 los extendió sin romper nada
 - **La jerarquía no se copia a la actividad.** Grupo, asignatura, área, grado y docente se leen por FK desde la `TeacherAssignment`
   (`actividadContexto.service.ts`), nunca se duplican en `Activity` (regla de oro de datos). Un docente solo programa sobre sus clases
   `CLASE` activas (M08); coordinación y ADMIN solo consultan.
-- **Requisito M07, validado por el servidor:** no se crea una actividad sin el `CurricularDevelopment` de ese periodo en estado
-  `APROBADO` (409 con el estado actual). Cada actividad exige un `dba_id` (debe estar en `dba_seleccionados` de esa planeación) o una
-  `competencia_evaluada` (debe estar contenida en `competencias`, comparada sin tildes/mayúsculas). Guarda `desarrollo_curricular_id`.
-  Al editar, el DBA/competencia solo se revalida si se cambian (reabrir una planeación no bloquea corregir un título).
+- **Requisito M07, validado por el servidor:** no se programa (ni se publica, es decir, no se cambia la `fecha_apertura` de) una actividad sin el
+  **plan de aula aprobado** de ese docente, asignatura, grado y periodo (`exigirPlanAulaAprobado`, 409 que dice si falta, está en revisión o fue
+  devuelto). Corregir un título con el plan reabierto sí se puede. **La actividad ya no guarda ni exige DBA ni competencia** (se retiró el banco);
+  el formulario muestra al lado el PDF del plan aprobado. Ver M07.
 - **Prevención de sobrecarga (M25 aún no existe):** `utils/actividades.ts#evaluarCalendarioActividad` (pura, con tests) cruza la fecha de
   entrega —un instante; el día se calcula en hora de Colombia— con M05 (periodo efectivo de la sede, recesos/vacaciones, recuperaciones,
   `dias_habiles` de la jornada) y con las demás actividades del grupo ese día. **BLOQUEO** (no se salta): fecha pasada con entrega
@@ -660,7 +718,7 @@ lee `componente_siee` y `peso_en_componente`); M11 los extendió sin romper nada
   endpoint; la planilla completa es M12. `Activity.componente_siee` ya no es un enum: es la **clave de un bloque del molde de la planilla del
   año** (M12), validada al programar (existe y aún tiene cupo de casillas: 409 si el bloque está lleno); `componente_nombre` viaja en la vista. `peso_en_componente` es un
   % opcional del bloque (`null` = automático). El docente cambia bloque y peso mientras la planilla esté abierta, no programa actividades nuevas en una planilla cerrada, y no se elimina una actividad con entregas o notas. El periodo y la asignación de una actividad no se cambian (se elimina y
-  se programa de nuevo con la planeación del otro periodo).
+  se programa de nuevo con el plan de aula del otro periodo).
 - **Pruebas:** `tests/actividades.test.ts` (funciones puras), `tests/integracion/actividades.int.test.ts` (servicios con base real) y
   `actividades.http.int.test.ts` (rutas, validadores, permisos por rol y subida multipart real).
 - **Pendiente, a propósito:** vista del acudiente y notificaciones de actividades nuevas/por vencer (M27/M28), M25 como fuente del
@@ -741,6 +799,13 @@ coordinación) y `CreadorPlanillasPage` (`/admin/creador-planillas`, ADMIN). La 
   cambió es **conflicto** (400 con la fila y «descarga de nuevo»; no se guarda nada, como el resto de errores). Igual con pesos y con el nombre de una nota suelta.
   Lo que el Excel nunca puede romper el porcentaje: los % de los bloques no viajan en el archivo (son del molde), los pesos se validan ≤100% por bloque, las
   casillas nuevas se miden contra el cupo vivo del bloque y la nota que se muestra después es la que calcula el servidor. Un archivo sin instantánea se rechaza.
+- **Registro de importaciones del Excel (M22)** (`ImportacionNotas`, `notasExcel.service#importarPlantillaNotas`, `GET /notas/planilla/excel/importaciones`, DOCENTE de la clase y
+  ADMIN/COORDINADOR): cada archivo subido deja un registro, aplicado o no: usuario, nombre, **huella SHA-256** (el archivo no se conserva), cuándo se descargó, `resultado` (`APLICADA`;
+  `RECHAZADA` = validación fallida, no se guardó nada; `INTERRUMPIDA` = pasó la validación y la escritura falló, puede haber quedado a medias), conteos y hasta 100 errores de fila con
+  `conflicto: true` cuando lo cambió el sistema después de la descarga. Un archivo que ni se reconoce como planilla de Klassy se guarda sin clase (no sale en el historial de ninguna). Registrar
+  nunca cambia la respuesta al docente (si falla, solo se deja en consola). Auditoría: `NOTAS_EXCEL_IMPORTADO` / `NOTAS_EXCEL_RECHAZADO`, sin notas ni nombres en el `detalle`. La respuesta de
+  error al docente conserva su forma (`conflicto` solo vive en el registro). En pantalla: `HistorialImportacionesExcel` bajo el Excel de la planilla. Un archivo que no es `.xlsx` lo corta
+  multer antes del servicio y no se registra. **Pendiente:** registrar también las descargas, y ver el historial desde el seguimiento de coordinación.
 - **Vista previa y Excel de muestra del molde** (administración, pestaña «Vista del docente y Excel» del Creador de planillas): `GET /notas/molde/vista-previa` y
   `/notas/molde/excel?academic_year_id=` (ADMIN/COORDINADOR; `planillaMuestra.service.ts`). Arman una `Planilla` inventada (3 estudiantes, 2 casillas por bloque) con
   el molde y la plantilla de impresión vigentes, reusando `armarFila`/`armarBloques` y el mismo generador de Excel del docente; no tocan la base. El Excel lleva la
@@ -830,6 +895,8 @@ Botón flotante en `AppShell` (`components/asistente/AsistenteFlotante.tsx`) que
 - **Solo ofrece pantallas que el rol puede abrir**: recibe los `items` de `NAV_ITEMS` ya filtrados por rol y modalidad. **Una pantalla nueva en el menú se suma también a `PALABRAS_CLAVE_POR_RUTA`** (`lib/asistente.ts`: descripción + palabras clave) o el asistente no la conocerá bien.
 - **Dos niveles**: `POST /asistente/orientar` (`asistente.service.ts`, Claude con una herramienta forzada que elige ruta) y, si falla o no hay `ANTHROPIC_API_KEY` (503), la búsqueda local por palabras clave (`buscarDestinos`). La salida del modelo se valida (`utils/asistente.ts#validarRespuesta`): una ruta o grado que no estaba en la lista enviada se descarta.
 - **Abrir un grado**: una pantalla con `aceptaGrado: true` en el catálogo acepta `?grado=<id>` (hoy solo Plan de estudios, que abre el nivel de ese grado y resalta su columna).
+- **El botón se arrastra** (mouse o dedo, `useBotonArrastrable`): queda dentro de la ventana, la posición se recuerda en el navegador
+  (`localStorage`, solo comodidad) y un movimiento menor a 5 px es un clic. El chat sigue al botón y se cierra con clic fuera, Escape o la X.
 - Variables: `ANTHROPIC_API_KEY` (opcional), `ASISTENTE_MODELO` (por defecto `claude-haiku-5-5`). Límite de 20 preguntas/min por IP.
 
 ### Cargas masivas por CSV (M02 usuarios, M03 estudiantes)
@@ -954,7 +1021,7 @@ nuevos para lo que ya existe aquí** — extenderlos si falta un caso, no duplic
   mapeo rol→color o estado→color en una página), `Card`/`CardHeader`, `Table`/`TableHead`/`Th`/
   `TableBody`/`Td`/`EmptyRow`, `Drawer` (formularios de creación/edición; su botón principal
   acepta `submitVariant` para casos como confirmar un borrado en rojo), `PageHeader` (título +
-  subtítulo + acción de la página), `Field` (`Input`/`Select`), `MultiSelect` (selector desplegable de selección múltiple con checkboxes, contador y badges de rol/estado; prop opcional `emptyLabel` cuando elegir es obligatorio), `Alert`, `Spinner`, `EstadoEspacioBadge` (M10), `EstadoAsistenciaChip`/`EstadoJustificacionBadge` (M13), `MallaDisponibilidad` (M09: cuadrícula de tiempo libre por clic, disponible/condicional/no disponible), `GuiaColumnas` (guía colapsable de columnas de una carga CSV), `ProgressBar` (barra de avance con tono, ej. semanas lectivas vs. el mínimo de 40), `LineaTiempo` (línea de tiempo vertical con punto, fecha, chips y contenido por registro; la usa el historial de convivencia), `EstadoCasoBadge`/`TipoSituacionBadge` (M15), `EstadoExpedienteBadge`/`EstadoSolicitudApoyoBadge` (M16), `EstadoNotaBadge` (M12: pendiente/borrador/cerrado/definitivo), `EstadoEntregaBadge`/`TipoActividadChip` (M11: programada → entregada → con retraso → calificada; tipo de actividad), `Dropzone` (zona para soltar o elegir un archivo, valida extensión y tamaño en el navegador y muestra el archivo elegido; el servidor siempre confirma el contenido), `VistaPreviaPdf` (M17: muestra un PDF dentro de la página con su botón de descargar; recibe `cargar` que pide el blob con la sesión y `claveConsulta` que lo cachea, y libera el blob al cerrar), `VisorDocumento` (PDF dentro de la pantalla con descargar, imprimir y abrir aparte; certificados M26), `Switch` (interruptor encendido/apagado para decisiones al momento, con `disabledReason` como tooltip; ej. firmas y sello al expedir en M26), `Tabs`/`TabPanel` (navegación por pestañas con subrayado azul en la activa; reusar en vez de reinventar un switch de pestañas en otra página), `EditorConVariables` (párrafo de texto con los datos del sistema como fichas en lugar de `{{llaves}}`: «Insertar dato» o «/», una ficha se borra de una vez, una sola línea, lo pegado se limpia; guarda el mismo formato `{{modulo.dato}}` de siempre; M26 plantillas), `Stepper` (indicador de pasos para formularios largos por secciones, ej. el asistente de creación de estudiante en M03), e iconos SVG propios en `components/ui/icons.tsx` (no se agregó ninguna librería de iconos).
+  subtítulo + acción de la página), `Field` (`Input`/`Select`), `MultiSelect` (selector desplegable de selección múltiple con checkboxes, contador y badges de rol/estado; prop opcional `emptyLabel` cuando elegir es obligatorio), `Alert`, `Spinner`, `EstadoEspacioBadge` (M10), `EstadoAsistenciaChip`/`EstadoJustificacionBadge` (M13), `MallaDisponibilidad` (M09: cuadrícula de tiempo libre por clic, disponible/condicional/no disponible), `GuiaColumnas` (guía colapsable de columnas de una carga CSV), `ProgressBar` (barra de avance con tono, ej. semanas lectivas vs. el mínimo de 40), `LineaTiempo` (línea de tiempo vertical con punto, fecha, chips y contenido por registro; la usa el historial de convivencia), `EstadoCasoBadge`/`TipoSituacionBadge` (M15), `EstadoExpedienteBadge`/`EstadoSolicitudApoyoBadge` (M16), `EstadoNotaBadge` (M12: pendiente/borrador/cerrado/definitivo), `EstadoEntregaBadge`/`TipoActividadChip` (M11: programada → entregada → con retraso → calificada; tipo de actividad), `Dropzone` (zona para soltar o elegir un archivo, valida extensión y tamaño en el navegador y muestra el archivo elegido; el servidor siempre confirma el contenido), `VistaPreviaPdf` (M17: muestra un PDF dentro de la página con su botón de descargar; recibe `cargar` que pide el blob con la sesión y `claveConsulta` que lo cachea, y libera el blob al cerrar), `VisorDocumento` (PDF dentro de la pantalla con descargar, imprimir y abrir aparte; certificados M26), `PanelDocumentosPdf` (M07: panel lateral para leer PDF mientras se trabaja en otra cosa: un selector con los documentos —agrupables— y el visor del elegido, que se pide con la sesión y solo al abrirlo; lo usan el plan de área, el plan de aula y el formulario de actividades; `VistaPreviaPdf` acepta `altoVisor` y `Dropzone` una `etiqueta` accesible, ambos opcionales), `EstadoPlanBadge`/`FueraDePlazoChip`/`EstadoVentanaBadge` (M07: estado de un plan; la etiqueta roja «ENTREGADO FUERA DE PLAZO» con fecha y hora; y si la entrega del periodo aún no abre, está abierta o venció), `Switch` (interruptor encendido/apagado para decisiones al momento, con `disabledReason` como tooltip; ej. firmas y sello al expedir en M26), `Tabs`/`TabPanel` (navegación por pestañas con subrayado azul en la activa; reusar en vez de reinventar un switch de pestañas en otra página), `EditorConVariables` (párrafo de texto con los datos del sistema como fichas en lugar de `{{llaves}}`: «Insertar dato» o «/», una ficha se borra de una vez, una sola línea, lo pegado se limpia; guarda el mismo formato `{{modulo.dato}}` de siempre; M26 plantillas), `Stepper` (indicador de pasos para formularios largos por secciones, ej. el asistente de creación de estudiante en M03), e iconos SVG propios en `components/ui/icons.tsx` (no se agregó ninguna librería de iconos).
 - **Contenedor global y densidad** (`components/layout/AppShell.tsx`): el `<main>` centra el
   contenido en `max-w-7xl` (no `max-w-5xl`) para que las tablas anchas (Usuarios, Grupos) no
   scrolleen antes de tiempo en pantallas grandes. Cada página usa `space-y-4` (no `space-y-6`)

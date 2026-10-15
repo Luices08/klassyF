@@ -182,7 +182,6 @@ export async function completitudDelExpediente(exp: ExpedienteInclusionDocument,
     esperadas.map((e) => ({ subject_id: e.subject_id, docente_id: e.docente_id })),
     ajustes.map((a) => ({
       subject_id: String(a.subject_id),
-      dba_ids: a.dba_ids.map(String),
       objetivo_flexibilizado: a.objetivo_flexibilizado,
       barrera_asignatura: a.barrera_asignatura,
       ajuste_metodologico: a.ajuste_metodologico,
@@ -416,7 +415,6 @@ export async function misEstudiantesConApoyo(usuario: UserDocument) {
           completo: Boolean(
             ajuste &&
               ajusteCompleto({
-                dba_ids: ajuste.dba_ids.map(String),
                 objetivo_flexibilizado: ajuste.objetivo_flexibilizado,
                 barrera_asignatura: ajuste.barrera_asignatura,
                 ajuste_metodologico: ajuste.ajuste_metodologico,

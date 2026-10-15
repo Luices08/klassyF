@@ -6,7 +6,8 @@ import { FormatoEvidencia } from '../../src/constants/actividades';
 import AcademicYear from '../../src/models/academicYear.model';
 import Activity from '../../src/models/activity.model';
 import ActivitySubmission from '../../src/models/activitySubmission.model';
-import CurricularDevelopment from '../../src/models/curricularDevelopment.model';
+import Group from '../../src/models/group.model';
+import PlanAula from '../../src/models/planAula.model';
 import TeacherAssignment, { TeacherAssignmentDocument } from '../../src/models/teacherAssignment.model';
 import { UserDocument } from '../../src/models/user.model';
 import * as entregas from '../../src/services/actividadEntrega.service';
@@ -16,11 +17,11 @@ import { hoyColombia } from '../../src/services/attendance.service';
 import * as configuracion from '../../src/services/configuracionActividades.service';
 import { detenerBaseDeDatos, iniciarBaseDeDatos, limpiarBaseDeDatos } from './baseDeDatos';
 import { armarEscenario, crearUsuario, Escenario } from './escenario';
+import { crearPlanAula } from './escenarioNotas';
 import { UPLOADS_ROOT } from '../../src/utils/uploadPaths';
 
 const DIA_MS = 86_400_000;
 const pdf = (nombre = 'tarea.pdf') => ({ buffer: Buffer.from('%PDF-1.4 mi tarea'), mimetype: 'application/pdf', originalname: nombre });
-const dbaDeLaPlaneacion = String(new Types.ObjectId());
 
 /** Un día hábil (lunes a viernes) dentro de `desdeDias` días o más, a las 12 m. en Colombia. */
 function proximoDiaHabil(desdeDias: number): Date {
@@ -72,16 +73,7 @@ describe('M11: actividades y entregas (con base de datos)', () => {
     await anio.save();
   }, 60_000);
 
-  const aprobarPlaneacion = (estado: 'APROBADO' | 'ENVIADO_REVISION' = 'APROBADO') =>
-    CurricularDevelopment.create({
-      teacher_assignment_id: asignacion._id,
-      periodo_numero: 1,
-      dba_seleccionados: [dbaDeLaPlaneacion],
-      competencias: 'Resuelve problemas con fracciones. Compara y ordena números racionales.',
-      metodologia_y_recursos: 'Trabajo en equipo',
-      criterios_evaluacion: 'Rúbrica',
-      estado,
-    });
+  const aprobarPlaneacion = (estado: 'APROBADO' | 'EN_REVISION' | 'DEVUELTO' = 'APROBADO', periodo = 1) => crearPlanAula(asignacion, periodo, estado);
 
   const datos = (extra: Partial<actividades.CreateActivityInput> = {}): actividades.CreateActivityInput => ({
     teacher_assignment_id: String(asignacion._id),
@@ -96,19 +88,65 @@ describe('M11: actividades y entregas (con base de datos)', () => {
     requiere_entrega: true,
     formatos_permitidos: ['PDF'] as FormatoEvidencia[],
     permite_entrega_tardia: false,
-    competencia_evaluada: 'Resuelve problemas con fracciones',
     ...extra,
   });
 
   describe('programación (CU-DOC-02)', () => {
-    it('no se programa sin planeación curricular, ni con una que no está aprobada', async () => {
-      await expect(actividades.createActivity(datos(), docente)).rejects.toMatchObject({ statusCode: 409, message: expect.stringMatching(/Aún no has formulado/) });
+    it('no se programa sin plan de aula, ni con uno que no está aprobado', async () => {
+      await expect(actividades.createActivity(datos(), docente)).rejects.toMatchObject({ statusCode: 409, message: expect.stringMatching(/Aún no has radicado tu plan de aula/) });
 
-      await aprobarPlaneacion('ENVIADO_REVISION');
-      await expect(actividades.createActivity(datos(), docente)).rejects.toMatchObject({
-        statusCode: 409,
-        message: expect.stringMatching(/en revisión de coordinación/),
+      const plan = await aprobarPlaneacion('EN_REVISION');
+      await expect(actividades.createActivity(datos(), docente)).rejects.toMatchObject({ statusCode: 409, message: expect.stringMatching(/está en revisión/) });
+
+      await PlanAula.updateOne({ _id: plan._id }, { $set: { estado: 'DEVUELTO' } });
+      await expect(actividades.createActivity(datos(), docente)).rejects.toMatchObject({ statusCode: 409, message: expect.stringMatching(/devuelto con comentarios/) });
+
+      await PlanAula.updateOne({ _id: plan._id }, { $set: { estado: 'APROBADO' } });
+      await expect(actividades.createActivity(datos(), docente)).resolves.toBeTruthy();
+    });
+
+    it('el plan de aula habilita solo su periodo y a su docente: ni el de otro periodo ni el de otro docente sirven', async () => {
+      await aprobarPlaneacion('APROBADO', 2);
+      await expect(actividades.createActivity(datos({ periodo_numero: 1 }), docente)).rejects.toMatchObject({ statusCode: 409, message: expect.stringMatching(/periodo 1/) });
+
+      // Otro docente con el plan aprobado de esa misma asignatura y grado no habilita a este docente.
+      const grupo = (await Group.findById(asignacion.group_id))!;
+      await PlanAula.create({
+        academic_year_id: asignacion.academic_year_id,
+        periodo_numero: 1,
+        subject_id: asignacion.subject_id,
+        grade_id: grupo.grade_id,
+        docente_id: e.docenteAjeno._id,
+        estado: 'APROBADO',
+        radicacion: { fecha: new Date(), fecha_limite: null, fuera_de_plazo: false },
+        versiones: [
+          {
+            numero: 1,
+            titulo: 'Plan',
+            descripcion: 'x',
+            archivo: { nombre: 'a.pdf', ruta: 'uploads/planeacion/a.pdf', bytes: 5, sha256: 'b'.repeat(64) },
+            origen: 'CARGADA',
+            adoptado_de: null,
+            subido_por: e.docenteAjeno._id,
+            fecha: new Date(),
+          },
+        ],
       });
+      await expect(actividades.createActivity(datos(), docente)).rejects.toMatchObject({ statusCode: 409 });
+    });
+
+    it('mover la fecha de apertura (publicar) exige el plan aprobado; corregir un título, no', async () => {
+      const plan = await aprobarPlaneacion();
+      const creada = await actividades.createActivity(datos(), docente);
+      await PlanAula.updateOne({ _id: plan._id }, { $set: { estado: 'DEVUELTO' } });
+
+      await expect(actividades.updateActivity(String(creada._id), { titulo: 'Solo corrijo el título' }, docente)).resolves.toMatchObject({ titulo: 'Solo corrijo el título' });
+      await expect(actividades.updateActivity(String(creada._id), { fecha_apertura: new Date(Date.now() + DIA_MS) }, docente)).rejects.toMatchObject({
+        statusCode: 409,
+        message: expect.stringMatching(/devuelto con comentarios/),
+      });
+      // Reenviar la misma fecha que ya tenía no es publicar de nuevo.
+      await expect(actividades.updateActivity(String(creada._id), { fecha_apertura: creada.fecha_apertura }, docente)).resolves.toBeTruthy();
     });
 
     it('un docente solo programa sobre sus propias clases', async () => {
@@ -117,23 +155,13 @@ describe('M11: actividades y entregas (con base de datos)', () => {
       await expect(actividades.createActivity(datos(), e.coordAcademico)).rejects.toMatchObject({ statusCode: 403 });
     });
 
-    it('exige un DBA o una competencia, y que sean de la planeación aprobada', async () => {
+    it('ya no pide DBA ni competencia: basta el plan de aula aprobado, y la actividad no guarda esos campos', async () => {
       await aprobarPlaneacion();
-      await expect(
-        actividades.createActivity(datos({ competencia_evaluada: undefined, dba_id: undefined }), docente)
-      ).rejects.toMatchObject({ statusCode: 400, message: expect.stringMatching(/DBA o competencia/) });
-      await expect(actividades.createActivity(datos({ competencia_evaluada: 'Baila salsa' }), docente)).rejects.toMatchObject({
-        statusCode: 400,
-        message: expect.stringMatching(/competencia elegida/),
-      });
-      await expect(
-        actividades.createActivity(datos({ competencia_evaluada: undefined, dba_id: String(new Types.ObjectId()) }), docente)
-      ).rejects.toMatchObject({ statusCode: 400, message: expect.stringMatching(/DBA elegido/) });
-
-      const conDba = await actividades.createActivity(datos({ competencia_evaluada: undefined, dba_id: dbaDeLaPlaneacion }), docente);
-      expect(String(conDba.dba_id)).toBe(dbaDeLaPlaneacion);
-      const conCompetencia = await actividades.createActivity(datos({ competencia_evaluada: 'compara y ordena NÚMEROS racionales' }), docente);
-      expect(conCompetencia.desarrollo_curricular_id).toBeTruthy();
+      const creada = await actividades.createActivity(datos(), docente);
+      const guardada = (await Activity.findById(creada._id).lean()) as unknown as Record<string, unknown>;
+      expect(guardada).not.toHaveProperty('dba_id');
+      expect(guardada).not.toHaveProperty('competencia_evaluada');
+      expect(guardada).not.toHaveProperty('desarrollo_curricular_id');
     });
 
     it('bloquea fechas imposibles: pasada o fuera del periodo', async () => {
@@ -235,7 +263,7 @@ describe('M11: actividades y entregas (con base de datos)', () => {
 
   describe('entrega de evidencias (CU-EST-03)', () => {
     const programar = async (extra: Partial<actividades.CreateActivityInput> = {}) => {
-      if (!(await CurricularDevelopment.exists({ teacher_assignment_id: asignacion._id }))) await aprobarPlaneacion();
+      if (!(await PlanAula.exists({ docente_id: docente._id }))) await aprobarPlaneacion();
       return String((await actividades.createActivity(datos(extra), docente))._id);
     };
 

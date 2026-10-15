@@ -5,6 +5,7 @@ import { buscarDestinos, destinoClaro, destinosParaServidor, type Coincidencia }
 import type { NavItem } from '../layout/navigation';
 import { Button } from '../ui/Button';
 import { MessageCircleIcon, SendIcon, XIcon } from '../ui/icons';
+import { useBotonArrastrable } from './useBotonArrastrable';
 
 interface Mensaje {
   id: number;
@@ -12,6 +13,11 @@ interface Mensaje {
   texto: string;
   opciones?: Coincidencia[];
 }
+
+const TAMANO_BOTON = 56;
+const SEPARACION = 12;
+const ANCHO_PANEL = 384;
+const ALTO_PANEL = 448;
 
 const SALUDO: Mensaje = {
   id: 0,
@@ -32,11 +38,49 @@ export function AsistenteFlotante({ items }: AsistenteFlotanteProps) {
   const [mensajes, setMensajes] = useState<Mensaje[]>([SALUDO]);
   const orientar = useOrientarAsistente();
   const finRef = useRef<HTMLDivElement>(null);
+  const panelRef = useRef<HTMLElement>(null);
+  const botonRef = useRef<HTMLButtonElement>(null);
   const contador = useRef(1);
+  const { posicion, ventana, margen, debeIgnorarClic, handlers } = useBotonArrastrable(TAMANO_BOTON);
 
   useEffect(() => {
     finRef.current?.scrollIntoView({ block: 'end' });
   }, [mensajes, abierto]);
+
+  // Con el chat abierto, un clic o toque fuera de él (y fuera del botón, que ya alterna) lo cierra, igual que Escape.
+  useEffect(() => {
+    if (!abierto) return;
+    const alPresionar = (e: PointerEvent) => {
+      const objetivo = e.target as Node;
+      if (panelRef.current?.contains(objetivo) || botonRef.current?.contains(objetivo)) return;
+      setAbierto(false);
+    };
+    const alTeclear = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setAbierto(false);
+    };
+    document.addEventListener('pointerdown', alPresionar);
+    document.addEventListener('keydown', alTeclear);
+    return () => {
+      document.removeEventListener('pointerdown', alPresionar);
+      document.removeEventListener('keydown', alTeclear);
+    };
+  }, [abierto]);
+
+  // El panel sigue al botón: alineado a su borde derecho, arriba si cabe y si no debajo, siempre dentro de la ventana.
+  const anchoPanel = Math.min(ANCHO_PANEL, ventana.ancho - 2 * margen);
+  const altoPanel = Math.min(ALTO_PANEL, ventana.alto - 2 * margen);
+  const izquierdaPanel = Math.min(
+    Math.max(posicion.x + TAMANO_BOTON - anchoPanel, margen),
+    Math.max(margen, ventana.ancho - anchoPanel - margen)
+  );
+  const arribaDelBoton = posicion.y - SEPARACION - altoPanel;
+  const debajoDelBoton = posicion.y + TAMANO_BOTON + SEPARACION;
+  const arribaPanel =
+    arribaDelBoton >= margen
+      ? arribaDelBoton
+      : debajoDelBoton + altoPanel <= ventana.alto - margen
+        ? debajoDelBoton
+        : Math.max(margen, ventana.alto - altoPanel - margen);
 
   function agregar(...nuevos: Omit<Mensaje, 'id'>[]) {
     setMensajes((actuales) => [...actuales, ...nuevos.map((m) => ({ ...m, id: contador.current++ }))]);
@@ -94,11 +138,13 @@ export function AsistenteFlotante({ items }: AsistenteFlotanteProps) {
   }
 
   return (
-    <div className="fixed bottom-4 right-4 z-40 flex flex-col items-end gap-3 sm:bottom-6 sm:right-6">
+    <>
       {abierto && (
         <section
+          ref={panelRef}
           aria-label="Asistente de Klassy"
-          className="flex h-[28rem] max-h-[calc(100vh-7rem)] w-[calc(100vw-2rem)] max-w-sm flex-col overflow-hidden rounded-xl border border-border bg-surface shadow-lg"
+          style={{ left: izquierdaPanel, top: arribaPanel, width: anchoPanel, height: altoPanel }}
+          className="fixed z-40 flex flex-col overflow-hidden rounded-xl border border-border bg-surface shadow-lg"
         >
           <header className="flex items-center justify-between border-b border-border px-4 py-3">
             <div>
@@ -157,14 +203,20 @@ export function AsistenteFlotante({ items }: AsistenteFlotanteProps) {
       )}
 
       <button
+        ref={botonRef}
         type="button"
-        onClick={() => setAbierto((v) => !v)}
-        aria-label={abierto ? 'Cerrar asistente' : 'Abrir asistente'}
+        {...handlers}
+        onClick={() => {
+          if (!debeIgnorarClic()) setAbierto((v) => !v);
+        }}
+        aria-label={abierto ? 'Cerrar asistente' : 'Abrir asistente (puedes arrastrarlo)'}
         aria-expanded={abierto}
-        className="flex h-14 w-14 items-center justify-center rounded-full bg-primary text-white shadow-lg transition-colors hover:bg-primary/90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+        title="Arrastra para moverlo"
+        style={{ left: posicion.x, top: posicion.y }}
+        className="fixed z-40 flex h-14 w-14 cursor-grab touch-none select-none items-center justify-center rounded-full bg-primary text-white shadow-lg transition-colors hover:bg-primary/90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary active:cursor-grabbing"
       >
         {abierto ? <XIcon className="h-6 w-6" /> : <MessageCircleIcon className="h-6 w-6" />}
       </button>
-    </div>
+    </>
   );
 }

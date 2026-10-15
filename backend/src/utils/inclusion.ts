@@ -42,7 +42,6 @@ export const esMayorDeEdad = (fechaNacimiento: Date, referencia: Date): boolean 
 
 export interface AjusteParaCompletitud {
   subject_id: string;
-  dba_ids: string[];
   objetivo_flexibilizado: string;
   barrera_asignatura: string;
   ajuste_metodologico: string;
@@ -51,9 +50,9 @@ export interface AjusteParaCompletitud {
 
 const lleno = (texto: string | undefined | null) => Boolean(texto && texto.trim().length > 0);
 
-/** Un ajuste está completo cuando el docente fijó objetivo (DBA o texto), barrera y los dos ajustes que exige el formato. */
+/** Un ajuste está completo cuando el docente fijó el objetivo, la barrera y los dos ajustes que exige el formato. */
 export const ajusteCompleto = (a: Omit<AjusteParaCompletitud, 'subject_id'>): boolean =>
-  (a.dba_ids.length > 0 || lleno(a.objetivo_flexibilizado)) && lleno(a.barrera_asignatura) && lleno(a.ajuste_metodologico) && lleno(a.ajuste_evaluativo);
+  lleno(a.objetivo_flexibilizado) && lleno(a.barrera_asignatura) && lleno(a.ajuste_metodologico) && lleno(a.ajuste_evaluativo);
 
 export interface AsignaturaEsperada {
   subject_id: string;

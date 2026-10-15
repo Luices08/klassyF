@@ -69,6 +69,8 @@ export function useCrearTeacherAssignment() {
       // Un solo prefijo ['teacher-assignments'] ya cubre el listado, el resumen y "mi carga".
       void queryClient.invalidateQueries({ queryKey: ['teacher-assignments'] });
       void queryClient.invalidateQueries({ queryKey: ['groups'] });
+      // Las tarjetas de planeación del docente y la cobertura de coordinación (M07) salen de estas asignaciones.
+      void queryClient.invalidateQueries({ queryKey: ['planes-aula'] });
     },
   });
 }
@@ -80,9 +82,7 @@ export function useEliminarTeacherAssignment() {
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['teacher-assignments'] });
       void queryClient.invalidateQueries({ queryKey: ['groups'] });
-      // Eliminar una asignación cascada borra sus planeaciones no aprobadas (M07): sin esto, una
-      // pantalla de M07 ya abierta seguía mostrándolas hasta que venciera el staleTime.
-      void queryClient.invalidateQueries({ queryKey: ['curricular-developments'] });
+      void queryClient.invalidateQueries({ queryKey: ['planes-aula'] });
     },
   });
 }
@@ -115,4 +115,65 @@ export function useActualizarLimitesCarga() {
     },
   });
 }
+
+export interface ClaseLoteInput {
+  group_id: string;
+  subject_id: string;
+  observaciones?: string;
+}
+
+export interface ProyectoLoteInput {
+  proyecto_nombre: string;
+  horas_semanales: number;
+  observaciones?: string;
+}
+
+export interface GuardarCargaDocenteLoteInput {
+  docente_id: string;
+  academic_year_id: string;
+  direccion_grupo_id?: string | null;
+  horas_direccion?: number;
+  clases: ClaseLoteInput[];
+  proyectos?: ProyectoLoteInput[];
+}
+
+export interface AsignaturaDocenteGrupoInput {
+  subject_id: string;
+  docente_id?: string | null;
+}
+
+export interface GuardarMallaGrupoLoteInput {
+  group_id: string;
+  academic_year_id: string;
+  director_grupo_id?: string | null;
+  horas_direccion?: number;
+  asignaciones: AsignaturaDocenteGrupoInput[];
+}
+
+export function useGuardarCargaDocenteLote() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: GuardarCargaDocenteLoteInput) =>
+      api.post<{ success: true }>('/teacher-assignments/docente-carga', input),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['teacher-assignments'] });
+      void queryClient.invalidateQueries({ queryKey: ['groups'] });
+      void queryClient.invalidateQueries({ queryKey: ['planes-aula'] });
+    },
+  });
+}
+
+export function useGuardarMallaGrupoLote() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: GuardarMallaGrupoLoteInput) =>
+      api.post<{ success: true }>('/teacher-assignments/grupo-carga', input),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['teacher-assignments'] });
+      void queryClient.invalidateQueries({ queryKey: ['groups'] });
+      void queryClient.invalidateQueries({ queryKey: ['planes-aula'] });
+    },
+  });
+}
+
 

@@ -1,0 +1,230 @@
+{
+  "fecha": "2026-10-14T04:24:43.013Z",
+  "academicYearOriginal": {
+    "_id": "6ab96dd10c0e12f29a63d65f",
+    "institucion_id": "6ab96dd10c0e12f29a63d65b",
+    "year": 2026,
+    "calendario": "A",
+    "estado": "EN_CURSO",
+    "periodos": [
+      {
+        "numero": 1,
+        "nombre": "Periodo 1",
+        "porcentaje": 34,
+        "fecha_inicio": "2026-01-21T00:00:00.000Z",
+        "fecha_fin": "2026-04-17T00:00:00.000Z",
+        "fecha_apertura_notas": null,
+        "fecha_cierre_notas": null,
+        "estado": "EN_DIGITACION",
+        "_id": "6ab96dd10c0e12f29a63d660"
+      },
+      {
+        "numero": 2,
+        "nombre": "Periodo 2",
+        "porcentaje": 33,
+        "fecha_inicio": "2026-04-20T00:00:00.000Z",
+        "fecha_fin": "2026-08-14T00:00:00.000Z",
+        "fecha_apertura_notas": null,
+        "fecha_cierre_notas": null,
+        "estado": "PROGRAMADO",
+        "_id": "6ab96dd10c0e12f29a63d661"
+      },
+      {
+        "numero": 3,
+        "nombre": "Periodo 3",
+        "porcentaje": 33,
+        "fecha_inicio": "2026-08-17T00:00:00.000Z",
+        "fecha_fin": "2026-12-01T00:00:00.000Z",
+        "fecha_apertura_notas": null,
+        "fecha_cierre_notas": null,
+        "estado": "PROGRAMADO",
+        "_id": "6ab96dd10c0e12f29a63d662"
+      }
+    ],
+    "createdAt": "2026-09-27T19:26:09.191Z",
+    "updatedAt": "2026-10-05T18:34:12.449Z",
+    "__v": 1,
+    "calendarios_sede": [],
+    "eventos": [],
+    "fecha_fin": "2026-12-01T00:00:00.000Z",
+    "fecha_inicio": "2026-01-21T00:00:00.000Z",
+    "nombre": "2026",
+    "escala_evaluacion": {
+      "nota_minima": 1,
+      "nota_maxima": 5,
+      "nota_aprobatoria": 3,
+      "precision_decimales": 1,
+      "rangos": [
+        {
+          "nivel": "BAJO",
+          "etiqueta": "Bajo",
+          "valor_minimo": 1,
+          "valor_maximo": 2.9,
+          "es_aprobatorio": false
+        },
+        {
+          "nivel": "BASICO",
+          "etiqueta": "Básico",
+          "valor_minimo": 3,
+          "valor_maximo": 3.6,
+          "es_aprobatorio": true
+        },
+        {
+          "nivel": "ALTO",
+          "etiqueta": "Alto",
+          "valor_minimo": 3.7,
+          "valor_maximo": 4.2,
+          "es_aprobatorio": true
+        },
+        {
+          "nivel": "SUPERIOR",
+          "etiqueta": "Superior",
+          "valor_minimo": 4.3,
+          "valor_maximo": 5,
+          "es_aprobatorio": true
+        }
+      ]
+    },
+    "ponderacion_componentes": {
+      "COGNITIVO_SABER": 0.4,
+      "PROCEDIMENTAL_HACER": 0.4,
+      "ACTITUDINAL_SER": 0.2
+    }
+  },
+  "actividades": [
+    {
+      "_id": "6ac3ef89f08aaba72c85d3cf",
+      "teacher_assignment_id": "6ac3ef89f08aaba72c85d3ba",
+      "periodo_numero": 1,
+      "titulo": "Taller 1: Operaciones con números enteros",
+      "descripcion": "Resolución de situaciones problema contextualizadas aplicando propiedades de la adición y multiplicación en Z.",
+      "componente_siee": "COGNITIVO_SABER",
+      "peso_en_componente": 50,
+      "fecha_apertura": "2026-02-02T00:00:00.000Z",
+      "fecha_entrega": "2026-02-20T00:00:00.000Z",
+      "dba_id": "6abca57421665fa6420400d3",
+      "createdAt": "2026-10-05T18:42:17.952Z",
+      "updatedAt": "2026-10-05T18:42:17.952Z",
+      "__v": 0
+    },
+    {
+      "_id": "6ac3ef89f08aaba72c85d3d2",
+      "teacher_assignment_id": "6ac3ef89f08aaba72c85d3ba",
+      "periodo_numero": 1,
+      "titulo": "Laboratorio Práctico: Recta numérica y aplicaciones",
+      "descripcion": "Construcción y representación de trayectorias en la recta numérica en el aula de informática.",
+      "componente_siee": "PROCEDIMENTAL_HACER",
+      "peso_en_componente": 50,
+      "fecha_apertura": "2026-02-23T00:00:00.000Z",
+      "fecha_entrega": "2026-03-15T00:00:00.000Z",
+      "dba_id": "6abca57421665fa6420400d3",
+      "createdAt": "2026-10-05T18:42:17.964Z",
+      "updatedAt": "2026-10-05T18:42:17.964Z",
+      "__v": 0
+    }
+  ],
+  "entregas": [
+    {
+      "_id": "6ac3ef893760a0d0b87e15cd",
+      "activity_id": "6ac3ef89f08aaba72c85d3cf",
+      "student_id": "6ac1494bb0a26f24c1534a69",
+      "__v": 0,
+      "archivo_url": null,
+      "calificacion_numerica": 4.5,
+      "createdAt": "2026-10-05T18:42:17.978Z",
+      "docente_id": "6ac3eda4f255cb11d309bda5",
+      "fecha_calificacion": "2026-02-22T00:00:00.000Z",
+      "fecha_entrega": "2026-02-18T00:00:00.000Z",
+      "retroalimentacion": "Excelente dominio de las propiedades de los enteros.",
+      "texto_entrega": "Entrega del taller resuelto en clase y cuaderno.",
+      "updatedAt": "2026-10-05T18:43:59.581Z"
+    },
+    {
+      "_id": "6ac3ef893760a0d0b87e15ce",
+      "activity_id": "6ac3ef89f08aaba72c85d3cf",
+      "student_id": "6ac3c4b1eef5e51df0f9070f",
+      "__v": 0,
+      "archivo_url": null,
+      "calificacion_numerica": 3.8,
+      "createdAt": "2026-10-05T18:42:17.993Z",
+      "docente_id": "6ac3eda4f255cb11d309bda5",
+      "fecha_calificacion": "2026-02-22T00:00:00.000Z",
+      "fecha_entrega": "2026-02-18T00:00:00.000Z",
+      "retroalimentacion": "Buen trabajo, repasar ley de signos en multiplicaciones complejas.",
+      "texto_entrega": "Entrega del taller resuelto en clase y cuaderno.",
+      "updatedAt": "2026-10-05T18:43:59.591Z"
+    },
+    {
+      "_id": "6ac3ef8a3760a0d0b87e15cf",
+      "activity_id": "6ac3ef89f08aaba72c85d3cf",
+      "student_id": "6ac3eda7f255cb11d309bdbc",
+      "__v": 0,
+      "archivo_url": null,
+      "calificacion_numerica": 5,
+      "createdAt": "2026-10-05T18:42:18.009Z",
+      "docente_id": "6ac3eda4f255cb11d309bda5",
+      "fecha_calificacion": "2026-02-22T00:00:00.000Z",
+      "fecha_entrega": "2026-02-18T00:00:00.000Z",
+      "retroalimentacion": "Desempeño sobresaliente y solución impecable.",
+      "texto_entrega": "Entrega del taller resuelto en clase y cuaderno.",
+      "updatedAt": "2026-10-05T18:43:59.605Z"
+    },
+    {
+      "_id": "6ac3ef8a3760a0d0b87e15d0",
+      "activity_id": "6ac3ef89f08aaba72c85d3cf",
+      "student_id": "6ac3eda8f255cb11d309bdbf",
+      "__v": 0,
+      "archivo_url": null,
+      "calificacion_numerica": 4,
+      "createdAt": "2026-10-05T18:42:18.024Z",
+      "docente_id": "6ac3eda4f255cb11d309bda5",
+      "fecha_calificacion": "2026-02-22T00:00:00.000Z",
+      "fecha_entrega": "2026-02-18T00:00:00.000Z",
+      "retroalimentacion": "Trabajo completo y presentado puntualmente.",
+      "texto_entrega": "Entrega del taller resuelto en clase y cuaderno.",
+      "updatedAt": "2026-10-05T18:43:59.621Z"
+    }
+  ],
+  "asistencias": [
+    {
+      "_id": "6ac3ef8af08aaba72c85d3da",
+      "group_id": "6ab96ef50c0e12f29a63d6db",
+      "subject_id": "6ab9bc5ade4b959bc6073e74",
+      "academic_year_id": "6ab96dd10c0e12f29a63d65f",
+      "fecha": "2026-02-16T00:00:00.000Z",
+      "periodo_numero": 1,
+      "registros": [
+        {
+          "student_id": "6ac1494bb0a26f24c1534a69",
+          "state_id": "6ac1442fb0a26f24c15348ce",
+          "novedad": "",
+          "_id": "6ac3ef8af08aaba72c85d3db"
+        },
+        {
+          "student_id": "6ac3c4b1eef5e51df0f9070f",
+          "state_id": "6ac1442fb0a26f24c15348cf",
+          "novedad": "Cita odontológica con justificación",
+          "_id": "6ac3ef8af08aaba72c85d3dc"
+        },
+        {
+          "student_id": "6ac3eda7f255cb11d309bdbc",
+          "state_id": "6ac1442fb0a26f24c15348ce",
+          "novedad": "",
+          "_id": "6ac3ef8af08aaba72c85d3dd"
+        },
+        {
+          "student_id": "6ac3eda8f255cb11d309bdbf",
+          "state_id": "6ac1442fb0a26f24c15348ce",
+          "novedad": "",
+          "_id": "6ac3ef8af08aaba72c85d3de"
+        }
+      ],
+      "registrado_por": "6ac3eda4f255cb11d309bda5",
+      "createdAt": "2026-10-05T18:42:18.048Z",
+      "updatedAt": "2026-10-05T18:42:18.048Z",
+      "__v": 0
+    }
+  ],
+  "prorrogas": [],
+  "columnas": []
+}

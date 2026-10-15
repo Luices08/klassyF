@@ -50,6 +50,31 @@ describe('Validador crearEstudianteCompleto', () => {
     expect(error).toBeUndefined();
     expect(value.acudiente_nombre).toBe('María');
     expect(value.acudiente_parentesco).toBe('MADRE');
+    expect(value.acudiente_habilitar_portal).toBe(false);
+  });
+
+  it('permite habilitar portal explícitamente para el acudiente', () => {
+    const payload = {
+      tipo_documento: 'TI',
+      numero_documento: '1098765432',
+      nombre: 'Juanito',
+      apellido: 'Pérez',
+      fecha_nacimiento: '2012-05-15',
+      acudiente_tipo_documento: 'CC',
+      acudiente_numero_documento: '52123456',
+      acudiente_nombre: 'María',
+      acudiente_apellido: 'González',
+      acudiente_telefono_principal: '3001234567',
+      acudiente_email: 'maria@ejemplo.com',
+      acudiente_parentesco: 'MADRE',
+      acudiente_habilitar_portal: true,
+      acudiente_password: 'Password123',
+    };
+
+    const { error, value } = crearEstudianteCompleto.body!.validate(payload);
+    expect(error).toBeUndefined();
+    expect(value.acudiente_habilitar_portal).toBe(true);
+    expect(value.acudiente_password).toBe('Password123');
   });
 
   it('falla si falta un campo requerido como apellido o fecha_nacimiento', () => {

@@ -17,7 +17,6 @@ import {
 } from '../src/utils/inclusion';
 
 const ajuste = (extra: Partial<Parameters<typeof ajusteCompleto>[0]> = {}) => ({
-  dba_ids: [],
   objetivo_flexibilizado: 'Comprender fracciones con material concreto',
   barrera_asignatura: 'No alcanza a leer el tablero',
   ajuste_metodologico: 'Material ampliado',
@@ -86,10 +85,9 @@ describe('edad y firmante del acta', () => {
 });
 
 describe('completitud de los ajustes (Anexo 2)', () => {
-  it('un ajuste está completo con objetivo (DBA o texto), barrera y los dos ajustes', () => {
+  it('un ajuste está completo con objetivo, barrera y los dos ajustes', () => {
     expect(ajusteCompleto(ajuste())).toBe(true);
-    expect(ajusteCompleto(ajuste({ objetivo_flexibilizado: '', dba_ids: ['d1'] }))).toBe(true);
-    expect(ajusteCompleto(ajuste({ objetivo_flexibilizado: '', dba_ids: [] }))).toBe(false);
+    expect(ajusteCompleto(ajuste({ objetivo_flexibilizado: '' }))).toBe(false);
     expect(ajusteCompleto(ajuste({ barrera_asignatura: '  ' }))).toBe(false);
     expect(ajusteCompleto(ajuste({ ajuste_evaluativo: '' }))).toBe(false);
   });

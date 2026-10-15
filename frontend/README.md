@@ -53,7 +53,7 @@ src/
   (b) la función más compleja/valiosa del backend — el boletín — con una vista completamente fiel al JSON del
   Decreto 1290. Las pantallas de administración son las mínimas necesarias para poder *generar* datos reales
   (institución → usuarios → grupos → matrícula) y así poder ver un boletín con información real, no solo en
-  ceros. Pantallas de currículo (áreas/DBA/malla), carga docente, actividades/calificaciones y asistencia no
+  ceros. Pantallas de currículo (áreas/malla), carga docente, actividades/calificaciones y asistencia no
   se construyeron en esta pasada — son el siguiente incremento natural si se necesitan.
 - **Dos endpoints nuevos en el backend**: `GET /grades` y `GET /campuses?institucion_id=` no existían — sin
   ellos, la pantalla de Grupos no tenía forma de ofrecer un selector real de grado/sede sin pegar ObjectIds a
@@ -77,6 +77,6 @@ src/
 
 ## Siguientes pasos
 
-Pantallas para el resto del backend (currículo/DBA/malla, carga docente, planeación curricular, actividades,
+Pantallas para el resto del backend (currículo/malla, carga docente, planeación documental, actividades,
 calificaciones, asistencia, cierre de periodo) — todas ya tienen API funcional y probada en `../backend`, solo
 falta construir su UI cuando se priorice.

@@ -29,6 +29,8 @@ export interface ConfigurarAsignaturasGradoInput {
   institucion_id: string;
   academic_year_id: string;
   grade_id: string;
+  sede_id?: string | null;
+  jornada_id?: string | null;
   asignaturas: AsignaturaGrado[];
   /** Obligatorio cuando el año lectivo ya está en curso. */
   motivo?: string;
@@ -46,6 +48,8 @@ export function useConfigurarAsignaturasGrado() {
 export interface ConfigurarAsignaturasMultiplesGradosInput {
   institucion_id: string;
   academic_year_id: string;
+  sede_id?: string | null;
+  jornada_id?: string | null;
   grados: {
     grade_id: string;
     asignaturas: AsignaturaGrado[];
@@ -66,6 +70,8 @@ export interface ConfigurarEvaluacionAreaInput {
   institucion_id: string;
   academic_year_id: string;
   grade_id: string;
+  sede_id?: string | null;
+  jornada_id?: string | null;
   area_id: string;
   metodo_calculo: MetodoCalculoEvaluacion;
   asignaturas: PonderacionAsignatura[];

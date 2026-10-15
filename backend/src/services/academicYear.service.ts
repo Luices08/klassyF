@@ -23,6 +23,7 @@ import { sugerirRangos, SugerenciaRangosInput } from '../utils/escalaEvaluacion'
 import { runTransaction } from '../utils/runTransaction';
 import { claveDeComponente, componentesEfectivos, validarComponentesEvaluativos } from '../utils/siee';
 import { registrarEvento } from './audit.service';
+import { exigirPlanesDeAreaAprobados } from './planeacionCompuertas.service';
 
 type FechaEntrada = Date | string;
 
@@ -174,7 +175,7 @@ export async function listarAnios(): Promise<AnioLectivoDto[]> {
   const institucion = await Institution.findOne();
   if (!institucion) return [];
 
-  const anios = await AcademicYear.find({ institucion_id: institucion._id }).sort({ year: -1 });
+  const anios = await AcademicYear.find({ institucion_id: institucion._id }).sort({ year: -1, createdAt: -1 });
   return Promise.all(anios.map(aDtoConEvaluacion));
 }
 
@@ -186,6 +187,15 @@ export async function obtenerAnio(id: string): Promise<AnioLectivoDto> {
 export async function obtenerAnioActivo(): Promise<AnioLectivoDto | null> {
   const anio = await AcademicYear.findOne({ estado: 'EN_CURSO' });
   return anio ? aDtoConEvaluacion(anio) : null;
+}
+
+// Editar el año reconstruye cada periodo: la ventana de entrega de planes de aula (M07) no viaja en ese formulario,
+// así que se conserva aquí o se perdería (y volvería a la sugerida) en cada edición.
+function ventanaPlanesAulaDe(previo: IPeriodo | undefined): Partial<IPeriodo> {
+  return {
+    fecha_apertura_planes_aula: previo?.fecha_apertura_planes_aula ?? null,
+    fecha_limite_planes_aula: previo?.fecha_limite_planes_aula ?? null,
+  };
 }
 
 function mapearPeriodos(periodos: PeriodoInput[], conservar: (numero: number) => Partial<IPeriodo> = () => ({})) {
@@ -208,17 +218,23 @@ export async function crearAnio(
   const institucion = await obtenerInstitucion();
 
   const resultado = await runTransaction(async (session) => {
-    const yaExiste = await AcademicYear.exists({ institucion_id: institucion._id, year: input.year }).session(session);
-    if (yaExiste) throw new ApiError(409, `Ya existe el año lectivo ${input.year}.`);
+    // Un año del mismo número solo bloquea si sigue abierto: los cerrados son histórico.
+    const mismoNumero = await AcademicYear.find({ institucion_id: institucion._id, year: input.year })
+      .select('estado')
+      .session(session)
+      .lean();
+    if (mismoNumero.some((a) => a.estado !== 'CERRADO')) {
+      throw new ApiError(409, `Ya existe el año lectivo ${input.year} sin cerrar: ciérralo antes de crear otro del mismo año.`);
+    }
 
     // El molde de la planilla (bloques, porcentajes y máximo de casillas) es del colegio, no de un año: el año nuevo
     // arranca con el del más reciente que lo haya definido, y el administrador lo ajusta si hace falta.
     const anterior = await AcademicYear.findOne({
       institucion_id: institucion._id,
-      year: { $lt: input.year },
+      year: { $lte: input.year },
       'componentes_evaluativos.0': { $exists: true },
     })
-      .sort({ year: -1 })
+      .sort({ year: -1, createdAt: -1 })
       .session(session);
 
     const [anio] = await AcademicYear.create(
@@ -232,7 +248,10 @@ export async function crearAnio(
             porcentaje: c.porcentaje,
             max_casillas: c.max_casillas,
           })),
-          nombre: input.nombre?.trim() || `Año lectivo ${input.year}`,
+          // Sin nombre propio, el repetido se distingue del cerrado en los selectores.
+          nombre:
+            input.nombre?.trim() ||
+            (mismoNumero.length > 0 ? `Año lectivo ${input.year} (${mismoNumero.length + 1})` : `Año lectivo ${input.year}`),
           calendario: input.calendario,
           fecha_inicio: new Date(input.fecha_inicio),
           fecha_fin: new Date(input.fecha_fin),
@@ -317,7 +336,11 @@ export async function actualizarAnio(
   if (anio.estado === 'PLANIFICACION') {
     periodos = mapearPeriodos(input.periodos, (numero) => {
       const previo = anio.periodos.find((p) => p.numero === numero);
-      return { ...(previo ? { _id: previo._id } : {}), estado: 'PROGRAMADO' as EstadoPeriodoAcademico };
+      return {
+        ...(previo ? { _id: previo._id } : {}),
+        ...ventanaPlanesAulaDe(previo),
+        estado: 'PROGRAMADO' as EstadoPeriodoAcademico,
+      };
     });
   } else {
     const mismosNumeros =
@@ -346,7 +369,7 @@ export async function actualizarAnio(
 
     periodos = mapearPeriodos(input.periodos, (numero) => {
       const previo = anio.periodos.find((p) => p.numero === numero) as IPeriodo & { _id: Types.ObjectId };
-      return { _id: previo._id, estado: previo.estado };
+      return { _id: previo._id, ...ventanaPlanesAulaDe(previo), estado: previo.estado };
     });
   }
 
@@ -382,6 +405,9 @@ export async function activarAnio(id: string, { usuarioId, ip }: ContextoUsuario
       `El año lectivo ${vigente.year} sigue vigente. Ciérralo antes de activar el ${anio.year}: solo puede haber una vigencia activa.`
     );
   }
+
+  // M07: el año no arranca con áreas obligatorias sin plan de área aprobado.
+  await exigirPlanesDeAreaAprobados(anio);
 
   let activado: AcademicYearDocument | null;
   try {

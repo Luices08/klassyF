@@ -51,7 +51,7 @@ interface ActualizarEstadoAreaBody {
 }
 
 // Activa/inactiva el area. Nunca se elimina: puede tener asignaturas, notas,
-// boletines o desarrollos curriculares asociados (trazabilidad, ver CLAUDE.md).
+// boletines o planes de área asociados (trazabilidad, ver CLAUDE.md).
 export const actualizarEstadoArea = catchAsync<AreaParams, unknown, ActualizarEstadoAreaBody>(
   async (req, res) => {
     if (!req.user) throw new ApiError(401, 'Usuario no autenticado.');

@@ -4,14 +4,17 @@ import { EstadoUsuario, Rol, TIPOS_DOCUMENTO, TipoDocumento } from '../constants
 import { ROLES, ROLES_LIST, puedeGestionarRol } from '../constants/roles';
 import ActivitySubmission from '../models/activitySubmission.model';
 import AdmissionRequest from '../models/admissionRequest.model';
+import LiderArea from '../models/liderArea.model';
 import Attendance from '../models/attendance.model';
 import Campus from '../models/campus.model';
-import CurricularDevelopment from '../models/curricularDevelopment.model';
+import DocumentoReferencia from '../models/documentoReferencia.model';
 import Enrollment from '../models/enrollment.model';
 import Group from '../models/group.model';
 import Guardian from '../models/guardian.model';
 import Institution from '../models/institution.model';
 import PeriodoProrroga from '../models/periodoProrroga.model';
+import PlanArea from '../models/planArea.model';
+import PlanAula from '../models/planAula.model';
 import StudentGuardian from '../models/studentGuardian.model';
 import StudentProfile from '../models/studentProfile.model';
 import TeacherAssignment from '../models/teacherAssignment.model';
@@ -252,9 +255,11 @@ async function tieneHistorial(userId: string): Promise<boolean> {
     TeacherAssignment.countDocuments({ docente_id: userId }),
     StudentProfile.countDocuments({ $or: [{ user_id: userId }, { registrado_por_id: userId }] }),
     Group.countDocuments({ director_grupo_id: userId }),
-    CurricularDevelopment.countDocuments({
-      $or: [{ 'historial_revisiones.coordinador_id': userId }, { 'historial_versiones.modificado_por': userId }],
-    }),
+    // M07: líder de un área, planes radicados o revisados y documentos de apoyo cargados.
+    LiderArea.countDocuments({ docente_id: userId }),
+    PlanArea.countDocuments({ $or: [{ 'versiones.subido_por': userId }, { 'revisiones.revisor_id': userId }] }),
+    PlanAula.countDocuments({ $or: [{ docente_id: userId }, { 'versiones.subido_por': userId }, { 'revisiones.revisor_id': userId }] }),
+    DocumentoReferencia.countDocuments({ subido_por: userId }),
     Institution.countDocuments({ administrador_id: userId }),
     PeriodoProrroga.countDocuments({ $or: [{ docente_id: userId }, { otorgada_por_id: userId }, { revocada_por_id: userId }] }),
     AdmissionRequest.countDocuments({ revisado_por: userId }),

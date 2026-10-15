@@ -6,7 +6,6 @@ import {
   estadoDeEntrega,
   evaluarCalendarioActividad,
   evaluarVentanaEntrega,
-  normalizarTexto,
 } from '../src/utils/actividades';
 import { detectarEvidencia } from '../src/utils/evidenciasActividad';
 
@@ -181,12 +180,6 @@ describe('evaluarCalendarioActividad', () => {
   it('los bloqueos van primero', () => {
     const alertas = evaluarCalendarioActividad(base({ fecha_entrega: new Date('2026-04-06T17:00:00Z'), dias_habiles: [2] }));
     expect(alertas.map((a) => a.severidad)).toEqual(['BLOQUEO', 'ADVERTENCIA']);
-  });
-});
-
-describe('normalizarTexto', () => {
-  it('ignora tildes, mayúsculas y espacios repetidos', () => {
-    expect(normalizarTexto('  Resuelve   problemas de Comparación ')).toBe('resuelve problemas de comparacion');
   });
 });
 

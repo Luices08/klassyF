@@ -8,11 +8,11 @@ Backend Node.js + **TypeScript** + Express + MongoDB/Mongoose. Implementa:
 3. Años lectivos y calendarios (periodos con validación de suma 100%).
 4. Matrículas con control de cupos a prueba de concurrencia (transacciones + update atómico + reintento ante `TransientTransactionError`).
 
-**Prompt 2 — Malla Curricular, Banco de DBA y Planeación Pedagógica**
+**Prompt 2 — Malla Curricular y Planeación Documental (M07)**
 5. Áreas, asignaturas y malla curricular por grado (`StudyPlanAssignment`) con validación de suma 100% *por área*.
-6. Banco de DBA/estándares precargado, filtrable por grado y área.
+6. Documentos de apoyo en PDF (DBA, estándares, lineamientos) que coordinación asigna a un área y a los grados donde aplican; el área tiene uno o varios docentes líderes (por nivel, jornada diurna/nocturna y sede).
 7. Carga docente (`TeacherAssignment`) con validación de rol e índice único anti-duplicados.
-8. Workflow de Desarrollo Curricular (planeación de aula) docente ↔ coordinador: `BORRADOR → ENVIADO_REVISION → APROBADO | DEVUELTO_OBSERVACIONES`, con `historial_revisiones` para trazabilidad.
+8. Planeación documental en PDF, docente ↔ coordinador: el líder carga el plan de área anual y cada docente su plan de aula por periodo (`EN_REVISION → APROBADO | DEVUELTO`, con comentarios y versiones). Hay una ventana de entrega por periodo, el plan entregado tarde queda marcado «fuera de plazo» y quien reemplaza a un docente puede adoptar su plan aprobado.
 
 **Prompt 3 — Actividades, Calificaciones, Asistencia y Motor de Boletines (Decreto 1290)**
 9. Actividades por componente SIEE (`Activity`) y entregas/calificaciones (`ActivitySubmission`), con bloqueo extemporáneo por `PeriodLock`.
@@ -50,6 +50,7 @@ npm run dev              # http://localhost:4000  (tsx watch, hot-reload)
 | `npm run migrate:m05-anio-lectivo` | Migra los años lectivos creados antes de M05 (nombre, fechas, eventos y semáforo de periodos). Idempotente. |
 | `npm run migrate:folio-al-matricular` | Migra el Libro de Matrícula al nuevo esquema: el folio se asigna al legalizar la matrícula, no al preinscribir. Idempotente. |
 | `npm run migrate:estado-por-defecto` | Guarda `estado: 'activo'` en grados, sedes, institución y usuarios creados antes de que existiera ese campo. Idempotente. |
+| `npm run migrate:retirar-banco-curricular` | Retira el banco de DBA/EBC y el desarrollo curricular estructurado (M07 pasó a planeación documental en PDF): elimina esas colecciones y limpia `activities` y `ajusteasignaturas`. **Por defecto solo simula**; con `-- --aplicar` escribe, y exige respaldo de Mongo antes. Idempotente. |
 | `npm run typecheck` | `tsc --noEmit` — valida tipos de `src/` sin emitir archivos. |
 | `npm run typecheck:all` | Igual, pero incluye también `scripts/` (fuera de `rootDir`, por eso usa `tsconfig.scripts.json`). |
 
@@ -69,7 +70,7 @@ src/
                         campus (crearSede), jornadaOperativa (crearJornada),
                         enrollment (matrícula/retiro a prueba de condiciones de carrera),
                         studyPlan (malla, validación 100% por área), teacherAssignment,
-                        curricularDevelopment (workflow docente ↔ coordinador),
+                        documentoReferencia, planArea, planAula, ventanaPlanes (planeación documental, M07),
                         activity (crear/entregar/calificar), attendance (registro en lote),
                         periodLock (abrir/cerrar + guardia de bloqueo extemporáneo),
                         reportCard (motor de boletines Decreto 1290)
@@ -81,8 +82,8 @@ src/
 scripts/seed.ts
 ```
 
-Modelos de Prompt 2 (`src/models/`): `Area`, `Subject`, `StudyPlanAssignment`, `ReferenteCurricular`
-(discriminadores `Dba`/`Ebc`/`Lineamiento`), `TeacherAssignment`, `CurricularDevelopment`. Modelos de Prompt 3: `Activity`, `ActivitySubmission`,
+Modelos de Prompt 2 (`src/models/`): `Area`, `Subject`, `StudyPlanAssignment`, `TeacherAssignment` y, de la planeación documental (M07),
+`DocumentoReferencia`, `PlanArea`, `PlanAula`. Modelos de Prompt 3: `Activity`, `ActivitySubmission`,
 `Attendance`, `PeriodLock` — mismo patrón en todos (interfaz `IXxx` + `XxxDocument = HydratedDocument<IXxx>`).
 
 ## Flujo de prueba end-to-end (curl)
@@ -165,10 +166,15 @@ curl -s -X POST $BASE/curriculum/study-plan -H "Authorization: Bearer $TOKEN" -H
     {\"subject_id\":\"<fisica_id>\",\"porcentaje_en_area\":20}
   ]}"
 
-# 3) Banco de Referentes Curriculares — DBA/EBC/Lineamiento (carga individual o masiva con array)
-curl -s -X POST $BASE/curriculum/referentes -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
-  -d "{\"tipo_referente\":\"DBA\",\"grade_id\":\"<grade_id>\",\"area_id\":\"$AREA_ID\",\"numero_dba\":1,\"organizador\":\"Entorno vivo\",\"enunciado\":\"...\"}"
-curl -s "$BASE/curriculum/referentes?tipo_referente=DBA&grade_id=<grade_id>&area_id=$AREA_ID" -H "Authorization: Bearer $TOKEN"
+# 3) Documento de apoyo en PDF (DBA, estándares...) para un área y los grados donde aplica (multipart: el PDF va en `file`)
+curl -s -X POST $BASE/planeacion/documentos-referencia -H "Authorization: Bearer $TOKEN" \
+  -F "file=@dba-matematicas.pdf;type=application/pdf" -F "titulo=DBA de Matemáticas" -F "area_id=$AREA_ID" -F "grados_ids=<grade_id>"
+curl -s "$BASE/planeacion/documentos-referencia?area_id=$AREA_ID&grade_id=<grade_id>" -H "Authorization: Bearer $TOKEN"
+
+# 3b) Líder del área: el único que carga el plan de área de lo que cubre. Sin más datos cubre toda la institución (un jefe por área);
+#     en un colegio grande se separa por niveles, jornada (DIURNA | NOCTURNA) y, opcionalmente, sedes (vacío = todas)
+LIDER_ID=$(curl -s -X POST $BASE/planeacion/lideres-area -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+  -d "{\"area_id\":\"$AREA_ID\",\"docente_id\":\"<docente_user_id>\",\"niveles\":[\"SECUNDARIA\",\"MEDIA\"],\"jornada\":\"DIURNA\"}" | jq -r .data._id)
 
 # 4) Carga docente
 TA_ID=$(curl -s -X POST $BASE/teacher-assignments -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
@@ -177,15 +183,22 @@ TA_ID=$(curl -s -X POST $BASE/teacher-assignments -H "Authorization: Bearer $TOK
 # 5) El docente ve su carga (requiere login como ese docente)
 curl -s $BASE/teacher-assignments/my-load -H "Authorization: Bearer $DOCENTE_TOKEN"
 
-# 6) Workflow de planeación de aula: crear borrador -> enviar -> revisar
-CD_ID=$(curl -s -X POST $BASE/curricular-developments -H "Authorization: Bearer $DOCENTE_TOKEN" -H "Content-Type: application/json" \
-  -d "{\"teacher_assignment_id\":\"$TA_ID\",\"periodo_numero\":1,\"dba_seleccionados\":[],\"competencias\":\"...\",\"metodologia_y_recursos\":\"...\",\"criterios_evaluacion\":\"...\"}" | jq -r .data._id)
+# 6) Planeación documental: el líder radica el plan de área, coordinación lo revisa y luego el docente radica su plan de aula
+PA_ID=$(curl -s -X POST $BASE/planeacion/planes-area -H "Authorization: Bearer $LIDER_TOKEN" \
+  -F "file=@plan-de-area.pdf;type=application/pdf" -F "academic_year_id=<academic_year_id>" -F "lider_area_id=$LIDER_ID" \
+  -F "titulo=Plan de área 2026" -F "descripcion=Secuencia anual" | jq -r .data._id)
 
-curl -s -X PATCH $BASE/curricular-developments/$CD_ID/submit -H "Authorization: Bearer $DOCENTE_TOKEN"
+# Coordinador/Admin aprueba (para todo el año) o devuelve con un comentario obligatorio
+curl -s -X PATCH $BASE/planeacion/planes-area/$PA_ID/revision -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+  -d '{"decision":"DEVUELTO","comentario":"Falta la secuencia por periodos."}'
 
-# Coordinador/Admin/Superadmin aprueba o devuelve con observaciones
-curl -s -X PATCH $BASE/curricular-developments/$CD_ID/review -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
-  -d '{"decision":"DEVUELTO_OBSERVACIONES","observacion":"Falta profundizar en evidencias."}'
+# Con el plan de área aprobado, el docente radica su plan de aula del periodo (uno por docente, asignatura, grado y periodo)
+curl -s -X POST $BASE/planeacion/planes-aula -H "Authorization: Bearer $DOCENTE_TOKEN" \
+  -F "file=@plan-de-aula.pdf;type=application/pdf" -F "academic_year_id=<academic_year_id>" -F "periodo_numero=1" \
+  -F "subject_id=$BIO_ID" -F "grade_id=<grade_id>" -F "titulo=Plan de aula P1" -F "descripcion=Unidades y evaluación"
+
+# Si radica después de la fecha límite, el plan queda marcado "fuera de plazo" (no se bloquea). Un docente que llega a reemplazar a otro
+# puede adoptar su plan aprobado: POST $BASE/planeacion/planes-aula/adoptar {"plan_origen_id": "..."}
 ```
 
 ## Flujo de prueba Prompt 3 (curl)
@@ -249,15 +262,17 @@ curl -s "$BASE/reports/report-card?student_id=<id1>&academic_year_id=<academic_y
   agrupa las asignaturas enviadas por su `area_id` (vía `Subject.area_id`) y exige que la suma de
   `porcentaje_en_area` de cada área sea exactamente 100 — así se soporta el caso de varias áreas en una
   sola llamada (ej. Ciencias Naturales 100% + Matemáticas 100% en el mismo request).
-- **Prompt 2 — consistencia de DBA**: al crear/editar un borrador, cada id en `dba_seleccionados` se valida
-  contra el `grade_id` del `Group` y el `area_id` del `Subject` de la `TeacherAssignment` correspondiente,
-  para que un docente no pueda asociar un DBA de otro grado o área.
+- **Planeación documental (M07) — el plan de aula no cuelga de la asignación docente**: M08 elimina la `TeacherAssignment`
+  al cambiar de docente, y el plan aprobado debe sobrevivir (queda archivado en el histórico del periodo). Por eso `PlanAula`
+  tiene su propia llave `(año, periodo, asignatura, grado, docente)` y «archivado» se calcula mirando si el dueño aún dicta esa
+  asignatura en ese grado. Los PDF viven en `uploads/planeacion/` (hasta 25 MB, firma de bytes `%PDF`), nunca en Mongo y nunca con su ruta
+  en la respuesta de la API; se bajan con sesión y permiso.
 - **Prompt 2 — endpoints de soporte** (`POST/GET /curriculum/areas`, `POST/GET /curriculum/subjects`): no
   estaban en la lista de "endpoints requeridos", pero sin ellos no hay forma de obtener un `area_id`/`subject_id`
-  válido vía API para probar `referentes`, `study-plan` o `teacher-assignments` — mismo criterio usado en
+  válido vía API para probar `planeacion`, `study-plan` o `teacher-assignments` — mismo criterio usado en
   Prompt 1 para `/users`.
-- **Prompt 2 — historial_revisiones**: se registra en cada decisión del coordinador, tanto al aprobar como al
-  devolver (no solo al devolver), para mantener una traza completa de todo el ciclo de revisión.
+- **Planeación documental (M07) — historial de revisión**: `revisiones[]` registra cada decisión (aprobar, devolver con comentario
+  obligatorio, reabrir con motivo) y la aprobación automática de una adopción, para mantener una traza completa del ciclo.
 - **Prompt 3 — motor de calificación (`src/services/reportCard.service.ts`)**: nota de componente = promedio
   ponderado (por `peso_en_componente`) de las actividades *calificadas* de ese componente — un componente sin
   ninguna actividad calificada aporta 0 (no se excluye ni se renormaliza; ver comentarios en el servicio).

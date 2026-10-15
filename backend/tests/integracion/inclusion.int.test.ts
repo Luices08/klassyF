@@ -175,7 +175,7 @@ describe('M16: inclusión (con base de datos)', () => {
       await expect(ajustes.listarAjustes(id, e.docenteAjeno)).rejects.toMatchObject({ statusCode: 404 });
     });
 
-    it('no se diligencia con el expediente en borrador, y un DBA de otra área se rechaza', async () => {
+    it('no se diligencia con el expediente en borrador, y con la construcción iniciada el docente de la asignatura sí', async () => {
       const s = await solicitudes.crearSolicitud({ student_id: String(e.estudiante._id), motivo_declarado: 'Baja visión' }, e.docenteDeClase);
       await solicitudes.valorarSolicitud(String(s._id), e.orientador);
       const id = String((await solicitudes.resolverSolicitud(String(s._id), { resultado: 'ABRIR_PIAR', motivo: 'Hay soporte' }, e.orientador)).expediente_id);
@@ -183,7 +183,7 @@ describe('M16: inclusión (con base de datos)', () => {
 
       await expedientes.registrarConsentimiento(id, { otorgado_por_nombre: 'Marta Morales', parentesco: 'Madre' }, e.orientador);
       await expedientes.iniciarConstruccion(id, e.orientador);
-      await expect(ajustes.guardarAjuste(id, matematicas, { dba_ids: ['64b000000000000000000000'] }, e.docenteDeClase)).rejects.toMatchObject({ statusCode: 400 });
+      await expect(ajustes.guardarAjuste(id, matematicas, ajusteCompleto, e.docenteDeClase)).resolves.toMatchObject({ completo: true });
     });
 
     it('la coordinación solo aprueba cuando todo está completo; editar un expediente aprobado lo devuelve a construcción', async () => {

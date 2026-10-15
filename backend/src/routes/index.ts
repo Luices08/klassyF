@@ -12,7 +12,7 @@ import campusRoutes from './campus.routes';
 import certificadoRoutes from './certificado.routes';
 import casoRoutes from './caso.routes';
 import orientacionRoutes from './orientacion.routes';
-import curricularDevelopmentRoutes from './curricularDevelopment.routes';
+import documentoReferenciaRoutes from './documentoReferencia.routes';
 import enrollmentRoutes from './enrollment.routes';
 import espacioRoutes from './espacio.routes';
 import gradeRoutes from './grade.routes';
@@ -22,18 +22,21 @@ import horarioRoutes from './horario.routes';
 import inclusionRoutes from './inclusion.routes';
 import institutionRoutes from './institution.routes';
 import jornadaOperativaRoutes from './jornadaOperativa.routes';
+import liderAreaRoutes from './liderArea.routes';
 import notasRoutes from './notas.routes';
 import observacionRoutes from './observacion.routes';
 import periodLockRoutes from './periodLock.routes';
+import planAreaRoutes from './planArea.routes';
+import planAulaRoutes from './planAula.routes';
 import publicRoutes from './public.routes';
 import recuperacionRoutes from './recuperacion.routes';
-import referenteCurricularRoutes from './referenteCurricular.routes';
 import reportCardRoutes from './reportCard.routes';
 import studentRoutes from './student.routes';
 import studyPlanRoutes from './studyPlan.routes';
 import subjectRoutes from './subject.routes';
 import teacherAssignmentRoutes from './teacherAssignment.routes';
 import userRoutes from './user.routes';
+import ventanaPlanesRoutes from './ventanaPlanes.routes';
 
 const router = Router();
 
@@ -67,13 +70,18 @@ router.use('/guardians', guardianRoutes);
 router.use('/admission-requests', admissionRequestRoutes);
 router.use('/public', publicRoutes);
 
-// Prompt 2: Malla Curricular, Banco de DBA y Planeación Pedagógica
+// M06/M08: catálogo académico, plan de estudios y carga docente
 router.use('/curriculum/areas', areaRoutes);
 router.use('/curriculum/subjects', subjectRoutes);
-router.use('/curriculum/referentes', referenteCurricularRoutes);
 router.use('/curriculum/study-plan', studyPlanRoutes);
 router.use('/teacher-assignments', teacherAssignmentRoutes);
-router.use('/curricular-developments', curricularDevelopmentRoutes);
+
+// M07: Planeación documental (PDF) — documentos de apoyo, plan de área anual y plan de aula por periodo
+router.use('/planeacion/documentos-referencia', documentoReferenciaRoutes);
+router.use('/planeacion/lideres-area', liderAreaRoutes);
+router.use('/planeacion/planes-area', planAreaRoutes);
+router.use('/planeacion/planes-aula', planAulaRoutes);
+router.use('/planeacion/ventanas', ventanaPlanesRoutes);
 
 // M14: Observaciones y convivencia (Observador)
 router.use('/observaciones', observacionRoutes);

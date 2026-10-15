@@ -237,7 +237,7 @@ export async function vincularAcudiente(
 
 export async function actualizarVinculo(
   relationId: string,
-  patch: { parentesco?: Parentesco; es_principal?: boolean; autorizado_retiro?: boolean },
+  patch: { parentesco?: Parentesco; es_principal?: boolean; autorizado_retiro?: boolean; habilitar_portal?: boolean },
   { usuarioId, ip }: ContextoActor
 ): Promise<StudentGuardianDocument> {
   const relacion = await StudentGuardian.findById(relationId);
@@ -245,7 +245,19 @@ export async function actualizarVinculo(
 
   if (patch.es_principal) await asegurarUnicoPrincipal(String(relacion.student_id), relacion._id);
 
-  Object.assign(relacion, patch);
+  if (patch.habilitar_portal) {
+    const guardian = await Guardian.findById(relacion.guardian_id);
+    if (guardian && !guardian.user_id) {
+      await runTransaction(async (session) => {
+        const cuenta = await asegurarCuentaPortal(guardian, session);
+        guardian.user_id = cuenta.usuarioId;
+        await guardian.save({ session });
+      });
+    }
+  }
+
+  const { habilitar_portal: _, ...datosRelacion } = patch;
+  Object.assign(relacion, datosRelacion);
   await relacion.save();
 
   await registrarEvento({

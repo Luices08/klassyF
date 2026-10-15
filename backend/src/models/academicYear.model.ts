@@ -26,6 +26,10 @@ export interface IPeriodo {
   // Ventana en la que los docentes digitan notas; null = sin limite de fechas.
   fecha_apertura_notas: Date | null;
   fecha_cierre_notas: Date | null;
+  // Ventana en la que los docentes radican su plan de aula del periodo (M07); null = la sugerida,
+  // que se calcula con las fechas del periodo (ver utils/planeacion.ts#ventanaDeEntrega).
+  fecha_apertura_planes_aula?: Date | null;
+  fecha_limite_planes_aula?: Date | null;
   estado: EstadoPeriodoAcademico;
 }
 
@@ -132,6 +136,8 @@ const periodoSchema = new Schema<IPeriodo>(
     fecha_fin: { type: Date, required: true },
     fecha_apertura_notas: { type: Date, default: null },
     fecha_cierre_notas: { type: Date, default: null },
+    fecha_apertura_planes_aula: { type: Date, default: null },
+    fecha_limite_planes_aula: { type: Date, default: null },
     estado: { type: String, enum: ESTADOS_PERIODO_ACADEMICO, default: 'PROGRAMADO' },
   },
   { _id: true }
@@ -244,8 +250,18 @@ const academicYearSchema = new Schema<IAcademicYear, AcademicYearModel>(
   { timestamps: true }
 );
 
-// Un año lectivo es unico por institucion.
-academicYearSchema.index({ institucion_id: 1, year: 1 }, { unique: true });
+// Un mismo año calendario solo tiene un año lectivo sin cerrar: los CERRADOS son historico y no cuentan, asi se
+// puede abrir otro 2026 despues de cerrar el primero (p. ej. para repetir pruebas). Reemplaza al indice unico
+// institucion+year de antes: `npm run migrate:anio-repetible` lo retira en bases existentes.
+export const INDICE_ANIO_SIN_CERRAR = 'anio_sin_cerrar_unico';
+academicYearSchema.index(
+  { institucion_id: 1, year: 1 },
+  {
+    unique: true,
+    name: INDICE_ANIO_SIN_CERRAR,
+    partialFilterExpression: { estado: { $in: ['PLANIFICACION', 'EN_CURSO'] } },
+  }
+);
 
 // Vigencia activa unica: la base de datos misma impide dos años EN_CURSO en la
 // institucion, aunque dos activaciones lleguen a la vez.

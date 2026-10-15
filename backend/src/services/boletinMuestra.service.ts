@@ -9,8 +9,8 @@ import type { ReportCardArea, ReportCardAsignatura, ReportCardResult } from './r
 /** El año vigente; si no hay, el más reciente sin cerrar o, en último caso, el último que exista. */
 const anioDeTrabajo = async () =>
   (await AcademicYear.findOne({ estado: 'EN_CURSO' }).lean()) ??
-  (await AcademicYear.findOne({ estado: { $ne: 'CERRADO' } }).sort({ year: -1 }).lean()) ??
-  (await AcademicYear.findOne().sort({ year: -1 }).lean());
+  (await AcademicYear.findOne({ estado: { $ne: 'CERRADO' } }).sort({ year: -1, createdAt: -1 }).lean()) ??
+  (await AcademicYear.findOne().sort({ year: -1, createdAt: -1 }).lean());
 
 const OBSERVACION_DE_MUESTRA = 'Ejemplo de una observación escrita por el docente para este estudiante.';
 

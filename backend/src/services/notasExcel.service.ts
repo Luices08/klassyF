@@ -1,11 +1,14 @@
 import ExcelJS from 'exceljs';
 import { Types } from 'mongoose';
-import { MAX_BYTES_EXCEL_NOTAS } from '../constants/notas';
+import { createHash } from 'crypto';
+import { MAX_BYTES_EXCEL_NOTAS, MAX_ERRORES_REGISTRADOS } from '../constants/notas';
+import ImportacionNotas, { IErrorImportacionNotas } from '../models/importacionNotas.model';
 import { UserDocument } from '../models/user.model';
 import ApiError from '../utils/ApiError';
+import { registrarEvento } from './audit.service';
 import { exigirPesosValidos } from './casillasBloque.service';
 import { actualizarCasilla, crearCasilla, establecerPesos } from './columnasPlanilla.service';
-import { CeldaPlanilla, guardarCeldas, obtenerPlanilla, Planilla } from './notas.service';
+import { CeldaPlanilla, guardarCeldas, obtenerPlanilla, Planilla, resolverAcceso } from './notas.service';
 import { armarPlanillaDeMuestra } from './planillaMuestra.service';
 
 const HOJA_PLANILLA = 'Planilla';
@@ -354,6 +357,24 @@ export interface ResultadoImportacionNotas {
 const igualesPeso = (a: number | null, b: number | null): boolean => (a === null || b === null ? a === b : Math.abs(a - b) < 0.005);
 const igualesNota = (a: number | null, b: number | null): boolean => (a === null || b === null ? a === b : Math.abs(a - b) < 0.0001);
 
+interface ErrorDeImportacion {
+  fila: number;
+  documento?: string;
+  motivo: string;
+  /** Lo cambió el sistema después de que se descargó el archivo: no es un error de digitación. */
+  conflicto?: boolean;
+}
+
+/** Lo que se sabe del archivo mientras se procesa, para dejar registro aunque falle a la mitad. */
+interface TrazaImportacion {
+  asignacionId: string | null;
+  periodoNumero: number | null;
+  descargadoEn: Date | null;
+  errores: ErrorDeImportacion[];
+  /** Ya pasó toda la validación: si falla de aquí en adelante, pudo quedar algo escrito. */
+  validado: boolean;
+}
+
 interface ColumnaImportada {
   indice: number;
   tipo: 'CASILLA' | 'NUEVA';
@@ -378,7 +399,7 @@ interface ColumnaImportada {
  * no tocó nunca pisa lo nuevo del sistema, y si tocó una que alguien más cambió entretanto es un conflicto que se reporta (no se
  * guarda nada) para que descargue de nuevo y decida.
  */
-export async function importarPlantillaNotas(archivo: Buffer, docente: UserDocument, ip?: string | null): Promise<ResultadoImportacionNotas> {
+async function aplicarImportacion(archivo: Buffer, docente: UserDocument, ip: string | null | undefined, traza: TrazaImportacion): Promise<ResultadoImportacionNotas> {
   if (archivo.length > MAX_BYTES_EXCEL_NOTAS) throw new ApiError(400, 'El archivo supera los 2 MB.');
   if (!archivo.subarray(0, 4).equals(FIRMA_ZIP)) throw new ApiError(400, 'El archivo no es un Excel (.xlsx) válido.');
 
@@ -399,6 +420,10 @@ export async function importarPlantillaNotas(archivo: Buffer, docente: UserDocum
   if (!hoja || !datos || !Types.ObjectId.isValid(asignacionId) || !Number.isInteger(periodoNumero)) {
     throw new ApiError(400, 'El archivo no es una planilla de notas de Klassy. Descárgala desde «Notas» y vuelve a subirla.');
   }
+  traza.asignacionId = asignacionId;
+  traza.periodoNumero = periodoNumero;
+  const descargado = new Date(textoDeCelda(datos.getCell('B3')));
+  traza.descargadoEn = Number.isNaN(descargado.getTime()) ? null : descargado;
   if (textoDeCelda(datos.getCell('B4')) !== VERSION_INSTANTANEA) {
     throw new ApiError(400, 'Este archivo se descargó con una versión anterior de Klassy y no se puede comparar con lo que hay hoy en el sistema. Descarga la planilla de nuevo.');
   }
@@ -431,7 +456,7 @@ export async function importarPlantillaNotas(archivo: Buffer, docente: UserDocum
     return fila === undefined ? null : numeroDeCelda(datos.getCell(fila, indice));
   };
 
-  const errores: Array<{ fila: number; documento?: string; motivo: string }> = [];
+  const errores: ErrorDeImportacion[] = [];
 
   // --- Encabezados: nombre y peso de cada casilla ---
   const importadas: ColumnaImportada[] = [];
@@ -448,7 +473,7 @@ export async function importarPlantillaNotas(archivo: Buffer, docente: UserDocum
     if (llave.tipo === 'CASILLA') {
       const existente = existentes.get(llave.clave);
       if (!existente) {
-        errores.push({ fila: FILA_NOMBRES, motivo: 'Una columna corresponde a una casilla que ya no existe: descarga la planilla de nuevo.' });
+        errores.push({ fila: FILA_NOMBRES, motivo: 'Una columna corresponde a una casilla que ya no existe: descarga la planilla de nuevo.', conflicto: true });
         continue;
       }
       if (existente.tipo === 'MANUAL' && nombre === '') {
@@ -459,6 +484,7 @@ export async function importarPlantillaNotas(archivo: Buffer, docente: UserDocum
         errores.push({
           fila: FILA_PESOS,
           motivo: `El peso de «${existente.titulo}» cambió en el sistema después de que descargaste el archivo (ahora es ${existente.peso ?? 'automático'}). Descarga la planilla de nuevo para no pisar ese cambio.`,
+          conflicto: true,
         });
         continue;
       }
@@ -466,6 +492,7 @@ export async function importarPlantillaNotas(archivo: Buffer, docente: UserDocum
         errores.push({
           fila: FILA_NOMBRES,
           motivo: `La casilla «${existente.titulo}» cambió de nombre en el sistema después de que descargaste el archivo. Descarga la planilla de nuevo.`,
+          conflicto: true,
         });
         continue;
       }
@@ -514,6 +541,7 @@ export async function importarPlantillaNotas(archivo: Buffer, docente: UserDocum
             fila: numeroFila,
             documento,
             motivo: `La nota de «${titulo}» cambió en el sistema después de que descargaste el archivo (en tu archivo: ${alDescargar ?? 'vacía'}, ahora en el sistema: ${actual}). Descarga la planilla de nuevo para no pisarla.`,
+            conflicto: true,
           });
           continue;
         }
@@ -549,7 +577,12 @@ export async function importarPlantillaNotas(archivo: Buffer, docente: UserDocum
     else throw err;
   }
 
-  if (errores.length > 0) throw new ApiError(400, `El archivo tiene ${errores.length} fila(s) con errores; no se guardó nada.`, errores);
+  if (errores.length > 0) {
+    traza.errores = errores;
+    // `conflicto` es solo del registro; la respuesta al docente conserva su forma (fila, documento, motivo).
+    throw new ApiError(400, `El archivo tiene ${errores.length} fila(s) con errores; no se guardó nada.`, errores.map(({ conflicto: _conflicto, ...visible }) => visible));
+  }
+  traza.validado = true;
 
   // --- Escritura: casillas nuevas, nombres, pesos y por último las notas ---
   const idDeNueva = new Map<number, string>();
@@ -599,4 +632,95 @@ export async function importarPlantillaNotas(archivo: Buffer, docente: UserDocum
     casillas_renombradas: renombradas,
     pesos_actualizados: pesos.length,
   };
+}
+
+const detalleBreve = (r: ResultadoImportacionNotas): string =>
+  `${r.guardadas} nota(s), ${r.casillas_creadas} casilla(s) nueva(s), ${r.casillas_renombradas} renombrada(s), ${r.pesos_actualizados} peso(s)`;
+
+/**
+ * Sube una planilla diligenciada sin conexión (ver `aplicarImportacion`) y deja siempre registro: quién, cuándo, qué archivo
+ * (su huella SHA-256), qué se aplicó y, si no se aplicó, qué errores o conflictos tuvo. Registrar nunca cambia el resultado: si
+ * el registro falla, el docente recibe igual lo que le tocaba (la planilla ya guardada o su error).
+ */
+export async function importarPlantillaNotas(
+  archivo: Buffer,
+  docente: UserDocument,
+  ip?: string | null,
+  nombreArchivo = ''
+): Promise<ResultadoImportacionNotas> {
+  const traza: TrazaImportacion = { asignacionId: null, periodoNumero: null, descargadoEn: null, errores: [], validado: false };
+  const hash = createHash('sha256').update(archivo).digest('hex');
+  try {
+    const resultado = await aplicarImportacion(archivo, docente, ip, traza);
+    await registrarImportacion({ docente, ip, traza, hash, nombreArchivo, resultado: 'APLICADA', aplicado: resultado });
+    return resultado;
+  } catch (err) {
+    const mensaje = err instanceof Error ? err.message : 'Error desconocido al importar el archivo.';
+    await registrarImportacion({ docente, ip, traza, hash, nombreArchivo, resultado: traza.validado ? 'INTERRUMPIDA' : 'RECHAZADA', mensaje });
+    throw err;
+  }
+}
+
+interface EntradaRegistro {
+  docente: UserDocument;
+  ip?: string | null;
+  traza: TrazaImportacion;
+  hash: string;
+  nombreArchivo: string;
+  resultado: 'APLICADA' | 'RECHAZADA' | 'INTERRUMPIDA';
+  aplicado?: ResultadoImportacionNotas;
+  mensaje?: string;
+}
+
+async function registrarImportacion({ docente, ip, traza, hash, nombreArchivo, resultado, aplicado, mensaje }: EntradaRegistro): Promise<void> {
+  try {
+    const errores: IErrorImportacionNotas[] = traza.errores.slice(0, MAX_ERRORES_REGISTRADOS).map((e) => ({
+      fila: e.fila,
+      documento: e.documento ?? null,
+      motivo: e.motivo.slice(0, 500),
+      conflicto: e.conflicto ?? false,
+    }));
+    const registro = await ImportacionNotas.create({
+      usuario_id: docente._id,
+      teacher_assignment_id: traza.asignacionId,
+      periodo_numero: traza.periodoNumero,
+      archivo_nombre: nombreArchivo.slice(0, 200),
+      hash,
+      descargado_en: traza.descargadoEn,
+      resultado,
+      mensaje: mensaje ? mensaje.slice(0, 500) : null,
+      notas_guardadas: aplicado?.guardadas ?? 0,
+      sin_cambios: aplicado?.sin_cambios ?? 0,
+      casillas_creadas: aplicado?.casillas_creadas ?? 0,
+      casillas_renombradas: aplicado?.casillas_renombradas ?? 0,
+      pesos_actualizados: aplicado?.pesos_actualizados ?? 0,
+      total_errores: traza.errores.length,
+      total_conflictos: traza.errores.filter((e) => e.conflicto).length,
+      errores,
+    });
+    // El detalle de la auditoría nunca lleva notas ni nombres de estudiantes: solo conteos y la huella del archivo.
+    await registrarEvento({
+      usuario_id: docente._id,
+      accion: resultado === 'APLICADA' ? 'NOTAS_EXCEL_IMPORTADO' : 'NOTAS_EXCEL_RECHAZADO',
+      entidad: 'ImportacionNotas',
+      entidad_id: registro._id,
+      detalle:
+        resultado === 'APLICADA' && aplicado
+          ? `${detalleBreve(aplicado)}; sha256 ${hash}`
+          : `${resultado}: ${traza.errores.length} error(es), ${registro.total_conflictos} conflicto(s); sha256 ${hash}`,
+      ip,
+    });
+  } catch (err) {
+    console.error('No se pudo registrar la importación del Excel de notas:', err);
+  }
+}
+
+/** Las últimas importaciones de la planilla de una clase y periodo, para que el docente (o coordinación) vea qué pasó con cada archivo. */
+export async function listarImportacionesDeNotas(asignacionId: string, periodoNumero: number, usuario: UserDocument) {
+  const asignacion = await resolverAcceso(asignacionId, usuario);
+  return ImportacionNotas.find({ teacher_assignment_id: asignacion._id, periodo_numero: periodoNumero })
+    .sort({ createdAt: -1 })
+    .limit(20)
+    .populate<{ usuario_id: { nombre: string; apellido: string } }>('usuario_id', 'nombre apellido')
+    .lean();
 }

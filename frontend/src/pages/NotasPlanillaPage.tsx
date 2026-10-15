@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { EntregasDrawer } from '../components/actividades/EntregasDrawer';
 import { CasillaDrawer, type CasillaEnEdicion } from '../components/notas/CasillaDrawer';
 import { ExcelNotas } from '../components/notas/ExcelNotas';
+import { HistorialImportacionesExcel } from '../components/notas/HistorialImportacionesExcel';
 import { PlanillaNotas } from '../components/notas/PlanillaNotas';
 import { ReabrirPlanillaDrawer } from '../components/notas/ReabrirPlanillaDrawer';
 import { Alert, errorMessage } from '../components/ui/Alert';
@@ -234,6 +235,8 @@ export function NotasPlanillaPage() {
             puedeSubir={planilla.edicion.puede_editar}
             puedeDescargar
           />
+
+          <HistorialImportacionesExcel key={`${asignacion._id}-${periodo.numero}`} teacherAssignmentId={asignacion._id} periodoNumero={periodo.numero} />
 
           <EntregasDrawer actividad={revisando} onClose={() => setRevisando(null)} escala={anio?.escala_evaluacion ?? null} />
 

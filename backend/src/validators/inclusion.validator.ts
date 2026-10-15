@@ -221,7 +221,6 @@ export const listarAjustes: ValidationSchema = idParam;
 export const guardarAjuste: ValidationSchema = {
   ...paramsAjuste,
   body: Joi.object({
-    dba_ids: Joi.array().items(objectId).max(15),
     objetivo_flexibilizado: largo,
     barrera_asignatura: largo,
     tipos_barrera: Joi.array().items(Joi.string().valid(...TIPOS_BARRERA)).max(TIPOS_BARRERA.length),

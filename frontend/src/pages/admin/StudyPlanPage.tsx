@@ -118,12 +118,25 @@ function resolverGradoPlan(
   jornadaId?: string | null
 ) {
   if (!studyPlan?.grades || studyPlan.grades.length === 0) return undefined;
+  // Igual que el backend (obtenerGradoPlanEfectivo): una entrada sin asignaturas no tapa el plan que se hereda.
+  return (
+    resolverPorJerarquia(studyPlan.grades.filter((g) => g.asignaturas.length > 0), gradeId, sedeId, jornadaId) ??
+    resolverPorJerarquia(studyPlan.grades, gradeId, sedeId, jornadaId)
+  );
+}
+
+function resolverPorJerarquia(
+  grades: NonNullable<ReturnType<typeof useStudyPlan>['data']>['grades'],
+  gradeId: string,
+  sedeId?: string | null,
+  jornadaId?: string | null
+) {
   const sId = sedeId ? String(sedeId) : null;
   const jId = jornadaId ? String(jornadaId) : null;
 
   // 1. Coincidencia exacta: (grade_id, sede_id, jornada_id)
   if (sId && jId) {
-    const exacto = studyPlan.grades.find(
+    const exacto = grades.find(
       (g) => g.grade_id === gradeId && (g.sede_id || null) === sId && (g.jornada_id || null) === jId
     );
     if (exacto) return exacto;
@@ -131,22 +144,18 @@ function resolverGradoPlan(
 
   // 2. Coincidencia por jornada (todas las sedes): (grade_id, null, jornada_id)
   if (jId) {
-    const porJornada = studyPlan.grades.find(
-      (g) => g.grade_id === gradeId && !g.sede_id && (g.jornada_id || null) === jId
-    );
+    const porJornada = grades.find((g) => g.grade_id === gradeId && !g.sede_id && (g.jornada_id || null) === jId);
     if (porJornada) return porJornada;
   }
 
   // 3. Coincidencia por sede (todas las jornadas): (grade_id, sede_id, null)
   if (sId) {
-    const porSede = studyPlan.grades.find(
-      (g) => g.grade_id === gradeId && (g.sede_id || null) === sId && !g.jornada_id
-    );
+    const porSede = grades.find((g) => g.grade_id === gradeId && (g.sede_id || null) === sId && !g.jornada_id);
     if (porSede) return porSede;
   }
 
   // 4. Base general institucional: (grade_id, null, null)
-  return studyPlan.grades.find((g) => g.grade_id === gradeId && !g.sede_id && !g.jornada_id);
+  return grades.find((g) => g.grade_id === gradeId && !g.sede_id && !g.jornada_id);
 }
 
 const TABS = [
@@ -812,16 +821,34 @@ function ConfiguracionGeneralNivelTab({
     return Array.from(porClave.values()).sort((a, b) => a.etiqueta.localeCompare(b.etiqueta));
   }, [studyPlan, gradosDelNivel, jornadas, sedes]);
 
-  // Grados sin plan propio en la sede/jornada elegida: rige el de la base general (lo mismo que resuelve el backend)
-  const gradosHeredados = useMemo(() => {
+  // De dónde sale el plan que se muestra (y que leen grupos, carga docente y horarios): propio de este contexto o heredado.
+  const origenDelPlan = useMemo(() => {
     const sId = sedeId || null;
     const jId = jornadaId || null;
-    return gradosDelNivel.filter((grado) => {
+    const nombreSede = (id: string | null | undefined) => sedes.find((x) => x._id === id)?.nombre ?? 'Sede';
+    const nombreJornada = (id: string | null | undefined) => jornadas.find((x) => x._id === id)?.nombre ?? 'Jornada';
+    const describir = (g: { sede_id?: string | null; jornada_id?: string | null }) => {
+      if (g.sede_id && g.jornada_id) return `${nombreSede(g.sede_id)} · jornada ${nombreJornada(g.jornada_id)}`;
+      if (g.jornada_id) return `jornada ${nombreJornada(g.jornada_id)} (todas las sedes)`;
+      if (g.sede_id) return `${nombreSede(g.sede_id)} · todas las jornadas`;
+      return 'todas las sedes y todas las jornadas (plan general de la institución)';
+    };
+    const propios: string[] = [];
+    const sinPlan: string[] = [];
+    const heredados = new Map<string, string[]>();
+    for (const grado of gradosDelNivel) {
       const efectivo = resolverGradoPlan(studyPlan, grado._id, sId, jId);
-      if (!efectivo) return false;
-      return (efectivo.sede_id || null) !== sId || (efectivo.jornada_id || null) !== jId;
-    });
-  }, [gradosDelNivel, studyPlan, sedeId, jornadaId]);
+      if (!efectivo || efectivo.asignaturas.length === 0) {
+        sinPlan.push(grado.nombre);
+      } else if ((efectivo.sede_id || null) === sId && (efectivo.jornada_id || null) === jId) {
+        propios.push(grado.nombre);
+      } else {
+        const fuente = describir(efectivo);
+        heredados.set(fuente, [...(heredados.get(fuente) ?? []), grado.nombre]);
+      }
+    }
+    return { propios, sinPlan, heredados: Array.from(heredados.entries()) };
+  }, [gradosDelNivel, studyPlan, sedeId, jornadaId, sedes, jornadas]);
 
   // 3. Grados que exceden el límite de horas semanales configurado para este nivel/jornada
   const gradosExcedidos = useMemo(() => {
@@ -1047,16 +1074,27 @@ function ConfiguracionGeneralNivelTab({
           </div>
         )}
 
-        {/* Sede/jornada sin plan propio: rige la base general (así lo leen grupos, carga docente y horarios) */}
-        {(sedeId || jornadaId) && gradosHeredados.length > 0 && (
-          <div className="mb-4">
-            <Alert tone="info">
-              {gradosHeredados.length === gradosDelNivel.length ? 'Este contexto' : `Los grados ${gradosHeredados.map((g) => g.nombre).join(', ')}`}{' '}
-              no tiene plan propio: se muestra y se usa el plan de la <strong>base general</strong>. No necesitas repetirlo aquí.
-              Solo edítalo si esta sede o jornada tiene horas distintas: al guardar, se crea un plan propio.
+        {/* Qué plan rige en este contexto: el propio o el que hereda (así lo leen grupos, carga docente y horarios) */}
+        <div className="mb-4 space-y-2">
+          {origenDelPlan.propios.length > 0 && (
+            <Alert tone="success">
+              {origenDelPlan.propios.length === gradosDelNivel.length ? 'Todos los grados' : `Los grados ${origenDelPlan.propios.join(', ')}`}{' '}
+              tienen plan propio de este contexto{sedeId || jornadaId ? '' : ' (plan general)'}.
             </Alert>
-          </div>
-        )}
+          )}
+          {origenDelPlan.heredados.map(([fuente, grados]) => (
+            <Alert key={fuente} tone="info">
+              {grados.length === gradosDelNivel.length ? 'Este contexto' : `Los grados ${grados.join(', ')}`} no tiene plan propio: por defecto
+              se está usando el plan de <strong>{fuente}</strong>. Solo edítalo si aquí las horas son distintas: al guardar se crea un plan propio.
+            </Alert>
+          ))}
+          {origenDelPlan.sinPlan.length > 0 && (
+            <Alert tone="warning">
+              {origenDelPlan.sinPlan.length === gradosDelNivel.length ? 'Ningún grado de este nivel' : `Los grados ${origenDelPlan.sinPlan.join(', ')}`} tiene
+              plan ni aquí ni en un ámbito más general: el horario no tendrá asignaturas para sus grupos hasta que configures las intensidades.
+            </Alert>
+          )}
+        </div>
 
         {/* Fila de Filtro por Área */}
         <div className="flex flex-wrap items-center justify-between gap-4 border-b border-border pb-4">

@@ -215,3 +215,20 @@ describe('obtenerGradoPlanEfectivo', () => {
     expect(res).toBeUndefined();
   });
 });
+
+describe('obtenerGradoPlanEfectivo con entradas vacías', () => {
+  const entrada = (sede: string | null, jornada: string | null, ...asignaturas: ReturnType<typeof asignatura>[]) =>
+    ({ grade_id: 'g3' as any, sede_id: sede as any, jornada_id: jornada as any, asignaturas: asignaturas as any, evaluaciones_area: [], personalizaciones_grupo: [] }) as IGradoPlan;
+
+  it('una entrada exacta sin asignaturas no tapa el plan de la jornada o la sede', () => {
+    const plan = { grades: [entrada('s1', 'tarde'), entrada('s1', null, asignatura('mat', 5))] };
+    expect(obtenerGradoPlanEfectivo(plan, 'g3', 's1', 'tarde')?.asignaturas[0].subject_id).toBe('mat');
+  });
+
+  it('si ninguna entrada tiene asignaturas devuelve la que corresponde por jerarquía', () => {
+    const plan = { grades: [entrada('s1', 'tarde'), entrada(null, null)] };
+    const res = obtenerGradoPlanEfectivo(plan, 'g3', 's1', 'tarde');
+    expect(res?.sede_id).toBe('s1');
+    expect(res?.asignaturas).toHaveLength(0);
+  });
+});

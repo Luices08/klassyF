@@ -120,6 +120,20 @@ export function obtenerGradoPlanEfectivo(
   jornada_id?: string | Types.ObjectId | null
 ): IGradoPlan | undefined {
   if (!plan?.grades || plan.grades.length === 0) return undefined;
+  // Una entrada sin asignaturas (p. ej. creada y nunca llenada) no es un plan: no debe tapar al que se hereda.
+  // Solo si ninguna tiene asignaturas se devuelve la que corresponda por jerarquía, vacía.
+  return (
+    resolverPorJerarquia(plan.grades.filter((g) => g.asignaturas.length > 0), grade_id, sede_id, jornada_id) ??
+    resolverPorJerarquia(plan.grades, grade_id, sede_id, jornada_id)
+  );
+}
+
+function resolverPorJerarquia(
+  grades: IGradoPlan[],
+  grade_id: string | Types.ObjectId,
+  sede_id?: string | Types.ObjectId | null,
+  jornada_id?: string | Types.ObjectId | null
+): IGradoPlan | undefined {
   const gId = String(grade_id);
   const sId = sede_id ? String(sede_id) : null;
   const jId = jornada_id ? String(jornada_id) : null;
@@ -130,31 +144,22 @@ export function obtenerGradoPlanEfectivo(
 
   // 1. Coincidencia exacta: (grade_id, sede_id, jornada_id)
   if (sId && jId) {
-    const exacto = plan.grades.find(
-      (g) => coincideGrado(g) && sedeDeGrado(g) === sId && jornadaDeGrado(g) === jId
-    );
+    const exacto = grades.find((g) => coincideGrado(g) && sedeDeGrado(g) === sId && jornadaDeGrado(g) === jId);
     if (exacto) return exacto;
   }
 
   // 2. Coincidencia por jornada institucional: (grade_id, sede_id: null, jornada_id)
   if (jId) {
-    const porJornada = plan.grades.find(
-      (g) => coincideGrado(g) && !sedeDeGrado(g) && jornadaDeGrado(g) === jId
-    );
+    const porJornada = grades.find((g) => coincideGrado(g) && !sedeDeGrado(g) && jornadaDeGrado(g) === jId);
     if (porJornada) return porJornada;
   }
 
   // 3. Coincidencia por sede institucional: (grade_id, sede_id, jornada_id: null)
   if (sId) {
-    const porSede = plan.grades.find(
-      (g) => coincideGrado(g) && sedeDeGrado(g) === sId && !jornadaDeGrado(g)
-    );
+    const porSede = grades.find((g) => coincideGrado(g) && sedeDeGrado(g) === sId && !jornadaDeGrado(g));
     if (porSede) return porSede;
   }
 
   // 4. Base general institucional: (grade_id, sede_id: null, jornada_id: null)
-  return plan.grades.find(
-    (g) => coincideGrado(g) && !sedeDeGrado(g) && !jornadaDeGrado(g)
-  );
+  return grades.find((g) => coincideGrado(g) && !sedeDeGrado(g) && !jornadaDeGrado(g));
 }
-

@@ -463,6 +463,11 @@ Backend `/espacios` (modelo `Espacio`), frontend `/admin/espacios` (`EspaciosPag
   ponderaciones solo si el área no tiene actividades en ese grado/grupo. Quitar una asignatura del plan exige antes retirar
   su asignación docente, en cualquier estado del año. El versionamiento completo del Análisis_M06 (nueva versión con fechas
   e impacto) queda para cuando existan M09 y el cálculo de boletín por periodo (M12).
+- **Qué plan rige en una sede/jornada** (`obtenerGradoPlanEfectivo`, y su espejo `resolverGradoPlan` en `StudyPlanPage`): sede+jornada → jornada → sede → base
+  general, y **una entrada sin asignaturas no cuenta** (no tapa el plan que se hereda; solo si ninguna tiene asignaturas se devuelve la vacía). La
+  pantalla dice de dónde sale lo que muestra (plan propio, o «por defecto se está usando el plan de …»), porque grupos, carga docente y horarios (M09)
+  leen exactamente eso. `obtenerOCrearGrado` devuelve el subdocumento ya empujado a `plan.grades` (con el literal, el primer guardado de un grado nuevo
+  quedaba vacío).
 - **Una asignatura que ya está en la malla, en una ponderación o en la distribución de un grupo de cualquier plan no cambia de
   `area_id`** (`actualizarSubject`): dejaría ponderaciones colgando de un área que ya no es la suya.
 - **Topes de carga docente** (`Institution.limites_carga_docente`, `max_direcciones_grupo_por_docente`,

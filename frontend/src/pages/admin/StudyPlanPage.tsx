@@ -974,11 +974,21 @@ function ConfiguracionGeneralNivelTab({
         {/* 3. Alerta de validación si algún grado excede el tope de horas semanales del nivel */}
         {gradosExcedidos.length > 0 && (
           <div className="mb-4">
-            <Alert tone="error">
-              Atención: Los grados{' '}
-              <strong>{gradosExcedidos.map((g) => `${g.nombre} (${totalHorasPorGrado[g._id]} h)`).join(', ')}</strong>{' '}
-              superan el límite máximo permitido de {MAX_HORAS_SEMANALES} horas semanales para esta jornada/nivel. Ajusta las intensidades antes de guardar.
-            </Alert>
+            {modoEdicion ? (
+              <Alert tone="error">
+                Atención: Los grados{' '}
+                <strong>{gradosExcedidos.map((g) => `${g.nombre} (${totalHorasPorGrado[g._id]} h)`).join(', ')}</strong>{' '}
+                superan el límite máximo permitido de {MAX_HORAS_SEMANALES} horas semanales para esta jornada/nivel. Ajusta las intensidades antes de guardar.
+              </Alert>
+            ) : (
+              <Alert tone="warning">
+                No se perdió nada: los grados{' '}
+                <strong>{gradosExcedidos.map((g) => `${g.nombre} (${totalHorasPorGrado[g._id]} h)`).join(', ')}</strong>{' '}
+                tienen ese plan guardado, pero {selectedJornada ? `la jornada ${selectedJornada.nombre} solo tiene` : 'este contexto solo admite'}{' '}
+                {MAX_HORAS_SEMANALES} horas semanales y el horario no lo podrá acomodar. Pulsa «Editar intensidades del nivel» y ajústalo a{' '}
+                {MAX_HORAS_SEMANALES} h: se guarda como plan propio de esta jornada y la base general queda igual.
+              </Alert>
+            )}
           </div>
         )}
 

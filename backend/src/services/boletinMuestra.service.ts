@@ -53,6 +53,7 @@ export async function armarBoletinDeMuestra(): Promise<ReportCardResult> {
       descripcion: textoDe(nivel, 'DESCRIPCION'),
       recomendacion: textoDe(nivel, 'RECOMENDACION'),
       observacion_docente: indice === 1 ? OBSERVACION_DE_MUESTRA : null,
+      recuperacion: null,
     };
   };
 

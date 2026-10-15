@@ -39,6 +39,8 @@ export interface ReportCardAsignatura {
   recomendacion: string;
   /** Lo que el docente titular escribió de este estudiante en esta asignatura y periodo. */
   observacion_docente: string | null;
+  /** Recuperación del periodo (M18), si la hubo. Con `cuenta`, `nota_asignatura` ya la incluye. */
+  recuperacion: { nota_original: number; nota_resultante: number; estado: string; cuenta: boolean; detalle: string } | null;
 }
 
 /** Un nivel de la escala del colegio con su equivalencia nacional (Superior/Alto/Básico/Bajo). */

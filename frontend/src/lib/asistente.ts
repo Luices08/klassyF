@@ -134,6 +134,10 @@ export const PALABRAS_CLAVE_POR_RUTA: Record<string, { descripcion: string; clav
     descripcion: 'Programar actividades y revisar entregas.',
     claves: ['actividades', 'tareas', 'programar actividad', 'entregas', 'evaluacion'],
   },
+  '/recuperaciones': {
+    descripcion: 'Política de recuperaciones del colegio y registro de resultados.',
+    claves: ['recuperacion', 'recuperaciones', 'recuperar', 'nivelacion', 'refuerzo', 'perdio la materia', 'recuperacion de fin de año', 'siee'],
+  },
   '/docente/notas': {
     descripcion: 'Planilla de notas de tus clases.',
     claves: ['planilla de notas', 'poner notas', 'calificar', 'registrar notas', 'subir notas'],

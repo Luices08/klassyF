@@ -225,6 +225,10 @@ function areas(c: Contexto, tituloSeccion: string): void {
     if (a.descripcion && asig.descripcion) lista.push([p.rotulos.descripcion, asig.descripcion]);
     if (a.recomendacion && asig.recomendacion) lista.push([p.rotulos.recomendacion, asig.recomendacion]);
     if (a.observacion && asig.observacion_docente) lista.push([p.rotulos.observacion, asig.observacion_docente]);
+    if (asig.recuperacion) {
+      const r = asig.recuperacion;
+      lista.push(['Recuperación', r.cuenta ? `nota del periodo ${nota(r.nota_original)}, con la recuperación ${nota(r.nota_resultante)}.` : `presentada (${nota(r.nota_resultante)}); la nota del periodo se conserva en ${nota(r.nota_original)}.`]);
+    }
     return lista;
   };
 

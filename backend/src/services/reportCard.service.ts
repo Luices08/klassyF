@@ -13,6 +13,7 @@ import Institution from '../models/institution.model';
 import { JornadaOperativaDocument } from '../models/jornadaOperativa.model';
 import Guardian from '../models/guardian.model';
 import ObservacionBoletin from '../models/observacionBoletin.model';
+import Recuperacion from '../models/recuperacion.model';
 import StudentGuardian from '../models/studentGuardian.model';
 import StudyPlan from '../models/studyPlan.model';
 import Subject, { SubjectDocument } from '../models/subject.model';
@@ -22,6 +23,7 @@ import ApiError from '../utils/ApiError';
 import { calcularNotaArea, calcularPromedioGeneral } from '../utils/calculoNotas';
 import { escalaEfectiva, type ResultadoDesempeno } from '../utils/escalaEvaluacion';
 import { ESTADO_ACTIVO } from '../utils/filtroEstado';
+import { integracionDe } from '../utils/integracionRecuperacion';
 import { obtenerGradoPlanEfectivo } from '../utils/horasPlanEstudios';
 import { resumenAsistenciaParaBoletin } from './attendanceStats.service';
 import { leerConfiguracionBoletin } from './boletinConfig.service';
@@ -57,6 +59,8 @@ export interface ReportCardAsignatura {
   recomendacion: string;
   /** Lo que el docente titular escribió de este estudiante en esta asignatura y periodo. */
   observacion_docente: string | null;
+  /** La recuperación del periodo (M18), si la hubo: `nota_asignatura` ya la incluye cuando `cuenta` es cierto; si no, solo se anota. */
+  recuperacion: { nota_original: number; nota_resultante: number; estado: string; cuenta: boolean; detalle: string } | null;
 }
 
 export interface ReportCardArea {
@@ -282,6 +286,16 @@ async function cargarContextoGrupo(
   }).lean();
   const cerradoPor = new Map(cerrados.map((c) => [`${String(c.subject_id)}|${String(c.student_id)}`, c]));
 
+  // Recuperaciones de periodo con resultado (M18): la nota cerrada de M12 no se toca, el boletín la reemplaza al armarse.
+  const recuperadas = await Recuperacion.find({
+    group_id: grupo._id,
+    academic_year_id: anio._id,
+    tipo: 'PERIODO',
+    periodo_numero: periodoNumero,
+    nota_resultante: { $ne: null },
+  });
+  const recuperacionDe = new Map(recuperadas.map((r) => [`${String(r.subject_id)}|${String(r.student_id)}`, r]));
+
   const { porEstudiante: asistenciaTotales, fallasPorAsignatura } = await resumenAsistenciaParaBoletin(grupo._id, periodoNumero);
 
   const [frases, observaciones, configuracion, directorGrupo, institucion] = await Promise.all([
@@ -324,7 +338,9 @@ async function cargarContextoGrupo(
 
       const asignaturas: ReportCardAsignatura[] = entries.map(({ subject, porcentaje }) => {
         const registro = cerradoPor.get(`${String(subject._id)}|${studentId}`);
-        const nota = registro?.resultado?.nota_asignatura ?? null;
+        const recuperada = registro?.resultado ? recuperacionDe.get(`${String(subject._id)}|${studentId}`) : undefined;
+        const cuentaRecuperacion = recuperada ? integracionDe(recuperada.integracion).cuenta_en_boletin : false;
+        const nota = (cuentaRecuperacion ? recuperada?.nota_resultante : null) ?? registro?.resultado?.nota_asignatura ?? null;
         if (nota === null) pendientes.push(subject.nombre);
         const fallas = fallasPorAsignatura.get(`${String(subject._id)}_${studentId}`) ?? 0;
         const desempeno = nota === null ? null : desempenoCualitativo(nota, escalaEvaluacion);
@@ -336,11 +352,24 @@ async function cargarContextoGrupo(
           estado: registro ? (registro.estado as 'CERRADO' | 'DEFINITIVO') : 'SIN_CERRAR',
           desempeno,
           fallas_asignatura: fallas,
-          componentes: registro?.resultado?.componentes ?? [],
+          componentes:
+            cuentaRecuperacion && recuperada && recuperada.componentes.length > 0
+              ? recuperada.componentes.map((c) => ({ clave: c.clave, nombre: c.nombre, porcentaje: c.porcentaje, nota: c.nota }))
+              : (registro?.resultado?.componentes ?? []),
           // La descripción y la recomendación dependen del nivel de una nota cerrada; la observación es del docente y no del cálculo.
           descripcion: desempeno ? fraseGuardada.get(`${desempeno.nivel}|DESCRIPCION`) ?? '' : '',
           recomendacion: desempeno ? fraseGuardada.get(`${desempeno.nivel}|RECOMENDACION`) ?? '' : '',
           observacion_docente: observacionGuardada.get(`${String(subject._id)}|${studentId}`) ?? null,
+          recuperacion:
+            recuperada && registro?.resultado && recuperada.nota_resultante !== null
+              ? {
+                  nota_original: registro.resultado.nota_asignatura,
+                  nota_resultante: recuperada.nota_resultante,
+                  estado: recuperada.estado,
+                  cuenta: cuentaRecuperacion,
+                  detalle: recuperada.detalle,
+                }
+              : null,
         };
       });
 

@@ -652,15 +652,8 @@ function ConfiguracionGeneralNivelTab({
   // tenga horas configuradas en algún grado de este contexto específico (sede + jornada)
   const idsConHorasEnNivel = useMemo(() => {
     const ids = new Set<string>();
-    const sId = sedeId || null;
-    const jId = jornadaId || null;
     for (const grado of gradosDelNivel) {
-      const gradoPlan = studyPlan?.grades.find(
-        (g) =>
-          g.grade_id === grado._id &&
-          (g.sede_id || null) === sId &&
-          (g.jornada_id || null) === jId
-      );
+      const gradoPlan = resolverGradoPlan(studyPlan, grado._id, sedeId, jornadaId);
       for (const a of gradoPlan?.asignaturas ?? []) ids.add(a.subject_id);
     }
     return ids;
@@ -687,15 +680,8 @@ function ConfiguracionGeneralNivelTab({
   // Mapa de horas actuales en base de datos para este contexto: Map<subjectId, Map<gradeId, number>>
   const horasActualesBD = useMemo(() => {
     const mapa = new Map<string, Map<string, number>>();
-    const sId = sedeId || null;
-    const jId = jornadaId || null;
     for (const grado of gradosDelNivel) {
-      const gradoPlan = studyPlan?.grades.find(
-        (g) =>
-          g.grade_id === grado._id &&
-          (g.sede_id || null) === sId &&
-          (g.jornada_id || null) === jId
-      );
+      const gradoPlan = resolverGradoPlan(studyPlan, grado._id, sedeId, jornadaId);
       if (!gradoPlan) continue;
       for (const asig of gradoPlan.asignaturas) {
         if (!mapa.has(asig.subject_id)) {
@@ -773,8 +759,6 @@ function ConfiguracionGeneralNivelTab({
   // 3. Cálculo de horas semanales totales por grado (en lectura o en edición)
   const totalHorasPorGrado = useMemo(() => {
     const totales: Record<string, number> = {};
-    const sId = sedeId || null;
-    const jId = jornadaId || null;
     for (const grado of gradosDelNivel) {
       if (modoEdicion) {
         let suma = 0;
@@ -786,12 +770,7 @@ function ConfiguracionGeneralNivelTab({
         }
         totales[grado._id] = suma;
       } else {
-        const gradoPlan = studyPlan?.grades.find(
-          (g) =>
-            g.grade_id === grado._id &&
-            (g.sede_id || null) === sId &&
-            (g.jornada_id || null) === jId
-        );
+        const gradoPlan = resolverGradoPlan(studyPlan, grado._id, sedeId, jornadaId);
         totales[grado._id] = (gradoPlan?.asignaturas ?? []).reduce(
           (sum, a) => sum + (a.intensidad_horaria_semanal || 0),
           0
@@ -800,6 +779,17 @@ function ConfiguracionGeneralNivelTab({
     }
     return totales;
   }, [gradosDelNivel, modoEdicion, asignaturasDelNivel, horasEdicion, studyPlan, sedeId, jornadaId]);
+
+  // Grados sin plan propio en la sede/jornada elegida: rige el de la base general (lo mismo que resuelve el backend)
+  const gradosHeredados = useMemo(() => {
+    const sId = sedeId || null;
+    const jId = jornadaId || null;
+    return gradosDelNivel.filter((grado) => {
+      const efectivo = resolverGradoPlan(studyPlan, grado._id, sId, jId);
+      if (!efectivo) return false;
+      return (efectivo.sede_id || null) !== sId || (efectivo.jornada_id || null) !== jId;
+    });
+  }, [gradosDelNivel, studyPlan, sedeId, jornadaId]);
 
   // 3. Grados que exceden el límite de horas semanales configurado para este nivel/jornada
   const gradosExcedidos = useMemo(() => {
@@ -850,12 +840,7 @@ function ConfiguracionGeneralNivelTab({
     const { subject, grade } = desvinculandoGrado;
     const sId = sedeId || null;
     const jId = jornadaId || null;
-    const gradoPlan = studyPlan?.grades.find(
-      (g) =>
-        g.grade_id === grade._id &&
-        (g.sede_id || null) === sId &&
-        (g.jornada_id || null) === jId
-    );
+    const gradoPlan = resolverGradoPlan(studyPlan, grade._id, sId, jId);
     const nuevasAsignaturas = (gradoPlan?.asignaturas ?? []).filter((a) => a.subject_id !== subject._id);
 
     const motivo = pedirMotivoDelCambio(exigeMotivo);
@@ -883,12 +868,7 @@ function ConfiguracionGeneralNivelTab({
     const jId = jornadaId || null;
 
     const nuevosGrados = gradosDelNivel.map((grado) => {
-      const gradoPlan = studyPlan?.grades.find(
-        (g) =>
-          g.grade_id === grado._id &&
-          (g.sede_id || null) === sId &&
-          (g.jornada_id || null) === jId
-      );
+      const gradoPlan = resolverGradoPlan(studyPlan, grado._id, sId, jId);
       const asignaturasActuales = (gradoPlan?.asignaturas ?? []).filter((a) => a.subject_id !== subjectId);
       return {
         grade_id: grado._id,
@@ -998,6 +978,17 @@ function ConfiguracionGeneralNivelTab({
               Atención: Los grados{' '}
               <strong>{gradosExcedidos.map((g) => `${g.nombre} (${totalHorasPorGrado[g._id]} h)`).join(', ')}</strong>{' '}
               superan el límite máximo permitido de {MAX_HORAS_SEMANALES} horas semanales para esta jornada/nivel. Ajusta las intensidades antes de guardar.
+            </Alert>
+          </div>
+        )}
+
+        {/* Sede/jornada sin plan propio: rige la base general (así lo leen grupos, carga docente y horarios) */}
+        {(sedeId || jornadaId) && gradosHeredados.length > 0 && (
+          <div className="mb-4">
+            <Alert tone="info">
+              {gradosHeredados.length === gradosDelNivel.length ? 'Este contexto' : `Los grados ${gradosHeredados.map((g) => g.nombre).join(', ')}`}{' '}
+              no tiene plan propio: se muestra y se usa el plan de la <strong>base general</strong>. No necesitas repetirlo aquí.
+              Solo edítalo si esta sede o jornada tiene horas distintas: al guardar, se crea un plan propio.
             </Alert>
           </div>
         )}

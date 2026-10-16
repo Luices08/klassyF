@@ -1,7 +1,7 @@
 import { type FormEvent, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Alert, errorMessage } from '../../components/ui/Alert';
-import { CupoBadge, EstadoMatriculaBadge } from '../../components/ui/Badge';
+import { Chip, CupoBadge, EstadoMatriculaBadge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import { Card, CardHeader } from '../../components/ui/Card';
 import { Drawer } from '../../components/ui/Drawer';
@@ -27,8 +27,10 @@ import {
   type EstadoMatricula,
   type Parentesco,
   type TipoDocumento,
+  type ChecklistItem,
   type TipoIngreso,
 } from '../../types/domain';
+import { DocumentosPrevistos } from '../../components/matriculas/DocumentosPrevistos';
 import { InformacionApoyoCampos } from '../../components/inclusion/InformacionApoyoCampos';
 import { APOYO_VACIO, aApoyoDeclarado } from '../../lib/apoyoDeclarado';
 
@@ -36,6 +38,21 @@ const PAGE_SIZE = 20;
 
 function nombreEstudiante(v: string | { nombre: string; apellido: string; numero_documento: string }): string {
   return typeof v === 'string' ? v : `${v.nombre} ${v.apellido} · ${v.numero_documento}`;
+}
+
+function ResumenDocumentos({ checklist }: { checklist: ChecklistItem[] }) {
+  const obligatorios = checklist.filter((c) => c.obligatorio !== false);
+  const aprobados = obligatorios.filter((c) => c.estado === 'APROBADO').length;
+  const porRevisar = checklist.filter((c) => c.estado === 'CARGADO').length;
+  const rechazados = checklist.filter((c) => c.estado === 'RECHAZADO').length;
+  const completo = obligatorios.length > 0 && aprobados === obligatorios.length;
+  return (
+    <div className="flex flex-wrap gap-1.5">
+      <Chip tone={completo ? 'green' : 'neutral'}>{`${aprobados}/${obligatorios.length} aprobados`}</Chip>
+      {porRevisar > 0 && <Chip tone="blue">{`${porRevisar} en revisión`}</Chip>}
+      {rechazados > 0 && <Chip tone="red">{`${rechazados} rechazados`}</Chip>}
+    </div>
+  );
 }
 
 function nombreGrupo(v: string | { nomenclatura: string }): string {
@@ -165,7 +182,7 @@ export function EnrollmentsPage() {
         finalStudentId = resultado.estudiante._id;
       }
 
-      await createEnrollment.mutateAsync({
+      const matricula = await createEnrollment.mutateAsync({
         student_id: finalStudentId,
         group_id: form.group_id,
         academic_year_id: anioId,
@@ -178,6 +195,8 @@ export function EnrollmentsPage() {
       setForm(FORM_VACIO);
       setDrawerOpen(false);
       void studentsQuery.refetch();
+      // Los documentos se cargan y se revisan en el expediente: se abre de una vez.
+      navigate(`/admin/enrollments/${matricula._id}`);
     } catch (err) {
       setErrorEnvio(errorMessage(err));
     }
@@ -193,6 +212,9 @@ export function EnrollmentsPage() {
         subtitle="Cupos por sede/jornada/grado, formalización de matrícula y novedades."
         action={
           <div className="flex gap-2">
+            <Button variant="outline" onClick={() => navigate('/admin/documentos-por-revisar')}>
+              Documentos por revisar
+            </Button>
             <Button
               variant="outline"
               onClick={() => {
@@ -328,6 +350,7 @@ export function EnrollmentsPage() {
                 <Th>Folio</Th>
                 <Th>Tipo ingreso</Th>
                 <Th>Estado</Th>
+                <Th>Documentos</Th>
                 <Th />
               </TableHead>
               <TableBody>
@@ -341,6 +364,9 @@ export function EnrollmentsPage() {
                       <EstadoMatriculaBadge value={en.estado} />
                     </Td>
                     <Td>
+                      <ResumenDocumentos checklist={en.checklist ?? []} />
+                    </Td>
+                    <Td>
                       <div className="flex justify-end">
                         <IconButton
                           tone="edit"
@@ -352,7 +378,7 @@ export function EnrollmentsPage() {
                     </Td>
                   </tr>
                 ))}
-                {paginaInfo.data.length === 0 && <EmptyRow colSpan={6}>Sin matrículas registradas.</EmptyRow>}
+                {paginaInfo.data.length === 0 && <EmptyRow colSpan={7}>Sin matrículas registradas.</EmptyRow>}
               </TableBody>
             </Table>
 
@@ -619,6 +645,12 @@ export function EnrollmentsPage() {
           value={form.fecha_limite_compromiso}
           onChange={(e) => setForm((f) => ({ ...f, fecha_limite_compromiso: e.target.value }))}
           hint="La matrícula nace condicional y pasa sola a definitiva cuando todos los documentos obligatorios estén aprobados."
+        />
+
+        <DocumentosPrevistos
+          groupId={form.group_id}
+          tipoIngreso={form.tipo_ingreso}
+          studentId={modoMatricula === 'existente' ? form.student_id : undefined}
         />
 
         <InformacionApoyoCampos valor={form.apoyo} onChange={(apoyo) => setForm((f) => ({ ...f, apoyo }))} />

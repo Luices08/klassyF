@@ -213,3 +213,20 @@ export function useDocumentosPorRevisar(filter: { academic_year_id?: string; gro
     enabled: Boolean(filter.academic_year_id),
   });
 }
+
+export interface DocumentoPrevisto {
+  tipo_documento: TipoDocumentoMatricula;
+  nombre: string;
+  indicacion: string;
+  categoria: string;
+  obligatorio: boolean;
+}
+
+/** Los documentos que se le pedirán al estudiante según el grado del grupo y su tipo de ingreso (mismo cálculo que al crear la matrícula). */
+export function useDocumentosPrevistos(params: { group_id?: string; tipo_ingreso: TipoIngreso; student_id?: string }) {
+  return useQuery({
+    queryKey: ['enrollments', 'documentos-previstos', params],
+    queryFn: () => api.get<DocumentoPrevisto[]>('/enrollments/documentos-previstos', { ...params }),
+    enabled: Boolean(params.group_id),
+  });
+}

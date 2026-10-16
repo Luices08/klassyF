@@ -1,5 +1,10 @@
 import { Types } from 'mongoose';
-import { generarChecklistMatricula } from '../constants/matriculaChecklist';
+import {
+  CATEGORIAS_DOCUMENTO_MATRICULA,
+  generarChecklistMatricula,
+  INDICACIONES_DOCUMENTO_MATRICULA,
+  NOMBRES_DOCUMENTO_MATRICULA,
+} from '../constants/matriculaChecklist';
 import {
   ESTADOS_MATRICULA_CON_FOLIO,
   EstadoDocumentoMatricula,
@@ -654,6 +659,45 @@ export async function actualizarComentarioDocumento(
   });
 
   return enrollment;
+}
+
+export interface FiltroDocumentosPrevistos {
+  group_id: string;
+  tipo_ingreso: TipoIngreso;
+  student_id?: string;
+}
+
+/**
+ * Los documentos que se le pedirán a un estudiante antes de crear la matrícula: es la misma función que arma el checklist
+ * al crearla, así que lo que se ve en el formulario es lo que luego se encuentra en el expediente. Con `student_id` se
+ * tienen en cuenta su discapacidad y el parentesco de su acudiente principal; sin él, solo grado e ingreso.
+ */
+export async function listarDocumentosPrevistos(filtro: FiltroDocumentosPrevistos) {
+  const group = await Group.findById(filtro.group_id);
+  if (!group) throw new ApiError(404, 'Grupo no encontrado.');
+  const grade = await Grade.findById(group.grade_id);
+  if (!grade) throw new ApiError(404, 'Grado no encontrado.');
+
+  const [profile, vinculoAcudiente] = filtro.student_id
+    ? await Promise.all([
+        StudentProfile.findOne({ user_id: filtro.student_id }),
+        StudentGuardian.findOne({ student_id: filtro.student_id, es_principal: true }),
+      ])
+    : [null, null];
+
+  return generarChecklistMatricula({
+    nivel: grade.nivel,
+    numeroGrado: grade.numero,
+    tipoIngreso: filtro.tipo_ingreso,
+    tieneDiscapacidad: profile?.tiene_discapacidad,
+    parentescoAcudiente: vinculoAcudiente?.parentesco,
+  }).map((item) => ({
+    tipo_documento: item.tipo_documento,
+    nombre: item.nombre_personalizado || NOMBRES_DOCUMENTO_MATRICULA[item.tipo_documento],
+    indicacion: INDICACIONES_DOCUMENTO_MATRICULA[item.tipo_documento],
+    categoria: CATEGORIAS_DOCUMENTO_MATRICULA[item.tipo_documento],
+    obligatorio: item.obligatorio,
+  }));
 }
 
 export interface FiltroDocumentosPorRevisar {

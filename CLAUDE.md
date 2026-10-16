@@ -969,6 +969,14 @@ Botón flotante en `AppShell` (`components/asistente/AsistenteFlotante.tsx`) que
 - **Compuerta de la definitiva.** `MATRICULADO_DEFINITIVO` solo existe con todos los documentos obligatorios del checklist `APROBADO` (`documentosObligatoriosPendientes`,
   `utils/documentosMatricula.ts`). `createEnrollment` ya no admite `estado_inicial: DEFINITIVO` (409: nace condicional) y `updateEnrollmentStatus` responde 409 con la lista de
   lo que falta. Pasa sola a definitiva al aprobar el último documento (`revisarDocumento`, sin cambios). Para algo que no aplica a un estudiante, se quita del checklist.
+- **Qué documentos pide cada grado** (`generarChecklistMatricula`, una sola función para crear, sincronizar, preinscribir y previsualizar): quien llega de otro colegio (`NUEVO`/`TRASLADO`)
+  trae el certificado del grado que acaba de aprobar: **6° → `CERTIFICADO_QUINTO_PRIMARIA`**, **10° → 9°** (`CERTIFICADO_GRADO_ANTERIOR` con `nombre_personalizado` «Certificado de 9° aprobado (cierra la básica
+  secundaria)»), y en los demás grados (2° a 5°, 7° a 9°, 11°) el del grado inmediatamente anterior; para entrar a 1° y a preescolar no se pide. Los antiguos y repitentes no traen certificado (el boletín ya está
+  aquí), solo el paz y salvo de fin de año. Lo común (identidad, foto, EPS, acudiente), vacunas hasta 2°, notas anteriores y SIMAT, servicio social en 11° por traslado, diagnóstico por discapacidad y custodia si el
+  acudiente no es padre ni madre siguen igual. Las matrículas viejas que ya traen `CERTIFICADO_QUINTO_PRIMARIA` en 7°–11° lo conservan (se corrigen quitándolo desde el expediente).
+- **Verlos antes de matricular**: `GET /enrollments/documentos-previstos?group_id=&tipo_ingreso=&student_id?` (STAFF) devuelve lo que el checklist pedirá (nombre, indicación, categoría, obligatorio) sin crear nada;
+  el drawer «Formalizar matrícula» lo muestra en `DocumentosPrevistos` (todos «No enviado»: **en el drawer no se suben documentos**) y al crear la matrícula navega a su expediente
+  (`/admin/enrollments/:id`), donde se cargan, aprueban y rechazan. La lista de matrículas lleva la columna «Documentos» (aprobados/obligatorios, en revisión, rechazados) leída del `checklist` que ya viene en el listado.
 - **Bandeja «Documentos por revisar»** (`GET /enrollments/documentos-por-revisar`, `DocumentosPorRevisarPage` en `/admin/documentos-por-revisar`, STAFF): una fila por documento
   `CARGADO` de matrículas no terminales, del más antiguo al más reciente, con ver / aprobar / rechazar sin abrir el expediente.
 - **Paz y salvo de fin de año** (`PazYSalvo`, `/paz-y-salvo`, `PazYSalvoPage` en `/paz-y-salvo`): un registro por estudiante y año que termina (`CARGADO` → `CONFIRMADO` | `RECHAZADO`;

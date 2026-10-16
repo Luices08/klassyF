@@ -134,6 +134,23 @@ export interface ItemChecklistGenerado {
 }
 
 /**
+ * Quien llega de otro colegio trae el certificado del grado que acaba de aprobar: el de 5° para entrar a 6° (cierra la
+ * primaria), el de 9° para entrar a 10° (cierra la básica) y el del grado inmediatamente anterior en los demás. Para
+ * entrar a 1° no se pide certificado de transición, ni si no se conoce el grado.
+ */
+function certificadoDelGradoAnterior(numeroGrado: number | undefined): ItemChecklistGenerado | null {
+  if (numeroGrado === undefined || numeroGrado <= 1) return null;
+  if (numeroGrado === 6) return { tipo_documento: 'CERTIFICADO_QUINTO_PRIMARIA', obligatorio: true };
+  const anterior = numeroGrado - 1;
+  const cierraBasica = anterior === 9 ? ' (cierra la básica secundaria)' : '';
+  return {
+    tipo_documento: 'CERTIFICADO_GRADO_ANTERIOR',
+    obligatorio: true,
+    nombre_personalizado: `Certificado de ${anterior}° aprobado${cierraBasica}`,
+  };
+}
+
+/**
  * Genera el checklist documental preciso e inteligente para un estudiante segun su nivel escolar,
  * grado, tipo de ingreso (antiguo vs nuevo/traslado) y condiciones especiales.
  */
@@ -158,18 +175,15 @@ export function generarChecklistMatricula(params: GenerarChecklistParams): ItemC
       items.push({ tipo_documento: 'CARNE_VACUNAS', obligatorio: true });
     }
     if (esNuevoOTraslado) {
+      const certificado = certificadoDelGradoAnterior(params.numeroGrado);
+      if (certificado) items.push(certificado);
       items.push({ tipo_documento: 'CERTIFICADOS_NOTAS_ANTERIORES', obligatorio: true });
       items.push({ tipo_documento: 'PAZ_Y_SALVO_SIMAT', obligatorio: true });
     }
-  } else if (params.nivel === 'SECUNDARIA') {
+  } else if (params.nivel === 'SECUNDARIA' || params.nivel === 'MEDIA') {
     if (esNuevoOTraslado) {
-      items.push({ tipo_documento: 'CERTIFICADO_QUINTO_PRIMARIA', obligatorio: true });
-      items.push({ tipo_documento: 'CERTIFICADOS_NOTAS_ANTERIORES', obligatorio: true });
-      items.push({ tipo_documento: 'PAZ_Y_SALVO_SIMAT', obligatorio: true });
-    }
-  } else if (params.nivel === 'MEDIA') {
-    if (esNuevoOTraslado) {
-      items.push({ tipo_documento: 'CERTIFICADO_QUINTO_PRIMARIA', obligatorio: true });
+      const certificado = certificadoDelGradoAnterior(params.numeroGrado);
+      if (certificado) items.push(certificado);
       items.push({ tipo_documento: 'CERTIFICADOS_NOTAS_ANTERIORES', obligatorio: true });
       items.push({ tipo_documento: 'PAZ_Y_SALVO_SIMAT', obligatorio: true });
       // Exclusivo para grado 11° por traslado

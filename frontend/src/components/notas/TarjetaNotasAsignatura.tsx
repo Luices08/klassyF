@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { formatoDiaCorto } from '../../lib/actividades';
+import { colorPastelDeAsignatura, obtenerEstiloAsignatura } from '../../lib/asignaturasEstilos';
 import type { AsignaturaDeMisNotas, CasillaDeMisNotas } from '../../hooks/useNotas';
 import { Chip, DesempenoBadge, EstadoEntregaBadge, TipoActividadChip } from '../ui/Badge';
 import { Button } from '../ui/Button';
@@ -87,10 +88,22 @@ function FilaCasilla({ casilla, aprobatoria, enlazar }: { casilla: CasillaDeMisN
 function EncabezadoNota({ asignatura, aprobatoria, paraFamilia, conAviso = true }: { asignatura: AsignaturaDeMisNotas; aprobatoria: number; paraFamilia: boolean; conAviso?: boolean }) {
   const definitiva = asignatura.estado === 'CERRADO' || asignatura.estado === 'DEFINITIVO';
   const docente = asignatura.asignacion?.docente;
+  const nombreAsignatura = asignatura.asignacion?.asignatura?.nombre ?? 'Asignatura';
+  const { Icon } = obtenerEstiloAsignatura(nombreAsignatura);
+  const color = colorPastelDeAsignatura(nombreAsignatura);
   return (
     <>
       <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="min-w-0">
+        {!paraFamilia && (
+          <div
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl"
+            style={{ backgroundColor: color.fondo, color: color.icono }}
+            aria-hidden="true"
+          >
+            <Icon className="h-5 w-5" />
+          </div>
+        )}
+        <div className="min-w-0 flex-1">
           <h2 className="text-h3 truncate text-ink" title={asignatura.asignacion?.asignatura?.nombre}>
             {asignatura.asignacion?.asignatura?.nombre ?? 'Asignatura'}
           </h2>
@@ -165,7 +178,7 @@ export function TarjetaNotasAsignatura({ asignatura, aprobatoria, paraFamilia = 
   const totalCasillas = asignatura.bloques.reduce((t, b) => t + b.casillas.length, 0);
 
   return (
-    <Card className="flex flex-col">
+    <Card className="flex flex-col border-2!" style={{ borderColor: colorPastelDeAsignatura(nombre).borde }}>
       {/* Sin el aviso de nota parcial (va en el panel de notas completas) para que todas las tarjetas midan lo mismo. */}
       <EncabezadoNota asignatura={asignatura} aprobatoria={aprobatoria} paraFamilia={paraFamilia} conAviso={false} />
 

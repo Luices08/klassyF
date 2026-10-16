@@ -147,3 +147,34 @@ export function obtenerEstiloAsignatura(nombre: string, areaNombre?: string): Es
     barraColor: 'bg-primary',
   };
 }
+
+export interface ColorPastelAsignatura {
+  fondo: string;
+  borde: string;
+  icono: string;
+}
+
+/**
+ * Colores pastel para distinguir las asignaturas en las pantallas del estudiante (catálogo de actividades y «Mis notas»). Es una excepción
+ * pedida por el usuario a «no agregar colores nuevos» y no es un token de la guía: el color nunca es la única señal (siempre va el nombre).
+ */
+const PALETA_PASTEL_ASIGNATURAS: readonly ColorPastelAsignatura[] = [
+  { fondo: '#DCEBFB', borde: '#A9CCF2', icono: '#3A6FA8' },
+  { fondo: '#D9F4E6', borde: '#A3DEC0', icono: '#2F8A5F' },
+  { fondo: '#F6E0F5', borde: '#DDB0DB', icono: '#9150A0' },
+  { fondo: '#FCE8D2', borde: '#F2C99A', icono: '#B06A1E' },
+  { fondo: '#E3DDF8', borde: '#BDB0EA', icono: '#6150B0' },
+  { fondo: '#FADDE3', borde: '#EFB0BE', icono: '#B04462' },
+  { fondo: '#D6F2F3', borde: '#9FD8DB', icono: '#2B8A90' },
+  { fondo: '#F3F3CF', borde: '#D9D99A', icono: '#7E7E1E' },
+  { fondo: '#E2F3D2', borde: '#B9DE97', icono: '#527F26' },
+  { fondo: '#FADDD0', borde: '#EFB69E', icono: '#B0502A' },
+];
+
+/** El color depende solo del nombre de la asignatura, así es el mismo en el catálogo, en «Mis notas» y entre recargas. */
+export function colorPastelDeAsignatura(nombre: string): ColorPastelAsignatura {
+  const norm = normalizarTexto(nombre).trim();
+  let hash = 0;
+  for (let i = 0; i < norm.length; i += 1) hash = (hash * 31 + norm.charCodeAt(i)) >>> 0;
+  return PALETA_PASTEL_ASIGNATURAS[hash % PALETA_PASTEL_ASIGNATURAS.length];
+}

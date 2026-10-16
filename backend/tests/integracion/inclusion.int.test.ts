@@ -131,7 +131,7 @@ describe('M16: inclusión (con base de datos)', () => {
           group_id: grupo._id,
           academic_year_id: grupo.academic_year_id,
           tipo_ingreso: 'NUEVO',
-          estado_inicial: 'MATRICULADO_DEFINITIVO',
+          fecha_limite_compromiso: new Date(Date.now() + 15 * 86_400_000),
           apoyo_declarado: { motivo_declarado: 'Es hiperactivo y se distrae mucho', aporta_soporte: true },
         },
         { id: e.secretaria._id, rol: 'SECRETARIA' }

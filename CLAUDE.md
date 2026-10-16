@@ -955,6 +955,26 @@ Botón flotante en `AppShell` (`components/asistente/AsistenteFlotante.tsx`) que
 - Bases anteriores a este cambio: `npm run migrate:folio-al-matricular` (libera folios de preinscritos, reemplaza
   los índices y reajusta el contador; un hueco en medio del libro solo se reporta, no se renumera).
 
+### Documentos de matrícula y paz y salvo de fin de año (M04)
+
+- **Compuerta de la definitiva.** `MATRICULADO_DEFINITIVO` solo existe con todos los documentos obligatorios del checklist `APROBADO` (`documentosObligatoriosPendientes`,
+  `utils/documentosMatricula.ts`). `createEnrollment` ya no admite `estado_inicial: DEFINITIVO` (409: nace condicional) y `updateEnrollmentStatus` responde 409 con la lista de
+  lo que falta. Pasa sola a definitiva al aprobar el último documento (`revisarDocumento`, sin cambios). Para algo que no aplica a un estudiante, se quita del checklist.
+- **Bandeja «Documentos por revisar»** (`GET /enrollments/documentos-por-revisar`, `DocumentosPorRevisarPage` en `/admin/documentos-por-revisar`, STAFF): una fila por documento
+  `CARGADO` de matrículas no terminales, del más antiguo al más reciente, con ver / aprobar / rechazar sin abrir el expediente.
+- **Paz y salvo de fin de año** (`PazYSalvo`, `/paz-y-salvo`, `PazYSalvoPage` en `/paz-y-salvo`): un registro por estudiante y año que termina (`CARGADO` → `CONFIRMADO` | `RECHAZADO`;
+  «sin cargar» se deriva). **Confirmar no exige archivo** (es el «check»); rechazar exige motivo. No se modifica en un año `CERRADO`. El aviso fijo de la pantalla dice que se usa al terminar el periodo final.
+  Quién lo gestiona (`permisoPazYSalvo`, `utils/permisosPazYSalvo.ts`, pura con tests, sin herencia): ADMIN, COORDINADOR y SECRETARIA siempre; **DOCENTE solo si
+  `Institution.paz_y_salvo_docentes`** (Configuración institucional, apagado por defecto), y entonces solo para los estudiantes de los grupos donde dicta clase o dirige, sin poder quitar una
+  confirmación (eso es del personal de matrículas). Con la opción apagada el docente ve el motivo, no un vacío. Los soportes van a `uploads/paz-y-salvo/<año>/` (firma de bytes, 5 MB, se bajan con sesión y se auditan).
+- **Lo lee la matrícula del año siguiente.** El checklist de `ANTIGUO` y `REPITENTE` lleva el documento `PAZ_Y_SALVO_ANIO_ANTERIOR` (el de `NUEVO`/`TRASLADO` sigue siendo el de SIMAT). Si el estudiante ya tiene
+  un paz y salvo `CONFIRMADO` de un año anterior (`pazYSalvoConfirmadoPrevio`), el documento nace `APROBADO` sin archivo propio (en `createEnrollment` y en `sincronizarRequisitosMatricula`). Si se
+  confirma después, `aprobarEnMatriculasPosteriores` lo aprueba en las matrículas preinscritas/condicionales/definitivas del año siguiente y promueve a definitiva si ya está completo; quitar la confirmación devuelve
+  a `PENDIENTE` solo lo aprobado automáticamente (sin `archivo_path`) y baja a condicional. Matrículas existentes de antiguos reciben el documento nuevo con «Sincronizar requisitos».
+- Pruebas: unitarias en `tests/pazYSalvo.test.ts` y `tests/checklistMatriculas.test.ts`; con base real en `tests/integracion/pazYSalvo.int.test.ts` (compuerta, bandeja, permisos, propagación).
+- **Pendiente, a propósito:** que el estudiante o el acudiente suban su propio paz y salvo desde un portal (M27: hoy lo sube el personal o, si se habilitó, el docente); avisos a los docentes al terminar el periodo final (M28);
+  confirmación masiva por grupo; filtrar la bandeja por grupo en pantalla (el endpoint ya lo acepta).
+
 ### Acceso al portal del acudiente (M03 → M02/M27)
 
 - `POST /users/:userId/guardians` acepta `habilitar_portal` (checkbox en el drawer "Vincular acudiente", solo al

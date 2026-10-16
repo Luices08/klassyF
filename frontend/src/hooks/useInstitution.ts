@@ -64,6 +64,7 @@ export interface UpdateInstitutionInput {
   horario_atencion?: string | null;
   modalidad?: ModalidadInstitucion;
   politica_aforo_aula?: PoliticaAforoAula;
+  paz_y_salvo_docentes?: boolean;
   confirm_password: string;
 }
 

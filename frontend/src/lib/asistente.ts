@@ -154,6 +154,14 @@ export const PALABRAS_CLAVE_POR_RUTA: Record<string, { descripcion: string; clav
     descripcion: 'Matrículas y libro de matrícula.',
     claves: ['matriculas', 'matricula', 'matricular', 'folio', 'libro de matricula'],
   },
+  '/admin/documentos-por-revisar': {
+    descripcion: 'Bandeja de documentos de matrícula subidos que falta aprobar o rechazar.',
+    claves: ['documentos por revisar', 'revisar documentos', 'aprobar documentos', 'documentos pendientes', 'bandeja de documentos', 'checklist'],
+  },
+  '/paz-y-salvo': {
+    descripcion: 'Paz y salvo de fin de año de los estudiantes, para su matrícula del año siguiente.',
+    claves: ['paz y salvo', 'pazysalvo', 'fin de ano', 'estar a paz y salvo', 'debe libros', 'renovar matricula'],
+  },
   '/admin/admisiones': {
     descripcion: 'Solicitudes de admisión y preinscripciones.',
     claves: ['admisiones', 'admision', 'preinscripcion', 'aspirantes', 'solicitudes de cupo'],

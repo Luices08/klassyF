@@ -7,6 +7,7 @@ import { Card, CardHeader } from '../../components/ui/Card';
 import { Drawer } from '../../components/ui/Drawer';
 import { Input, Select } from '../../components/ui/Field';
 import { IconButton } from '../../components/ui/IconButton';
+import { Switch } from '../../components/ui/Switch';
 import { PageHeader } from '../../components/ui/PageHeader';
 import { Spinner } from '../../components/ui/Spinner';
 import { Table, TableBody, TableHead, Td, Th } from '../../components/ui/Table';
@@ -100,6 +101,7 @@ function InstitutionOverview({ institution }: { institution: Institution }) {
     horario_atencion: institution.horario_atencion ?? '',
     modalidad: institution.modalidad ?? 'PRESENCIAL',
     politica_aforo_aula: institution.politica_aforo_aula ?? 'BLOQUEAR',
+    paz_y_salvo_docentes: institution.paz_y_salvo_docentes ?? false,
     confirm_password: '',
   });
 
@@ -119,6 +121,7 @@ function InstitutionOverview({ institution }: { institution: Institution }) {
       horario_atencion: institution.horario_atencion ?? '',
       modalidad: institution.modalidad ?? 'PRESENCIAL',
       politica_aforo_aula: institution.politica_aforo_aula ?? 'BLOQUEAR',
+      paz_y_salvo_docentes: institution.paz_y_salvo_docentes ?? false,
       confirm_password: '',
     });
     setDrawerOpen(true);
@@ -193,6 +196,10 @@ function InstitutionOverview({ institution }: { institution: Institution }) {
                 value={institution.politica_aforo_aula === 'ADVERTIR' ? 'Solo advertir' : 'Bloquear la creación'}
               />
             )}
+            <StaticField
+              label="Paz y salvo de fin de año"
+              value={institution.paz_y_salvo_docentes ? 'Lo gestionan secretaría y docentes' : 'Lo gestiona solo secretaría'}
+            />
           </div>
         </Card>
 
@@ -350,6 +357,13 @@ function InstitutionOverview({ institution }: { institution: Institution }) {
             <option value="ADVERTIR">Solo advertir (queda en auditoría)</option>
           </Select>
         )}
+
+        <Switch
+          checked={form.paz_y_salvo_docentes}
+          onChange={(v) => setForm((f) => ({ ...f, paz_y_salvo_docentes: v }))}
+          label="Los docentes pueden cargar y confirmar el paz y salvo de fin de año"
+          description="Apagado: solo secretaría, coordinación y administración lo gestionan. Encendido: cada docente también lo hace para los estudiantes de sus grupos (útil donde son ellos quienes revisan). Quien ya lo tiene confirmado no lo vuelve a subir al matricularse."
+        />
 
         <div>
           {form.logo_url && (

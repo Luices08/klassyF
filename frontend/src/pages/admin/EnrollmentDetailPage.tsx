@@ -547,7 +547,9 @@ export function EnrollmentDetailPage() {
               : 'Faltan documentos por aprobar: lo habitual es una matrícula condicional con acta de compromiso.'
           }
         >
-          <option value="MATRICULADO_DEFINITIVO">Definitiva (documentos completos)</option>
+          <option value="MATRICULADO_DEFINITIVO" disabled={!documentosCompletos}>
+            Definitiva (documentos completos)
+          </option>
           <option value="MATRICULADO_CONDICIONAL">Condicional (con acta de compromiso)</option>
         </Select>
         {tipoFormalizacion === 'MATRICULADO_CONDICIONAL' && (

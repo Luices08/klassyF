@@ -47,7 +47,6 @@ const FORM_VACIO = {
   student_id: '',
   group_id: '',
   tipo_ingreso: 'NUEVO' as TipoIngreso,
-  estado_inicial: 'MATRICULADO_CONDICIONAL' as 'MATRICULADO_CONDICIONAL' | 'MATRICULADO_DEFINITIVO',
   fecha_limite_compromiso: '',
   forzar_sobrecupo: false,
   apoyo: APOYO_VACIO,
@@ -171,8 +170,7 @@ export function EnrollmentsPage() {
         group_id: form.group_id,
         academic_year_id: anioId,
         tipo_ingreso: form.tipo_ingreso,
-        estado_inicial: form.estado_inicial,
-        fecha_limite_compromiso: form.estado_inicial === 'MATRICULADO_CONDICIONAL' ? form.fecha_limite_compromiso : undefined,
+        fecha_limite_compromiso: form.fecha_limite_compromiso,
         forzar_sobrecupo: form.forzar_sobrecupo,
         apoyo_declarado: aApoyoDeclarado(form.apoyo),
       });
@@ -614,24 +612,14 @@ export function EnrollmentsPage() {
           ))}
         </Select>
 
-        <Select
-          label="Estado inicial"
-          value={form.estado_inicial}
-          onChange={(e) => setForm((f) => ({ ...f, estado_inicial: e.target.value as typeof f.estado_inicial }))}
-        >
-          <option value="MATRICULADO_CONDICIONAL">Condicional (documentación pendiente)</option>
-          <option value="MATRICULADO_DEFINITIVO">Definitivo (documentación completa)</option>
-        </Select>
-
-        {form.estado_inicial === 'MATRICULADO_CONDICIONAL' && (
-          <Input
-            label="Fecha límite del acta de compromiso"
-            type="date"
-            required
-            value={form.fecha_limite_compromiso}
-            onChange={(e) => setForm((f) => ({ ...f, fecha_limite_compromiso: e.target.value }))}
-          />
-        )}
+        <Input
+          label="Fecha límite del acta de compromiso"
+          type="date"
+          required
+          value={form.fecha_limite_compromiso}
+          onChange={(e) => setForm((f) => ({ ...f, fecha_limite_compromiso: e.target.value }))}
+          hint="La matrícula nace condicional y pasa sola a definitiva cuando todos los documentos obligatorios estén aprobados."
+        />
 
         <InformacionApoyoCampos valor={form.apoyo} onChange={(apoyo) => setForm((f) => ({ ...f, apoyo }))} />
 

@@ -35,7 +35,9 @@ import { ComitePage } from './pages/admin/ComitePage';
 import { CatalogoConvivenciaPage } from './pages/admin/CatalogoConvivenciaPage';
 import { SolicitudesCasoPage } from './pages/admin/SolicitudesCasoPage';
 import { EnrollmentDetailPage } from './pages/admin/EnrollmentDetailPage';
+import { DocumentosPorRevisarPage } from './pages/admin/DocumentosPorRevisarPage';
 import { EnrollmentsPage } from './pages/admin/EnrollmentsPage';
+import { PazYSalvoPage } from './pages/admin/PazYSalvoPage';
 import { EspaciosPage } from './pages/admin/EspaciosPage';
 import { GradesPage } from './pages/admin/GradesPage';
 import { GrupoFichaPage } from './pages/admin/GrupoFichaPage';
@@ -80,9 +82,15 @@ export default function App() {
             <Route path="/admin/users" element={<UsersPage />} />
             <Route path="/admin/enrollments" element={<EnrollmentsPage />} />
             <Route path="/admin/enrollments/:id" element={<EnrollmentDetailPage />} />
+            <Route path="/admin/documentos-por-revisar" element={<DocumentosPorRevisarPage />} />
             <Route path="/admin/students" element={<StudentsPage />} />
             <Route path="/admin/students/:id" element={<StudentDetailPage />} />
             <Route path="/admin/admisiones" element={<AdmissionRequestsPage />} />
+          </Route>
+
+          {/* El docente entra a la ruta: el servidor dice si la institución lo habilitó (Configuración institucional). */}
+          <Route element={<ProtectedRoute allowedRoles={['ADMIN', 'COORDINADOR', 'SECRETARIA', 'DOCENTE']} />}>
+            <Route path="/paz-y-salvo" element={<PazYSalvoPage />} />
           </Route>
 
           <Route element={<ProtectedRoute allowedRoles={['ADMIN', 'SECRETARIA']} />}>

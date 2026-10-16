@@ -45,6 +45,8 @@ export interface IInstitution {
   modalidad: ModalidadInstitucion;
   /** M10: que pasa si el cupo de un grupo excede el aforo de su aula (bloquear o solo advertir). */
   politica_aforo_aula: PoliticaAforoAula;
+  /** M04: los docentes también pueden cargar y confirmar el paz y salvo de fin de año (si no, solo el personal de matrículas). */
+  paz_y_salvo_docentes: boolean;
   /** M08: Topes maximos de carga horaria semanal por nivel segun Decreto 1850 / PEI institucional */
   limites_carga_docente?: ILimitesCargaDocente;
   /** M06: Tope maximo de horas semanales del Plan de Estudios por nivel (antes quemado en el frontend). */
@@ -90,6 +92,7 @@ const institutionSchema = new Schema<IInstitution, InstitutionModel>(
     plantilla_franjas: { type: [franjaPlantillaSchema], default: [] },
     modalidad: { type: String, enum: MODALIDADES_INSTITUCION, default: 'PRESENCIAL' },
     politica_aforo_aula: { type: String, enum: POLITICAS_AFORO_AULA, default: 'BLOQUEAR' },
+    paz_y_salvo_docentes: { type: Boolean, default: false },
     limites_carga_docente: {
       type: new Schema<ILimitesCargaDocente>(
         {

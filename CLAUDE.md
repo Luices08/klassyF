@@ -970,6 +970,10 @@ Botón flotante en `AppShell` (`components/asistente/AsistenteFlotante.tsx`) que
   toma los valores válidos de las mismas constantes de dominio: al agregar o cambiar una columna del importador,
   se actualiza ahí en el mismo cambio.
 
+### Matricular a los estudiantes ya registrados (script)
+
+- `npm run matricular:estudiantes` (`backend/scripts/matricularEstudiantes.ts`) matricula a los estudiantes activos sin matrícula viva en el año de trabajo (EN_CURSO o el más reciente sin cerrar) llamando al mismo `createEnrollment` de secretaría (cupo, folio, checklist): nacen **condicionales** con plazo de compromiso (`--dias-compromiso`, 30 por defecto) y pasan a definitiva al aprobarse sus documentos. El estudiante no guarda su grado, así que los reparte en orden (grado, grupo) llenando cada grupo hasta su cupo; `--grado=` y `--grupo=` acotan, `--tipo=` fija el tipo de ingreso (NUEVO por defecto). **Solo simula** salvo `--aplicar`.
+
 ### Folio del Libro de Matrícula (M04)
 
 - **El folio se asigna al legalizar la matrícula, no al preinscribir**: `Enrollment.folio_matricula`,

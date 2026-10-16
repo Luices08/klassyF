@@ -71,6 +71,7 @@ export default function App() {
           <Route path="/panel" element={<DashboardPage />} />
           <Route path="/report-card" element={<ReportCardPage />} />
           <Route path="/mi-cuenta" element={<MyAccountPage />} />
+          <Route path="/anuncios" element={<AnunciosPage />} />
           <Route path="/anio-lectivo" element={<AnioLectivoPage />} />
 
           <Route element={<ProtectedRoute allowedRoles={['ADMIN']} />}>
@@ -163,7 +164,6 @@ export default function App() {
           </Route>
           <Route element={<ProtectedRoute allowedRoles={['ESTUDIANTE']} />}>
             <Route path="/mis-actividades" element={<MisActividadesPage />} />
-            <Route path="/anuncios" element={<AnunciosPage />} />
             <Route path="/mis-notas" element={<MisNotasPage />} />
             <Route path="/mi-observador" element={<MiObservadorPage />} />
           </Route>

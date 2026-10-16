@@ -166,6 +166,8 @@ export interface IncidenciaHorario {
   magnitud: number;
   claves_sesion: string[];
   mensaje: string;
+  jornada_cruce_id?: string | null;
+  sede_cruce_id?: string | null;
 }
 
 export interface ResumenHorario {

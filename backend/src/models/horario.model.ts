@@ -36,6 +36,9 @@ export interface IIncidenciaHorario {
   magnitud: number;
   claves_sesion: string[];
   mensaje: string;
+  /** Si es un cruce con otra jornada del docente: la jornada donde está la clase con la que choca. */
+  jornada_cruce_id?: Types.ObjectId | null;
+  sede_cruce_id?: Types.ObjectId | null;
 }
 
 export interface IHorario {
@@ -88,6 +91,8 @@ const incidenciaSchema = new Schema<IIncidenciaHorario>(
     magnitud: { type: Number, required: true },
     claves_sesion: { type: [String], default: [] },
     mensaje: { type: String, required: true },
+    jornada_cruce_id: { type: Schema.Types.ObjectId, ref: 'JornadaOperativa', default: null },
+    sede_cruce_id: { type: Schema.Types.ObjectId, ref: 'Campus', default: null },
   },
   { _id: false }
 );

@@ -37,7 +37,16 @@ const ESTADO: Record<EstadoHorario, { texto: string; tono: Tone }> = {
 const MAX_INCIDENCIAS = 15;
 const conHorario = (e: EstadoHorario) => e !== 'GENERANDO' && e !== 'FALLIDO';
 
-export function PanelVersiones({ contexto, puedeGenerar }: { contexto: ContextoHorario; puedeGenerar: boolean }) {
+export function PanelVersiones({
+  contexto,
+  puedeGenerar,
+  onIrAJornada,
+}: {
+  contexto: ContextoHorario;
+  puedeGenerar: boolean;
+  /** Cambia la jornada de la pantalla: el cruce de un docente con otra jornada se resuelve fijando aquí y regenerando allá. */
+  onIrAJornada?: (sedeId: string, jornadaId: string) => void;
+}) {
   const versionesQuery = useVersionesHorario(contexto);
   const generar = useGenerarHorario();
   const eliminar = useEliminarHorario();
@@ -149,6 +158,7 @@ export function PanelVersiones({ contexto, puedeGenerar }: { contexto: ContextoH
           estado={vista.estado}
           generando={generando || generar.isPending}
           onRegenerar={() => void handleGenerar(verId)}
+          onIrAJornada={onIrAJornada}
         />
       )}
       <PublicarDrawer version={publicando} onClose={() => setPublicando(null)} />
@@ -156,7 +166,19 @@ export function PanelVersiones({ contexto, puedeGenerar }: { contexto: ContextoH
   );
 }
 
-function DetalleVersion({ id, estado, generando, onRegenerar }: { id: string; estado: EstadoHorario; generando: boolean; onRegenerar: () => void }) {
+function DetalleVersion({
+  id,
+  estado,
+  generando,
+  onRegenerar,
+  onIrAJornada,
+}: {
+  id: string;
+  estado: EstadoHorario;
+  generando: boolean;
+  onRegenerar: () => void;
+  onIrAJornada?: (sedeId: string, jornadaId: string) => void;
+}) {
   const detalleQuery = useDetalleHorario(id, estado);
   const editar = useEditarSesion();
   const [vista, setVista] = useState<VistaHorario>('GRUPO');
@@ -264,7 +286,21 @@ function DetalleVersion({ id, estado, generando, onRegenerar }: { id: string; es
             <p className="font-semibold">Conflictos que impiden publicar (resaltados en rojo):</p>
             <ul className="mt-1 list-disc space-y-1 pl-4">
               {duras.slice(0, MAX_INCIDENCIAS).map((i, k) => (
-                <li key={k}>{i.mensaje}</li>
+                <li key={k}>
+                  {i.mensaje}
+                  {onIrAJornada && i.jornada_cruce_id && i.sede_cruce_id && (
+                    <>
+                      {' '}
+                      <button
+                        type="button"
+                        className="font-semibold underline"
+                        onClick={() => onIrAJornada(i.sede_cruce_id!, i.jornada_cruce_id!)}
+                      >
+                        Ir a esa jornada
+                      </button>
+                    </>
+                  )}
+                </li>
               ))}
             </ul>
             {duras.length > MAX_INCIDENCIAS && <p className="mt-1">Y {duras.length - MAX_INCIDENCIAS} más.</p>}

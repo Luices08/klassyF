@@ -9,8 +9,9 @@ import { MultiSelect } from '../ui/MultiSelect';
 import { PanelDocumentosPdf } from '../ui/PanelDocumentosPdf';
 import { Spinner } from '../ui/Spinner';
 import { Switch } from '../ui/Switch';
-import { PaperclipIcon, PlayIcon, XIcon } from '../ui/icons';
+import { CalendarIcon, PaperclipIcon, PlayIcon, XIcon } from '../ui/icons';
 import { AlertasCalendario } from './AlertasCalendario';
+import { PanelCargaGrupo } from './PanelCargaGrupo';
 import {
   type Actividad,
   type ActividadConResumen,
@@ -40,6 +41,7 @@ import {
   aInputInstante,
   aInstante,
   formatoTamano,
+  mesDeInstante,
 } from '../../lib/actividades';
 import type { ResumenPlanAula } from '../../types/domain';
 
@@ -167,6 +169,7 @@ function FormularioActividad({
   // Los bloques del molde del colegio con lo que ya tienen en esta clase y periodo: solo se ofrecen los que aún tienen lugar.
   const bloques = useBloquesDeClase({ teacherAssignmentId, periodoNumero });
   const [mensaje, setMensaje] = useState<string | null>(null);
+  const [cargaAbierta, setCargaAbierta] = useState(false);
   const crear = useCrearActividad();
   const actualizar = useActualizarActividad();
   const guardando = crear.isPending || actualizar.isPending;
@@ -299,275 +302,297 @@ function FormularioActividad({
   }
 
   return (
-    <Drawer
-      open
-      size="xl"
-      title={actividad ? 'Editar actividad' : 'Nueva actividad'}
-      subtitle={`Periodo ${periodoNumero}. Estudiantes y calendario se resuelven por tu asignación.`}
-      onClose={onClose}
-      onSubmit={(e) => void guardar(e)}
-      submitLabel={actividad ? 'Guardar cambios' : 'Programar actividad'}
-      isSubmitting={guardando}
-      submitDisabled={!completo || hayBloqueo || (hayAdvertencia && !f.confirmar)}
-    >
-      <div className="grid gap-5 lg:grid-cols-2">
-        <div className="space-y-4">
-          {mensaje && <Alert tone="error">{mensaje}</Alert>}
-          {omitidas.length > 0 && (
-            <Alert tone="warning">
-              <p className="font-semibold">La actividad se creó, pero no se pudo publicar en estos grupos:</p>
-              <ul className="mt-1 list-disc pl-5">
-                {omitidas.map((o) => (
-                  <li key={o}>{o}</li>
+    <>
+      <Drawer
+        open
+        size="xl"
+        title={actividad ? 'Editar actividad' : 'Nueva actividad'}
+        subtitle={`Periodo ${periodoNumero}. Estudiantes y calendario se resuelven por tu asignación.`}
+        onClose={onClose}
+        onSubmit={(e) => void guardar(e)}
+        submitLabel={actividad ? 'Guardar cambios' : 'Programar actividad'}
+        isSubmitting={guardando}
+        submitDisabled={!completo || hayBloqueo || (hayAdvertencia && !f.confirmar)}
+      >
+        <div className="grid gap-5 lg:grid-cols-2">
+          <div className="space-y-4">
+            {mensaje && <Alert tone="error">{mensaje}</Alert>}
+            {omitidas.length > 0 && (
+              <Alert tone="warning">
+                <p className="font-semibold">La actividad se creó, pero no se pudo publicar en estos grupos:</p>
+                <ul className="mt-1 list-disc pl-5">
+                  {omitidas.map((o) => (
+                    <li key={o}>{o}</li>
+                  ))}
+                </ul>
+                <button type="button" onClick={onClose} className="mt-2 font-semibold underline">
+                  Entendido, cerrar
+                </button>
+              </Alert>
+            )}
+
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+              <Select label="Tipo" value={f.tipo} onChange={(e) => cambiar('tipo', e.target.value as TipoActividad)}>
+                {TIPOS_ACTIVIDAD.map((t) => (
+                  <option key={t} value={t}>
+                    {NOMBRES_TIPO_ACTIVIDAD[t]}
+                  </option>
                 ))}
-              </ul>
-              <button type="button" onClick={onClose} className="mt-2 font-semibold underline">
-                Entendido, cerrar
-              </button>
-            </Alert>
-          )}
-
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-            <Select label="Tipo" value={f.tipo} onChange={(e) => cambiar('tipo', e.target.value as TipoActividad)}>
-              {TIPOS_ACTIVIDAD.map((t) => (
-                <option key={t} value={t}>
-                  {NOMBRES_TIPO_ACTIVIDAD[t]}
-                </option>
-              ))}
-            </Select>
-            <div className="sm:col-span-2">
-              <Input label="Título" value={f.titulo} maxLength={150} onChange={(e) => cambiar('titulo', e.target.value)} />
+              </Select>
+              <div className="sm:col-span-2">
+                <Input label="Título" value={f.titulo} maxLength={150} onChange={(e) => cambiar('titulo', e.target.value)} />
+              </div>
             </div>
-          </div>
 
-          <div className="space-y-1.5">
-            <p className="text-label text-ink">Instrucciones</p>
-            <EditorRico
-              value={f.contenido}
-              onChange={(html) => cambiar('contenido', html)}
-              etiqueta="Instrucciones de la actividad"
-              placeholder="Lo que el estudiante debe hacer y cómo se evalúa. Puedes pegar imágenes."
-            />
-          </div>
+            <div className="space-y-1.5">
+              <p className="text-label text-ink">Instrucciones</p>
+              <EditorRico
+                value={f.contenido}
+                onChange={(html) => cambiar('contenido', html)}
+                etiqueta="Instrucciones de la actividad"
+                placeholder="Lo que el estudiante debe hacer y cómo se evalúa. Puedes pegar imágenes."
+              />
+            </div>
 
-          <fieldset className="space-y-3 rounded-lg border border-border p-3">
-            <legend className="px-1 text-label text-body">Material de apoyo</legend>
-            <DropzoneMultiple
-              extensiones={EXTENSIONES_ADJUNTO}
-              maxBytes={MAX_BYTES_ADJUNTO}
-              maxArchivos={MAX_ARCHIVOS_POR_SUBIDA}
-              disabled={subir.isPending || f.adjuntos.length >= MAX_ADJUNTOS_POR_ACTIVIDAD}
-              onFiles={(archivos) => void subirArchivos(archivos)}
-              hint={`JPG, PNG, WEBP, PDF, Word, Excel, PowerPoint, MP3 o MP4 · hasta ${formatoTamano(MAX_BYTES_ADJUNTO)} cada uno · máx. ${MAX_ADJUNTOS_POR_ACTIVIDAD} archivos`}
-            />
-            {subir.isPending && <Spinner label="Subiendo archivos..." />}
-            {f.adjuntos.length > 0 && (
-              <ul className="space-y-1.5">
-                {f.adjuntos.map((a) => (
-                  <li key={a.id} className="flex items-center justify-between gap-3 rounded-lg bg-primary-soft px-3 py-2 text-sm">
-                    <span className="flex min-w-0 items-center gap-2 text-primary">
-                      <PaperclipIcon className="h-4 w-4 shrink-0" />
-                      <span className="truncate">{a.nombre}</span>
-                      <span className="shrink-0 text-xs text-muted">
-                        {NOMBRES_TIPO_ADJUNTO[a.tipo]} · {formatoTamano(a.bytes)}
+            <fieldset className="space-y-3 rounded-lg border border-border p-3">
+              <legend className="px-1 text-label text-body">Material de apoyo</legend>
+              <DropzoneMultiple
+                extensiones={EXTENSIONES_ADJUNTO}
+                maxBytes={MAX_BYTES_ADJUNTO}
+                maxArchivos={MAX_ARCHIVOS_POR_SUBIDA}
+                disabled={subir.isPending || f.adjuntos.length >= MAX_ADJUNTOS_POR_ACTIVIDAD}
+                onFiles={(archivos) => void subirArchivos(archivos)}
+                hint={`JPG, PNG, WEBP, PDF, Word, Excel, PowerPoint, MP3 o MP4 · hasta ${formatoTamano(MAX_BYTES_ADJUNTO)} cada uno · máx. ${MAX_ADJUNTOS_POR_ACTIVIDAD} archivos`}
+              />
+              {subir.isPending && <Spinner label="Subiendo archivos..." />}
+              {f.adjuntos.length > 0 && (
+                <ul className="space-y-1.5">
+                  {f.adjuntos.map((a) => (
+                    <li key={a.id} className="flex items-center justify-between gap-3 rounded-lg bg-primary-soft px-3 py-2 text-sm">
+                      <span className="flex min-w-0 items-center gap-2 text-primary">
+                        <PaperclipIcon className="h-4 w-4 shrink-0" />
+                        <span className="truncate">{a.nombre}</span>
+                        <span className="shrink-0 text-xs text-muted">
+                          {NOMBRES_TIPO_ADJUNTO[a.tipo]} · {formatoTamano(a.bytes)}
+                        </span>
                       </span>
+                      <button
+                        type="button"
+                        aria-label={`Quitar ${a.nombre}`}
+                        onClick={() => setF((prev) => ({ ...prev, adjuntos: prev.adjuntos.filter((x) => x.id !== a.id) }))}
+                        className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-primary hover:bg-surface"
+                      >
+                        <XIcon className="h-3.5 w-3.5" />
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+
+              <div className="space-y-1.5">
+                <div className="flex items-end gap-2">
+                  <div className="min-w-0 flex-1">
+                    <Input
+                      label="Video (YouTube o Vimeo)"
+                      value={f.videoNuevo}
+                      placeholder="https://www.youtube.com/watch?v=…"
+                      disabled={f.videos.length >= MAX_VIDEOS_POR_ACTIVIDAD}
+                      onChange={(e) => cambiar('videoNuevo', e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          agregarVideo();
+                        }
+                      }}
+                    />
+                  </div>
+                  <Button type="button" variant="outline" disabled={!f.videoNuevo.trim() || f.videos.length >= MAX_VIDEOS_POR_ACTIVIDAD} onClick={agregarVideo}>
+                    Agregar
+                  </Button>
+                </div>
+                {f.videos.map((v) => (
+                  <div key={v} className="flex items-center justify-between gap-3 rounded-lg bg-soft px-3 py-2 text-sm">
+                    <span className="flex min-w-0 items-center gap-2 text-body">
+                      <PlayIcon className="h-4 w-4 shrink-0 text-primary" />
+                      <span className="truncate">{v}</span>
                     </span>
                     <button
                       type="button"
-                      aria-label={`Quitar ${a.nombre}`}
-                      onClick={() => setF((prev) => ({ ...prev, adjuntos: prev.adjuntos.filter((x) => x.id !== a.id) }))}
-                      className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-primary hover:bg-surface"
+                      aria-label="Quitar video"
+                      onClick={() => setF((prev) => ({ ...prev, videos: prev.videos.filter((x) => x !== v) }))}
+                      className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-body hover:bg-surface"
                     >
                       <XIcon className="h-3.5 w-3.5" />
                     </button>
-                  </li>
+                  </div>
                 ))}
-              </ul>
-            )}
+              </div>
+            </fieldset>
 
-            <div className="space-y-1.5">
-              <div className="flex items-end gap-2">
-                <div className="min-w-0 flex-1">
-                  <Input
-                    label="Video (YouTube o Vimeo)"
-                    value={f.videoNuevo}
-                    placeholder="https://www.youtube.com/watch?v=…"
-                    disabled={f.videos.length >= MAX_VIDEOS_POR_ACTIVIDAD}
-                    onChange={(e) => cambiar('videoNuevo', e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') {
-                        e.preventDefault();
-                        agregarVideo();
-                      }
-                    }}
-                  />
-                </div>
-                <Button type="button" variant="outline" disabled={!f.videoNuevo.trim() || f.videos.length >= MAX_VIDEOS_POR_ACTIVIDAD} onClick={agregarVideo}>
-                  Agregar
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <Select
+                label="Bloque de la planilla"
+                value={bloqueElegido}
+                disabled={bloques.isLoading}
+                error={bloques.isError ? errorMessage(bloques.error) : undefined}
+                hint="El colegio define los bloques y cuántas casillas admite cada uno."
+                onChange={(e) => cambiar('componente', e.target.value)}
+              >
+                {/* Una actividad antigua puede apuntar a un bloque que el año ya no ofrece: se conserva visible. */}
+                {actividad && !bloques.data?.some((b) => b.clave === actividad.componente_siee) && (
+                  <option value={actividad.componente_siee}>{actividad.componente_nombre}</option>
+                )}
+                {(bloques.data ?? []).map((b) => {
+                  const lleno = b.casillas.length >= b.max_casillas && b.clave !== actividad?.componente_siee;
+                  return (
+                    <option key={b.clave} value={b.clave} disabled={lleno}>
+                      {b.nombre} ({b.porcentaje}%) · {b.casillas.length}/{b.max_casillas} casillas{lleno ? ' · lleno' : ''}
+                    </option>
+                  );
+                })}
+              </Select>
+              <Input
+                label="Peso dentro del bloque (%)"
+                type="number"
+                min={0}
+                max={100}
+                step="0.5"
+                value={f.peso}
+                hint="Opcional. Vacío: las casillas sin peso se reparten en partes iguales lo que queda del bloque."
+                onChange={(e) => cambiar('peso', e.target.value)}
+              />
+            </div>
+
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <Input
+                label="Se publica (hora de Colombia)"
+                type="datetime-local"
+                value={f.apertura}
+                onChange={(e) => cambiar('apertura', e.target.value)}
+              />
+              <div className="space-y-1.5">
+                <Input
+                  label="Límite de entrega (hora de Colombia)"
+                  type="datetime-local"
+                  value={f.entrega}
+                  min={f.apertura || undefined}
+                  onChange={(e) => {
+                    cambiar('entrega', e.target.value);
+                    cambiar('confirmar', false);
+                  }}
+                />
+                <Button type="button" variant="outline" onClick={() => setCargaAbierta(true)} className="inline-flex items-center gap-2">
+                  <CalendarIcon className="h-4 w-4" />
+                  Ver carga de tareas del grupo
                 </Button>
               </div>
-              {f.videos.map((v) => (
-                <div key={v} className="flex items-center justify-between gap-3 rounded-lg bg-soft px-3 py-2 text-sm">
-                  <span className="flex min-w-0 items-center gap-2 text-body">
-                    <PlayIcon className="h-4 w-4 shrink-0 text-primary" />
-                    <span className="truncate">{v}</span>
-                  </span>
-                  <button
-                    type="button"
-                    aria-label="Quitar video"
-                    onClick={() => setF((prev) => ({ ...prev, videos: prev.videos.filter((x) => x !== v) }))}
-                    className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-body hover:bg-surface"
-                  >
-                    <XIcon className="h-3.5 w-3.5" />
-                  </button>
-                </div>
-              ))}
             </div>
-          </fieldset>
 
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <Select
-              label="Bloque de la planilla"
-              value={bloqueElegido}
-              disabled={bloques.isLoading}
-              error={bloques.isError ? errorMessage(bloques.error) : undefined}
-              hint="El colegio define los bloques y cuántas casillas admite cada uno."
-              onChange={(e) => cambiar('componente', e.target.value)}
-            >
-              {/* Una actividad antigua puede apuntar a un bloque que el año ya no ofrece: se conserva visible. */}
-              {actividad && !bloques.data?.some((b) => b.clave === actividad.componente_siee) && (
-                <option value={actividad.componente_siee}>{actividad.componente_nombre}</option>
-              )}
-              {(bloques.data ?? []).map((b) => {
-                const lleno = b.casillas.length >= b.max_casillas && b.clave !== actividad?.componente_siee;
-                return (
-                  <option key={b.clave} value={b.clave} disabled={lleno}>
-                    {b.nombre} ({b.porcentaje}%) · {b.casillas.length}/{b.max_casillas} casillas{lleno ? ' · lleno' : ''}
-                  </option>
-                );
-              })}
-            </Select>
-            <Input
-              label="Peso dentro del bloque (%)"
-              type="number"
-              min={0}
-              max={100}
-              step="0.5"
-              value={f.peso}
-              hint="Opcional. Vacío: las casillas sin peso se reparten en partes iguales lo que queda del bloque."
-              onChange={(e) => cambiar('peso', e.target.value)}
-            />
-          </div>
-
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <Input
-              label="Se publica (hora de Colombia)"
-              type="datetime-local"
-              value={f.apertura}
-              onChange={(e) => cambiar('apertura', e.target.value)}
-            />
-            <Input
-              label="Límite de entrega (hora de Colombia)"
-              type="datetime-local"
-              value={f.entrega}
-              min={f.apertura || undefined}
-              onChange={(e) => {
-                cambiar('entrega', e.target.value);
-                cambiar('confirmar', false);
-              }}
-            />
-          </div>
-
-          {fechaEntrega && <AlertasCalendario revision={revision.data} cargando={revision.isFetching} error={revision.error} />}
-          {hayAdvertencia && !hayBloqueo && (
-            <label className="flex items-start gap-2 text-sm text-body">
-              <input type="checkbox" className="mt-0.5" checked={f.confirmar} onChange={(e) => cambiar('confirmar', e.target.checked)} />
-              Entiendo las advertencias y quiero programar la actividad en esta fecha.
-            </label>
-          )}
-
-          {!actividad && otrasClases.length > 0 && (
-            <div className="space-y-1.5">
-              <MultiSelect
-                label="Publicar también en otros grupos (misma materia)"
-                options={otrasClases.map((c) => ({ value: c.id, label: c.etiqueta }))}
-                selected={f.grupos}
-                onChange={(grupos) => cambiar('grupos', grupos)}
-                emptyLabel="Solo en este grupo"
-                allLabel="Solo en este grupo"
-              />
-              <p className="text-xs text-muted">
-                Se crea una copia en cada grupo elegido. Cada copia sigue sus propias reglas: si el plan de aula de ese grado aún no está aprobado, esa copia se omite y te avisamos.
-              </p>
-            </div>
-          )}
-
-          <fieldset className="space-y-3 rounded-lg border border-border p-3">
-            <legend className="px-1 text-label text-body">Recepción de entregas</legend>
-            <label className="flex items-center gap-2 text-sm text-body">
-              <input
-                type="checkbox"
-                checked={f.requiere}
-                disabled={tieneEntregas}
-                onChange={(e) => cambiar('requiere', e.target.checked)}
-              />
-              Los estudiantes entregan algo en la plataforma
-            </label>
-            {f.requiere ? (
-              <>
-                <div>
-                  <p className="mb-1.5 text-label text-body">Formatos que se aceptan</p>
-                  <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-2">
-                    {FORMATOS_EVIDENCIA.map((formato) => (
-                      <label key={formato.clave} className="flex items-center gap-2 text-sm text-body">
-                        <input
-                          type="checkbox"
-                          checked={f.formatos.includes(formato.clave)}
-                          disabled={tieneEntregas}
-                          onChange={() => toggleFormato(formato.clave)}
-                        />
-                        {formato.etiqueta}
-                      </label>
-                    ))}
-                  </div>
-                  {tieneEntregas && <p className="mt-1.5 text-xs text-muted">Los formatos ya no se pueden cambiar: hay estudiantes que entregaron.</p>}
-                  {f.formatos.length === 0 && (
-                    <p className="mt-1.5 text-xs text-muted">Sin formatos marcados, el estudiante responde escribiendo en la plataforma.</p>
-                  )}
-                </div>
-                <label className="flex items-center gap-2 text-sm text-body">
-                  <input type="checkbox" checked={f.tardia} onChange={(e) => cambiar('tardia', e.target.checked)} />
-                  Acepta entregas tardías (quedan marcadas «Entregada con retraso»)
-                </label>
-                <Switch
-                  label="Permite múltiples entregas"
-                  description="Si está apagado, cada estudiante entrega una sola vez. Encendido, puede volver a entregar y tú eliges cuál es la válida antes de calificar."
-                  checked={f.multiples}
-                  onChange={(v) => cambiar('multiples', v)}
-                />
-              </>
-            ) : (
-              <p className="text-xs text-muted">Actividad de aula: no recibe archivos. La calificas directamente.</p>
+            {fechaEntrega && <AlertasCalendario revision={revision.data} cargando={revision.isFetching} error={revision.error} />}
+            {hayAdvertencia && !hayBloqueo && (
+              <label className="flex items-start gap-2 text-sm text-body">
+                <input type="checkbox" className="mt-0.5" checked={f.confirmar} onChange={(e) => cambiar('confirmar', e.target.checked)} />
+                Entiendo las advertencias y quiero programar la actividad en esta fecha.
+              </label>
             )}
-          </fieldset>
-        </div>
 
-        <PanelDocumentosPdf
-          documentos={
-            planAula
-              ? [
-                  {
-                    clave: `plan-aula-${planAula._id}-${planAula.version_actual}`,
-                    titulo: `Tu plan de aula aprobado: ${planAula.titulo}`,
-                    nombreArchivo: planAula.archivo_nombre,
-                    cargar: () => cargarArchivoPlanAula(planAula._id, planAula.version_actual),
-                  },
-                ]
-              : []
-          }
-          vacio="Aquí verás el plan de aula aprobado de este periodo."
+            {!actividad && otrasClases.length > 0 && (
+              <div className="space-y-1.5">
+                <MultiSelect
+                  label="Publicar también en otros grupos (misma materia)"
+                  options={otrasClases.map((c) => ({ value: c.id, label: c.etiqueta }))}
+                  selected={f.grupos}
+                  onChange={(grupos) => cambiar('grupos', grupos)}
+                  emptyLabel="Solo en este grupo"
+                  allLabel="Solo en este grupo"
+                />
+                <p className="text-xs text-muted">
+                  Se crea una copia en cada grupo elegido. Cada copia sigue sus propias reglas: si el plan de aula de ese grado aún no está aprobado, esa copia se omite y te avisamos.
+                </p>
+              </div>
+            )}
+
+            <fieldset className="space-y-3 rounded-lg border border-border p-3">
+              <legend className="px-1 text-label text-body">Recepción de entregas</legend>
+              <label className="flex items-center gap-2 text-sm text-body">
+                <input
+                  type="checkbox"
+                  checked={f.requiere}
+                  disabled={tieneEntregas}
+                  onChange={(e) => cambiar('requiere', e.target.checked)}
+                />
+                Los estudiantes entregan algo en la plataforma
+              </label>
+              {f.requiere ? (
+                <>
+                  <div>
+                    <p className="mb-1.5 text-label text-body">Formatos que se aceptan</p>
+                    <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-2">
+                      {FORMATOS_EVIDENCIA.map((formato) => (
+                        <label key={formato.clave} className="flex items-center gap-2 text-sm text-body">
+                          <input
+                            type="checkbox"
+                            checked={f.formatos.includes(formato.clave)}
+                            disabled={tieneEntregas}
+                            onChange={() => toggleFormato(formato.clave)}
+                          />
+                          {formato.etiqueta}
+                        </label>
+                      ))}
+                    </div>
+                    {tieneEntregas && <p className="mt-1.5 text-xs text-muted">Los formatos ya no se pueden cambiar: hay estudiantes que entregaron.</p>}
+                    {f.formatos.length === 0 && (
+                      <p className="mt-1.5 text-xs text-muted">Sin formatos marcados, el estudiante responde escribiendo en la plataforma.</p>
+                    )}
+                  </div>
+                  <label className="flex items-center gap-2 text-sm text-body">
+                    <input type="checkbox" checked={f.tardia} onChange={(e) => cambiar('tardia', e.target.checked)} />
+                    Acepta entregas tardías (quedan marcadas «Entregada con retraso»)
+                  </label>
+                  <Switch
+                    label="Permite múltiples entregas"
+                    description="Si está apagado, cada estudiante entrega una sola vez. Encendido, puede volver a entregar y tú eliges cuál es la válida antes de calificar."
+                    checked={f.multiples}
+                    onChange={(v) => cambiar('multiples', v)}
+                  />
+                </>
+              ) : (
+                <p className="text-xs text-muted">Actividad de aula: no recibe archivos. La calificas directamente.</p>
+              )}
+            </fieldset>
+          </div>
+
+          <PanelDocumentosPdf
+            documentos={
+              planAula
+                ? [
+                    {
+                      clave: `plan-aula-${planAula._id}-${planAula.version_actual}`,
+                      titulo: `Tu plan de aula aprobado: ${planAula.titulo}`,
+                      nombreArchivo: planAula.archivo_nombre,
+                      cargar: () => cargarArchivoPlanAula(planAula._id, planAula.version_actual),
+                    },
+                  ]
+                : []
+            }
+            vacio="Aquí verás el plan de aula aprobado de este periodo."
+          />
+        </div>
+      </Drawer>
+      {cargaAbierta && (
+        <PanelCargaGrupo
+          onClose={() => setCargaAbierta(false)}
+          teacherAssignmentId={teacherAssignmentId}
+          otrasClases={otrasClases}
+          excluirId={actividad?._id}
+          mesInicial={mesDeInstante(fechaEntrega ?? new Date().toISOString())}
+          fechaActual={f.entrega ? f.entrega.slice(0, 10) : null}
+          onElegirDia={(dia) => {
+            cambiar('entrega', `${dia}T${f.entrega ? f.entrega.slice(11, 16) : '23:59'}`);
+            cambiar('confirmar', false);
+          }}
         />
-      </div>
-    </Drawer>
+      )}
+    </>
   );
 }

@@ -2,11 +2,16 @@ import { describe, expect, it } from 'vitest';
 import {
   ActividadDelGrupo,
   EntradaCalendario,
+  agruparCargaPorDia,
   diaCalendarioColombia,
   estadoDeEntrega,
   evaluarCalendarioActividad,
   evaluarVentanaEntrega,
+  nivelDeCarga,
+  rangoDelMes,
+  sugerenciaDeCarga,
 } from '../src/utils/actividades';
+import { exigirAlertasResueltas } from '../src/services/actividadCalendario.service';
 import { detectarEvidencia } from '../src/utils/evidenciasActividad';
 
 const DOCX = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
@@ -206,5 +211,50 @@ describe('detectarEvidencia', () => {
 
   it('rechaza un ejecutable que declara ser PDF', () => {
     expect(detectarEvidencia('application/pdf', 'virus.pdf', Buffer.from('MZ\x90\x00'))).toBeNull();
+  });
+});
+
+describe('sugerencia de carga del día', () => {
+  it('con 0 o 1 entregas no sugiere nada; con 2 o más sí, nombrando las asignaturas', () => {
+    expect(sugerenciaDeCarga([])).toBeNull();
+    expect(sugerenciaDeCarga([{ asignatura: 'Matemáticas' }])).toBeNull();
+    const s = sugerenciaDeCarga([{ asignatura: 'Matemáticas' }, { asignatura: 'Inglés' }, { asignatura: 'Inglés' }]);
+    expect(s).toMatchObject({ codigo: 'CARGA_DEL_DIA', severidad: 'SUGERENCIA' });
+    expect(s?.mensaje).toContain('Este día ya cuenta con 3 entregas programadas (Matemáticas, Inglés)');
+  });
+
+  it('no frena ni exige confirmar: exigirAlertasResueltas la deja pasar', () => {
+    const s = sugerenciaDeCarga([{ asignatura: 'A' }, { asignatura: 'B' }])!;
+    expect(() => exigirAlertasResueltas([s], false)).not.toThrow();
+  });
+});
+
+describe('carga del grupo por mes', () => {
+  it('nivelDeCarga: 0–1 baja, 2 moderada, 3 o más alta', () => {
+    expect([0, 1, 2, 3, 7].map(nivelDeCarga)).toEqual(['BAJA', 'BAJA', 'MODERADA', 'ALTA', 'ALTA']);
+  });
+
+  it('rangoDelMes cubre el mes entero en hora de Colombia y rechaza lo que no es AAAA-MM', () => {
+    const feb = rangoDelMes('2028-02')!;
+    expect(feb.dias).toBe(29);
+    expect(feb.desde.toISOString()).toBe('2028-02-01T05:00:00.000Z');
+    expect(feb.hasta.toISOString()).toBe('2028-03-01T04:59:59.999Z');
+    expect(rangoDelMes('2026-13')).toBeNull();
+    expect(rangoDelMes('2026-3')).toBeNull();
+  });
+
+  it('agruparCargaPorDia usa el día de Colombia: una entrega a las 11 p. m. no salta al día siguiente', () => {
+    const base = { tipo: 'TAREA' as const, asignatura: 'Matemáticas', docente: 'Ana Ruiz' };
+    const dias = agruparCargaPorDia([
+      { ...base, _id: 'a', titulo: 'Tarea 1', fecha_entrega: new Date('2026-03-11T04:00:00Z') }, // 10 mar, 11 p. m. en Colombia
+      { ...base, _id: 'b', titulo: 'Tarea 2', fecha_entrega: new Date('2026-03-10T20:00:00Z') },
+      { ...base, _id: 'c', titulo: 'Tarea 3', fecha_entrega: new Date('2026-03-10T15:00:00Z') },
+      { ...base, _id: 'd', titulo: 'Otra', fecha_entrega: new Date('2026-03-12T15:00:00Z') },
+    ]);
+    expect(dias.map((d) => [d.fecha, d.total, d.nivel])).toEqual([
+      ['2026-03-10', 3, 'ALTA'],
+      ['2026-03-12', 1, 'BAJA'],
+    ]);
+    expect(dias[0].actividades.map((a) => a.titulo)).toEqual(['Tarea 3', 'Tarea 2', 'Tarea 1']);
   });
 });

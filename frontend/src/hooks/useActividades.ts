@@ -163,7 +163,7 @@ export interface AnalisisActividad {
 
 export interface AlertaCalendario {
   codigo: string;
-  severidad: 'BLOQUEO' | 'ADVERTENCIA';
+  severidad: 'BLOQUEO' | 'ADVERTENCIA' | 'SUGERENCIA';
   mensaje: string;
 }
 
@@ -227,6 +227,34 @@ export function useRevisionCalendario(consulta: ConsultaRevisionCalendario | nul
         exigir_futuro: consulta ? String(consulta.exigir_futuro) : undefined,
       }),
     enabled: consulta !== null,
+    staleTime: 30_000,
+  });
+}
+
+export type NivelCarga = 'BAJA' | 'MODERADA' | 'ALTA';
+
+export interface DiaDeCarga {
+  /** YYYY-MM-DD en hora de Colombia. */
+  fecha: string;
+  total: number;
+  nivel: NivelCarga;
+  actividades: Array<{ _id: string; titulo: string; tipo: TipoActividad; asignatura: string; docente: string; fecha_entrega: string }>;
+}
+
+export interface CargaMensualDelGrupo {
+  mes: string;
+  grupo: { _id: string; nomenclatura: string };
+  dias: DiaDeCarga[];
+  no_lectivos: string[];
+  /** ISO 1=lunes … 7=domingo. */
+  dias_habiles: number[];
+}
+
+/** Lo que un grupo ya tiene por entregar en un mes, de todos sus docentes: el mapa de calor para elegir la fecha de entrega. */
+export function useCargaDelGrupo(teacherAssignmentId: string, mes: string, excluirId?: string) {
+  return useQuery({
+    queryKey: ['activities', 'carga-del-grupo', teacherAssignmentId, mes, excluirId ?? null],
+    queryFn: () => api.get<CargaMensualDelGrupo>('/activities/carga-del-grupo', { teacher_assignment_id: teacherAssignmentId, mes, excluir_id: excluirId }),
     staleTime: 30_000,
   });
 }

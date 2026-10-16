@@ -24,6 +24,7 @@ import {
   obtenerConfiguracion,
   otorgarAccesoEspecial,
   revisionCalendario,
+  cargaDelGrupo,
   revocarAccesoEspecial,
   subirAdjuntos,
   updateActivity,
@@ -99,6 +100,7 @@ router.get('/mias', checkRole(ROLES.ESTUDIANTE), validate(activityValidator.list
 router.get('/entregas/:id/archivo', checkRole(ROLES.ESTUDIANTE, ROLES.DOCENTE, ...GESTION), validate(activityValidator.descargarEntrega), descargarEntrega);
 
 // Gestor del docente (CU-DOC-02).
+router.get('/carga-del-grupo', checkRole(ROLES.DOCENTE), validate(activityValidator.cargaDelGrupo), cargaDelGrupo);
 router.get('/revision-calendario', checkRole(ROLES.DOCENTE), validate(activityValidator.revisionCalendario), revisionCalendario);
 // multer va antes de validate: el cuerpo multipart no existe hasta que multer lo lee.
 router.post('/adjuntos', checkRole(ROLES.DOCENTE), subirVariosAdjuntos, subirAdjuntos);

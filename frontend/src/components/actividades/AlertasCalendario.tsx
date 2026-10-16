@@ -20,6 +20,8 @@ export function AlertasCalendario({ revision, cargando, error }: AlertasCalendar
   const bloqueos = revision.alertas.filter((a) => a.severidad === 'BLOQUEO');
   const advertencias = revision.alertas.filter((a) => a.severidad === 'ADVERTENCIA');
 
+  const sugerencias = revision.alertas.filter((a) => a.severidad === 'SUGERENCIA');
+
   return (
     <div className="space-y-2">
       {bloqueos.map((a) => (
@@ -29,6 +31,11 @@ export function AlertasCalendario({ revision, cargando, error }: AlertasCalendar
       ))}
       {advertencias.map((a) => (
         <Alert key={a.codigo} tone="warning">
+          {a.mensaje}
+        </Alert>
+      ))}
+      {sugerencias.map((a) => (
+        <Alert key={a.codigo} tone="info">
           {a.mensaje}
         </Alert>
       ))}

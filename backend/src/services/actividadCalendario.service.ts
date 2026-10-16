@@ -7,10 +7,14 @@ import ApiError from '../utils/ApiError';
 import {
   ActividadDelGrupo,
   AlertaCalendario,
+  DiaDeCarga,
+  agruparCargaPorDia,
   diaCalendarioColombia,
   evaluarCalendarioActividad,
+  sugerenciaDeCarga,
+  rangoDelMes,
 } from '../utils/actividades';
-import { finDelDia, inicioDelDia, periodosEfectivos } from '../utils/calendarioAcademico';
+import { finDelDia, hayEventoNoLectivo, inicioDelDia, periodosEfectivos } from '../utils/calendarioAcademico';
 import { ESTADO_ACTIVO } from '../utils/filtroEstado';
 import { cargarContextoFechas } from './attendance.service';
 import { obtenerConfiguracionActividades } from './configuracionActividades.service';
@@ -89,6 +93,9 @@ export async function revisarCalendario(
     del_grupo: delGrupo,
     limites,
   });
+  // Solo si el límite del colegio no avisó ya de lo mismo: dos mensajes sobre la misma carga serían ruido.
+  const sugerencia = alertas.some((a) => a.codigo.startsWith('SOBRECARGA')) ? null : sugerenciaDeCarga(delGrupo);
+  if (sugerencia) alertas.push(sugerencia);
 
   return {
     alertas,
@@ -109,4 +116,78 @@ export function exigirAlertasResueltas(alertas: AlertaCalendario[], confirmadas:
   if (advertencias.length > 0 && !confirmadas) {
     throw new ApiError(409, `Revisa el calendario antes de continuar: ${advertencias.map((a) => a.mensaje).join(' ')} Confirma para programarla de todos modos.`, { alertas });
   }
+}
+
+export interface CargaMensualDelGrupo {
+  mes: string;
+  grupo: { _id: string; nomenclatura: string };
+  /** Solo los días con actividades; el resto del mes está libre. */
+  dias: DiaDeCarga[];
+  /** Días del mes sin clases (recesos, vacaciones, desarrollo institucional) para marcarlos en el calendario. */
+  no_lectivos: string[];
+  /** Días hábiles de la jornada del grupo (ISO 1=lunes … 7=domingo). */
+  dias_habiles: number[];
+}
+
+/**
+ * Lo que el grupo ya tiene por entregar en un mes, de **todos** sus docentes (M11), con los días sin clases y los días hábiles de su
+ * jornada (M05/M01). Es la misma carga que cuenta `revisarCalendario` para avisar de sobrecarga, vista de un mes entero para elegir bien la fecha.
+ */
+export async function cargaMensualDelGrupo(
+  asignacion: TeacherAssignmentDocument,
+  mes: string,
+  excluirId?: string | Types.ObjectId
+): Promise<CargaMensualDelGrupo> {
+  const rango = rangoDelMes(mes);
+  if (!rango) throw new ApiError(400, 'El mes debe tener el formato AAAA-MM.');
+  const grupo = await Group.findById(asignacion.group_id);
+  if (!grupo) throw new ApiError(404, 'Grupo de la asignación académica no encontrado.');
+
+  const [contexto, clasesDelGrupo] = await Promise.all([
+    cargarContextoFechas(grupo),
+    TeacherAssignment.find({
+      group_id: grupo._id,
+      academic_year_id: asignacion.academic_year_id,
+      tipo_asignacion: 'CLASE',
+      estado: ESTADO_ACTIVO,
+    })
+      .populate<{ subject_id: { nombre: string } | null }>('subject_id', 'nombre')
+      .populate<{ docente_id: { nombre: string; apellido: string } | null }>('docente_id', 'nombre apellido')
+      .lean(),
+  ]);
+  const claseDe = new Map(clasesDelGrupo.map((c) => [String(c._id), c]));
+
+  const actividades = await Activity.find({
+    teacher_assignment_id: { $in: clasesDelGrupo.map((c) => c._id) },
+    fecha_entrega: { $gte: rango.desde, $lte: rango.hasta },
+    ...(excluirId ? { _id: { $ne: excluirId } } : {}),
+  }).lean();
+
+  const dias = agruparCargaPorDia(
+    actividades.map((a) => {
+      const clase = claseDe.get(String(a.teacher_assignment_id));
+      return {
+        _id: String(a._id),
+        titulo: a.titulo,
+        tipo: a.tipo ?? 'TAREA',
+        asignatura: clase?.subject_id?.nombre ?? 'Asignatura',
+        docente: clase?.docente_id ? `${clase.docente_id.nombre} ${clase.docente_id.apellido}` : 'Docente',
+        fecha_entrega: a.fecha_entrega,
+      };
+    })
+  );
+
+  const no_lectivos: string[] = [];
+  for (let n = 0; n < rango.dias; n += 1) {
+    const dia = new Date(rango.primerDia.getTime() + n * 24 * 3_600_000);
+    if (hayEventoNoLectivo(dia, contexto.anio.eventos)) no_lectivos.push(dia.toISOString().slice(0, 10));
+  }
+
+  return {
+    mes,
+    grupo: { _id: String(grupo._id), nomenclatura: grupo.nomenclatura },
+    dias,
+    no_lectivos,
+    dias_habiles: contexto.jornada.dias_habiles,
+  };
 }

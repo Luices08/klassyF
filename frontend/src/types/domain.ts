@@ -126,7 +126,10 @@ export interface User {
   email: string;
   telefono: string | null;
   foto_url: string | null;
+  /** Perfil por omisión (el primero de `roles`). */
   rol: Rol;
+  /** Todos los perfiles: un solo registro puede ser, p. ej., DOCENTE y ACUDIENTE. */
+  roles: Rol[];
   estado: EstadoActivo;
   sedes_ids: Array<string | { _id: string; nombre: string }>;
   debe_cambiar_password: boolean;

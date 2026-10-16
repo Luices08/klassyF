@@ -1,4 +1,4 @@
-import { Link } from 'react-router-dom';
+import { Link, Navigate } from 'react-router-dom';
 import { PageHeader } from '../components/ui/PageHeader';
 import { useAuth } from '../context/AuthContext';
 import { NAV_ITEMS } from '../components/layout/navigation';
@@ -17,6 +17,8 @@ const ROLE_LABELS: Record<string, string> = {
 export function DashboardPage() {
   const { user } = useAuth();
   if (!user) return null;
+  // El acudiente no tiene panel de accesos: su inicio es el portal.
+  if (user.rol === 'ACUDIENTE') return <Navigate to="/portal" replace />;
 
   const links = NAV_ITEMS.filter((item) => item.to !== '/panel' && (!item.roles || item.roles.includes(user.rol)));
 

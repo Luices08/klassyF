@@ -4,29 +4,53 @@ import { Alert, errorMessage } from '../components/ui/Alert';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Field';
 import { ArrowLeftIcon } from '../components/ui/icons';
+import { SelectorPerfil } from '../components/auth/SelectorPerfil';
 import { useAuth } from '../context/AuthContext';
+import { rutaInicialDe } from '../lib/rutaInicial';
+import type { Rol, SeleccionPerfilPendiente } from '../types/api';
 
 export function LoginPage() {
-  const { login, isAuthenticated, isLoading } = useAuth();
+  const { login, seleccionarPerfil, user, isAuthenticated, isLoading } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const [numeroDocumento, setNumeroDocumento] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
+  // Contraseña correcta con varios perfiles: se muestra el selector y todavía no hay sesión.
+  const [seleccion, setSeleccion] = useState<SeleccionPerfilPendiente | null>(null);
+  const [abriendo, setAbriendo] = useState<Rol | null>(null);
 
-  if (isAuthenticated) {
+  if (isAuthenticated && user) {
     const from = (location.state as { from?: { pathname?: string } } | null)?.from?.pathname;
-    return <Navigate to={from ?? '/panel'} replace />;
+    return <Navigate to={from ?? rutaInicialDe(user.rol)} replace />;
   }
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     setError(null);
     try {
-      await login(numeroDocumento, password);
-      navigate('/panel', { replace: true });
+      const resultado = await login(numeroDocumento, password);
+      if (resultado.tipo === 'seleccion') {
+        setPassword('');
+        setSeleccion(resultado.seleccion);
+        return;
+      }
+      navigate(rutaInicialDe(resultado.user.rol), { replace: true });
     } catch (err) {
       setError(errorMessage(err));
+    }
+  }
+
+  async function elegirPerfil(rol: Rol) {
+    if (!seleccion) return;
+    setError(null);
+    setAbriendo(rol);
+    try {
+      const usuario = await seleccionarPerfil(seleccion, rol);
+      navigate(rutaInicialDe(usuario.rol), { replace: true });
+    } catch (err) {
+      setError(errorMessage(err));
+      setAbriendo(null);
     }
   }
 
@@ -49,6 +73,21 @@ export function LoginPage() {
           <p className="mt-1 text-sm text-muted">Gestor académico y administrativo</p>
         </div>
 
+        {seleccion ? (
+          <div className="space-y-4">
+            {error && <Alert tone="error">{error}</Alert>}
+            <SelectorPerfil
+              nombre={seleccion.usuario.nombre}
+              perfiles={seleccion.perfiles}
+              abriendo={abriendo}
+              onElegir={(rol) => void elegirPerfil(rol)}
+              onVolver={() => {
+                setSeleccion(null);
+                setError(null);
+              }}
+            />
+          </div>
+        ) : (
         <form onSubmit={handleSubmit} className="space-y-4 rounded-xl border border-border bg-surface p-6 shadow-xs">
           {error && <Alert tone="error">{error}</Alert>}
 
@@ -85,6 +124,7 @@ export function LoginPage() {
             Volver a la pantalla de inicio
           </Button>
         </form>
+        )}
       </div>
     </div>
   );

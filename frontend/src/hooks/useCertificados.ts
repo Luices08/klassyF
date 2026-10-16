@@ -465,6 +465,8 @@ export interface TipoCertificado {
   estados_matricula: string[];
   fuentes: FuenteCertificado[];
   variables_obligatorias: string[];
+  /** Si el acudiente puede generarlo solo desde el portal (M27). Solo lo cambia el ADMIN. */
+  autoservicio_acudiente: boolean;
   estado: EstadoTipoCertificado;
   orden: number;
   /** Documentos ya expedidos de este tipo: si hay alguno, no se elimina (se archiva). */
@@ -487,7 +489,7 @@ export interface EntradaTipoCertificado {
   fuentes: FuenteCertificado[];
 }
 
-export type CambiosTipoCertificado = Partial<EntradaTipoCertificado> & { variables_obligatorias?: string[] };
+export type CambiosTipoCertificado = Partial<EntradaTipoCertificado> & { variables_obligatorias?: string[]; autoservicio_acudiente?: boolean };
 
 export function useTiposCertificado() {
   return useQuery({ queryKey: ['certificados', 'tipos'], queryFn: () => api.get<ListaTiposCertificado>('/certificados/tipos') });

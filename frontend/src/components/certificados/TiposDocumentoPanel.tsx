@@ -144,6 +144,7 @@ function TipoDrawer({ tipo, lista, onClose }: { tipo: TipoCertificado | null; li
   const [estados, setEstados] = useState<string[]>(tipo?.estados_matricula ?? ['MATRICULADO_DEFINITIVO', 'MATRICULADO_CONDICIONAL']);
   const [fuentes, setFuentes] = useState<FuenteCertificado[]>(tipo?.fuentes ?? []);
   const [variables, setVariables] = useState<string[]>(tipo?.variables_obligatorias ?? []);
+  const [autoservicio, setAutoservicio] = useState(tipo?.autoservicio_acudiente ?? false);
 
   // El prefijo y las fuentes son parte de los códigos y del contenido: solo cambian en borrador y sin documentos expedidos.
   const bloqueado = tipo !== null && (tipo.estado !== 'BORRADOR' || tipo.emitidos > 0);
@@ -158,7 +159,7 @@ function TipoDrawer({ tipo, lista, onClose }: { tipo: TipoCertificado | null; li
     e.preventDefault();
     const base = { nombre: nombre.trim(), descripcion: descripcion.trim(), prefijo: prefijo.trim().toUpperCase(), estados_matricula: estados, fuentes };
     if (tipo) {
-      await actualizar.mutateAsync({ clave: tipo.clave, cambios: { ...base, ...(esAdmin ? { variables_obligatorias: variables } : {}) } });
+      await actualizar.mutateAsync({ clave: tipo.clave, cambios: { ...base, ...(esAdmin ? { variables_obligatorias: variables, autoservicio_acudiente: autoservicio && !fuentes.includes('DEPENDENCIAS') } : {}) } });
     } else {
       await crear.mutateAsync(base);
     }
@@ -221,6 +222,16 @@ function TipoDrawer({ tipo, lista, onClose }: { tipo: TipoCertificado | null; li
           />
         ))}
       </div>
+      {esAdmin && tipo && (
+        <Switch
+          label="El acudiente lo genera desde su portal"
+          description="Se expide al instante, sin intervención de secretaría (máximo 3 por estudiante al día). Las firmas siguen la política del documento; la de Rectoría solo sale si la secretaría tiene esa delegación. No aplica a documentos con confirmación de dependencias (paz y salvo)."
+          checked={autoservicio && !fuentes.includes('DEPENDENCIAS')}
+          onChange={setAutoservicio}
+          disabled={fuentes.includes('DEPENDENCIAS')}
+          disabledReason={fuentes.includes('DEPENDENCIAS') ? 'Un documento que exige confirmar dependencias lo expide siempre la secretaría.' : null}
+        />
+      )}
       {esAdmin && (
         <MultiSelect
           label="Datos que el texto no puede perder (opcional)"

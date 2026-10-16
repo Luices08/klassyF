@@ -39,6 +39,8 @@ const CONVIVENCIA_GESTIONA: Rol[] = ['ADMIN', 'COORDINADOR_CONVIVENCIA'];
 
 export const NAV_ITEMS: NavItem[] = [
   { to: '/panel', label: 'Inicio', icon: HomeIcon },
+  // M27: el acudiente tiene su propio portal con un selector de estudiante; el resto de sus pantallas (boletín, horario) siguen aquí.
+  { to: '/portal', label: 'Portal del acudiente', icon: UsersIcon, roles: ['ACUDIENTE'] },
   { to: '/report-card', label: 'Boletín', icon: FileTextIcon },
   { to: '/mi-horario', label: 'Mi horario', icon: ClockIcon, roles: ['DOCENTE', 'ESTUDIANTE', 'ACUDIENTE'] },
   { to: '/mi-cuenta', label: 'Mi cuenta', icon: UserIcon },

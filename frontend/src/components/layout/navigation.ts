@@ -28,6 +28,8 @@ export interface NavItem {
   roles?: Rol[];
   /** Oculto en instituciones virtuales (sin espacios físicos). */
   soloPresencial?: boolean;
+  /** No sale en el menú lateral ni en los accesos del inicio: tiene su botón en el encabezado (el asistente sí lo conoce). */
+  soloEncabezado?: boolean;
 }
 
 const STAFF: Rol[] = ['ADMIN', 'COORDINADOR', 'SECRETARIA'];
@@ -45,7 +47,7 @@ export const NAV_ITEMS: NavItem[] = [
   { to: '/report-card', label: 'Boletín', icon: FileTextIcon },
   { to: '/mi-horario', label: 'Mi horario', icon: ClockIcon, roles: ['DOCENTE', 'ESTUDIANTE', 'ACUDIENTE'] },
   { to: '/anuncios', label: 'Anuncios', icon: MegaphoneIcon },
-  { to: '/mi-cuenta', label: 'Mi cuenta', icon: UserIcon },
+  { to: '/mi-cuenta', label: 'Mi cuenta', icon: UserIcon, soloEncabezado: true },
   { to: '/admin/setup', label: 'Configuración institucional', icon: SlidersIcon, roles: STRUCTURAL_ADMINS },
   { to: '/admin/sedes', label: 'Sedes y jornadas', icon: BuildingIcon, roles: STRUCTURAL_ADMINS },
   // Consulta para todos los roles; solo ADMIN/COORDINADOR ven los controles de gestion dentro de la pagina.
@@ -92,3 +94,102 @@ export const NAV_ITEMS: NavItem[] = [
   { to: '/mis-notas', label: 'Mis notas', icon: FileTextIcon, roles: ['ESTUDIANTE'] },
   { to: '/mi-observador', label: 'Mi observador', icon: EyeIcon, roles: ['ESTUDIANTE'] },
 ];
+
+export interface GrupoNav {
+  clave: string;
+  label: string;
+  icon: ComponentType<SVGProps<SVGSVGElement>>;
+  /** Rutas que agrupa, en el orden en que salen. Un grupo sin pantallas visibles para el rol no se dibuja. */
+  rutas: string[];
+}
+
+/** Categorías del menú lateral. Lo que no esté en ninguna (Inicio, Boletín, Anuncios…) queda suelto arriba. */
+export const GRUPOS_NAV: GrupoNav[] = [
+  {
+    clave: 'matriculas',
+    label: 'Matrículas y admisiones',
+    icon: ClipboardListIcon,
+    rutas: ['/admin/admisiones', '/admin/enrollments', '/admin/documentos-por-revisar', '/paz-y-salvo', '/admin/students', '/secretaria/certificados'],
+  },
+  {
+    clave: 'institucion',
+    label: 'Institución',
+    icon: BuildingIcon,
+    rutas: ['/admin/setup', '/admin/sedes', '/anio-lectivo', '/admin/grades', '/admin/users'],
+  },
+  {
+    clave: 'academico',
+    label: 'Gestión académica',
+    icon: GraduationCapIcon,
+    rutas: ['/admin/academic-catalog', '/admin/study-plan', '/admin/groups', '/admin/teacher-assignments', '/admin/horarios', '/admin/espacios'],
+  },
+  {
+    clave: 'evaluacion',
+    label: 'Evaluación y seguimiento',
+    icon: FileTextIcon,
+    rutas: [
+      '/admin/documentos-referencia',
+      '/admin/revision-planeacion',
+      '/admin/actividades',
+      '/admin/notas',
+      '/admin/creador-planillas',
+      '/admin/boletin',
+      '/recuperaciones',
+      '/asistencia/gestion',
+    ],
+  },
+  {
+    clave: 'docencia',
+    label: 'Mi docencia',
+    icon: BookIcon,
+    rutas: [
+      '/docente/mi-carga',
+      '/docente/planeacion',
+      '/docente/actividades',
+      '/docente/notas',
+      '/docente/boletin-observaciones',
+      '/docente/asistencia',
+      '/docente/ajustes-razonables',
+    ],
+  },
+  {
+    clave: 'convivencia',
+    label: 'Convivencia',
+    icon: EyeIcon,
+    rutas: ['/convivencia/observador', '/convivencia/solicitudes', '/convivencia/casos', '/convivencia/comite', '/convivencia/catalogo'],
+  },
+  {
+    clave: 'orientacion',
+    label: 'Orientación e inclusión',
+    icon: FolderIcon,
+    rutas: ['/inclusion', '/orientacion/remisiones'],
+  },
+  {
+    clave: 'estudio',
+    label: 'Mi estudio',
+    icon: GraduationCapIcon,
+    rutas: ['/mis-actividades', '/mis-notas', '/mi-observador'],
+  },
+];
+
+export type EntradaMenu = { tipo: 'item'; item: NavItem } | { tipo: 'grupo'; grupo: GrupoNav; items: NavItem[] };
+
+/**
+ * Arma el menú lateral con los items que el rol puede abrir: cada grupo reúne los suyos (omitido si queda vacío) y aparece donde
+ * está su primera pantalla; lo suelto conserva su lugar. Es pura para poder probarla sin React.
+ */
+export function agruparMenu(items: NavItem[], grupos: GrupoNav[] = GRUPOS_NAV): EntradaMenu[] {
+  const visibles = items.filter((i) => !i.soloEncabezado);
+  const grupoDe = new Map<string, GrupoNav>();
+  grupos.forEach((g) => g.rutas.forEach((r) => grupoDe.set(r, g)));
+
+  const sueltos = visibles.filter((i) => !grupoDe.has(i.to));
+  const entradas: EntradaMenu[] = sueltos.map((item) => ({ tipo: 'item', item }));
+  for (const grupo of grupos) {
+    const delGrupo = grupo.rutas.map((r) => visibles.find((i) => i.to === r)).filter((i): i is NavItem => !!i);
+    // Un grupo de una sola pantalla no ahorra nada: se muestra como pantalla suelta.
+    if (delGrupo.length === 1) entradas.push({ tipo: 'item', item: delGrupo[0]! });
+    else if (delGrupo.length > 1) entradas.push({ tipo: 'grupo', grupo, items: delGrupo });
+  }
+  return entradas;
+}

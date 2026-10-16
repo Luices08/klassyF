@@ -1,16 +1,16 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
 import { AsistenteFlotante } from '../asistente/AsistenteFlotante';
 import { RolBadge } from '../ui/Badge';
-import { LogOutIcon } from '../ui/icons';
+import { LogOutIcon, UserIcon } from '../ui/icons';
 import { useAuth } from '../../context/AuthContext';
 import { useInstitution } from '../../hooks/useInstitution';
 import { CambiadorDePerfil } from './CambiadorDePerfil';
 import { ForcedPasswordChangeGate } from './ForcedPasswordChangeGate';
 import { NAV_ITEMS } from './navigation';
 import { Campanita } from '../notificaciones/Campanita';
-import { ContadorInsignia } from '../notificaciones/ContadorInsignia';
-import { contadorDeRuta, useMarcarVisto, useResumenNotificaciones } from '../../hooks/useNotificaciones';
+import { MenuLateral } from './MenuLateral';
+import { useMarcarVisto, useResumenNotificaciones } from '../../hooks/useNotificaciones';
 
 export function AppShell() {
   const { user, logout } = useAuth();
@@ -18,6 +18,7 @@ export function AppShell() {
   const { data: resumen } = useResumenNotificaciones();
   const marcarVisto = useMarcarVisto();
   const { pathname } = useLocation();
+  const zonaContenido = useRef<HTMLElement>(null);
   const hayPuntoEnRuta = resumen?.insignias.some((i) => i.ruta === pathname && i.pestana === '') ?? false;
 
   // Entrar al módulo apaga su punto (los de pestañas se apagan cuando se abre la pestaña).
@@ -25,6 +26,11 @@ export function AppShell() {
     if (hayPuntoEnRuta) marcarVisto.mutate({ ruta: pathname });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pathname, hayPuntoEnRuta]);
+
+  // El contenido es lo único que se desplaza (menú y encabezado quedan fijos): cada pantalla empieza arriba.
+  useEffect(() => {
+    zonaContenido.current?.scrollTo({ top: 0 });
+  }, [pathname]);
 
   const noLeidas = resumen?.no_leidas ?? 0;
   // Quien deja la pestaña abierta ve en el título si le llegó algo.
@@ -45,37 +51,34 @@ export function AppShell() {
 
   return (
     <ForcedPasswordChangeGate>
-      <div className="min-h-screen bg-soft">
-        <div className="flex min-h-screen">
+      <div className="h-dvh overflow-hidden bg-soft">
+        <div className="flex h-full">
           <aside className="hidden w-64 shrink-0 border-r border-border bg-surface sm:flex sm:flex-col">
-            <div className="flex h-16 items-center px-6">
+            <div className="flex h-16 shrink-0 items-center px-6">
               <span className="text-h3 text-primary">Klassy</span>
             </div>
-            <nav className="flex flex-col gap-1 px-3">
-              {items.map((item) => (
+            <div className="flex-1 overflow-y-auto px-3 pb-4">
+              <MenuLateral items={items} resumen={resumen} />
+            </div>
+          </aside>
+
+          <div className="flex min-w-0 flex-1 flex-col">
+            <header className="flex h-16 shrink-0 items-center justify-between border-b border-border bg-surface px-4 sm:px-6">
+              <span className="text-h3 text-primary sm:hidden">Klassy</span>
+              <div className="ml-auto flex items-center gap-4">
+                <Campanita />
                 <NavLink
-                  key={item.to}
-                  to={item.to}
-                  end={item.to === '/panel'}
+                  to="/mi-cuenta"
+                  title="Mi cuenta"
+                  aria-label="Mi cuenta"
                   className={({ isActive }) =>
-                    `flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
+                    `inline-flex h-9 w-9 items-center justify-center rounded-full ring-1 ring-inset ring-border ${
                       isActive ? 'bg-primary-soft text-primary' : 'text-body hover:bg-soft'
                     }`
                   }
                 >
-                  <item.icon className="h-[18px] w-[18px] shrink-0" />
-                  {item.label}
-                  <ContadorInsignia valor={contadorDeRuta(resumen, item.to)} />
+                  <UserIcon className="h-[18px] w-[18px]" />
                 </NavLink>
-              ))}
-            </nav>
-          </aside>
-
-          <div className="flex flex-1 flex-col">
-            <header className="flex h-16 items-center justify-between border-b border-border bg-surface px-4 sm:px-6">
-              <span className="text-h3 text-primary sm:hidden">Klassy</span>
-              <div className="ml-auto flex items-center gap-4">
-                <Campanita />
                 <CambiadorDePerfil />
                 <div className="text-right">
                   <p className="text-sm font-semibold text-ink">
@@ -95,7 +98,7 @@ export function AppShell() {
               </div>
             </header>
 
-            <main className="flex-1 p-4 sm:p-6">
+            <main ref={zonaContenido} className="flex-1 overflow-y-auto p-4 sm:p-6">
               {/* Contenedor global: max-w-7xl (no max-w-5xl) para que tablas anchas
                   (Usuarios, Grupos) no scrolleen antes de tiempo en pantallas grandes. */}
               <div className="mx-auto max-w-7xl">

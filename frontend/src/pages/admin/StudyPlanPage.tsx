@@ -610,6 +610,15 @@ function ConfiguracionGeneralNivelTab({
   const configurarMultiples = useConfigurarAsignaturasMultiplesGrados();
   const configurarGrado = useConfigurarAsignaturasGrado();
   const actualizarLimites = useActualizarLimitesHorasPlan();
+  const impactoDelGuardado = (configurarGrado.data ?? configurarMultiples.data)?.impacto;
+
+  // El aviso describe el último guardado: al cambiar de matriz (sede, jornada o nivel) deja de ser relevante.
+  const { reset: reiniciarGuardadoGrado } = configurarGrado;
+  const { reset: reiniciarGuardadoMultiple } = configurarMultiples;
+  useEffect(() => {
+    reiniciarGuardadoGrado();
+    reiniciarGuardadoMultiple();
+  }, [sedeId, jornadaId, nivel, reiniciarGuardadoGrado, reiniciarGuardadoMultiple]);
 
   const selectedSede = useMemo(() => sedes.find((s) => s._id === sedeId), [sedes, sedeId]);
   const selectedJornada = useMemo(() => jornadas.find((j) => j._id === jornadaId), [jornadas, jornadaId]);
@@ -881,6 +890,7 @@ function ConfiguracionGeneralNivelTab({
     if (motivo === null) return;
 
     configurarMultiples.reset();
+    configurarGrado.reset();
     await configurarMultiples.mutateAsync({
       institucion_id: institucionId,
       academic_year_id: academicYearId,
@@ -906,6 +916,7 @@ function ConfiguracionGeneralNivelTab({
     if (motivo === null) return;
 
     configurarGrado.reset();
+    configurarMultiples.reset();
     await configurarGrado.mutateAsync({
       institucion_id: institucionId,
       academic_year_id: academicYearId,
@@ -939,6 +950,7 @@ function ConfiguracionGeneralNivelTab({
     if (motivo === null) return;
 
     configurarMultiples.reset();
+    configurarGrado.reset();
     await configurarMultiples.mutateAsync({
       institucion_id: institucionId,
       academic_year_id: academicYearId,
@@ -1122,6 +1134,19 @@ function ConfiguracionGeneralNivelTab({
         {/* Notificaciones de error de mutación */}
         {configurarMultiples.isError && <Alert tone="error">{errorMessage(configurarMultiples.error)}</Alert>}
         {configurarGrado.isError && <Alert tone="error">{errorMessage(configurarGrado.error)}</Alert>}
+        {impactoDelGuardado && impactoDelGuardado.asignaciones_actualizadas > 0 && (
+          <Alert tone={impactoDelGuardado.horarios_afectados.length > 0 ? 'warning' : 'info'}>
+            Al guardar se actualizaron las horas de {impactoDelGuardado.asignaciones_actualizadas} asignación(es) docente(s).{' '}
+            {impactoDelGuardado.horarios_afectados.length > 0
+              ? `Los horarios ya generados quedaron desfasados y hay que generarlos de nuevo en Horarios: ${impactoDelGuardado.horarios_afectados
+                  .map((h) => `${h.nombre} (${h.estado === 'PUBLICADO' ? 'publicado' : 'borrador'})`)
+                  .join(', ')}.`
+              : 'Ningún horario generado usa esas asignaciones.'}
+          </Alert>
+        )}
+        {impactoDelGuardado && impactoDelGuardado.asignaciones_actualizadas === 0 && (
+          <Alert tone="success">Guardado. Ninguna asignación docente ni horario cambió con este ajuste.</Alert>
+        )}
 
         {/* Tabla General de Asignaturas e Intensidades */}
         <div className="mt-4 overflow-x-auto">

@@ -1,5 +1,9 @@
 import { type FormEvent, useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
+import { ChipCarga } from '../../components/cargaDocente/ChipCarga';
+import { DocentesPorSituacionDrawer, type SituacionCarga } from '../../components/cargaDocente/DocentesPorSituacionDrawer';
+import { GraficaCargaDocentes } from '../../components/cargaDocente/GraficaCargaDocentes';
+import { ListaDocentesCarga } from '../../components/cargaDocente/ListaDocentesCarga';
 import { Alert, errorMessage } from '../../components/ui/Alert';
 import { Chip } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
@@ -8,6 +12,7 @@ import { Drawer } from '../../components/ui/Drawer';
 import { Input, Select } from '../../components/ui/Field';
 import { IconButton } from '../../components/ui/IconButton';
 import { PageHeader } from '../../components/ui/PageHeader';
+import { SelectBuscable } from '../../components/ui/SelectBuscable';
 import { Spinner } from '../../components/ui/Spinner';
 import { EmptyRow, Table, TableBody, TableHead, Td, Th } from '../../components/ui/Table';
 import { Tabs } from '../../components/ui/Tabs';
@@ -39,7 +44,6 @@ import {
 } from '../../hooks/useTeacherAssignments';
 import { useUsers } from '../../hooks/useUsers';
 import type {
-  DocenteCargaResumen,
   Group,
   StudyPlan,
   Subject,
@@ -144,25 +148,6 @@ const FORM_VACIO = {
   observaciones: '',
 };
 
-/** Un docente en varios niveles se mide como % de su jornada: un tope en horas redondeado se contradiría con el diagnóstico. */
-function ChipCarga({ item }: { item: DocenteCargaResumen }) {
-  const horas = item.horas_totales;
-  if (item.estado_carga === 'SIN_CARGA') {
-    return (
-      <Chip tone="neutral">{horas === 0 ? 'Sin asignación (0 h)' : `Sin clases (${horas} h en otras asignaciones)`}</Chip>
-    );
-  }
-
-  const detalle =
-    item.nivel_predominante === 'MULTINIVEL' && item.fraccion_carga != null
-      ? `${horas}h · ${Math.round(item.fraccion_carga * 100)}% de la jornada`
-      : `${horas}h ${item.estado_carga === 'SOBRE_CARGA' ? '>' : '/'} ${item.tope_horas}h`;
-
-  if (item.estado_carga === 'SOBRE_CARGA') return <Chip tone="red">Sobrecarga ({detalle})</Chip>;
-  if (item.estado_carga === 'SUB_CARGA') return <Chip tone="orange">Subcarga ({detalle})</Chip>;
-  return <Chip tone="green">Normal ({detalle})</Chip>;
-}
-
 export function TeacherAssignmentsPage() {
   // Otros módulos (p. ej. la ficha de un grupo) llegan aquí con el contexto ya elegido; todo es opcional y solo
   // fija el estado inicial: ?anio=&docente= (filtra), ?grupo=&grado=&asignatura=&tipo= (abre la asignación lista para confirmar).
@@ -227,6 +212,7 @@ export function TeacherAssignmentsPage() {
 
   // Estado Ficha Integral por Docente
   const [selectedDocenteId, setSelectedDocenteId] = useState<string>(docenteDeEntrada);
+  const [situacionAbierta, setSituacionAbierta] = useState<SituacionCarga | null>(null);
   const [docenteFiltroSede, setDocenteFiltroSede] = useState<string>('');
   const [docenteFiltroJornada, setDocenteFiltroJornada] = useState<string>('');
   const [docenteDireccionGroupId, setDocenteDireccionGroupId] = useState<string>('');
@@ -537,6 +523,12 @@ export function TeacherAssignmentsPage() {
     max_direcciones_grupo_por_docente: 1,
     tolerancia_subcarga_horas: 2,
   });
+
+  function abrirFichaDeDocente(docenteId: string) {
+    setTabActiva('docente');
+    setSelectedDocenteId(docenteId);
+    setDocenteFeedback(null);
+  }
 
   // Métricas de diagnóstico
   const totalDocentes = docentesResumen.length;
@@ -872,25 +864,35 @@ export function TeacherAssignmentsPage() {
         </Card>
 
         <Card>
-          <div className="p-4">
+          <button
+            type="button"
+            onClick={() => setSituacionAbierta('SOBRE_CARGA')}
+            className="block w-full rounded-xl p-4 text-left hover:bg-soft/60"
+            aria-label={`Ver los ${sobrecargaCount} docentes con sobrecarga`}
+          >
             <div className="flex items-center justify-between">
               <span className="text-xs font-medium text-muted uppercase">Sobrecarga</span>
               <AlertTriangleIcon className="h-4 w-4 text-danger" />
             </div>
             <p className="mt-2 text-h2 text-danger">{sobrecargaCount}</p>
-            <span className="text-xs text-muted">Exceden el tope por nivel</span>
-          </div>
+            <span className="text-xs text-muted">Exceden el tope por nivel · Ver lista</span>
+          </button>
         </Card>
 
         <Card>
-          <div className="p-4">
+          <button
+            type="button"
+            onClick={() => setSituacionAbierta('SUB_CARGA')}
+            className="block w-full rounded-xl p-4 text-left hover:bg-soft/60"
+            aria-label={`Ver los ${subcargaCount} docentes con subcarga`}
+          >
             <div className="flex items-center justify-between">
               <span className="text-xs font-medium text-muted uppercase">Subcarga</span>
               <AlertTriangleIcon className="h-4 w-4 text-warning" />
             </div>
             <p className="mt-2 text-h2 text-warning">{subcargaCount}</p>
-            <span className="text-xs text-muted">Disponibilidad de horas</span>
-          </div>
+            <span className="text-xs text-muted">Disponibilidad de horas · Ver lista</span>
+          </button>
         </Card>
       </div>
 
@@ -935,30 +937,34 @@ export function TeacherAssignmentsPage() {
                 })}
               </Select>
 
-              <Select
+              <SelectBuscable
                 label="Seleccionar Docente Titular *"
                 value={selectedDocenteId}
-                onChange={(e) => {
-                  setSelectedDocenteId(e.target.value);
+                onChange={(id) => {
+                  setSelectedDocenteId(id);
                   setDocenteFeedback(null);
                 }}
-              >
-                <option value="">Seleccione un docente...</option>
-                {docentes.map((d) => (
-                  <option key={d._id} value={d._id}>
-                    {d.apellido}, {d.nombre} ({d.numero_documento})
-                  </option>
-                ))}
-              </Select>
+                placeholder="Buscar por nombre o documento…"
+                vacioLabel="Seleccione un docente..."
+                opciones={docentes.map((d) => ({
+                  value: d._id,
+                  label: `${d.apellido}, ${d.nombre}`,
+                  detalle: d.numero_documento,
+                }))}
+              />
             </div>
 
             {!selectedDocenteId ? (
-              <div className="p-8 text-center text-muted">
-                <UsersIcon className="h-10 w-10 mx-auto text-muted/60 mb-2" />
-                <p className="font-medium text-ink">Seleccione un docente para gestionar su carga académica integral</p>
-                <p className="text-sm mt-1">
-                  Podrá definir su dirección de grupo, asignar clases en múltiples grupos con casillas de verificación y registrar proyectos transversales en una sola pantalla.
-                </p>
+              <div className="space-y-6 p-6">
+                <div>
+                  <h3 className="text-sm font-bold text-ink">Carga semanal por docente</h3>
+                  <p className="mb-3 text-xs text-muted">De mayor a menor. Toca una barra para abrir la carga académica del docente.</p>
+                  <GraficaCargaDocentes items={docentesResumen} onSeleccionar={abrirFichaDeDocente} />
+                </div>
+                <div>
+                  <h3 className="mb-3 text-sm font-bold text-ink">Docentes ({docentesResumen.length})</h3>
+                  <ListaDocentesCarga items={docentesResumen} onGestionar={abrirFichaDeDocente} vacio="Aún no hay docentes activos en el año." />
+                </div>
               </div>
             ) : (
               <div className="p-6 space-y-6">
@@ -978,6 +984,9 @@ export function TeacherAssignmentsPage() {
                   </div>
 
                   <div className="flex items-center gap-3">
+                    <Button variant="secondary" onClick={() => setSelectedDocenteId('')}>
+                      ← Volver a la lista
+                    </Button>
                     <div className="text-right">
                       <span className="text-xs text-muted uppercase tracking-wider block">Carga Semanal Total</span>
                       <span className="text-xl font-bold text-ink">{totalHorasDocenteEnVivo} h</span>
@@ -2119,6 +2128,13 @@ export function TeacherAssignmentsPage() {
           </div>
         </form>
       </Drawer>
+
+      <DocentesPorSituacionDrawer
+        situacion={situacionAbierta}
+        docentes={docentesResumen}
+        onGestionar={abrirFichaDeDocente}
+        onClose={() => setSituacionAbierta(null)}
+      />
     </div>
   );
 }

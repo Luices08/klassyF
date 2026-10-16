@@ -1,6 +1,6 @@
 import { Franja } from '../franjas';
 import { resolverVariables } from './alcance';
-import { AsignacionMotor, Aviso, EstructuraSemana, SesionMotor, VariableDeTipo, VariableMotor } from './tipos';
+import { AsignacionMotor, Aviso, EspacioMotor, EstructuraSemana, SesionMotor, VariableDeTipo, VariableMotor } from './tipos';
 
 /**
  * La semana del motor sale de la jornada (M01): sus días hábiles y sus franjas. M09 no define estructura propia.
@@ -114,7 +114,8 @@ export function expandirSesiones(
 export function diagnosticarCapacidad(
   sesiones: readonly SesionMotor[],
   variables: readonly VariableMotor[],
-  estructura: EstructuraSemana
+  estructura: EstructuraSemana,
+  espacios: readonly EspacioMotor[] = []
 ): Aviso[] {
   const avisos: Aviso[] = [];
   const totalPeriodos = estructura.dias.length * estructura.periodos.length;
@@ -160,6 +161,26 @@ export function diagnosticarCapacidad(
   for (const [grupo, horas] of horasPorGrupo) {
     if (horas > totalPeriodos) {
       avisos.push({ codigo: 'GRUPO_EXCEDE_PERIODOS', mensaje: `El grupo ${grupo} tiene ${horas} horas y la semana solo ${totalPeriodos} periodos.` });
+    }
+  }
+
+  // Las horas que piden el mismo conjunto de espacios no pueden pasar de lo que esos espacios dan en una semana. Si alguno
+  // admite grupos simultáneos no hay tope por espacio y no se avisa.
+  const admiteVarios = new Set(espacios.filter((e) => e.admite_grupos_simultaneos).map((e) => e.id));
+  const horasPorEspacios = new Map<string, { ids: string[]; horas: number }>();
+  for (const s of sesiones) {
+    if (!s.espacios_permitidos || s.espacios_permitidos.length === 0) continue;
+    const ids = [...s.espacios_permitidos].sort();
+    const clave = ids.join('|');
+    horasPorEspacios.set(clave, { ids, horas: (horasPorEspacios.get(clave)?.horas ?? 0) + s.duracion });
+  }
+  for (const { ids, horas } of horasPorEspacios.values()) {
+    if (ids.some((id) => admiteVarios.has(id))) continue;
+    if (horas > ids.length * totalPeriodos) {
+      avisos.push({
+        codigo: 'ESPACIOS_INSUFICIENTES',
+        mensaje: `Las clases que piden ${ids.length === 1 ? 'un mismo espacio' : `estos ${ids.length} espacios`} suman ${horas} horas y ${ids.length === 1 ? 'ese espacio solo da' : 'entre todos solo dan'} ${ids.length * totalPeriodos} por semana. Agrega espacios o quita la regla de espacio requerido.`,
+      });
     }
   }
 

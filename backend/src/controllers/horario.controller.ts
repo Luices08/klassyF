@@ -80,7 +80,7 @@ export const pdfHorario = catchAsync<IdParams, unknown, unknown, { vista?: Vista
 });
 
 export const obtenerHorario = catchAsync<IdParams>(async (req, res) => {
-  res.status(200).json({ success: true, data: await horarioService.obtenerHorario(req.params.id) });
+  res.status(200).json({ success: true, data: await horarioService.obtenerHorarioConRevision(req.params.id) });
 });
 
 export const publicarHorario = catchAsync<IdParams, unknown, { confirm_password: string }>(async (req, res) => {

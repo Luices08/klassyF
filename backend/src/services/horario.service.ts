@@ -12,18 +12,21 @@ import Enrollment from '../models/enrollment.model';
 import Guardian from '../models/guardian.model';
 import StudentGuardian from '../models/studentGuardian.model';
 import AcademicYear from '../models/academicYear.model';
+import Campus from '../models/campus.model';
 import Espacio from '../models/espacio.model';
 import Grade from '../models/grade.model';
 import Group from '../models/group.model';
 import Horario, { HorarioDocument } from '../models/horario.model';
 import Institution from '../models/institution.model';
 import JornadaOperativa, { JornadaOperativaDocument } from '../models/jornadaOperativa.model';
+import StudyPlan from '../models/studyPlan.model';
 import Subject from '../models/subject.model';
 import TeacherAssignment from '../models/teacherAssignment.model';
 import User from '../models/user.model';
 import VariableHorario, { VariableHorarioDocument } from '../models/variableHorario.model';
 import ApiError from '../utils/ApiError';
 import { ESTADO_ACTIVO } from '../utils/filtroEstado';
+import { conciliarCargaConPlan, horasDelPlanDeGrupo, jornadasSeTraslapan, resumirLista } from '../utils/horarioCoherencia';
 import {
   AsignacionMotor,
   Aviso,
@@ -140,6 +143,111 @@ function crearHumanizador(catalogo: CatalogoHorario, extra: Map<string, string> 
   return (texto: string) => texto.replace(/[0-9a-f]{24}(#\d+)?/g, (m) => nombres.get(m.split('#')[0] ?? m) ?? m);
 }
 
+const ESTADOS_ESPACIO_NO_USABLES = ['EN_MANTENIMIENTO', 'INACTIVO'];
+
+/**
+ * Docentes (M08) con lo que el motor de UNA jornada no puede ver: si ya no están activos, o si dictan también en otra
+ * jornada (de esta u otra sede) cuyas horas se cruzan con esta, caso en que no podrían estar en los dos lugares a la vez.
+ */
+async function avisosDeDocentes(
+  docenteIds: string[],
+  academicYearId: Types.ObjectId,
+  jornada: JornadaOperativaDocument,
+  gruposDeEstaJornada: Types.ObjectId[]
+): Promise<Aviso[]> {
+  if (docenteIds.length === 0) return [];
+  const avisos: Aviso[] = [];
+
+  const inactivos = await User.find({ _id: { $in: docenteIds }, estado: 'inactivo' }).select('_id').lean();
+  if (inactivos.length > 0) {
+    avisos.push({
+      codigo: 'DOCENTE_INACTIVO',
+      mensaje: `Tienen clases asignadas pero ya no están activos: ${resumirLista(inactivos.map((d) => String(d._id)))}. Reasigna sus clases en Carga académica.`,
+    });
+  }
+
+  const enOtrosGrupos = await TeacherAssignment.find({
+    academic_year_id: academicYearId,
+    tipo_asignacion: 'CLASE',
+    estado: ESTADO_ACTIVO,
+    docente_id: { $in: docenteIds },
+    group_id: { $nin: gruposDeEstaJornada, $ne: null },
+  })
+    .select('docente_id group_id')
+    .lean();
+  if (enOtrosGrupos.length === 0) return avisos;
+
+  const gruposOtros = await Group.find({
+    _id: { $in: enOtrosGrupos.map((a) => a.group_id) },
+    estado: { $ne: 'CLOSED' },
+    jornada_id: { $ne: jornada._id },
+  })
+    .select('jornada_id')
+    .lean();
+  const jornadaDeGrupo = new Map(gruposOtros.map((g) => [String(g._id), String(g.jornada_id)]));
+  const jornadasOtras = await JornadaOperativa.find({ _id: { $in: [...new Set(jornadaDeGrupo.values())] } }).lean();
+  const sedes = new Map((await Campus.find({ _id: { $in: jornadasOtras.map((j) => j.sede_id) } }).select('nombre').lean()).map((c) => [String(c._id), c.nombre]));
+  const cruzadas = new Map(jornadasOtras.filter((j) => jornadasSeTraslapan(jornada, j)).map((j) => [String(j._id), j]));
+
+  const porDocente = new Map<string, Set<string>>();
+  for (const a of enOtrosGrupos) {
+    const otra = jornadaDeGrupo.get(String(a.group_id));
+    if (!otra || !cruzadas.has(otra)) continue;
+    porDocente.set(String(a.docente_id), (porDocente.get(String(a.docente_id)) ?? new Set()).add(otra));
+  }
+  for (const [docente, jornadasIds] of porDocente) {
+    const donde = [...jornadasIds].map((id) => {
+      const j = cruzadas.get(id)!;
+      return `${NOMBRES_JORNADA[j.nombre] ?? j.nombre} de ${sedes.get(String(j.sede_id)) ?? 'otra sede'} (${j.hora_inicio}–${j.hora_fin})`;
+    });
+    avisos.push({
+      codigo: 'DOCENTE_EN_JORNADAS_QUE_SE_CRUZAN',
+      mensaje: `El docente ${docente} también dicta en ${donde.join(' y ')}, que se cruza con esta jornada (${jornada.hora_inicio}–${jornada.hora_fin}). Cada horario se arma por separado: revisa que no le queden clases a la misma hora.`,
+    });
+  }
+  return avisos;
+}
+
+/** Salones titulares (M10): grupos sin salón o con uno que ya no sirve (eliminado, en mantenimiento, inactivo o de otra sede). */
+async function avisosDeSalones(
+  grupos: Array<{ _id: Types.ObjectId; aula_id?: Types.ObjectId | null }>,
+  sedeId: Types.ObjectId,
+  virtual: boolean
+): Promise<Aviso[]> {
+  if (virtual || grupos.length === 0) return [];
+  // Una sede que no registra salones (M10 es opcional) no tiene nada que avisar.
+  if (!(await Espacio.exists({ sede_id: sedeId, tipo_espacio: 'AULA_REGULAR' })) && grupos.every((g) => !g.aula_id)) return [];
+  const avisos: Aviso[] = [];
+  const aulaIds = [...new Set(grupos.flatMap((g) => (g.aula_id ? [String(g.aula_id)] : [])))];
+  const aulas = new Map((await Espacio.find({ _id: { $in: aulaIds } }).select('nombre estado sede_id').lean()).map((e) => [String(e._id), e]));
+
+  const sinSalon: string[] = [];
+  const salonNoSirve: string[] = [];
+  for (const g of grupos) {
+    if (!g.aula_id) {
+      sinSalon.push(String(g._id));
+      continue;
+    }
+    const aula = aulas.get(String(g.aula_id));
+    if (!aula) salonNoSirve.push(`${g._id} (su salón fue eliminado)`);
+    else if (aula.estado !== 'DISPONIBLE') salonNoSirve.push(`${g._id} (${aula.nombre} está ${aula.estado === 'EN_MANTENIMIENTO' ? 'en mantenimiento' : 'inactivo'})`);
+    else if (String(aula.sede_id) !== String(sedeId)) salonNoSirve.push(`${g._id} (${aula.nombre} es de otra sede)`);
+  }
+  if (sinSalon.length > 0) {
+    avisos.push({
+      codigo: 'GRUPO_SIN_SALON',
+      mensaje: `${sinSalon.length} grupo(s) no tienen salón titular: ${resumirLista(sinSalon)}. El horario no depende de eso, pero no tendrán aula asignada (Grupos o Espacios y aulas).`,
+    });
+  }
+  if (salonNoSirve.length > 0) {
+    avisos.push({
+      codigo: 'SALON_DEL_GRUPO_NO_DISPONIBLE',
+      mensaje: `Grupos cuyo salón titular ya no está disponible: ${resumirLista(salonNoSirve)}. Asígnales otro en Grupos.`,
+    });
+  }
+  return avisos;
+}
+
 /**
  * Lee del sistema todo lo que el motor necesita para una jornada y un año: grupos activos de la jornada, su carga de
  * clase (M08), la estructura de tiempo de la jornada (M01), los espacios disponibles de su sede (M10) y las variables
@@ -149,10 +257,13 @@ async function cargarContexto(academicYearId: string, jornadaId: string) {
   const { anio, jornada } = await exigirAnioYJornada(academicYearId, jornadaId, false);
   const estructura = construirEstructura(jornada.dias_habiles, jornada.franjas);
 
-  const grupos = await Group.find({ academic_year_id: anio._id, jornada_id: jornada._id, estado: 'ACTIVE' }).select('grade_id').lean();
+  // `$ne: 'CLOSED'`: un grupo anterior al campo `estado` cuenta como activo (ver utils/filtroEstado).
+  const grupos = await Group.find({ academic_year_id: anio._id, jornada_id: jornada._id, estado: { $ne: 'CLOSED' } })
+    .select('grade_id sede_id jornada_id aula_id')
+    .lean();
   const gradoDeGrupo = new Map(grupos.map((g) => [String(g._id), String(g.grade_id)]));
 
-  const [asignaciones, variablesDocs, institucion] = await Promise.all([
+  const [asignaciones, variablesDocs, institucion, plan] = await Promise.all([
     TeacherAssignment.find({
       academic_year_id: anio._id,
       tipo_asignacion: 'CLASE',
@@ -162,11 +273,12 @@ async function cargarContexto(academicYearId: string, jornadaId: string) {
     }).lean(),
     VariableHorario.find({ academic_year_id: anio._id, jornada_id: jornada._id, estado: ESTADO_ACTIVO }).sort({ updatedAt: 1 }),
     Institution.findOne().select('modalidad').lean(),
+    StudyPlan.findOne({ academic_year_id: anio._id }).select('grades').lean(),
   ]);
-  const espaciosDocs =
-    institucion?.modalidad === 'VIRTUAL' ? [] : await Espacio.find({ sede_id: jornada.sede_id, estado: 'DISPONIBLE' }).lean();
+  const virtual = institucion?.modalidad === 'VIRTUAL';
+  const espaciosDocs = virtual ? [] : await Espacio.find({ sede_id: jornada.sede_id, estado: { $nin: ESTADOS_ESPACIO_NO_USABLES } }).lean();
 
-  const asignacionesMotor: AsignacionMotor[] = asignaciones.map((a) => ({
+  const asignacionesBrutas: AsignacionMotor[] = asignaciones.map((a) => ({
     id: String(a._id),
     docente_id: String(a.docente_id),
     group_id: String(a.group_id),
@@ -175,8 +287,68 @@ async function cargarContexto(academicYearId: string, jornadaId: string) {
     horas_semanales: a.horas_semanales,
   }));
 
+  // Las horas de una clase las manda el plan de estudios que rige en la sede y jornada del grupo (M06): la copia que guarda la
+  // asignación (M08) puede haber quedado atrás. Un grupo sin plan aplicable se programa con las horas de su asignación.
+  const planes = new Map(
+    grupos.map((g) => [
+      String(g._id),
+      horasDelPlanDeGrupo(plan, { id: String(g._id), grade_id: String(g.grade_id), sede_id: String(g.sede_id), jornada_id: String(g.jornada_id) }),
+    ])
+  );
+  const carga = conciliarCargaConPlan(asignacionesBrutas, gradoDeGrupo.keys(), planes);
+  const asignacionesMotor = carga.asignaciones;
+
   const avisos: Aviso[] = [];
+  if (!plan) {
+    avisos.push({ codigo: 'SIN_PLAN_DE_ESTUDIOS', mensaje: 'Este año lectivo no tiene plan de estudios (M06): las horas se toman tal como están en Carga académica.' });
+  }
+  const etiquetaClase = (c: { subject_id: string; group_id: string }) => `${c.subject_id} de ${c.group_id}`;
+  if (carga.grupos_sin_plan.length > 0 && plan) {
+    avisos.push({
+      codigo: 'GRUPO_SIN_PLAN',
+      mensaje: `El plan de estudios no tiene asignaturas para ${resumirLista(carga.grupos_sin_plan)}: se usaron las horas de Carga académica. Configúralo en Plan de estudios.`,
+    });
+  }
+  if (carga.horas_corregidas.length > 0) {
+    avisos.push({
+      codigo: 'HORAS_SEGUN_PLAN',
+      mensaje: `${carga.horas_corregidas.length} clase(s) tenían en Carga académica horas distintas a las del plan de estudios de su grupo y se programaron con las del plan: ${resumirLista(
+        carga.horas_corregidas.map((c) => `${etiquetaClase(c)} (${c.antes} h → ${c.ahora} h)`)
+      )}. Guarda el plan del grado para actualizar Carga académica.`,
+    });
+  }
+  if (carga.fuera_del_plan.length > 0) {
+    avisos.push({
+      codigo: 'ASIGNACION_FUERA_DEL_PLAN',
+      mensaje: `Tienen docente, pero ya no están en el plan de estudios de su grupo y no se programaron: ${resumirLista(carga.fuera_del_plan.map(etiquetaClase))}. Retira esas asignaciones en Carga académica.`,
+    });
+  }
+  if (carga.sin_docente.length > 0) {
+    const horasSinDocente = carga.sin_docente.reduce((suma, c) => suma + c.horas, 0);
+    avisos.push({
+      codigo: 'ASIGNATURA_SIN_DOCENTE',
+      mensaje: `Faltan docentes: ${carga.sin_docente.length} asignatura(s) del plan (${horasSinDocente} h semanales) no se pueden programar hasta asignarlas en Carga académica: ${resumirLista(
+        carga.sin_docente.map((c) => `${etiquetaClase(c)} (${c.horas} h)`)
+      )}.`,
+    });
+  }
+
+  const docentesConCarga = [...new Set(asignacionesMotor.map((a) => a.docente_id))];
+  avisos.push(...(await avisosDeDocentes(docentesConCarga, anio._id, jornada, grupos.map((g) => g._id))));
+  avisos.push(...(await avisosDeSalones(grupos, jornada.sede_id, virtual)));
+
+  const planPorGrupo = new Map(
+    [...planes].map(([id, horas]) => [
+      id,
+      {
+        horas_plan: horas ? [...horas.values()].reduce((suma, h) => suma + h, 0) : null,
+        horas_sin_docente: carga.sin_docente.filter((c) => c.group_id === id).reduce((suma, c) => suma + c.horas, 0),
+      },
+    ])
+  );
+
   const asignaturasIds = new Set(asignacionesMotor.map((a) => a.subject_id));
+  for (const c of [...carga.fuera_del_plan, ...carga.sin_docente]) asignaturasIds.add(c.subject_id);
   for (const v of variablesDocs) for (const s of v.asignatura_ids) asignaturasIds.add(String(s));
   const areaDeAsignatura = new Map(
     (await Subject.find({ _id: { $in: [...asignaturasIds] } }).select('area_id').lean()).map((s) => [String(s._id), String(s.area_id)])
@@ -195,31 +367,34 @@ async function cargarContexto(academicYearId: string, jornadaId: string) {
         const exclusivas = e.areas_exclusivas.map(String);
         return v.asignatura_ids.length > 0 && v.asignatura_ids.every((s) => exclusivas.includes(areaDeAsignatura.get(s) ?? ''));
       });
+      const nombreRegla = doc.descripcion || METADATOS_VARIABLE_HORARIO[v.tipo].etiqueta;
       if (usables.length === 0) {
         avisos.push({
           codigo: 'ESPACIO_NO_DISPONIBLE',
-          mensaje: `La variable "${doc.descripcion || METADATOS_VARIABLE_HORARIO[v.tipo].etiqueta}" no tiene ningún espacio disponible para sus asignaturas (en mantenimiento, inactivo o exclusivo de otra área); no se aplicó.`,
+          mensaje: `La variable "${nombreRegla}" no tiene ningún espacio disponible para sus asignaturas (eliminado, en mantenimiento, inactivo o exclusivo de otra área); no se aplicó.`,
         });
         continue;
+      }
+      if (usables.length < v.parametros.espacio_ids.length) {
+        avisos.push({
+          codigo: 'ESPACIO_PARCIAL',
+          mensaje: `La variable "${nombreRegla}" perdió ${v.parametros.espacio_ids.length - usables.length} de sus ${v.parametros.espacio_ids.length} espacios (eliminados, en mantenimiento o inactivos): quedan ${usables.length}.`,
+        });
       }
       v.parametros = { espacio_ids: usables };
     }
     variables.push(v);
   }
 
+  const espaciosMotor = espaciosDocs.map((e) => ({ id: String(e._id), admite_grupos_simultaneos: e.admite_grupos_simultaneos }));
   const { sesiones, avisos: avisosExpansion } = expandirSesiones(asignacionesMotor, variables, estructura);
-  avisos.push(...avisosExpansion, ...diagnosticarCapacidad(sesiones, variables, estructura));
+  avisos.push(...avisosExpansion, ...diagnosticarCapacidad(sesiones, variables, estructura, espaciosMotor));
 
-  const entrada: EntradaMotor = {
-    estructura,
-    sesiones,
-    variables,
-    espacios: espaciosDocs.map((e) => ({ id: String(e._id), admite_grupos_simultaneos: e.admite_grupos_simultaneos })),
-  };
+  const entrada: EntradaMotor = { estructura, sesiones, variables, espacios: espaciosMotor };
 
   const catalogo = await construirCatalogo({
     grupos: gradoDeGrupo.keys(),
-    docentes: sesiones.flatMap((s) => s.docente_ids),
+    docentes: [...sesiones.flatMap((s) => s.docente_ids), ...docentesConCarga],
     asignaturas: asignaturasIds,
     espacios: espacioPorId.keys(),
     reuniones: variables.filter((v) => v.tipo === 'REUNION_COLECTIVA').map((v) => v.id),
@@ -241,6 +416,7 @@ async function cargarContexto(academicYearId: string, jornadaId: string) {
     humanizar,
     avisos: avisos.map((a) => ({ ...a, mensaje: humanizar(a.mensaje) })),
     huella: huellaFranjas(jornada),
+    planPorGrupo,
   };
 }
 
@@ -413,7 +589,12 @@ export async function obtenerInsumos(query: ListarPorContexto) {
     estructura: ctx.estructura,
     periodos_semana: periodosSemana,
     total_sesiones: ctx.entrada.sesiones.length,
-    grupos: ctx.catalogo.grupos.map((g) => ({ ...g, horas: horasGrupo.get(g._id) ?? 0 })),
+    grupos: ctx.catalogo.grupos.map((g) => ({
+      ...g,
+      horas: horasGrupo.get(g._id) ?? 0,
+      horas_plan: ctx.planPorGrupo.get(g._id)?.horas_plan ?? null,
+      horas_sin_docente: ctx.planPorGrupo.get(g._id)?.horas_sin_docente ?? 0,
+    })),
     docentes: ctx.catalogo.docentes.map((d) => ({ ...d, horas: horasDocente.get(d._id) ?? 0 })),
     avisos: ctx.avisos,
     catalogo: ctx.catalogo,
@@ -584,6 +765,29 @@ export async function obtenerHorario(id: string, filtro?: (s: { group_id: Types.
 }
 
 /**
+ * El detalle que ve coordinación, con una comprobación más: si la carga de HOY (plan de estudios, docentes) ya no produce las
+ * mismas sesiones que tiene esta versión. Un horario generado antes de cambiar horas o docentes queda desfasado y no se
+ * recalcula solo; aquí se dice, antes de que publicar lo rechace.
+ */
+export async function obtenerHorarioConRevision(id: string) {
+  const detalle = await obtenerHorario(id);
+  const { horario } = detalle;
+  if (horario.estado !== 'BORRADOR' && horario.estado !== 'PUBLICADO') return { ...detalle, carga_cambio: null };
+  try {
+    const ctx = await cargarContexto(String(horario.academic_year_id), String(horario.jornada_id));
+    const actuales = new Map(ctx.entrada.sesiones.map((x) => [x.id, x.duracion]));
+    const guardadas = new Map(horario.sesiones.map((x) => [x.clave, x.duracion]));
+    const sobran = [...guardadas.keys()].filter((c) => !actuales.has(c)).length;
+    const faltan = [...actuales.keys()].filter((c) => !guardadas.has(c)).length;
+    const cambiaron = [...guardadas].filter(([c, d]) => actuales.has(c) && actuales.get(c) !== d).length;
+    return { ...detalle, carga_cambio: sobran + faltan + cambiaron > 0 ? { sobran, faltan, cambiaron } : null };
+  } catch {
+    // Sin año o jornada ya no hay con qué comparar: el detalle se entrega igual.
+    return { ...detalle, carga_cambio: null };
+  }
+}
+
+/**
  * Publica una versión. Antes la revalida contra los insumos de HOY (carga de M08, franjas, variables): si algo cambió
  * desde que se generó y ya no cuadra, no se publica. Exige la contraseña del usuario, como el cierre de año.
  */
@@ -612,6 +816,11 @@ export async function publicarHorario(id: string, confirmPassword: string, { usu
     await horario.save();
     const cambios = revision.sin_ubicar.length > 0 ? ' La carga académica o las variables cambiaron desde que se generó.' : '';
     throw new ApiError(409, `La versión tiene ${revision.conflictos_duros} conflicto(s) duro(s) con los datos actuales.${cambios} Revisa los conflictos o genera una nueva versión.`);
+  }
+
+  // Un salón o laboratorio que se eliminó o salió de servicio desde que se generó no puede quedar en el horario publicado.
+  for (const x of horario.sesiones) {
+    if (x.clave in revision.espacios) x.espacio_id = revision.espacios[x.clave] ? new Types.ObjectId(revision.espacios[x.clave]!) : null;
   }
 
   await runTransaction(async (session) => {

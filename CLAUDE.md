@@ -507,6 +507,18 @@ Diseño en `doc/Analisis_M09_Horarios.md`. Backend `/horarios` (`horario.control
 - **Diagnóstico antes que motor**: `diagnosticarCapacidad` explica lo imposible (horas > periodos, horas > franjas
   libres del docente, `BLOQUES_NO_CABEN`). La pantalla debe mostrarlo antes de dejar generar.
 - Publicar exige 0 conflictos duros (lo valida el modelo) y hay una sola versión `PUBLICADO` por año + jornada.
+- **Coherencia con los demás módulos** (`utils/horarioCoherencia.ts`, puro y con tests; la usa `cargarContexto`): las horas de una clase las
+  manda el **plan de estudios que rige en la sede y jornada del grupo** (`horasDelPlanDeGrupo`: base del grado, más lo de la jornada y lo del grupo);
+  la copia que guarda `TeacherAssignment` puede haber quedado atrás, así que M09 programa con las del plan y lo avisa (`HORAS_SEGUN_PLAN`). Una
+  asignación cuya asignatura ya no está en el plan del grupo no se programa (`ASIGNACION_FUERA_DEL_PLAN`); una asignatura del plan sin docente se
+  avisa y se cuenta en Insumos (`ASIGNATURA_SIN_DOCENTE`, columna «Plan»). Un grupo sin plan aplicable se programa con las horas de su asignación.
+  También avisa (sin bloquear): docentes inactivos, docentes con clase en otra jornada —de esta u otra sede— cuyas horas se cruzan con esta
+  (`DOCENTE_EN_JORNADAS_QUE_SE_CRUZAN`: cada horario se arma por jornada, el motor no lo ve), grupos sin salón titular o con uno eliminado/en
+  mantenimiento/de otra sede (solo si la sede registra salones), espacios de una regla `ESPACIO_REQUERIDO` que ya no sirven
+  (`ESPACIO_PARCIAL` / `ESPACIO_NO_DISPONIBLE`) y horas que piden un mismo espacio por encima de lo que da en la semana (`ESPACIOS_INSUFICIENTES`).
+  Los grupos activos y los espacios usables se filtran por exclusión (`$ne: 'CLOSED'`, `$nin: [EN_MANTENIMIENTO, INACTIVO]`) para no perder
+  documentos anteriores al campo `estado`. Publicar **reasigna los espacios** con los de hoy. El detalle de una versión
+  (`GET /horarios/:id`) trae `carga_cambio` (sesiones nuevas/que sobran/con otra duración frente a la carga actual) para decir que está desfasada antes de que publicar la rechace.
 
 ### M13 (Asistencia) — estado: núcleo completo
 

@@ -21,7 +21,7 @@ interface PanelVariablesProps {
   variables: VariableHorario[];
   grados: Grade[];
   catalogo: CatalogoHorario;
-  espacios: Array<{ _id: string; nombre: string }>;
+  espacios: Array<{ _id: string; nombre: string; disponible?: boolean }>;
 }
 
 const MAX_CHIPS = 3;

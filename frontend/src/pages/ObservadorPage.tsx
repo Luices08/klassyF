@@ -8,7 +8,7 @@ import { Alert, errorMessage } from '../components/ui/Alert';
 import { Button } from '../components/ui/Button';
 import { Card, CardHeader } from '../components/ui/Card';
 import { Drawer } from '../components/ui/Drawer';
-import { Input, Select } from '../components/ui/Field';
+import { Input } from '../components/ui/Field';
 import { PageHeader } from '../components/ui/PageHeader';
 import { Spinner } from '../components/ui/Spinner';
 import { EmptyRow, Table, TableBody, TableHead, Td, Th } from '../components/ui/Table';
@@ -22,6 +22,7 @@ import {
   useMisObservaciones,
 } from '../hooks/useObservaciones';
 import { formatoFechaCalendario } from '../lib/fechas';
+import { SelectBuscable } from '../components/ui/SelectBuscable';
 
 export function ObservadorPage() {
   const { user } = useAuth();
@@ -106,22 +107,17 @@ function RegistrarTab({ esDocente, puedeRegistrarFalta }: { esDocente: boolean; 
         }
       />
       <div className="grid grid-cols-1 gap-4 p-4 sm:grid-cols-2">
-        <Select
+        <SelectBuscable
           label="Grupo"
           value={grupoId}
-          onChange={(e) => {
-            setGrupoId(e.target.value);
+          onChange={(id) => {
+            setGrupoId(id);
             setSeleccion(new Set());
           }}
-        >
-          <option value="">Todos mis grupos (usa la búsqueda)</option>
-          {(grupos.data ?? []).map((g) => (
-            <option key={g._id} value={g._id}>
-              {g.grado} · {g.nomenclatura}
-              {g.es_director ? ' (director)' : ''}
-            </option>
-          ))}
-        </Select>
+          placeholder="Buscar grupo…"
+          vacioLabel="Todos mis grupos (usa la búsqueda)"
+          opciones={(grupos.data ?? []).map((g) => ({ value: g._id, label: `${g.grado} · ${g.nomenclatura}${g.es_director ? ' (director)' : ''}` }))}
+        />
         <Input label="Buscar" value={busqueda} onChange={(e) => setBusqueda(e.target.value)} placeholder="Nombre o documento" />
       </div>
       {(grupos.data ?? []).length === 0 && (

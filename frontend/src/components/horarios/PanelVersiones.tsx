@@ -23,6 +23,7 @@ import { Spinner } from '../ui/Spinner';
 import { EmptyRow, Table, TableBody, TableHead, Td, Th } from '../ui/Table';
 import { CheckCircleIcon, EyeIcon, FileTextIcon, LockIcon, RefreshIcon, TrashIcon } from '../ui/icons';
 import { MallaHorario, type VistaHorario } from './MallaHorario';
+import { SelectBuscable } from '../ui/SelectBuscable';
 
 const ESTADO: Record<EstadoHorario, { texto: string; tono: Tone }> = {
   GENERANDO: { texto: 'Generando…', tono: 'blue' },
@@ -287,20 +288,16 @@ function DetalleVersion({ id, estado, generando, onRegenerar }: { id: string; es
             <option value="GENERAL">General (todos los docentes)</option>
           </Select>
           {vista !== 'GENERAL' && (
-            <Select
+            <SelectBuscable
               label={vista === 'GRUPO' ? 'Grupo' : 'Docente'}
               value={elegido?.id ?? ''}
-              onChange={(e) => {
-                setEntidadId(e.target.value);
+              onChange={(id) => {
+                setEntidadId(id);
                 setSeleccion(null);
               }}
-            >
-              {opciones.map((o) => (
-                <option key={o.id} value={o.id}>
-                  {o.nombre}
-                </option>
-              ))}
-            </Select>
+              placeholder={vista === 'GRUPO' ? 'Buscar grupo…' : 'Buscar docente…'}
+              opciones={opciones.map((o) => ({ value: o.id, label: o.nombre }))}
+            />
           )}
         </div>
 

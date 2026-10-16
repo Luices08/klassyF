@@ -1,8 +1,9 @@
 import { useState } from 'react';
 import { Alert, errorMessage } from '../ui/Alert';
-import { Input, Select } from '../ui/Field';
+import { Input } from '../ui/Field';
 import { Spinner } from '../ui/Spinner';
 import { type EstudianteBuscado, useEstudiantesInclusion, useGruposInclusion } from '../../hooks/useInclusion';
+import { SelectBuscable } from '../ui/SelectBuscable';
 
 /**
  * Busca estudiantes dentro del alcance del usuario (sus sedes o los grupos del docente). No abre el directorio general de
@@ -34,14 +35,14 @@ export function SelectorEstudiante({ seleccionado, onSelect }: { seleccionado: E
 
   return (
     <div className="space-y-3">
-      <Select label="Grupo" value={grupo} onChange={(e) => setGrupo(e.target.value)}>
-        <option value="">Todos mis grupos (escribe al menos 3 letras)</option>
-        {(grupos.data ?? []).map((g) => (
-          <option key={g._id} value={g._id}>
-            {g.grado} — {g.nomenclatura}
-          </option>
-        ))}
-      </Select>
+      <SelectBuscable
+        label="Grupo"
+        value={grupo}
+        onChange={setGrupo}
+        placeholder="Buscar grupo…"
+        vacioLabel="Todos mis grupos (escribe al menos 3 letras)"
+        opciones={(grupos.data ?? []).map((g) => ({ value: g._id, label: `${g.grado} — ${g.nomenclatura}` }))}
+      />
       <Input label="Nombre o documento" value={texto} onChange={(e) => setTexto(e.target.value)} placeholder="Ej.: Morales" />
       {estudiantes.isFetching && <Spinner />}
       {estudiantes.isError && <Alert tone="error">{errorMessage(estudiantes.error)}</Alert>}

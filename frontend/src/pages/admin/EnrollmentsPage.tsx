@@ -33,6 +33,8 @@ import {
 import { DocumentosPrevistos } from '../../components/matriculas/DocumentosPrevistos';
 import { InformacionApoyoCampos } from '../../components/inclusion/InformacionApoyoCampos';
 import { APOYO_VACIO, aApoyoDeclarado } from '../../lib/apoyoDeclarado';
+import { SelectBuscable } from '../../components/ui/SelectBuscable';
+import { opcionesDeGrupos, opcionesDePersonas } from '../../lib/opcionesBuscables';
 
 const PAGE_SIZE = 20;
 
@@ -453,19 +455,15 @@ export function EnrollmentsPage() {
         )}
 
         {modoMatricula === 'existente' ? (
-          <Select
+          <SelectBuscable
             label="Estudiante"
             required
             value={form.student_id}
-            onChange={(e) => setForm((f) => ({ ...f, student_id: e.target.value }))}
-          >
-            <option value="">Selecciona...</option>
-            {(studentsQuery.data ?? []).map((s) => (
-              <option key={s._id} value={s._id}>
-                {s.nombre} {s.apellido} · {s.numero_documento}
-              </option>
-            ))}
-          </Select>
+            onChange={(id) => setForm((f) => ({ ...f, student_id: id }))}
+            placeholder="Buscar por nombre o documento…"
+            vacioLabel="Selecciona..."
+            opciones={opcionesDePersonas(studentsQuery.data ?? [])}
+          />
         ) : (
           <div className="space-y-4">
             <div className="space-y-3 rounded-lg border border-border bg-subtle/40 p-3">
@@ -627,14 +625,15 @@ export function EnrollmentsPage() {
           </div>
         )}
 
-        <Select label="Grupo" required value={form.group_id} onChange={(e) => setForm((f) => ({ ...f, group_id: e.target.value }))}>
-          <option value="">Selecciona...</option>
-          {(groupsQuery.data ?? []).map((g) => (
-            <option key={g._id} value={g._id}>
-              {g.nomenclatura} ({g.cupos_ocupados}/{g.max_capacity})
-            </option>
-          ))}
-        </Select>
+        <SelectBuscable
+          label="Grupo"
+          required
+          value={form.group_id}
+          onChange={(id) => setForm((f) => ({ ...f, group_id: id }))}
+          placeholder="Buscar grupo…"
+          vacioLabel="Selecciona..."
+          opciones={opcionesDeGrupos(groupsQuery.data ?? [], { conCupos: true })}
+        />
 
         <Select
           label="Tipo de ingreso"

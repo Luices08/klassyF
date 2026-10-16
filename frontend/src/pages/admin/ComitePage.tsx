@@ -28,6 +28,8 @@ import {
 } from '../../hooks/useComite';
 import { useUsersPaginados } from '../../hooks/useUsers';
 import { formatoFechaCalendario } from '../../lib/fechas';
+import { SelectBuscable } from '../../components/ui/SelectBuscable';
+import { opcionesDePersonas } from '../../lib/opcionesBuscables';
 
 /** Comité Escolar de Convivencia (M15): miembros por año, sesiones y actas. Solo convivencia accede. */
 export function ComitePage() {
@@ -248,24 +250,21 @@ function MiembrosTab() {
 
 /** Solo el administrador puede ver la lista de usuarios (M02): coordinación designa externos o pide el vínculo a un ADMIN. */
 function SelectorUsuario({ valor, onCambio }: { valor: string; onCambio: (id: string, nombre: string) => void }) {
-  const usuarios = useUsersPaginados({ roles: ['ADMIN', 'COORDINADOR', 'COORDINADOR_CONVIVENCIA', 'ORIENTADOR', 'DOCENTE'], estado: 'activo', limit: 100 });
+  // Sin `limit` el servidor no pagina y devuelve todos: el buscador filtra en el navegador y debe tener la lista completa.
+  const usuarios = useUsersPaginados({ roles: ['ADMIN', 'COORDINADOR', 'COORDINADOR_CONVIVENCIA', 'ORIENTADOR', 'DOCENTE'], estado: 'activo' });
   return (
-    <Select
+    <SelectBuscable
       label="Vincular a un usuario del sistema (opcional)"
       value={valor}
-      onChange={(e) => {
-        const u = usuarios.data?.data.find((x) => x._id === e.target.value);
-        onCambio(e.target.value, u ? `${u.nombre} ${u.apellido}` : '');
+      onChange={(id) => {
+        const u = usuarios.data?.data.find((x) => x._id === id);
+        onCambio(id, u ? `${u.nombre} ${u.apellido}` : '');
       }}
+      placeholder="Buscar por nombre o documento…"
+      vacioLabel="Designación externa"
+      opciones={opcionesDePersonas(usuarios.data?.data ?? [])}
       hint="Si lo vinculas, el nombre sale de su cuenta y se aparta solo de los casos en que se declare impedido."
-    >
-      <option value="">Designación externa</option>
-      {(usuarios.data?.data ?? []).map((u) => (
-        <option key={u._id} value={u._id}>
-          {u.nombre} {u.apellido}
-        </option>
-      ))}
-    </Select>
+    />
   );
 }
 

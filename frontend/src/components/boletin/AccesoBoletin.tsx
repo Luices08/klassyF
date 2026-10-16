@@ -15,6 +15,8 @@ import {
 } from '../../hooks/useBoletin';
 import { useGroups } from '../../hooks/useGroups';
 import { formatoFechaHora } from '../../lib/fechas';
+import { opcionesDeGrupos } from '../../lib/opcionesBuscables';
+import { SelectBuscable } from '../ui/SelectBuscable';
 
 const TEXTO_ORIGEN: Record<OrigenAccesoBoletin, string> = {
   GRUPO: 'Lo decidió el grupo',
@@ -76,15 +78,14 @@ export function AccesoBoletin({ puedeEditar }: { puedeEditar: boolean }) {
               </option>
             ))}
           </Select>
-          <Select label="Grupo" value={grupoId} onChange={(e) => setGrupoId(e.target.value)}>
-            <option value="">Selecciona...</option>
-            {(grupos.data ?? []).map((g) => (
-              <option key={g._id} value={g._id}>
-                {typeof g.grade_id === 'object' ? g.grade_id.nombre : ''} {g.nomenclatura}
-                {typeof g.sede_id === 'object' ? ` · ${g.sede_id.nombre}` : ''}
-              </option>
-            ))}
-          </Select>
+          <SelectBuscable
+            label="Grupo"
+            value={grupoId}
+            onChange={setGrupoId}
+            placeholder="Buscar grupo…"
+            vacioLabel="Selecciona..."
+            opciones={opcionesDeGrupos(grupos.data ?? [])}
+          />
         </div>
       </Card>
 

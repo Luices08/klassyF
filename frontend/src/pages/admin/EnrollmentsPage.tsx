@@ -214,6 +214,16 @@ export function EnrollmentsPage() {
     }
   }
 
+  function handleSeguirMatriculando() {
+    setMatriculaCreadaId(null);
+    setErrorEnvio(null);
+    setForm(FORM_VACIO);
+    setFiltroEstudiante('DISPONIBLES');
+    setReingresoConfirmado(false);
+    createEnrollment.reset();
+    crearEstudiante.reset();
+  }
+
   const esAdmin = user?.rol === 'ADMIN';
   const paginaInfo = listQuery.data;
 
@@ -432,7 +442,12 @@ export function EnrollmentsPage() {
         {matriculaCreadaId ? (
           <div className="space-y-4">
             <Alert tone="success">La matrícula quedó registrada. Los documentos se cargan, aprueban o rechazan en su expediente.</Alert>
-            <Button onClick={() => navigate(`/admin/enrollments/${matriculaCreadaId}`)}>Ir al expediente</Button>
+            <div className="flex flex-wrap gap-2">
+              <Button onClick={() => navigate(`/admin/enrollments/${matriculaCreadaId}`)}>Ir al expediente</Button>
+              <Button variant="secondary" onClick={handleSeguirMatriculando}>
+                Seguir matriculando
+              </Button>
+            </div>
           </div>
         ) : (
           <>

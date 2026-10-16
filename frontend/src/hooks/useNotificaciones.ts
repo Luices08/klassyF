@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../lib/apiClient';
 import type { Rol } from '../types/api';
@@ -96,9 +97,33 @@ export function useMarcarVisto() {
   });
 }
 
+/** Total de novedades de una pantalla: su contador general más el de todas sus pestañas (lo que muestra el botón del menú). */
+export function contadorDeRuta(resumen: ResumenNotificaciones | undefined, ruta: string): number {
+  return resumen?.insignias.filter((i) => i.ruta === ruta).reduce((total, i) => total + i.contador, 0) ?? 0;
+}
+
 /** Contador de una pestaña de un módulo (0 si no hay), para pasarlo a `Tabs`. */
 export function contadorDePestana(resumen: ResumenNotificaciones | undefined, ruta: string, pestana: string): number {
   return resumen?.insignias.find((i) => i.ruta === ruta && i.pestana === pestana)?.contador ?? 0;
+}
+
+/**
+ * Puntos rojos de las pestañas de una pantalla (M28). Devuelve una función `(pestana) => contador` para pasar a `Tabs`, y apaga el punto de
+ * la pestaña que está abierta (también al entrar a la pantalla, cuando ya es la pestaña por defecto). `sufijo` es para pantallas que muestran un
+ * elemento a la vez, como el portal con un hijo: el servidor guarda `<pestana>-<sufijo>`.
+ */
+export function useContadoresDePestana(ruta: string, activa: string, sufijo?: string) {
+  const { data: resumen } = useResumenNotificaciones();
+  const { mutate: marcarVisto } = useMarcarVisto();
+  const clave = (pestana: string) => (sufijo ? `${pestana}-${sufijo}` : pestana);
+  const hayEnLaActiva = contadorDePestana(resumen, ruta, clave(activa)) > 0;
+  const claveActiva = clave(activa);
+
+  useEffect(() => {
+    if (hayEnLaActiva) marcarVisto({ ruta, pestana: claveActiva });
+  }, [hayEnLaActiva, ruta, claveActiva, marcarVisto]);
+
+  return (pestana: string) => (pestana === activa ? 0 : contadorDePestana(resumen, ruta, clave(pestana)));
 }
 
 // --- Anuncios ---

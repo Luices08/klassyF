@@ -16,6 +16,7 @@ import ApiError from '../utils/ApiError';
 import { hayEventoNoLectivo, periodosEfectivos } from '../utils/calendarioAcademico';
 import { ESTADO_ACTIVO } from '../utils/filtroEstado';
 import { registrarEvento } from './audit.service';
+import { avisarInasistencias } from './notificacionesEventos.service';
 import { listarEstados, mapaDeEstados } from './attendanceState.service';
 
 const MS_HORA = 3_600_000;
@@ -261,6 +262,10 @@ async function cargarContextoAsistencia(groupId: string, subjectId: string, doce
   return { grupo, subjectId, fechas, matriculados: new Set(matriculas.map((m) => String(m.student_id._id))), estados };
 }
 
+/** Estudiantes que con este guardado pasan a tener una inasistencia (M28): volver a guardar la misma planilla no los repite. */
+const nuevasFallas = new WeakMap<AttendanceDocument, string[]>();
+const esInasistencia = (e: { cuenta_como_falla: boolean; es_justificada: boolean }) => e.cuenta_como_falla && !e.es_justificada;
+
 /** Valida un día completo y deja su planilla lista en memoria, sin escribir: un lote se valida entero antes de guardar. */
 async function prepararDia(
   contexto: ContextoAsistencia,
@@ -295,11 +300,14 @@ async function prepararDia(
       registrado_por: docente._id,
     });
 
+  const nuevas: string[] = [];
   for (const entrada of dia.registros) {
     const estado = estados.get(entrada.state_id);
     if (!estado) throw new ApiError(400, 'Uno de los estados de asistencia no existe.');
 
     const registro = planilla.registros.find((r) => String(r.student_id) === entrada.student_id);
+    const anterior = registro ? estados.get(String(registro.state_id)) : undefined;
+    if (esInasistencia(estado) && !(anterior && esInasistencia(anterior))) nuevas.push(entrada.student_id);
     // Un estado desactivado ya no se ofrece, pero un registro que ya lo tenía puede conservarlo.
     if (estado.estado === 'inactivo' && String(registro?.state_id) !== entrada.state_id) {
       throw new ApiError(400, `El estado "${estado.nombre}" está desactivado.`);
@@ -312,6 +320,7 @@ async function prepararDia(
       planilla.registros.push({ student_id: entrada.student_id, state_id: estado._id, novedad: entrada.novedad ?? '' });
     }
   }
+  nuevasFallas.set(planilla, nuevas);
   return planilla;
 }
 
@@ -340,6 +349,7 @@ async function guardarDia(
     detalle: `Grupo ${contexto.grupo.nomenclatura}, ${fecha}: ${planilla.registros.length} registros, ${fallas} fallas.`,
     ip,
   });
+  await avisarInasistencias(nuevasFallas.get(planilla) ?? []);
 }
 
 /**

@@ -49,6 +49,16 @@ describe('M28: notificaciones (con base de datos)', () => {
     expect((await notificaciones.resumenNotificaciones(e.admin)).insignias).toHaveLength(0);
   });
 
+  it('el punto de una pestaña no se apaga al ver otra ni al ver el módulo', async () => {
+    await notificaciones.sumarInsignia({ destinatarios: [e.admin._id], rol: 'ADMIN', ruta: '/asistencia/gestion', pestana: 'justificaciones' });
+    await notificaciones.sumarInsignia({ destinatarios: [e.admin._id], rol: 'ADMIN', ruta: '/admin/revision-planeacion', pestana: 'aulas', cantidad: 2 });
+    await notificaciones.marcarVisto(e.admin, '/asistencia/gestion');
+    await notificaciones.marcarVisto(e.admin, '/admin/revision-planeacion', 'areas');
+    expect((await notificaciones.resumenNotificaciones(e.admin)).insignias).toHaveLength(2);
+    await notificaciones.marcarVisto(e.admin, '/asistencia/gestion', 'justificaciones');
+    expect((await notificaciones.resumenNotificaciones(e.admin)).insignias).toEqual([{ ruta: '/admin/revision-planeacion', pestana: 'aulas', contador: 2 }]);
+  });
+
   it('un anuncio solo llega a los perfiles elegidos', async () => {
     await anuncios.crearAnuncio({ titulo: 'Reunión', cuerpo: 'Viernes 3 p. m.', roles_destino: ['DOCENTE'] }, e.admin);
     expect(await anuncios.anunciosParaMi(e.docenteDeClase)).toHaveLength(1);

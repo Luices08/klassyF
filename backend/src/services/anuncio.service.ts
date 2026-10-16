@@ -4,6 +4,7 @@ import Anuncio, { AnuncioDocument } from '../models/anuncio.model';
 import { UserDocument } from '../models/user.model';
 import ApiError from '../utils/ApiError';
 import { registrarEvento } from './audit.service';
+import { avisarAnuncioNuevo } from './notificacionesEventos.service';
 
 export interface AnuncioVista {
   id: string;
@@ -82,6 +83,7 @@ export async function crearAnuncio(input: AnuncioInput, autor: UserDocument, ip?
     creado_por: autor._id,
   });
   await registrarEvento({ usuario_id: autor._id, accion: 'ANUNCIO_CREADO', entidad: 'Anuncio', entidad_id: anuncio._id, detalle: `Para: ${input.roles_destino.join(', ')}`, ip });
+  if (desde.getTime() <= Date.now()) await avisarAnuncioNuevo(input.roles_destino, autor._id);
   return vista(anuncio, new Date(), true);
 }
 

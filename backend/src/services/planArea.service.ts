@@ -262,7 +262,7 @@ export async function radicarPlanDeArea(input: RadicarPlanAreaInput, archivo: Pd
     detalle: `${lider.area_id.nombre} (${textoDeAlcance(alcanceDeLider(lider))}), versión ${numero}.`,
     ip,
   });
-  await avisarPlanEnRevision();
+  await avisarPlanEnRevision('area');
   return obtenerPlanDeArea(String(plan._id), usuario);
 }
 

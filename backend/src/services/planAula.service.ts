@@ -511,7 +511,7 @@ export async function radicarPlanDeAula(input: RadicarPlanAulaInput, archivo: Pd
     detalle: `Periodo ${input.periodo_numero}, versión ${numero}${!existente && radicacion.fuera_de_plazo ? ' (fuera de plazo)' : ''}.`,
     ip,
   });
-  await avisarPlanEnRevision();
+  await avisarPlanEnRevision('aula');
   return obtenerPlanDeAula(String(plan._id), docente);
 }
 

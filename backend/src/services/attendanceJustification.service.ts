@@ -11,6 +11,7 @@ import { detectarFirmaArchivo } from '../utils/firmasArchivo';
 import { carpetaAsistencia } from '../utils/uploadPaths';
 import { registrarEvento } from './audit.service';
 import { mapaDeEstados } from './attendanceState.service';
+import { avisarJustificacionPorRevisar, avisarJustificacionRevisada } from './notificacionesEventos.service';
 import { filtroAlcanceAsistencia } from './attendance.service';
 
 export interface ArchivoSubido {
@@ -105,6 +106,7 @@ export async function crearJustificacion(
     detalle: `Estudiante ${String(registro.student_id)}, ${planilla.fecha.toISOString().slice(0, 10)}${archivoPath ? ' (con soporte)' : ''}.`,
     ip,
   });
+  await avisarJustificacionPorRevisar();
   return justificacion;
 }
 
@@ -190,6 +192,7 @@ export async function revisarJustificacion(
     detalle: input.estado,
     ip,
   });
+  await avisarJustificacionRevisada(justificacion, input.estado, justificacion.comentario_revision);
   return justificacion;
 }
 

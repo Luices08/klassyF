@@ -10,7 +10,7 @@ import { ForcedPasswordChangeGate } from './ForcedPasswordChangeGate';
 import { NAV_ITEMS } from './navigation';
 import { Campanita } from '../notificaciones/Campanita';
 import { ContadorInsignia } from '../notificaciones/ContadorInsignia';
-import { useMarcarVisto, useResumenNotificaciones } from '../../hooks/useNotificaciones';
+import { contadorDeRuta, useMarcarVisto, useResumenNotificaciones } from '../../hooks/useNotificaciones';
 
 export function AppShell() {
   const { user, logout } = useAuth();
@@ -26,10 +26,17 @@ export function AppShell() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pathname, hayPuntoEnRuta]);
 
+  const noLeidas = resumen?.no_leidas ?? 0;
+  // Quien deja la pestaña abierta ve en el título si le llegó algo.
+  useEffect(() => {
+    document.title = noLeidas > 0 ? `(${noLeidas}) Klassy` : 'Klassy';
+    return () => {
+      document.title = 'Klassy';
+    };
+  }, [noLeidas]);
+
   if (!user) return null;
 
-  // Un módulo muestra la suma de su contador general y el de sus pestañas.
-  const contadorDeRuta = (ruta: string) => resumen?.insignias.filter((i) => i.ruta === ruta).reduce((t, i) => t + i.contador, 0) ?? 0;
 
   const esVirtual = institucion?.modalidad === 'VIRTUAL';
   const items = NAV_ITEMS.filter(
@@ -58,7 +65,7 @@ export function AppShell() {
                 >
                   <item.icon className="h-[18px] w-[18px] shrink-0" />
                   {item.label}
-                  <ContadorInsignia valor={contadorDeRuta(item.to)} />
+                  <ContadorInsignia valor={contadorDeRuta(resumen, item.to)} />
                 </NavLink>
               ))}
             </nav>

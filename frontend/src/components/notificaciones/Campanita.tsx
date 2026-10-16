@@ -43,6 +43,8 @@ export function Campanita() {
       <button
         type="button"
         aria-label={noLeidas > 0 ? `Notificaciones: ${noLeidas} sin leer` : 'Notificaciones'}
+        aria-expanded={abierta}
+        aria-haspopup="true"
         onClick={() => setAbierta((v) => !v)}
         className="relative inline-flex h-9 w-9 items-center justify-center rounded-full text-body ring-1 ring-inset ring-border hover:bg-soft"
       >
@@ -68,7 +70,10 @@ export function Campanita() {
             {isLoading && <li className="px-4 py-6 text-center text-sm text-muted">Cargando…</li>}
             {!isLoading && (lista?.length ?? 0) === 0 && <li className="px-4 py-6 text-center text-sm text-muted">No tienes notificaciones.</li>}
             {lista?.map((n) => (
-              <li key={n.id} className={`border-b border-border last:border-b-0 ${n.leida ? '' : 'bg-primary-soft/40'}`}>
+              <li
+                key={n.id}
+                className={`border-b border-border last:border-b-0 ${n.leida ? '' : 'bg-primary-soft/40'} ${n.severidad === 'CRITICA' && !n.leida ? 'border-l-4 border-l-danger' : ''}`}
+              >
                 <button
                   type="button"
                   className="block w-full px-4 py-3 text-left hover:bg-soft"
@@ -88,6 +93,18 @@ export function Campanita() {
               </li>
             ))}
           </ul>
+          <div className="border-t border-border px-4 py-2 text-right">
+            <button
+              type="button"
+              className="text-xs font-semibold text-primary hover:underline"
+              onClick={() => {
+                setAbierta(false);
+                navigate('/anuncios');
+              }}
+            >
+              Ver anuncios
+            </button>
+          </div>
         </div>
       )}
     </div>

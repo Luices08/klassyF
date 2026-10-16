@@ -10,6 +10,7 @@ import { PageHeader } from '../../components/ui/PageHeader';
 import { Spinner } from '../../components/ui/Spinner';
 import { EmptyRow, Table, TableBody, TableHead, Td, Th } from '../../components/ui/Table';
 import { TabPanel, Tabs } from '../../components/ui/Tabs';
+import { useContadoresDePestana } from '../../hooks/useNotificaciones';
 import { EyeIcon } from '../../components/ui/icons';
 import { useAnioDeTrabajo } from '../../hooks/useAniosLectivos';
 import { useAreas } from '../../hooks/useCatalogoAcademico';
@@ -31,6 +32,7 @@ export function RevisionPlaneacionPage() {
   const anio = anios.find((a) => a._id === anioElegido) ?? anioDeTrabajo;
 
   const [pestana, setPestana] = useState('aulas');
+  const contadorDe = useContadoresDePestana('/admin/revision-planeacion', pestana);
   const [viendo, setViendo] = useState<{ tipo: 'AREA' | 'AULA'; id: string } | null>(null);
 
   const [periodo, setPeriodo] = useState('');
@@ -76,8 +78,8 @@ export function RevisionPlaneacionPage() {
 
       <Tabs
         items={[
-          { key: 'aulas', label: 'Planes de aula' },
-          { key: 'areas', label: 'Planes de área' },
+          { key: 'aulas', label: 'Planes de aula', contador: contadorDe('aulas') },
+          { key: 'areas', label: 'Planes de área', contador: contadorDe('areas') },
         ]}
         active={pestana}
         onChange={setPestana}

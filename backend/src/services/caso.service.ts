@@ -34,6 +34,7 @@ import { fechaDeClase, hoyColombia } from './attendance.service';
 import { registrarEvento } from './audit.service';
 import { obtenerConfiguracion } from './convivenciaCatalogo.service';
 import { exigirPermisoSobreEstudiante } from './observacion.service';
+import { avisarRemisionesOrientacion } from './notificacionesEventos.service';
 import { auditarRemisionesCreadas, remitirAutomaticamente, remitirManualmente, resumenDeRemisionesDelCaso } from './remisionOrientacion.service';
 
 const ROLES_CONVIVENCIA: string[] = [ROLES.ADMIN, ROLES.COORDINADOR_CONVIVENCIA];
@@ -336,7 +337,10 @@ export async function actualizarPaso(id: string, pasoId: string, datos: { estado
   const vista = await guardarYAuditar(caso, usuario, 'CASO_CONVIVENCIA_ACTUALIZADO', 'paso', ip, remite ? async (session) => {
     creadas = await remitirAutomaticamente(caso, { tipo: 'PASO', id: String(paso._id), nombre: paso.nombre }, usuario, session);
   } : undefined);
-  if (creadas > 0) await auditarRemisionesCreadas(usuario, caso, creadas, `paso «${paso.nombre}»`, ip);
+  if (creadas > 0) {
+    await auditarRemisionesCreadas(usuario, caso, creadas, `paso «${paso.nombre}»`, ip);
+    await avisarRemisionesOrientacion(caso.sede_id, creadas);
+  }
   return vista;
 }
 
@@ -430,7 +434,10 @@ export async function agregarRegistroCaso(id: string, coleccion: ColeccionRegist
   const vista = await guardarYAuditar(caso, usuario, 'CASO_CONVIVENCIA_ACTUALIZADO', coleccion, ip, origen ? async (session) => {
     creadas = await remitirAutomaticamente(caso, origen, usuario, session);
   } : undefined);
-  if (creadas > 0 && origen) await auditarRemisionesCreadas(usuario, caso, creadas, `medida «${origen.nombre}»`, ip);
+  if (creadas > 0 && origen) {
+    await auditarRemisionesCreadas(usuario, caso, creadas, `medida «${origen.nombre}»`, ip);
+    await avisarRemisionesOrientacion(caso.sede_id, creadas);
+  }
   return vista;
 }
 
@@ -440,6 +447,7 @@ export async function remitirAOrientacion(id: string, datos: { student_ids: stri
   exigirEditable(caso);
   const creadas = await runTransaction((session) => remitirManualmente(caso, datos.student_ids, datos.motivo, usuario, session));
   await auditarRemisionesCreadas(usuario, caso, creadas, 'manual', ip);
+  await avisarRemisionesOrientacion(caso.sede_id, creadas);
   return vistaCaso(caso);
 }
 

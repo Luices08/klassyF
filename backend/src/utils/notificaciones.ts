@@ -9,6 +9,9 @@ export interface DatosNotificacion {
   grupo?: string;
   dias?: number;
   motivo?: string;
+  /** Nombre de un evento del calendario. */
+  nombre?: string;
+  decision?: 'APROBADA' | 'RECHAZADA';
 }
 
 const plural = (n: number, uno: string, varios: string) => (n === 1 ? uno : varios);
@@ -54,6 +57,31 @@ export function renderizarNotificacion(evento: EventoNotificacion, contador: num
       return {
         titulo: 'Cierre de periodo',
         mensaje: `El periodo ${datos.periodo ?? ''} cierra ${datos.dias === 0 ? 'hoy' : `en ${datos.dias ?? '?'} ${plural(datos.dias ?? 0, 'día', 'días')}`}. Revisa que tus notas estén completas.`,
+      };
+    case 'INASISTENCIA_REGISTRADA':
+      return {
+        titulo: 'Inasistencia registrada',
+        mensaje: `Se ${plural(n, 'registró 1 inasistencia nueva', `registraron ${n} inasistencias nuevas`)}${datos.estudiante ? ` de ${datos.estudiante}` : ''}. Revisa el detalle y justifícala si corresponde.`,
+      };
+    case 'OBSERVACION_REGISTRADA':
+      return {
+        titulo: 'Observador',
+        mensaje: `Hay ${n} ${plural(n, 'registro nuevo', 'registros nuevos')} en el observador${datos.estudiante ? ` de ${datos.estudiante}` : ''}.`,
+      };
+    case 'ACTIVIDAD_NUEVA':
+      return {
+        titulo: 'Actividad nueva',
+        mensaje: `Tu docente publicó ${n} ${plural(n, 'actividad nueva', 'actividades nuevas')}${datos.asignatura ? ` en ${datos.asignatura}` : ''}.`,
+      };
+    case 'JUSTIFICACION_REVISADA':
+      return {
+        titulo: 'Justificación revisada',
+        mensaje: `Coordinación ${datos.decision === 'APROBADA' ? 'aprobó' : 'rechazó'} la justificación de inasistencia${datos.estudiante ? ` de ${datos.estudiante}` : ''}.${datos.decision === 'RECHAZADA' && datos.motivo ? ` Motivo: ${datos.motivo}` : ''}`,
+      };
+    case 'RECORDATORIO_CALENDARIO':
+      return {
+        titulo: 'Próximamente',
+        mensaje: `${datos.nombre ?? 'Un evento del calendario'} ${datos.dias === 0 ? 'es hoy' : `empieza en ${datos.dias ?? '?'} ${plural(datos.dias ?? 0, 'día', 'días')}`}.`,
       };
   }
 }

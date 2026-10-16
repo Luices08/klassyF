@@ -31,6 +31,11 @@ export const EVENTOS_NOTIFICACION = [
   'BOLETIN_PUBLICADO',
   'FALTA_GRAVE',
   'CIERRE_PERIODO_PROXIMO',
+  'INASISTENCIA_REGISTRADA',
+  'OBSERVACION_REGISTRADA',
+  'ACTIVIDAD_NUEVA',
+  'JUSTIFICACION_REVISADA',
+  'RECORDATORIO_CALENDARIO',
 ] as const;
 export type EventoNotificacion = (typeof EVENTOS_NOTIFICACION)[number];
 
@@ -49,4 +54,15 @@ export const METADATOS_EVENTO: Record<EventoNotificacion, MetadatoEvento> = {
   // Una citación o falta grave llega también por correo cuando exista el envío: por eso el canal ya queda registrado.
   FALTA_GRAVE: { severidad: 'CRITICA', canales: ['CAMPANITA', 'CORREO'] },
   CIERRE_PERIODO_PROXIMO: { severidad: 'IMPORTANTE', canales: ['CAMPANITA'] },
+  INASISTENCIA_REGISTRADA: { severidad: 'IMPORTANTE', canales: ['CAMPANITA'] },
+  OBSERVACION_REGISTRADA: { severidad: 'INFO', canales: ['CAMPANITA'] },
+  ACTIVIDAD_NUEVA: { severidad: 'INFO', canales: ['CAMPANITA'] },
+  JUSTIFICACION_REVISADA: { severidad: 'INFO', canales: ['CAMPANITA'] },
+  RECORDATORIO_CALENDARIO: { severidad: 'INFO', canales: ['CAMPANITA'] },
 };
+
+/**
+ * Pestaña de un contador del portal del acudiente: el portal muestra un hijo a la vez, así que el punto de «Inasistencias» de un hijo
+ * no se apaga al abrir esa pestaña de otro (`inasistencias-<id del estudiante>`; el frontend arma la misma clave).
+ */
+export const pestanaDeHijo = (pestana: string, estudianteId: { toString(): string }) => `${pestana}-${estudianteId.toString()}`;

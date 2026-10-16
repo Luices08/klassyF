@@ -7,6 +7,7 @@ import { Alert } from '../components/ui/Alert';
 import { PageHeader } from '../components/ui/PageHeader';
 import { Spinner } from '../components/ui/Spinner';
 import { TabPanel, Tabs, type TabItem } from '../components/ui/Tabs';
+import { useContadoresDePestana } from '../hooks/useNotificaciones';
 import { useAuth } from '../context/AuthContext';
 import { useAnioDeTrabajo } from '../hooks/useAniosLectivos';
 
@@ -15,13 +16,14 @@ export function GestionAsistenciaPage() {
   const { user } = useAuth();
   const { anio, query } = useAnioDeTrabajo();
   const [pestana, setPestana] = useState('estadisticas');
+  const contadorDe = useContadoresDePestana('/asistencia/gestion', pestana);
 
   const esAdmin = user?.rol === 'ADMIN';
   const puedeRevisar = esAdmin || user?.rol === 'COORDINADOR';
 
   const pestanas: TabItem[] = [
     { key: 'estadisticas', label: 'Estadísticas' },
-    { key: 'justificaciones', label: 'Justificaciones' },
+    { key: 'justificaciones', label: 'Justificaciones', contador: contadorDe('justificaciones') },
     { key: 'reportes', label: 'Reportes PDF' },
     ...(esAdmin ? [{ key: 'estados', label: 'Estados de asistencia' }] : []),
   ];

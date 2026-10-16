@@ -14,6 +14,7 @@ import { ProgressBar } from '../components/ui/ProgressBar';
 import { Spinner } from '../components/ui/Spinner';
 import { EmptyRow, Table, TableBody, TableHead, Td, Th } from '../components/ui/Table';
 import { TabPanel, Tabs } from '../components/ui/Tabs';
+import { useContadoresDePestana } from '../hooks/useNotificaciones';
 import { useAuth } from '../context/AuthContext';
 import {
   ESTADOS_EXPEDIENTE,
@@ -58,6 +59,7 @@ export function InclusionPage() {
   const rol = useAuth().user?.rol;
   const esOrientacion = rol === 'ADMIN' || rol === 'ORIENTADOR';
   const [pestana, setPestana] = useState('solicitudes');
+  const contadorDe = useContadoresDePestana('/inclusion', pestana);
   const [nuevo, setNuevo] = useState(false);
   const [reportar, setReportar] = useState(false);
 
@@ -78,7 +80,7 @@ export function InclusionPage() {
       <Card>
         <Tabs
           items={[
-            { key: 'solicitudes', label: 'Solicitudes de apoyo' },
+            { key: 'solicitudes', label: 'Solicitudes de apoyo', contador: contadorDe('solicitudes') },
             { key: 'expedientes', label: 'Expedientes' },
             { key: 'configuracion', label: 'Configuración' },
           ]}

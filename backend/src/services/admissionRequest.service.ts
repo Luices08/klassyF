@@ -15,6 +15,7 @@ import ApiError from '../utils/ApiError';
 import { ESTADO_ACTIVO } from '../utils/filtroEstado';
 import { runTransaction } from '../utils/runTransaction';
 import { buscarMatriculaDePreinscripcion, construirDetalle, PreinscripcionDetalle } from './preinscripcionPublica.service';
+import { avisarSolicitudAdmision } from './notificacionesEventos.service';
 import { crearDesdeMatricula } from './solicitudApoyo.service';
 
 // Incluye APROBADA para que un aspirante ya admitido no pueda radicar una segunda solicitud
@@ -56,7 +57,9 @@ export async function crearSolicitud(input: CrearSolicitudInput): Promise<Admiss
     );
   }
 
-  return AdmissionRequest.create({ ...input, estado: 'PENDIENTE' });
+  const solicitud = await AdmissionRequest.create({ ...input, estado: 'PENDIENTE' });
+  await avisarSolicitudAdmision();
+  return solicitud;
 }
 
 export interface EstadoSolicitudPublico {

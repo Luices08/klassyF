@@ -1,6 +1,7 @@
 import { Types } from 'mongoose';
 import { ESTADOS_MATRICULA_ACTIVOS, Rol } from '../constants/enums';
 import { ROLES } from '../constants/roles';
+import { pestanaDeHijo } from '../constants/notificaciones';
 import Activity from '../models/activity.model';
 import AcademicYear from '../models/academicYear.model';
 import Area from '../models/area.model';
@@ -8,7 +9,7 @@ import Enrollment from '../models/enrollment.model';
 import Subject from '../models/subject.model';
 import TeacherAssignment from '../models/teacherAssignment.model';
 import User from '../models/user.model';
-import { finDelDia } from '../utils/calendarioAcademico';
+import { finDelDia, inicioDelDia } from '../utils/calendarioAcademico';
 import { ESTADO_ACTIVO } from '../utils/filtroEstado';
 import { acudientesConPortalDe, usuariosConRol } from './destinatariosNotificacion.service';
 import { avisar, sumarInsignia } from './notificaciones.service';
@@ -28,8 +29,8 @@ async function sinRomper(que: string, accion: () => Promise<void>): Promise<void
 }
 
 /** Suma el contador del menú a todos los que tienen esos perfiles (y, si se da la sede, atienden esa sede). */
-async function insigniaParaRoles(roles: Rol[], ruta: string, sedeId?: Id): Promise<void> {
-  for (const rol of roles) await sumarInsignia({ destinatarios: await usuariosConRol([rol], sedeId), rol, ruta });
+async function insigniaParaRoles(roles: Rol[], ruta: string, sedeId?: Id, pestana?: string, cantidad?: number): Promise<void> {
+  for (const rol of roles) await sumarInsignia({ destinatarios: await usuariosConRol([rol], sedeId), rol, ruta, pestana, cantidad });
 }
 
 const nombreCompleto = (u: { nombre: string; apellido: string } | null | undefined) => (u ? `${u.nombre} ${u.apellido}` : undefined);
@@ -62,14 +63,15 @@ export function avisarActividadesCalificadas(actividadesPorEstudiante: Array<{ e
         datos: { actividad: titulos.get(String(actividadId)) },
         ruta: '/mis-notas',
       });
+      await sumarInsignia({ destinatarios: [estudianteId], rol: ROLES.ESTUDIANTE, ruta: '/mis-notas' });
     }
   });
 }
 
-/** M07: un plan quedó en revisión → coordinación tiene trabajo pendiente en «Revisión de planeación». */
-export function avisarPlanEnRevision(): Promise<void> {
+/** M07: un plan quedó en revisión → coordinación tiene trabajo pendiente en la pestaña de planes de aula o de área de «Revisión de planeación». */
+export function avisarPlanEnRevision(tipo: 'aula' | 'area'): Promise<void> {
   return sinRomper('plan en revisión', async () => {
-    await insigniaParaRoles([ROLES.ADMIN, ROLES.COORDINADOR], '/admin/revision-planeacion');
+    await insigniaParaRoles([ROLES.ADMIN, ROLES.COORDINADOR], '/admin/revision-planeacion', undefined, tipo === 'aula' ? 'aulas' : 'areas');
   });
 }
 
@@ -88,6 +90,7 @@ export function avisarPlanRevisado(plan: { _id: Id; docenteId: Id; decision: 'AP
       datos: { asignatura: asignatura?.nombre, area: area?.nombre },
       ruta: '/docente/planeacion',
     });
+    await sumarInsignia({ destinatarios: [plan.docenteId], rol: ROLES.DOCENTE, ruta: '/docente/planeacion', pestana: plan.subjectId ? 'aula' : 'area' });
   });
 }
 
@@ -110,6 +113,7 @@ export function avisarDocumentoRechazado(enrollment: { _id: Id; student_id: Id }
       datos: { estudiante: nombreCompleto(estudiante), motivo },
       ruta: '/portal',
     });
+    await sumarInsignia({ destinatarios: acudientes, rol: ROLES.ACUDIENTE, ruta: '/portal', pestana: pestanaDeHijo('documentos', enrollment.student_id) });
   });
 }
 
@@ -123,8 +127,11 @@ export function avisarBoletinPublicado(grupo: { groupId: Id; academicYearId: Id;
     for (const e of estudiantes) {
       const entidad = `${String(grupo.groupId)}:${grupo.periodo}:${String(e._id)}`;
       await avisar({ destinatarios: [e._id], rol: ROLES.ESTUDIANTE, evento: 'BOLETIN_PUBLICADO', entidad_id: entidad, datos: { periodo: grupo.periodo }, ruta: '/report-card' });
+      await sumarInsignia({ destinatarios: [e._id], rol: ROLES.ESTUDIANTE, ruta: '/report-card' });
+      const acudientes = await acudientesConPortalDe([e._id]);
+      await sumarInsignia({ destinatarios: acudientes, rol: ROLES.ACUDIENTE, ruta: '/report-card' });
       await avisar({
-        destinatarios: await acudientesConPortalDe([e._id]),
+        destinatarios: acudientes,
         rol: ROLES.ACUDIENTE,
         evento: 'BOLETIN_PUBLICADO',
         entidad_id: entidad,
@@ -147,8 +154,103 @@ export function avisarFaltaGrave(falta: { observacionId: Id; estudianteId: Id; s
       datos: { estudiante: nombreCompleto(estudiante) },
       ruta: '/portal',
     });
+    await sumarInsignia({ destinatarios: acudientes, rol: ROLES.ACUDIENTE, ruta: '/portal', pestana: pestanaDeHijo('convivencia', falta.estudianteId) });
     if (falta.hayCaso) {
       await insigniaParaRoles([ROLES.ADMIN, ROLES.COORDINADOR_CONVIVENCIA], '/convivencia/solicitudes', falta.sedeId ?? undefined);
+    }
+  });
+}
+
+/** M11: una actividad ya publicada → los estudiantes del grupo la ven en su campanita (agrupada por asignatura) y en la pestaña «Pendientes». */
+export function avisarActividadNueva(asignacion: { _id: Id; group_id?: Id | null; subject_id?: Id | null; academic_year_id: Id }): Promise<void> {
+  return sinRomper('actividad nueva', async () => {
+    if (!asignacion.group_id) return;
+    const [matriculas, asignatura] = await Promise.all([
+      Enrollment.find({ group_id: asignacion.group_id, academic_year_id: asignacion.academic_year_id, estado: { $in: ESTADOS_MATRICULA_ACTIVOS } }).select('student_id').lean(),
+      asignacion.subject_id ? Subject.findById(asignacion.subject_id).select('nombre').lean() : null,
+    ]);
+    const estudiantes = matriculas.map((m) => m.student_id);
+    await avisar({ destinatarios: estudiantes, rol: ROLES.ESTUDIANTE, evento: 'ACTIVIDAD_NUEVA', entidad_id: String(asignacion._id), datos: { asignatura: asignatura?.nombre }, ruta: '/mis-actividades' });
+    await sumarInsignia({ destinatarios: estudiantes, rol: ROLES.ESTUDIANTE, ruta: '/mis-actividades', pestana: 'pendientes' });
+  });
+}
+
+/** M13: estudiantes que acaban de quedar con una inasistencia (solo el paso a falla: volver a guardar la planilla no cuenta doble). */
+export function avisarInasistencias(estudiantes: Id[]): Promise<void> {
+  return sinRomper('inasistencias', async () => {
+    for (const estudianteId of new Set(estudiantes.map(String))) {
+      const [estudiante, acudientes] = await Promise.all([User.findById(estudianteId).select('nombre apellido').lean(), acudientesConPortalDe([estudianteId])]);
+      await avisar({ destinatarios: acudientes, rol: ROLES.ACUDIENTE, evento: 'INASISTENCIA_REGISTRADA', entidad_id: estudianteId, datos: { estudiante: nombreCompleto(estudiante) }, ruta: '/portal' });
+      await sumarInsignia({ destinatarios: acudientes, rol: ROLES.ACUDIENTE, ruta: '/portal', pestana: pestanaDeHijo('inasistencias', estudianteId) });
+    }
+  });
+}
+
+/**
+ * M14: registros que la familia SÍ puede ver (no confidenciales, de tipos visibles al estudiante, o una falta Tipo I). Los confidenciales y las
+ * faltas II/III no pasan por aquí: esas tienen su propia regla (`avisarFaltaGrave`).
+ */
+export function avisarObservacionesVisibles(estudiantes: Id[]): Promise<void> {
+  return sinRomper('observaciones', async () => {
+    for (const estudianteId of new Set(estudiantes.map(String))) {
+      const [estudiante, acudientes] = await Promise.all([User.findById(estudianteId).select('nombre apellido').lean(), acudientesConPortalDe([estudianteId])]);
+      await avisar({ destinatarios: acudientes, rol: ROLES.ACUDIENTE, evento: 'OBSERVACION_REGISTRADA', entidad_id: estudianteId, datos: { estudiante: nombreCompleto(estudiante) }, ruta: '/portal' });
+      await sumarInsignia({ destinatarios: acudientes, rol: ROLES.ACUDIENTE, ruta: '/portal', pestana: pestanaDeHijo('convivencia', estudianteId) });
+      await sumarInsignia({ destinatarios: [estudianteId], rol: ROLES.ESTUDIANTE, ruta: '/mi-observador' });
+    }
+  });
+}
+
+/** M13: alguien justificó una inasistencia → coordinación la tiene por revisar en la pestaña «Justificaciones». */
+export function avisarJustificacionPorRevisar(): Promise<void> {
+  return sinRomper('justificación por revisar', async () => {
+    await insigniaParaRoles([ROLES.ADMIN, ROLES.COORDINADOR], '/asistencia/gestion', undefined, 'justificaciones');
+  });
+}
+
+/** M13: coordinación decidió → el acudiente lo sabe (campanita y pestaña «Inasistencias» de ese hijo). */
+export function avisarJustificacionRevisada(justificacion: { _id: Id; student_id: Id }, decision: 'APROBADA' | 'RECHAZADA', motivo?: string | null): Promise<void> {
+  return sinRomper('justificación revisada', async () => {
+    const [estudiante, acudientes] = await Promise.all([User.findById(justificacion.student_id).select('nombre apellido').lean(), acudientesConPortalDe([justificacion.student_id])]);
+    await avisar({
+      destinatarios: acudientes,
+      rol: ROLES.ACUDIENTE,
+      evento: 'JUSTIFICACION_REVISADA',
+      entidad_id: String(justificacion._id),
+      datos: { estudiante: nombreCompleto(estudiante), decision, motivo: motivo ?? undefined },
+      ruta: '/portal',
+    });
+    await sumarInsignia({ destinatarios: acudientes, rol: ROLES.ACUDIENTE, ruta: '/portal', pestana: pestanaDeHijo('inasistencias', justificacion.student_id) });
+  });
+}
+
+/** M16: llegó una solicitud de apoyo → orientación de esa sede (y el ADMIN) la ve en la pestaña «Solicitudes de apoyo». */
+export function avisarSolicitudApoyo(sedeId: Id): Promise<void> {
+  return sinRomper('solicitud de apoyo', async () => {
+    await insigniaParaRoles([ROLES.ORIENTADOR, ROLES.ADMIN], '/inclusion', sedeId, 'solicitudes');
+  });
+}
+
+/** M15: convivencia remitió estudiantes a orientación → bandeja «Remisiones a orientación» de esa sede. */
+export function avisarRemisionesOrientacion(sedeId: Id, cantidad: number): Promise<void> {
+  return sinRomper('remisión a orientación', async () => {
+    if (cantidad > 0) await insigniaParaRoles([ROLES.ORIENTADOR, ROLES.ADMIN], '/orientacion/remisiones', sedeId, undefined, cantidad);
+  });
+}
+
+/** M04: alguien se preinscribió desde el sitio público → bandeja de admisiones. */
+export function avisarSolicitudAdmision(): Promise<void> {
+  return sinRomper('solicitud de admisión', async () => {
+    await insigniaParaRoles([ROLES.ADMIN, ROLES.COORDINADOR, ROLES.SECRETARIA], '/admin/admisiones');
+  });
+}
+
+/** Tablero: un anuncio ya vigente → punto en «Anuncios» de cada perfil al que va dirigido (no del autor). */
+export function avisarAnuncioNuevo(roles: Rol[], autorId: Id): Promise<void> {
+  return sinRomper('anuncio nuevo', async () => {
+    for (const rol of roles) {
+      const destinatarios = (await usuariosConRol([rol])).filter((id) => String(id) !== String(autorId));
+      await sumarInsignia({ destinatarios, rol, ruta: '/anuncios' });
     }
   });
 }
@@ -176,6 +278,51 @@ export async function recordarCierresDePeriodo(ahora = new Date()): Promise<{ av
     for (const rol of [ROLES.ADMIN, ROLES.COORDINADOR]) {
       await avisar({ destinatarios: await usuariosConRol([rol]), rol, evento: 'CIERRE_PERIODO_PROXIMO', entidad_id: entidad, datos: { periodo: periodo.numero, dias }, ruta: '/admin/notas' });
     }
+    avisos += 1;
+  }
+  return { avisos };
+}
+
+/** Eventos del calendario (M05) que un docente debe tener presentes: las recuperaciones y el desarrollo institucional. */
+const EVENTOS_QUE_SE_RECUERDAN = ['RECUPERACION_PERIODO', 'RECUPERACION_FINAL', 'DESARROLLO_INSTITUCIONAL'] as const;
+export const DIAS_RECORDATORIO_EVENTO = 3;
+
+/** Igual que `recordarCierresDePeriodo`: se corre una vez al día (`npm run notificar:cierres`) y es idempotente mientras el aviso siga sin leer. */
+export async function recordarEventosDelCalendario(ahora = new Date()): Promise<{ avisos: number }> {
+  const anio = await AcademicYear.findOne({ estado: 'EN_CURSO' }).lean();
+  if (!anio) return { avisos: 0 };
+  const docentes = await TeacherAssignment.distinct('docente_id', { academic_year_id: anio._id, tipo_asignacion: 'CLASE', estado: ESTADO_ACTIVO });
+  let avisos = 0;
+  for (const evento of anio.eventos) {
+    if (!(EVENTOS_QUE_SE_RECUERDAN as readonly string[]).includes(evento.tipo)) continue;
+    const dias = Math.ceil((inicioDelDia(evento.fecha_inicio).getTime() - ahora.getTime()) / 86_400_000);
+    if (dias < 0 || dias > DIAS_RECORDATORIO_EVENTO) continue;
+    await avisar({
+      destinatarios: docentes,
+      rol: ROLES.DOCENTE,
+      evento: 'RECORDATORIO_CALENDARIO',
+      entidad_id: `${String(anio._id)}:${String(evento._id)}`,
+      datos: { nombre: evento.nombre, dias },
+      ruta: '/anio-lectivo',
+    });
+    avisos += 1;
+  }
+  return { avisos };
+}
+
+/**
+ * Actividades que se programaron con una fecha de publicación futura y ya llegó (en las últimas 24 h): los estudiantes se enteran el día que
+ * se publican. Las que se crearon ya publicadas avisaron al crearse; por eso solo cuentan las creadas antes de su fecha de apertura.
+ */
+export async function avisarActividadesPublicadasHoy(ahora = new Date()): Promise<{ avisos: number }> {
+  const desde = new Date(ahora.getTime() - 86_400_000);
+  const actividades = await Activity.find({ fecha_apertura: { $gt: desde, $lte: ahora } }).select('teacher_assignment_id fecha_apertura createdAt').lean();
+  const asignaciones = new Set(actividades.filter((a) => a.createdAt && a.createdAt.getTime() < a.fecha_apertura.getTime() - 60_000).map((a) => String(a.teacher_assignment_id)));
+  let avisos = 0;
+  for (const id of asignaciones) {
+    const asignacion = await TeacherAssignment.findById(id).lean();
+    if (!asignacion) continue;
+    await avisarActividadNueva(asignacion);
     avisos += 1;
   }
   return { avisos };

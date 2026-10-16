@@ -130,6 +130,16 @@ export const actualizarComentario: ValidationSchema = {
   }),
 };
 
+export const listarDocumentosPrevistos: ValidationSchema = {
+  query: Joi.object({
+    group_id: objectId.required(),
+    tipo_ingreso: Joi.string()
+      .valid(...TIPOS_INGRESO)
+      .required(),
+    student_id: objectId,
+  }),
+};
+
 export const listarDocumentosPorRevisar: ValidationSchema = {
   query: Joi.object({
     academic_year_id: objectId,

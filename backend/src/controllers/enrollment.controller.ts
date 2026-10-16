@@ -34,6 +34,12 @@ export const listarDocumentosPorRevisar = catchAsync<unknown, unknown, unknown, 
   res.status(200).json({ success: true, ...resultado });
 });
 
+export const listarDocumentosPrevistos = catchAsync(async (req, res) => {
+  // El validador ya exige group_id y tipo_ingreso.
+  const data = await enrollmentService.listarDocumentosPrevistos(req.query as unknown as enrollmentService.FiltroDocumentosPrevistos);
+  res.status(200).json({ success: true, data });
+});
+
 interface EnrollmentParams extends ParamsDictionary {
   id: string;
 }

@@ -65,17 +65,47 @@ describe('Generador Dinámico de Checklist de Matrículas (M04)', () => {
     expect(tipos).toContain('PAZ_Y_SALVO_ANIO_ANTERIOR');
   });
 
-  it('Secundaria Estudiante Nuevo: exige certificado de 5° de primaria y SIMAT', () => {
-    const checklist = generarChecklistMatricula({
-      nivel: 'SECUNDARIA',
-      numeroGrado: 8,
-      tipoIngreso: 'TRASLADO',
-    });
+  it('Sexto nuevo: exige el certificado de 5° de primaria, notas y SIMAT', () => {
+    const checklist = generarChecklistMatricula({ nivel: 'SECUNDARIA', numeroGrado: 6, tipoIngreso: 'NUEVO' });
 
     const tipos = checklist.map((c) => c.tipo_documento);
     expect(tipos).toContain('CERTIFICADO_QUINTO_PRIMARIA');
+    expect(tipos).not.toContain('CERTIFICADO_GRADO_ANTERIOR');
     expect(tipos).toContain('CERTIFICADOS_NOTAS_ANTERIORES');
     expect(tipos).toContain('PAZ_Y_SALVO_SIMAT');
+  });
+
+  it('Octavo por traslado: pide el certificado de 7°, no el de 5° de primaria', () => {
+    const checklist = generarChecklistMatricula({ nivel: 'SECUNDARIA', numeroGrado: 8, tipoIngreso: 'TRASLADO' });
+
+    const tipos = checklist.map((c) => c.tipo_documento);
+    expect(tipos).not.toContain('CERTIFICADO_QUINTO_PRIMARIA');
+    expect(checklist.find((c) => c.tipo_documento === 'CERTIFICADO_GRADO_ANTERIOR')).toMatchObject({
+      obligatorio: true,
+      nombre_personalizado: 'Certificado de 7° aprobado',
+    });
+  });
+
+  it('Décimo nuevo: el certificado esencial es el de 9° (cierra la básica)', () => {
+    const checklist = generarChecklistMatricula({ nivel: 'MEDIA', numeroGrado: 10, tipoIngreso: 'NUEVO' });
+
+    expect(checklist.map((c) => c.tipo_documento)).not.toContain('CERTIFICADO_QUINTO_PRIMARIA');
+    expect(checklist.find((c) => c.tipo_documento === 'CERTIFICADO_GRADO_ANTERIOR')?.nombre_personalizado).toBe(
+      'Certificado de 9° aprobado (cierra la básica secundaria)'
+    );
+  });
+
+  it('Primaria nueva pide el certificado del grado anterior salvo en 1°', () => {
+    const grado3 = generarChecklistMatricula({ nivel: 'PRIMARIA', numeroGrado: 3, tipoIngreso: 'NUEVO' });
+    expect(grado3.find((c) => c.tipo_documento === 'CERTIFICADO_GRADO_ANTERIOR')?.nombre_personalizado).toBe('Certificado de 2° aprobado');
+    const grado1 = generarChecklistMatricula({ nivel: 'PRIMARIA', numeroGrado: 1, tipoIngreso: 'NUEVO' });
+    expect(grado1.map((c) => c.tipo_documento)).not.toContain('CERTIFICADO_GRADO_ANTERIOR');
+  });
+
+  it('Quien ya estudia aquí no trae certificado del grado anterior', () => {
+    const tipos = generarChecklistMatricula({ nivel: 'MEDIA', numeroGrado: 10, tipoIngreso: 'ANTIGUO' }).map((c) => c.tipo_documento);
+    expect(tipos).not.toContain('CERTIFICADO_GRADO_ANTERIOR');
+    expect(tipos).not.toContain('CERTIFICADO_QUINTO_PRIMARIA');
   });
 
   it('Media Grado 11° por Traslado: incluye Servicio Social Obligatorio', () => {
@@ -87,7 +117,7 @@ describe('Generador Dinámico de Checklist de Matrículas (M04)', () => {
 
     const tipos = checklist.map((c) => c.tipo_documento);
     expect(tipos).toContain('SERVICIO_SOCIAL_ESTUDIANTIL');
-    expect(tipos).toContain('CERTIFICADO_QUINTO_PRIMARIA');
+    expect(tipos).toContain('CERTIFICADO_GRADO_ANTERIOR');
   });
 
   it('Inclusión / Discapacidad: añade diagnóstico médico / valoración PIAR', () => {

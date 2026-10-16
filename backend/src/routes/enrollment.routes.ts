@@ -13,6 +13,7 @@ import {
   eliminarDocumentoChecklist,
   getEnrollment,
   listarDocumentosPorRevisar,
+  listarDocumentosPrevistos,
   listEnrollments,
   revisarDocumento,
   sincronizarRequisitos,
@@ -56,6 +57,12 @@ router.get(
   checkRole(...STAFF_MATRICULAS),
   validate(enrollmentValidator.listarDocumentosPorRevisar),
   listarDocumentosPorRevisar
+);
+router.get(
+  '/documentos-previstos',
+  checkRole(...STAFF_MATRICULAS),
+  validate(enrollmentValidator.listarDocumentosPrevistos),
+  listarDocumentosPrevistos
 );
 router.get('/:id', checkRole(...STAFF_MATRICULAS), validate(enrollmentValidator.getEnrollment), getEnrollment);
 

@@ -14,7 +14,7 @@ import { ArrowLeftIcon } from '../components/ui/icons';
 import { type ActividadEstudiante, useMisActividades } from '../hooks/useActividades';
 import { useAnioDeTrabajo } from '../hooks/useAniosLectivos';
 import { useMisNotas } from '../hooks/useNotas';
-import { useContadoresDePestana } from '../hooks/useNotificaciones';
+import { contadorDePestana, useContadoresDePestana, useResumenNotificaciones } from '../hooks/useNotificaciones';
 import { diasParaEntrega, formatoInstante } from '../lib/actividades';
 
 type Pestana = 'pendientes' | 'entregadas' | 'calificadas' | 'todas';
@@ -25,6 +25,8 @@ const PERTENECE: Record<Pestana, (a: ActividadEstudiante) => boolean> = {
   calificadas: (a) => a.estado === 'CALIFICADA',
   todas: () => true,
 };
+
+const CONTEOS_VACIOS = { totalActividades: 0, pendientes: 0, vencidas: 0, entregadas: 0, calificadas: 0 };
 
 /** El día de calendario (Colombia) de un instante, para comparar contra un filtro YYYY-MM-DD. */
 const diaDe = (iso: string): string => new Date(new Date(iso).getTime() - 5 * 3_600_000).toISOString().slice(0, 10);
@@ -53,7 +55,9 @@ export function MisActividadesPage() {
   const asignaturaParam = searchParams.get('asignatura') ?? '';
 
   const [pestana, setPestana] = useState<Pestana>('pendientes');
-  const contadorDe = useContadoresDePestana('/mis-actividades', pestana);
+  // El punto rojo de cada asignatura (M28) se guarda como `pendientes-<asignatura>`; entrar a la asignatura lo apaga.
+  const contadorDe = useContadoresDePestana('/mis-actividades', pestana, asignaturaParam || undefined);
+  const { data: resumen } = useResumenNotificaciones();
   const [desde, setDesde] = useState('');
   const [hasta, setHasta] = useState('');
   const navigate = useNavigate();
@@ -79,9 +83,8 @@ export function MisActividadesPage() {
           areaNombre: item.asignacion?.area?.nombre,
           docenteNombre,
           gradoGrupo: gradoGrupo || undefined,
-          totalActividades: 0,
-          pendientes: 0,
-          proximas: 0,
+          ...CONTEOS_VACIOS,
+          novedades: contadorDePestana(resumen, '/mis-actividades', `pendientes-${asig._id}`),
         });
       }
     }
@@ -104,9 +107,8 @@ export function MisActividadesPage() {
           areaNombre: a.asignacion?.area?.nombre,
           docenteNombre,
           gradoGrupo: gradoGrupo || undefined,
-          totalActividades: 0,
-          pendientes: 0,
-          proximas: 0,
+          ...CONTEOS_VACIOS,
+          novedades: contadorDePestana(resumen, '/mis-actividades', `pendientes-${asig._id}`),
         });
       }
 
@@ -114,15 +116,14 @@ export function MisActividadesPage() {
       card.totalActividades += 1;
       if (a.estado === 'PROGRAMADA') {
         card.pendientes += 1;
-        const dias = diasParaEntrega(a.fecha_entrega);
-        if (dias >= 0 && dias <= 3) {
-          card.proximas += 1;
-        }
-      }
+        if (a.vencida) card.vencidas += 1;
+        else if (!card.proximaEntrega || a.fecha_entrega < card.proximaEntrega) card.proximaEntrega = a.fecha_entrega;
+      } else if (a.estado === 'CALIFICADA') card.calificadas += 1;
+      else card.entregadas += 1;
     }
 
     return Array.from(mapa.values()).sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'));
-  }, [data, notasQuery.data]);
+  }, [data, notasQuery.data, resumen]);
 
   // Si hay una asignatura seleccionada en la URL, estamos en Vista 2
   const enVistaDetalle = Boolean(asignaturaParam);
@@ -253,7 +254,7 @@ export function MisActividadesPage() {
                     {data.length === 0
                       ? 'Tus docentes aún no han publicado actividades.'
                       : pestana === 'pendientes'
-                        ? 'No tienes actividades pendientes en esta materia. 🎉'
+                        ? 'No tienes actividades pendientes en esta materia.'
                         : 'No hay actividades en esta lista.'}
                   </EmptyRow>
                 )}

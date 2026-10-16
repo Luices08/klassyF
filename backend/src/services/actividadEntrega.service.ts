@@ -402,7 +402,7 @@ export async function registrarEntrega(
     detalle: `Actividad ${String(actividad._id)}, entrega ${numero}${ventana.tardia ? ' (con retraso)' : ''}${ventana.acceso_especial ? ' (acceso especial)' : ''}.`,
     ip,
   });
-  await avisarEntregaNueva(actividad, asignacion.docente_id);
+  await avisarEntregaNueva(actividad, asignacion);
   return vistaEntrega(entrega as unknown as EntregaPlana);
 }
 

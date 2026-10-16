@@ -1,11 +1,12 @@
 import { Types } from 'mongoose';
 import { ESTADOS_MATRICULA_ACTIVOS, Rol } from '../constants/enums';
 import { ROLES } from '../constants/roles';
-import { pestanaDeHijo } from '../constants/notificaciones';
+import { pestanaDeAsignatura, pestanaDeClase, pestanaDeHijo } from '../constants/notificaciones';
 import Activity from '../models/activity.model';
 import AcademicYear from '../models/academicYear.model';
 import Area from '../models/area.model';
 import Enrollment from '../models/enrollment.model';
+import Group from '../models/group.model';
 import Subject from '../models/subject.model';
 import TeacherAssignment from '../models/teacherAssignment.model';
 import User from '../models/user.model';
@@ -35,33 +36,40 @@ async function insigniaParaRoles(roles: Rol[], ruta: string, sedeId?: Id, pestan
 
 const nombreCompleto = (u: { nombre: string; apellido: string } | null | undefined) => (u ? `${u.nombre} ${u.apellido}` : undefined);
 
-/** M11: un estudiante entregó. Se agrupa por actividad en la campanita del docente («Tienes 145 entregas nuevas…») y suma en su menú. */
-export function avisarEntregaNueva(actividad: { _id: Id; titulo: string }, docenteId: Id): Promise<void> {
+/**
+ * M11: un estudiante entregó. Se agrupa por actividad en la campanita del docente («Tienes 145 entregas nuevas…»), que lleva directo a la
+ * página de esa actividad, y suma un punto en el botón del grupo (la clase) donde ocurrió.
+ */
+export function avisarEntregaNueva(actividad: { _id: Id; titulo: string }, asignacion: { _id: Id; group_id?: Id | null; docente_id: Id }): Promise<void> {
   return sinRomper('entrega nueva', async () => {
+    const grupo = asignacion.group_id ? await Group.findById(asignacion.group_id).select('nomenclatura').lean() : null;
     await avisar({
-      destinatarios: [docenteId],
+      destinatarios: [asignacion.docente_id],
       rol: ROLES.DOCENTE,
       evento: 'ENTREGA_NUEVA',
       entidad_id: String(actividad._id),
-      datos: { actividad: actividad.titulo },
-      ruta: '/docente/actividades',
+      datos: { actividad: actividad.titulo, grupo: grupo?.nomenclatura },
+      ruta: `/docente/actividades/${String(actividad._id)}`,
     });
-    await sumarInsignia({ destinatarios: [docenteId], rol: ROLES.DOCENTE, ruta: '/docente/actividades' });
+    await sumarInsignia({ destinatarios: [asignacion.docente_id], rol: ROLES.DOCENTE, ruta: '/docente/actividades', pestana: pestanaDeClase(asignacion._id) });
   });
 }
 
 /** M12: el docente calificó. Cada estudiante recibe un aviso por actividad (si no lo había leído, no se duplica). */
 export function avisarActividadesCalificadas(actividadesPorEstudiante: Array<{ estudianteId: Id; actividadId: Id }>): Promise<void> {
   return sinRomper('actividad calificada', async () => {
-    const titulos = new Map((await Activity.find({ _id: { $in: actividadesPorEstudiante.map((a) => a.actividadId) } }).select('titulo').lean()).map((a) => [String(a._id), a.titulo]));
+    const actividades = new Map(
+      (await Activity.find({ _id: { $in: actividadesPorEstudiante.map((a) => a.actividadId) } }).select('titulo requiere_entrega').lean()).map((a) => [String(a._id), a])
+    );
     for (const { estudianteId, actividadId } of actividadesPorEstudiante) {
       await avisar({
         destinatarios: [estudianteId],
         rol: ROLES.ESTUDIANTE,
         evento: 'ACTIVIDAD_CALIFICADA',
         entidad_id: String(actividadId),
-        datos: { actividad: titulos.get(String(actividadId)) },
-        ruta: '/mis-notas',
+        datos: { actividad: actividades.get(String(actividadId))?.titulo },
+        // Una actividad que se entrega en línea tiene su página; una de aula solo existe en las notas.
+        ruta: actividades.get(String(actividadId))?.requiere_entrega === false ? '/mis-notas' : `/mis-actividades/${String(actividadId)}`,
       });
       await sumarInsignia({ destinatarios: [estudianteId], rol: ROLES.ESTUDIANTE, ruta: '/mis-notas' });
     }
@@ -170,8 +178,8 @@ export function avisarActividadNueva(asignacion: { _id: Id; group_id?: Id | null
       asignacion.subject_id ? Subject.findById(asignacion.subject_id).select('nombre').lean() : null,
     ]);
     const estudiantes = matriculas.map((m) => m.student_id);
-    await avisar({ destinatarios: estudiantes, rol: ROLES.ESTUDIANTE, evento: 'ACTIVIDAD_NUEVA', entidad_id: String(asignacion._id), datos: { asignatura: asignatura?.nombre }, ruta: '/mis-actividades' });
-    await sumarInsignia({ destinatarios: estudiantes, rol: ROLES.ESTUDIANTE, ruta: '/mis-actividades', pestana: 'pendientes' });
+    await avisar({ destinatarios: estudiantes, rol: ROLES.ESTUDIANTE, evento: 'ACTIVIDAD_NUEVA', entidad_id: String(asignacion._id), datos: { asignatura: asignatura?.nombre }, ruta: asignacion.subject_id ? `/mis-actividades?asignatura=${String(asignacion.subject_id)}` : '/mis-actividades' });
+    await sumarInsignia({ destinatarios: estudiantes, rol: ROLES.ESTUDIANTE, ruta: '/mis-actividades', pestana: asignacion.subject_id ? pestanaDeAsignatura(asignacion.subject_id) : 'pendientes' });
   });
 }
 

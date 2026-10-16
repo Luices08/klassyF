@@ -54,9 +54,9 @@ export function MisNotasPage() {
       )}
       {data && data.asignaturas.length === 0 && <Alert tone="info">No tienes asignaturas con matrícula activa en este año lectivo.</Alert>}
       {data && data.asignaturas.length > 0 && (
-        <div className="grid items-start gap-4 lg:grid-cols-2">
+        <div className="grid gap-4 lg:grid-cols-2">
           {data.asignaturas.map((a) => (
-            <TarjetaNotasAsignatura key={a.teacher_assignment_id} asignatura={a} aprobatoria={data.nota_aprobatoria} />
+            <TarjetaNotasAsignatura key={a.teacher_assignment_id} asignatura={a} aprobatoria={data.nota_aprobatoria} ultimasNotas={4} />
           ))}
         </div>
       )}

@@ -15,6 +15,7 @@ import { ArrowLeftIcon } from '../components/ui/icons';
 import { useAuth } from '../context/AuthContext';
 import { useActualizarActividad, useActividad, useEliminarActividad } from '../hooks/useActividades';
 import { useAnioDeTrabajo } from '../hooks/useAniosLectivos';
+import { useContadoresDePestana } from '../hooks/useNotificaciones';
 import { usePlanDeAsignacion } from '../hooks/usePlanesAula';
 import { formatoInstante } from '../lib/actividades';
 
@@ -36,6 +37,8 @@ export function ActividadRevisionPage() {
   const actividad = detalle.data;
   const esDocente = user?.rol === 'DOCENTE';
   const plan = usePlanDeAsignacion(esDocente ? actividad?.teacher_assignment_id : undefined, actividad?.periodo_numero);
+  // Llegar por la campanita a una actividad también apaga el punto rojo de su grupo (M28).
+  useContadoresDePestana('/docente/actividades', esDocente && actividad ? 'clase' : 'sin-clase', actividad?.teacher_assignment_id);
   const volver = esDocente ? `/docente/actividades?clase=${actividad?.teacher_assignment_id ?? ''}&periodo=${actividad?.periodo_numero ?? ''}` : '/admin/actividades';
 
   if (detalle.isLoading) {

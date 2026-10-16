@@ -1020,6 +1020,18 @@ Botón flotante en `AppShell` (`components/asistente/AsistenteFlotante.tsx`) que
 - Bases anteriores a este cambio: `npm run migrate:folio-al-matricular` (libera folios de preinscritos, reemplaza
   los índices y reajusta el contador; un hueco en medio del libro solo se reporta, no se renumera).
 
+### Una matrícula viva por estudiante y año (M04)
+
+- **Un estudiante tiene una sola matrícula «viva» (`PREINSCRITO`, `MATRICULADO_CONDICIONAL` o `MATRICULADO_DEFINITIVO`, `ESTADOS_MATRICULA_VIVOS`) por año lectivo.** Antes nada lo impedía y un estudiante quedaba en 10-A y 11-A a la vez, con dos folios.
+  Lo garantizan dos capas: `exigirSinMatriculaViva` en `createEnrollment` (409 que dice en qué grupo ya está, con su estado y folio, manda a «Cambiar grupo» y trae `details.enrollment_id`) y el índice único parcial `matricula_viva_unica`
+  (`student_id` + `academic_year_id`, solo con esos estados) en el modelo, que cubre cualquier otro camino y la carrera entre dos secretarias. `RETIRADO` y `ANULADO` son historial y no bloquean una matrícula nueva en el mismo año.
+  La aprobación de una preinscripción crea al estudiante nuevo, así que no puede chocar.
+- **Mover a un estudiante de grupo o de grado (p. ej. corregir 10-A a 11-A) nunca crea otra matrícula**: es `cambiarGrupo` (`PATCH /enrollments/:id/grupo`, botón «Cambiar grupo» del expediente), que conserva el folio, el checklist y el historial y mueve los cupos.
+- **Bases con duplicados:** crear el índice falla mientras existan. `npm run migrate:matricula-unica` lista los estudiantes con más de una matrícula viva en el año; con `--aplicar` conserva la más reciente (`--conservar=antigua` la primera) y **anula** las demás con motivo
+  (libera el cupo; el folio queda como asiento del Libro, no se renumera), reemplaza el índice no único `student_id_1_academic_year_id_1` y crea el único. Por defecto solo simula: revisar la lista y hacer respaldo de Mongo antes de aplicar. Notas, asistencia y demás datos
+  siguen colgando del grupo de la matrícula anulada: si eran de la que se conserva, hay que revisarlos a mano.
+- Pruebas: `tests/integracion/matriculaUnica.int.test.ts` (base real; no se pudo correr donde no hay binario de MongoDB).
+
 ### Documentos de matrícula y paz y salvo de fin de año (M04)
 
 - **Compuerta de la definitiva.** `MATRICULADO_DEFINITIVO` solo existe con todos los documentos obligatorios del checklist `APROBADO` (`documentosObligatoriosPendientes`,

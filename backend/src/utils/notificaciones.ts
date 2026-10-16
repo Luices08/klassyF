@@ -23,7 +23,7 @@ export function renderizarNotificacion(evento: EventoNotificacion, contador: num
     case 'ENTREGA_NUEVA':
       return {
         titulo: 'Entregas nuevas',
-        mensaje: `Tienes ${n} ${plural(n, 'entrega nueva', 'entregas nuevas')} en la actividad «${datos.actividad ?? 'sin nombre'}».`,
+        mensaje: `Tienes ${n} ${plural(n, 'entrega nueva', 'entregas nuevas')} en la actividad «${datos.actividad ?? 'sin nombre'}»${datos.grupo ? ` del grupo ${datos.grupo}` : ''}.`,
       };
     case 'ACTIVIDAD_CALIFICADA':
       return { titulo: 'Actividad calificada', mensaje: `Tu docente calificó «${datos.actividad ?? 'una actividad'}».` };

@@ -14,7 +14,9 @@ import { EmptyRow, Table, TableBody, TableHead, Td, Th } from '../components/ui/
 import { ArrowLeftIcon, EyeIcon, PencilIcon, PlusIcon, TrashIcon } from '../components/ui/icons';
 import { type ActividadConResumen, useActividades, useEliminarActividad } from '../hooks/useActividades';
 import { useAnioDeTrabajo } from '../hooks/useAniosLectivos';
+import { ETIQUETA_JORNADA } from '../hooks/useCertificados';
 import { usePlanDeAsignacion } from '../hooks/usePlanesAula';
+import { contadorDePestana, useContadoresDePestana, useResumenNotificaciones } from '../hooks/useNotificaciones';
 import { useMyTeacherLoad } from '../hooks/useTeacherAssignments';
 import { formatoInstante, hoyColombia } from '../lib/actividades';
 import { aInputFecha } from '../lib/fechas';
@@ -22,7 +24,7 @@ import { aInputFecha } from '../lib/fechas';
 /**
  * CU-DOC-02: Gestión de actividades y tareas para el docente.
  * Flujo en dos vistas para máxima claridad y agilidad de UX:
- * - Vista 1: Filtros de Sede, Jornada y Periodo con Catálogo de Asignaturas y sus cursos visibles de inmediato en cuadritos ordenados por grado.
+ * - Vista 1: Filtros de Sede, Jornada (por defecto todas) y Periodo con el Catálogo de Asignaturas y sus grupos en botones ordenados por grado.
  * - Vista 2: Gestión de actividades de la clase seleccionada (tabla, creación, edición y revisión de entregas).
  */
 export function ActividadesDocentePage() {
@@ -69,11 +71,10 @@ export function ActividadesDocentePage() {
     return Array.from(mapa.entries()).map(([_id, nombre]) => ({ _id, nombre }));
   }, [clases, sedeElegida]);
 
+  // Vacío = todas las jornadas: por defecto el docente ve todos sus grupos y cada botón dice su jornada.
   const [jornadaElegida, setJornadaElegida] = useState('');
   useEffect(() => {
-    if (jornadasDisponibles.length > 0 && (!jornadaElegida || !jornadasDisponibles.some((j) => j._id === jornadaElegida))) {
-      setJornadaElegida(jornadasDisponibles[0]._id);
-    }
+    if (jornadaElegida && !jornadasDisponibles.some((j) => j._id === jornadaElegida)) setJornadaElegida('');
   }, [jornadasDisponibles, jornadaElegida]);
 
   // Periodos lectivos
@@ -127,6 +128,10 @@ export function ActividadesDocentePage() {
   );
   const eliminar = useEliminarActividad();
   const navigate = useNavigate();
+
+  // Punto rojo de cada grupo (M28): entrar a una clase apaga el suyo.
+  const { data: resumen } = useResumenNotificaciones();
+  useContadoresDePestana('/docente/actividades', asignacion ? 'clase' : 'sin-clase', asignacion?._id);
 
   const [editando, setEditando] = useState<ActividadConResumen | 'nueva' | null>(null);
   const [mensaje, setMensaje] = useState<string | null>(null);
@@ -196,9 +201,10 @@ export function ActividadesDocentePage() {
                   onChange={(e) => setJornadaElegida(e.target.value)}
                   disabled={cargandoCarga || jornadasDisponibles.length <= 1}
                 >
+                  <option value="">Todas las jornadas</option>
                   {jornadasDisponibles.map((j) => (
                     <option key={j._id} value={j._id}>
-                      {j.nombre}
+                      {ETIQUETA_JORNADA[j.nombre] ?? j.nombre}
                     </option>
                   ))}
                 </Select>
@@ -236,6 +242,7 @@ export function ActividadesDocentePage() {
               clases={clases}
               sedeId={sedeElegida}
               jornadaId={jornadaElegida}
+              novedadesDeClase={(id) => contadorDePestana(resumen, '/docente/actividades', `clase-${id}`)}
               onSeleccionarClase={seleccionarClase}
             />
           )}
@@ -292,7 +299,7 @@ export function ActividadesDocentePage() {
 
               <div className="text-xs text-muted">
                 {puedeProgramar ? (
-                  <span className="text-success font-medium">✓ Plan de aula aprobado para programar</span>
+                  <span className="font-medium text-success">Plan de aula aprobado para programar</span>
                 ) : (
                   <span>Plan de aula pendiente o periodo cerrado</span>
                 )}

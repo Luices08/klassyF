@@ -65,4 +65,12 @@ export const METADATOS_EVENTO: Record<EventoNotificacion, MetadatoEvento> = {
  * Pestaña de un contador del portal del acudiente: el portal muestra un hijo a la vez, así que el punto de «Inasistencias» de un hijo
  * no se apaga al abrir esa pestaña de otro (`inasistencias-<id del estudiante>`; el frontend arma la misma clave).
  */
+/**
+ * Contadores de M11 que se ven en los botones de cada clase: el docente ve un punto en cada grupo con entregas nuevas
+ * (`clase-<id de la asignación>` en `/docente/actividades`) y el estudiante en cada asignatura con actividades nuevas
+ * (`pendientes-<id de la asignatura>` en `/mis-actividades`). El frontend arma las mismas claves.
+ */
+export const pestanaDeClase = (asignacionId: { toString(): string }) => `clase-${asignacionId.toString()}`;
+export const pestanaDeAsignatura = (asignaturaId: { toString(): string }) => `pendientes-${asignaturaId.toString()}`;
+
 export const pestanaDeHijo = (pestana: string, estudianteId: { toString(): string }) => `${pestana}-${estudianteId.toString()}`;

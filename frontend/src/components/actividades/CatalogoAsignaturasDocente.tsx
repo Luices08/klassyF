@@ -1,6 +1,8 @@
 import { useMemo } from 'react';
+import { ETIQUETA_JORNADA } from '../../hooks/useCertificados';
 import { obtenerEstiloAsignatura } from '../../lib/asignaturasEstilos';
 import type { TeacherAssignment } from '../../types/domain';
+import { ContadorInsignia } from '../notificaciones/ContadorInsignia';
 import { Card } from '../ui/Card';
 
 interface GrupoItem {
@@ -9,6 +11,7 @@ interface GrupoItem {
   nomenclatura: string;
   gradoNumero: number;
   gradoNombre: string;
+  jornada: string;
 }
 
 interface AsignaturaCardData {
@@ -23,17 +26,20 @@ interface CatalogoAsignaturasDocenteProps {
   clases: TeacherAssignment[];
   sedeId: string;
   jornadaId: string;
+  /** Novedades sin ver de una clase (punto rojo del botón del grupo). */
+  novedadesDeClase?: (asignacionId: string) => number;
   onSeleccionarClase: (asignacionId: string) => void;
 }
 
 /**
- * Vista 1: Catálogo de asignaturas con sus cursos visibles en cuadritos ordenados por grado.
- * Los cuadritos son accesibles directamente y están acotados en ancho para que no se desborden.
+ * Vista 1: Catálogo de asignaturas con sus grupos como botones amplios ordenados por grado. Con «todas las jornadas» salen
+ * todos los grupos asignados, por eso cada botón dice su jornada; el punto rojo avisa de entregas nuevas en esa clase.
  */
 export function CatalogoAsignaturasDocente({
   clases,
   sedeId,
   jornadaId,
+  novedadesDeClase,
   onSeleccionarClase,
 }: CatalogoAsignaturasDocenteProps) {
   // Filtra por sede y jornada, luego agrupa por materia ordenando sus cursos de menor a mayor grado
@@ -66,6 +72,7 @@ export function CatalogoAsignaturasDocente({
       const gradoObj = typeof g.grade_id === 'object' && g.grade_id ? g.grade_id : null;
       const gradoNum = gradoObj && typeof gradoObj.numero === 'number' ? gradoObj.numero : 999;
       const gradoNom = gradoObj?.nombre ?? '';
+      const jornadaNombre = typeof g.jornada_id === 'object' && g.jornada_id ? g.jornada_id.nombre : '';
 
       mapa.get(subId)!.grupos.push({
         asignacionId: c._id,
@@ -73,6 +80,7 @@ export function CatalogoAsignaturasDocente({
         nomenclatura: g.nomenclatura,
         gradoNumero: gradoNum,
         gradoNombre: gradoNom,
+        jornada: ETIQUETA_JORNADA[jornadaNombre] ?? jornadaNombre,
       });
     }
 
@@ -87,7 +95,7 @@ export function CatalogoAsignaturasDocente({
         if (a.gradoNumero !== b.gradoNumero) {
           return a.gradoNumero - b.gradoNumero;
         }
-        return a.nomenclatura.localeCompare(b.nomenclatura, undefined, { numeric: true });
+        return a.nomenclatura.localeCompare(b.nomenclatura, undefined, { numeric: true }) || a.jornada.localeCompare(b.jornada, 'es');
       });
     }
 
@@ -143,19 +151,25 @@ export function CatalogoAsignaturasDocente({
                       Grados y grupos
                     </p>
 
-                    {/* Contenedor con límite de ancho para evitar que se desborden horizontalmente */}
-                    <div className="flex max-w-3xl flex-wrap gap-3">
-                      {asig.grupos.map((g) => (
-                        <button
-                          key={g.asignacionId}
-                          type="button"
-                          onClick={() => onSeleccionarClase(g.asignacionId)}
-                          className="group relative inline-flex min-h-[46px] min-w-[4.5rem] items-center justify-center rounded-xl border border-border bg-white px-4 py-2.5 text-base font-bold text-ink shadow-sm transition-all hover:scale-[1.03] hover:border-primary hover:bg-primary-soft hover:text-primary hover:shadow active:scale-95 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-1"
-                          title={`Ver actividades de ${asig.nombre} - Grupo ${g.nomenclatura}`}
-                        >
-                          <span>{g.nomenclatura}</span>
-                        </button>
-                      ))}
+                    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+                      {asig.grupos.map((g) => {
+                        const etiqueta = `${g.gradoNombre} ${g.nomenclatura}`.trim();
+                        return (
+                          <button
+                            key={g.asignacionId}
+                            type="button"
+                            onClick={() => onSeleccionarClase(g.asignacionId)}
+                            className="relative flex min-h-[84px] flex-col items-start justify-center gap-0.5 rounded-xl border border-border bg-surface px-4 py-3 text-left shadow-sm transition-all hover:border-primary hover:bg-primary-soft hover:shadow focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-1 active:scale-[0.98]"
+                            title={`Ver actividades de ${asig.nombre} - ${etiqueta}${g.jornada ? ` (${g.jornada})` : ''}`}
+                          >
+                            <span className="text-lg font-bold leading-6 text-ink">{etiqueta}</span>
+                            {g.jornada && <span className="text-xs font-medium text-muted">Jornada {g.jornada.toLowerCase()}</span>}
+                            <span className="absolute -right-2 -top-2">
+                              <ContadorInsignia valor={novedadesDeClase?.(g.asignacionId) ?? 0} />
+                            </span>
+                          </button>
+                        );
+                      })}
                     </div>
                   </div>
                 </div>

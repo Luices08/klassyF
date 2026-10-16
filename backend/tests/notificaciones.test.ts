@@ -1,12 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import { Types } from 'mongoose';
-import { pestanaDeHijo } from '../src/constants/notificaciones';
+import { pestanaDeAsignatura, pestanaDeClase, pestanaDeHijo } from '../src/constants/notificaciones';
 import { renderizarNotificacion } from '../src/utils/notificaciones';
 
 describe('renderizarNotificacion', () => {
   it('cambia el texto según cuántas entregas se acumularon', () => {
     expect(renderizarNotificacion('ENTREGA_NUEVA', 1, { actividad: 'Fraccionarios' }).mensaje).toBe('Tienes 1 entrega nueva en la actividad «Fraccionarios».');
     expect(renderizarNotificacion('ENTREGA_NUEVA', 145, { actividad: 'Fraccionarios' }).mensaje).toContain('145 entregas nuevas');
+    expect(renderizarNotificacion('ENTREGA_NUEVA', 2, { actividad: 'Fraccionarios', grupo: '10-A' }).mensaje).toBe('Tienes 2 entregas nuevas en la actividad «Fraccionarios» del grupo 10-A.');
   });
 
   it('el aviso de falta grave no revela hechos ni a otros involucrados', () => {
@@ -41,5 +42,15 @@ describe('pestanaDeHijo', () => {
     for (const pestana of ['inasistencias', 'convivencia', 'documentos']) {
       expect(pestanaDeHijo(pestana, new Types.ObjectId())).toMatch(/^[a-z0-9-]{1,40}$/);
     }
+  });
+});
+
+describe('pestanas de clase y de asignatura (puntos rojos de los botones del catálogo)', () => {
+  it('son únicas por clase o asignatura y caben en lo que acepta el validador de «visto»', () => {
+    const id = new Types.ObjectId();
+    expect(pestanaDeClase(id)).toBe(`clase-${id}`);
+    expect(pestanaDeAsignatura(id)).toBe(`pendientes-${id}`);
+    expect(pestanaDeClase(id)).toMatch(/^[a-z0-9-]{1,40}$/);
+    expect(pestanaDeAsignatura(id)).toMatch(/^[a-z0-9-]{1,40}$/);
   });
 });

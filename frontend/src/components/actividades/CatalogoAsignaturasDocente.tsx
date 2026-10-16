@@ -266,13 +266,13 @@ export function CatalogoAsignaturasDocente({
                     </p>
 
                     {/* Contenedor con límite de ancho para evitar que se desborden horizontalmente */}
-                    <div className="flex max-w-2xl flex-wrap gap-2.5">
+                    <div className="flex max-w-3xl flex-wrap gap-3">
                       {asig.grupos.map((g) => (
                         <button
                           key={g.asignacionId}
                           type="button"
                           onClick={() => onSeleccionarClase(g.asignacionId)}
-                          className="group relative inline-flex items-center justify-center rounded-lg border border-border bg-white px-3.5 py-1.5 text-sm font-semibold text-ink shadow-sm transition-all hover:border-primary hover:bg-primary-soft hover:text-primary active:scale-95 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-1"
+                          className="group relative inline-flex min-h-[46px] min-w-[4.5rem] items-center justify-center rounded-xl border border-border bg-white px-4 py-2.5 text-base font-bold text-ink shadow-sm transition-all hover:scale-[1.03] hover:border-primary hover:bg-primary-soft hover:text-primary hover:shadow active:scale-95 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-1"
                           title={`Ver actividades de ${asig.nombre} - Grupo ${g.nomenclatura}`}
                         >
                           <span>{g.nomenclatura}</span>

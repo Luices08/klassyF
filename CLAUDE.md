@@ -468,6 +468,8 @@ Backend `/espacios` (modelo `Espacio`), frontend `/admin/espacios` (`EspaciosPag
   pantalla dice de dónde sale lo que muestra (plan propio, o «por defecto se está usando el plan de …»), porque grupos, carga docente y horarios (M09)
   leen exactamente eso. `obtenerOCrearGrado` devuelve el subdocumento ya empujado a `plan.grades` (con el literal, el primer guardado de un grado nuevo
   quedaba vacío).
+- **Guardar la malla de un grado avisa qué más cambió** (`calcularImpactoDelPlan`, `planEstudiosDependencias.service.ts`): `POST /curriculum/study-plan/asignaturas-grado(s)` responde `{ data: plan, impacto }` con las asignaciones docentes cuyas horas se
+  actualizaron y los horarios M09 (BORRADOR/PUBLICADO) que tienen sesiones de esas asignaciones y quedaron desfasados; el motor no los recalcula solo. `StudyPlanPage` lo muestra bajo la tabla.
 - **Una asignatura que ya está en la malla, en una ponderación o en la distribución de un grupo de cualquier plan no cambia de
   `area_id`** (`actualizarSubject`): dejaría ponderaciones colgando de un área que ya no es la suya.
 - **Topes de carga docente** (`Institution.limites_carga_docente`, `max_direcciones_grupo_por_docente`,

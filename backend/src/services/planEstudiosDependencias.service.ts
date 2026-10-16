@@ -1,6 +1,7 @@
 import { Types } from 'mongoose';
 import Activity from '../models/activity.model';
 import Group from '../models/group.model';
+import Horario from '../models/horario.model';
 import { StudyPlanDocument } from '../models/studyPlan.model';
 import Subject from '../models/subject.model';
 import TeacherAssignment from '../models/teacherAssignment.model';
@@ -95,7 +96,15 @@ export async function exigirAreasSinActividades(
  * ponen al día; es idempotente, así que si algo falla a medias se corrige guardando el plan de nuevo.
  */
 export async function sincronizarHorasDeAsignaciones(plan: StudyPlanDocument, gradeIds: string[]): Promise<number> {
-  let actualizadas = 0;
+  return (await sincronizarHorasDeAsignacionesDetallado(plan, gradeIds)).length;
+}
+
+/** Igual que `sincronizarHorasDeAsignaciones`, pero devuelve los ids de las asignaciones cuyas horas cambiaron. */
+export async function sincronizarHorasDeAsignacionesDetallado(
+  plan: StudyPlanDocument,
+  gradeIds: string[]
+): Promise<string[]> {
+  const actualizadas: string[] = [];
 
   for (const gradeId of gradeIds) {
     const grado = plan.grades.find((g) => String(g.grade_id) === gradeId);
@@ -124,13 +133,41 @@ export async function sincronizarHorasDeAsignaciones(plan: StudyPlanDocument, gr
       const horas = horasDeAsignaturaEnGrupo(gradoEfectivo, String(a.group_id), String(a.subject_id), jId ?? undefined);
       if (horas !== undefined && horas !== a.horas_semanales) {
         operaciones.push({ updateOne: { filter: { _id: a._id }, update: { $set: { horas_semanales: horas } } } });
+        actualizadas.push(String(a._id));
       }
     }
     if (operaciones.length > 0) await TeacherAssignment.bulkWrite(operaciones);
-    actualizadas += operaciones.length;
   }
 
   return actualizadas;
+}
+
+export interface ImpactoDelPlan {
+  asignaciones_actualizadas: number;
+  /** Horarios (M09) con sesiones de las asignaciones cuyas horas cambiaron: hay que generarlos de nuevo. */
+  horarios_afectados: Array<{ id: string; nombre: string; estado: string }>;
+}
+
+/**
+ * Un horario ya generado guarda las sesiones que salieron de las horas de entonces y no se recalcula solo:
+ * se avisa cuáles quedaron desfasados tras cambiar las horas de sus asignaciones.
+ */
+export async function calcularImpactoDelPlan(
+  academicYearId: string,
+  asignacionIds: string[]
+): Promise<ImpactoDelPlan> {
+  if (asignacionIds.length === 0) return { asignaciones_actualizadas: 0, horarios_afectados: [] };
+
+  const horarios = await Horario.find({
+    academic_year_id: academicYearId,
+    estado: { $in: ['BORRADOR', 'PUBLICADO'] },
+    'sesiones.asignacion_id': { $in: asignacionIds },
+  }).select('nombre estado');
+
+  return {
+    asignaciones_actualizadas: asignacionIds.length,
+    horarios_afectados: horarios.map((h) => ({ id: String(h._id), nombre: h.nombre, estado: h.estado })),
+  };
 }
 
 /** Con el año EN_CURSO todo cambio al plan debe quedar justificado; antes de activarlo no hace falta. */

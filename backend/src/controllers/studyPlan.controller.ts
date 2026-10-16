@@ -18,22 +18,22 @@ interface ObtenerStudyPlanQuery extends ParsedQs {
 export const configurarAsignaturasGrado = catchAsync<unknown, unknown, ConfigurarAsignaturasGradoInput>(
   async (req, res) => {
     if (!req.user) throw new ApiError(401, 'Usuario no autenticado.');
-    const plan = await studyPlanService.configurarAsignaturasGrado(req.body, {
+    const { plan, impacto } = await studyPlanService.configurarAsignaturasGrado(req.body, {
       usuarioId: req.user._id,
       ip: req.ip ?? null,
     });
-    res.status(200).json({ success: true, data: plan });
+    res.status(200).json({ success: true, data: plan, impacto });
   }
 );
 
 export const configurarAsignaturasMultiplesGrados = catchAsync<unknown, unknown, ConfigurarAsignaturasMultiplesGradosInput>(
   async (req, res) => {
     if (!req.user) throw new ApiError(401, 'Usuario no autenticado.');
-    const plan = await studyPlanService.configurarAsignaturasMultiplesGrados(req.body, {
+    const { plan, impacto } = await studyPlanService.configurarAsignaturasMultiplesGrados(req.body, {
       usuarioId: req.user._id,
       ip: req.ip ?? null,
     });
-    res.status(200).json({ success: true, data: plan });
+    res.status(200).json({ success: true, data: plan, impacto });
   }
 );
 

@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../lib/apiClient';
+import type { ApiSuccess } from '../types/api';
 import type {
   AsignaturaGrado,
   AsignaturaPersonalizadaGrupo,
@@ -25,6 +26,22 @@ function invalidateStudyPlan(queryClient: ReturnType<typeof useQueryClient>) {
   void queryClient.invalidateQueries({ queryKey: ['study-plan'] });
 }
 
+/** Lo que provocó guardar el plan en otros módulos: asignaciones docentes con horas nuevas y horarios (M09) desfasados. */
+export interface ImpactoDelPlan {
+  asignaciones_actualizadas: number;
+  horarios_afectados: { id: string; nombre: string; estado: string }[];
+}
+
+export interface ResultadoGuardadoPlan {
+  plan: StudyPlan;
+  impacto: ImpactoDelPlan;
+}
+
+async function guardarPlan(path: string, input: unknown): Promise<ResultadoGuardadoPlan> {
+  const res = await api.raw<ApiSuccess<StudyPlan> & { impacto: ImpactoDelPlan }>(path, { method: 'POST', body: input });
+  return { plan: res.data, impacto: res.impacto };
+}
+
 export interface ConfigurarAsignaturasGradoInput {
   institucion_id: string;
   academic_year_id: string;
@@ -39,8 +56,7 @@ export interface ConfigurarAsignaturasGradoInput {
 export function useConfigurarAsignaturasGrado() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (input: ConfigurarAsignaturasGradoInput) =>
-      api.post<StudyPlan>('/curriculum/study-plan/asignaturas-grado', input),
+    mutationFn: (input: ConfigurarAsignaturasGradoInput) => guardarPlan('/curriculum/study-plan/asignaturas-grado', input),
     onSuccess: () => invalidateStudyPlan(queryClient),
   });
 }
@@ -61,7 +77,7 @@ export function useConfigurarAsignaturasMultiplesGrados() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (input: ConfigurarAsignaturasMultiplesGradosInput) =>
-      api.post<StudyPlan>('/curriculum/study-plan/asignaturas-grados', input),
+      guardarPlan('/curriculum/study-plan/asignaturas-grados', input),
     onSuccess: () => invalidateStudyPlan(queryClient),
   });
 }

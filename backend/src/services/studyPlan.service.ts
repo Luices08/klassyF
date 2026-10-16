@@ -32,6 +32,9 @@ import {
   exigirMotivoSiAnioEnCurso,
   exigirSinAsignacionesActivas,
   sincronizarHorasDeAsignaciones,
+  sincronizarHorasDeAsignacionesDetallado,
+  calcularImpactoDelPlan,
+  type ImpactoDelPlan,
 } from './planEstudiosDependencias.service';
 
 // Los subdocumentos tipan sus *_id como Types.ObjectId; los inputs del
@@ -308,7 +311,7 @@ export interface ConfigurarAsignaturasGradoInput {
 export async function configurarAsignaturasGrado(
   input: ConfigurarAsignaturasGradoInput,
   { usuarioId, ip }: ContextoActor
-): Promise<StudyPlanDocument> {
+): Promise<{ plan: StudyPlanDocument; impacto: ImpactoDelPlan }> {
   const grade = await Grade.findById(input.grade_id);
   if (!grade) throw new ApiError(404, 'Grado no encontrado.');
   if (grade.estado !== 'activo') throw new ApiError(400, 'El grado esta inactivo.');
@@ -336,7 +339,8 @@ export async function configurarAsignaturasGrado(
   await validarCoberturaPonderaciones(grado);
 
   await plan.save();
-  const sincronizadas = await sincronizarHorasDeAsignaciones(plan, [input.grade_id]);
+  const asignacionesActualizadas = await sincronizarHorasDeAsignacionesDetallado(plan, [input.grade_id]);
+  const sincronizadas = asignacionesActualizadas.length;
 
   await registrarEvento({
     usuario_id: usuarioId,
@@ -350,7 +354,8 @@ export async function configurarAsignaturasGrado(
     ),
     ip,
   });
-  return plan;
+  const impacto = await calcularImpactoDelPlan(String(plan.academic_year_id), asignacionesActualizadas);
+  return { plan, impacto };
 }
 
 export interface ConfigurarAsignaturasGradosItemInput {
@@ -373,7 +378,7 @@ export interface ConfigurarAsignaturasMultiplesGradosInput {
 export async function configurarAsignaturasMultiplesGrados(
   input: ConfigurarAsignaturasMultiplesGradosInput,
   { usuarioId, ip }: ContextoActor
-): Promise<StudyPlanDocument> {
+): Promise<{ plan: StudyPlanDocument; impacto: ImpactoDelPlan }> {
   const gradeIdsSolicitados = input.grados.map((g) => g.grade_id);
   if (new Set(gradeIdsSolicitados).size !== gradeIdsSolicitados.length) {
     throw new ApiError(400, 'No se puede repetir el mismo grado en una misma solicitud de configuración masiva.');
@@ -420,7 +425,8 @@ export async function configurarAsignaturasMultiplesGrados(
   }
 
   await plan.save();
-  const sincronizadas = await sincronizarHorasDeAsignaciones(plan, gradeIdsSolicitados);
+  const asignacionesActualizadas = await sincronizarHorasDeAsignacionesDetallado(plan, gradeIdsSolicitados);
+  const sincronizadas = asignacionesActualizadas.length;
 
   await registrarEvento({
     usuario_id: usuarioId,
@@ -434,7 +440,8 @@ export async function configurarAsignaturasMultiplesGrados(
     ),
     ip,
   });
-  return plan;
+  const impacto = await calcularImpactoDelPlan(String(plan.academic_year_id), asignacionesActualizadas);
+  return { plan, impacto };
 }
 
 // ---------------------------------------------------------------------------

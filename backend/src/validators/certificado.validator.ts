@@ -160,7 +160,7 @@ export const crearTipo: ValidationSchema = {
 
 export const actualizarTipo: ValidationSchema = {
   params: conClaveDeTipo,
-  body: Joi.object({ ...camposTipo, variables_obligatorias: Joi.array().items(Joi.string().trim().max(60)).max(20).unique() }).min(1),
+  body: Joi.object({ ...camposTipo, variables_obligatorias: Joi.array().items(Joi.string().trim().max(60)).max(20).unique(), autoservicio_acudiente: Joi.boolean() }).min(1),
 };
 
 export const tipoConClave: ValidationSchema = { params: conClaveDeTipo };

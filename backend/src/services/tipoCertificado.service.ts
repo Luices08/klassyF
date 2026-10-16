@@ -36,6 +36,7 @@ export function exigirGestionDeTipos(usuario: UserDocument): void {
 export interface TipoDefinido extends DefinicionCertificado {
   estado: EstadoTipoCertificado;
   orden: number;
+  autoservicio_acudiente: boolean;
 }
 
 const aTipoDefinido = (t: TipoCertificadoDocument): TipoDefinido => ({
@@ -49,6 +50,7 @@ const aTipoDefinido = (t: TipoCertificadoDocument): TipoDefinido => ({
   politica: { rectoria: t.politica.rectoria, secretaria: t.politica.secretaria, sello: t.politica.sello },
   estado: t.estado,
   orden: t.orden,
+  autoservicio_acudiente: Boolean(t.autoservicio_acudiente),
 });
 
 // --- Siembra de los tipos de partida (una sola vez) ---
@@ -203,6 +205,7 @@ export interface CambiosTipo {
   estados_matricula?: string[];
   fuentes?: FuenteCertificado[];
   variables_obligatorias?: string[];
+  autoservicio_acudiente?: boolean;
 }
 
 async function cargarTipo(clave: string): Promise<TipoCertificadoDocument> {
@@ -231,12 +234,21 @@ export async function actualizarTipo(clave: string, cambios: CambiosTipo, usuari
   if (cambios.fuentes !== undefined && [...cambios.fuentes].sort().join() !== [...tipo.fuentes].sort().join()) {
     if (emitidos > 0 || tipo.estado !== 'BORRADOR') throw new ApiError(409, 'Las fuentes de datos solo se cambian mientras el tipo está en borrador y sin documentos expedidos.');
     tipo.fuentes = cambios.fuentes;
+    if (tipo.fuentes.includes('DEPENDENCIAS')) tipo.autoservicio_acudiente = false;
   }
   if (cambios.variables_obligatorias !== undefined) {
     if (usuario.rol !== ROLES.ADMIN) throw new ApiError(403, 'Solo el administrador define qué datos no puede perder el texto del documento.');
     const desconocidas = cambios.variables_obligatorias.filter((v) => !CLAVES_VARIABLES.has(v));
     if (desconocidas.length > 0) throw new ApiError(400, `Variables desconocidas: ${desconocidas.join(', ')}.`);
     tipo.variables_obligatorias = [...new Set(cambios.variables_obligatorias)];
+  }
+  if (cambios.autoservicio_acudiente !== undefined) {
+    if (usuario.rol !== ROLES.ADMIN) throw new ApiError(403, 'Solo el administrador decide qué documentos genera el acudiente sin intervención de secretaría.');
+    // La confirmación de «sin pendientes» la hace una persona de cada dependencia: no se puede automatizar.
+    if (cambios.autoservicio_acudiente && tipo.fuentes.includes('DEPENDENCIAS')) {
+      throw new ApiError(409, 'Un documento que exige confirmar dependencias (paz y salvo) lo expide siempre Secretaría: no puede ser de autoservicio.');
+    }
+    tipo.autoservicio_acudiente = cambios.autoservicio_acudiente;
   }
   if (cambios.nombre !== undefined) tipo.nombre = cambios.nombre.trim();
   if (cambios.descripcion !== undefined) tipo.descripcion = cambios.descripcion.trim();

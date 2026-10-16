@@ -611,7 +611,24 @@ export async function misObservaciones(usuario: UserDocument, paginacion: Pagina
 /** El estudiante ve solo lo suyo y solo el texto final (ver `esVisibleParaEstudiante` para qué entra). */
 export async function miObservador(usuario: UserDocument, ip?: string | null) {
   if (usuario.rol !== ROLES.ESTUDIANTE) throw new ApiError(403, 'Solo un estudiante consulta su propio observador.');
-  const registros = (await Observacion.find({ student_id: usuario._id, estado: 'ACTIVA' }).sort({ fecha_hecho: -1, createdAt: -1 }).limit(LIMITE_HISTORIAL)).sort(porFechaDesc);
+  return observadorParaLaFamilia(usuario._id, usuario, 'CONVIVENCIA_OBSERVACIONES_PROPIAS_CONSULTADAS', ip);
+}
+
+/**
+ * Lo mismo que ve el estudiante en su observador, para su acudiente en el portal (M27): quien llama ya comprobó el vínculo. La consulta se
+ * audita a nombre del acudiente y sobre el estudiante, porque es un menor y los datos de convivencia son sensibles.
+ */
+export async function observadorDelEstudianteParaAcudiente(estudianteId: Types.ObjectId, acudiente: UserDocument, ip?: string | null) {
+  return observadorParaLaFamilia(estudianteId, acudiente, 'CONVIVENCIA_OBSERVADOR_CONSULTADO_POR_ACUDIENTE', ip);
+}
+
+async function observadorParaLaFamilia(
+  estudianteId: Types.ObjectId,
+  consultadoPor: UserDocument,
+  accion: 'CONVIVENCIA_OBSERVACIONES_PROPIAS_CONSULTADAS' | 'CONVIVENCIA_OBSERVADOR_CONSULTADO_POR_ACUDIENTE',
+  ip?: string | null
+) {
+  const registros = (await Observacion.find({ student_id: estudianteId, estado: 'ACTIVA' }).sort({ fecha_hecho: -1, createdAt: -1 }).limit(LIMITE_HISTORIAL)).sort(porFechaDesc);
 
   // De una falta grave el estudiante solo ve que hay un caso (o que está en revisión) y su estado; sin caso ni solicitud viva, no hay nada que mostrar.
   const graves = registros.filter((o) => esSituacionGrave(o.falta?.gravedad));
@@ -629,10 +646,10 @@ export async function miObservador(usuario: UserDocument, ip?: string | null) {
     .slice(0, 200);
 
   await registrarEvento({
-    usuario_id: usuario._id,
-    accion: 'CONVIVENCIA_OBSERVACIONES_PROPIAS_CONSULTADAS',
+    usuario_id: consultadoPor._id,
+    accion,
     entidad: 'User',
-    entidad_id: usuario._id,
+    entidad_id: estudianteId,
     detalle: `${visibles.length} registro(s)`,
     ip,
   });

@@ -44,12 +44,14 @@ export function entradaDeElementos(
   config: ConfiguracionCertificadosDocument,
   politica: PoliticaDeCertificado,
   usuario: UserDocument,
-  presencia: Record<ElementoAutenticacion, boolean>
+  presencia: Record<ElementoAutenticacion, boolean>,
+  autoservicio = false
 ): EntradaElementos {
   return {
     politica,
     tieneImagen: presencia,
-    puedeAplicar: { rectoria: puedeAplicarFirmaRectoria(config, usuario), secretaria: true, sello: true },
+    // Sin una persona de la institución al expedir, la firma de Rectoría solo se estampa si el ADMIN delegó esa firma (la más sensible).
+    puedeAplicar: { rectoria: autoservicio ? config.permitir_firma_rectoria_a_secretaria : puedeAplicarFirmaRectoria(config, usuario), secretaria: true, sello: true },
     tieneFirmante: { rectoria: Boolean(config.rectoria.usuario_id), secretaria: Boolean(config.secretaria.usuario_id), sello: true },
   };
 }

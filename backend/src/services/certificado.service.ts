@@ -242,15 +242,19 @@ async function acudientePrincipal(studentId: Types.ObjectId): Promise<SnapshotCe
 async function prepararDocumento(
   entrada: EntradaExpedicion,
   usuario: UserDocument,
-  soloActivo: boolean
+  soloActivo: boolean,
+  autoservicio = false
 ): Promise<{ def: TipoDefinido; matricula: MatriculaCompleta; snapshot: SnapshotCertificado; solicitante: SolicitanteResuelto | null; entidadDe: string | null }> {
-  exigirSecretaria(usuario);
+  // En autoservicio no hay personal de la institución: el portal ya comprobó que el acudiente es de este estudiante.
+  if (!autoservicio) exigirSecretaria(usuario);
   const def = await tipoPorClave(entrada.tipo);
+  if (autoservicio && def.fuentes.includes('DEPENDENCIAS')) throw new ApiError(409, `«${def.nombre}» exige confirmar dependencias: lo expide Secretaría.`);
+  if (autoservicio && !def.autoservicio_acudiente) throw new ApiError(403, `«${def.nombre}» no se genera desde el portal: solicítalo en secretaría.`);
   if (def.estado === 'ARCHIVADO' || (soloActivo && def.estado !== 'ACTIVO')) {
     throw new ApiError(409, def.estado === 'BORRADOR' ? `«${def.nombre}» está en borrador: el administrador debe activarlo antes de expedirlo.` : `«${def.nombre}» está archivado y ya no se expide.`);
   }
   const matricula = await cargarMatricula(entrada.enrollment_id);
-  if (!puedeVerSede(usuario, matricula.group_id.sede_id._id)) throw new ApiError(404, 'Matrícula no encontrada.');
+  if (!autoservicio && !puedeVerSede(usuario, matricula.group_id.sede_id._id)) throw new ApiError(404, 'Matrícula no encontrada.');
   if (!def.estados_matricula.includes(matricula.estado)) {
     throw new ApiError(409, `«${def.nombre}» no se puede expedir con la matrícula en estado ${matricula.estado}.`);
   }
@@ -258,7 +262,7 @@ async function prepararDocumento(
   const [institucion, config] = await Promise.all([Institution.findOne(), obtenerConfiguracion()]);
   if (!institucion) throw new ApiError(409, 'Configura primero la institución antes de expedir certificados.');
 
-  const { aplicados, errores } = resolverElementos(entradaDeElementos(config, def.politica, usuario, await presenciaDeImagenes(config)), entrada.firmas ?? {});
+  const { aplicados, errores } = resolverElementos(entradaDeElementos(config, def.politica, usuario, await presenciaDeImagenes(config), autoservicio), autoservicio ? {} : (entrada.firmas ?? {}));
   if (errores.length > 0) throw new ApiError(409, errores.join(' '));
 
   const plantilla = await plantillaVigente(def.clave);
@@ -358,9 +362,13 @@ export async function prepararVistaPrevia(entrada: EntradaExpedicion, usuario: U
 
 // --- Expedir ---
 
-export async function expedirCertificado(entrada: EntradaExpedicion, usuario: UserDocument, ip?: string | null): Promise<CertificadoEmitidoDocument> {
+/**
+ * `autoservicio`: lo genera el acudiente desde el portal (M27). Solo vale para un tipo que el ADMIN marcó `autoservicio_acudiente`, las firmas
+ * salen por política (el acudiente no las elige) y quien llama (`portalAcudiente.service`) ya comprobó el vínculo con el estudiante.
+ */
+export async function expedirCertificado(entrada: EntradaExpedicion, usuario: UserDocument, ip?: string | null, autoservicio = false): Promise<CertificadoEmitidoDocument> {
   const clave = claveDeHuella();
-  const { def, matricula, snapshot, solicitante, entidadDe } = await prepararDocumento(entrada, usuario, true);
+  const { def, matricula, snapshot, solicitante, entidadDe } = await prepararDocumento(entrada, usuario, true, autoservicio);
   // Lo expedido se congela: con un dato ausente no se emite un documento oficial (habría que anularlo para corregirlo).
   if (def.fuentes.includes('VALORACIONES') && !snapshot.estudios?.promocion) throw new ApiError(409, MOTIVO_SIN_PROMOCION.replace('Solo vista previa: falta', 'No se puede expedir como oficial: falta'));
   if (def.fuentes.includes('VALORACIONES') && !snapshot.estudios?.completo) throw new ApiError(409, 'Hay asignaturas con periodos sin cerrar: un documento con valoraciones solo se expide con todas ellas completas.');
@@ -395,7 +403,7 @@ export async function expedirCertificado(entrada: EntradaExpedicion, usuario: Us
     return creado;
   });
   const usadas = ['rectoria', 'secretaria'].filter((e) => snapshot.firmas[e as 'rectoria' | 'secretaria'].aplicada).concat(snapshot.firmas.sello.aplicado ? ['sello'] : []);
-  await registrarEvento({ usuario_id: usuario._id, accion: 'CERTIFICADO_EMITIDO', entidad: 'CertificadoEmitido', entidad_id: certificado._id, detalle: `${certificado.codigo}; estampado: ${usadas.join(', ') || 'ninguno'}; solicitante: ${solicitante?.tipo ?? 'sin registro'}${entidadDe ? `; entidad de ${entidadDe} (M03)` : ''}`, ip });
+  await registrarEvento({ usuario_id: usuario._id, accion: 'CERTIFICADO_EMITIDO', entidad: 'CertificadoEmitido', entidad_id: certificado._id, detalle: `${certificado.codigo}; estampado: ${usadas.join(', ') || 'ninguno'}; solicitante: ${solicitante?.tipo ?? 'sin registro'}${autoservicio ? '; autoservicio (portal)' : ''}${entidadDe ? `; entidad de ${entidadDe} (M03)` : ''}`, ip });
   return certificado;
 }
 

@@ -1,13 +1,10 @@
-import fs from 'fs/promises';
-import path from 'path';
 import { EstadoDocumentoMatricula, EstadoMatricula, TipoDocumentoMatricula } from '../constants/enums';
 import { NOMBRES_DOCUMENTO_MATRICULA } from '../constants/matriculaChecklist';
 import AdmissionRequest from '../models/admissionRequest.model';
 import Enrollment, { EnrollmentDocument } from '../models/enrollment.model';
 import ApiError from '../utils/ApiError';
 import { finDelDia } from '../utils/calendarioAcademico';
-import { detectarFirmaArchivo } from '../utils/firmasArchivo';
-import { carpetaMatricula } from '../utils/uploadPaths';
+import { guardarArchivoDeDocumento } from './documentoMatriculaArchivo.service';
 import { cargarDocumento } from './enrollment.service';
 
 /**
@@ -17,7 +14,7 @@ import { cargarDocumento } from './enrollment.service';
  */
 
 // Con la matricula en estos estados aun faltan documentos por entregar.
-const ESTADOS_QUE_ADMITEN_DOCUMENTOS: EstadoMatricula[] = ['PREINSCRITO', 'MATRICULADO_CONDICIONAL'];
+export const ESTADOS_QUE_ADMITEN_DOCUMENTOS: EstadoMatricula[] = ['PREINSCRITO', 'MATRICULADO_CONDICIONAL'];
 
 export interface DocumentoPreinscripcion {
   tipo_documento: TipoDocumentoMatricula;
@@ -113,15 +110,8 @@ export async function subirDocumento(
   if (!item) throw new ApiError(400, 'Ese documento no aplica para el grado del aspirante.');
   if (item.estado === 'APROBADO') throw new ApiError(409, 'Este documento ya fue aprobado por la secretaría.');
 
-  const firma = detectarFirmaArchivo(archivo.mimetype, archivo.buffer);
-  if (!firma) throw new ApiError(400, 'El archivo no es un PDF, JPG, PNG o WEBP válido.');
-
-  const carpeta = carpetaMatricula(String(enrollment._id));
-  await fs.mkdir(carpeta, { recursive: true });
-  const destino = path.join(carpeta, `${tipoDocumento}-${Date.now()}${firma.ext}`);
-  await fs.writeFile(destino, archivo.buffer);
-
-  const actualizada = await cargarDocumento(String(enrollment._id), tipoDocumento, path.relative(process.cwd(), destino), {
+  const archivoPath = await guardarArchivoDeDocumento(String(enrollment._id), tipoDocumento, archivo);
+  const actualizada = await cargarDocumento(String(enrollment._id), tipoDocumento, archivoPath, {
     id: null,
   });
   // cargarDocumento devuelve la matricula sin poblar: se reutiliza el grupo ya poblado.

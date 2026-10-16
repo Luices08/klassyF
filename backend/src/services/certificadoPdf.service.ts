@@ -13,6 +13,7 @@ import { snapshotDeVistaPreviaDePlantilla } from './certificadoPlantilla.service
 import { COLOR, MARGEN, cargarEscudoCongelado, dibujarEncabezado } from './encabezadoInstitucional.service';
 import { nombresDeTipos } from './tipoCertificado.service';
 import User from '../models/user.model';
+import { CertificadoEmitidoDocument } from '../models/certificadoEmitido.model';
 
 type Documento = InstanceType<typeof PDFDocument>;
 
@@ -204,7 +205,11 @@ export async function generarVistaPreviaDePlantillaPdf(tipo: ClaveCertificado, b
  * recalcula la huella: un documento alterado en la base no se imprime.
  */
 export async function generarPdfDeCertificado(id: string, urlBase: string, usuario: UserDocument, ip?: string | null): Promise<{ buffer: Buffer; nombreArchivo: string }> {
-  const certificado = await cargarCertificado(id, usuario);
+  return dibujarCertificadoEmitido(await cargarCertificado(id, usuario), urlBase, usuario, ip);
+}
+
+/** Dibuja un documento ya cargado y autorizado por quien llama (secretaría por sede, o el acudiente de ese estudiante en el portal). */
+export async function dibujarCertificadoEmitido(certificado: CertificadoEmitidoDocument, urlBase: string, usuario: UserDocument, ip?: string | null): Promise<{ buffer: Buffer; nombreArchivo: string }> {
   if (huellaActual(certificado) !== certificado.hash) {
     throw new ApiError(409, 'La huella de este documento no coincide con la sellada al expedirlo: no se puede imprimir. Avisa al administrador.');
   }

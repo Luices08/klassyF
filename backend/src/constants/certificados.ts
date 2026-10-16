@@ -31,6 +31,12 @@ export type EstadoTipoCertificado = (typeof ESTADOS_TIPO_CERTIFICADO)[number];
 /** Estados de matrícula con los que tiene sentido expedir algo. */
 export const ESTADOS_MATRICULA_EXPEDIBLES: EstadoMatricula[] = ['MATRICULADO_CONDICIONAL', 'MATRICULADO_DEFINITIVO', 'RETIRADO'];
 
+/**
+ * Tope de documentos del mismo tipo que un acudiente puede generar solo, por estudiante y cada 24 horas. Sin una persona de por medio, cada
+ * clic consume un consecutivo oficial (sin huecos): el tope evita que un clic repetido o un abuso llene el libro de documentos.
+ */
+export const MAX_CERTIFICADOS_AUTOSERVICIO_POR_DIA = 3;
+
 export const MAX_TIPOS_CERTIFICADO = 40;
 export const MAX_NOMBRE_TIPO = 80;
 export const MAX_DESCRIPCION_TIPO = 200;

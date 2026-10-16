@@ -22,6 +22,8 @@ export interface ITipoCertificado extends DefinicionCertificado {
   estado: EstadoTipoCertificado;
   /** Orden en el que se ofrece al expedir. */
   orden: number;
+  /** El acudiente lo genera solo desde el portal (M27), sin intervención de secretaría. Solo lo enciende el ADMIN. */
+  autoservicio_acudiente: boolean;
   /** null = lo sembró el sistema. */
   creado_por: Types.ObjectId | null;
   createdAt: Date;
@@ -48,6 +50,7 @@ const tipoSchema = new Schema<ITipoCertificado, TipoCertificadoModel>(
     politica: { type: politicaSchema, required: true },
     estado: { type: String, enum: ESTADOS_TIPO_CERTIFICADO, default: 'BORRADOR' },
     orden: { type: Number, default: 0 },
+    autoservicio_acudiente: { type: Boolean, default: false },
     creado_por: { type: Schema.Types.ObjectId, ref: 'User', default: null },
   },
   { timestamps: true }

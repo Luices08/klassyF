@@ -27,6 +27,7 @@ import liderAreaRoutes from './liderArea.routes';
 import notasRoutes from './notas.routes';
 import observacionRoutes from './observacion.routes';
 import periodLockRoutes from './periodLock.routes';
+import portalAcudienteRoutes from './portalAcudiente.routes';
 import planAreaRoutes from './planArea.routes';
 import planAulaRoutes from './planAula.routes';
 import publicRoutes from './public.routes';
@@ -114,5 +115,8 @@ router.use('/boletines', boletinRoutes);
 
 // M18: Recuperaciones — política del colegio (por periodo y de fin de año), candidatos y registro de intentos
 router.use('/recuperaciones', recuperacionRoutes);
+
+// M27: Portal del acudiente — lo de cada hijo (notas, inasistencias, convivencia), sus documentos de matrícula y certificados de autoservicio
+router.use('/portal', portalAcudienteRoutes);
 
 export default router;

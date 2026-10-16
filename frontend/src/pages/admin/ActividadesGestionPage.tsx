@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { ConfiguracionActividadesCard } from '../../components/actividades/ConfiguracionActividadesCard';
 import { Alert, errorMessage } from '../../components/ui/Alert';
 import { TipoActividadChip } from '../../components/ui/Badge';
@@ -88,7 +89,9 @@ export function ActividadesGestionPage() {
                 <Td>{formatoInstante(a.fecha_entrega)}</Td>
                 <Td>
                   <div className="flex flex-wrap items-center gap-2">
-                    <span className="font-semibold text-ink">{a.titulo}</span>
+                    <Link to={`/admin/actividades/${a._id}`} className="font-semibold text-primary hover:underline">
+                      {a.titulo}
+                    </Link>
                     <TipoActividadChip value={a.tipo} />
                   </div>
                   <p className="text-xs text-muted">Periodo {a.periodo_numero}</p>

@@ -1,6 +1,5 @@
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
-import { EntregasDrawer } from '../components/actividades/EntregasDrawer';
+import { Link, useNavigate } from 'react-router-dom';
 import { CasillaDrawer, type CasillaEnEdicion } from '../components/notas/CasillaDrawer';
 import { ExcelNotas } from '../components/notas/ExcelNotas';
 import { HistorialImportacionesExcel } from '../components/notas/HistorialImportacionesExcel';
@@ -46,7 +45,7 @@ export function NotasPlanillaPage() {
   const [asignacionElegida, setAsignacionElegida] = useState('');
   const [periodoElegido, setPeriodoElegido] = useState<number | null>(null);
   const [reabriendo, setReabriendo] = useState(false);
-  const [revisando, setRevisando] = useState<{ _id: string; titulo: string } | null>(null);
+  const navigate = useNavigate();
   const [errorPdf, setErrorPdf] = useState<string | null>(null);
   // Formulario de casilla: agregar a un bloque o editar una existente.
   const [casillaForm, setCasillaForm] = useState<{ bloqueInicial?: string; casillaId?: string } | null>(null);
@@ -209,7 +208,7 @@ export function NotasPlanillaPage() {
             key={`planilla-${asignacion._id}-${periodo.numero}`}
             planilla={planilla}
             guardando={guardar.isPending || casillas.establecerPesos.isPending}
-            onRevisarActividad={setRevisando}
+            onRevisarActividad={(a) => navigate(`/docente/actividades/${a._id}`)}
             onGuardar={guardarCambios}
             onAgregarCasilla={(bloqueClave) => setCasillaForm({ bloqueInicial: bloqueClave })}
             onEditarCasilla={(casillaId) => setCasillaForm({ casillaId })}
@@ -238,7 +237,6 @@ export function NotasPlanillaPage() {
 
           <HistorialImportacionesExcel key={`historial-${asignacion._id}-${periodo.numero}`} teacherAssignmentId={asignacion._id} periodoNumero={periodo.numero} />
 
-          <EntregasDrawer actividad={revisando} onClose={() => setRevisando(null)} escala={anio?.escala_evaluacion ?? null} />
 
           <ReabrirPlanillaDrawer
             open={reabriendo}

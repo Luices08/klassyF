@@ -1,6 +1,6 @@
 import { ClientSession, Types } from 'mongoose';
 import { avisarActividadesCalificadas } from './notificacionesEventos.service';
-import { EstadoActividadEstudiante, TipoActividad } from '../constants/actividades';
+import { EstadoActividadEstudiante, OrigenNota, TipoActividad } from '../constants/actividades';
 import { ESTADOS_MATRICULA_ACTIVOS, NivelDesempeno } from '../constants/enums';
 import { ESTADOS_NOTA_CERRADOS, EstadoNota } from '../constants/notas';
 import { ROLES } from '../constants/roles';
@@ -14,6 +14,7 @@ import TeacherAssignment, { TeacherAssignmentDocument } from '../models/teacherA
 import { UserDocument } from '../models/user.model';
 import ApiError from '../utils/ApiError';
 import { estadoDeEntrega } from '../utils/actividades';
+import { requiereElegirIntento } from '../utils/entregasActividad';
 import { calcularNotaAsignatura, estadoAbiertoDe, pesosEfectivos, ResultadoAsignatura } from '../utils/calculoNotas';
 import { escalaEfectiva, validarNotaDentroDeEscala } from '../utils/escalaEvaluacion';
 import { ESTADO_ACTIVO } from '../utils/filtroEstado';
@@ -360,7 +361,8 @@ export async function registrarNotas(
   ctx: ContextoPlanilla,
   docente: UserDocument,
   celdas: CeldaNota[],
-  ip?: string | null
+  ip?: string | null,
+  origen: OrigenNota = 'PLANILLA'
 ): Promise<{ guardadas: number; sin_cambios: number }> {
   const { asignacion } = ctx;
   await assertPeriodNotLocked(asignacion.academic_year_id, asignacion.group_id as Types.ObjectId, ctx.periodo.numero, docente._id);
@@ -396,6 +398,7 @@ export async function registrarNotas(
 
   const deActividad = cambios.filter((c) => casillaPorId.get(c.casillaId)?.tipo === 'ACTIVIDAD');
   const sueltas = cambios.filter((c) => casillaPorId.get(c.casillaId)?.tipo === 'MANUAL');
+  await exigirIntentoValidoElegido(deActividad);
 
   await runTransaction(async (session: ClientSession) => {
     for (const celda of deActividad) {
@@ -411,7 +414,7 @@ export async function registrarNotas(
             docente_id: docente._id,
             ...(celda.retroalimentacion !== undefined ? { retroalimentacion: celda.retroalimentacion } : {}),
           },
-          ...(anterior !== celda.nota ? { $push: { historial_notas: { valor_anterior: anterior, valor_nuevo: celda.nota, por: docente._id, fecha: ahora } } } : {}),
+          ...(anterior !== celda.nota ? { $push: { historial_notas: { valor_anterior: anterior, valor_nuevo: celda.nota, por: docente._id, fecha: ahora, origen } } } : {}),
         },
         { upsert: true, runValidators: true, session }
       );
@@ -464,6 +467,26 @@ export async function registrarNotas(
   return { guardadas: cambios.length, sin_cambios: sinCambios };
 }
 
+/**
+ * Con entregas múltiples, quien entregó más de una vez no se califica hasta que el docente elija cuál entrega es la válida: la
+ * nota tiene que saber a qué trabajo corresponde. Rige igual para la planilla, el Excel y la calificación desde la actividad.
+ */
+async function exigirIntentoValidoElegido(celdas: CeldaNota[]): Promise<void> {
+  if (celdas.length === 0) return;
+  const entregas = await ActivitySubmission.find({
+    $or: celdas.map((c) => ({ activity_id: c.casillaId, student_id: c.estudianteId })),
+  })
+    .select('activity_id student_id intentos intento_valido')
+    .lean();
+  const pendientes = entregas.filter((e) => requiereElegirIntento(e.intentos ?? [], e.intento_valido));
+  if (pendientes.length === 0) return;
+  throw new ApiError(
+    409,
+    `${pendientes.length} estudiante(s) entregaron más de una vez: elige cuál entrega es la válida antes de calificar.`,
+    pendientes.map((e) => ({ activity_id: String(e.activity_id), student_id: String(e.student_id) }))
+  );
+}
+
 export interface CeldaPlanilla {
   student_id: string;
   /** La casilla: el id de una actividad de M11 o de una nota suelta de la planilla. */
@@ -478,7 +501,7 @@ export interface GuardarCeldasInput {
 }
 
 /** Guarda las celdas que el docente modificó en la planilla y devuelve la planilla al día. */
-export async function guardarCeldas(input: GuardarCeldasInput, docente: UserDocument, ip?: string | null) {
+export async function guardarCeldas(input: GuardarCeldasInput, docente: UserDocument, ip?: string | null, origen: OrigenNota = 'PLANILLA') {
   const asignacion = await asignacionDelDocente(input.teacher_assignment_id, docente);
   await asegurarAnioNoCerrado(String(asignacion.academic_year_id));
   const ctx = await cargarContextoPlanilla(asignacion, input.periodo_numero);
@@ -487,7 +510,8 @@ export async function guardarCeldas(input: GuardarCeldasInput, docente: UserDocu
     ctx,
     docente,
     input.celdas.map((c) => ({ casillaId: c.casilla_id, estudianteId: c.student_id, nota: c.nota })),
-    ip
+    ip,
+    origen
   );
   return { ...resultado, planilla: await obtenerPlanilla(input.teacher_assignment_id, input.periodo_numero, docente) };
 }
@@ -531,7 +555,8 @@ export async function gradeActivity(
       nota: e.calificacion_numerica,
       retroalimentacion: e.retroalimentacion ?? undefined,
     })),
-    ip
+    ip,
+    'ACTIVIDAD'
   );
   return ActivitySubmission.find({ activity_id: activityId, student_id: { $in: entries.map((e) => e.student_id) } });
 }

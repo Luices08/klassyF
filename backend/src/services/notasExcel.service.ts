@@ -620,7 +620,7 @@ async function aplicarImportacion(archivo: Buffer, docente: UserDocument, ip: st
     const columna = porIndice.get(n.columna) as ColumnaImportada;
     return { student_id: n.estudianteId, casilla_id: columna.tipo === 'CASILLA' ? columna.clave : (idDeNueva.get(columna.indice) as string), nota: n.nota };
   });
-  const guardado = celdas.length > 0 ? await guardarCeldas({ teacher_assignment_id: asignacionId, periodo_numero: periodoNumero, celdas }, docente, ip) : { guardadas: 0, sin_cambios: 0 };
+  const guardado = celdas.length > 0 ? await guardarCeldas({ teacher_assignment_id: asignacionId, periodo_numero: periodoNumero, celdas }, docente, ip, 'EXCEL') : { guardadas: 0, sin_cambios: 0 };
 
   return {
     asignatura: nombreAsignatura,

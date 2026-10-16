@@ -300,4 +300,91 @@ describe('M11: actividades (capa HTTP)', () => {
     expect((await json('PUT', '/activities/configuracion', e.coordAcademico, { max_evaluaciones_por_dia: 3, max_entregas_por_dia: 0 })).estado).toBe(200);
     expect((await json('GET', '/activities/configuracion', e.docenteDeClase)).cuerpo.data).toMatchObject({ max_evaluaciones_por_dia: 3, max_entregas_por_dia: 0 });
   });
+
+  it('adjuntos del docente: varios archivos a la vez, comprobados por contenido, y la actividad los entrega a su grupo con sesión', async () => {
+    const mp4 = Buffer.concat([Buffer.from([0, 0, 0, 24]), Buffer.from('ftypisom'), Buffer.alloc(16)]);
+    const subirAdjuntos = async (usuario: UserDocument | null, archivos: Array<{ contenido: BlobPart; nombre: string; tipo: string }>) => {
+      const formulario = new FormData();
+      for (const a of archivos) formulario.append('files', new Blob([a.contenido], { type: a.tipo }), a.nombre);
+      const respuesta = await fetch(`${base}/activities/adjuntos`, { method: 'POST', headers: encabezado(usuario), body: formulario });
+      return { estado: respuesta.status, cuerpo: (await respuesta.json()) as { success: boolean; message?: string; data?: any } };
+    };
+
+    expect((await subirAdjuntos(null, [])).estado).toBe(401);
+    expect((await subirAdjuntos(e.estudiante, [{ contenido: '%PDF-1.4 x', nombre: 'a.pdf', tipo: 'application/pdf' }])).estado).toBe(403);
+    const falso = await subirAdjuntos(e.docenteDeClase, [{ contenido: 'no soy un video', nombre: 'clase.mp4', tipo: 'video/mp4' }]);
+    expect(falso.estado).toBe(400);
+    const exe = await subirAdjuntos(e.docenteDeClase, [{ contenido: 'MZ', nombre: 'a.exe', tipo: 'application/x-msdownload' }]);
+    expect(exe.estado).toBe(400);
+
+    const subidos = await subirAdjuntos(e.docenteDeClase, [
+      { contenido: '%PDF-1.4 guia', nombre: 'guia.pdf', tipo: 'application/pdf' },
+      { contenido: mp4, nombre: 'clase.mp4', tipo: 'video/mp4' },
+    ]);
+    expect(subidos.estado).toBe(201);
+    expect(subidos.cuerpo.data.map((a: { tipo: string }) => a.tipo)).toEqual(['PDF', 'VIDEO']);
+    expect(JSON.stringify(subidos.cuerpo)).not.toMatch(/uploads|\/tmp/);
+
+    const adjuntos = subidos.cuerpo.data.map(({ id, ext, nombre }: { id: string; ext: string; nombre: string }) => ({ id, ext, nombre }));
+    const creada = await json('POST', '/activities', e.docenteDeClase, nueva({ adjuntos, videos: ['https://youtu.be/dQw4w9WgXcQ'] }));
+    expect(creada.estado).toBe(201);
+    const id = creada.cuerpo.data._id as string;
+
+    const detalle = await json('GET', `/activities/${id}`, e.estudiante);
+    expect(detalle.cuerpo.data.adjuntos).toHaveLength(2);
+    const descarga = await fetch(`${base}/activities/${id}/adjuntos/${adjuntos[0].id}`, { headers: encabezado(e.estudiante) });
+    expect(descarga.status).toBe(200);
+    expect(await descarga.text()).toBe('%PDF-1.4 guia');
+    expect((await fetch(`${base}/activities/${id}/adjuntos/${adjuntos[0].id}`)).status).toBe(401);
+    expect((await fetch(`${base}/activities/${id}/adjuntos/${adjuntos[0].id}`, { headers: encabezado(e.docenteAjeno) })).status).toBe(403);
+
+    // Un adjunto que nadie subió no se puede referenciar.
+    const inventado = await json('POST', '/activities', e.docenteDeClase, nueva({ adjuntos: [{ id: 'a'.repeat(64), ext: '.pdf', nombre: 'fantasma.pdf' }] }));
+    expect(inventado.estado).toBe(400);
+  });
+
+  it('acceso especial, entrega válida y comentarios por la API, con los roles que corresponden', async () => {
+    const id = (await json('POST', '/activities', e.docenteDeClase, nueva({ permite_multiples_entregas: true }))).cuerpo.data._id as string;
+    const pdfEntrega = { contenido: '%PDF-1.4 mi tarea', nombre: 'tarea.pdf', tipo: 'application/pdf' };
+    await subir(`/activities/${id}/submissions`, e.estudiante, pdfEntrega);
+    await new Promise((r) => setTimeout(r, 5));
+    await subir(`/activities/${id}/submissions`, e.estudiante, { ...pdfEntrega, nombre: 'v2.pdf' });
+    const alumno = String(e.estudiante._id);
+
+    // Con dos entregas no se califica hasta elegir la válida.
+    const sinElegir = await json('PATCH', `/activities/${id}/grade`, e.docenteDeClase, { student_id: alumno, calificacion_numerica: 4 });
+    expect(sinElegir.estado).toBe(409);
+    expect((await json('PATCH', `/activities/${id}/entregas/${alumno}/valida`, e.estudiante, { intento: 1 })).estado).toBe(403);
+    expect((await json('PATCH', `/activities/${id}/entregas/${alumno}/valida`, e.coordAcademico, { intento: 1 })).estado).toBe(403);
+    expect((await json('PATCH', `/activities/${id}/entregas/${alumno}/valida`, e.docenteDeClase, { intento: 0 })).estado).toBe(400);
+    const elegida = await json('PATCH', `/activities/${id}/entregas/${alumno}/valida`, e.docenteDeClase, { intento: 1 });
+    expect(elegida.estado).toBe(200);
+    expect(elegida.cuerpo.data).toMatchObject({ intento_valido: 1, archivo_nombre: 'tarea.pdf' });
+    expect((await json('PATCH', `/activities/${id}/grade`, e.docenteDeClase, { student_id: alumno, calificacion_numerica: 4 })).estado).toBe(200);
+
+    // Acceso especial: solo el docente titular, con motivo y fecha futura.
+    const fecha = new Date(Date.now() + 30 * 86_400_000).toISOString();
+    const otro = String(e.otroEstudiante._id);
+    expect((await json('POST', `/activities/${id}/accesos-especiales`, e.estudiante, { student_id: otro, fecha_limite: fecha, motivo: 'Incapacidad' })).estado).toBe(403);
+    expect((await json('POST', `/activities/${id}/accesos-especiales`, e.docenteDeClase, { student_id: otro, fecha_limite: fecha })).estado).toBe(400);
+    expect((await json('POST', `/activities/${id}/accesos-especiales`, e.docenteDeClase, { student_id: otro, fecha_limite: fecha, motivo: 'Incapacidad médica' })).estado).toBe(201);
+    const filas = await json('GET', `/activities/${id}/entregas`, e.docenteDeClase);
+    expect(filas.cuerpo.data.find((f: { estudiante: { _id: string } }) => f.estudiante._id === otro).acceso_especial).toMatchObject({ motivo: 'Incapacidad médica' });
+    expect((await json('GET', `/activities/${id}`, e.otroEstudiante)).cuerpo.data.acceso_especial).toBeTruthy();
+    expect((await json('DELETE', `/activities/${id}/accesos-especiales/${otro}`, e.docenteDeClase)).estado).toBe(200);
+
+    // Comentarios: lo ven docente y grupo; el estudiante de otro grupo no.
+    expect((await json('POST', `/activities/${id}/comentarios`, e.estudiante, { texto: '¿Hasta qué hora?' })).estado).toBe(201);
+    expect((await json('POST', `/activities/${id}/comentarios`, e.estudiante, { texto: '' })).estado).toBe(400);
+    const lista = await json('GET', `/activities/${id}/comentarios`, e.otroEstudiante);
+    expect(lista.cuerpo.count).toBe(1);
+    expect(JSON.stringify(lista.cuerpo)).not.toMatch(/autor_id/);
+    const comentarioId = lista.cuerpo.data[0]._id as string;
+    expect((await json('DELETE', `/activities/${id}/comentarios/${comentarioId}`, e.otroEstudiante)).estado).toBe(403);
+    expect((await json('DELETE', `/activities/${id}/comentarios/${comentarioId}`, e.docenteDeClase)).estado).toBe(200);
+
+    // Análisis solo para quien gestiona.
+    expect((await json('GET', `/activities/${id}/analisis`, e.coordAcademico)).cuerpo.data).toMatchObject({ total_estudiantes: 3, entregaron: 1, calificados: 1 });
+    expect((await json('GET', `/activities/${id}/analisis`, e.estudiante)).estado).toBe(403);
+  });
 });

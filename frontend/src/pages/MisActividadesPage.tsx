@@ -1,7 +1,6 @@
 import { useMemo, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { CatalogoAsignaturasEstudiante, type AsignaturaEstudianteCard } from '../components/actividades/CatalogoAsignaturasEstudiante';
-import { EntregaEstudianteDrawer } from '../components/actividades/EntregaEstudianteDrawer';
 import { Alert, errorMessage } from '../components/ui/Alert';
 import { Chip, EstadoEntregaBadge, TipoActividadChip } from '../components/ui/Badge';
 import { Button } from '../components/ui/Button';
@@ -57,7 +56,7 @@ export function MisActividadesPage() {
   const contadorDe = useContadoresDePestana('/mis-actividades', pestana);
   const [desde, setDesde] = useState('');
   const [hasta, setHasta] = useState('');
-  const [seleccionada, setSeleccionada] = useState<string | null>(null);
+  const navigate = useNavigate();
 
   // Catálogo completo de asignaturas del estudiante (de su matrícula y/o actividades publicadas)
   const asignaturasCatalogo = useMemo<AsignaturaEstudianteCard[]>(() => {
@@ -159,7 +158,6 @@ export function MisActividadesPage() {
   const filtrando = Boolean(desde || hasta);
 
   // La pestaña de «pendientes» ordena lo más próximo a vencer primero (el servidor ya entrega ordenado por fecha).
-  const abierta = data.find((a) => a._id === seleccionada) ?? null;
 
   return (
     <div className="space-y-4">
@@ -284,9 +282,9 @@ export function MisActividadesPage() {
                       <Button
                         type="button"
                         variant={a.puede_entregar ? 'primary' : 'outline'}
-                        onClick={() => setSeleccionada(a._id)}
+                        onClick={() => navigate(`/mis-actividades/${a._id}`)}
                       >
-                        {a.puede_entregar ? (a.entrega?.fecha_entrega ? 'Ver o reemplazar' : 'Entregar') : 'Ver'}
+                        {a.puede_entregar ? (a.entrega?.fecha_entrega ? 'Ver o entregar de nuevo' : 'Entregar') : 'Ver'}
                       </Button>
                     </Td>
                   </tr>
@@ -295,7 +293,6 @@ export function MisActividadesPage() {
             </Table>
           )}
 
-          <EntregaEstudianteDrawer actividad={abierta} onClose={() => setSeleccionada(null)} />
         </>
       )}
     </div>

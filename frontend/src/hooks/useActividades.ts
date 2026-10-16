@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../lib/apiClient';
-import type { FormatoEvidencia, TipoActividad } from '../lib/actividades';
+import type { FormatoEvidencia, TipoActividad, TipoAdjunto } from '../lib/actividades';
 
 // --- Tipos (espejo de las respuestas de /activities) ---
 
@@ -14,6 +14,20 @@ export interface ContextoAsignacion {
   grado: { _id: string; nombre: string; numero: number } | null;
   asignatura: { _id: string; nombre: string } | null;
   area: { _id: string; nombre: string } | null;
+}
+
+export interface AdjuntoActividad {
+  id: string;
+  ext: string;
+  nombre: string;
+  tipo: TipoAdjunto;
+  bytes: number;
+}
+
+export interface VideoActividad {
+  proveedor: 'YOUTUBE' | 'VIMEO';
+  video_id: string;
+  url_incrustada: string;
 }
 
 export interface Actividad {
@@ -33,6 +47,17 @@ export interface Actividad {
   requiere_entrega: boolean;
   formatos_permitidos: FormatoEvidencia[];
   permite_entrega_tardia: boolean;
+  /** false = una sola entrega por estudiante; true = puede volver a entregar y el docente elige cuál califica. */
+  permite_multiples_entregas: boolean;
+  /** El docente la cerró a mano: ya no recibe entregas (salvo el plazo personal de un acceso especial). */
+  cerrada: boolean;
+  /** El texto del editor (ya limpiado por el servidor). Solo viaja en el detalle, no en los listados. */
+  contenido_html?: string;
+  adjuntos: AdjuntoActividad[];
+  videos: VideoActividad[];
+  publicacion_id: string | null;
+  /** Qué cambió el docente después de publicarla (solo los nombres de los campos). */
+  modificaciones: Array<{ fecha: string; campos: string[] }>;
   publicada: boolean;
   vencida: boolean;
   asignacion: ContextoAsignacion | null;
@@ -49,6 +74,22 @@ export interface ActividadConResumen extends Actividad {
   resumen: ResumenEntregas;
 }
 
+export interface IntentoEntrega {
+  numero: number;
+  fecha_entrega: string;
+  con_retraso: boolean;
+  acceso_especial: boolean;
+  texto_entrega: string;
+  tiene_archivo: boolean;
+  archivo_nombre: string | null;
+  archivo_formato: FormatoEvidencia | null;
+  /** Es el intento que cuenta para la nota (el elegido por el docente o, si no eligió, el último). */
+  considerado: boolean;
+}
+
+export type OrigenNota = 'ACTIVIDAD' | 'PLANILLA' | 'EXCEL';
+
+/** Los campos de arriba reflejan el intento que cuenta; `intentos` trae todos. */
 export interface Entrega {
   _id: string;
   estado: EstadoActividadEstudiante;
@@ -61,19 +102,63 @@ export interface Entrega {
   calificacion_numerica: number | null;
   retroalimentacion: string;
   fecha_calificacion: string | null;
+  intentos: IntentoEntrega[];
+  intento_valido: number | null;
+  /** Entregó más de una vez y el docente aún no eligió cuál es la válida: no se puede calificar. */
+  requiere_elegir_intento: boolean;
+  /** La nota también se puede poner desde la planilla de notas o su Excel: de dónde vino la última. */
+  ultimo_cambio_nota: { origen: OrigenNota; fecha: string } | null;
 }
 
 export interface ActividadEstudiante extends Actividad {
   estado: EstadoActividadEstudiante;
   puede_entregar: boolean;
   motivo_bloqueo: string | null;
+  /** El plazo personal que el docente le dio a este estudiante. */
+  acceso_especial: { fecha_limite: string } | null;
   entrega: Entrega | null;
+}
+
+export interface AccesoEspecial {
+  fecha_limite: string;
+  motivo: string;
+  fecha: string;
 }
 
 export interface FilaEntrega {
   estudiante: { _id: string; nombre: string; apellido: string; numero_documento: string };
   estado: EstadoActividadEstudiante;
   entrega: Entrega | null;
+  acceso_especial: AccesoEspecial | null;
+}
+
+export interface ActividadDetalleGestion extends ActividadConResumen {
+  /** Las copias de esta misma actividad en otros grupos. */
+  publicada_tambien_en: Array<{ _id: string; grupo: string }>;
+}
+
+export interface Comentario {
+  _id: string;
+  autor: { nombre: string; apellido: string } | null;
+  autor_rol: string;
+  texto: string;
+  fecha: string;
+  es_mio: boolean;
+  puede_eliminar: boolean;
+}
+
+export interface AnalisisActividad {
+  total_estudiantes: number;
+  entregaron: number;
+  sin_entregar: number;
+  con_retraso: number;
+  con_varios_intentos: number;
+  calificados: number;
+  por_calificar: number;
+  porcentaje_entrega: number;
+  porcentaje_calificado: number;
+  notas: { promedio: number; mediana: number; minima: number; maxima: number; aprueban: number; pierden: number; porcentaje_aprueban: number } | null;
+  distribucion: Array<{ nivel: string; etiqueta: string; cantidad: number; aprobatorio: boolean }>;
 }
 
 export interface AlertaCalendario {
@@ -146,9 +231,22 @@ export function useRevisionCalendario(consulta: ConsultaRevisionCalendario | nul
   });
 }
 
+export interface ReferenciaAdjunto {
+  id: string;
+  ext: string;
+  nombre: string;
+}
+
 export interface DatosActividad {
   titulo: string;
-  descripcion: string;
+  /** Texto sin formato; si hay `contenido_html`, el servidor lo deriva de ahí. */
+  descripcion?: string;
+  contenido_html?: string;
+  adjuntos?: ReferenciaAdjunto[];
+  /** Enlaces de YouTube o Vimeo. */
+  videos?: string[];
+  permite_multiples_entregas?: boolean;
+  cerrada?: boolean;
   tipo: TipoActividad;
   componente_siee: string;
   peso_en_componente: number | null;
@@ -167,12 +265,38 @@ function useInvalidarActividades() {
   };
 }
 
+export interface ResultadoCreacion {
+  actividad: Actividad;
+  /** Las copias en los otros grupos donde sí se publicó. */
+  copias: Actividad[];
+  /** Grupos donde no se pudo publicar y por qué. */
+  omitidas: Array<{ teacher_assignment_id: string; grupo: string; motivo: string }>;
+}
+
 export function useCrearActividad() {
   const invalidar = useInvalidarActividades();
   return useMutation({
-    mutationFn: (input: DatosActividad & { teacher_assignment_id: string; periodo_numero: number }) =>
-      api.post<Actividad>('/activities', input),
+    mutationFn: async (
+      input: DatosActividad & { teacher_assignment_id: string; periodo_numero: number; grupos_adicionales?: string[] }
+    ): Promise<ResultadoCreacion> => {
+      const respuesta = await api.raw<{ success: true; data: Actividad; copias: Actividad[]; omitidas: ResultadoCreacion['omitidas'] }>('/activities', {
+        method: 'POST',
+        body: input,
+      });
+      return { actividad: respuesta.data, copias: respuesta.copias ?? [], omitidas: respuesta.omitidas ?? [] };
+    },
     onSuccess: invalidar,
+  });
+}
+
+/** Sube varios archivos de apoyo de una vez; devuelve las referencias que se mandan al guardar la actividad. */
+export function useSubirAdjuntos() {
+  return useMutation({
+    mutationFn: (archivos: File[]) => {
+      const formData = new FormData();
+      for (const archivo of archivos) formData.append('files', archivo);
+      return api.upload<Array<ReferenciaAdjunto & { tipo: TipoAdjunto; bytes: number }>>('/activities/adjuntos', formData);
+    },
   });
 }
 
@@ -189,6 +313,16 @@ export function useEliminarActividad() {
   return useMutation({
     mutationFn: (id: string) => api.delete<null>(`/activities/${id}`),
     onSuccess: invalidar,
+  });
+}
+
+/** El detalle completo de una actividad para quien la gestiona (docente titular, coordinación, administración). */
+export function useActividad(id: string | undefined) {
+  return useQuery({
+    queryKey: ['activities', 'detalle', id],
+    queryFn: () => api.get<ActividadDetalleGestion>(`/activities/${id}`),
+    enabled: Boolean(id),
+    staleTime: 15_000,
   });
 }
 
@@ -222,9 +356,73 @@ export function useCalificarEntrega() {
   });
 }
 
-/** Baja la evidencia con la sesión (nunca por URL directa) y la abre en una pestaña nueva. */
-export async function descargarEntrega(entregaId: string, nombreArchivo: string): Promise<void> {
-  const { url } = await api.downloadBlob(`/activities/entregas/${entregaId}/archivo`);
+/** El docente escoge cuál de las entregas del estudiante es la válida para calificar. */
+export function useElegirIntentoValido() {
+  const invalidar = useInvalidarActividades();
+  return useMutation({
+    mutationFn: ({ actividadId, studentId, intento }: { actividadId: string; studentId: string; intento: number }) =>
+      api.patch<Entrega>(`/activities/${actividadId}/entregas/${studentId}/valida`, { intento }),
+    onSuccess: invalidar,
+  });
+}
+
+export function useAnalisisActividad(id: string | undefined) {
+  return useQuery({
+    queryKey: ['activities', 'analisis', id],
+    queryFn: () => api.get<AnalisisActividad>(`/activities/${id}/analisis`),
+    enabled: Boolean(id),
+    staleTime: 15_000,
+  });
+}
+
+export function useOtorgarAccesoEspecial() {
+  const invalidar = useInvalidarActividades();
+  return useMutation({
+    mutationFn: ({ actividadId, ...datos }: { actividadId: string; student_id: string; fecha_limite: string; motivo: string }) =>
+      api.post<unknown>(`/activities/${actividadId}/accesos-especiales`, datos),
+    onSuccess: invalidar,
+  });
+}
+
+export function useRevocarAccesoEspecial() {
+  const invalidar = useInvalidarActividades();
+  return useMutation({
+    mutationFn: ({ actividadId, studentId }: { actividadId: string; studentId: string }) =>
+      api.delete<null>(`/activities/${actividadId}/accesos-especiales/${studentId}`),
+    onSuccess: invalidar,
+  });
+}
+
+// --- Comentarios públicos ---
+
+export function useComentarios(actividadId: string | undefined) {
+  return useQuery({
+    queryKey: ['activities', 'comentarios', actividadId],
+    queryFn: () => api.get<Comentario[]>(`/activities/${actividadId}/comentarios`),
+    enabled: Boolean(actividadId),
+    staleTime: 15_000,
+  });
+}
+
+export function useCrearComentario(actividadId: string) {
+  const invalidar = useInvalidarActividades();
+  return useMutation({
+    mutationFn: (texto: string) => api.post<Comentario>(`/activities/${actividadId}/comentarios`, { texto }),
+    onSuccess: invalidar,
+  });
+}
+
+export function useEliminarComentario(actividadId: string) {
+  const invalidar = useInvalidarActividades();
+  return useMutation({
+    mutationFn: (comentarioId: string) => api.delete<null>(`/activities/${actividadId}/comentarios/${comentarioId}`),
+    onSuccess: invalidar,
+  });
+}
+
+/** Baja un archivo con la sesión (nunca por URL directa) y lo entrega al navegador con su nombre. */
+async function bajarConSesion(ruta: string, nombreArchivo: string): Promise<void> {
+  const { url } = await api.downloadBlob(ruta);
   const enlace = document.createElement('a');
   enlace.href = url;
   enlace.download = nombreArchivo;
@@ -232,7 +430,27 @@ export async function descargarEntrega(entregaId: string, nombreArchivo: string)
   setTimeout(() => URL.revokeObjectURL(url), 10_000);
 }
 
+/** La evidencia del estudiante; sin `intento` es la que cuenta, con él cualquiera de sus entregas. */
+export function descargarEntrega(entregaId: string, nombreArchivo: string, intento?: number): Promise<void> {
+  return bajarConSesion(`/activities/entregas/${entregaId}/archivo${intento ? `?intento=${intento}` : ''}`, nombreArchivo);
+}
+
+/** Un archivo de apoyo que el docente adjuntó a la actividad. */
+export function descargarAdjunto(actividadId: string, adjunto: AdjuntoActividad): Promise<void> {
+  return bajarConSesion(`/activities/${actividadId}/adjuntos/${adjunto.id}`, adjunto.nombre);
+}
+
 // --- Estudiante (CU-EST-03) ---
+
+/** Una actividad publicada, con todo lo que el estudiante necesita para entregarla. */
+export function useMiActividad(id: string | undefined) {
+  return useQuery({
+    queryKey: ['activities', 'mia', id],
+    queryFn: () => api.get<ActividadEstudiante>(`/activities/${id}`),
+    enabled: Boolean(id),
+    staleTime: 15_000,
+  });
+}
 
 export function useMisActividades() {
   return useQuery({

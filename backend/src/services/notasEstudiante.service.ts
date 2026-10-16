@@ -22,6 +22,8 @@ export interface CasillaDeMisNotas {
   nota: number | null;
   /** Solo actividades con entrega digital: cómo va su entrega. */
   entrega: EstadoActividadEstudiante | null;
+  /** La actividad se entrega en línea (abre su página); false = se trabaja en clase o es una nota suelta. */
+  requiere_entrega: boolean;
 }
 
 export interface BloqueDeMisNotas {
@@ -113,6 +115,7 @@ export async function misNotas(estudiante: UserDocument, periodoNumero: number, 
             peso_efectivo: c.peso_efectivo,
             nota: fila.notas[c.id] ?? null,
             entrega: fila.entregas[c.id]?.estado ?? null,
+            requiere_entrega: c.tipo === 'ACTIVIDAD' && c.requiere_entrega,
           })),
       })),
     });

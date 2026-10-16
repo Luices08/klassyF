@@ -1,8 +1,11 @@
 import { ParamsDictionary } from 'express-serve-static-core';
 import { ParsedQs } from 'qs';
 import * as activityService from '../services/activity.service';
+import * as adjuntosService from '../services/actividadAdjuntos.service';
 import * as entregaService from '../services/actividadEntrega.service';
+import * as revisionService from '../services/actividadRevision.service';
 import * as configuracionService from '../services/configuracionActividades.service';
+import { exigirAccesoALaActividad } from '../services/actividadPermisos.service';
 import * as notasService from '../services/notas.service';
 import ApiError from '../utils/ApiError';
 import catchAsync from '../utils/catchAsync';
@@ -14,8 +17,9 @@ interface IdParams extends ParamsDictionary {
 // --- Gestión del docente (CU-DOC-02) ---
 
 export const createActivity = catchAsync<unknown, unknown, activityService.CreateActivityInput>(async (req, res) => {
-  const activity = await activityService.createActivity(req.body, req.user!, req.ip);
-  res.status(201).json({ success: true, data: activity });
+  const resultado = await activityService.publicarActividad(req.body, req.user!, req.ip);
+  // `data` sigue siendo la actividad de la clase desde la que se programó; las copias en otros grupos y las que no se pudieron publicar van aparte.
+  res.status(201).json({ success: true, data: resultado.actividad, copias: resultado.copias, omitidas: resultado.omitidas });
 });
 
 export const updateActivity = catchAsync<IdParams, unknown, activityService.UpdateActivityInput>(async (req, res) => {
@@ -68,11 +72,72 @@ export const createSubmission = catchAsync<IdParams, unknown, entregaService.Reg
   res.status(201).json({ success: true, data: entrega });
 });
 
-export const descargarEntrega = catchAsync<IdParams>(async (req, res) => {
-  const { ruta, nombre } = await entregaService.rutaDeEntrega(req.params.id, req.user!);
+export const descargarEntrega = catchAsync<IdParams, unknown, unknown, ParsedQs & { intento?: string }>(async (req, res) => {
+  const intento = req.query.intento ? Number(req.query.intento) : undefined;
+  const { ruta, nombre } = await entregaService.rutaDeEntrega(req.params.id, req.user!, intento);
   res.download(ruta, nombre ?? 'entrega', (err) => {
     if (err && !res.headersSent) res.status(404).json({ success: false, message: 'El archivo de la entrega ya no está disponible.' });
   });
+});
+
+export const elegirIntentoValido = catchAsync<IdParams & { studentId: string }, unknown, { intento: number }>(async (req, res) => {
+  const entrega = await entregaService.elegirIntentoValido(req.params.id, req.params.studentId, req.body.intento, req.user!, req.ip);
+  res.status(200).json({ success: true, data: entrega });
+});
+
+// --- Adjuntos del docente ---
+
+interface ArchivoDeMulter {
+  path: string;
+  originalname: string;
+  mimetype: string;
+}
+
+export const subirAdjuntos = catchAsync(async (req, res) => {
+  const archivos = ((req.files ?? []) as ArchivoDeMulter[]).map(({ path, originalname, mimetype }) => ({ path, originalname, mimetype }));
+  if (archivos.length === 0) throw new ApiError(400, 'Selecciona al menos un archivo.');
+  const adjuntos = await adjuntosService.guardarAdjuntos(archivos);
+  res.status(201).json({ success: true, count: adjuntos.length, data: adjuntos });
+});
+
+export const descargarAdjunto = catchAsync<IdParams & { adjuntoId: string }>(async (req, res) => {
+  const { actividad } = await exigirAccesoALaActividad(req.params.id, req.user!);
+  const adjunto = (actividad.adjuntos ?? []).find((a) => a.id === req.params.adjuntoId);
+  if (!adjunto) throw new ApiError(404, 'Adjunto no encontrado.');
+  res.download(adjuntosService.rutaDelAdjunto(adjunto), adjunto.nombre, (err) => {
+    if (err && !res.headersSent) res.status(404).json({ success: false, message: 'El archivo ya no está disponible.' });
+  });
+});
+
+// --- Revisión: análisis, acceso especial y comentarios ---
+
+export const analisisActividad = catchAsync<IdParams>(async (req, res) => {
+  res.status(200).json({ success: true, data: await revisionService.analisisDeActividad(req.params.id, req.user!) });
+});
+
+export const otorgarAccesoEspecial = catchAsync<IdParams, unknown, revisionService.OtorgarAccesoInput>(async (req, res) => {
+  const acceso = await revisionService.otorgarAccesoEspecial(req.params.id, req.body, req.user!, req.ip);
+  res.status(201).json({ success: true, data: acceso });
+});
+
+export const revocarAccesoEspecial = catchAsync<IdParams & { studentId: string }>(async (req, res) => {
+  await revisionService.revocarAccesoEspecial(req.params.id, req.params.studentId, req.user!, req.ip);
+  res.status(200).json({ success: true, data: null });
+});
+
+export const listarComentarios = catchAsync<IdParams>(async (req, res) => {
+  const comentarios = await revisionService.listarComentarios(req.params.id, req.user!);
+  res.status(200).json({ success: true, count: comentarios.length, data: comentarios });
+});
+
+export const crearComentario = catchAsync<IdParams, unknown, { texto: string }>(async (req, res) => {
+  const comentario = await revisionService.crearComentario(req.params.id, req.body.texto, req.user!);
+  res.status(201).json({ success: true, data: comentario });
+});
+
+export const eliminarComentario = catchAsync<IdParams & { comentarioId: string }>(async (req, res) => {
+  await revisionService.eliminarComentario(req.params.id, req.params.comentarioId, req.user!, req.ip);
+  res.status(200).json({ success: true, data: null });
 });
 
 // --- Puente hacia M12 ---

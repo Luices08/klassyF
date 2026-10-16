@@ -22,6 +22,49 @@ export const FORMATOS_EVIDENCIA: Array<{ clave: FormatoEvidencia; etiqueta: stri
 
 export const MAX_BYTES_ENTREGA = 10 * 1024 * 1024;
 
+// Lo que el docente adjunta como material de apoyo (más formatos que las evidencias del estudiante).
+export type TipoAdjunto = FormatoEvidencia | 'AUDIO' | 'VIDEO';
+export const EXTENSIONES_ADJUNTO = ['.jpg', '.jpeg', '.png', '.webp', '.pdf', '.docx', '.xlsx', '.pptx', '.mp3', '.mp4'];
+export const MAX_BYTES_ADJUNTO = 50 * 1024 * 1024;
+export const MAX_ADJUNTOS_POR_ACTIVIDAD = 10;
+export const MAX_ARCHIVOS_POR_SUBIDA = 5;
+export const MAX_VIDEOS_POR_ACTIVIDAD = 5;
+export const MAX_BYTES_CONTENIDO_HTML = 2 * 1024 * 1024;
+export const MAX_INTENTOS_ENTREGA = 10;
+export const MAX_CARACTERES_COMENTARIO = 1000;
+
+export const NOMBRES_TIPO_ADJUNTO: Record<TipoAdjunto, string> = {
+  PDF: 'PDF',
+  WORD: 'Word',
+  EXCEL: 'Excel',
+  POWERPOINT: 'PowerPoint',
+  IMAGEN: 'Imagen',
+  AUDIO: 'Audio',
+  VIDEO: 'Video',
+};
+
+/** Desde dónde se puso la última nota de una actividad. */
+export const ORIGENES_NOTA_ETIQUETA: Record<'ACTIVIDAD' | 'PLANILLA' | 'EXCEL', string> = {
+  ACTIVIDAD: 'la actividad',
+  PLANILLA: 'la planilla de notas',
+  EXCEL: 'el Excel de la planilla',
+};
+
+/** Los campos que el docente cambió después de publicar, en palabras (lo que viaja en `modificaciones[].campos`). */
+export const ETIQUETAS_CAMPO_MODIFICADO: Record<string, string> = {
+  titulo: 'el título',
+  tipo: 'el tipo',
+  contenido_html: 'las instrucciones',
+  adjuntos: 'el material de apoyo',
+  videos: 'los videos',
+  fecha_apertura: 'la fecha de publicación',
+  fecha_entrega: 'la fecha límite',
+  requiere_entrega: 'si se entrega en la plataforma',
+  formatos_permitidos: 'los formatos aceptados',
+  permite_entrega_tardia: 'las entregas tardías',
+  permite_multiples_entregas: 'cuántas veces se puede entregar',
+};
+
 export const etiquetaDeFormato = (clave: FormatoEvidencia): string => FORMATOS_EVIDENCIA.find((f) => f.clave === clave)?.etiqueta ?? clave;
 
 export function extensionesDe(formatos: FormatoEvidencia[]): string[] {

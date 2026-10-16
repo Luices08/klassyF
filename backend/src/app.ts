@@ -15,6 +15,9 @@ app.set('trust proxy', 1);
 
 app.use(helmet());
 app.use(cors());
+// El editor de actividades lleva las imágenes pegadas dentro del texto (data URI, ya reducidas por el navegador): este parser va
+// antes del general y deja el cuerpo leído, así que solo esa ruta admite un JSON más grande.
+app.use('/api/v1/activities', express.json({ limit: '5mb' }));
 // El logo institucional y el escudo del boletín viajan como data URI en el JSON (hasta 800 KB); el límite por defecto (100 KB) los rechazaba.
 app.use(express.json({ limit: '1mb' }));
 app.use(express.urlencoded({ extended: true }));

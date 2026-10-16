@@ -60,26 +60,37 @@ export interface VentanaEntrega {
   abierta: boolean;
   /** Una entrega hecha ahora quedaría ENTREGADA_TARDE. */
   tardia: boolean;
+  /** Se abre solo por el plazo personal que el docente le dio a este estudiante (excusa válida): no cuenta como tardía. */
+  acceso_especial: boolean;
   motivo: string | null;
 }
 
-export function evaluarVentanaEntrega(plazos: PlazosActividad, ahora: Date): VentanaEntrega {
+/**
+ * `accesoEspecialHasta` es el plazo personal que el docente le otorgó a ESTE estudiante: pasada la fecha de la actividad, deja
+ * entregar hasta ese instante aunque la actividad no admita entregas tardías, y la entrega no queda marcada con retraso.
+ */
+export function evaluarVentanaEntrega(plazos: PlazosActividad, ahora: Date, accesoEspecialHasta?: Date | null): VentanaEntrega {
   if (ahora < plazos.fecha_apertura) {
     return {
       publicada: false,
       vencida: false,
       abierta: false,
       tardia: false,
+      acceso_especial: false,
       motivo: `La actividad se publica el ${formatoInstante(plazos.fecha_apertura)}.`,
     };
   }
-  if (ahora <= plazos.fecha_entrega) return { publicada: true, vencida: false, abierta: true, tardia: false, motivo: null };
-  if (plazos.permite_entrega_tardia) return { publicada: true, vencida: true, abierta: true, tardia: true, motivo: null };
+  if (ahora <= plazos.fecha_entrega) return { publicada: true, vencida: false, abierta: true, tardia: false, acceso_especial: false, motivo: null };
+  if (accesoEspecialHasta && ahora <= accesoEspecialHasta) {
+    return { publicada: true, vencida: true, abierta: true, tardia: false, acceso_especial: true, motivo: null };
+  }
+  if (plazos.permite_entrega_tardia) return { publicada: true, vencida: true, abierta: true, tardia: true, acceso_especial: false, motivo: null };
   return {
     publicada: true,
     vencida: true,
     abierta: false,
     tardia: false,
+    acceso_especial: false,
     motivo: `El plazo de entrega venció el ${formatoInstante(plazos.fecha_entrega)} y esta actividad no recibe entregas tardías.`,
   };
 }

@@ -29,3 +29,24 @@ export const MAX_BYTES_ENTREGA = 10 * 1024 * 1024;
 // Valores iniciales de la política de carga del colegio (ConfiguracionActividades); 0 = sin límite.
 export const MAX_EVALUACIONES_POR_DIA_INICIAL = 2;
 export const MAX_ENTREGAS_POR_DIA_INICIAL = 4;
+
+// Lo que el docente adjunta a la actividad (material de apoyo): más formatos que las evidencias del estudiante.
+export const TIPOS_ADJUNTO = ['PDF', 'WORD', 'EXCEL', 'POWERPOINT', 'IMAGEN', 'AUDIO', 'VIDEO'] as const;
+export type TipoAdjunto = (typeof TIPOS_ADJUNTO)[number];
+export const MAX_BYTES_ADJUNTO = 50 * 1024 * 1024;
+export const MAX_ADJUNTOS_POR_ACTIVIDAD = 10;
+export const MAX_ARCHIVOS_POR_SUBIDA = 5;
+export const MAX_VIDEOS_POR_ACTIVIDAD = 5;
+/** El HTML del editor lleva las imágenes pegadas dentro (data URI): el tope cubre varias imágenes ya reducidas por el navegador. */
+export const MAX_BYTES_CONTENIDO_HTML = 2 * 1024 * 1024;
+
+export const PROVEEDORES_VIDEO = ['YOUTUBE', 'VIMEO'] as const;
+export type ProveedorVideo = (typeof PROVEEDORES_VIDEO)[number];
+
+/** Con varias entregas permitidas, cuántas puede hacer un estudiante antes de que el docente elija la válida. */
+export const MAX_INTENTOS_ENTREGA = 10;
+export const MAX_CARACTERES_COMENTARIO = 1000;
+
+/** Desde dónde se puso una nota de actividad: la actividad misma, la planilla de notas o el Excel de la planilla. */
+export const ORIGENES_NOTA = ['ACTIVIDAD', 'PLANILLA', 'EXCEL'] as const;
+export type OrigenNota = (typeof ORIGENES_NOTA)[number];

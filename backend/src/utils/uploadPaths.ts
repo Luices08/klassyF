@@ -32,6 +32,14 @@ export function carpetaActividad(activityId: string): string {
   return path.join(ACTIVIDADES_DIR, activityId);
 }
 
+/** Archivos que el docente adjunta a una actividad: se nombran por su huella, así varios grupos comparten uno solo. */
+export function rutaAdjuntoActividad(hash: string, ext: string): string {
+  return path.join(ACTIVIDADES_DIR, 'adjuntos', `${hash}${ext}`);
+}
+
+/** Donde multer deja un archivo mientras el servidor confirma por sus bytes qué es. */
+export const TEMPORAL_ACTIVIDADES_DIR = path.join(ACTIVIDADES_DIR, 'tmp');
+
 /** PDF de apoyo (DBA, estándares, lineamientos) que coordinación carga por área y grados (M07). */
 export function carpetaDocumentoReferencia(documentoId: string): string {
   return path.join(PLANEACION_DIR, 'documentos-referencia', documentoId);

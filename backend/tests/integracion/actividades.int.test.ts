@@ -1,6 +1,6 @@
 import fs from 'fs/promises';
-import path from 'path';
 import { Types } from 'mongoose';
+import path from 'path';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { FormatoEvidencia } from '../../src/constants/actividades';
 import AcademicYear from '../../src/models/academicYear.model';
@@ -11,6 +11,7 @@ import PlanAula from '../../src/models/planAula.model';
 import TeacherAssignment, { TeacherAssignmentDocument } from '../../src/models/teacherAssignment.model';
 import { UserDocument } from '../../src/models/user.model';
 import * as entregas from '../../src/services/actividadEntrega.service';
+import * as revision from '../../src/services/actividadRevision.service';
 import * as actividades from '../../src/services/activity.service';
 import * as notas from '../../src/services/notas.service';
 import { hoyColombia } from '../../src/services/attendance.service';
@@ -307,17 +308,80 @@ describe('M11: actividades y entregas (con base de datos)', () => {
       await expect(entregas.registrarEntrega(id, {}, pdf(), e.estudiante)).rejects.toMatchObject({ statusCode: 409, message: expect.stringMatching(/ya fue calificada/) });
     });
 
-    it('reentregar reemplaza el archivo anterior mientras no esté calificada', async () => {
+    it('solo se entrega una vez salvo que la actividad permita varias entregas', async () => {
       const id = await programar();
       await entregas.registrarEntrega(id, {}, pdf('primera.pdf'), e.estudiante);
-      const primera = (await ActivitySubmission.findOne({ activity_id: id }))!.archivo_path!;
-      await new Promise((r) => setTimeout(r, 5));
-      await entregas.registrarEntrega(id, {}, pdf('segunda.pdf'), e.estudiante);
-
+      await expect(entregas.registrarEntrega(id, {}, pdf('segunda.pdf'), e.estudiante)).rejects.toMatchObject({
+        statusCode: 409,
+        message: expect.stringMatching(/Solo se permite una entrega/),
+      });
       const entrega = (await ActivitySubmission.findOne({ activity_id: id }))!;
-      expect(entrega.archivo_nombre).toBe('segunda.pdf');
-      expect(await ActivitySubmission.countDocuments({ activity_id: id })).toBe(1);
-      await expect(fs.access(path.resolve(process.cwd(), primera))).rejects.toThrow();
+      expect(entrega.archivo_nombre).toBe('primera.pdf');
+      expect(entrega.intentos).toHaveLength(1);
+    });
+
+    it('con entregas múltiples cada entrega es un intento, se conservan todos y el docente tiene que elegir la válida antes de calificar', async () => {
+      const id = await programar({ permite_multiples_entregas: true });
+      await entregas.registrarEntrega(id, {}, pdf('primera.pdf'), e.estudiante);
+      await new Promise((r) => setTimeout(r, 5));
+      const segunda = await entregas.registrarEntrega(id, {}, pdf('segunda.pdf'), e.estudiante);
+
+      expect(segunda).toMatchObject({ archivo_nombre: 'segunda.pdf', requiere_elegir_intento: true, intento_valido: null });
+      expect(segunda?.intentos.map((i) => i.numero)).toEqual([1, 2]);
+      const guardada = (await ActivitySubmission.findOne({ activity_id: id }))!;
+      for (const intento of guardada.intentos) await fs.access(path.resolve(process.cwd(), intento.archivo_path!));
+
+      const grado = { student_id: String(e.estudiante._id), calificacion_numerica: 4 };
+      await expect(notas.gradeActivity(id, [grado], docente)).rejects.toMatchObject({ statusCode: 409, message: expect.stringMatching(/entregaron más de una vez/) });
+
+      const elegida = await entregas.elegirIntentoValido(id, String(e.estudiante._id), 1, docente);
+      expect(elegida).toMatchObject({ intento_valido: 1, archivo_nombre: 'primera.pdf', requiere_elegir_intento: false });
+      await expect(entregas.elegirIntentoValido(id, String(e.estudiante._id), 7, docente)).rejects.toMatchObject({ statusCode: 404 });
+      await expect(entregas.elegirIntentoValido(id, String(e.estudiante._id), 1, e.docenteAjeno)).rejects.toMatchObject({ statusCode: 403 });
+
+      await notas.gradeActivity(id, [grado], docente);
+      expect((await entregas.detalleParaEstudiante(id, e.estudiante)).estado).toBe('CALIFICADA');
+      // Ya calificada no admite otra entrega, aunque la actividad las permita.
+      await expect(entregas.registrarEntrega(id, {}, pdf('tercera.pdf'), e.estudiante)).rejects.toMatchObject({ statusCode: 409 });
+    });
+
+    it('una entrega nueva después de elegir la válida obliga a elegir de nuevo', async () => {
+      const id = await programar({ permite_multiples_entregas: true });
+      await entregas.registrarEntrega(id, {}, pdf('a.pdf'), e.estudiante);
+      await new Promise((r) => setTimeout(r, 5));
+      await entregas.registrarEntrega(id, {}, pdf('b.pdf'), e.estudiante);
+      await entregas.elegirIntentoValido(id, String(e.estudiante._id), 2, docente);
+      await new Promise((r) => setTimeout(r, 5));
+      const tercera = await entregas.registrarEntrega(id, {}, pdf('c.pdf'), e.estudiante);
+      expect(tercera).toMatchObject({ intento_valido: null, requiere_elegir_intento: true });
+    });
+
+    it('el docente descarga cualquier intento; el estudiante solo los suyos', async () => {
+      const id = await programar({ permite_multiples_entregas: true });
+      await entregas.registrarEntrega(id, {}, pdf('a.pdf'), e.estudiante);
+      await new Promise((r) => setTimeout(r, 5));
+      await entregas.registrarEntrega(id, {}, pdf('b.pdf'), e.estudiante);
+      const entregaId = String((await ActivitySubmission.findOne({ activity_id: id }))!._id);
+
+      expect((await entregas.rutaDeEntrega(entregaId, docente, 1)).nombre).toBe('a.pdf');
+      expect((await entregas.rutaDeEntrega(entregaId, docente)).nombre).toBe('b.pdf');
+      await expect(entregas.rutaDeEntrega(entregaId, e.otroEstudiante, 1)).rejects.toMatchObject({ statusCode: 404 });
+    });
+
+    it('una nota puesta desde la planilla se ve en la entrega de la actividad, con su origen', async () => {
+      const id = await programar();
+      await entregas.registrarEntrega(id, {}, pdf(), e.estudiante);
+      const ref = { teacher_assignment_id: String(asignacion._id), periodo_numero: 1 };
+      await notas.guardarCeldas({ ...ref, celdas: [{ student_id: String(e.estudiante._id), casilla_id: id, nota: 3.2 }] }, docente);
+
+      const filas = await entregas.listarEntregas(id, docente);
+      const fila = filas.find((f) => f.estudiante._id === String(e.estudiante._id))!;
+      expect(fila.entrega).toMatchObject({ calificacion_numerica: 3.2, ultimo_cambio_nota: { origen: 'PLANILLA' } });
+      expect((await entregas.detalleParaEstudiante(id, e.estudiante)).entrega).toMatchObject({ calificacion_numerica: 3.2 });
+
+      await notas.gradeActivity(id, [{ student_id: String(e.estudiante._id), calificacion_numerica: 4 }], docente);
+      const despues = (await entregas.listarEntregas(id, docente)).find((f) => f.estudiante._id === String(e.estudiante._id))!;
+      expect(despues.entrega?.ultimo_cambio_nota?.origen).toBe('ACTIVIDAD');
     });
 
     it('solo recibe los formatos que el docente permitió, comprobados por contenido', async () => {
@@ -387,6 +451,202 @@ describe('M11: actividades y entregas (con base de datos)', () => {
       const [listada] = await actividades.listActivities({ academic_year_id: String(asignacion.academic_year_id) }, docente);
       expect(listada?.resumen).toEqual({ estudiantes: 3, entregadas: 2, con_retraso: 0, calificadas: 1 });
       expect(await actividades.listActivities({}, e.docenteAjeno)).toEqual([]);
+    });
+  });
+
+  describe('acceso especial por estudiante', () => {
+    const programar = async (extra: Partial<actividades.CreateActivityInput> = {}) => {
+      if (!(await PlanAula.exists({ docente_id: docente._id }))) await aprobarPlaneacion();
+      return String((await actividades.createActivity(datos(extra), docente))._id);
+    };
+    const vencer = (id: string) => Activity.updateOne({ _id: id }, { fecha_entrega: new Date(Date.now() - 3_600_000) });
+    const manana = () => new Date(Date.now() + DIA_MS);
+    const alumno = () => String(e.estudiante._id);
+
+    it('un estudiante con excusa entrega vencido el plazo, sin quedar como tardío, y los demás siguen sin poder', async () => {
+      const id = await programar();
+      await vencer(id);
+      await expect(entregas.registrarEntrega(id, {}, pdf(), e.estudiante)).rejects.toMatchObject({ statusCode: 409 });
+
+      await revision.otorgarAccesoEspecial(id, { student_id: alumno(), fecha_limite: manana(), motivo: 'Incapacidad médica' }, docente);
+
+      const detalle = await entregas.detalleParaEstudiante(id, e.estudiante);
+      expect(detalle).toMatchObject({ puede_entregar: true, acceso_especial: { fecha_limite: expect.any(Date) } });
+      expect(await entregas.registrarEntrega(id, {}, pdf(), e.estudiante)).toMatchObject({ estado: 'ENTREGADA', con_retraso: false });
+      await expect(entregas.registrarEntrega(id, {}, pdf(), e.otroEstudiante)).rejects.toMatchObject({ statusCode: 409 });
+    });
+
+    it('valen también en una actividad cerrada a mano, pero no pasado el plazo personal', async () => {
+      const id = await programar();
+      await vencer(id);
+      await actividades.updateActivity(id, { cerrada: true }, docente);
+      await revision.otorgarAccesoEspecial(id, { student_id: alumno(), fecha_limite: manana(), motivo: 'Viaje con el colegio' }, docente);
+      expect((await entregas.detalleParaEstudiante(id, e.estudiante)).puede_entregar).toBe(true);
+      expect((await entregas.detalleParaEstudiante(id, e.otroEstudiante)).motivo_bloqueo).toMatch(/cerró/);
+
+      await Activity.updateOne({ _id: id, 'accesos_especiales.student_id': e.estudiante._id }, { $set: { 'accesos_especiales.$.fecha_limite': new Date(Date.now() - 1000) } });
+      expect((await entregas.detalleParaEstudiante(id, e.estudiante)).puede_entregar).toBe(false);
+    });
+
+    it('se exige un motivo, un plazo futuro y posterior a la fecha límite, y un estudiante del grupo', async () => {
+      const id = await programar();
+      const base = { student_id: alumno(), fecha_limite: manana(), motivo: 'Incapacidad médica' };
+      await expect(revision.otorgarAccesoEspecial(id, { ...base, motivo: 'no' }, docente)).rejects.toMatchObject({ statusCode: 400 });
+      await expect(revision.otorgarAccesoEspecial(id, { ...base, fecha_limite: new Date(Date.now() - 1000) }, docente)).rejects.toMatchObject({ statusCode: 400 });
+      // Antes de la fecha límite de la actividad no tiene sentido.
+      await expect(revision.otorgarAccesoEspecial(id, { ...base, fecha_limite: manana() }, docente)).rejects.toMatchObject({ statusCode: 400 });
+      await vencer(id);
+      const ajeno = await crearUsuario('ESTUDIANTE');
+      await expect(revision.otorgarAccesoEspecial(id, { ...base, student_id: String(ajeno._id) }, docente)).rejects.toMatchObject({ statusCode: 400 });
+      await expect(revision.otorgarAccesoEspecial(id, base, e.docenteAjeno)).rejects.toMatchObject({ statusCode: 403 });
+      await expect(revision.otorgarAccesoEspecial(id, base, e.estudiante)).rejects.toMatchObject({ statusCode: 403 });
+    });
+
+    it('no se otorga a quien ya tiene nota, ni en un periodo cerrado, y se puede quitar', async () => {
+      const id = await programar();
+      await vencer(id);
+      await notas.gradeActivity(id, [{ student_id: alumno(), calificacion_numerica: 3 }], docente);
+      await expect(revision.otorgarAccesoEspecial(id, { student_id: alumno(), fecha_limite: manana(), motivo: 'Incapacidad médica' }, docente)).rejects.toMatchObject({ statusCode: 409 });
+
+      const otro = String(e.otroEstudiante._id);
+      await revision.otorgarAccesoEspecial(id, { student_id: otro, fecha_limite: manana(), motivo: 'Incapacidad médica' }, docente);
+      await revision.revocarAccesoEspecial(id, otro, docente);
+      await expect(revision.revocarAccesoEspecial(id, otro, docente)).rejects.toMatchObject({ statusCode: 404 });
+      expect((await entregas.detalleParaEstudiante(id, e.otroEstudiante)).puede_entregar).toBe(false);
+
+      await AcademicYear.updateOne({}, { $set: { 'periodos.0.estado': 'CERRADO' } });
+      await expect(revision.otorgarAccesoEspecial(id, { student_id: String(e.tercerEstudiante._id), fecha_limite: manana(), motivo: 'Incapacidad médica' }, docente)).rejects.toMatchObject({ statusCode: 409 });
+    });
+  });
+
+  describe('validaciones al modificar una actividad ya publicada', () => {
+    const programar = async (extra: Partial<actividades.CreateActivityInput> = {}) => {
+      if (!(await PlanAula.exists({ docente_id: docente._id }))) await aprobarPlaneacion();
+      return String((await actividades.createActivity(datos(extra), docente))._id);
+    };
+
+    it('lo que cambia el docente después de publicar queda anotado, sin el contenido', async () => {
+      const id = await programar();
+      await actividades.updateActivity(id, { fecha_entrega: proximoDiaHabil(5), titulo: 'Nuevo título' }, docente, null);
+      const detalle = await entregas.detalleParaEstudiante(id, e.estudiante);
+      expect(detalle.modificaciones).toHaveLength(1);
+      expect(detalle.modificaciones[0]?.campos).toEqual(expect.arrayContaining(['la fecha límite', 'el título']));
+    });
+
+    it('con entregas ya hechas no cambian los formatos ni la actividad deja de recibir entregas', async () => {
+      const id = await programar({ permite_multiples_entregas: true });
+      await entregas.registrarEntrega(id, {}, pdf(), e.estudiante);
+      await expect(actividades.updateActivity(id, { formatos_permitidos: ['IMAGEN'] as FormatoEvidencia[] }, docente)).rejects.toMatchObject({ statusCode: 409 });
+      await expect(actividades.updateActivity(id, { requiere_entrega: false }, docente)).rejects.toMatchObject({ statusCode: 409 });
+      await actividades.updateActivity(id, { permite_entrega_tardia: true }, docente);
+    });
+
+    it('no vuelve a una sola entrega si alguien ya entregó dos veces', async () => {
+      const id = await programar({ permite_multiples_entregas: true });
+      await entregas.registrarEntrega(id, {}, pdf('a.pdf'), e.estudiante);
+      await new Promise((r) => setTimeout(r, 5));
+      await entregas.registrarEntrega(id, {}, pdf('b.pdf'), e.estudiante);
+      await expect(actividades.updateActivity(id, { permite_multiples_entregas: false }, docente)).rejects.toMatchObject({ statusCode: 409 });
+    });
+
+    it('cerrar la actividad a mano frena las entregas y reabrirla las devuelve', async () => {
+      const id = await programar();
+      await actividades.updateActivity(id, { cerrada: true }, docente);
+      await expect(entregas.registrarEntrega(id, {}, pdf(), e.estudiante)).rejects.toMatchObject({ statusCode: 409, message: expect.stringMatching(/cerró/) });
+      await actividades.updateActivity(id, { cerrada: false }, docente);
+      await expect(entregas.registrarEntrega(id, {}, pdf(), e.estudiante)).resolves.toBeTruthy();
+    });
+
+    it('con el periodo cerrado no se modifica la actividad ni se recibe una entrega', async () => {
+      const id = await programar();
+      await AcademicYear.updateOne({}, { $set: { 'periodos.0.estado': 'CERRADO' } });
+      await expect(actividades.updateActivity(id, { titulo: 'Tarde' }, docente)).rejects.toMatchObject({ statusCode: 409, message: expect.stringMatching(/CERRADO/) });
+      await expect(entregas.registrarEntrega(id, {}, pdf(), e.estudiante)).rejects.toMatchObject({ statusCode: 409, message: expect.stringMatching(/cerrado/) });
+      expect((await entregas.detalleParaEstudiante(id, e.estudiante)).motivo_bloqueo).toMatch(/cerrado/);
+    });
+  });
+
+  describe('contenido enriquecido, videos y comentarios', () => {
+    const programar = async (extra: Partial<actividades.CreateActivityInput> = {}) => {
+      if (!(await PlanAula.exists({ docente_id: docente._id }))) await aprobarPlaneacion();
+      return String((await actividades.createActivity(datos(extra), docente))._id);
+    };
+
+    it('el HTML del editor se limpia en el servidor y de ahí sale la descripción en texto', async () => {
+      const id = await programar({
+        descripcion: undefined,
+        contenido_html: '<p>Lee con <strong>atención</strong></p><script>alert(1)</script><img src="https://malo.com/x.png">',
+        videos: ['https://youtu.be/dQw4w9WgXcQ'],
+      });
+      const actividad = (await Activity.findById(id))!;
+      expect(actividad.contenido_html).not.toMatch(/script|img/);
+      expect(actividad.descripcion).toBe('Lee con atención');
+      const detalle = await entregas.detalleParaEstudiante(id, e.estudiante);
+      expect(detalle.videos[0]).toMatchObject({ proveedor: 'YOUTUBE', url_incrustada: 'https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ' });
+      await expect(programar({ descripcion: undefined, contenido_html: '' })).rejects.toMatchObject({ statusCode: 400 });
+      await expect(programar({ videos: ['https://ejemplo.com/video.mp4'] })).rejects.toMatchObject({ statusCode: 400 });
+    });
+
+    it('el comentario lo ven el docente y los estudiantes del grupo; cada quien borra el suyo y el docente modera', async () => {
+      const id = await programar();
+      const mio = await revision.crearComentario(id, '¿Se puede entregar en Word?', e.estudiante);
+      await revision.crearComentario(id, 'Solo PDF.', docente);
+
+      const vistos = await revision.listarComentarios(id, e.otroEstudiante);
+      expect(vistos.map((c) => c.texto)).toEqual(['¿Se puede entregar en Word?', 'Solo PDF.']);
+      expect(vistos.every((c) => !c.es_mio)).toBe(true);
+
+      await expect(revision.eliminarComentario(id, mio._id, e.otroEstudiante)).rejects.toMatchObject({ statusCode: 403 });
+      await revision.eliminarComentario(id, mio._id, docente);
+      expect(await revision.listarComentarios(id, e.estudiante)).toHaveLength(1);
+
+      const ajeno = await crearUsuario('ESTUDIANTE');
+      await expect(revision.listarComentarios(id, ajeno)).rejects.toMatchObject({ statusCode: 404 });
+      await expect(revision.crearComentario(id, 'hola', e.docenteAjeno)).rejects.toMatchObject({ statusCode: 403 });
+      await expect(revision.crearComentario(id, '   ', e.estudiante)).rejects.toMatchObject({ statusCode: 400 });
+    });
+
+    it('el análisis cuenta entregas y notas del grupo y no es para estudiantes', async () => {
+      const id = await programar();
+      await entregas.registrarEntrega(id, {}, pdf(), e.estudiante);
+      await notas.gradeActivity(id, [{ student_id: String(e.estudiante._id), calificacion_numerica: 4 }], docente);
+
+      const analisis = await revision.analisisDeActividad(id, docente);
+      expect(analisis).toMatchObject({ total_estudiantes: 3, entregaron: 1, sin_entregar: 2, calificados: 1 });
+      expect(analisis.notas).toMatchObject({ promedio: 4, aprueban: 1 });
+      await expect(revision.analisisDeActividad(id, e.estudiante)).rejects.toMatchObject({ statusCode: 403 });
+    });
+  });
+
+  describe('publicar en varios grupos', () => {
+    it('la clase principal debe cumplir todo; los grupos adicionales que no pueden quedan fuera con su motivo', async () => {
+      await aprobarPlaneacion();
+      // Un segundo grupo donde el mismo docente dicta la misma asignatura, pero sin plan de aula aprobado.
+      const grupo = (await Group.findById(asignacion.group_id))!;
+      const otroGrupo = await Group.create({
+        sede_id: grupo.sede_id,
+        academic_year_id: grupo.academic_year_id,
+        grade_id: grupo.grade_id,
+        jornada_id: grupo.jornada_id,
+        nomenclatura: '602',
+        max_capacity: 40,
+      });
+      const copia = await TeacherAssignment.create({
+        docente_id: docente._id,
+        academic_year_id: asignacion.academic_year_id,
+        tipo_asignacion: 'CLASE',
+        group_id: otroGrupo._id,
+        subject_id: asignacion.subject_id,
+        horas_semanales: 4,
+      });
+
+      const resultado = await actividades.publicarActividad({ ...datos(), grupos_adicionales: [String(copia._id)] }, docente);
+      expect(resultado.copias).toHaveLength(0);
+      expect(resultado.omitidas).toHaveLength(1);
+      expect(resultado.omitidas[0]).toMatchObject({ teacher_assignment_id: String(copia._id), motivo: expect.stringMatching(/plan de aula/) });
+      expect(resultado.actividad.publicacion_id).toBeNull();
+
+      await expect(actividades.publicarActividad({ ...datos(), grupos_adicionales: [String(e.docenteAjeno._id)] }, docente)).rejects.toBeTruthy();
     });
   });
 });

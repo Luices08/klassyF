@@ -44,3 +44,44 @@ body {
   @apply bg-soft text-body antialiased;
   font-feature-settings: 'ss01';
 }
+
+/* Texto enriquecido: lo que escribe el docente en `EditorRico` y lo que ve el estudiante en `ContenidoRico`. */
+.contenido-rico {
+  @apply text-body break-words;
+}
+.contenido-rico > * + * {
+  @apply mt-2;
+}
+.contenido-rico h2 {
+  @apply text-h3 text-ink;
+}
+.contenido-rico h3 {
+  @apply text-body font-semibold text-ink;
+}
+.contenido-rico ul {
+  @apply list-disc pl-5;
+}
+.contenido-rico ol {
+  @apply list-decimal pl-5;
+}
+.contenido-rico a {
+  @apply text-primary underline;
+}
+.contenido-rico blockquote {
+  @apply border-l-4 border-border pl-3 text-muted;
+}
+.contenido-rico code {
+  @apply rounded bg-soft px-1 text-label;
+}
+.contenido-rico pre {
+  @apply overflow-x-auto rounded-lg bg-soft p-3 text-label;
+}
+.contenido-rico img {
+  @apply h-auto max-w-full rounded-lg;
+}
+.contenido-rico hr {
+  @apply border-border;
+}
+.contenido-rico.ProseMirror {
+  @apply min-h-[10rem] px-3 py-2 outline-none;
+}

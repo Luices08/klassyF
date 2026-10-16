@@ -26,6 +26,8 @@ import { ExpedienteInclusionPage } from './pages/ExpedienteInclusionPage';
 import { InclusionPage } from './pages/InclusionPage';
 import { MisAjustesPage } from './pages/MisAjustesPage';
 import { AcademicCatalogPage } from './pages/admin/AcademicCatalogPage';
+import { ActividadEstudiantePage } from './pages/ActividadEstudiantePage';
+import { ActividadRevisionPage } from './pages/ActividadRevisionPage';
 import { ActividadesGestionPage } from './pages/admin/ActividadesGestionPage';
 import { NotasGestionPage } from './pages/admin/NotasGestionPage';
 import { CreadorPlanillasPage } from './pages/admin/CreadorPlanillasPage';
@@ -111,6 +113,7 @@ export default function App() {
             <Route path="/admin/documentos-referencia" element={<DocumentosReferenciaPage />} />
             <Route path="/admin/revision-planeacion" element={<RevisionPlaneacionPage />} />
             <Route path="/admin/actividades" element={<ActividadesGestionPage />} />
+            <Route path="/admin/actividades/:id" element={<ActividadRevisionPage />} />
             <Route path="/admin/notas" element={<NotasGestionPage />} />
             <Route path="/admin/boletin" element={<ConfiguracionBoletinPage />} />
           </Route>
@@ -128,6 +131,7 @@ export default function App() {
             <Route path="/docente/planeacion" element={<PlaneacionDocentePage />} />
             <Route path="/docente/asistencia" element={<AsistenciaPage />} />
             <Route path="/docente/actividades" element={<ActividadesDocentePage />} />
+            <Route path="/docente/actividades/:id" element={<ActividadRevisionPage />} />
             <Route path="/docente/notas" element={<NotasPlanillaPage />} />
             <Route path="/docente/boletin-observaciones" element={<ObservacionesBoletinPage />} />
           </Route>
@@ -164,6 +168,7 @@ export default function App() {
           </Route>
           <Route element={<ProtectedRoute allowedRoles={['ESTUDIANTE']} />}>
             <Route path="/mis-actividades" element={<MisActividadesPage />} />
+            <Route path="/mis-actividades/:id" element={<ActividadEstudiantePage />} />
             <Route path="/mis-notas" element={<MisNotasPage />} />
             <Route path="/mi-observador" element={<MiObservadorPage />} />
           </Route>

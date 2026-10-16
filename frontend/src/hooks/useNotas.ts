@@ -355,6 +355,8 @@ export interface CasillaDeMisNotas {
   nota: number | null;
   /** Solo actividades con entrega digital. */
   entrega: EstadoActividadEstudiante | null;
+  /** La actividad se entrega en línea (tiene su página); false = se trabaja en clase o es una nota suelta. */
+  requiere_entrega: boolean;
 }
 
 export interface BloqueDeMisNotas {

@@ -1,8 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { ActividadDrawer } from '../components/actividades/ActividadDrawer';
 import { CatalogoAsignaturasDocente } from '../components/actividades/CatalogoAsignaturasDocente';
-import { EntregasDrawer } from '../components/actividades/EntregasDrawer';
 import { Alert, errorMessage } from '../components/ui/Alert';
 import { EstadoPeriodoBadge, EstadoPlanBadge, TipoActividadChip } from '../components/ui/Badge';
 import { Button } from '../components/ui/Button';
@@ -127,9 +126,9 @@ export function ActividadesDocentePage() {
     Boolean(anio && asignacion && periodo)
   );
   const eliminar = useEliminarActividad();
+  const navigate = useNavigate();
 
   const [editando, setEditando] = useState<ActividadConResumen | 'nueva' | null>(null);
-  const [revisando, setRevisando] = useState<ActividadConResumen | null>(null);
   const [mensaje, setMensaje] = useState<string | null>(null);
 
   const planAulaAprobado = plan.data?.aprobado === true;
@@ -138,6 +137,17 @@ export function ActividadesDocentePage() {
 
   const grupo = typeof asignacion?.group_id === 'object' && asignacion?.group_id ? asignacion.group_id : null;
   const asignatura = typeof asignacion?.subject_id === 'object' && asignacion?.subject_id ? asignacion.subject_id : null;
+  // Otras clases del docente con esta misma asignatura: donde se puede publicar lo mismo de una vez.
+  const otrasClases = clases
+    .filter((c) => {
+      const materia = typeof c.subject_id === 'object' && c.subject_id ? c.subject_id._id : String(c.subject_id);
+      return c._id !== asignacion?._id && materia === asignatura?._id;
+    })
+    .map((c) => {
+      const g = typeof c.group_id === 'object' && c.group_id ? c.group_id : null;
+      const grado = g && typeof g.grade_id === 'object' && g.grade_id ? g.grade_id.nombre : '';
+      return { id: c._id, etiqueta: g ? `${grado} ${g.nomenclatura}`.trim() : c._id };
+    });
   const sedeNombre = grupo && typeof grupo.sede_id === 'object' && grupo.sede_id ? grupo.sede_id.nombre : '';
   const jornadaNombre = grupo && typeof grupo.jornada_id === 'object' && grupo.jornada_id ? grupo.jornada_id.nombre : '';
 
@@ -357,7 +367,7 @@ export function ActividadesDocentePage() {
                     </Td>
                     <Td className="text-right">
                       <div className="flex justify-end gap-2">
-                        <IconButton tone="success" label="Revisar y calificar" icon={<EyeIcon />} onClick={() => setRevisando(a)} />
+                        <IconButton tone="success" label="Revisar y calificar" icon={<EyeIcon />} onClick={() => navigate(`/docente/actividades/${a._id}`)} />
                         <IconButton tone="edit" label="Editar" icon={<PencilIcon />} disabled={periodoCerrado} onClick={() => setEditando(a)} />
                         <IconButton
                           tone="danger"
@@ -382,10 +392,10 @@ export function ActividadesDocentePage() {
               periodoNumero={periodo.numero}
               planAula={planAulaAprobado ? (plan.data?.plan ?? null) : null}
               actividad={editando === 'nueva' ? null : editando}
+              otrasClases={otrasClases}
             />
           )}
 
-          <EntregasDrawer actividad={revisando} onClose={() => setRevisando(null)} escala={anio?.escala_evaluacion ?? null} />
         </>
       )}
     </div>

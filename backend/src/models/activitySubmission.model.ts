@@ -1,5 +1,26 @@
 import { HydratedDocument, Model, Schema, Types, model } from 'mongoose';
-import { CLAVES_FORMATO_EVIDENCIA, ESTADOS_ENTREGA, EstadoEntrega, FormatoEvidencia } from '../constants/actividades';
+import {
+  CLAVES_FORMATO_EVIDENCIA,
+  ESTADOS_ENTREGA,
+  EstadoEntrega,
+  FormatoEvidencia,
+  ORIGENES_NOTA,
+  OrigenNota,
+} from '../constants/actividades';
+
+/** Cada vez que el estudiante entrega queda un intento; los campos de la entrega de abajo reflejan el que cuenta. */
+export interface IIntentoEntrega {
+  numero: number;
+  texto_entrega: string;
+  archivo_path: string | null;
+  archivo_nombre: string | null;
+  archivo_formato: FormatoEvidencia | null;
+  archivo_bytes: number | null;
+  fecha_entrega: Date;
+  con_retraso: boolean;
+  /** Se entregó dentro del plazo personal que el docente le dio a este estudiante. */
+  acceso_especial: boolean;
+}
 
 export interface IActivitySubmission {
   activity_id: Types.ObjectId;
@@ -21,7 +42,11 @@ export interface IActivitySubmission {
   fecha_calificacion: Date | null;
   docente_id: Types.ObjectId | null;
   /** Cada cambio de la nota (M12): quién, cuándo y de qué valor a cuál. Nunca se borra. */
-  historial_notas: Array<{ valor_anterior: number | null; valor_nuevo: number; por: Types.ObjectId; fecha: Date }>;
+  historial_notas: Array<{ valor_anterior: number | null; valor_nuevo: number; por: Types.ObjectId; fecha: Date; origen?: OrigenNota }>;
+  /** Todas las entregas del estudiante, de la primera a la última. Las de antes de las entregas múltiples no lo tienen: se leen como un solo intento. */
+  intentos: IIntentoEntrega[];
+  /** El intento que el docente eligió para calificar; null = el último. */
+  intento_valido: number | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -56,12 +81,33 @@ const activitySubmissionSchema = new Schema<IActivitySubmission, ActivitySubmiss
             valor_nuevo: { type: Number, required: true },
             por: { type: Schema.Types.ObjectId, ref: 'User', required: true },
             fecha: { type: Date, required: true },
+            origen: { type: String, enum: ORIGENES_NOTA },
           },
           { _id: false }
         ),
       ],
       default: [],
     },
+    intentos: {
+      type: [
+        new Schema(
+          {
+            numero: { type: Number, required: true, min: 1 },
+            texto_entrega: { type: String, default: '', maxlength: 10000 },
+            archivo_path: { type: String, default: null },
+            archivo_nombre: { type: String, default: null },
+            archivo_formato: { type: String, enum: [...CLAVES_FORMATO_EVIDENCIA, null], default: null },
+            archivo_bytes: { type: Number, default: null },
+            fecha_entrega: { type: Date, required: true },
+            con_retraso: { type: Boolean, default: false },
+            acceso_especial: { type: Boolean, default: false },
+          },
+          { _id: false }
+        ),
+      ],
+      default: [],
+    },
+    intento_valido: { type: Number, default: null, min: 1 },
   },
   { timestamps: true }
 );

@@ -1,5 +1,14 @@
 import Joi from 'joi';
-import { CLAVES_FORMATO_EVIDENCIA, ESTADOS_ACTIVIDAD_ESTUDIANTE, TIPOS_ACTIVIDAD } from '../constants/actividades';
+import {
+  CLAVES_FORMATO_EVIDENCIA,
+  ESTADOS_ACTIVIDAD_ESTUDIANTE,
+  MAX_ADJUNTOS_POR_ACTIVIDAD,
+  MAX_BYTES_CONTENIDO_HTML,
+  MAX_CARACTERES_COMENTARIO,
+  MAX_VIDEOS_POR_ACTIVIDAD,
+  TIPOS_ACTIVIDAD,
+} from '../constants/actividades';
+import { EXTENSIONES_ADJUNTO } from '../services/actividadAdjuntos.service';
 import { ValidationSchema } from '../middlewares/validate.middleware';
 import { objectId } from './common.validator';
 
@@ -11,12 +20,24 @@ const formatos = Joi.array()
   .unique();
 const diaCalendario = Joi.string().pattern(/^\d{4}-\d{2}-\d{2}$/);
 
+// Lo que devolvió la subida de adjuntos: la huella SHA-256, la extensión y el nombre a mostrar. El servicio comprueba que el archivo exista.
+const referenciaAdjunto = Joi.object({
+  id: Joi.string().pattern(/^[a-f0-9]{64}$/).required(),
+  ext: Joi.string().valid(...EXTENSIONES_ADJUNTO).required(),
+  nombre: Joi.string().trim().max(120).required(),
+});
+const adjuntos = Joi.array().items(referenciaAdjunto).max(MAX_ADJUNTOS_POR_ACTIVIDAD);
+const videos = Joi.array().items(Joi.string().trim().uri({ scheme: ['http', 'https'] }).max(300)).max(MAX_VIDEOS_POR_ACTIVIDAD);
+const contenidoHtml = Joi.string().max(MAX_BYTES_CONTENIDO_HTML * 2).allow('');
+
 export const createActivity: ValidationSchema = {
   body: Joi.object({
     teacher_assignment_id: objectId.required(),
     periodo_numero: Joi.number().integer().min(1).max(4).required(),
     titulo: Joi.string().trim().max(150).required(),
-    descripcion: Joi.string().trim().max(5000).required(),
+    // Basta una de las dos: el texto plano o lo escrito en el editor (de donde se deriva la descripción).
+    descripcion: Joi.string().trim().max(5000).allow(''),
+    contenido_html: contenidoHtml,
     tipo: Joi.string()
       .valid(...TIPOS_ACTIVIDAD)
       .required(),
@@ -28,8 +49,13 @@ export const createActivity: ValidationSchema = {
     requiere_entrega: Joi.boolean(),
     formatos_permitidos: formatos,
     permite_entrega_tardia: Joi.boolean(),
+    permite_multiples_entregas: Joi.boolean(),
+    adjuntos,
+    videos,
+    // Otras clases del mismo docente (misma asignatura) donde se publica lo mismo.
+    grupos_adicionales: Joi.array().items(objectId).unique().max(20),
     confirmar_alertas: Joi.boolean(),
-  }),
+  }).or('descripcion', 'contenido_html'),
 };
 
 export const updateActivity: ValidationSchema = {
@@ -37,6 +63,7 @@ export const updateActivity: ValidationSchema = {
   body: Joi.object({
     titulo: Joi.string().trim().max(150),
     descripcion: Joi.string().trim().max(5000),
+    contenido_html: contenidoHtml,
     tipo: Joi.string().valid(...TIPOS_ACTIVIDAD),
     componente_siee: componenteBloque,
     peso_en_componente: Joi.number().min(0).max(100).allow(null),
@@ -45,6 +72,10 @@ export const updateActivity: ValidationSchema = {
     requiere_entrega: Joi.boolean(),
     formatos_permitidos: formatos,
     permite_entrega_tardia: Joi.boolean(),
+    permite_multiples_entregas: Joi.boolean(),
+    adjuntos,
+    videos,
+    cerrada: Joi.boolean(),
     confirmar_alertas: Joi.boolean(),
   }).min(1),
 };
@@ -117,4 +148,40 @@ export const actualizarConfiguracion: ValidationSchema = {
     max_evaluaciones_por_dia: Joi.number().integer().min(0).max(20),
     max_entregas_por_dia: Joi.number().integer().min(0).max(50),
   }).min(1),
+};
+
+export const descargarEntrega: ValidationSchema = {
+  params: Joi.object({ id: objectId.required() }),
+  query: Joi.object({ intento: Joi.number().integer().min(1) }),
+};
+
+export const descargarAdjunto: ValidationSchema = {
+  params: Joi.object({ id: objectId.required(), adjuntoId: Joi.string().pattern(/^[a-f0-9]{64}$/).required() }),
+};
+
+export const elegirIntentoValido: ValidationSchema = {
+  params: Joi.object({ id: objectId.required(), studentId: objectId.required() }),
+  body: Joi.object({ intento: Joi.number().integer().min(1).required() }),
+};
+
+export const otorgarAccesoEspecial: ValidationSchema = {
+  params: Joi.object({ id: objectId.required() }),
+  body: Joi.object({
+    student_id: objectId.required(),
+    fecha_limite: Joi.date().iso().required(),
+    motivo: Joi.string().trim().min(5).max(300).required(),
+  }),
+};
+
+export const accesoEspecialDeEstudiante: ValidationSchema = {
+  params: Joi.object({ id: objectId.required(), studentId: objectId.required() }),
+};
+
+export const crearComentario: ValidationSchema = {
+  params: Joi.object({ id: objectId.required() }),
+  body: Joi.object({ texto: Joi.string().trim().min(1).max(MAX_CARACTERES_COMENTARIO).required() }),
+};
+
+export const eliminarComentario: ValidationSchema = {
+  params: Joi.object({ id: objectId.required(), comentarioId: objectId.required() }),
 };

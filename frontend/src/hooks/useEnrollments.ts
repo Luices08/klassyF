@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../lib/apiClient';
-import type { EstadoDocumentoMatricula, EstadoMatricula, Enrollment, TipoDocumentoMatricula, TipoIngreso } from '../types/domain';
+import type { EstadoDocumentoMatricula, EstadoMatricula, Enrollment, SituacionEstudianteMatricula, TipoDocumentoMatricula, TipoIngreso } from '../types/domain';
 
 export interface CreateEnrollmentInput {
   student_id: string;
@@ -10,6 +10,8 @@ export interface CreateEnrollmentInput {
   numero_libro?: number;
   fecha_limite_compromiso?: string;
   forzar_sobrecupo?: boolean;
+  /** Confirma la reincorporación de quien estaba RETIRADO o INACTIVO en su expediente. */
+  reingreso?: boolean;
   /** Lo que la familia declara sobre apoyos o diagnósticos previos: pasa a la bandeja de orientación (M16). */
   apoyo_declarado?: { motivo_declarado: string; aporta_soporte?: boolean; observacion?: string };
 }
@@ -22,6 +24,15 @@ export function useCreateEnrollment() {
       void queryClient.invalidateQueries({ queryKey: ['groups'] });
       void queryClient.invalidateQueries({ queryKey: ['enrollments'] });
     },
+  });
+}
+
+/** Todos los estudiantes con su situación frente a la matrícula del año: alimenta los filtros del formulario de matrícula. */
+export function useSituacionEstudiantes(anioId: string | undefined) {
+  return useQuery({
+    queryKey: ['enrollments', 'estudiantes-situacion', anioId],
+    queryFn: () => api.get<SituacionEstudianteMatricula[]>('/enrollments/estudiantes-situacion', { academic_year_id: anioId }),
+    enabled: Boolean(anioId),
   });
 }
 

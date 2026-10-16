@@ -547,6 +547,7 @@ Diseño en `doc/Analisis_M09_Horarios.md`. Backend `/horarios` (`horario.control
   horas, no números de periodo. El que se genera primero no tiene qué respetar; el segundo evita al primero (y si faltan franjas libres, el diagnóstico de capacidad y el 409 al publicar lo dicen). Editar a mano
   una clase que choca con la otra jornada da un conflicto duro «Cruce con la otra jornada del docente». Si el horario de la otra jornada se generó con franjas distintas de las actuales no se usa y se avisa
   (`HORARIO_OTRA_JORNADA_DESFASADO`); con borrador se avisa (`..._EN_BORRADOR`). Al regenerar una jornada, conviene regenerar la otra para que ambas queden coherentes.
+- **Tiempo libre (`PanelTiempoLibre`)**: la pestaña lista lo ya registrado y la tabla (malla) **solo se abre a pedido** («Abrir tabla» en un registro o «Agregar tiempo libre»), con el docente o los grados de ese registro. Antes mostraba siempre la malla del primer docente y parecía vacía al volver a la pestaña aunque lo guardado estuviera bien.
 - **No es una optimización conjunta:** las dos jornadas no se resuelven a la vez (una puede dejar a la otra sin solución); es el orden de generación lo que decide quién cede.
 
 ### M13 (Asistencia) — estado: núcleo completo
@@ -995,8 +996,8 @@ Botón flotante en `AppShell` (`components/asistente/AsistenteFlotante.tsx`) que
   aquí), solo el paz y salvo de fin de año. Lo común (identidad, foto, EPS, acudiente), vacunas hasta 2°, notas anteriores y SIMAT, servicio social en 11° por traslado, diagnóstico por discapacidad y custodia si el
   acudiente no es padre ni madre siguen igual. Las matrículas viejas que ya traen `CERTIFICADO_QUINTO_PRIMARIA` en 7°–11° lo conservan (se corrigen quitándolo desde el expediente).
 - **Verlos antes de matricular**: `GET /enrollments/documentos-previstos?group_id=&tipo_ingreso=&student_id?` (STAFF) devuelve lo que el checklist pedirá (nombre, indicación, categoría, obligatorio) sin crear nada;
-  el drawer «Formalizar matrícula» lo muestra en `DocumentosPrevistos` (todos «No enviado»: **en el drawer no se suben documentos**) y al crear la matrícula navega a su expediente
-  (`/admin/enrollments/:id`), donde se cargan, aprueban y rechazan. La lista de matrículas lleva la columna «Documentos» (aprobados/obligatorios, en revisión, rechazados) leída del `checklist` que ya viene en el listado.
+  el drawer «Formalizar matrícula» lo muestra en `DocumentosPrevistos` (todos «No enviado»: **en el drawer no se suben documentos**) y al crear la matrícula el drawer muestra la confirmación con el botón «Ir al expediente»
+  (`/admin/enrollments/:id`; no navega solo), donde se cargan, aprueban y rechazan. La lista de matrículas lleva la columna «Documentos» (aprobados/obligatorios, en revisión, rechazados) leída del `checklist` que ya viene en el listado.
 - **Bandeja «Documentos por revisar»** (`GET /enrollments/documentos-por-revisar`, `DocumentosPorRevisarPage` en `/admin/documentos-por-revisar`, STAFF): una fila por documento
   `CARGADO` de matrículas no terminales, del más antiguo al más reciente, con ver / aprobar / rechazar sin abrir el expediente.
 - **Paz y salvo de fin de año** (`PazYSalvo`, `/paz-y-salvo`, `PazYSalvoPage` en `/paz-y-salvo`): un registro por estudiante y año que termina (`CARGADO` → `CONFIRMADO` | `RECHAZADO`;

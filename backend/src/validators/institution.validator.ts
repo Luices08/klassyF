@@ -1,6 +1,7 @@
 import Joi from 'joi';
 import { CALENDARIOS, ESTADOS_USUARIO, MODALIDADES_INSTITUCION, POLITICAS_AFORO_AULA, TIPOS_FRANJA } from '../constants/enums';
 import { ValidationSchema } from '../middlewares/validate.middleware';
+import { CLAVES_IMAGEN_INSTITUCIONAL } from '../constants/imagenesInstitucionales';
 import { objectId } from './common.validator';
 
 const periodoSchema = Joi.object({
@@ -78,9 +79,6 @@ export const updateInstitution: ValidationSchema = {
     departamento: Joi.string().trim().max(80).allow('', null),
     correo_secretaria: Joi.string().email().allow('', null),
     horario_atencion: Joi.string().allow('', null),
-    modalidad: Joi.string().valid(...MODALIDADES_INSTITUCION),
-    politica_aforo_aula: Joi.string().valid(...POLITICAS_AFORO_AULA),
-    paz_y_salvo_docentes: Joi.boolean(),
     confirm_password: Joi.string().required(),
   }),
 };
@@ -103,4 +101,16 @@ export const updateLimitesHorasPlan: ValidationSchema = {
     SECUNDARIA: Joi.number().integer().min(1).max(50).optional(),
     MEDIA: Joi.number().integer().min(1).max(50).optional(),
   }).min(1),
+};
+
+export const actualizarAjustes: ValidationSchema = {
+  body: Joi.object({
+    modalidad: Joi.string().valid(...MODALIDADES_INSTITUCION),
+    politica_aforo_aula: Joi.string().valid(...POLITICAS_AFORO_AULA),
+    paz_y_salvo_docentes: Joi.boolean(),
+  }).min(1),
+};
+
+export const conClaveDeImagen: ValidationSchema = {
+  params: Joi.object({ clave: Joi.string().valid(...CLAVES_IMAGEN_INSTITUCIONAL).required() }),
 };

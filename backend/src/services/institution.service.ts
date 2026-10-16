@@ -6,6 +6,9 @@ import Campus, { CampusDocument } from '../models/campus.model';
 import Institution, { ILimitesCargaDocente, ILimitesHorasPlanEstudios, InstitutionDocument } from '../models/institution.model';
 import User from '../models/user.model';
 import ApiError from '../utils/ApiError';
+import { detectarFirmaArchivo } from '../utils/firmasArchivo';
+import { ClaveImagenInstitucional, MAX_BYTES_IMAGEN_INSTITUCIONAL, TIPOS_IMAGEN_INSTITUCIONAL } from '../constants/imagenesInstitucionales';
+import ImagenInstitucional from '../models/imagenInstitucional.model';
 import { FranjaPlantilla } from '../utils/franjas';
 import { registrarEvento } from './audit.service';
 import { runTransaction } from '../utils/runTransaction';
@@ -21,6 +24,9 @@ export interface UpdateInstitutionInput {
   departamento?: string | null;
   correo_secretaria?: string | null;
   horario_atencion?: string | null;
+}
+
+export interface AjustesInstitucion {
   modalidad?: ModalidadInstitucion;
   politica_aforo_aula?: PoliticaAforoAula;
   paz_y_salvo_docentes?: boolean;
@@ -181,12 +187,98 @@ export async function updateInstitution(
   if (input.departamento !== undefined) institucion.departamento = input.departamento?.trim() || null;
   if (input.correo_secretaria !== undefined) institucion.correo_secretaria = input.correo_secretaria;
   if (input.horario_atencion !== undefined) institucion.horario_atencion = input.horario_atencion;
-  if (input.modalidad !== undefined) institucion.modalidad = input.modalidad;
-  if (input.politica_aforo_aula !== undefined) institucion.politica_aforo_aula = input.politica_aforo_aula;
-  if (input.paz_y_salvo_docentes !== undefined) institucion.paz_y_salvo_docentes = input.paz_y_salvo_docentes;
   await institucion.save();
 
   return institucion;
+}
+
+/**
+ * Ajustes de funcionamiento (modalidad, política de aforo, paz y salvo de docentes): bloques propios de Configuración institucional.
+ * No piden contraseña —no son datos legales del colegio— pero quedan en auditoría.
+ */
+export async function actualizarAjustes(
+  ajustes: AjustesInstitucion,
+  { usuarioId, ip }: { usuarioId: Types.ObjectId | string; ip?: string | null }
+): Promise<InstitutionDocument> {
+  const institucion = await Institution.findOne();
+  if (!institucion) throw new ApiError(404, 'No hay una institución configurada todavía.');
+
+  const cambios: string[] = [];
+  if (ajustes.modalidad !== undefined && ajustes.modalidad !== institucion.modalidad) {
+    institucion.modalidad = ajustes.modalidad;
+    cambios.push(`modalidad ${ajustes.modalidad}`);
+  }
+  if (ajustes.politica_aforo_aula !== undefined && ajustes.politica_aforo_aula !== institucion.politica_aforo_aula) {
+    institucion.politica_aforo_aula = ajustes.politica_aforo_aula;
+    cambios.push(`aforo ${ajustes.politica_aforo_aula}`);
+  }
+  if (ajustes.paz_y_salvo_docentes !== undefined && ajustes.paz_y_salvo_docentes !== institucion.paz_y_salvo_docentes) {
+    institucion.paz_y_salvo_docentes = ajustes.paz_y_salvo_docentes;
+    cambios.push(`paz y salvo por docentes ${ajustes.paz_y_salvo_docentes ? 'sí' : 'no'}`);
+  }
+  if (cambios.length === 0) return institucion;
+
+  await institucion.save();
+  await registrarEvento({
+    usuario_id: usuarioId,
+    accion: 'INSTITUCION_AJUSTES_ACTUALIZADOS',
+    entidad: 'Institution',
+    entidad_id: institucion._id,
+    detalle: cambios.join(', '),
+    ip,
+  });
+  return institucion;
+}
+
+export interface ResumenImagenInstitucional {
+  actualizada_en: Date;
+}
+
+/** Qué fotos hay cargadas (sin los bytes). */
+export async function resumenImagenes(): Promise<Record<ClaveImagenInstitucional, ResumenImagenInstitucional | null>> {
+  const imagenes = await ImagenInstitucional.find().select('clave actualizada_en');
+  const resumen = { login: null, dashboard: null } as Record<ClaveImagenInstitucional, ResumenImagenInstitucional | null>;
+  for (const img of imagenes) resumen[img.clave] = { actualizada_en: img.actualizada_en };
+  return resumen;
+}
+
+export async function guardarImagenInstitucional(
+  clave: ClaveImagenInstitucional,
+  archivo: Express.Multer.File | undefined,
+  { usuarioId, ip }: { usuarioId: Types.ObjectId | string; ip?: string | null }
+): Promise<void> {
+  const institucion = await Institution.findOne();
+  if (!institucion) throw new ApiError(404, 'No hay una institución configurada todavía.');
+  if (!archivo) throw new ApiError(400, 'Adjunta la imagen (PNG, JPG o WEBP).');
+  if (archivo.size > MAX_BYTES_IMAGEN_INSTITUCIONAL) throw new ApiError(400, 'La imagen supera el tamaño máximo permitido (2 MB).');
+  const firma = detectarFirmaArchivo(archivo.mimetype, archivo.buffer);
+  if (!firma || !(TIPOS_IMAGEN_INSTITUCIONAL as readonly string[]).includes(firma.mimetype)) {
+    throw new ApiError(400, 'La imagen debe ser un PNG, JPG o WEBP válido.');
+  }
+
+  await ImagenInstitucional.findOneAndUpdate(
+    { clave },
+    { clave, mime: firma.mimetype, datos: archivo.buffer, actualizada_en: new Date() },
+    { upsert: true }
+  );
+  await registrarEvento({ usuario_id: usuarioId, accion: 'INSTITUCION_IMAGEN_ACTUALIZADA', entidad: 'Institution', entidad_id: institucion._id, detalle: `Imagen ${clave}`, ip });
+}
+
+export async function quitarImagenInstitucional(
+  clave: ClaveImagenInstitucional,
+  { usuarioId, ip }: { usuarioId: Types.ObjectId | string; ip?: string | null }
+): Promise<void> {
+  const institucion = await Institution.findOne();
+  if (!institucion) throw new ApiError(404, 'No hay una institución configurada todavía.');
+  const { deletedCount } = await ImagenInstitucional.deleteOne({ clave });
+  if (deletedCount === 0) return;
+  await registrarEvento({ usuario_id: usuarioId, accion: 'INSTITUCION_IMAGEN_QUITADA', entidad: 'Institution', entidad_id: institucion._id, detalle: `Imagen ${clave}`, ip });
+}
+
+export async function leerImagenInstitucional(clave: ClaveImagenInstitucional): Promise<{ mime: string; datos: Buffer }> {
+  const imagen = await ImagenInstitucional.findOne({ clave });
+  if (!imagen) throw new ApiError(404, 'No hay imagen cargada.');
+  return { mime: imagen.mime, datos: imagen.datos };
 }
 
 export interface ConfiguracionCargaDocente extends ILimitesCargaDocente {

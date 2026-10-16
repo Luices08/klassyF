@@ -7,11 +7,12 @@ import { Card, CardHeader } from '../../components/ui/Card';
 import { Drawer } from '../../components/ui/Drawer';
 import { Input, Select } from '../../components/ui/Field';
 import { IconButton } from '../../components/ui/IconButton';
-import { Switch } from '../../components/ui/Switch';
 import { PageHeader } from '../../components/ui/PageHeader';
 import { Spinner } from '../../components/ui/Spinner';
 import { Table, TableBody, TableHead, Td, Th } from '../../components/ui/Table';
 import { BuildingIcon, PlusIcon, TrashIcon } from '../../components/ui/icons';
+import { AjustesInstitucion } from '../../components/institucion/AjustesInstitucion';
+import { ImagenesInstitucion } from '../../components/institucion/ImagenesInstitucion';
 import { PlantillaFranjasDrawer } from '../../components/jornadas/PlantillaFranjasDrawer';
 import { avisosCalendario } from '../../lib/calendarioColombia';
 import { useInstitution, useSetupInstitution, useUpdateInstitution } from '../../hooks/useInstitution';
@@ -23,7 +24,6 @@ import {
   type Institution,
   type ModalidadInstitucion,
   type Periodo,
-  type PoliticaAforoAula,
 } from '../../types/domain';
 
 const LOGO_MAX_BYTES = 500 * 1024;
@@ -99,9 +99,6 @@ function InstitutionOverview({ institution }: { institution: Institution }) {
     departamento: institution.departamento ?? '',
     correo_secretaria: institution.correo_secretaria ?? '',
     horario_atencion: institution.horario_atencion ?? '',
-    modalidad: institution.modalidad ?? 'PRESENCIAL',
-    politica_aforo_aula: institution.politica_aforo_aula ?? 'BLOQUEAR',
-    paz_y_salvo_docentes: institution.paz_y_salvo_docentes ?? false,
     confirm_password: '',
   });
 
@@ -119,9 +116,6 @@ function InstitutionOverview({ institution }: { institution: Institution }) {
     departamento: institution.departamento ?? '',
     correo_secretaria: institution.correo_secretaria ?? '',
       horario_atencion: institution.horario_atencion ?? '',
-      modalidad: institution.modalidad ?? 'PRESENCIAL',
-      politica_aforo_aula: institution.politica_aforo_aula ?? 'BLOQUEAR',
-      paz_y_salvo_docentes: institution.paz_y_salvo_docentes ?? false,
       confirm_password: '',
     });
     setDrawerOpen(true);
@@ -189,17 +183,6 @@ function InstitutionOverview({ institution }: { institution: Institution }) {
             <StaticField label="Departamento" value={institution.departamento || '—'} />
             <StaticField label="Correo de secretaría" value={institution.correo_secretaria || '—'} />
             <StaticField label="Horario de atención" value={institution.horario_atencion || '—'} />
-            <StaticField label="Modalidad" value={institution.modalidad === 'VIRTUAL' ? 'Virtual' : 'Presencial'} />
-            {institution.modalidad !== 'VIRTUAL' && (
-              <StaticField
-                label="Si el cupo de un grupo excede el aforo de su aula"
-                value={institution.politica_aforo_aula === 'ADVERTIR' ? 'Solo advertir' : 'Bloquear la creación'}
-              />
-            )}
-            <StaticField
-              label="Paz y salvo de fin de año"
-              value={institution.paz_y_salvo_docentes ? 'Lo gestionan secretaría y docentes' : 'Lo gestiona solo secretaría'}
-            />
           </div>
         </Card>
 
@@ -215,6 +198,16 @@ function InstitutionOverview({ institution }: { institution: Institution }) {
           </Button>
         </Card>
       </div>
+
+      <section className="space-y-2">
+        <h2 className="text-h3 text-ink">Funcionamiento</h2>
+        <AjustesInstitucion institution={institution} />
+      </section>
+
+      <section className="space-y-2">
+        <h2 className="text-h3 text-ink">Imágenes de la institución</h2>
+        <ImagenesInstitucion />
+      </section>
 
       <Card>
         <CardHeader
@@ -334,37 +327,6 @@ function InstitutionOverview({ institution }: { institution: Institution }) {
           onChange={(e) => setForm((f) => ({ ...f, horario_atencion: e.target.value }))}
           hint='Ej. "Lunes a viernes, 7:00 a.m. – 3:00 p.m."'
         />
-        <Select
-          label="Modalidad"
-          value={form.modalidad}
-          onChange={(e) => setForm((f) => ({ ...f, modalidad: e.target.value as ModalidadInstitucion }))}
-          hint="Una institución virtual no usa aulas: se oculta el módulo Espacios y aulas y los grupos no llevan aula. Los espacios ya registrados se conservan."
-        >
-          {MODALIDADES_INSTITUCION.map((m) => (
-            <option key={m} value={m}>
-              {NOMBRES_MODALIDAD[m]}
-            </option>
-          ))}
-        </Select>
-        {form.modalidad === 'PRESENCIAL' && (
-          <Select
-            label="Si el cupo de un grupo excede el aforo de su aula"
-            value={form.politica_aforo_aula}
-            onChange={(e) => setForm((f) => ({ ...f, politica_aforo_aula: e.target.value as PoliticaAforoAula }))}
-            hint="Aplica solo a grupos con aula asignada (Espacios y aulas)."
-          >
-            <option value="BLOQUEAR">Bloquear la creación del grupo</option>
-            <option value="ADVERTIR">Solo advertir (queda en auditoría)</option>
-          </Select>
-        )}
-
-        <Switch
-          checked={form.paz_y_salvo_docentes}
-          onChange={(v) => setForm((f) => ({ ...f, paz_y_salvo_docentes: v }))}
-          label="Los docentes pueden cargar y confirmar el paz y salvo de fin de año"
-          description="Apagado: solo secretaría, coordinación y administración lo gestionan. Encendido: cada docente también lo hace para los estudiantes de sus grupos (útil donde son ellos quienes revisan). Quien ya lo tiene confirmado no lo vuelve a subir al matricularse."
-        />
-
         <div>
           {form.logo_url && (
             <div className="mb-2 flex items-center gap-3">

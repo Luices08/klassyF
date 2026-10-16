@@ -8,7 +8,9 @@ import {
   subirDocumentoPublico,
 } from '../controllers/admissionRequest.controller';
 import { verificarPublico } from '../controllers/certificado.controller';
+import { verImagenPublica } from '../controllers/institution.controller';
 import { listarGradosPublicos, obtenerInfoPublica } from '../controllers/public.controller';
+import * as institutionValidator from '../validators/institution.validator';
 import validate from '../middlewares/validate.middleware';
 import * as admissionValidator from '../validators/admissionRequest.validator';
 import * as certificadoValidator from '../validators/certificado.validator';
@@ -31,6 +33,7 @@ router.get('/certificados/verificar', verificacionLimiter, validate(certificadoV
 
 router.get('/institution-info', lecturaLimiter, obtenerInfoPublica);
 router.get('/grades', lecturaLimiter, listarGradosPublicos);
+router.get('/institution-imagen/:clave', lecturaLimiter, validate(institutionValidator.conClaveDeImagen), verImagenPublica);
 
 router.post(
   '/admission-requests',

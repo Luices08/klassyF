@@ -30,6 +30,11 @@ interface RequestOptions {
   query?: Record<string, string | number | undefined | null>;
 }
 
+/** URL absoluta de un recurso de la API (p. ej. una imagen pública para un `<img>`), resuelta igual que las peticiones. */
+export function urlDeApi(path: string): string {
+  return buildUrl(path);
+}
+
 function buildUrl(path: string, query?: RequestOptions['query']): string {
   // En Docker BASE_URL es relativa ('/api/v1', nginx la reenvia al backend): se resuelve contra el origen de la pagina.
   const url = new URL(`${BASE_URL}${path}`, window.location.origin);

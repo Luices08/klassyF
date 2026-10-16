@@ -10,6 +10,7 @@ import {
   ESTADOS_MATRICULA_CON_FOLIO,
   ESTADOS_MATRICULA_VIVOS,
   EstadoDocumentoMatricula,
+  EstadoEstudiante,
   EstadoMatricula,
   Rol,
   TipoDocumentoMatricula,
@@ -24,6 +25,7 @@ import StudentGuardian from '../models/studentGuardian.model';
 import StudentProfile from '../models/studentProfile.model';
 import User from '../models/user.model';
 import ApiError from '../utils/ApiError';
+import { ESTADOS_QUE_EXIGEN_REINGRESO, SituacionEstudiante, situacionDeEstudiante } from '../utils/situacionEstudiante';
 import { documentosObligatoriosPendientes } from '../utils/documentosMatricula';
 import { resumirLista } from '../utils/horarioCoherencia';
 import { runTransaction } from '../utils/runTransaction';
@@ -44,6 +46,8 @@ export interface CreateEnrollmentInput {
   estado_inicial?: 'MATRICULADO_CONDICIONAL' | 'MATRICULADO_DEFINITIVO';
   fecha_limite_compromiso?: string | Date;
   forzar_sobrecupo?: boolean;
+  /** Confirma que quien estaba RETIRADO o INACTIVO en M03 vuelve al colegio: la matrícula lo reactiva. */
+  reingreso?: boolean;
   /** Lo que la familia declara sobre apoyos o diagnósticos previos (M16): se transcribe, sin valorar ni rotular. */
   apoyo_declarado?: { motivo_declarado: string; aporta_soporte?: boolean; observacion?: string };
 }
@@ -112,6 +116,13 @@ export async function createEnrollment(
 
     await exigirSinMatriculaViva(student_id, academic_year_id, session);
 
+    // Un retirado o inactivo no se matricula por el camino normal: el reingreso es una decisión explícita y deja rastro.
+    const perfilPrevio = await StudentProfile.findOne({ user_id: student_id }).select('estado').session(session);
+    const requiereReingreso = Boolean(perfilPrevio && ESTADOS_QUE_EXIGEN_REINGRESO.includes(perfilPrevio.estado));
+    if (requiereReingreso && !input.reingreso) {
+      throw new ApiError(409, `El estudiante figura ${perfilPrevio!.estado} en su expediente. Para matricularlo de nuevo usa el filtro «Retirados / Reingreso» y confirma la reincorporación.`);
+    }
+
     const group = await Group.findById(group_id).session(session);
     if (!group) throw new ApiError(404, 'Grupo no encontrado.');
     if (String(group.academic_year_id) !== String(academic_year_id)) {
@@ -135,6 +146,10 @@ export async function createEnrollment(
     const { numero_folio, folio_matricula } = await generateFolioMatricula(academicYear.year, numeroLibro, session);
 
     const profile = await StudentProfile.findOne({ user_id: student_id }).session(session);
+    if (profile && requiereReingreso) {
+      profile.estado = 'ACTIVO';
+      await profile.save({ session });
+    }
     const vinculoAcudiente = await StudentGuardian.findOne({ student_id, es_principal: true }).session(session);
 
     const itemsGenerados = generarChecklistMatricula({
@@ -207,6 +222,15 @@ export async function createEnrollment(
       entidad_id: enrollment._id,
       detalle: `Folio ${folio_matricula}, tipo_ingreso ${tipo_ingreso}, estado ${estadoInicial}`,
     });
+    if (requiereReingreso) {
+      await registrarEvento({
+        usuario_id: actor.id,
+        accion: 'MATRICULA_REINGRESO',
+        entidad: 'Enrollment',
+        entidad_id: enrollment._id,
+        detalle: `El estudiante estaba ${perfilPrevio!.estado} y se reincorporó con esta matrícula`,
+      });
+    }
     if (puedeForzar) {
       await registrarEvento({
         usuario_id: actor.id,
@@ -420,6 +444,54 @@ export async function listarEnrollments(filter: ListarEnrollmentsFilter) {
   ]);
 
   return { data, total, page, pages: Math.max(1, Math.ceil(total / limit)) };
+}
+
+export interface SituacionDeEstudianteMatricula {
+  _id: string;
+  nombre: string;
+  apellido: string;
+  numero_documento: string;
+  tipo_documento: string;
+  estado_expediente: EstadoEstudiante | null;
+  situacion: SituacionEstudiante;
+  matricula: { _id: string; estado: EstadoMatricula; grupo: string; folio: string | null } | null;
+}
+
+/** Todos los estudiantes con su situación frente a la matrícula del año: alimenta los filtros del formulario de matrícula (sin duplicar datos). */
+export async function listarSituacionEstudiantes(academicYearId: string): Promise<SituacionDeEstudianteMatricula[]> {
+  const [usuarios, perfiles, vivas] = await Promise.all([
+    User.find({ roles: ROLES.ESTUDIANTE }).select('nombre apellido numero_documento tipo_documento estado').sort({ apellido: 1, nombre: 1 }).lean(),
+    StudentProfile.find().select('user_id estado').lean(),
+    Enrollment.find({ academic_year_id: academicYearId, estado: { $in: ESTADOS_MATRICULA_VIVOS } })
+      .select('student_id group_id estado folio_matricula')
+      .populate({ path: 'group_id', select: 'nomenclatura grade_id', populate: { path: 'grade_id', select: 'nombre' } })
+      .lean(),
+  ]);
+  const estadoPorUsuario = new Map(perfiles.map((p) => [String(p.user_id), p.estado]));
+  const matriculaPorUsuario = new Map(vivas.map((m) => [String(m.student_id), m]));
+
+  return usuarios.map((u) => {
+    const viva = matriculaPorUsuario.get(String(u._id));
+    const estadoPerfil = estadoPorUsuario.get(String(u._id));
+    const grupo = viva?.group_id as unknown as { nomenclatura: string; grade_id?: { nombre: string } } | null | undefined;
+    return {
+      _id: String(u._id),
+      nombre: u.nombre,
+      apellido: u.apellido,
+      numero_documento: u.numero_documento,
+      tipo_documento: u.tipo_documento,
+      estado_expediente: estadoPerfil ?? null,
+      situacion: situacionDeEstudiante({ tieneMatriculaViva: Boolean(viva), estadoPerfil, usuarioActivo: u.estado === 'activo' }),
+      matricula: viva
+        ? {
+            _id: String(viva._id),
+            estado: viva.estado,
+            grupo: grupo ? `${grupo.grade_id?.nombre ?? ''} ${grupo.nomenclatura}`.trim() : '—',
+            folio: viva.folio_matricula ?? null,
+          }
+        : null,
+    };
+  });
 }
 
 export async function obtenerEnrollment(id: string): Promise<EnrollmentDocument> {

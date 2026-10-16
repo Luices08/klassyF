@@ -1,5 +1,6 @@
 import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react';
 import { createPortal } from 'react-dom';
+import { Chip, type Tone } from './Badge';
 import { FieldWrapper } from './Field';
 import { ChevronDownIcon } from './icons';
 
@@ -8,6 +9,8 @@ export interface OpcionBuscable {
   label: string;
   /** Texto secundario que también se busca (p. ej. el documento). */
   detalle?: string;
+  /** Marca visual a la derecha (p. ej. la situación de un estudiante). */
+  etiqueta?: { texto: string; tone: Tone };
 }
 
 interface SelectBuscableProps {
@@ -232,6 +235,11 @@ export function SelectBuscable({
                 >
                   {o.label}
                   {o.detalle && <span className="ml-2 text-xs text-muted">{o.detalle}</span>}
+                  {o.etiqueta && (
+                    <span className="ml-2 align-middle">
+                      <Chip tone={o.etiqueta.tone}>{o.etiqueta.texto}</Chip>
+                    </span>
+                  )}
                 </li>
               ))}
               {filtradas.length > MAX_VISIBLES && (

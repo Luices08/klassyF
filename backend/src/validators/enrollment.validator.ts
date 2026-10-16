@@ -22,6 +22,7 @@ export const createEnrollment: ValidationSchema = {
     estado_inicial: Joi.string().valid('MATRICULADO_CONDICIONAL', 'MATRICULADO_DEFINITIVO'),
     fecha_limite_compromiso: Joi.date(),
     forzar_sobrecupo: Joi.boolean(),
+    reingreso: Joi.boolean(),
     apoyo_declarado: apoyoDeclarado,
   }),
 };
@@ -35,6 +36,10 @@ export const listEnrollments: ValidationSchema = {
     page: Joi.number().integer().min(1),
     limit: Joi.number().integer().min(1).max(100),
   }),
+};
+
+export const situacionEstudiantes: ValidationSchema = {
+  query: Joi.object({ academic_year_id: objectId.required() }),
 };
 
 export const getEnrollment: ValidationSchema = {

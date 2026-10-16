@@ -489,6 +489,21 @@ export interface ChecklistItem {
   revisado_por: string | { _id: string; nombre: string; apellido: string } | null;
 }
 
+export const SITUACIONES_ESTUDIANTE = ['DISPONIBLE', 'MATRICULADO', 'REINGRESO', 'GRADUADO', 'USUARIO_INACTIVO'] as const;
+export type SituacionEstudiante = (typeof SITUACIONES_ESTUDIANTE)[number];
+
+/** Un estudiante frente a la matrícula del año (GET /enrollments/estudiantes-situacion). */
+export interface SituacionEstudianteMatricula {
+  _id: string;
+  nombre: string;
+  apellido: string;
+  numero_documento: string;
+  tipo_documento: TipoDocumento;
+  estado_expediente: EstadoEstudiante | null;
+  situacion: SituacionEstudiante;
+  matricula: { _id: string; estado: EstadoMatricula; grupo: string; folio: string | null } | null;
+}
+
 export interface Enrollment {
   _id: string;
   student_id: string | { _id: string; nombre: string; apellido: string; numero_documento: string; tipo_documento: TipoDocumento };

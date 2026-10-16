@@ -14,10 +14,9 @@ import { EyeIcon, PlusIcon, SearchIcon } from '../../components/ui/icons';
 import { useAuth } from '../../context/AuthContext';
 import { useAnioDeTrabajo } from '../../hooks/useAniosLectivos';
 import { useCampuses, useGrades, useJornadas } from '../../hooks/useCatalogs';
-import { useCreateEnrollment, useEnrollmentsList, type EnrollmentsFilter } from '../../hooks/useEnrollments';
+import { useCreateEnrollment, useEnrollmentsList, useSituacionEstudiantes, type EnrollmentsFilter } from '../../hooks/useEnrollments';
 import { useGroups } from '../../hooks/useGroups';
 import { useInstitution } from '../../hooks/useInstitution';
-import { useUsers } from '../../hooks/useUsers';
 import { useCrearEstudianteCompleto } from '../../hooks/useStudents';
 import {
   ESTADOS_MATRICULA,
@@ -34,7 +33,9 @@ import { DocumentosPrevistos } from '../../components/matriculas/DocumentosPrevi
 import { InformacionApoyoCampos } from '../../components/inclusion/InformacionApoyoCampos';
 import { APOYO_VACIO, aApoyoDeclarado } from '../../lib/apoyoDeclarado';
 import { SelectBuscable } from '../../components/ui/SelectBuscable';
-import { opcionesDeGrupos, opcionesDePersonas } from '../../lib/opcionesBuscables';
+import { opcionesDeGrupos } from '../../lib/opcionesBuscables';
+import { SelectorEstudianteMatricula } from '../../components/matriculas/SelectorEstudianteMatricula';
+import { admiteMatricula, type FiltroEstudiante } from '../../lib/situacionEstudiante';
 
 const PAGE_SIZE = 20;
 
@@ -145,7 +146,14 @@ export function EnrollmentsPage() {
   const [form, setForm] = useState(FORM_VACIO);
   const [errorEnvio, setErrorEnvio] = useState<string | null>(null);
 
-  const studentsQuery = useUsers({ rol: 'ESTUDIANTE' });
+  const studentsQuery = useSituacionEstudiantes(anioId);
+  const [filtroEstudiante, setFiltroEstudiante] = useState<FiltroEstudiante>('DISPONIBLES');
+  const [reingresoConfirmado, setReingresoConfirmado] = useState(false);
+  const estudianteElegido = modoMatricula === 'existente' ? studentsQuery.data?.find((e) => e._id === form.student_id) : undefined;
+  const esReingreso = estudianteElegido?.situacion === 'REINGRESO';
+  // Matricular a quien ya está matriculado (o graduado / sin usuario activo) no se permite; el servidor lo rechaza igual.
+  const matriculaBloqueada =
+    modoMatricula === 'existente' && Boolean(estudianteElegido) && (!admiteMatricula(estudianteElegido!.situacion) || (esReingreso && !reingresoConfirmado));
   // Solo grupos activos: uno CLOSED ya no admite nuevas matriculas (ver group.controller).
   const groupsQuery = useGroups({ academic_year_id: anioId, estado: 'ACTIVE' });
   const createEnrollment = useCreateEnrollment();
@@ -192,10 +200,12 @@ export function EnrollmentsPage() {
         tipo_ingreso: form.tipo_ingreso,
         fecha_limite_compromiso: form.fecha_limite_compromiso,
         forzar_sobrecupo: form.forzar_sobrecupo,
+        reingreso: modoMatricula === 'existente' && esReingreso && reingresoConfirmado ? true : undefined,
         apoyo_declarado: aApoyoDeclarado(form.apoyo),
       });
 
       setForm(FORM_VACIO);
+      setReingresoConfirmado(false);
       void studentsQuery.refetch();
       // Los documentos se cargan y se revisan en el expediente: el drawer ofrece el botón para ir a él.
       setMatriculaCreadaId(matricula._id);
@@ -417,6 +427,7 @@ export function EnrollmentsPage() {
         onSubmit={matriculaCreadaId ? undefined : handleSubmit}
         submitLabel={modoMatricula === 'expres' ? 'Crear estudiante y matricular' : 'Matricular'}
         isSubmitting={createEnrollment.isPending || crearEstudiante.isPending}
+        submitDisabled={matriculaBloqueada}
       >
         {matriculaCreadaId ? (
           <div className="space-y-4">
@@ -455,14 +466,23 @@ export function EnrollmentsPage() {
         )}
 
         {modoMatricula === 'existente' ? (
-          <SelectBuscable
-            label="Estudiante"
-            required
-            value={form.student_id}
-            onChange={(id) => setForm((f) => ({ ...f, student_id: id }))}
-            placeholder="Buscar por nombre o documento…"
-            vacioLabel="Selecciona..."
-            opciones={opcionesDePersonas(studentsQuery.data ?? [])}
+          <SelectorEstudianteMatricula
+            estudiantes={studentsQuery.data ?? []}
+            filtro={filtroEstudiante}
+            onFiltroChange={(filtro) => {
+              setFiltroEstudiante(filtro);
+              setReingresoConfirmado(false);
+              setForm((f) => ({ ...f, student_id: '' }));
+            }}
+            valor={form.student_id}
+            onChange={(id) => {
+              setReingresoConfirmado(false);
+              const elegido = studentsQuery.data?.find((e) => e._id === id);
+              // Quien vuelve ya estudió aquí: el tipo de ingreso natural es ANTIGUO (secretaría lo puede cambiar).
+              setForm((f) => ({ ...f, student_id: id, tipo_ingreso: elegido?.situacion === 'REINGRESO' ? 'ANTIGUO' : f.tipo_ingreso }));
+            }}
+            reingresoConfirmado={reingresoConfirmado}
+            onReingresoChange={setReingresoConfirmado}
           />
         ) : (
           <div className="space-y-4">

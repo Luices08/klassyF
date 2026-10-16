@@ -2,7 +2,8 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import Enrollment from '../../src/models/enrollment.model';
 import Group, { GroupDocument } from '../../src/models/group.model';
 import { UserDocument } from '../../src/models/user.model';
-import { cambiarGrupo, createEnrollment, updateEnrollmentStatus } from '../../src/services/enrollment.service';
+import StudentProfile from '../../src/models/studentProfile.model';
+import { cambiarGrupo, createEnrollment, listarSituacionEstudiantes, updateEnrollmentStatus } from '../../src/services/enrollment.service';
 import { detenerBaseDeDatos, iniciarBaseDeDatos, limpiarBaseDeDatos } from './baseDeDatos';
 import { armarEscenario, Escenario } from './escenario';
 
@@ -89,5 +90,28 @@ describe('M04: una matrícula viva por estudiante y año', () => {
     expect(await Enrollment.countDocuments({ student_id: e.estudiante._id })).toBe(1);
     expect((await Group.findById(otroGrupo._id))!.cupos_ocupados).toBe(1);
     expect((await Group.findById(grupoActual._id))!.cupos_ocupados).toBe(Math.max(ocupadosAntes - 1, 0));
+  });
+  describe('situación del estudiante y reingreso', () => {
+    const anio = () => String(grupoActual.academic_year_id);
+
+    it('lista a cada estudiante con su situación: matriculado con grupo y folio, o disponible', async () => {
+      const lista = await listarSituacionEstudiantes(anio());
+      const propio = lista.find((x) => x._id === String(e.estudiante._id))!;
+      expect(propio.situacion).toBe('MATRICULADO');
+      expect(propio.matricula).toMatchObject({ estado: 'MATRICULADO_CONDICIONAL', folio: expect.any(String) });
+      expect(lista.find((x) => x._id === String(e.otroEstudiante._id))!.situacion).toBe('DISPONIBLE');
+    });
+
+    it('un retirado figura en reingreso y no se matricula sin confirmar la reincorporación', async () => {
+      await StudentProfile.updateOne({ user_id: e.otroEstudiante._id }, { estado: 'RETIRADO' }, { upsert: true });
+      const lista = await listarSituacionEstudiantes(anio());
+      expect(lista.find((x) => x._id === String(e.otroEstudiante._id))!.situacion).toBe('REINGRESO');
+
+      const datos = { student_id: e.otroEstudiante._id, group_id: otroGrupo._id, academic_year_id: otroGrupo.academic_year_id, tipo_ingreso: 'ANTIGUO' as const, fecha_limite_compromiso: PLAZO };
+      await expect(createEnrollment(datos, como(e.secretaria))).rejects.toMatchObject({ statusCode: 409, message: expect.stringMatching(/Reingreso/) });
+
+      await createEnrollment({ ...datos, reingreso: true }, como(e.secretaria));
+      expect((await StudentProfile.findOne({ user_id: e.otroEstudiante._id }))!.estado).toBe('ACTIVO');
+    });
   });
 });

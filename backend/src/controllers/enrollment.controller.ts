@@ -27,6 +27,11 @@ export const listEnrollments = catchAsync<unknown, unknown, unknown, ListQuery>(
   res.status(200).json({ success: true, ...resultado });
 });
 
+export const situacionEstudiantes = catchAsync<unknown, unknown, unknown, { academic_year_id: string }>(async (req, res) => {
+  const data = await enrollmentService.listarSituacionEstudiantes(req.query.academic_year_id);
+  res.status(200).json({ success: true, data });
+});
+
 export const listarDocumentosPorRevisar = catchAsync<unknown, unknown, unknown, enrollmentService.FiltroDocumentosPorRevisar>(async (req, res) => {
   const resultado = await enrollmentService.listarDocumentosPorRevisar(req.query);
   res.status(200).json({ success: true, ...resultado });

@@ -10,6 +10,7 @@ import runTransaction from '../utils/runTransaction';
 import Enrollment from '../models/enrollment.model';
 import { registrarEvento } from './audit.service';
 import { abrirExpediente } from './expedienteInclusion.service';
+import { avisarSolicitudApoyo } from './notificacionesEventos.service';
 import { anioEnCurso, cargarContextoEstudiante, comoUsuarioInclusion, exigirPermiso } from './inclusionContexto.service';
 import { enAlcanceDeSede } from '../utils/permisosConvivencia';
 
@@ -51,6 +52,7 @@ export async function crearSolicitud(input: CrearSolicitudInput, usuario: UserDo
     return traducirDuplicado(err);
   }
   await registrarEvento({ usuario_id: usuario._id, accion: 'INCLUSION_SOLICITUD_CREADA', entidad: 'SolicitudApoyo', entidad_id: solicitud._id, detalle: solicitud.origen, ip });
+  await avisarSolicitudApoyo(solicitud.sede_id);
   return solicitud;
 }
 
@@ -93,6 +95,8 @@ export async function crearDesdeMatricula(input: SolicitudDesdeMatricula, sessio
     ],
     { session }
   );
+  // Dentro de la transacción de la matrícula: si esta se deshace, a lo sumo queda un punto de más que se apaga al entrar.
+  await avisarSolicitudApoyo(grupo.sede_id);
 }
 
 async function vistaSolicitudes(solicitudes: SolicitudApoyoDocument[], verContenido: boolean) {

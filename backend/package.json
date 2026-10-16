@@ -11,6 +11,7 @@
     "seed:demo": "tsx scripts/seedDemoCompleto.ts",
     "seed:subjects": "tsx scripts/seedSubjects.ts",
     "migrate:roles-multiples": "tsx scripts/migrateRolesMultiples.ts",
+    "notificar:diario": "tsx scripts/notificarDiario.ts",
     "migrate:superadmin-to-admin": "tsx scripts/migrateSuperadminToAdmin.ts",
     "migrate:m05-anio-lectivo": "tsx scripts/migrateM05AnioLectivo.ts",
     "migrate:folio-al-matricular": "tsx scripts/migrateFolioAlMatricular.ts",

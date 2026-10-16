@@ -9,6 +9,7 @@ import { PageHeader } from '../components/ui/PageHeader';
 import { Spinner } from '../components/ui/Spinner';
 import { EmptyRow, Table, TableBody, TableHead, Td, Th } from '../components/ui/Table';
 import { Tabs } from '../components/ui/Tabs';
+import { useContadoresDePestana } from '../hooks/useNotificaciones';
 import { type ActividadEstudiante, useMisActividades } from '../hooks/useActividades';
 import { diasParaEntrega, formatoInstante } from '../lib/actividades';
 
@@ -37,6 +38,7 @@ function Plazo({ actividad }: { actividad: ActividadEstudiante }) {
 export function MisActividadesPage() {
   const { data = [], isLoading, isError, error } = useMisActividades();
   const [pestana, setPestana] = useState<Pestana>('pendientes');
+  const contadorDe = useContadoresDePestana('/mis-actividades', pestana);
   const [asignatura, setAsignatura] = useState('');
   const [desde, setDesde] = useState('');
   const [hasta, setHasta] = useState('');
@@ -99,7 +101,7 @@ export function MisActividadesPage() {
 
       <Tabs
         items={[
-          { key: 'pendientes', label: `Pendientes (${cuenta('pendientes')})` },
+          { key: 'pendientes', label: `Pendientes (${cuenta('pendientes')})`, contador: contadorDe('pendientes') },
           { key: 'entregadas', label: `Entregadas (${cuenta('entregadas')})` },
           { key: 'calificadas', label: `Calificadas (${cuenta('calificadas')})` },
           { key: 'todas', label: `Todas (${cuenta('todas')})` },

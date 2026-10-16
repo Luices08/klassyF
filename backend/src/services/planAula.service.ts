@@ -1,4 +1,5 @@
 import { Types } from 'mongoose';
+import { avisarPlanEnRevision, avisarPlanRevisado } from './notificacionesEventos.service';
 import { NivelEducativo } from '../constants/enums';
 import { EstadoPlanVista, MAX_COMENTARIO_REVISION, NOMBRES_ESTADO_PLAN } from '../constants/planeacion';
 import { ROLES } from '../constants/roles';
@@ -510,6 +511,7 @@ export async function radicarPlanDeAula(input: RadicarPlanAulaInput, archivo: Pd
     detalle: `Periodo ${input.periodo_numero}, versión ${numero}${!existente && radicacion.fuera_de_plazo ? ' (fuera de plazo)' : ''}.`,
     ip,
   });
+  await avisarPlanEnRevision('aula');
   return obtenerPlanDeAula(String(plan._id), docente);
 }
 
@@ -645,6 +647,7 @@ export async function revisarPlanDeAula(id: string, input: RevisarPlanInput, rev
     detalle: `Periodo ${plan.periodo_numero} → ${nuevoEstado}.`,
     ip,
   });
+  await avisarPlanRevisado({ _id: plan._id, docenteId: plan.docente_id, decision: input.decision, subjectId: plan.subject_id });
   return obtenerPlanDeAula(id, revisor);
 }
 

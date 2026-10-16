@@ -281,3 +281,17 @@ export const SendIcon = (p: IconProps) => (
     <path d="M22 2 11 13M22 2l-7 20-4-9-9-4Z" />
   </Icon>
 );
+
+export const BellIcon = (p: IconProps) => (
+  <Icon {...p}>
+    <path d="M6 16V11a6 6 0 0 1 12 0v5l1.5 2h-15L6 16Z" />
+    <path d="M10 21h4" />
+  </Icon>
+);
+
+export const MegaphoneIcon = (p: IconProps) => (
+  <Icon {...p}>
+    <path d="M4 10v4h3l7 4V6L7 10H4Z" />
+    <path d="M18 9a4 4 0 0 1 0 6" />
+  </Icon>
+);

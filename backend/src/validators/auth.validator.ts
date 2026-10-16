@@ -8,6 +8,8 @@ export const login: ValidationSchema = {
   body: Joi.object({
     numero_documento: Joi.string().required(),
     password: Joi.string().required(),
+    // Perfil con el que quiere entrar (selector del login). Sin él se mantiene el flujo de elegir después de validar la contraseña.
+    rol: Joi.string().valid(...ROLES),
   }),
 };
 

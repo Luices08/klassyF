@@ -1,4 +1,5 @@
 import { HydratedDocument, Types } from 'mongoose';
+import { avisarFaltaGrave, avisarObservacionesVisibles } from './notificacionesEventos.service';
 import {
   ContextoObservacion,
   EstadoCompromiso,
@@ -370,6 +371,8 @@ export async function registrarObservacion(input: RegistrarObservacionInput, usu
     detalle: `${creadas.length} estudiante(s)${eventoId ? `; evento ${eventoId}` : ''}`,
     ip,
   });
+  // Solo lo que la familia puede ver (misma regla que `observadorParaLaFamilia`): lo confidencial no deja rastro en ninguna alerta.
+  if (!confidencial && tipo.visible_estudiante) await avisarObservacionesVisibles(creadas.map((o) => o.student_id));
   return creadas.map((o) => vista(o, 'COMPLETA'));
 }
 
@@ -486,6 +489,13 @@ export async function registrarFalta(input: RegistrarFaltaInput, usuario: UserDo
   });
   if (solicitudId) {
     await registrarEvento({ usuario_id: usuario._id, accion: 'SOLICITUD_CASO_REGISTRADA', entidad: 'SolicitudCaso', entidad_id: solicitudId, ip });
+  }
+  // Una Tipo I (aunque se remita) se queda en el observador y la familia la ve completa; II y III son alerta crítica y sin detalle.
+  if (falta.gravedad === 'I') await avisarObservacionesVisibles(creadas.map((o) => o.student_id));
+  else {
+    for (const o of creadas) {
+      await avisarFaltaGrave({ observacionId: o._id, estudianteId: o.student_id, sedeId: solicitud?.sede_id ?? null, hayCaso: Boolean(solicitud) });
+    }
   }
   return { registros: creadas.map((o) => vista(o, 'COMPLETA')), remitida };
 }

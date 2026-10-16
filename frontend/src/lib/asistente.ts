@@ -200,6 +200,7 @@ export const PALABRAS_CLAVE_POR_RUTA: Record<string, { descripcion: string; clav
     descripcion: 'Portal del acudiente: notas, inasistencias, convivencia, documentos de matrícula y certificados de tus estudiantes a cargo.',
     claves: ['portal', 'portal del acudiente', 'mis hijos', 'mi hijo', 'notas de mi hijo', 'inasistencias de mi hijo', 'fallas de mi hijo', 'subir documentos', 'documentos pendientes', 'documentos de matricula', 'constancia de estudio', 'certificado de estudio', 'descargar certificado', 'observador de mi hijo'],
   },
+  '/anuncios': { descripcion: 'Tablero de anuncios de la institución; coordinación y administración los publican.', claves: ['anuncios', 'avisos', 'comunicados', 'circulares', 'publicar anuncio', 'tablero'] },
   '/mis-notas': { descripcion: 'Tus notas por asignatura.', claves: ['mis notas', 'ver mis notas', 'cuanto llevo', 'mis calificaciones'] },
   '/mi-observador': { descripcion: 'Tu observador.', claves: ['mi observador', 'mis observaciones', 'mis faltas'] },
 };

@@ -12,6 +12,7 @@ import { Select } from '../components/ui/Field';
 import { PageHeader } from '../components/ui/PageHeader';
 import { Spinner } from '../components/ui/Spinner';
 import { TabPanel, Tabs } from '../components/ui/Tabs';
+import { useContadoresDePestana } from '../hooks/useNotificaciones';
 import { useAnioDeTrabajo } from '../hooks/useAniosLectivos';
 import { usePlanesArea } from '../hooks/usePlanesArea';
 import { useMisPlanesAula } from '../hooks/usePlanesAula';
@@ -39,12 +40,13 @@ export function PlaneacionDocentePage() {
   const filasQueLidero = (planesArea.data ?? []).filter((f) => f.soy_lider);
 
   const [pestana, setPestana] = useState('aula');
+  const contadorDe = useContadoresDePestana('/docente/planeacion', pestana);
   const [cargandoAula, setCargandoAula] = useState<ObjetivoAula | null>(null);
   const [adoptando, setAdoptando] = useState<(ObjetivoAula & { plan: PlanAdoptable }) | null>(null);
   const [cargandoArea, setCargandoArea] = useState<FilaPlanArea | null>(null);
   const [viendo, setViendo] = useState<{ tipo: 'AREA' | 'AULA'; id: string } | null>(null);
 
-  const pestanas = [{ key: 'aula', label: 'Planes de aula' }, ...(filasQueLidero.length > 0 ? [{ key: 'area', label: 'Plan de área' }] : [])];
+  const pestanas = [{ key: 'aula', label: 'Planes de aula', contador: contadorDe('aula') }, ...(filasQueLidero.length > 0 ? [{ key: 'area', label: 'Plan de área', contador: contadorDe('area') }] : [])];
   const areasPendientes = filasQueLidero.filter((f) => f.vigente && (f.estado === 'SIN_CARGAR' || f.estado === 'DEVUELTO'));
   const nombresDeAreasPendientes = [...new Set(areasPendientes.map((f) => f.area.nombre))];
 

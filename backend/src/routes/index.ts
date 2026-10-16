@@ -25,6 +25,7 @@ import institutionRoutes from './institution.routes';
 import jornadaOperativaRoutes from './jornadaOperativa.routes';
 import liderAreaRoutes from './liderArea.routes';
 import notasRoutes from './notas.routes';
+import notificacionRoutes from './notificacion.routes';
 import observacionRoutes from './observacion.routes';
 import periodLockRoutes from './periodLock.routes';
 import portalAcudienteRoutes from './portalAcudiente.routes';
@@ -43,6 +44,9 @@ import ventanaPlanesRoutes from './ventanaPlanes.routes';
 const router = Router();
 
 router.use('/auth', authRoutes);
+
+// M28: campanita, contadores del menú y tablero de anuncios
+router.use('/notificaciones', notificacionRoutes);
 router.use('/users', userRoutes);
 
 // Asistente flotante: orienta al usuario hacia la pantalla que busca

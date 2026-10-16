@@ -19,6 +19,7 @@ import { registrarEvento } from './audit.service';
 import { fechaDeClase } from './attendance.service';
 import { casillasDeClase, exigirCasillaDisponible, exigirPesosValidos } from './casillasBloque.service';
 import { exigirPlanillaAbierta } from './notasEstado.service';
+import { avisarActividadNueva } from './notificacionesEventos.service';
 import { exigirPlanAulaAprobado } from './planeacionCompuertas.service';
 
 export type ActividadPlana = IActivity & { _id: Types.ObjectId };
@@ -203,6 +204,7 @@ export async function createActivity(input: CreateActivityInput, docente: UserDo
     detalle: `${input.tipo} «${input.titulo}», periodo ${input.periodo_numero}.`,
     ip,
   });
+  if (actividad.fecha_apertura.getTime() <= Date.now()) await avisarActividadNueva(asignacion);
   return actividad;
 }
 
@@ -273,6 +275,7 @@ export async function updateActivity(
   }
 
   const { confirmar_alertas: _confirmar, ...resto } = cambios;
+  const estabaOculta = actividad.fecha_apertura.getTime() > Date.now();
   actividad.set(resto);
   if (!requiereEntrega) actividad.formatos_permitidos = [];
   await actividad.save();
@@ -285,6 +288,7 @@ export async function updateActivity(
     detalle: Object.keys(resto).join(', '),
     ip,
   });
+  if (estabaOculta && actividad.fecha_apertura.getTime() <= Date.now()) await avisarActividadNueva(asignacion);
   return actividad;
 }
 

@@ -18,6 +18,7 @@ import { AsistenciaPage } from './pages/AsistenciaPage';
 import { GestionAsistenciaPage } from './pages/GestionAsistenciaPage';
 import { MisActividadesPage } from './pages/MisActividadesPage';
 import { MisNotasPage } from './pages/MisNotasPage';
+import { AnunciosPage } from './pages/AnunciosPage';
 import { MiObservadorPage } from './pages/MiObservadorPage';
 import { ObservadorPage } from './pages/ObservadorPage';
 import { OrientacionPage } from './pages/OrientacionPage';
@@ -162,6 +163,7 @@ export default function App() {
           </Route>
           <Route element={<ProtectedRoute allowedRoles={['ESTUDIANTE']} />}>
             <Route path="/mis-actividades" element={<MisActividadesPage />} />
+            <Route path="/anuncios" element={<AnunciosPage />} />
             <Route path="/mis-notas" element={<MisNotasPage />} />
             <Route path="/mi-observador" element={<MiObservadorPage />} />
           </Route>

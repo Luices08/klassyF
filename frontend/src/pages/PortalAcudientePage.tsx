@@ -11,6 +11,7 @@ import { Card } from '../components/ui/Card';
 import { PageHeader } from '../components/ui/PageHeader';
 import { Spinner } from '../components/ui/Spinner';
 import { TabPanel, Tabs } from '../components/ui/Tabs';
+import { useContadoresDePestana } from '../hooks/useNotificaciones';
 import { type HijoDelPortal, useHijos } from '../hooks/usePortal';
 
 type Pestana = 'notas' | 'inasistencias' | 'convivencia' | 'documentos' | 'certificados';
@@ -72,11 +73,28 @@ export function PortalAcudientePage() {
 
   // Un id que no es de la familia (URL antigua o manipulada) cae en el primer hijo en lugar de pedir datos ajenos.
   const hijo = hijos.find((h) => h.student_id === params.get('hijo')) ?? hijos[0]!;
+  return <PortalDeHijo hijos={hijos} hijo={hijo} pedida={params.get('pestana') as Pestana | null} onCambiar={setParams} />;
+}
+
+/** El contenido del portal para el hijo elegido; aparte del componente de arriba para poder usar hooks después de sus retornos tempranos. */
+function PortalDeHijo({
+  hijos,
+  hijo,
+  pedida,
+  onCambiar,
+}: {
+  hijos: HijoDelPortal[];
+  hijo: HijoDelPortal;
+  pedida: Pestana | null;
+  onCambiar: (params: Record<string, string>, opciones: { replace: boolean }) => void;
+}) {
   const academica = Boolean(hijo.matricula && MATRICULA_ACADEMICA.includes(hijo.matricula.estado));
-  const pedida = params.get('pestana') as Pestana | null;
   const pestana: Pestana = pedida && PESTANAS.includes(pedida) ? pedida : academica ? 'notas' : 'documentos';
 
-  const elegir = (cambios: Record<string, string>) => setParams({ hijo: hijo.student_id, pestana, ...cambios }, { replace: true });
+  // Cada hijo tiene sus propios puntos rojos: abrir «Inasistencias» de uno no apaga el de otro.
+  const contadorDe = useContadoresDePestana('/portal', pestana, hijo.student_id);
+
+  const elegir = (cambios: Record<string, string>) => onCambiar({ hijo: hijo.student_id, pestana, ...cambios }, { replace: true });
 
   return (
     <div className="space-y-4">
@@ -88,9 +106,9 @@ export function PortalAcudientePage() {
       <Tabs
         items={[
           { key: 'notas', label: 'Notas' },
-          { key: 'inasistencias', label: 'Inasistencias' },
-          { key: 'convivencia', label: 'Convivencia' },
-          { key: 'documentos', label: hijo.documentos_pendientes > 0 ? `Documentos (${hijo.documentos_pendientes})` : 'Documentos' },
+          { key: 'inasistencias', label: 'Inasistencias', contador: contadorDe('inasistencias') },
+          { key: 'convivencia', label: 'Convivencia', contador: contadorDe('convivencia') },
+          { key: 'documentos', label: hijo.documentos_pendientes > 0 ? `Documentos (${hijo.documentos_pendientes})` : 'Documentos', contador: contadorDe('documentos') },
           { key: 'certificados', label: 'Certificados' },
         ]}
         active={pestana}

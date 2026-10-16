@@ -725,6 +725,8 @@ export interface PublicInstitutionInfo {
   nit: string;
   resolucion_aprobacion: string;
   logo_url: string | null;
+  /** Fecha (ms) de la foto del login, o null si no hay: sirve de versión en la URL de la imagen. */
+  imagen_login_version: number | null;
   correo_secretaria: string | null;
   horario_atencion: string | null;
   sedes: PublicSede[];

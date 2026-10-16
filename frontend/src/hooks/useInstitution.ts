@@ -62,10 +62,60 @@ export interface UpdateInstitutionInput {
   departamento?: string | null;
   correo_secretaria?: string | null;
   horario_atencion?: string | null;
+  confirm_password: string;
+}
+
+export interface AjustesInstitucionInput {
   modalidad?: ModalidadInstitucion;
   politica_aforo_aula?: PoliticaAforoAula;
   paz_y_salvo_docentes?: boolean;
-  confirm_password: string;
+}
+
+/** Ajustes de funcionamiento (modalidad, aforo, paz y salvo): bloques propios, sin contraseña. */
+export function useActualizarAjustesInstitucion() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (ajustes: AjustesInstitucionInput) => api.patch<Institution>('/institution/ajustes', ajustes),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['institution'] });
+    },
+  });
+}
+
+export type ClaveImagenInstitucional = 'login' | 'dashboard';
+export type ImagenesInstitucion = Record<ClaveImagenInstitucional, { actualizada_en: string } | null>;
+
+export function useImagenesInstitucion() {
+  return useQuery({
+    queryKey: ['institution', 'imagenes'],
+    queryFn: () => api.get<ImagenesInstitucion>('/institution/imagenes'),
+  });
+}
+
+export function useSubirImagenInstitucion() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ clave, file }: { clave: ClaveImagenInstitucional; file: File }) => {
+      const formData = new FormData();
+      formData.append('file', file);
+      return api.upload<ImagenesInstitucion>(`/institution/imagenes/${clave}`, formData);
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['institution'] });
+      void queryClient.invalidateQueries({ queryKey: ['public', 'institution-info'] });
+    },
+  });
+}
+
+export function useQuitarImagenInstitucion() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (clave: ClaveImagenInstitucional) => api.delete<ImagenesInstitucion>(`/institution/imagenes/${clave}`),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['institution'] });
+      void queryClient.invalidateQueries({ queryKey: ['public', 'institution-info'] });
+    },
+  });
 }
 
 export function useUpdateInstitution() {

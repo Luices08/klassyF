@@ -1,4 +1,5 @@
-import { NavLink, Outlet } from 'react-router-dom';
+import { useEffect } from 'react';
+import { NavLink, Outlet, useLocation } from 'react-router-dom';
 import { AsistenteFlotante } from '../asistente/AsistenteFlotante';
 import { RolBadge } from '../ui/Badge';
 import { LogOutIcon } from '../ui/icons';
@@ -7,11 +8,35 @@ import { useInstitution } from '../../hooks/useInstitution';
 import { CambiadorDePerfil } from './CambiadorDePerfil';
 import { ForcedPasswordChangeGate } from './ForcedPasswordChangeGate';
 import { NAV_ITEMS } from './navigation';
+import { Campanita } from '../notificaciones/Campanita';
+import { ContadorInsignia } from '../notificaciones/ContadorInsignia';
+import { contadorDeRuta, useMarcarVisto, useResumenNotificaciones } from '../../hooks/useNotificaciones';
 
 export function AppShell() {
   const { user, logout } = useAuth();
   const { data: institucion } = useInstitution();
+  const { data: resumen } = useResumenNotificaciones();
+  const marcarVisto = useMarcarVisto();
+  const { pathname } = useLocation();
+  const hayPuntoEnRuta = resumen?.insignias.some((i) => i.ruta === pathname && i.pestana === '') ?? false;
+
+  // Entrar al módulo apaga su punto (los de pestañas se apagan cuando se abre la pestaña).
+  useEffect(() => {
+    if (hayPuntoEnRuta) marcarVisto.mutate({ ruta: pathname });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pathname, hayPuntoEnRuta]);
+
+  const noLeidas = resumen?.no_leidas ?? 0;
+  // Quien deja la pestaña abierta ve en el título si le llegó algo.
+  useEffect(() => {
+    document.title = noLeidas > 0 ? `(${noLeidas}) Klassy` : 'Klassy';
+    return () => {
+      document.title = 'Klassy';
+    };
+  }, [noLeidas]);
+
   if (!user) return null;
+
 
   const esVirtual = institucion?.modalidad === 'VIRTUAL';
   const items = NAV_ITEMS.filter(
@@ -40,6 +65,7 @@ export function AppShell() {
                 >
                   <item.icon className="h-[18px] w-[18px] shrink-0" />
                   {item.label}
+                  <ContadorInsignia valor={contadorDeRuta(resumen, item.to)} />
                 </NavLink>
               ))}
             </nav>
@@ -49,6 +75,7 @@ export function AppShell() {
             <header className="flex h-16 items-center justify-between border-b border-border bg-surface px-4 sm:px-6">
               <span className="text-h3 text-primary sm:hidden">Klassy</span>
               <div className="ml-auto flex items-center gap-4">
+                <Campanita />
                 <CambiadorDePerfil />
                 <div className="text-right">
                   <p className="text-sm font-semibold text-ink">

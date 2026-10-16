@@ -13,10 +13,11 @@ const MINUTOS_BLOQUEO = 15;
 interface LoginBody {
   numero_documento: string;
   password: string;
+  rol?: Rol;
 }
 
 export const login = catchAsync<unknown, unknown, LoginBody>(async (req, res) => {
-  const { numero_documento, password } = req.body;
+  const { numero_documento, password, rol } = req.body;
   const ip = req.ip ?? null;
 
   const user = await User.findOne({ numero_documento }).select('+password_hash');
@@ -58,6 +59,13 @@ export const login = catchAsync<unknown, unknown, LoginBody>(async (req, res) =>
   user.bloqueado_hasta = null;
   user.ultimo_login = new Date();
   await user.save();
+
+  // Eligió el perfil en el formulario: se valida después de la contraseña para no revelar qué perfiles tiene quien no la conoce.
+  if (rol) {
+    if (!perfiles.includes(rol)) throw new ApiError(403, 'Tu usuario no tiene ese perfil habilitado. Elige otro perfil.');
+    await abrirSesion(res, user, rol, ip);
+    return;
+  }
 
   // Con un solo perfil se abre la sesión de una vez; con varios, la persona elige (sin repetir la contraseña).
   if (perfiles.length === 1) {

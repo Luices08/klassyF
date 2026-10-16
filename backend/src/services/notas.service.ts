@@ -1,4 +1,5 @@
 import { ClientSession, Types } from 'mongoose';
+import { avisarActividadesCalificadas } from './notificacionesEventos.service';
 import { EstadoActividadEstudiante, TipoActividad } from '../constants/actividades';
 import { ESTADOS_MATRICULA_ACTIVOS, NivelDesempeno } from '../constants/enums';
 import { ESTADOS_NOTA_CERRADOS, EstadoNota } from '../constants/notas';
@@ -459,6 +460,7 @@ export async function registrarNotas(
     detalle: `Periodo ${ctx.periodo.numero}: ${deActividad.length} nota(s) de actividades y ${sueltas.length} de casillas sueltas de ${afectados.length} estudiante(s).`,
     ip,
   });
+  await avisarActividadesCalificadas(deActividad.map((c) => ({ estudianteId: c.estudianteId, actividadId: c.casillaId })));
   return { guardadas: cambios.length, sin_cambios: sinCambios };
 }
 

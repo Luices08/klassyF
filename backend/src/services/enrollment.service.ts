@@ -1,4 +1,5 @@
 import { Types } from 'mongoose';
+import { avisarDocumentoPorRevisar, avisarDocumentoRechazado } from './notificacionesEventos.service';
 import {
   CATEGORIAS_DOCUMENTO_MATRICULA,
   generarChecklistMatricula,
@@ -432,6 +433,7 @@ export async function cargarDocumento(
     entidad_id: enrollment._id,
     detalle: tipoDocumento,
   });
+  await avisarDocumentoPorRevisar();
 
   return enrollment;
 }
@@ -477,6 +479,7 @@ export async function revisarDocumento(
     entidad_id: enrollment._id,
     detalle: `${tipoDocumento}: ${input.estado}${transicion}`,
   });
+  if (input.estado === 'RECHAZADO') await avisarDocumentoRechazado(enrollment, input.comentario);
 
   return enrollment;
 }

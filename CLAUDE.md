@@ -789,6 +789,8 @@ lee `componente_siee` y `peso_en_componente`); M11 los extendió sin romper nada
   `max_evaluaciones_por_dia`: es un apoyo visual, el bloqueo/advertencia sigue siendo `revisarCalendario`. En el formulario de actividad, junto al límite de entrega, el
   botón «Ver carga de tareas del grupo» abre `PanelCargaGrupo` (drawer encima del formulario, no pierde lo digitado) con `CalendarioCalor`; al pasar o elegir un día lista asignatura,
   título, docente y hora, y «Usar este día como fecha de entrega» conserva la hora y desmarca `confirmar_alertas`. «Amarillo» es el token `warning` (no hay color nuevo).
+  **Sugerencia formativa, no bloqueo:** `revisarCalendario` suma una alerta de severidad `SUGERENCIA` (`CARGA_DEL_DIA`, `sugerenciaDeCarga`) cuando el día elegido ya tiene 2 o más entregas
+  («Este día ya cuenta con X entregas programadas…»); `exigirAlertasResueltas` solo mira `BLOQUEO` y `ADVERTENCIA`, así que nunca exige confirmar. No sale si el límite del colegio ya avisó (`SOBRECARGA_*`).
 - **Reglas de entrega:** `requiere_entrega` (false = actividad de aula, el docente califica directo) y `formatos_permitidos` (PDF, Word,
   Excel, PowerPoint, imagen; **vacío con entrega = respuesta escrita**, sin archivo). `permite_entrega_tardia`. Un solo archivo por
   entrega (o intento), 10 MB (`MAX_BYTES_ENTREGA`; nginx en 12 MB por el multipart). El contenido se confirma por firma de bytes

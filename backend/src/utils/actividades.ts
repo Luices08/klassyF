@@ -97,7 +97,8 @@ export function evaluarVentanaEntrega(plazos: PlazosActividad, ahora: Date, acce
 
 // --- Prevención de choques y sobrecarga ---
 
-export type SeveridadAlerta = 'BLOQUEO' | 'ADVERTENCIA';
+/** SUGERENCIA es formativa: se muestra pero nunca exige confirmar ni frena nada (autonomía pedagógica). */
+export type SeveridadAlerta = 'BLOQUEO' | 'ADVERTENCIA' | 'SUGERENCIA';
 
 export interface AlertaCalendario {
   codigo:
@@ -107,7 +108,8 @@ export interface AlertaCalendario {
     | 'DIA_NO_HABIL'
     | 'VENTANA_RECUPERACION'
     | 'SOBRECARGA_EVALUACIONES'
-    | 'SOBRECARGA_ENTREGAS';
+    | 'SOBRECARGA_ENTREGAS'
+    | 'CARGA_DEL_DIA';
   severidad: SeveridadAlerta;
   mensaje: string;
 }
@@ -202,6 +204,20 @@ export function evaluarCalendarioActividad(entrada: EntradaCalendario): AlertaCa
   }
 
   return alertas.sort((a, b) => Number(b.severidad === 'BLOQUEO') - Number(a.severidad === 'BLOQUEO'));
+}
+
+/**
+ * Sugerencia formativa cuando el día elegido ya tiene 2 o más entregas (con esta quedaría moderado o saturado, los mismos
+ * umbrales del mapa de carga). Los límites del colegio no intervienen: son un tope, esto es solo una invitación a mirar otro día.
+ */
+export function sugerenciaDeCarga(delDia: Array<Pick<ActividadDelGrupo, 'asignatura'>>): AlertaCalendario | null {
+  if (nivelDeCarga(delDia.length) === 'BAJA') return null;
+  const asignaturas = [...new Set(delDia.map((a) => a.asignatura))].join(', ');
+  return {
+    codigo: 'CARGA_DEL_DIA',
+    severidad: 'SUGERENCIA',
+    mensaje: `Este día ya cuenta con ${delDia.length} entregas programadas (${asignaturas}). Si tu planeación lo permite, otra fecha cercana repartiría mejor la carga del grupo; la decisión es tuya.`,
+  };
 }
 
 // --- Carga del grupo por mes (mapa de calor del formulario de actividades) ---

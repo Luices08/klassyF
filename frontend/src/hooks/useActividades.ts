@@ -163,7 +163,7 @@ export interface AnalisisActividad {
 
 export interface AlertaCalendario {
   codigo: string;
-  severidad: 'BLOQUEO' | 'ADVERTENCIA';
+  severidad: 'BLOQUEO' | 'ADVERTENCIA' | 'SUGERENCIA';
   mensaje: string;
 }
 

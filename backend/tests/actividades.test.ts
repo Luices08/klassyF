@@ -9,7 +9,9 @@ import {
   evaluarVentanaEntrega,
   nivelDeCarga,
   rangoDelMes,
+  sugerenciaDeCarga,
 } from '../src/utils/actividades';
+import { exigirAlertasResueltas } from '../src/services/actividadCalendario.service';
 import { detectarEvidencia } from '../src/utils/evidenciasActividad';
 
 const DOCX = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
@@ -209,6 +211,21 @@ describe('detectarEvidencia', () => {
 
   it('rechaza un ejecutable que declara ser PDF', () => {
     expect(detectarEvidencia('application/pdf', 'virus.pdf', Buffer.from('MZ\x90\x00'))).toBeNull();
+  });
+});
+
+describe('sugerencia de carga del día', () => {
+  it('con 0 o 1 entregas no sugiere nada; con 2 o más sí, nombrando las asignaturas', () => {
+    expect(sugerenciaDeCarga([])).toBeNull();
+    expect(sugerenciaDeCarga([{ asignatura: 'Matemáticas' }])).toBeNull();
+    const s = sugerenciaDeCarga([{ asignatura: 'Matemáticas' }, { asignatura: 'Inglés' }, { asignatura: 'Inglés' }]);
+    expect(s).toMatchObject({ codigo: 'CARGA_DEL_DIA', severidad: 'SUGERENCIA' });
+    expect(s?.mensaje).toContain('Este día ya cuenta con 3 entregas programadas (Matemáticas, Inglés)');
+  });
+
+  it('no frena ni exige confirmar: exigirAlertasResueltas la deja pasar', () => {
+    const s = sugerenciaDeCarga([{ asignatura: 'A' }, { asignatura: 'B' }])!;
+    expect(() => exigirAlertasResueltas([s], false)).not.toThrow();
   });
 });
 

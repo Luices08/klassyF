@@ -11,6 +11,7 @@ import {
   agruparCargaPorDia,
   diaCalendarioColombia,
   evaluarCalendarioActividad,
+  sugerenciaDeCarga,
   rangoDelMes,
 } from '../utils/actividades';
 import { finDelDia, hayEventoNoLectivo, inicioDelDia, periodosEfectivos } from '../utils/calendarioAcademico';
@@ -92,6 +93,9 @@ export async function revisarCalendario(
     del_grupo: delGrupo,
     limites,
   });
+  // Solo si el límite del colegio no avisó ya de lo mismo: dos mensajes sobre la misma carga serían ruido.
+  const sugerencia = alertas.some((a) => a.codigo.startsWith('SOBRECARGA')) ? null : sugerenciaDeCarga(delGrupo);
+  if (sugerencia) alertas.push(sugerencia);
 
   return {
     alertas,

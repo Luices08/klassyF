@@ -1,14 +1,21 @@
 import { Types } from 'mongoose';
 import PDFDocument from 'pdfkit';
+import { ColorAsignatura } from '../constants/horarios';
 import { Rol } from '../constants/enums';
 import AcademicYear from '../models/academicYear.model';
+import Campus from '../models/campus.model';
 import Horario from '../models/horario.model';
 import Institution from '../models/institution.model';
 import JornadaOperativa from '../models/jornadaOperativa.model';
 import ApiError from '../utils/ApiError';
+import { asignarColoresAsignaturas } from '../utils/coloresHorario';
 import { gruposDelUsuario, obtenerHorario } from './horario.service';
 
-export type VistaPdfHorario = 'GRUPO' | 'DOCENTE' | 'GENERAL';
+/**
+ * GRUPO / DOCENTE: la malla de uno (con `entidadId`) o de todos, una página cada uno. GENERAL: la hoja total de los docentes.
+ * TOTAL_GRUPOS: la hoja total de los grupos. COMPLETO: las dos hojas totales y después cada docente y cada grupo.
+ */
+export type VistaPdfHorario = 'GRUPO' | 'DOCENTE' | 'GENERAL' | 'TOTAL_GRUPOS' | 'COMPLETO';
 
 // Los mismos tonos de la guía visual (Klassy UI Spec) que usan los PDF de asistencia.
 const COLOR = {
@@ -19,14 +26,22 @@ const COLOR = {
   primario: '#2878EA',
   primarioSuave: '#EAF3FF',
   alertaSuave: '#FFF5E6',
+  alerta: '#F2A23A',
   suave: '#F1F5F9',
+  blanco: '#FFFFFF',
 };
+const COLOR_REUNION: ColorAsignatura = { fondo: COLOR.alertaSuave, borde: COLOR.alerta };
+const COLOR_SIN_ASIGNATURA: ColorAsignatura = { fondo: COLOR.primarioSuave, borde: COLOR.primario };
 const MARGEN = 30;
 const DIAS = ['', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
 const JORNADAS: Record<string, string> = { MANANA: 'Mañana', TARDE: 'Tarde', UNICA: 'Única', NOCTURNA: 'Nocturna', SABATINA: 'Sabatina' };
 
 type Documento = InstanceType<typeof PDFDocument>;
-type Detalle = Awaited<ReturnType<typeof obtenerHorario>>;
+type Marcador = Documento['outline'];
+type DetalleCompleto = Awaited<ReturnType<typeof obtenerHorario>>;
+/** Lo que el dibujo lee de una versión: sus sesiones, la estructura de la jornada y los nombres. */
+export type DetalleParaPdf = Pick<DetalleCompleto, 'horario' | 'estructura' | 'catalogo'>;
+type Detalle = DetalleParaPdf;
 type Sesion = Detalle['horario']['sesiones'][number];
 
 interface Usuario {
@@ -34,16 +49,22 @@ interface Usuario {
   rol: Rol;
 }
 
+/** Lo que cambia de un horario a otro dentro de un mismo documento: quién lo encabeza y de qué jornada es. */
+export interface ContextoHoja {
+  institucion: string;
+  subtitulo: string;
+}
+
 /**
  * Quién puede bajar qué: ADMIN y COORDINADOR, cualquier vista de cualquier versión. El resto, solo versiones publicadas y
- * solo lo suyo: el docente su horario; el estudiante y el acudiente, el de su(s) grupo(s). La sábana general es de gestión.
+ * solo lo suyo: el docente su horario; el estudiante y el acudiente, el de su(s) grupo(s). Las hojas totales son de gestión.
  */
 async function exigirPermiso(usuario: Usuario, horario: { estado: string; academic_year_id: Types.ObjectId }, vista: VistaPdfHorario, entidadId?: string) {
   if (usuario.rol === 'ADMIN' || usuario.rol === 'COORDINADOR') return;
   const negar = () => {
     throw new ApiError(403, 'No tienes permiso para descargar este horario.');
   };
-  if (horario.estado !== 'PUBLICADO' || vista === 'GENERAL' || !entidadId) return negar();
+  if (horario.estado !== 'PUBLICADO' || (vista !== 'GRUPO' && vista !== 'DOCENTE') || !entidadId) return negar();
   if (usuario.rol === 'DOCENTE') {
     if (vista !== 'DOCENTE' || entidadId !== String(usuario._id)) negar();
     return;
@@ -60,29 +81,82 @@ function nombres(detalle: Detalle) {
   const { catalogo } = detalle;
   const asignatura = new Map(catalogo.asignaturas.map((s) => [s._id, s]));
   const grupo = new Map(catalogo.grupos.map((g) => [g._id, g]));
-  const docente = new Map(catalogo.docentes.map((d) => [d._id, d.nombre]));
+  const docente = new Map(catalogo.docentes.map((d) => [d._id, d]));
   const espacio = new Map(catalogo.espacios.map((e) => [e._id, e.nombre]));
   const reunion = new Map(catalogo.reuniones.map((r) => [r._id, r.nombre]));
   return {
     titulo: (s: Sesion) => (s.subject_id ? (asignatura.get(String(s.subject_id))?.nombre ?? '') : (reunion.get(String(s.reunion_variable_id)) ?? 'Reunión')),
     corto: (s: Sesion) => (s.subject_id ? (asignatura.get(String(s.subject_id))?.abreviatura ?? '') : 'Reun.'),
+    color: (s: Sesion): ColorAsignatura => (s.subject_id ? (asignatura.get(String(s.subject_id))?.color ?? COLOR_SIN_ASIGNATURA) : COLOR_REUNION),
     grupo: (id: Types.ObjectId | null) => (id ? (grupo.get(String(id))?.etiqueta ?? '') : ''),
     grupoCorto: (id: Types.ObjectId | null) => (id ? (grupo.get(String(id))?.etiqueta_corta ?? '') : ''),
-    docentes: (s: Sesion) => s.docente_ids.map((d) => docente.get(String(d)) ?? '').join(', '),
+    docentes: (s: Sesion) => s.docente_ids.map((d) => docente.get(String(d))?.nombre ?? '').join(', '),
+    docentesCortos: (s: Sesion) => s.docente_ids.map((d) => docente.get(String(d))?.nombre_corto ?? '').join(' / '),
     espacio: (id: Types.ObjectId | null) => (id ? (espacio.get(String(id)) ?? '') : ''),
   };
 }
+type Nombres = ReturnType<typeof nombres>;
 
-function encabezado(doc: Documento, institucion: string, titulo: string, subtitulo: string): number {
+// ------------------------------------------------------------------ documento
+
+function crearDocumento() {
+  const doc = new PDFDocument({ autoFirstPage: false, bufferPages: true, margins: { top: MARGEN, left: MARGEN, right: MARGEN, bottom: MARGEN } });
+  const partes: Buffer[] = [];
+  doc.on('data', (p: Buffer) => partes.push(p));
+  const listo = new Promise<Buffer>((resolve, reject) => {
+    doc.on('end', () => resolve(Buffer.concat(partes)));
+    doc.on('error', reject);
+  });
+  return { doc, listo };
+}
+
+/** Las hojas totales llevan muchas columnas y se dibujan en A3; las mallas de un grupo o un docente, en carta. */
+function nuevaPagina(doc: Documento, grande = false) {
+  doc.addPage({ size: grande ? 'A3' : 'LETTER', layout: 'landscape', margins: { top: MARGEN, left: MARGEN, right: MARGEN, bottom: MARGEN } });
+}
+
+/** Deja un marcador (el índice lateral del visor de PDF) sobre la página abierta, colgado de `padre` o de la raíz. */
+function marcar(padre: Marcador | null, doc: Documento, titulo: string): Marcador {
+  return (padre ?? doc.outline).addItem(titulo);
+}
+
+/** «Página n de N» arriba a la derecha y la fecha de generación abajo, ya con todas las páginas escritas. */
+function pieDePaginas(doc: Documento) {
+  const generado = new Date().toLocaleString('es-CO', { timeZone: 'America/Bogota', dateStyle: 'medium', timeStyle: 'short' });
+  const { start, count } = doc.bufferedPageRange();
+  for (let i = start; i < start + count; i += 1) {
+    doc.switchToPage(i);
+    const margenes = doc.page.margins;
+    const abajo = margenes.bottom;
+    margenes.bottom = 0;
+    const ancho = doc.page.width - MARGEN * 2;
+    doc.font('Helvetica').fontSize(7).fillColor(COLOR.tenue);
+    doc.text(`Página ${i + 1} de ${count}`, MARGEN, MARGEN, { width: ancho, align: 'right', lineBreak: false });
+    doc.text(`Horario generado el ${generado} · Klassy`, MARGEN, doc.page.height - MARGEN + 10, { width: ancho, lineBreak: false });
+    margenes.bottom = abajo;
+  }
+}
+
+function encabezado(doc: Documento, contexto: ContextoHoja, titulo: string): number {
   const ancho = doc.page.width - MARGEN * 2;
-  doc.font('Helvetica-Bold').fontSize(10).fillColor(COLOR.cuerpo).text(institucion, MARGEN, MARGEN, { width: ancho, lineBreak: false });
-  doc.font('Helvetica-Bold').fontSize(16).fillColor(COLOR.ink).text(titulo, MARGEN, MARGEN + 14, { width: ancho, lineBreak: false });
-  doc.font('Helvetica').fontSize(9).fillColor(COLOR.tenue).text(subtitulo, MARGEN, MARGEN + 34, { width: ancho, lineBreak: false });
+  doc.font('Helvetica-Bold').fontSize(10).fillColor(COLOR.cuerpo).text(contexto.institucion, MARGEN, MARGEN, { width: ancho - 80, lineBreak: false, ellipsis: true });
+  doc.font('Helvetica-Bold').fontSize(16).fillColor(COLOR.ink).text(titulo, MARGEN, MARGEN + 14, { width: ancho, lineBreak: false, ellipsis: true });
+  doc.font('Helvetica').fontSize(9).fillColor(COLOR.tenue).text(contexto.subtitulo, MARGEN, MARGEN + 34, { width: ancho, lineBreak: false, ellipsis: true });
   return MARGEN + 52;
 }
 
+/** Acorta el texto con «…» hasta que quepa en `ancho` con la fuente que esté puesta. */
+function recortar(doc: Documento, texto: string, ancho: number): string {
+  if (doc.widthOfString(texto) <= ancho) return texto;
+  let corto = texto;
+  while (corto.length > 1 && doc.widthOfString(`${corto}…`) > ancho) corto = corto.slice(0, -1);
+  return `${corto.trimEnd()}…`;
+}
+
+// ------------------------------------------------------------------ malla de un grupo o docente
+
 /** Una página: periodos en filas, días en columnas; los bloques de varias horas ocupan una sola caja alta. */
-function paginaMalla(doc: Documento, detalle: Detalle, sesiones: Sesion[], secundario: (s: Sesion) => string, n: ReturnType<typeof nombres>, y0: number) {
+function paginaMalla(doc: Documento, detalle: Detalle, sesiones: Sesion[], secundario: (s: Sesion) => string, n: Nombres, y0: number) {
   const { estructura } = detalle;
   const anchoPeriodo = 78;
   const anchoDia = (doc.page.width - MARGEN * 2 - anchoPeriodo) / Math.max(1, estructura.dias.length);
@@ -125,71 +199,289 @@ function paginaMalla(doc: Documento, detalle: Detalle, sesiones: Sesion[], secun
     const x = MARGEN + anchoPeriodo + col * anchoDia + 2;
     const yy = yPeriodo[s.periodo]! + 2;
     const alto = yPeriodo[ultimo]! + altoFila - yy - 2;
-    doc.roundedRect(x, yy, anchoDia - 4, alto, 3).fill(s.subject_id ? COLOR.primarioSuave : COLOR.alertaSuave);
+    const color = n.color(s);
+    doc.lineWidth(0.6).roundedRect(x, yy, anchoDia - 4, alto, 3).fillAndStroke(color.fondo, color.borde);
     const texto = [secundario(s), n.espacio(s.espacio_id)].filter(Boolean).join(' · ');
     doc.font('Helvetica-Bold').fontSize(8).fillColor(COLOR.ink).text(n.titulo(s), x + 4, yy + 3, { width: anchoDia - 12, height: 11, ellipsis: true });
     doc.font('Helvetica').fontSize(7).fillColor(COLOR.cuerpo).text(texto, x + 4, yy + 14, { width: anchoDia - 12, height: Math.max(9, alto - 16), ellipsis: true });
   }
 }
 
-/** La "sábana": un docente por fila, cada día × periodo en columnas, con el grupo que atiende. Pagina si no cabe. */
-function paginasSabana(doc: Documento, detalle: Detalle, n: ReturnType<typeof nombres>, encabezar: () => number) {
-  const { estructura, catalogo, horario } = detalle;
-  const columnas = estructura.dias.flatMap((d) => estructura.periodos.map((p, i) => ({ dia: d, periodo: i, descanso: p.descanso_antes })));
-  const anchoNombre = 118;
-  const anchoCelda = (doc.page.width - MARGEN * 2 - anchoNombre) / Math.max(1, columnas.length);
-  const altoFila = 13;
+/** Una página por grupo o docente. Si `primeraAbierta`, la primera usa la página que quien llama ya abrió (para colgarle el marcador que las agrupa). */
+function paginasDeEntidades(
+  doc: Documento,
+  detalle: Detalle,
+  vista: 'GRUPO' | 'DOCENTE',
+  entidades: Array<{ id: string; nombre: string }>,
+  contexto: ContextoHoja,
+  n: Nombres,
+  marcadorPadre: Marcador | null,
+  primeraAbierta = false
+) {
+  entidades.forEach((e, i) => {
+    if (i > 0 || !primeraAbierta) nuevaPagina(doc);
+    marcar(marcadorPadre, doc, e.nombre);
+    const propias = detalle.horario.sesiones.filter((s) => (vista === 'GRUPO' ? String(s.group_id) === e.id : s.docente_ids.some((d) => String(d) === e.id)));
+    const y0 = encabezado(doc, contexto, `Horario · ${e.nombre}`);
+    paginaMalla(doc, detalle, propias, vista === 'GRUPO' ? (s) => n.docentes(s) : (s) => n.grupo(s.group_id) || 'Sin grupo', n, y0);
+  });
+}
 
-  const ocupacion = new Map<string, Sesion[]>();
-  for (const s of horario.sesiones) {
-    for (const d of s.docente_ids) {
-      for (let k = 0; k < s.duracion; k += 1) {
-        const clave = `${String(d)}|${s.dia}|${s.periodo + k}`;
-        ocupacion.set(clave, [...(ocupacion.get(clave) ?? []), s]);
-      }
+// ------------------------------------------------------------------ hojas totales
+
+interface FilaTotal {
+  etiqueta: string;
+  sesiones: Sesion[];
+}
+
+interface OpcionesTotal {
+  titulo: string;
+  columna: string;
+  anchoEtiqueta: number;
+  /** Lo que se escribe en la celda de una sesión: el dato principal en negrita y, debajo, uno pequeño. */
+  celda: (s: Sesion) => { principal: string; secundario: string };
+}
+
+const ALTO_FILA_IDEAL = 40;
+const ALTO_FILA_MINIMO = 24;
+const ALTO_CABECERA_TOTAL = 30;
+const ALTO_LINEA_LEYENDA = 12;
+
+/** Una ficha de color por asignatura que aparece en la hoja: la abreviatura de la celda dice «MAT» y aquí se lee «Matemáticas». */
+function leyendaDeAsignaturas(doc: Documento, detalle: Detalle, sesiones: readonly Sesion[]) {
+  const usadas = new Set(sesiones.flatMap((s) => (s.subject_id ? [String(s.subject_id)] : [])));
+  const items = detalle.catalogo.asignaturas
+    .filter((a) => usadas.has(a._id))
+    .sort((a, b) => a.nombre.localeCompare(b.nombre))
+    .map((a) => ({ texto: `${a.abreviatura} = ${a.nombre}`, color: a.color }));
+  const ancho = doc.page.width - MARGEN * 2;
+  doc.font('Helvetica').fontSize(7);
+  const medida = (texto: string) => 12 + doc.widthOfString(texto) + 12;
+
+  const renglones: Array<typeof items> = [[]];
+  let usado = 0;
+  for (const item of items) {
+    if (usado + medida(item.texto) > ancho && renglones[renglones.length - 1]!.length > 0) {
+      renglones.push([]);
+      usado = 0;
     }
+    renglones[renglones.length - 1]!.push(item);
+    usado += medida(item.texto);
   }
-
-  const cabecera = (y: number) => {
-    doc.rect(MARGEN, y, doc.page.width - MARGEN * 2, 24).fill(COLOR.primarioSuave);
-    doc.font('Helvetica-Bold').fontSize(7).fillColor(COLOR.primario).text('Docente', MARGEN + 4, y + 8, { width: anchoNombre - 6 });
-    estructura.dias.forEach((d, i) => {
-      const x = MARGEN + anchoNombre + i * estructura.periodos.length * anchoCelda;
-      doc.text(DIAS[d] ?? '', x, y + 3, { width: estructura.periodos.length * anchoCelda, align: 'center' });
+  const alto = items.length === 0 ? 0 : renglones.length * ALTO_LINEA_LEYENDA + 4;
+  const dibujar = (yInicio: number) => {
+    renglones.forEach((fila, r) => {
+      let x = MARGEN;
+      const y = yInicio + r * ALTO_LINEA_LEYENDA;
+      for (const item of fila) {
+        doc.lineWidth(0.5).roundedRect(x, y + 1, 8, 8, 2).fillAndStroke(item.color.fondo, item.color.borde);
+        doc.font('Helvetica').fontSize(7).fillColor(COLOR.cuerpo).text(item.texto, x + 11, y + 2, { lineBreak: false });
+        x += medida(item.texto);
+      }
     });
-    columnas.forEach((c, i) => {
-      doc.font('Helvetica').fontSize(6).fillColor(COLOR.tenue).text(String(c.periodo + 1), MARGEN + anchoNombre + i * anchoCelda, y + 14, { width: anchoCelda, align: 'center' });
-    });
-    return y + 24;
   };
-
-  let y = cabecera(encabezar());
-  for (const docente of catalogo.docentes) {
-    if (y + altoFila > doc.page.height - MARGEN) {
-      doc.addPage();
-      y = cabecera(encabezar());
-    }
-    doc.moveTo(MARGEN, y).lineTo(doc.page.width - MARGEN, y).lineWidth(0.4).strokeColor(COLOR.borde).stroke();
-    doc.font('Helvetica').fontSize(7).fillColor(COLOR.ink).text(docente.nombre, MARGEN + 4, y + 3, { width: anchoNombre - 6, height: altoFila, ellipsis: true, lineBreak: false });
-    columnas.forEach((c, i) => {
-      const x = MARGEN + anchoNombre + i * anchoCelda;
-      if (c.periodo === 0 || c.descanso) {
-        doc.moveTo(x, y).lineTo(x, y + altoFila).lineWidth(c.periodo === 0 ? 0.6 : 1.5).strokeColor(c.periodo === 0 ? COLOR.borde : COLOR.suave).stroke();
-      }
-      const aqui = ocupacion.get(`${docente._id}|${c.dia}|${c.periodo}`) ?? [];
-      if (aqui.length === 0) return;
-      doc.rect(x + 0.8, y + 1.5, anchoCelda - 1.6, altoFila - 3).fill(aqui.every((s) => !s.subject_id) ? COLOR.alertaSuave : COLOR.primarioSuave);
-      const texto = aqui.map((s) => (s.group_id ? n.grupoCorto(s.group_id) : n.corto(s))).join('/');
-      doc.font('Helvetica').fontSize(6).fillColor(COLOR.ink).text(texto, x, y + 4, { width: anchoCelda, align: 'center', lineBreak: false, ellipsis: true });
-    });
-    y += altoFila;
-  }
+  return { alto, dibujar };
 }
 
 /**
- * PDF de una versión: GRUPO o DOCENTE con `entidadId` (una página) o sin él (una página por cada grupo o docente), y
- * GENERAL (la sábana de todos los docentes).
+ * Hoja total (como el «horario total» de los programas de horarios): una fila por grupo o por docente y, en columnas, cada
+ * día con sus periodos. La primera página ya debe estar abierta (en A3). Cada clase es una celda de su color; un bloque de varias horas ocupa varias columnas. Si las filas no
+ * caben en una página se reparten parejo en las que hagan falta y cada una repite el encabezado.
  */
+function paginasTotal(doc: Documento, detalle: Detalle, filas: FilaTotal[], opciones: OpcionesTotal, contexto: ContextoHoja, n: Nombres) {
+  const { estructura } = detalle;
+  const nPeriodos = estructura.periodos.length;
+  const nColumnas = estructura.dias.length * nPeriodos;
+  const leyenda = leyendaDeAsignaturas(doc, detalle, filas.flatMap((f) => f.sesiones));
+
+  const ancho = doc.page.width - MARGEN * 2;
+  const anchoCelda = (ancho - opciones.anchoEtiqueta) / Math.max(1, nColumnas);
+  const y0 = MARGEN + 52;
+  const disponible = doc.page.height - MARGEN - leyenda.alto - (y0 + ALTO_CABECERA_TOTAL);
+  const porPaginaMaximo = Math.max(1, Math.floor(disponible / ALTO_FILA_MINIMO));
+  const paginas = Math.max(1, Math.ceil(filas.length / porPaginaMaximo));
+  const porPagina = Math.max(1, Math.ceil(filas.length / paginas));
+  const altoFila = Math.min(ALTO_FILA_IDEAL, disponible / porPagina);
+  const x0 = MARGEN + opciones.anchoEtiqueta;
+
+  for (let pagina = 0; pagina < paginas; pagina += 1) {
+    if (pagina > 0) nuevaPagina(doc, true);
+    encabezado(doc, contexto, opciones.titulo);
+    const delaPagina = filas.slice(pagina * porPagina, (pagina + 1) * porPagina);
+    const yFilas = y0 + ALTO_CABECERA_TOTAL;
+    const yFin = yFilas + delaPagina.length * altoFila;
+
+    // Cabecera: día arriba; abajo, el número del periodo y su hora de inicio.
+    doc.rect(MARGEN, y0, ancho, ALTO_CABECERA_TOTAL).fill(COLOR.primarioSuave);
+    doc.font('Helvetica-Bold').fontSize(8).fillColor(COLOR.primario).text(opciones.columna, MARGEN + 6, y0 + 11, { width: opciones.anchoEtiqueta - 8, lineBreak: false });
+    estructura.dias.forEach((d, i) => {
+      doc.font('Helvetica-Bold').fontSize(8).fillColor(COLOR.primario).text(DIAS[d] ?? '', x0 + i * nPeriodos * anchoCelda, y0 + 3, { width: nPeriodos * anchoCelda, align: 'center', lineBreak: false });
+      estructura.periodos.forEach((p, k) => {
+        const x = x0 + (i * nPeriodos + k) * anchoCelda;
+        doc.font('Helvetica-Bold').fontSize(7).fillColor(COLOR.ink).text(String(k + 1), x, y0 + 14, { width: anchoCelda, align: 'center', lineBreak: false });
+        doc.font('Helvetica').fontSize(5).fillColor(COLOR.tenue).text(p.hora_inicio, x, y0 + 23, { width: anchoCelda, align: 'center', lineBreak: false });
+      });
+    });
+
+    // Filas y rejilla: línea fuerte entre días y media entre antes y después del descanso.
+    delaPagina.forEach((fila, r) => {
+      const y = yFilas + r * altoFila;
+      doc.moveTo(MARGEN, y).lineTo(MARGEN + ancho, y).lineWidth(0.4).strokeColor(COLOR.borde).stroke();
+      doc.font('Helvetica-Bold').fontSize(fila.etiqueta.length > 12 ? 7 : 9).fillColor(COLOR.ink);
+      doc.text(fila.etiqueta, MARGEN + 6, y + altoFila / 2 - 5, { width: opciones.anchoEtiqueta - 10, height: 12, ellipsis: true });
+    });
+    doc.moveTo(MARGEN, yFin).lineTo(MARGEN + ancho, yFin).lineWidth(0.4).strokeColor(COLOR.borde).stroke();
+    doc.moveTo(x0, y0).lineTo(x0, yFin).lineWidth(0.8).strokeColor(COLOR.tenue).stroke();
+    estructura.dias.forEach((_, i) => {
+      for (let k = 0; k < nPeriodos; k += 1) {
+        const x = x0 + (i * nPeriodos + k) * anchoCelda;
+        if (k === 0) doc.moveTo(x, y0).lineTo(x, yFin).lineWidth(0.8).strokeColor(COLOR.tenue).stroke();
+        else if (estructura.periodos[k]!.descanso_antes) doc.moveTo(x, yFilas).lineTo(x, yFin).lineWidth(1.4).strokeColor(COLOR.borde).stroke();
+      }
+    });
+    doc.moveTo(x0 + nColumnas * anchoCelda, y0).lineTo(x0 + nColumnas * anchoCelda, yFin).lineWidth(0.8).strokeColor(COLOR.tenue).stroke();
+
+    delaPagina.forEach((fila, r) => {
+      const yFila = yFilas + r * altoFila;
+      for (const s of fila.sesiones) {
+        const dia = estructura.dias.indexOf(s.dia);
+        if (dia < 0) continue;
+        const x = x0 + (dia * nPeriodos + s.periodo) * anchoCelda + 1;
+        const w = s.duracion * anchoCelda - 2;
+        const color = n.color(s);
+        doc.lineWidth(0.5).roundedRect(x, yFila + 1.5, w, altoFila - 3, 2).fillAndStroke(color.fondo, color.borde);
+        const { principal, secundario } = opciones.celda(s);
+        const alto2 = altoFila >= 32 ? 2 : 1;
+        const alto = 9 + alto2 * 6.5;
+        const yTexto = yFila + (altoFila - alto) / 2;
+        doc.font('Helvetica-Bold').fontSize(8);
+        doc.fillColor(COLOR.ink).text(recortar(doc, principal, w - 4), x + 2, yTexto, { width: w - 4, align: 'center', lineBreak: false });
+        doc.font('Helvetica').fontSize(5.5).fillColor(COLOR.cuerpo);
+        doc.text(secundario, x + 2, yTexto + 9, { width: w - 4, height: alto2 * 6.5, align: 'center', ellipsis: true });
+      }
+    });
+
+    leyenda.dibujar(doc.page.height - MARGEN - leyenda.alto + 2);
+  }
+}
+
+function totalGrupos(doc: Documento, detalle: Detalle, contexto: ContextoHoja, n: Nombres, marcadorPadre: Marcador | null, primeraAbierta = false) {
+  if (!primeraAbierta) nuevaPagina(doc, true);
+  marcar(marcadorPadre, doc, 'Horario total de las clases');
+  const filas = detalle.catalogo.grupos.map((g) => ({
+    etiqueta: g.etiqueta_corta || g.etiqueta,
+    sesiones: detalle.horario.sesiones.filter((s) => String(s.group_id) === g._id),
+  }));
+  paginasTotal(doc, detalle, filas, { titulo: 'Horario total de las clases', columna: 'Grupo', anchoEtiqueta: 46, celda: (s) => ({ principal: n.corto(s), secundario: n.docentesCortos(s) }) }, contexto, n);
+}
+
+function totalDocentes(doc: Documento, detalle: Detalle, contexto: ContextoHoja, n: Nombres, marcadorPadre: Marcador | null) {
+  nuevaPagina(doc, true);
+  marcar(marcadorPadre, doc, 'Horario total de los docentes');
+  const filas = detalle.catalogo.docentes.map((d) => ({
+    etiqueta: d.nombre,
+    sesiones: detalle.horario.sesiones.filter((s) => s.docente_ids.some((x) => String(x) === d._id)),
+  }));
+  paginasTotal(
+    doc,
+    detalle,
+    filas,
+    {
+      titulo: 'Horario total de los docentes',
+      columna: 'Docente',
+      anchoEtiqueta: 120,
+      celda: (s) => (s.group_id ? { principal: n.grupoCorto(s.group_id), secundario: n.corto(s) } : { principal: 'Reun.', secundario: n.titulo(s) }),
+    },
+    contexto,
+    n
+  );
+}
+
+/**
+ * Todo lo de una jornada en orden de lectura: la hoja total de grupos y la de docentes, luego cada docente y cada grupo. Con
+ * `tituloJornada` (el PDF de toda la sede) el índice del visor agrupa todo bajo esa jornada.
+ */
+function jornadaCompleta(doc: Documento, detalle: Detalle, contexto: ContextoHoja, n: Nombres, tituloJornada: string | null) {
+  nuevaPagina(doc, true);
+  const raiz = tituloJornada ? marcar(null, doc, tituloJornada) : null;
+  totalGrupos(doc, detalle, contexto, n, raiz, true);
+  totalDocentes(doc, detalle, contexto, n, raiz);
+
+  const docentes = detalle.catalogo.docentes.map((d) => ({ id: d._id, nombre: d.nombre }));
+  if (docentes.length > 0) {
+    nuevaPagina(doc);
+    paginasDeEntidades(doc, detalle, 'DOCENTE', docentes, contexto, n, marcar(raiz, doc, 'Cada docente'), true);
+  }
+  const grupos = detalle.catalogo.grupos.map((g) => ({ id: g._id, nombre: g.etiqueta }));
+  if (grupos.length > 0) {
+    nuevaPagina(doc);
+    paginasDeEntidades(doc, detalle, 'GRUPO', grupos, contexto, n, marcar(raiz, doc, 'Cada grupo'), true);
+  }
+}
+
+function subtituloDe(anio: string | undefined, jornada: { nombre: string } | null | undefined, version: string) {
+  return [anio, jornada ? `Jornada ${JORNADAS[jornada.nombre] ?? jornada.nombre}` : null, version].filter(Boolean).join(' · ');
+}
+
+const sinTildes = (texto: string) =>
+  texto
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-|-$/g, '');
+
+/**
+ * Dibuja una versión (pura: no toca la base). GRUPO o DOCENTE con `entidadId` (una página) o sin él (una por cada grupo o docente),
+ * GENERAL (la hoja total de docentes), TOTAL_GRUPOS (la de grupos) y COMPLETO (las dos hojas y cada docente y grupo).
+ */
+export async function renderizarHorario(detalle: DetalleParaPdf, contexto: ContextoHoja, vista: VistaPdfHorario, entidadId?: string) {
+  const n = nombres(detalle);
+  const { doc, listo } = crearDocumento();
+  let sufijo = '';
+
+  if (vista === 'GENERAL') {
+    totalDocentes(doc, detalle, contexto, n, null);
+    sufijo = '-docentes-total';
+  } else if (vista === 'TOTAL_GRUPOS') {
+    totalGrupos(doc, detalle, contexto, n, null);
+    sufijo = '-grupos-total';
+  } else if (vista === 'COMPLETO') {
+    jornadaCompleta(doc, detalle, contexto, n, null);
+    sufijo = '-completo';
+  } else {
+    const entidades =
+      vista === 'GRUPO'
+        ? detalle.catalogo.grupos.map((g) => ({ id: g._id, nombre: g.etiqueta }))
+        : detalle.catalogo.docentes.map((d) => ({ id: d._id, nombre: d.nombre }));
+    const elegidas = entidadId ? entidades.filter((e) => e.id === entidadId) : entidades;
+    if (elegidas.length === 0) throw new ApiError(404, vista === 'GRUPO' ? 'Ese grupo no tiene clases en esta versión.' : 'Ese docente no tiene clases en esta versión.');
+    paginasDeEntidades(doc, detalle, vista, elegidas, contexto, n, null);
+    sufijo = entidadId ? `-${sinTildes(elegidas[0]?.nombre ?? '')}` : vista === 'GRUPO' ? '-grupos' : '-docentes';
+  }
+
+  pieDePaginas(doc);
+  doc.end();
+  return { buffer: await listo, sufijo };
+}
+
+/**
+ * Dibuja los horarios publicados de varias jornadas en un solo documento (pura): por cada una, las dos hojas totales y una página
+ * por docente y por grupo, agrupadas en el índice del visor bajo el nombre de la jornada. Las asignaturas toman el mismo color en
+ * todas las jornadas.
+ */
+export async function renderizarHorariosDeSede(jornadas: Array<{ detalle: DetalleParaPdf; contexto: ContextoHoja; titulo: string }>) {
+  const colores = asignarColoresAsignaturas(jornadas.flatMap(({ detalle }) => detalle.catalogo.asignaturas.map((a) => a._id)));
+  for (const { detalle } of jornadas) for (const a of detalle.catalogo.asignaturas) a.color = colores.get(a._id) ?? a.color;
+
+  const { doc, listo } = crearDocumento();
+  for (const { detalle, contexto, titulo } of jornadas) jornadaCompleta(doc, detalle, contexto, nombres(detalle), titulo);
+  pieDePaginas(doc);
+  doc.end();
+  return listo;
+}
+
+/** PDF de una versión de horario; ver `renderizarHorario` para las vistas. */
 export async function generarPdfHorario(id: string, vista: VistaPdfHorario, entidadId: string | undefined, usuario: Usuario) {
   const registro = await Horario.findById(id).select('estado academic_year_id jornada_id nombre version');
   if (!registro) throw new ApiError(404, 'Horario no encontrado.');
@@ -202,45 +494,47 @@ export async function generarPdfHorario(id: string, vista: VistaPdfHorario, enti
     AcademicYear.findById(registro.academic_year_id).select('nombre').lean(),
     JornadaOperativa.findById(registro.jornada_id).select('nombre').lean(),
   ]);
-  const n = nombres(detalle);
   const estado = registro.estado === 'PUBLICADO' ? 'Publicado' : registro.estado === 'BORRADOR' ? 'Borrador' : 'Archivado';
-  const subtitulo = [anio?.nombre, jornada ? `Jornada ${JORNADAS[jornada.nombre] ?? jornada.nombre}` : null, `${registro.nombre} (${estado})`]
-    .filter(Boolean)
-    .join(' · ');
+  const contexto: ContextoHoja = { institucion: institucion?.nombre ?? '', subtitulo: subtituloDe(anio?.nombre, jornada, `${registro.nombre} (${estado})`) };
+  const { buffer, sufijo } = await renderizarHorario(detalle, contexto, vista, entidadId);
+  return { buffer, nombreArchivo: `horario-${registro.version}${sufijo}.pdf` };
+}
 
-  const doc = new PDFDocument({ size: 'LETTER', layout: 'landscape', margins: { top: MARGEN, left: MARGEN, right: MARGEN, bottom: MARGEN } });
-  const partes: Buffer[] = [];
-  doc.on('data', (p: Buffer) => partes.push(p));
-  const listo = new Promise<Buffer>((resolve, reject) => {
-    doc.on('end', () => resolve(Buffer.concat(partes)));
-    doc.on('error', reject);
+/**
+ * Un solo PDF con los horarios publicados de toda la sede en el año: por cada jornada, la hoja total de grupos, la de docentes,
+ * una página por docente y una por grupo. Solo gestión (ADMIN y COORDINADOR).
+ */
+export async function generarPdfSede(academicYearId: string, sedeId: string, usuario: Usuario) {
+  if (usuario.rol !== 'ADMIN' && usuario.rol !== 'COORDINADOR') throw new ApiError(403, 'No tienes permiso para descargar los horarios de la sede.');
+  const [anio, sede, institucion, jornadas] = await Promise.all([
+    AcademicYear.findById(academicYearId).select('nombre').lean(),
+    Campus.findById(sedeId).select('nombre').lean(),
+    Institution.findOne().select('nombre').lean(),
+    JornadaOperativa.find({ sede_id: sedeId }).select('nombre hora_inicio').sort({ hora_inicio: 1 }).lean(),
+  ]);
+  if (!anio) throw new ApiError(404, 'Año lectivo no encontrado.');
+  if (!sede) throw new ApiError(404, 'Sede no encontrada.');
+
+  const publicados = await Horario.find({ academic_year_id: academicYearId, jornada_id: { $in: jornadas.map((j) => j._id) }, estado: 'PUBLICADO' })
+    .select('_id jornada_id version nombre')
+    .lean();
+  const porJornada = jornadas.flatMap((j) => {
+    const horario = publicados.find((h) => String(h.jornada_id) === String(j._id));
+    return horario ? [{ jornada: j, horario }] : [];
   });
+  if (porJornada.length === 0) throw new ApiError(409, 'Esta sede no tiene horarios publicados en el año lectivo. Publica el de cada jornada para descargar el de la sede.');
 
-  const nombreInstitucion = institucion?.nombre ?? '';
-  let nombreArchivo = `horario-${registro.version}`;
-
-  if (vista === 'GENERAL') {
-    paginasSabana(doc, detalle, n, () => encabezado(doc, nombreInstitucion, 'Horario general de docentes', subtitulo));
-    nombreArchivo += '-general';
-  } else {
-    const entidades =
-      vista === 'GRUPO'
-        ? detalle.catalogo.grupos.map((g) => ({ id: g._id, nombre: g.etiqueta }))
-        : detalle.catalogo.docentes.map((d) => ({ id: d._id, nombre: d.nombre }));
-    const elegidas = entidadId ? entidades.filter((e) => e.id === entidadId) : entidades;
-    if (elegidas.length === 0) throw new ApiError(404, vista === 'GRUPO' ? 'Ese grupo no tiene clases en esta versión.' : 'Ese docente no tiene clases en esta versión.');
-
-    elegidas.forEach((e, i) => {
-      if (i > 0) doc.addPage();
-      const propias = detalle.horario.sesiones.filter((s) =>
-        vista === 'GRUPO' ? String(s.group_id) === e.id : s.docente_ids.some((d) => String(d) === e.id)
-      );
-      const y0 = encabezado(doc, nombreInstitucion, `Horario · ${e.nombre}`, subtitulo);
-      paginaMalla(doc, detalle, propias, vista === 'GRUPO' ? (s) => n.docentes(s) : (s) => n.grupo(s.group_id) || 'Sin grupo', n, y0);
-    });
-    nombreArchivo += entidadId ? `-${(elegidas[0]?.nombre ?? '').toLowerCase().replace(/[^a-z0-9]+/gi, '-')}` : vista === 'GRUPO' ? '-grupos' : '-docentes';
-  }
-
-  doc.end();
-  return { buffer: await listo, nombreArchivo: `${nombreArchivo}.pdf` };
+  const detalles = await Promise.all(porJornada.map(({ horario }) => obtenerHorario(String(horario._id))));
+  const buffer = await renderizarHorariosDeSede(
+    detalles.map((detalle, i) => {
+      const { jornada, horario } = porJornada[i]!;
+      const titulo = `Jornada ${JORNADAS[jornada.nombre] ?? jornada.nombre}`;
+      return {
+        detalle,
+        titulo,
+        contexto: { institucion: institucion?.nombre ?? '', subtitulo: [anio.nombre, sede.nombre, titulo, `${horario.nombre} (Publicado)`].join(' · ') },
+      };
+    })
+  );
+  return { buffer, nombreArchivo: `horarios-${sinTildes(sede.nombre)}-${sinTildes(anio.nombre)}.pdf` };
 }

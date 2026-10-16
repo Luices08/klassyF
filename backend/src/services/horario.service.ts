@@ -1,6 +1,7 @@
 import { createHash } from 'crypto';
 import { Types } from 'mongoose';
 import {
+  ColorAsignatura,
   METADATOS_VARIABLE_HORARIO,
   MINUTOS_GENERACION_INTERRUMPIDA,
   SeveridadVariableHorario,
@@ -25,6 +26,7 @@ import TeacherAssignment from '../models/teacherAssignment.model';
 import User from '../models/user.model';
 import VariableHorario, { VariableHorarioDocument } from '../models/variableHorario.model';
 import ApiError from '../utils/ApiError';
+import { asignarColoresAsignaturas } from '../utils/coloresHorario';
 import { ESTADO_ACTIVO } from '../utils/filtroEstado';
 import {
   celdasBloqueadasPorOcupaciones,
@@ -58,8 +60,9 @@ interface ContextoUsuario {
 /** Nombres para mostrar; también traducen los ids que el motor pone en sus mensajes. */
 export interface CatalogoHorario {
   grupos: Array<{ _id: string; etiqueta: string; etiqueta_corta: string; grade_id: string }>;
-  docentes: Array<{ _id: string; nombre: string }>;
-  asignaturas: Array<{ _id: string; nombre: string; abreviatura: string }>;
+  /** `nombre_corto` («J. Pérez») es para las celdas de las hojas totales, donde no cabe el nombre completo. */
+  docentes: Array<{ _id: string; nombre: string; nombre_corto: string }>;
+  asignaturas: Array<{ _id: string; nombre: string; abreviatura: string; color: ColorAsignatura }>;
   espacios: Array<{ _id: string; nombre: string }>;
   reuniones: Array<{ _id: string; nombre: string }>;
 }
@@ -116,6 +119,7 @@ async function construirCatalogo(ids: {
   ]);
   const grados = await Grade.find({ _id: { $in: grupos.map((g) => g.grade_id) } }).select('nombre numero').lean();
   const gradoPorId = new Map(grados.map((g) => [String(g._id), g]));
+  const colores = asignarColoresAsignaturas(asignaturas.map((s) => String(s._id)));
 
   return {
     grupos: grupos
@@ -133,9 +137,18 @@ async function construirCatalogo(ids: {
       .sort((a, b) => a.orden - b.orden || a.etiqueta.localeCompare(b.etiqueta))
       .map(({ orden: _orden, ...g }) => g),
     docentes: docentes
-      .map((d) => ({ _id: String(d._id), nombre: `${d.nombre} ${d.apellido}` }))
+      .map((d) => ({
+        _id: String(d._id),
+        nombre: `${d.nombre} ${d.apellido}`,
+        nombre_corto: `${d.nombre.trim().charAt(0)}. ${d.apellido.trim().split(/\s+/)[0] ?? ''}`,
+      }))
       .sort((a, b) => a.nombre.localeCompare(b.nombre)),
-    asignaturas: asignaturas.map((s) => ({ _id: String(s._id), nombre: s.nombre, abreviatura: s.abreviatura })),
+    asignaturas: asignaturas.map((s) => ({
+      _id: String(s._id),
+      nombre: s.nombre,
+      abreviatura: s.abreviatura,
+      color: colores.get(String(s._id))!,
+    })),
     espacios: espacios.map((e) => ({ _id: String(e._id), nombre: e.nombre })),
     reuniones: reuniones.map((r) => ({ _id: String(r._id), nombre: String((r.parametros as { nombre?: string }).nombre ?? 'Reunión') })),
   };
@@ -830,6 +843,40 @@ export async function listarHorarios(query: ListarPorContexto) {
     .select('-sesiones -incidencias')
     .sort({ version: -1 })
     .lean();
+}
+
+/**
+ * Los horarios publicados de una sede en un año (uno por jornada) con cuántos grupos, docentes y asignaturas trae cada uno, y un
+ * color por asignatura que vale para todas las jornadas: así «Matemáticas» se ve igual en la mañana y en la tarde.
+ */
+export async function listarPublicadosDeSede(academicYearId: string, sedeId: string) {
+  const jornadas = await JornadaOperativa.find({ sede_id: sedeId }).select('nombre hora_inicio hora_fin').sort({ hora_inicio: 1 }).lean();
+  const horarios = await Horario.find({ academic_year_id: academicYearId, jornada_id: { $in: jornadas.map((j) => j._id) }, estado: 'PUBLICADO' })
+    .select('jornada_id version nombre publicado_en sesiones.group_id sesiones.docente_ids sesiones.subject_id')
+    .lean();
+
+  const publicados = jornadas.flatMap((jornada) => {
+    const horario = horarios.find((h) => String(h.jornada_id) === String(jornada._id));
+    if (!horario) return [];
+    const unicos = (ids: Array<Types.ObjectId | null | undefined>) => new Set(ids.filter(Boolean).map(String)).size;
+    return [
+      {
+        _id: String(horario._id),
+        version: horario.version,
+        nombre: horario.nombre,
+        publicado_en: horario.publicado_en ?? null,
+        jornada: { _id: String(jornada._id), nombre: jornada.nombre, hora_inicio: jornada.hora_inicio, hora_fin: jornada.hora_fin },
+        resumen: {
+          grupos: unicos(horario.sesiones.map((s) => s.group_id)),
+          docentes: unicos(horario.sesiones.flatMap((s) => s.docente_ids)),
+          asignaturas: unicos(horario.sesiones.map((s) => s.subject_id)),
+          sesiones: horario.sesiones.length,
+        },
+      },
+    ];
+  });
+  const colores = asignarColoresAsignaturas(horarios.flatMap((h) => h.sesiones.flatMap((s) => (s.subject_id ? [String(s.subject_id)] : []))));
+  return { publicados, colores: Object.fromEntries(colores) };
 }
 
 /** Una versión con lo necesario para pintarla: estructura de la jornada y nombres de lo que aparece en sus sesiones. */

@@ -12,6 +12,7 @@ router.use(authenticate);
 // Consulta personal y PDF: cualquier rol autenticado. El servicio decide qué ve cada uno (el docente lo suyo; el
 // estudiante y el acudiente, su grupo; solo versiones publicadas). Van antes de `/:id` para no confundirse con un id.
 router.get('/mio', horario.miHorario);
+router.get('/sede/pdf', checkRole(ROLES.ADMIN, ROLES.COORDINADOR), validate(v.porSede), horario.pdfSede);
 router.get('/:id/pdf', validate(v.pdfHorario), horario.pdfHorario);
 
 // Gestión: ADMIN y COORDINADOR.
@@ -24,6 +25,7 @@ router.patch('/variables/:id/estado', validate(v.cambiarEstadoVariable), horario
 router.delete('/variables/:id', validate(v.eliminarVariable), horario.eliminarVariable);
 
 router.get('/insumos', validate(v.obtenerInsumos), horario.obtenerInsumos);
+router.get('/publicados', validate(v.porSede), horario.listarPublicados);
 
 router.get('/', validate(v.listarHorarios), horario.listarHorarios);
 router.post('/generar', validate(v.generarHorario), horario.generarHorario);

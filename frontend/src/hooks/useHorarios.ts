@@ -5,6 +5,7 @@ import type {
   Horario,
   InsumosHorario,
   MiHorario,
+  PublicadosDeSede,
   VistaPdfHorario,
   ResumenHorario,
   SeveridadVariableHorario,
@@ -60,6 +61,15 @@ export function useDetalleHorario(id: string | null, estado?: string) {
   });
 }
 
+/** Los horarios publicados de una sede en un año (uno por jornada) y los colores de asignatura que comparten. */
+export function usePublicadosDeSede(anioId: string, sedeId: string) {
+  return useQuery({
+    queryKey: ['horarios', 'publicados', anioId, sedeId],
+    queryFn: () => api.get<PublicadosDeSede>('/horarios/publicados', { academic_year_id: anioId, sede_id: sedeId }),
+    enabled: Boolean(anioId && sedeId),
+  });
+}
+
 export function useMiHorario() {
   return useQuery({
     queryKey: ['horarios', 'mio'],
@@ -81,6 +91,16 @@ export async function descargarPdfHorario(id: string, vista: VistaPdfHorario, en
   const parametros = new URLSearchParams({ vista });
   if (entidadId) parametros.set('entidad_id', entidadId);
   const { url } = await api.downloadBlob(`/horarios/${id}/pdf?${parametros.toString()}`);
+  const enlace = document.createElement('a');
+  enlace.href = url;
+  enlace.download = nombreArchivo;
+  enlace.click();
+  URL.revokeObjectURL(url);
+}
+
+/** Un solo PDF con los horarios publicados de toda la sede: hojas totales, cada docente y cada grupo. */
+export async function descargarPdfSede(anioId: string, sedeId: string, nombreArchivo: string): Promise<void> {
+  const { url } = await api.downloadBlob(`/horarios/sede/pdf?${new URLSearchParams({ academic_year_id: anioId, sede_id: sedeId }).toString()}`);
   const enlace = document.createElement('a');
   enlace.href = url;
   enlace.download = nombreArchivo;

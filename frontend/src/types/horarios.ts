@@ -107,10 +107,16 @@ export interface EstructuraSemana {
   periodos: Array<{ nombre: string; hora_inicio: string; hora_fin: string; descanso_antes: boolean }>;
 }
 
+/** Color pastel con el que el horario distingue una asignatura de otra (paleta propia de M09, ver CLAUDE.md). */
+export interface ColorAsignatura {
+  fondo: string;
+  borde: string;
+}
+
 export interface CatalogoHorario {
   grupos: Array<{ _id: string; etiqueta: string; etiqueta_corta: string; grade_id: string }>;
-  docentes: Array<{ _id: string; nombre: string }>;
-  asignaturas: Array<{ _id: string; nombre: string; abreviatura: string }>;
+  docentes: Array<{ _id: string; nombre: string; nombre_corto: string }>;
+  asignaturas: Array<{ _id: string; nombre: string; abreviatura: string; color: ColorAsignatura }>;
   espacios: Array<{ _id: string; nombre: string }>;
   reuniones: Array<{ _id: string; nombre: string }>;
 }
@@ -190,7 +196,24 @@ export interface DetalleHorario {
   carga_cambio?: { sobran: number; faltan: number; cambiaron: number } | null;
 }
 
-export type VistaPdfHorario = 'GRUPO' | 'DOCENTE' | 'GENERAL';
+/** GENERAL = la hoja total de los docentes; TOTAL_GRUPOS = la de los grupos; COMPLETO = ambas más una página por docente y por grupo. */
+export type VistaPdfHorario = 'GRUPO' | 'DOCENTE' | 'GENERAL' | 'TOTAL_GRUPOS' | 'COMPLETO';
+
+/** Un horario publicado de la sede (uno por jornada) con lo que trae. */
+export interface PublicadoDeSede {
+  _id: string;
+  version: number;
+  nombre: string;
+  publicado_en: string | null;
+  jornada: { _id: string; nombre: string; hora_inicio: string; hora_fin: string };
+  resumen: { grupos: number; docentes: number; asignaturas: number; sesiones: number };
+}
+
+export interface PublicadosDeSede {
+  publicados: PublicadoDeSede[];
+  /** Un color por asignatura que vale para todas las jornadas de la sede. */
+  colores: Record<string, ColorAsignatura>;
+}
 
 /** Un horario publicado que le corresponde a quien consulta (solo sus sesiones). */
 export interface MiHorario extends DetalleHorario {

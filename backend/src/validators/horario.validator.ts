@@ -150,9 +150,13 @@ export const editarSesion: ValidationSchema = {
 export const pdfHorario: ValidationSchema = {
   params: Joi.object({ id: objectId.required() }),
   query: Joi.object({
-    vista: Joi.string().valid('GRUPO', 'DOCENTE', 'GENERAL').required(),
+    vista: Joi.string().valid('GRUPO', 'DOCENTE', 'GENERAL', 'TOTAL_GRUPOS', 'COMPLETO').required(),
     entidad_id: objectId,
   }),
+};
+
+export const porSede: ValidationSchema = {
+  query: Joi.object({ academic_year_id: objectId.required(), sede_id: objectId.required() }),
 };
 
 export const obtenerHorario: ValidationSchema = { params: Joi.object({ id: objectId.required() }) };

@@ -118,13 +118,17 @@ function construirUnidades(entrada: EntradaMotor, estado: EstadoHorario, avisos:
       }
     }
     const podado = validas.filter((x) => !prohibidas.has(x));
+    // Un bloque de varias horas se queda entero entre descansos; solo si no hay otra franja posible se deja montar sobre uno.
+    const montaSobreDescanso = (duracion: number, p: number) =>
+      Array.from({ length: duracion - 1 }, (_, k) => entrada.estructura.periodos[p + k + 1]?.descanso_antes).some(Boolean);
+    const sinMontar = podado.filter((x) => sesiones.every((i) => !montaSobreDescanso(entrada.sesiones[i]!.duracion, x % nP)));
     if (podado.length === 0 && !fija) {
       avisos.push({
         codigo: 'SESION_SIN_FRANJA_LIBRE',
         mensaje: `La sesión ${entrada.sesiones[sesiones[0]!]!.id} no tiene ninguna franja que cumpla sus restricciones duras; se ubicará en la menos mala.`,
       });
     }
-    return { sesiones, dominio: podado.length > 0 ? podado : validas, fija };
+    return { sesiones, dominio: sinMontar.length > 0 ? sinMontar : podado.length > 0 ? podado : validas, fija };
   });
 }
 

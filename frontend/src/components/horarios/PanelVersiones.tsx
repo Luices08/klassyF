@@ -22,6 +22,7 @@ import { IconButton } from '../ui/IconButton';
 import { Spinner } from '../ui/Spinner';
 import { EmptyRow, Table, TableBody, TableHead, Td, Th } from '../ui/Table';
 import { CheckCircleIcon, EyeIcon, FileTextIcon, LockIcon, RefreshIcon, TrashIcon } from '../ui/icons';
+import { LeyendaAsignaturas } from './LeyendaAsignaturas';
 import { MallaHorario, type VistaHorario } from './MallaHorario';
 import { SelectBuscable } from '../ui/SelectBuscable';
 
@@ -182,7 +183,8 @@ function DetalleVersion({ id, estado, generando, onRegenerar }: { id: string; es
   const blandas = horario.incidencias.filter((i) => !i.dura);
   const enConflicto = new Set(duras.flatMap((i) => i.claves_sesion));
   const fijas = horario.sesiones.filter((s) => s.fija).length;
-  const editable = horario.estado === 'BORRADOR' && vista !== 'GENERAL' && !detalle.franjas_cambiaron;
+  const esHojaTotal = vista === 'GENERAL' || vista === 'TOTAL_GRUPOS';
+  const editable = horario.estado === 'BORRADOR' && !esHojaTotal && !detalle.franjas_cambiaron;
   const opciones = vista === 'GRUPO' ? catalogo.grupos.map((g) => ({ id: g._id, nombre: g.etiqueta })) : catalogo.docentes.map((d) => ({ id: d._id, nombre: d.nombre }));
   const elegido = opciones.find((o) => o.id === entidadId) ?? opciones[0];
   const nombreSesion = (s: SesionHorario) =>
@@ -203,7 +205,9 @@ function DetalleVersion({ id, estado, generando, onRegenerar }: { id: string; es
     setErrorPdf(null);
     setDescargando(true);
     try {
-      const sufijo = entidad ? (opciones.find((o) => o.id === entidad)?.nombre ?? '') : vistaPdf === 'GENERAL' ? 'general' : vistaPdf === 'GRUPO' ? 'grupos' : 'docentes';
+      const sufijo = entidad
+        ? (opciones.find((o) => o.id === entidad)?.nombre ?? '')
+        : { GENERAL: 'total docentes', TOTAL_GRUPOS: 'total grupos', COMPLETO: 'completo', GRUPO: 'grupos', DOCENTE: 'docentes' }[vistaPdf];
       await descargarPdfHorario(id, vistaPdf, entidad, `${horario.nombre} - ${sufijo}.pdf`);
     } catch (err) {
       setErrorPdf(errorMessage(err));
@@ -219,15 +223,18 @@ function DetalleVersion({ id, estado, generando, onRegenerar }: { id: string; es
         subtitle={horario.generacion ? `Generado en ${(horario.generacion.duracion_ms / 1000).toFixed(1)} s · ${horario.sesiones.length} sesiones` : undefined}
         action={
           <div className="flex flex-wrap justify-end gap-2">
-            <Button variant="outline" isLoading={descargando} disabled={descargando} onClick={() => void descargar(vista === 'GENERAL' ? 'GENERAL' : vista, vista === 'GENERAL' ? undefined : elegido?.id)}>
+            <Button variant="outline" isLoading={descargando} disabled={descargando} onClick={() => void descargar(vista, esHojaTotal ? undefined : elegido?.id)}>
               <FileTextIcon className="h-4 w-4" />
               Descargar PDF
             </Button>
-            {vista !== 'GENERAL' && (
+            {!esHojaTotal && (
               <Button variant="secondary" disabled={descargando} onClick={() => void descargar(vista)}>
                 {vista === 'GRUPO' ? 'PDF de todos los grupos' : 'PDF de todos los docentes'}
               </Button>
             )}
+            <Button variant="secondary" disabled={descargando} onClick={() => void descargar('COMPLETO')}>
+              PDF completo de la jornada
+            </Button>
           </div>
         }
       />
@@ -285,9 +292,10 @@ function DetalleVersion({ id, estado, generando, onRegenerar }: { id: string; es
           >
             <option value="GRUPO">Por grupo</option>
             <option value="DOCENTE">Por docente</option>
-            <option value="GENERAL">General (todos los docentes)</option>
+            <option value="TOTAL_GRUPOS">Hoja total de los grupos</option>
+            <option value="GENERAL">Hoja total de los docentes</option>
           </Select>
-          {vista !== 'GENERAL' && (
+          {!esHojaTotal && (
             <SelectBuscable
               label={vista === 'GRUPO' ? 'Grupo' : 'Docente'}
               value={elegido?.id ?? ''}
@@ -338,6 +346,7 @@ function DetalleVersion({ id, estado, generando, onRegenerar }: { id: string; es
         )}
         {editar.isError && <Alert tone="error">{errorMessage(editar.error)}</Alert>}
 
+        <LeyendaAsignaturas catalogo={catalogo} sesiones={horario.sesiones} />
         <MallaHorario
           estructura={estructura}
           sesiones={horario.sesiones}

@@ -5,6 +5,17 @@ import { CodigoIncidencia, EntradaMotor, Incidencia, Posicion, SesionMotor, Vari
 /** Un incumplimiento duro pesa más que cualquier suma razonable de preferencias. */
 export const PESO_DURO = 100_000;
 
+/**
+ * Reglas propias del motor: no dependen de que el coordinador cree una variable. Pesan menos que un choque (no bloquean la
+ * publicación) y más que cualquier preferencia (peso 1–10): primero se respeta el bloque, después lo condicional.
+ * - Un bloque de varias horas montado sobre un descanso es el peor caso.
+ * - Dos sesiones de una asignatura en horas seguidas del mismo grupo dejan 3 o 4 horas de lo mismo.
+ * - Repetir la asignatura el mismo día, aunque no sea seguida, pesa poco: a veces la semana no da para otra cosa.
+ */
+export const PESO_BLOQUE_PARTIDO = 1000;
+export const PESO_ASIGNATURA_SEGUIDA = 250;
+export const PESO_ASIGNATURA_MISMO_DIA = 40;
+
 interface Acumulador {
   duros: number;
   blando: number;
@@ -39,6 +50,10 @@ export class EstadoHorario {
   private readonly sesionesPorDocente: number[][];
   private readonly sesionesConEspacio: number[];
   private readonly unariasPorSesion: VariableMotor[][];
+  /** El descanso es un límite duro para esa sesión por una variable: su propia severidad rige en vez del peso del motor. */
+  private readonly recreoDuro: boolean[];
+  /** Por grupo, las sesiones de una misma asignatura (solo las asignaturas con más de una). */
+  private readonly sesionesPorAsignatura: number[][][];
   private readonly relacionesPorGrupo: Relacion[][];
   private readonly variablesPorDocente: VariableMotor[][];
   private readonly relacionesGlobales: Relacion[];
@@ -107,6 +122,15 @@ export class EstadoHorario {
     // Variables que rigen a cada sesión (cascada de alcance ya aplicada).
     const vigentesPorSesion = this.sesiones.map((s) => resolverVariables(entrada.variables, s));
     this.unariasPorSesion = vigentesPorSesion.map((vs) => vs.filter((v) => v.tipo === 'DISPONIBILIDAD' || v.tipo === 'RECREO_NO_INTERRUMPE'));
+    this.recreoDuro = vigentesPorSesion.map((vs) => vs.some((v) => v.tipo === 'RECREO_NO_INTERRUMPE' && v.severidad === 'DURA'));
+    this.sesionesPorAsignatura = this.sesionesPorGrupo.map((delGrupo) => {
+      const porAsignatura = new Map<string, number[]>();
+      for (const i of delGrupo) {
+        const asignatura = this.sesiones[i]!.subject_id;
+        if (asignatura) porAsignatura.set(asignatura, [...(porAsignatura.get(asignatura) ?? []), i]);
+      }
+      return [...porAsignatura.values()].filter((l) => l.length > 1);
+    });
 
     this.relacionesPorGrupo = this.sesionesPorGrupo.map((delGrupo) => {
       const porVariable = new Map<string, Relacion>();
@@ -308,6 +332,20 @@ export class EstadoHorario {
     });
   }
 
+  /** Penalización propia del motor (ver `PESO_BLOQUE_PARTIDO`): nunca es dura. Sin `mensaje` solo suma al costo, no se lista. */
+  private penalizarDelMotor(
+    acc: Acumulador,
+    codigo: CodigoIncidencia,
+    peso: number,
+    magnitud: number,
+    sesiones: readonly number[],
+    mensaje: (() => string) | null
+  ): void {
+    if (magnitud <= 0) return;
+    acc.blando += magnitud * peso;
+    if (mensaje) acc.incidencias?.push({ codigo, variable_id: null, dura: false, magnitud, sesion_ids: sesiones.map((i) => this.sesiones[i]!.id), mensaje: mensaje() });
+  }
+
   private nombreDia(d: number): string {
     return ['', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado', 'domingo'][this.entrada.estructura.dias[d] ?? 0] ?? `día ${d + 1}`;
   }
@@ -356,6 +394,11 @@ export class EstadoHorario {
         for (let k = 1; k < s.duracion; k += 1) if (this.descansoAntes[p + k]) cruza = true;
         this.penalizar(acc, 'RECREO_NO_INTERRUMPE', v, cruza ? 1 : 0, [i], () => `El bloque de ${s.duracion} horas queda partido por el descanso.`);
       }
+    }
+    if (s.duracion > 1 && !this.recreoDuro[i]) {
+      let cruza = false;
+      for (let k = 1; k < s.duracion; k += 1) if (this.descansoAntes[p + k]) cruza = true;
+      this.penalizarDelMotor(acc, 'BLOQUE_PARTIDO', PESO_BLOQUE_PARTIDO, cruza ? 1 : 0, [i], () => `El bloque de ${s.duracion} horas queda montado sobre el descanso (${this.nombreDia(d)}).`);
     }
   }
 
@@ -410,6 +453,7 @@ export class EstadoHorario {
     const delGrupo = this.colocadas(this.sesionesPorGrupo[g]!);
     const ocupacion = this.choques(delGrupo, acc, 'CHOQUE_GRUPO', `El grupo ${this.idsGrupo[g]}`);
     for (const i of delGrupo) this.evaluarUnarias(i, acc);
+    this.evaluarRepeticiones(g, acc);
 
     for (const { variable: v, sesiones } of this.relacionesPorGrupo[g]!) {
       const S = this.colocadas(sesiones);
@@ -506,6 +550,27 @@ export class EstadoHorario {
       }
     }
     return acc;
+  }
+
+  /** Una asignatura del grupo en horas seguidas o repetida el mismo día (ver `PESO_ASIGNATURA_SEGUIDA`). */
+  private evaluarRepeticiones(g: number, acc: Acumulador): void {
+    for (const todas of this.sesionesPorAsignatura[g]!) {
+      const S = this.colocadas(todas);
+      for (let x = 0; x < S.length; x += 1) {
+        for (let y = x + 1; y < S.length; y += 1) {
+          const a = S[x]!;
+          const b = S[y]!;
+          if (this.dia[a] !== this.dia[b]) continue;
+          const seguidas = this.periodo[a]! + this.sesiones[a]!.duracion === this.periodo[b] || this.periodo[b]! + this.sesiones[b]!.duracion === this.periodo[a];
+          if (seguidas) {
+            const horas = this.sesiones[a]!.duracion + this.sesiones[b]!.duracion;
+            this.penalizarDelMotor(acc, 'ASIGNATURA_SEGUIDA', PESO_ASIGNATURA_SEGUIDA, 1, [a, b], () => `La misma asignatura queda ${horas} horas seguidas el ${this.nombreDia(this.dia[a]!)}.`);
+          } else {
+            this.penalizarDelMotor(acc, 'ASIGNATURA_SEGUIDA', PESO_ASIGNATURA_MISMO_DIA, 1, [a, b], null);
+          }
+        }
+      }
+    }
   }
 
   private evaluarDocente(d: number, incidencias: Incidencia[] | null): Acumulador {

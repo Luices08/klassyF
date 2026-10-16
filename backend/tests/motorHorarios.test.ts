@@ -8,6 +8,7 @@ import {
   diagnosticarCapacidad,
   evaluarHorario,
   expandirSesiones,
+  PESO_BLOQUE_PARTIDO,
   generarHorario,
   resolverVariables,
 } from '../src/utils/motorHorarios';
@@ -115,13 +116,41 @@ describe('expandirSesiones', () => {
   });
 });
 
-describe('diagnosticarCapacidad', () => {
-  it('avisa cuando un docente necesita más bloques dobles de los que caben en la semana', () => {
-    const variables = [variable('DISTRIBUCION_BLOQUES', { bloques: [2, 2] }), variable('RECREO_NO_INTERRUMPE', {})];
+describe('bloques que caben entre descansos', () => {
+  const horasDe = (sesiones: ReturnType<typeof expandirSesiones>['sesiones'], asignacionId: string) =>
+    sesiones.filter((s) => s.asignacion_id === asignacionId).map((s) => s.duracion);
+
+  it('un tramo entre descansos da un solo bloque doble: los dobles de un docente que sobran en la semana se parten', () => {
+    const variables = [variable('DISTRIBUCION_BLOQUES', { bloques: [2, 2] })];
     const grupos = ['6A', '6B', '6C', '6D', '7A', '7B'];
-    const { sesiones } = expandirSesiones(grupos.map((g) => asignacion(g, g, 'g6', 'CAS', 'd1', 4)), variables, estructura);
-    // 6 grupos × 2 bloques = 12; cada día caben 2 (uno antes y otro después del descanso) → 10.
-    expect(diagnosticarCapacidad(sesiones, variables, estructura).map((a) => a.codigo)).toEqual(['BLOQUES_NO_CABEN']);
+    const asignaciones = grupos.map((g) => asignacion(g, g, 'g6', 'CAS', 'd1', 4));
+    const { sesiones, avisos } = expandirSesiones(asignaciones, variables, estructura);
+    // 6 grupos × 2 bloques = 12; cada día caben 2 (uno antes y otro después del descanso) → 10 enteros y los dos últimos, que ya no caben, en 1 + 1.
+    const dobles = sesiones.filter((s) => s.duracion === 2);
+    expect(dobles).toHaveLength(10);
+    expect(sesiones.reduce((suma, s) => suma + s.duracion, 0)).toBe(24);
+    expect(avisos.map((a) => a.codigo)).toEqual(['BLOQUES_PARTIDOS']);
+    expect(horasDe(sesiones, '7B')).toEqual([1, 1, 1, 1]);
+    // Sale solo de la carga y la estructura: repetirlo (publicar, editar) da exactamente lo mismo.
+    expect(expandirSesiones(asignaciones, variables, estructura).sesiones).toEqual(sesiones);
+  });
+
+  it('un bloque más largo que cualquier tramo se parte en lugar de cruzar el descanso', () => {
+    const variables = [variable('DISTRIBUCION_BLOQUES', { bloques: [4] })];
+    const { sesiones } = expandirSesiones([asignacion('a1', '6A', 'g6', 'MAT', 'd1', 4)], variables, estructura);
+    expect(horasDe(sesiones, 'a1')).toEqual([2, 2]);
+  });
+
+  it('el tiempo no disponible del docente también corta los tramos', () => {
+    // Los periodos 2 y 3 (3.º y 4.º) bloqueados todos los días dejan tramos de 2: un bloque de 3 horas no cabe en ninguno.
+    const bloqueo = variable(
+      'DISPONIBILIDAD',
+      { celdas: [1, 2, 3, 4, 5].flatMap((dia) => [2, 4].map((periodo) => ({ dia, periodo, valor: 'NO_DISPONIBLE' as const }))) },
+      { docente_ids: ['d1'] }
+    );
+    const variables = [variable('DISTRIBUCION_BLOQUES', { bloques: [3] }), bloqueo];
+    const { sesiones } = expandirSesiones([asignacion('a1', '6A', 'g6', 'MAT', 'd1', 3)], variables, estructura);
+    expect(horasDe(sesiones, 'a1')).toEqual([2, 1]);
   });
 });
 
@@ -150,6 +179,37 @@ describe('evaluarHorario', () => {
     ]);
     expect(evaluarHorario(entrada, [{ sesion_id: 'a1#0', dia: 1, periodo: 2 }]).conflictos_duros).toBe(1);
     expect(evaluarHorario(entrada, [{ sesion_id: 'a1#0', dia: 1, periodo: 3 }]).conflictos_duros).toBe(0);
+  });
+
+  it('un bloque sobre el descanso es un incumplimiento fuerte aunque no exista la variable, pero no bloquea publicar', () => {
+    const entrada = entradaDe([asignacion('a1', '6A', 'g6', 'MAT', 'd1', 2)], [variable('DISTRIBUCION_BLOQUES', { bloques: [2] })]);
+    const montado = evaluarHorario(entrada, [{ sesion_id: 'a1#0', dia: 1, periodo: 2 }]);
+    expect(montado.conflictos_duros).toBe(0);
+    expect(montado.penalizacion_blanda).toBeGreaterThanOrEqual(PESO_BLOQUE_PARTIDO);
+    expect(montado.incidencias.map((x) => [x.codigo, x.dura])).toEqual([['BLOQUE_PARTIDO', false]]);
+    expect(evaluarHorario(entrada, [{ sesion_id: 'a1#0', dia: 1, periodo: 0 }]).penalizacion_blanda).toBe(0);
+    expect(evaluarHorario(entrada, [{ sesion_id: 'a1#0', dia: 1, periodo: 3 }]).penalizacion_blanda).toBe(0);
+  });
+
+  it('la misma asignatura en horas seguidas pesa mucho más que repetirla el mismo día con otra clase en medio', () => {
+    const entrada = entradaDe([asignacion('a1', '6A', 'g6', 'MAT', 'd1', 2)], []);
+    const seguidas = evaluarHorario(entrada, [
+      { sesion_id: 'a1#0', dia: 1, periodo: 0 },
+      { sesion_id: 'a1#1', dia: 1, periodo: 1 },
+    ]);
+    expect(seguidas.incidencias.map((x) => x.codigo)).toEqual(['ASIGNATURA_SEGUIDA']);
+    const salteadas = evaluarHorario(entrada, [
+      { sesion_id: 'a1#0', dia: 1, periodo: 0 },
+      { sesion_id: 'a1#1', dia: 1, periodo: 2 },
+    ]);
+    const otroDia = evaluarHorario(entrada, [
+      { sesion_id: 'a1#0', dia: 1, periodo: 0 },
+      { sesion_id: 'a1#1', dia: 2, periodo: 0 },
+    ]);
+    expect(otroDia.penalizacion_blanda).toBe(0);
+    expect(salteadas.penalizacion_blanda).toBeGreaterThan(0);
+    expect(seguidas.penalizacion_blanda).toBeGreaterThan(salteadas.penalizacion_blanda);
+    expect(salteadas.incidencias).toEqual([]);
   });
 
   it('la disponibilidad condicional penaliza como preferencia, la no disponible bloquea', () => {
@@ -184,6 +244,34 @@ describe('evaluarHorario', () => {
 });
 
 describe('generarHorario', () => {
+  it('sin ninguna variable los bloques quedan enteros entre descansos y ninguna materia se repite seguida', () => {
+    const grupos = ['6A', '6B', '6C'];
+    // Semana llena (30 horas) con bloques dobles: lo que se ve en un colegio real cuando el coordinador no creó variables.
+    const plan: Array<[string, number]> = [['MAT', 4], ['LEN', 4], ['CNAT', 4], ['CSOC', 4], ['ING', 3], ['EDF', 2], ['ART', 2], ['TEC', 2], ['ETI', 1], ['REL', 1], ['LEC', 3]];
+    const variables = [
+      variable('DISTRIBUCION_BLOQUES', { bloques: [2, 2] }, { asignatura_ids: ['MAT', 'LEN', 'CNAT', 'CSOC'] }),
+      variable('DISTRIBUCION_BLOQUES', { bloques: [2] }, { asignatura_ids: ['EDF', 'ART', 'TEC'] }),
+    ];
+    const asignaciones = grupos.flatMap((g) => plan.map(([asig, horas]) => asignacion(`${g}-${asig}`, g, 'g6', asig, `d-${asig}`, horas)));
+    const { sesiones } = expandirSesiones(asignaciones, variables, estructura);
+    const r = generarHorario({ estructura, sesiones, variables, espacios: [] }, { semilla: 3, tiempo_max_ms: 6000 });
+
+    expect(r.conflictos_duros).toBe(0);
+    const donde = new Map(r.ubicaciones.map((u) => [u.sesion_id, u]));
+    const montados = sesiones.filter((s) => {
+      const { periodo } = donde.get(s.id)!;
+      return Array.from({ length: s.duracion - 1 }, (_, k) => estructura.periodos[periodo + k + 1]!.descanso_antes).some(Boolean);
+    });
+    const seguidas = sesiones.filter((a) =>
+      sesiones.some((b) => {
+        const ua = donde.get(a.id)!;
+        const ub = donde.get(b.id)!;
+        return a !== b && a.group_id === b.group_id && a.subject_id === b.subject_id && ua.dia === ub.dia && ua.periodo + a.duracion === ub.periodo;
+      })
+    );
+    expect({ montados: montados.map((s) => s.id), seguidas: seguidas.map((s) => s.id) }).toEqual({ montados: [], seguidas: [] });
+  }, 20_000);
+
   it('respeta simultáneas entre grupos, sesiones fijas y "no el mismo día"', () => {
     const variables = [
       // Todos los grupos de 6° (aquí 6A y 6B) ven Educación Física a la misma hora.

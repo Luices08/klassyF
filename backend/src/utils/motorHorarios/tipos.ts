@@ -134,6 +134,9 @@ export type CodigoIncidencia =
   | 'CHOQUE_GRUPO'
   | 'CHOQUE_DOCENTE'
   | 'CHOQUE_ESPACIO'
+  /** Reglas propias del motor, sin variable detrás (ver `PESO_BLOQUE_PARTIDO`). */
+  | 'BLOQUE_PARTIDO'
+  | 'ASIGNATURA_SEGUIDA'
   | VariableMotor['tipo'];
 
 export interface Incidencia {

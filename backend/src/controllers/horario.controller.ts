@@ -79,6 +79,18 @@ export const pdfHorario = catchAsync<IdParams, unknown, unknown, { vista?: Vista
   res.send(buffer);
 });
 
+export const pdfSede = catchAsync<unknown, unknown, unknown, { academic_year_id: string; sede_id: string }>(async (req, res) => {
+  if (!req.user) throw new ApiError(401, 'Usuario no autenticado.');
+  const { buffer, nombreArchivo } = await horarioPdfService.generarPdfSede(req.query.academic_year_id, req.query.sede_id, req.user);
+  res.setHeader('Content-Type', 'application/pdf');
+  res.setHeader('Content-Disposition', `inline; filename="${nombreArchivo}"`);
+  res.send(buffer);
+});
+
+export const listarPublicados = catchAsync<unknown, unknown, unknown, { academic_year_id: string; sede_id: string }>(async (req, res) => {
+  res.status(200).json({ success: true, data: await horarioService.listarPublicadosDeSede(req.query.academic_year_id, req.query.sede_id) });
+});
+
 export const obtenerHorario = catchAsync<IdParams>(async (req, res) => {
   res.status(200).json({ success: true, data: await horarioService.obtenerHorarioConRevision(req.params.id) });
 });

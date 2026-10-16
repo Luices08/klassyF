@@ -26,7 +26,14 @@ import User from '../models/user.model';
 import VariableHorario, { VariableHorarioDocument } from '../models/variableHorario.model';
 import ApiError from '../utils/ApiError';
 import { ESTADO_ACTIVO } from '../utils/filtroEstado';
-import { conciliarCargaConPlan, horasDelPlanDeGrupo, jornadasSeTraslapan, resumirLista } from '../utils/horarioCoherencia';
+import {
+  celdasBloqueadasPorOcupaciones,
+  conciliarCargaConPlan,
+  horasDelPlanDeGrupo,
+  jornadasSeTraslapan,
+  ocupacionesDeSesiones,
+  resumirLista,
+} from '../utils/horarioCoherencia';
 import {
   AsignacionMotor,
   Aviso,
@@ -153,7 +160,9 @@ async function avisosDeDocentes(
   docenteIds: string[],
   academicYearId: Types.ObjectId,
   jornada: JornadaOperativaDocument,
-  gruposDeEstaJornada: Types.ObjectId[]
+  gruposDeEstaJornada: Types.ObjectId[],
+  /** Jornadas cuyo horario ya se tiene en cuenta al generar (ver `restriccionesDeOtrasJornadas`): no hay nada que avisar de ellas. */
+  jornadasRespetadas: ReadonlySet<string>
 ): Promise<Aviso[]> {
   if (docenteIds.length === 0) return [];
   const avisos: Aviso[] = [];
@@ -187,7 +196,7 @@ async function avisosDeDocentes(
   const jornadaDeGrupo = new Map(gruposOtros.map((g) => [String(g._id), String(g.jornada_id)]));
   const jornadasOtras = await JornadaOperativa.find({ _id: { $in: [...new Set(jornadaDeGrupo.values())] } }).lean();
   const sedes = new Map((await Campus.find({ _id: { $in: jornadasOtras.map((j) => j.sede_id) } }).select('nombre').lean()).map((c) => [String(c._id), c.nombre]));
-  const cruzadas = new Map(jornadasOtras.filter((j) => jornadasSeTraslapan(jornada, j)).map((j) => [String(j._id), j]));
+  const cruzadas = new Map(jornadasOtras.filter((j) => jornadasSeTraslapan(jornada, j) && !jornadasRespetadas.has(String(j._id))).map((j) => [String(j._id), j]));
 
   const porDocente = new Map<string, Set<string>>();
   for (const a of enOtrosGrupos) {
@@ -202,10 +211,86 @@ async function avisosDeDocentes(
     });
     avisos.push({
       codigo: 'DOCENTE_EN_JORNADAS_QUE_SE_CRUZAN',
-      mensaje: `El docente ${docente} también dicta en ${donde.join(' y ')}, que se cruza con esta jornada (${jornada.hora_inicio}–${jornada.hora_fin}). Cada horario se arma por separado: revisa que no le queden clases a la misma hora.`,
+      mensaje: `El docente ${docente} también dicta en ${donde.join(' y ')}, que se cruza con esta jornada (${jornada.hora_inicio}–${jornada.hora_fin}), pero aún no hay un horario válido de esa jornada que respetar. Genera uno de los dos primero: el segundo se arma sin pisar las horas que el docente ya tiene en el otro.`,
     });
   }
   return avisos;
+}
+
+/**
+ * Un docente que dicta en dos jornadas que se cruzan (p. ej. Mañana para secundaria y Única para media técnica) no puede estar en
+ * dos clases a la misma hora. Cada jornada se genera por separado, así que al armar esta se leen los horarios ya hechos de las
+ * otras (el publicado y, si no hay, el borrador más reciente) y las horas que el docente tiene allí quedan como franjas
+ * NO disponibles (variables DURAS internas, `ext:<docente>`, que no se guardan ni salen en Variables). Funciona con franjas
+ * idénticas o distintas: se comparan por hora real, no por número de periodo.
+ */
+async function restriccionesDeOtrasJornadas(
+  docenteIds: string[],
+  academicYearId: Types.ObjectId,
+  jornada: JornadaOperativaDocument,
+  estructura: ReturnType<typeof construirEstructura>
+): Promise<{ variables: VariableMotor[]; avisos: Aviso[]; respetadas: Set<string> }> {
+  const vacio = { variables: [], avisos: [], respetadas: new Set<string>() };
+  if (docenteIds.length === 0) return vacio;
+
+  const jornadasOtras = (await JornadaOperativa.find({ _id: { $ne: jornada._id } })).filter((j) => jornadasSeTraslapan(jornada, j));
+  if (jornadasOtras.length === 0) return vacio;
+
+  const horarios = await Horario.find({
+    academic_year_id: academicYearId,
+    jornada_id: { $in: jornadasOtras.map((j) => j._id) },
+    estado: { $in: ['PUBLICADO', 'BORRADOR'] },
+  }).sort({ version: -1 });
+  const sedes = new Map((await Campus.find({ _id: { $in: jornadasOtras.map((j) => j.sede_id) } }).select('nombre').lean()).map((c) => [String(c._id), c.nombre]));
+
+  const avisos: Aviso[] = [];
+  const respetadas = new Set<string>();
+  const porDocente = new Map<string, Array<{ dia: number; inicio: string; fin: string }>>();
+  const docentes = new Set(docenteIds);
+
+  for (const otra of jornadasOtras) {
+    const delasJornada = horarios.filter((h) => String(h.jornada_id) === String(otra._id));
+    const elegido = delasJornada.find((h) => h.estado === 'PUBLICADO') ?? delasJornada[0];
+    if (!elegido) continue;
+    const donde = `${NOMBRES_JORNADA[otra.nombre] ?? otra.nombre} de ${sedes.get(String(otra.sede_id)) ?? 'otra sede'}`;
+    if (elegido.huella_franjas !== huellaFranjas(otra)) {
+      avisos.push({
+        codigo: 'HORARIO_OTRA_JORNADA_DESFASADO',
+        mensaje: `El horario de ${donde} se generó con otras franjas que las actuales de esa jornada, así que no se puede usar para evitar cruces de docentes. Genéralo de nuevo.`,
+      });
+      continue;
+    }
+    respetadas.add(String(otra._id));
+    if (elegido.estado !== 'PUBLICADO') {
+      avisos.push({
+        codigo: 'HORARIO_OTRA_JORNADA_EN_BORRADOR',
+        mensaje: `Los cruces de docentes con ${donde} se evitan con su borrador (versión ${elegido.version}), aún no publicado: si lo regeneras, vuelve a generar esta jornada.`,
+      });
+    }
+    const periodos = construirEstructura(otra.dias_habiles, otra.franjas).periodos;
+    const sesiones = elegido.sesiones.map((x) => ({ docente_ids: x.docente_ids.map(String).filter((d) => docentes.has(d)), dia: x.dia, periodo: x.periodo, duracion: x.duracion }));
+    for (const o of ocupacionesDeSesiones(sesiones, periodos)) {
+      porDocente.set(o.docente_id, [...(porDocente.get(o.docente_id) ?? []), { dia: o.dia, inicio: o.inicio, fin: o.fin }]);
+    }
+  }
+
+  const variables: VariableMotor[] = [];
+  for (const [docente, ocupaciones] of porDocente) {
+    const celdas = celdasBloqueadasPorOcupaciones(estructura, ocupaciones);
+    if (celdas.length === 0) continue;
+    variables.push({
+      id: `ext:${docente}`,
+      tipo: 'DISPONIBILIDAD',
+      severidad: 'DURA',
+      peso: 10,
+      alcance: { tipo: 'GLOBAL', grade_ids: [] },
+      asignatura_ids: [],
+      docente_ids: [docente],
+      es_excepcion: false,
+      parametros: { celdas },
+    });
+  }
+  return { variables, avisos, respetadas };
 }
 
 /** Salones titulares (M10): grupos sin salón o con uno que ya no sirve (eliminado, en mantenimiento, inactivo o de otra sede). */
@@ -334,7 +419,9 @@ async function cargarContexto(academicYearId: string, jornadaId: string) {
   }
 
   const docentesConCarga = [...new Set(asignacionesMotor.map((a) => a.docente_id))];
-  avisos.push(...(await avisosDeDocentes(docentesConCarga, anio._id, jornada, grupos.map((g) => g._id))));
+  const otrasJornadas = await restriccionesDeOtrasJornadas(docentesConCarga, anio._id, jornada, estructura);
+  avisos.push(...(await avisosDeDocentes(docentesConCarga, anio._id, jornada, grupos.map((g) => g._id), otrasJornadas.respetadas)));
+  avisos.push(...otrasJornadas.avisos);
   avisos.push(...(await avisosDeSalones(grupos, jornada.sede_id, virtual)));
 
   const planPorGrupo = new Map(
@@ -386,6 +473,8 @@ async function cargarContexto(academicYearId: string, jornadaId: string) {
     variables.push(v);
   }
 
+  variables.push(...otrasJornadas.variables);
+
   const espaciosMotor = espaciosDocs.map((e) => ({ id: String(e._id), admite_grupos_simultaneos: e.admite_grupos_simultaneos }));
   const { sesiones, avisos: avisosExpansion } = expandirSesiones(asignacionesMotor, variables, estructura);
   avisos.push(...avisosExpansion, ...diagnosticarCapacidad(sesiones, variables, estructura, espaciosMotor));
@@ -421,14 +510,18 @@ async function cargarContexto(academicYearId: string, jornadaId: string) {
 }
 
 function aIncidencias(incidencias: readonly Incidencia[], humanizar: (t: string) => string) {
-  return incidencias.map((i) => ({
-    codigo: i.codigo,
-    variable_id: i.variable_id,
-    dura: i.dura,
-    magnitud: i.magnitud,
-    claves_sesion: i.sesion_ids,
-    mensaje: humanizar(i.mensaje),
-  }));
+  return incidencias.map((i) => {
+    // `ext:` = franja ocupada en otra jornada: no es una variable guardada, así que no se enlaza y el mensaje lo dice.
+    const deOtraJornada = i.variable_id?.startsWith('ext:') ?? false;
+    return {
+      codigo: i.codigo,
+      variable_id: deOtraJornada ? null : i.variable_id,
+      dura: i.dura,
+      magnitud: i.magnitud,
+      claves_sesion: i.sesion_ids,
+      mensaje: humanizar(deOtraJornada ? `Cruce con la otra jornada del docente. ${i.mensaje}` : i.mensaje),
+    };
+  });
 }
 
 // ------------------------------------------------------------------ variables

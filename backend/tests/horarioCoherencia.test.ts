@@ -1,6 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { conciliarCargaConPlan, horasDelPlanDeGrupo, jornadasSeTraslapan, resumirLista } from '../src/utils/horarioCoherencia';
-import { AsignacionMotor, EspacioMotor, SesionMotor, construirEstructura, diagnosticarCapacidad } from '../src/utils/motorHorarios';
+import {
+  celdasBloqueadasPorOcupaciones,
+  conciliarCargaConPlan,
+  horasDelPlanDeGrupo,
+  jornadasSeTraslapan,
+  ocupacionesDeSesiones,
+  resumirLista,
+} from '../src/utils/horarioCoherencia';
+import { AsignacionMotor, EspacioMotor, SesionMotor, VariableMotor, construirEstructura, diagnosticarCapacidad, expandirSesiones, generarHorario } from '../src/utils/motorHorarios';
 
 const oid = (n: number) => String(n).padStart(24, '0');
 const G6 = oid(1);
@@ -132,5 +139,63 @@ describe('diagnosticarCapacidad: espacios', () => {
     expect(
       diagnosticarCapacidad([sesion('a', 4, ['lab']), sesion('b', 4, ['lab'])], [], estructura, [{ id: 'lab', admite_grupos_simultaneos: true }]).map((a) => a.codigo)
     ).not.toContain('ESPACIOS_INSUFICIENTES');
+  });
+});
+
+describe('docentes en dos jornadas que se cruzan', () => {
+  const clase = (nombre: string, hora_inicio: string, hora_fin: string) => ({ nombre, tipo: 'CLASE' as const, hora_inicio, hora_fin });
+  const descanso = (hora_inicio: string, hora_fin: string) => ({ nombre: 'Descanso', tipo: 'DESCANSO' as const, hora_inicio, hora_fin });
+  // Única (06:00-14:00) con 3 clases y un descanso, y Mañana (06:00-12:00) con las mismas primeras franjas.
+  const unica = construirEstructura([1, 2, 3, 4, 5], [clase('1', '06:00', '06:55'), clase('2', '06:55', '07:50'), descanso('07:50', '08:20'), clase('3', '08:20', '09:15'), clase('4', '09:15', '10:10')]);
+  const manana = construirEstructura([1, 2, 3, 4, 5], [clase('1', '06:00', '06:55'), clase('2', '06:55', '07:50'), descanso('07:50', '08:20'), clase('3', '08:20', '09:15'), clase('4', '09:15', '10:10')]);
+
+  it('las horas ocupadas salen de las franjas reales de la otra jornada, también en bloques de varias horas', () => {
+    const ocupadas = ocupacionesDeSesiones(
+      [{ docente_ids: ['d1'], dia: 1, periodo: 0, duracion: 2 }, { docente_ids: ['d1', 'd2'], dia: 3, periodo: 3, duracion: 1 }, { docente_ids: ['d1'], dia: 2, periodo: 9, duracion: 1 }],
+      unica.periodos
+    );
+    expect(ocupadas).toEqual([
+      { docente_id: 'd1', dia: 1, inicio: '06:00', fin: '07:50' },
+      { docente_id: 'd1', dia: 3, inicio: '09:15', fin: '10:10' },
+      { docente_id: 'd2', dia: 3, inicio: '09:15', fin: '10:10' },
+    ]);
+  });
+
+  it('con franjas idénticas se bloquean los mismos periodos; con franjas distintas, solo los que se pisan', () => {
+    expect(celdasBloqueadasPorOcupaciones(manana, [{ dia: 1, inicio: '06:00', fin: '07:50' }])).toEqual([
+      { dia: 1, periodo: 0, valor: 'NO_DISPONIBLE' },
+      { dia: 1, periodo: 1, valor: 'NO_DISPONIBLE' },
+    ]);
+    // Otra jornada con clases de 06:30 a 07:30: pisa los dos primeros periodos, no el tercero.
+    expect(celdasBloqueadasPorOcupaciones(manana, [{ dia: 2, inicio: '06:30', fin: '07:30' }]).map((c) => c.periodo)).toEqual([0, 1]);
+    // Pegadas no se pisan: terminar a las 08:20 no bloquea la clase que empieza a las 08:20.
+    expect(celdasBloqueadasPorOcupaciones(manana, [{ dia: 2, inicio: '07:00', fin: '08:20' }]).map((c) => c.periodo)).toEqual([1]);
+    // Otro día no bloquea nada.
+    expect(celdasBloqueadasPorOcupaciones(manana, [{ dia: 6, inicio: '06:00', fin: '14:00' }])).toEqual([]);
+  });
+
+  it('el motor no pone al docente a dar clase donde ya está en la otra jornada', () => {
+    const ocupadas = ocupacionesDeSesiones(
+      [1, 2, 3, 4, 5].flatMap((dia) => [{ docente_ids: ['d1'], dia, periodo: 0, duracion: 2 }]),
+      unica.periodos
+    );
+    const bloqueo: VariableMotor = {
+      id: 'ext:d1',
+      tipo: 'DISPONIBILIDAD',
+      severidad: 'DURA',
+      peso: 10,
+      alcance: { tipo: 'GLOBAL', grade_ids: [] },
+      asignatura_ids: [],
+      docente_ids: ['d1'],
+      es_excepcion: false,
+      parametros: { celdas: celdasBloqueadasPorOcupaciones(manana, ocupadas) },
+    };
+    const asignaciones: AsignacionMotor[] = [{ id: 'a1', docente_id: 'd1', group_id: 'g1', grade_id: 'gr', subject_id: 's1', horas_semanales: 8 }];
+    const { sesiones } = expandirSesiones(asignaciones, [bloqueo], manana);
+    const r = generarHorario({ estructura: manana, sesiones, variables: [bloqueo], espacios: [] }, { semilla: 3, tiempo_max_ms: 3000 });
+    expect(r.conflictos_duros).toBe(0);
+    for (const u of r.ubicaciones) {
+      for (let k = 0; k < (sesiones.find((x) => x.id === u.sesion_id)?.duracion ?? 1); k += 1) expect(u.periodo + k).toBeGreaterThanOrEqual(2);
+    }
   });
 });

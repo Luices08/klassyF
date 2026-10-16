@@ -513,12 +513,21 @@ Diseño en `doc/Analisis_M09_Horarios.md`. Backend `/horarios` (`horario.control
   asignación cuya asignatura ya no está en el plan del grupo no se programa (`ASIGNACION_FUERA_DEL_PLAN`); una asignatura del plan sin docente se
   avisa y se cuenta en Insumos (`ASIGNATURA_SIN_DOCENTE`, columna «Plan»). Un grupo sin plan aplicable se programa con las horas de su asignación.
   También avisa (sin bloquear): docentes inactivos, docentes con clase en otra jornada —de esta u otra sede— cuyas horas se cruzan con esta
-  (`DOCENTE_EN_JORNADAS_QUE_SE_CRUZAN`: cada horario se arma por jornada, el motor no lo ve), grupos sin salón titular o con uno eliminado/en
+  (`DOCENTE_EN_JORNADAS_QUE_SE_CRUZAN`, solo mientras esa otra jornada no tenga un horario que respetar; ver «Docentes en dos jornadas» abajo), grupos sin salón titular o con uno eliminado/en
   mantenimiento/de otra sede (solo si la sede registra salones), espacios de una regla `ESPACIO_REQUERIDO` que ya no sirven
   (`ESPACIO_PARCIAL` / `ESPACIO_NO_DISPONIBLE`) y horas que piden un mismo espacio por encima de lo que da en la semana (`ESPACIOS_INSUFICIENTES`).
   Los grupos activos y los espacios usables se filtran por exclusión (`$ne: 'CLOSED'`, `$nin: [EN_MANTENIMIENTO, INACTIVO]`) para no perder
   documentos anteriores al campo `estado`. Publicar **reasigna los espacios** con los de hoy. El detalle de una versión
   (`GET /horarios/:id`) trae `carga_cambio` (sesiones nuevas/que sobran/con otra duración frente a la carga actual) para decir que está desfasada antes de que publicar la rechace.
+
+- **Docentes en dos jornadas (p. ej. Mañana de secundaria y Única de media técnica).** Que dos jornadas se cruzan en el reloj es normal; lo que no puede pasar es que un docente
+  quede en dos clases a la misma hora. Cada jornada se sigue generando por separado, pero `restriccionesDeOtrasJornadas` (`horario.service.ts`) lee, para las jornadas que se
+  traslapan (de esta u otra sede), el horario **publicado** o, si no hay, el **borrador** más reciente, pasa sus sesiones a **horas reales** (`ocupacionesDeSesiones`) y bloquea esas horas del docente
+  como franjas NO disponibles DURAS (`celdasBloqueadasPorOcupaciones`, variables internas `ext:<docente>`: no se guardan ni salen en Variables). Sirve con franjas idénticas o distintas, porque se comparan
+  horas, no números de periodo. El que se genera primero no tiene qué respetar; el segundo evita al primero (y si faltan franjas libres, el diagnóstico de capacidad y el 409 al publicar lo dicen). Editar a mano
+  una clase que choca con la otra jornada da un conflicto duro «Cruce con la otra jornada del docente». Si el horario de la otra jornada se generó con franjas distintas de las actuales no se usa y se avisa
+  (`HORARIO_OTRA_JORNADA_DESFASADO`); con borrador se avisa (`..._EN_BORRADOR`). Al regenerar una jornada, conviene regenerar la otra para que ambas queden coherentes.
+- **No es una optimización conjunta:** las dos jornadas no se resuelven a la vez (una puede dejar a la otra sin solución); es el orden de generación lo que decide quién cede.
 
 ### M13 (Asistencia) — estado: núcleo completo
 

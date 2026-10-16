@@ -1,5 +1,5 @@
 import { IGradoPlan } from '../models/studyPlan.model';
-import { AsignacionMotor } from './motorHorarios';
+import { AsignacionMotor, CeldaDisponibilidad, EstructuraSemana } from './motorHorarios';
 import { horasDeAsignaturaEnGrupo, obtenerGradoPlanEfectivo } from './horasPlanEstudios';
 
 /**
@@ -120,4 +120,57 @@ export function jornadasSeTraslapan(a: VentanaDeJornada, b: VentanaDeJornada): b
 export function resumirLista(items: readonly string[], maximo = 8): string {
   if (items.length <= maximo) return items.join('; ');
   return `${items.slice(0, maximo).join('; ')} y ${items.length - maximo} más`;
+}
+
+/** Una franja de la semana en que un docente ya está ocupado en el horario de otra jornada (día ISO y horas HH:MM). */
+export interface OcupacionDeDocente {
+  docente_id: string;
+  dia: number;
+  inicio: string;
+  fin: string;
+}
+
+interface SesionOcupada {
+  docente_ids: readonly string[];
+  dia: number;
+  periodo: number;
+  duracion: number;
+}
+
+/**
+ * Pasa las sesiones de un horario ya armado (otra jornada) a horas reales, con las franjas de CLASE de esa jornada. Las
+ * posiciones del motor son índices de periodo: solo las horas son comparables entre jornadas con franjas distintas.
+ */
+export function ocupacionesDeSesiones(
+  sesiones: readonly SesionOcupada[],
+  periodos: ReadonlyArray<{ hora_inicio: string; hora_fin: string }>
+): OcupacionDeDocente[] {
+  const resultado: OcupacionDeDocente[] = [];
+  for (const s of sesiones) {
+    const primero = periodos[s.periodo];
+    const ultimo = periodos[s.periodo + s.duracion - 1];
+    if (!primero || !ultimo) continue;
+    for (const docente_id of s.docente_ids) resultado.push({ docente_id, dia: s.dia, inicio: primero.hora_inicio, fin: ultimo.hora_fin });
+  }
+  return resultado;
+}
+
+/**
+ * Celdas de ESTA jornada en las que un docente no puede dar clase porque a esa hora ya está en otra: los periodos que se
+ * pisan con alguna ocupación el mismo día. Con franjas idénticas son los mismos periodos; con franjas distintas, los que se traslapan.
+ */
+export function celdasBloqueadasPorOcupaciones(
+  estructura: EstructuraSemana,
+  ocupaciones: ReadonlyArray<{ dia: number; inicio: string; fin: string }>
+): CeldaDisponibilidad[] {
+  const celdas: CeldaDisponibilidad[] = [];
+  for (const dia of estructura.dias) {
+    const delDia = ocupaciones.filter((o) => o.dia === dia);
+    if (delDia.length === 0) continue;
+    estructura.periodos.forEach((p, periodo) => {
+      const pisa = delDia.some((o) => aMinutos(p.hora_inicio) < aMinutos(o.fin) && aMinutos(o.inicio) < aMinutos(p.hora_fin));
+      if (pisa) celdas.push({ dia, periodo, valor: 'NO_DISPONIBLE' });
+    });
+  }
+  return celdas;
 }

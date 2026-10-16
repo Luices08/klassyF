@@ -1,4 +1,4 @@
-import { Types } from 'mongoose';
+import { ClientSession, Types } from 'mongoose';
 import { avisarDocumentoPorRevisar, avisarDocumentoRechazado } from './notificacionesEventos.service';
 import {
   CATEGORIAS_DOCUMENTO_MATRICULA,
@@ -8,6 +8,7 @@ import {
 } from '../constants/matriculaChecklist';
 import {
   ESTADOS_MATRICULA_CON_FOLIO,
+  ESTADOS_MATRICULA_VIVOS,
   EstadoDocumentoMatricula,
   EstadoMatricula,
   Rol,
@@ -45,6 +46,28 @@ export interface CreateEnrollmentInput {
   forzar_sobrecupo?: boolean;
   /** Lo que la familia declara sobre apoyos o diagnósticos previos (M16): se transcribe, sin valorar ni rotular. */
   apoyo_declarado?: { motivo_declarado: string; aporta_soporte?: boolean; observacion?: string };
+}
+
+/**
+ * Un estudiante tiene una sola matrícula viva por año lectivo. Si ya la tiene, se dice en qué grupo está y se le indica el camino
+ * correcto (cambiar el grupo de la existente) en vez de crear otra con otro folio.
+ */
+export async function exigirSinMatriculaViva(
+  studentId: string | Types.ObjectId,
+  academicYearId: string | Types.ObjectId,
+  session?: ClientSession
+): Promise<void> {
+  const existente = await Enrollment.findOne({ student_id: studentId, academic_year_id: academicYearId, estado: { $in: ESTADOS_MATRICULA_VIVOS } }).session(session ?? null);
+  if (!existente) return;
+  const grupo = await Group.findById(existente.group_id).select('grade_id nomenclatura').session(session ?? null);
+  const grado = grupo ? await Grade.findById(grupo.grade_id).select('nombre').session(session ?? null) : null;
+  const donde = grupo ? `${grado?.nombre ?? ''} ${grupo.nomenclatura}`.trim() : 'otro grupo';
+  const folio = existente.folio_matricula ? `, folio ${existente.folio_matricula}` : ', aún sin folio';
+  throw new ApiError(
+    409,
+    `El estudiante ya está matriculado en ${donde} este año (${existente.estado}${folio}). Para cambiarlo de grupo usa «Cambiar grupo» en su matrícula; no se crea una matrícula nueva.`,
+    { enrollment_id: String(existente._id) }
+  );
 }
 
 /**
@@ -86,6 +109,8 @@ export async function createEnrollment(
     if (!academicYear) {
       throw new ApiError(404, 'Año lectivo no encontrado.');
     }
+
+    await exigirSinMatriculaViva(student_id, academic_year_id, session);
 
     const group = await Group.findById(group_id).session(session);
     if (!group) throw new ApiError(404, 'Grupo no encontrado.');

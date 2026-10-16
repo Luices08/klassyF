@@ -92,6 +92,10 @@ export type EstadoMatricula = (typeof ESTADOS_MATRICULA)[number];
 // consultar usr_students directo. Un condicional SIGUE yendo a clase.
 export const ESTADOS_MATRICULA_ACTIVOS: EstadoMatricula[] = ['MATRICULADO_CONDICIONAL', 'MATRICULADO_DEFINITIVO'];
 
+// Una matrícula "viva" es la que todavía cuenta como la del estudiante en el año: un estudiante tiene como máximo una por año
+// lectivo (índice único parcial en `enrollment.model.ts`). RETIRADO y ANULADO quedan como historial y permiten matricular de nuevo.
+export const ESTADOS_MATRICULA_VIVOS: EstadoMatricula[] = ['PREINSCRITO', ...ESTADOS_MATRICULA_ACTIVOS];
+
 // Solo una matricula formalizada (estos 2 estados) ocupa un folio del Libro de
 // Matricula: un PREINSCRITO que desiste no debe dejar un hueco en el consecutivo.
 export const ESTADOS_MATRICULA_CON_FOLIO: EstadoMatricula[] = ESTADOS_MATRICULA_ACTIVOS;

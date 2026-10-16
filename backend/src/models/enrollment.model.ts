@@ -2,6 +2,7 @@ import { HydratedDocument, Model, Schema, Types, model } from 'mongoose';
 import {
   ESTADOS_DOCUMENTO_MATRICULA,
   ESTADOS_MATRICULA_CON_FOLIO,
+  ESTADOS_MATRICULA_VIVOS,
   ESTADOS_MATRICULA,
   EstadoDocumentoMatricula,
   EstadoMatricula,
@@ -79,8 +80,13 @@ const enrollmentSchema = new Schema<IEnrollment, EnrollmentModel>(
   { timestamps: true }
 );
 
-enrollmentSchema.index({ student_id: 1, academic_year_id: 1 });
+enrollmentSchema.index({ student_id: 1, academic_year_id: 1, estado: 1 });
 enrollmentSchema.index({ group_id: 1 });
+// Una sola matrícula viva por estudiante y año lectivo: para cambiarlo de grupo se actualiza la existente (`cambiarGrupo`), no se crea otra.
+enrollmentSchema.index(
+  { student_id: 1, academic_year_id: 1 },
+  { unique: true, name: 'matricula_viva_unica', partialFilterExpression: { estado: { $in: ESTADOS_MATRICULA_VIVOS } } }
+);
 // Unicos solo entre matriculas que ya tienen folio: los PREINSCRITOS (null) no chocan entre si.
 enrollmentSchema.index({ folio_matricula: 1 }, { unique: true, partialFilterExpression: { folio_matricula: { $type: 'string' } } });
 enrollmentSchema.index(

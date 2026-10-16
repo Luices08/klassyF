@@ -206,7 +206,7 @@ export function NotasPlanillaPage() {
           {cerrar.isSuccess && <Alert tone="success">Planilla cerrada. Las notas ya son la fuente del boletín; coordinación las declarará definitivas.</Alert>}
 
           <PlanillaNotas
-            key={`${asignacion._id}-${periodo.numero}`}
+            key={`planilla-${asignacion._id}-${periodo.numero}`}
             planilla={planilla}
             guardando={guardar.isPending || casillas.establecerPesos.isPending}
             onRevisarActividad={setRevisando}
@@ -236,7 +236,7 @@ export function NotasPlanillaPage() {
             puedeDescargar
           />
 
-          <HistorialImportacionesExcel key={`${asignacion._id}-${periodo.numero}`} teacherAssignmentId={asignacion._id} periodoNumero={periodo.numero} />
+          <HistorialImportacionesExcel key={`historial-${asignacion._id}-${periodo.numero}`} teacherAssignmentId={asignacion._id} periodoNumero={periodo.numero} />
 
           <EntregasDrawer actividad={revisando} onClose={() => setRevisando(null)} escala={anio?.escala_evaluacion ?? null} />
 

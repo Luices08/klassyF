@@ -124,7 +124,15 @@ export interface InsumosHorario {
   estructura: EstructuraSemana;
   periodos_semana: number;
   total_sesiones: number;
-  grupos: Array<CatalogoHorario['grupos'][number] & { horas: number }>;
+  grupos: Array<
+    CatalogoHorario['grupos'][number] & {
+      horas: number;
+      /** Horas semanales que el plan de estudios le da al grupo (null = el plan no dice nada de él). */
+      horas_plan: number | null;
+      /** Horas del plan que aún no tienen docente en Carga académica. */
+      horas_sin_docente: number;
+    }
+  >;
   docentes: Array<CatalogoHorario['docentes'][number] & { horas: number }>;
   avisos: AvisoHorario[];
   catalogo: CatalogoHorario;
@@ -178,6 +186,8 @@ export interface DetalleHorario {
   estructura: EstructuraSemana;
   catalogo: CatalogoHorario;
   franjas_cambiaron: boolean;
+  /** La carga de hoy ya no produce las sesiones de esta versión (null = coincide, o no aplica). */
+  carga_cambio?: { sobran: number; faltan: number; cambiaron: number } | null;
 }
 
 export type VistaPdfHorario = 'GRUPO' | 'DOCENTE' | 'GENERAL';

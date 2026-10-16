@@ -118,7 +118,7 @@ export function HorariosPage() {
                   variables={variablesQuery.data}
                   grados={grados}
                   catalogo={insumos.catalogo}
-                  espacios={espacios.map((e) => ({ _id: e._id, nombre: e.nombre }))}
+                  espacios={espacios.map((e) => ({ _id: e._id, nombre: e.nombre, disponible: e.estado === 'DISPONIBLE' }))}
                 />
               </TabPanel>
               <TabPanel active={pestana} tabKey="tiempo-libre">

@@ -235,6 +235,13 @@ function DetalleVersion({ id, estado, generando, onRegenerar }: { id: string; es
         {detalle.franjas_cambiaron && (
           <Alert tone="warning">Las franjas de la jornada cambiaron después de generar esta versión. Genera una nueva antes de editar o publicar.</Alert>
         )}
+        {detalle.carga_cambio && (
+          <Alert tone="warning">
+            La carga académica o el plan de estudios cambiaron después de generar esta versión ({detalle.carga_cambio.faltan} sesión(es) nuevas,{' '}
+            {detalle.carga_cambio.sobran} que ya no existen, {detalle.carga_cambio.cambiaron} con otra duración). No se podrá publicar tal cual: genera una
+            versión nueva.
+          </Alert>
+        )}
         {horario.avisos.length > 0 && (
           <Alert tone="warning">
             <ul className="list-disc space-y-1 pl-4">

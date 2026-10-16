@@ -26,7 +26,7 @@ interface VariableDrawerProps {
   /** Grados activos del catálogo de la institución (M01): de aquí sale el alcance. */
   grados: Grade[];
   catalogo: CatalogoHorario;
-  espacios: Array<{ _id: string; nombre: string }>;
+  espacios: Array<{ _id: string; nombre: string; disponible?: boolean }>;
   onClose: () => void;
 }
 
@@ -262,7 +262,7 @@ function FormularioVariable({ variable, contexto, grados, catalogo, espacios, on
           </label>
         )}
         {tipo === 'ESPACIO_REQUERIDO' && (
-          <MultiSelect label="Espacios" options={espacios.map((e) => ({ value: e._id, label: e.nombre }))} selected={espacioIds} onChange={setEspacioIds} emptyLabel="Elige los espacios" />
+          <MultiSelect label="Espacios" options={espacios.filter((e) => e.disponible !== false || espacioIds.includes(e._id)).map((e) => ({ value: e._id, label: e.disponible === false ? `${e.nombre} (no disponible)` : e.nombre }))} selected={espacioIds} onChange={setEspacioIds} emptyLabel="Elige los espacios" />
         )}
 
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">

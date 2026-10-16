@@ -53,9 +53,10 @@ export function PanelInsumos({ insumos }: { insumos: InsumosHorario }) {
               <Th>Grupo</Th>
               <Th>Horas</Th>
               <Th>Ocupación</Th>
+              <Th>Plan</Th>
             </TableHead>
             <TableBody>
-              {insumos.grupos.length === 0 && <EmptyRow colSpan={3}>No hay grupos activos en esta jornada.</EmptyRow>}
+              {insumos.grupos.length === 0 && <EmptyRow colSpan={4}>No hay grupos activos en esta jornada.</EmptyRow>}
               {insumos.grupos.map((g) => (
                 <tr key={g._id}>
                   <Td className="font-medium text-ink">{g.etiqueta}</Td>
@@ -64,6 +65,15 @@ export function PanelInsumos({ insumos }: { insumos: InsumosHorario }) {
                   </Td>
                   <Td className="w-40">
                     <ProgressBar value={g.horas} max={insumos.periodos_semana} tone={g.horas > insumos.periodos_semana ? 'red' : 'blue'} />
+                  </Td>
+                  <Td>
+                    {g.horas_sin_docente > 0 ? (
+                      <Chip tone="orange">Faltan {g.horas_sin_docente} h sin docente</Chip>
+                    ) : g.horas_plan === null ? (
+                      <Chip tone="neutral">Sin plan</Chip>
+                    ) : (
+                      <Chip tone="green">{g.horas_plan} h completas</Chip>
+                    )}
                   </Td>
                 </tr>
               ))}

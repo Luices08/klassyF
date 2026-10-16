@@ -138,6 +138,7 @@ export function EnrollmentsPage() {
 
   // --- Formalizar matricula ---
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [matriculaCreadaId, setMatriculaCreadaId] = useState<string | null>(null);
   const [modoMatricula, setModoMatricula] = useState<'existente' | 'expres'>('existente');
   const [form, setForm] = useState(FORM_VACIO);
   const [errorEnvio, setErrorEnvio] = useState<string | null>(null);
@@ -193,10 +194,9 @@ export function EnrollmentsPage() {
       });
 
       setForm(FORM_VACIO);
-      setDrawerOpen(false);
       void studentsQuery.refetch();
-      // Los documentos se cargan y se revisan en el expediente: se abre de una vez.
-      navigate(`/admin/enrollments/${matricula._id}`);
+      // Los documentos se cargan y se revisan en el expediente: el drawer ofrece el botón para ir a él.
+      setMatriculaCreadaId(matricula._id);
     } catch (err) {
       setErrorEnvio(errorMessage(err));
     }
@@ -219,6 +219,7 @@ export function EnrollmentsPage() {
               variant="outline"
               onClick={() => {
                 setModoMatricula('expres');
+                setMatriculaCreadaId(null);
                 setDrawerOpen(true);
               }}
               disabled={!anioId}
@@ -229,6 +230,7 @@ export function EnrollmentsPage() {
             <Button
               onClick={() => {
                 setModoMatricula('existente');
+                setMatriculaCreadaId(null);
                 setDrawerOpen(true);
               }}
               disabled={!anioId}
@@ -403,16 +405,24 @@ export function EnrollmentsPage() {
 
       <Drawer
         open={drawerOpen}
-        title={modoMatricula === 'expres' ? 'Matrícula exprés (nuevo estudiante)' : 'Formalizar matrícula'}
-        size={modoMatricula === 'expres' ? 'lg' : 'md'}
+        title={matriculaCreadaId ? 'Matrícula creada' : modoMatricula === 'expres' ? 'Matrícula exprés (nuevo estudiante)' : 'Formalizar matrícula'}
+        size={matriculaCreadaId ? 'md' : modoMatricula === 'expres' ? 'lg' : 'md'}
         onClose={() => {
           setDrawerOpen(false);
+          setMatriculaCreadaId(null);
           setErrorEnvio(null);
         }}
-        onSubmit={handleSubmit}
+        onSubmit={matriculaCreadaId ? undefined : handleSubmit}
         submitLabel={modoMatricula === 'expres' ? 'Crear estudiante y matricular' : 'Matricular'}
         isSubmitting={createEnrollment.isPending || crearEstudiante.isPending}
       >
+        {matriculaCreadaId ? (
+          <div className="space-y-4">
+            <Alert tone="success">La matrícula quedó registrada. Los documentos se cargan, aprueban o rechazan en su expediente.</Alert>
+            <Button onClick={() => navigate(`/admin/enrollments/${matriculaCreadaId}`)}>Ir al expediente</Button>
+          </div>
+        ) : (
+          <>
         <div className="flex rounded-lg border border-border bg-subtle p-1 mb-2">
           <button
             type="button"
@@ -665,6 +675,8 @@ export function EnrollmentsPage() {
             />
             Autorizar matrícula aunque el grupo esté en su capacidad máxima (sobrecupo)
           </label>
+        )}
+          </>
         )}
       </Drawer>
     </div>

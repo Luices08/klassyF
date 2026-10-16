@@ -40,8 +40,10 @@ function buscarExistente(variables: VariableHorario[], para: Para, docenteId: st
  * viernes). Se guarda como una variable DISPONIBILIDAD obligatoria; dejar la malla vacía la elimina.
  */
 export function PanelTiempoLibre({ contexto, estructura, grados, catalogo, variables }: PanelTiempoLibreProps) {
+  // La tabla solo se abre a pedido (de un registro o con «Agregar»): así lo que se ve siempre es de quien se eligió, no de «el primer docente».
+  const [abierta, setAbierta] = useState(false);
   const [para, setPara] = useState<Para>('DOCENTE');
-  const [docenteId, setDocenteId] = useState(catalogo.docentes[0]?._id ?? '');
+  const [docenteId, setDocenteId] = useState('');
   const [gradeIds, setGradeIds] = useState<string[]>([]);
 
   if (estructura.periodos.length === 0) {
@@ -54,46 +56,40 @@ export function PanelTiempoLibre({ contexto, estructura, grados, catalogo, varia
   const nombreGrado = new Map(grados.map((g) => [g._id, g.nombre]));
   const registradas = variables.filter((v) => v.tipo === 'DISPONIBILIDAD');
 
+  function abrirNueva() {
+    setPara('DOCENTE');
+    setDocenteId('');
+    setGradeIds([]);
+    setAbierta(true);
+  }
+
+  function abrirRegistro(v: VariableHorario) {
+    if (v.docente_ids.length === 1) {
+      setPara('DOCENTE');
+      setDocenteId(v.docente_ids[0]);
+      setGradeIds([]);
+    } else {
+      setPara('GRADOS');
+      setGradeIds(v.alcance.grade_ids);
+      setDocenteId('');
+    }
+    setAbierta(true);
+  }
+
+  const editable = (v: VariableHorario) =>
+    !v.es_excepcion && v.asignatura_ids.length === 0 && ((v.docente_ids.length === 1 && v.alcance.tipo === 'GLOBAL') || (v.docente_ids.length === 0 && v.alcance.tipo === 'GRADOS'));
+
   return (
     <div className="space-y-4">
       <Card>
-        <CardHeader title="Tiempo libre" subtitle="Marca las franjas en que un docente o unos grados no pueden tener clase." />
-        <div className="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <Select label="Para" value={para} onChange={(e) => setPara(e.target.value as Para)}>
-            <option value="DOCENTE">Un docente</option>
-            <option value="GRADOS">Uno o varios grados</option>
-          </Select>
-          {para === 'DOCENTE' ? (
-            <Select label="Docente" value={docenteId} onChange={(e) => setDocenteId(e.target.value)}>
-              {catalogo.docentes.length === 0 && <option value="">Sin docentes con carga</option>}
-              {catalogo.docentes.map((d) => (
-                <option key={d._id} value={d._id}>
-                  {d.nombre}
-                </option>
-              ))}
-            </Select>
-          ) : (
-            <MultiSelect label="Grados" options={grados.map((g) => ({ value: g._id, label: g.nombre }))} selected={gradeIds} onChange={setGradeIds} emptyLabel="Elige los grados" />
-          )}
-        </div>
-        {seleccion ? (
-          <EditorMalla
-            key={`${para}:${seleccion}:${existente?._id ?? 'nueva'}`}
-            contexto={contexto}
-            estructura={estructura}
-            para={para}
-            docenteId={docenteId}
-            gradeIds={gradeIds}
-            existente={existente}
-          />
+        <CardHeader
+          title="Registrado"
+          subtitle="Tiempo libre ya guardado en esta jornada."
+          action={!abierta ? <Button onClick={abrirNueva}>Agregar tiempo libre</Button> : undefined}
+        />
+        {registradas.length === 0 ? (
+          <p className="text-sm text-muted">Aún no hay tiempo libre registrado en esta jornada.</p>
         ) : (
-          <p className="text-sm text-muted">Elige a quién aplica para ver su malla.</p>
-        )}
-      </Card>
-
-      {registradas.length > 0 && (
-        <Card>
-          <CardHeader title="Registrado" subtitle="Tiempo libre ya guardado en esta jornada." />
           <ul className="divide-y divide-border text-sm">
             {registradas.map((v) => (
               <li key={v._id} className="flex flex-wrap items-center justify-between gap-2 py-2">
@@ -104,10 +100,62 @@ export function PanelTiempoLibre({ contexto, estructura, grados, catalogo, varia
                       ? v.alcance.grade_ids.map((g) => nombreGrado.get(g) ?? 'Grado').join(', ')
                       : 'Todos los grados'}
                 </span>
-                <span className="text-muted">{(v.parametros.celdas as CeldaDisponibilidad[]).length} franja(s) marcada(s)</span>
+                <span className="flex items-center gap-3">
+                  <span className="text-muted">{(v.parametros.celdas as CeldaDisponibilidad[]).length} franja(s) marcada(s)</span>
+                  {editable(v) && (
+                    <Button variant="outline" onClick={() => abrirRegistro(v)}>
+                      Abrir tabla
+                    </Button>
+                  )}
+                </span>
               </li>
             ))}
           </ul>
+        )}
+      </Card>
+
+      {abierta && (
+        <Card>
+          <CardHeader
+            title="Tiempo libre"
+            subtitle="Marca las franjas en que un docente o unos grados no pueden tener clase."
+            action={
+              <Button variant="secondary" onClick={() => setAbierta(false)}>
+                Cerrar tabla
+              </Button>
+            }
+          />
+          <div className="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <Select label="Para" value={para} onChange={(e) => setPara(e.target.value as Para)}>
+              <option value="DOCENTE">Un docente</option>
+              <option value="GRADOS">Uno o varios grados</option>
+            </Select>
+            {para === 'DOCENTE' ? (
+              <Select label="Docente" value={docenteId} onChange={(e) => setDocenteId(e.target.value)}>
+                <option value="">{catalogo.docentes.length === 0 ? 'Sin docentes con carga' : 'Elige un docente'}</option>
+                {catalogo.docentes.map((d) => (
+                  <option key={d._id} value={d._id}>
+                    {d.nombre}
+                  </option>
+                ))}
+              </Select>
+            ) : (
+              <MultiSelect label="Grados" options={grados.map((g) => ({ value: g._id, label: g.nombre }))} selected={gradeIds} onChange={setGradeIds} emptyLabel="Elige los grados" />
+            )}
+          </div>
+          {seleccion ? (
+            <EditorMalla
+              key={`${para}:${seleccion}:${existente?._id ?? 'nueva'}`}
+              contexto={contexto}
+              estructura={estructura}
+              para={para}
+              docenteId={docenteId}
+              gradeIds={gradeIds}
+              existente={existente}
+            />
+          ) : (
+            <p className="text-sm text-muted">Elige a quién aplica para ver su tabla.</p>
+          )}
         </Card>
       )}
     </div>

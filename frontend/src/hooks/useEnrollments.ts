@@ -8,7 +8,6 @@ export interface CreateEnrollmentInput {
   academic_year_id: string;
   tipo_ingreso: TipoIngreso;
   numero_libro?: number;
-  estado_inicial?: 'MATRICULADO_CONDICIONAL' | 'MATRICULADO_DEFINITIVO';
   fecha_limite_compromiso?: string;
   forzar_sobrecupo?: boolean;
   /** Lo que la familia declara sobre apoyos o diagnósticos previos: pasa a la bandeja de orientación (M16). */
@@ -100,6 +99,7 @@ export function useCargarDocumentoMatricula() {
     },
     onSuccess: (_data, variables) => {
       void queryClient.invalidateQueries({ queryKey: ['enrollments', variables.id] });
+      void queryClient.invalidateQueries({ queryKey: ['enrollments', 'documentos-por-revisar'] });
     },
   });
 }
@@ -120,6 +120,7 @@ export function useRevisarDocumentoMatricula() {
     }) => api.patch<Enrollment>(`/enrollments/${id}/checklist/${tipoDocumento}/revisar`, { estado, comentario }),
     onSuccess: (_data, variables) => {
       void queryClient.invalidateQueries({ queryKey: ['enrollments', variables.id] });
+      void queryClient.invalidateQueries({ queryKey: ['enrollments', 'documentos-por-revisar'] });
     },
   });
 }
@@ -140,6 +141,7 @@ export function useAgregarDocumentoChecklist() {
     }) => api.post<Enrollment>(`/enrollments/${id}/checklist`, { tipo_documento, nombre_personalizado, obligatorio }),
     onSuccess: (_data, variables) => {
       void queryClient.invalidateQueries({ queryKey: ['enrollments', variables.id] });
+      void queryClient.invalidateQueries({ queryKey: ['enrollments', 'documentos-por-revisar'] });
     },
   });
 }
@@ -151,6 +153,7 @@ export function useEliminarDocumentoChecklist() {
       api.delete<Enrollment>(`/enrollments/${id}/checklist/${tipoDocumento}`),
     onSuccess: (_data, variables) => {
       void queryClient.invalidateQueries({ queryKey: ['enrollments', variables.id] });
+      void queryClient.invalidateQueries({ queryKey: ['enrollments', 'documentos-por-revisar'] });
     },
   });
 }
@@ -180,6 +183,33 @@ export function useActualizarComentarioDocumento() {
       api.patch<Enrollment>(`/enrollments/${id}/checklist/${tipoDocumento}/comentario`, { comentario }),
     onSuccess: (_data, variables) => {
       void queryClient.invalidateQueries({ queryKey: ['enrollments', variables.id] });
+      void queryClient.invalidateQueries({ queryKey: ['enrollments', 'documentos-por-revisar'] });
     },
+  });
+}
+
+export interface DocumentoPorRevisar {
+  enrollment_id: string;
+  estado_matricula: EstadoMatricula;
+  tipo_ingreso: TipoIngreso;
+  tipo_documento: TipoDocumentoMatricula;
+  nombre_personalizado: string | null;
+  obligatorio?: boolean;
+  fecha_carga: string | null;
+  nombre: string;
+  apellido: string;
+  numero_documento: string;
+  grupo: string | null;
+}
+
+export function useDocumentosPorRevisar(filter: { academic_year_id?: string; group_id?: string; page?: number; limit?: number }) {
+  return useQuery({
+    queryKey: ['enrollments', 'documentos-por-revisar', filter],
+    queryFn: () =>
+      api.raw<{ success: true; data: DocumentoPorRevisar[]; total: number; page: number; pages: number }>('/enrollments/documentos-por-revisar', {
+        query: { ...filter },
+      }),
+    select: (res) => ({ data: res.data, total: res.total, page: res.page, pages: res.pages }),
+    enabled: Boolean(filter.academic_year_id),
   });
 }

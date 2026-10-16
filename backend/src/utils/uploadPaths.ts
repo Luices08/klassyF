@@ -9,11 +9,17 @@ export const ASISTENCIA_DIR = path.join(UPLOADS_ROOT, 'asistencia');
 export const INCLUSION_DIR = path.join(UPLOADS_ROOT, 'inclusion');
 export const CERTIFICADOS_DIR = path.join(UPLOADS_ROOT, 'certificados');
 export const ACTIVIDADES_DIR = path.join(UPLOADS_ROOT, 'actividades');
+export const PAZ_Y_SALVO_DIR = path.join(UPLOADS_ROOT, 'paz-y-salvo');
 export const PLANEACION_DIR = path.join(UPLOADS_ROOT, 'planeacion');
 
 /** Carpeta de una matricula puntual, para aislar sus documentos del resto. */
 export function carpetaMatricula(enrollmentId: string): string {
   return path.join(MATRICULAS_DIR, enrollmentId);
+}
+
+/** Paz y salvo de fin de año (M04), una carpeta por año lectivo. */
+export function carpetaPazYSalvo(anioId: string): string {
+  return path.join(PAZ_Y_SALVO_DIR, anioId);
 }
 
 /** Soportes de justificaciones de asistencia (M13), una carpeta por planilla. */

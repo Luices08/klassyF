@@ -29,6 +29,11 @@ export const listEnrollments = catchAsync<unknown, unknown, unknown, ListQuery>(
   res.status(200).json({ success: true, ...resultado });
 });
 
+export const listarDocumentosPorRevisar = catchAsync<unknown, unknown, unknown, enrollmentService.FiltroDocumentosPorRevisar>(async (req, res) => {
+  const resultado = await enrollmentService.listarDocumentosPorRevisar(req.query);
+  res.status(200).json({ success: true, ...resultado });
+});
+
 interface EnrollmentParams extends ParamsDictionary {
   id: string;
 }

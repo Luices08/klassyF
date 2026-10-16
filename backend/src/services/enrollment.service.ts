@@ -17,9 +17,12 @@ import StudentGuardian from '../models/studentGuardian.model';
 import StudentProfile from '../models/studentProfile.model';
 import User from '../models/user.model';
 import ApiError from '../utils/ApiError';
+import { documentosObligatoriosPendientes } from '../utils/documentosMatricula';
+import { resumirLista } from '../utils/horarioCoherencia';
 import { runTransaction } from '../utils/runTransaction';
 import { registrarEvento } from './audit.service';
 import { generateFolioMatricula } from './folio.service';
+import { aprobarItemConPazYSalvo, pazYSalvoConfirmadoPrevio } from './pazYSalvo.service';
 import { crearDesdeMatricula } from './solicitudApoyo.service';
 
 const ESTADOS_QUE_LIBERAN_CUPO: EstadoMatricula[] = ['RETIRADO', 'ANULADO'];
@@ -51,6 +54,12 @@ export async function createEnrollment(
   const { student_id, group_id, academic_year_id, tipo_ingreso } = input;
   const numeroLibro = input.numero_libro ?? 1;
   const estadoInicial = input.estado_inicial ?? 'MATRICULADO_CONDICIONAL';
+
+  // Definitiva es el resultado de tener todos los documentos obligatorios aprobados, no una opción al crear: nace condicional
+  // y pasa sola cuando se aprueba el último (ver `revisarDocumento`).
+  if (estadoInicial === 'MATRICULADO_DEFINITIVO') {
+    throw new ApiError(409, 'Una matrícula nueva empieza como condicional y pasa a definitiva cuando todos sus documentos obligatorios estén aprobados.');
+  }
 
   if (estadoInicial === 'MATRICULADO_CONDICIONAL' && !input.fecha_limite_compromiso) {
     throw new ApiError(400, 'fecha_limite_compromiso es obligatoria para una matrícula condicional.');
@@ -115,6 +124,13 @@ export async function createEnrollment(
       fecha_carga: null,
       revisado_por: null,
     }));
+
+    // Quien ya estudió aquí no sube de nuevo el paz y salvo si el del año anterior ya está confirmado.
+    const itemPazYSalvo = checklist.find((c) => c.tipo_documento === 'PAZ_Y_SALVO_ANIO_ANTERIOR');
+    if (itemPazYSalvo) {
+      const previo = await pazYSalvoConfirmadoPrevio(student_id, academicYear.year);
+      if (previo) aprobarItemConPazYSalvo(itemPazYSalvo, previo);
+    }
 
     const [enrollment] = await Enrollment.create(
       [
@@ -239,6 +255,18 @@ export async function updateEnrollmentStatus(
       // La fecha de matricula es la de la formalizacion, no la de la preinscripcion.
       enrollment.fecha_matricula = new Date();
       detalleFolio = ` — folio ${folio_matricula}`;
+    }
+
+    // Compuerta de documentos: sin todo lo obligatorio aprobado la matrícula queda condicional.
+    if (nuevoEstado === 'MATRICULADO_DEFINITIVO') {
+      const pendientes = documentosObligatoriosPendientes(enrollment.checklist);
+      if (pendientes.length > 0) {
+        throw new ApiError(
+          409,
+          `No se puede dejar la matrícula como definitiva: faltan por aprobar ${pendientes.length} documento(s) obligatorio(s): ${resumirLista(pendientes, 5)}. ` +
+            'Apruébalos en el checklist y pasará sola a definitiva, o déjala como condicional con su plazo de compromiso.'
+        );
+      }
     }
 
     enrollment.estado = nuevoEstado;
@@ -569,6 +597,13 @@ export async function sincronizarRequisitosMatricula(
         revisado_por: null,
       } as unknown as (typeof enrollment.checklist)[number]);
       agregados++;
+
+      if (item.tipo_documento === 'PAZ_Y_SALVO_ANIO_ANTERIOR') {
+        const anio = await AcademicYear.findById(enrollment.academic_year_id).select('year');
+        const previo = anio ? await pazYSalvoConfirmadoPrevio(enrollment.student_id, anio.year) : null;
+        const agregado = enrollment.checklist[enrollment.checklist.length - 1];
+        if (previo && agregado) aprobarItemConPazYSalvo(agregado, previo);
+      }
     }
   }
 
@@ -619,4 +654,61 @@ export async function actualizarComentarioDocumento(
   });
 
   return enrollment;
+}
+
+export interface FiltroDocumentosPorRevisar {
+  academic_year_id?: string;
+  group_id?: string;
+  page?: number;
+  limit?: number;
+}
+
+/**
+ * Bandeja de secretaría: los documentos que ya subieron (CARGADO) y nadie ha revisado, del más antiguo al más reciente.
+ * Una fila por documento, no por matrícula, para revisar de corrido sin entrar a cada expediente.
+ */
+export async function listarDocumentosPorRevisar(filtro: FiltroDocumentosPorRevisar) {
+  const page = Math.max(1, filtro.page ?? 1);
+  const limit = Math.min(100, Math.max(1, filtro.limit ?? 25));
+
+  const match: Record<string, unknown> = { estado: { $nin: ESTADOS_TERMINALES }, 'checklist.estado': 'CARGADO' };
+  if (filtro.academic_year_id) match.academic_year_id = new Types.ObjectId(filtro.academic_year_id);
+  if (filtro.group_id) match.group_id = new Types.ObjectId(filtro.group_id);
+
+  const [resultado] = await Enrollment.aggregate<{ filas: Array<Record<string, unknown>>; total: Array<{ n: number }> }>([
+    { $match: match },
+    { $unwind: '$checklist' },
+    { $match: { 'checklist.estado': 'CARGADO' } },
+    {
+      $facet: {
+        total: [{ $count: 'n' }],
+        filas: [
+          { $sort: { 'checklist.fecha_carga': 1, _id: 1 } },
+          { $skip: (page - 1) * limit },
+          { $limit: limit },
+          { $lookup: { from: 'users', localField: 'student_id', foreignField: '_id', as: 'estudiante' } },
+          { $lookup: { from: 'groups', localField: 'group_id', foreignField: '_id', as: 'grupo' } },
+          {
+            $project: {
+              _id: 0,
+              enrollment_id: '$_id',
+              estado_matricula: '$estado',
+              tipo_ingreso: 1,
+              tipo_documento: '$checklist.tipo_documento',
+              nombre_personalizado: '$checklist.nombre_personalizado',
+              obligatorio: '$checklist.obligatorio',
+              fecha_carga: '$checklist.fecha_carga',
+              nombre: { $arrayElemAt: ['$estudiante.nombre', 0] },
+              apellido: { $arrayElemAt: ['$estudiante.apellido', 0] },
+              numero_documento: { $arrayElemAt: ['$estudiante.numero_documento', 0] },
+              grupo: { $arrayElemAt: ['$grupo.nomenclatura', 0] },
+            },
+          },
+        ],
+      },
+    },
+  ]);
+
+  const total = resultado?.total[0]?.n ?? 0;
+  return { data: resultado?.filas ?? [], total, page, pages: Math.max(1, Math.ceil(total / limit)) };
 }

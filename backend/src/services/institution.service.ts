@@ -23,6 +23,7 @@ export interface UpdateInstitutionInput {
   horario_atencion?: string | null;
   modalidad?: ModalidadInstitucion;
   politica_aforo_aula?: PoliticaAforoAula;
+  paz_y_salvo_docentes?: boolean;
 }
 
 export interface SetupInstitutionInput {
@@ -182,6 +183,7 @@ export async function updateInstitution(
   if (input.horario_atencion !== undefined) institucion.horario_atencion = input.horario_atencion;
   if (input.modalidad !== undefined) institucion.modalidad = input.modalidad;
   if (input.politica_aforo_aula !== undefined) institucion.politica_aforo_aula = input.politica_aforo_aula;
+  if (input.paz_y_salvo_docentes !== undefined) institucion.paz_y_salvo_docentes = input.paz_y_salvo_docentes;
   await institucion.save();
 
   return institucion;

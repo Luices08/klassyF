@@ -80,6 +80,7 @@ export const updateInstitution: ValidationSchema = {
     horario_atencion: Joi.string().allow('', null),
     modalidad: Joi.string().valid(...MODALIDADES_INSTITUCION),
     politica_aforo_aula: Joi.string().valid(...POLITICAS_AFORO_AULA),
+    paz_y_salvo_docentes: Joi.boolean(),
     confirm_password: Joi.string().required(),
   }),
 };

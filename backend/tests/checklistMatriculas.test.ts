@@ -49,6 +49,20 @@ describe('Generador Dinámico de Checklist de Matrículas (M04)', () => {
     expect(tipos).toContain('CARNE_EPS');
     expect(tipos).not.toContain('PAZ_Y_SALVO_SIMAT');
     expect(tipos).not.toContain('CERTIFICADOS_NOTAS_ANTERIORES');
+    // Pero sí el paz y salvo de fin de año con esta institución
+    expect(checklist.find((c) => c.tipo_documento === 'PAZ_Y_SALVO_ANIO_ANTERIOR')).toMatchObject({ obligatorio: true });
+  });
+
+  it('Estudiante nuevo o por traslado no trae el paz y salvo de fin de año (el suyo es el de SIMAT)', () => {
+    for (const tipoIngreso of ['NUEVO', 'TRASLADO'] as const) {
+      const tipos = generarChecklistMatricula({ nivel: 'PRIMARIA', numeroGrado: 4, tipoIngreso }).map((c) => c.tipo_documento);
+      expect(tipos).not.toContain('PAZ_Y_SALVO_ANIO_ANTERIOR');
+    }
+  });
+
+  it('Repitente también lleva el paz y salvo de fin de año', () => {
+    const tipos = generarChecklistMatricula({ nivel: 'SECUNDARIA', numeroGrado: 7, tipoIngreso: 'REPITENTE' }).map((c) => c.tipo_documento);
+    expect(tipos).toContain('PAZ_Y_SALVO_ANIO_ANTERIOR');
   });
 
   it('Secundaria Estudiante Nuevo: exige certificado de 5° de primaria y SIMAT', () => {

@@ -14,6 +14,7 @@ import casoRoutes from './caso.routes';
 import orientacionRoutes from './orientacion.routes';
 import documentoReferenciaRoutes from './documentoReferencia.routes';
 import enrollmentRoutes from './enrollment.routes';
+import pazYSalvoRoutes from './pazYSalvo.routes';
 import espacioRoutes from './espacio.routes';
 import gradeRoutes from './grade.routes';
 import groupRoutes from './group.routes';
@@ -52,6 +53,7 @@ router.use('/shifts', jornadaOperativaRoutes);
 router.use('/grades', gradeRoutes);
 router.use('/groups', groupRoutes);
 router.use('/enrollments', enrollmentRoutes);
+router.use('/paz-y-salvo', pazYSalvoRoutes);
 
 // M10: Espacios fisicos (aulas, laboratorios, canchas)
 router.use('/espacios', espacioRoutes);

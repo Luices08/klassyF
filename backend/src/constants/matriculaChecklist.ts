@@ -64,6 +64,7 @@ export const NOMBRES_DOCUMENTO_MATRICULA: Record<TipoDocumentoMatricula, string>
   CUSTODIA_LEGAL_O_PODER: 'Custodia legal / patria potestad / poder especial',
   DIAGNOSTICO_MEDICO_INCLUSION: 'Diagnóstico médico / valoración de inclusión (PIAR)',
   CERTIFICADO_GRADO_ANTERIOR: 'Certificado del grado anterior',
+  PAZ_Y_SALVO_ANIO_ANTERIOR: 'Paz y salvo de fin de año (año anterior)',
   OTRO_DOCUMENTO: 'Otro documento institucional',
 };
 
@@ -82,6 +83,8 @@ export const INDICACIONES_DOCUMENTO_MATRICULA: Record<TipoDocumentoMatricula, st
   CERTIFICADO_QUINTO_PRIMARIA: 'Certificado oficial de culminación y aprobación del ciclo de Básica Primaria (5°).',
   CERTIFICADO_GRADO_ANTERIOR: 'Certificado oficial final de notas y aprobación del grado inmediatamente anterior.',
   SERVICIO_SOCIAL_ESTUDIANTIL: 'Constancia de horas de servicio social obligatorio cursadas en el colegio anterior (exclusivo para 11°).',
+  PAZ_Y_SALVO_ANIO_ANTERIOR:
+    'Para quien ya estudió aquí: paz y salvo con la institución al terminar el año anterior. Si ya se confirmó en el módulo «Paz y salvo de fin de año», se aprueba solo.',
 
   DIAGNOSTICO_MEDICO_INCLUSION: 'Diagnóstico clínico o valoración integral para el Plan Individual de Ajustes Razonables (Decreto 1421).',
 
@@ -109,6 +112,7 @@ export const CATEGORIAS_DOCUMENTO_MATRICULA: Record<TipoDocumentoMatricula, Cate
   CERTIFICADO_QUINTO_PRIMARIA: 'TRAYECTORIA_ACADEMICA',
   CERTIFICADO_GRADO_ANTERIOR: 'TRAYECTORIA_ACADEMICA',
   SERVICIO_SOCIAL_ESTUDIANTIL: 'TRAYECTORIA_ACADEMICA',
+  PAZ_Y_SALVO_ANIO_ANTERIOR: 'TRAYECTORIA_ACADEMICA',
 
   DIAGNOSTICO_MEDICO_INCLUSION: 'INCLUSION_PIAR',
 
@@ -173,6 +177,11 @@ export function generarChecklistMatricula(params: GenerarChecklistParams): ItemC
         items.push({ tipo_documento: 'SERVICIO_SOCIAL_ESTUDIANTIL', obligatorio: true });
       }
     }
+  }
+
+  // Quien ya estudió aquí no trae paz y salvo de otro colegio: lo que se le pide es el de fin de año con esta institución.
+  if (!esNuevoOTraslado) {
+    items.push({ tipo_documento: 'PAZ_Y_SALVO_ANIO_ANTERIOR', obligatorio: true });
   }
 
   // 3. Casos especiales: Educación Inclusiva (Decreto 1421 de 2017)

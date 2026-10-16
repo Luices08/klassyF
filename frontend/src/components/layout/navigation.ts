@@ -4,6 +4,7 @@ import {
   BookIcon,
   BuildingIcon,
   CalendarIcon,
+  CheckCircleIcon,
   ClipboardListIcon,
   ClockIcon,
   DoorIcon,
@@ -69,6 +70,9 @@ export const NAV_ITEMS: NavItem[] = [
   { to: '/docente/asistencia', label: 'Tomar asistencia', icon: ClipboardListIcon, roles: ['DOCENTE'] },
   { to: '/asistencia/gestion', label: 'Gestión de asistencia', icon: UsersIcon, roles: [...STAFF, 'DOCENTE'] },
   { to: '/admin/enrollments', label: 'Matrículas', icon: ClipboardListIcon, roles: STAFF },
+  { to: '/admin/documentos-por-revisar', label: 'Documentos por revisar', icon: InboxIcon, roles: STAFF },
+  // Fin de año (M04): el docente solo lo ve si la institución lo habilitó; el servidor lo decide.
+  { to: '/paz-y-salvo', label: 'Paz y salvo de fin de año', icon: CheckCircleIcon, roles: [...STAFF, 'DOCENTE'] },
   { to: '/admin/admisiones', label: 'Admisiones', icon: InboxIcon, roles: STAFF },
   { to: '/secretaria/certificados', label: 'Certificados', icon: FileTextIcon, roles: ['ADMIN', 'SECRETARIA'] },
   { to: '/convivencia/observador', label: 'Observador', icon: EyeIcon, roles: CONVIVENCIA_REGISTRA },

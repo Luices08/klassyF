@@ -16,7 +16,7 @@ import { finDelDia, inicioDelDia } from '../utils/calendarioAcademico';
 import { componentesEfectivos } from '../utils/siee';
 import { ContextoAsignacion, contextosDeAsignaciones } from './actividadContexto.service';
 import { ReferenciaAdjunto, liberarAdjuntosSinUso, resolverAdjuntos, resolverVideos } from './actividadAdjuntos.service';
-import { exigirAlertasResueltas, revisarCalendario } from './actividadCalendario.service';
+import { cargaMensualDelGrupo, exigirAlertasResueltas, revisarCalendario } from './actividadCalendario.service';
 import { asegurarAnioNoCerrado } from './academicYear.service';
 import { registrarEvento } from './audit.service';
 import { fechaDeClase } from './attendance.service';
@@ -524,6 +524,19 @@ export async function revisionDeCalendario(query: RevisionCalendarioQuery, docen
     excluir_id: query.excluir_id,
     exigir_futuro: query.exigir_futuro ?? true,
   });
+}
+
+export interface CargaDelGrupoQuery {
+  teacher_assignment_id: string;
+  /** AAAA-MM. */
+  mes: string;
+  excluir_id?: string;
+}
+
+/** Mapa de calor del grupo para elegir la fecha de entrega: qué tiene ya cada día, de cualquier docente. */
+export async function cargaDelGrupo(query: CargaDelGrupoQuery, docente: UserDocument) {
+  const asignacion = await asignacionDelDocente(query.teacher_assignment_id, docente);
+  return cargaMensualDelGrupo(asignacion, query.mes, query.excluir_id);
 }
 
 // --- Consulta ---

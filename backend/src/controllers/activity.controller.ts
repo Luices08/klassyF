@@ -39,6 +39,11 @@ export const revisionCalendario = catchAsync<unknown, unknown, unknown, ParsedQs
   }
 );
 
+export const cargaDelGrupo = catchAsync<unknown, unknown, unknown, ParsedQs & activityService.CargaDelGrupoQuery>(async (req, res) => {
+  const carga = await activityService.cargaDelGrupo(req.query, req.user!);
+  res.status(200).json({ success: true, data: carga });
+});
+
 export const listActivities = catchAsync<unknown, unknown, unknown, ParsedQs & activityService.ListActivitiesQuery>(async (req, res) => {
   const actividades = await activityService.listActivities(req.query, req.user!);
   res.status(200).json({ success: true, count: actividades.length, data: actividades });

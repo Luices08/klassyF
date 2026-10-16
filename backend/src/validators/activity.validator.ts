@@ -109,6 +109,16 @@ export const revisionCalendario: ValidationSchema = {
   }),
 };
 
+export const cargaDelGrupo: ValidationSchema = {
+  query: Joi.object({
+    teacher_assignment_id: objectId.required(),
+    mes: Joi.string()
+      .pattern(/^\d{4}-(0[1-9]|1[0-2])$/)
+      .required(),
+    excluir_id: objectId,
+  }),
+};
+
 export const listMisActividades: ValidationSchema = {
   query: Joi.object({
     subject_id: objectId,

@@ -107,3 +107,8 @@ export function diasParaEntrega(iso: string): number {
   const dia = (instante: number) => Math.floor((instante - 5 * MS_HORA) / (24 * MS_HORA));
   return dia(new Date(iso).getTime()) - dia(Date.now());
 }
+
+/** El mes (AAAA-MM) en que cae un instante, en hora de Colombia. */
+export function mesDeInstante(iso: string): string {
+  return new Date(new Date(iso).getTime() - 5 * MS_HORA).toISOString().slice(0, 7);
+}

@@ -1,6 +1,6 @@
 import { EstadoActividadEstudiante, EstadoEntrega, TipoActividad } from '../constants/actividades';
 import { TIPOS_EVENTO_NO_LECTIVO } from '../constants/enums';
-import { EventoCalendario, RangoFechas, hayEventoNoLectivo } from './calendarioAcademico';
+import { EventoCalendario, RangoFechas, finDelDia, hayEventoNoLectivo, inicioDelDia } from './calendarioAcademico';
 
 /**
  * Funciones puras de M11 (actividades). Los plazos de entrega son instantes (tienen hora); el calendario del año
@@ -202,4 +202,59 @@ export function evaluarCalendarioActividad(entrada: EntradaCalendario): AlertaCa
   }
 
   return alertas.sort((a, b) => Number(b.severidad === 'BLOQUEO') - Number(a.severidad === 'BLOQUEO'));
+}
+
+// --- Carga del grupo por mes (mapa de calor del formulario de actividades) ---
+
+export type NivelCarga = 'BAJA' | 'MODERADA' | 'ALTA';
+
+/** Cuántas entregas o evaluaciones en un día son «cómodas» (0–1), «moderadas» (2) o «saturadas» (3 o más). */
+export function nivelDeCarga(cantidad: number): NivelCarga {
+  if (cantidad >= 3) return 'ALTA';
+  return cantidad === 2 ? 'MODERADA' : 'BAJA';
+}
+
+const PATRON_MES = /^(\d{4})-(0[1-9]|1[0-2])$/;
+
+/** Primer y último instante de un mes `YYYY-MM` en hora de Colombia, y su cantidad de días; `null` si el texto no es un mes. */
+export function rangoDelMes(mes: string): { desde: Date; hasta: Date; dias: number; primerDia: Date } | null {
+  const partes = PATRON_MES.exec(mes);
+  if (!partes) return null;
+  const anio = Number(partes[1]);
+  const numero = Number(partes[2]);
+  const primerDia = new Date(Date.UTC(anio, numero - 1, 1));
+  const dias = new Date(Date.UTC(anio, numero, 0)).getUTCDate();
+  const ultimoDia = new Date(Date.UTC(anio, numero - 1, dias));
+  return { desde: inicioDelDia(primerDia), hasta: finDelDia(ultimoDia), dias, primerDia };
+}
+
+export interface ActividadDeCarga {
+  _id: string;
+  titulo: string;
+  tipo: TipoActividad;
+  asignatura: string;
+  docente: string;
+  fecha_entrega: Date;
+}
+
+export interface DiaDeCarga {
+  /** YYYY-MM-DD en hora de Colombia. */
+  fecha: string;
+  total: number;
+  nivel: NivelCarga;
+  actividades: Array<Omit<ActividadDeCarga, 'fecha_entrega'> & { fecha_entrega: string }>;
+}
+
+/** Agrupa por día de entrega (Colombia) las actividades del grupo; solo salen los días que tienen algo. */
+export function agruparCargaPorDia(actividades: readonly ActividadDeCarga[]): DiaDeCarga[] {
+  const porDia = new Map<string, DiaDeCarga['actividades']>();
+  for (const a of [...actividades].sort((x, y) => x.fecha_entrega.getTime() - y.fecha_entrega.getTime())) {
+    const fecha = formatoDia(diaCalendarioColombia(a.fecha_entrega));
+    const lista = porDia.get(fecha) ?? [];
+    lista.push({ ...a, fecha_entrega: a.fecha_entrega.toISOString() });
+    porDia.set(fecha, lista);
+  }
+  return [...porDia.entries()]
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([fecha, lista]) => ({ fecha, total: lista.length, nivel: nivelDeCarga(lista.length), actividades: lista }));
 }

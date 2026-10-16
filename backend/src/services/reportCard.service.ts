@@ -528,7 +528,7 @@ export async function generateReportCard(
   params: ReportCardParams,
   requestingUser: UserDocument
 ): Promise<ReportCardResult> {
-  const student = await User.findOne({ _id: params.student_id, rol: ROLES.ESTUDIANTE });
+  const student = await User.findOne({ _id: params.student_id, roles: ROLES.ESTUDIANTE });
   if (!student) throw new ApiError(404, 'Estudiante no encontrado.');
 
   await assertCanViewReportCard(student, requestingUser);
@@ -578,6 +578,6 @@ export async function generarBoletinesDeGrupo(
   }
 
   const contexto = await cargarContextoGrupo(academicYear, group, params.periodo_numero);
-  const estudiantes = await User.find({ _id: { $in: contexto.studentIds }, rol: ROLES.ESTUDIANTE }).sort({ apellido: 1, nombre: 1 });
+  const estudiantes = await User.find({ _id: { $in: contexto.studentIds }, roles: ROLES.ESTUDIANTE }).sort({ apellido: 1, nombre: 1 });
   return estudiantes.map((e) => armarBoletin(contexto, e));
 }

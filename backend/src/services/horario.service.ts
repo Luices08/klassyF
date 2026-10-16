@@ -557,7 +557,7 @@ async function validarReferencias(
     if (n !== datos.asignatura_ids.length) throw new ApiError(400, 'Una o más asignaturas no existen.');
   }
   if (datos.docente_ids.length > 0) {
-    const n = await User.countDocuments({ _id: { $in: datos.docente_ids }, rol: 'DOCENTE' });
+    const n = await User.countDocuments({ _id: { $in: datos.docente_ids }, roles: 'DOCENTE' });
     if (n !== datos.docente_ids.length) throw new ApiError(400, 'Uno o más docentes no existen o no tienen rol docente.');
   }
   if (datos.tipo === 'REUNION_COLECTIVA' && datos.docente_ids.length === 0) {

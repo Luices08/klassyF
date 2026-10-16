@@ -225,7 +225,7 @@ async function resolverAutor(usuario: UserDocument, enNombreDeId?: string): Prom
   if (!ROLES_EN_NOMBRE_DE.includes(usuario.rol)) {
     throw new ApiError(403, 'Solo coordinación o administración pueden registrar en nombre de un docente.');
   }
-  const docente = await User.findOne({ _id: enNombreDeId, rol: ROLES.DOCENTE, estado: ESTADO_ACTIVO });
+  const docente = await User.findOne({ _id: enNombreDeId, roles: ROLES.DOCENTE, estado: ESTADO_ACTIVO });
   if (!docente) throw new ApiError(400, 'El docente indicado no existe o está inactivo.');
   return docente._id;
 }

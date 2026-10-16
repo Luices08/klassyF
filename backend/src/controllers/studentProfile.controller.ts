@@ -45,7 +45,7 @@ interface UpsertProfileBody {
 }
 
 async function obtenerEstudiante(userId: string) {
-  const student = await User.findOne({ _id: userId, rol: ROLES.ESTUDIANTE });
+  const student = await User.findOne({ _id: userId, roles: ROLES.ESTUDIANTE });
   if (!student) throw new ApiError(404, 'El usuario no existe o no tiene rol ESTUDIANTE.');
   return student;
 }

@@ -51,7 +51,7 @@ export async function createTeacherAssignment(
   const tipo = input.tipo_asignacion || 'CLASE';
 
   // 1. Validar que el usuario sea un DOCENTE activo
-  const docente = await User.findOne({ _id: input.docente_id, rol: ROLES.DOCENTE });
+  const docente = await User.findOne({ _id: input.docente_id, roles: ROLES.DOCENTE });
   if (!docente) {
     throw new ApiError(404, 'El usuario no existe o no tiene rol DOCENTE.');
   }
@@ -342,7 +342,7 @@ export async function getDocentesCargaResumen(academicYearId: string) {
   const limites = await getLimitesCarga();
 
   // 1. Obtener todos los docentes activos
-  const docentes = await User.find({ rol: ROLES.DOCENTE, estado: ESTADO_ACTIVO })
+  const docentes = await User.find({ roles: ROLES.DOCENTE, estado: ESTADO_ACTIVO })
     .select('nombre apellido numero_documento email')
     .sort({ apellido: 1, nombre: 1 });
 
@@ -504,7 +504,7 @@ export async function guardarCargaDocenteLote(
   input: GuardarCargaDocenteLoteInput,
   actor: ActorAsignacion
 ) {
-  const docente = await User.findOne({ _id: input.docente_id, rol: ROLES.DOCENTE });
+  const docente = await User.findOne({ _id: input.docente_id, roles: ROLES.DOCENTE });
   if (!docente) throw new ApiError(404, 'El usuario no existe o no tiene rol DOCENTE.');
   if (docente.estado === 'inactivo') throw new ApiError(409, 'El docente se encuentra inactivo.');
 
@@ -785,7 +785,7 @@ export async function guardarMallaGrupoLote(
     const currentDirDocenteId = group.director_grupo_id ? String(group.director_grupo_id) : null;
 
     if (targetDirDocenteId && targetDirDocenteId !== currentDirDocenteId) {
-      const nuevoDocente = await User.findOne({ _id: targetDirDocenteId, rol: ROLES.DOCENTE }).session(session);
+      const nuevoDocente = await User.findOne({ _id: targetDirDocenteId, roles: ROLES.DOCENTE }).session(session);
       if (!nuevoDocente || nuevoDocente.estado === 'inactivo') {
         throw new ApiError(400, 'El docente seleccionado para dirección de grupo no es válido o está inactivo.');
       }
@@ -889,7 +889,7 @@ export async function guardarMallaGrupoLote(
             }
             await TeacherAssignment.findByIdAndDelete(actual._id).session(session);
 
-            const docenteValido = await User.findOne({ _id: targetDocenteId, rol: ROLES.DOCENTE }).session(session);
+            const docenteValido = await User.findOne({ _id: targetDocenteId, roles: ROLES.DOCENTE }).session(session);
             if (!docenteValido || docenteValido.estado === 'inactivo') {
               throw new ApiError(400, 'El docente seleccionado está inactivo o no existe.');
             }
@@ -910,7 +910,7 @@ export async function guardarMallaGrupoLote(
             );
           }
         } else {
-          const docenteValido = await User.findOne({ _id: targetDocenteId, rol: ROLES.DOCENTE }).session(session);
+          const docenteValido = await User.findOne({ _id: targetDocenteId, roles: ROLES.DOCENTE }).session(session);
           if (!docenteValido || docenteValido.estado === 'inactivo') {
             throw new ApiError(400, 'El docente seleccionado está inactivo o no existe.');
           }

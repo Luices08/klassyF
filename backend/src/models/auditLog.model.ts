@@ -4,6 +4,7 @@ import { HydratedDocument, Model, Schema, Types, model } from 'mongoose';
 // otro modulo (M31 completo) necesite registrar los suyos.
 export const ACCIONES_AUDITORIA = [
   'LOGIN_EXITOSO',
+  'PERFIL_CAMBIADO',
   'LOGIN_FALLIDO',
   'USUARIO_CREADO',
   'USUARIO_ACTUALIZADO',

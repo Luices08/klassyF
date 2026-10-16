@@ -23,6 +23,7 @@ import StudentGuardian from '../models/studentGuardian.model';
 import StudentProfile from '../models/studentProfile.model';
 import User from '../models/user.model';
 import ApiError from '../utils/ApiError';
+import { concederRolAcudiente } from '../utils/concederRolAcudiente';
 import { leerCsv } from '../utils/csv';
 import { ocultarSaludAdministrativa } from '../utils/datosSensibles';
 
@@ -43,7 +44,7 @@ export async function listarEstudiantes(filter: ListarEstudiantesFilter, rolSoli
   const page = Math.max(1, filter.page ?? 1);
   const limit = Math.min(100, Math.max(1, filter.limit ?? 20));
 
-  const matchUser: Record<string, unknown> = { rol: ROLES.ESTUDIANTE };
+  const matchUser: Record<string, unknown> = { roles: ROLES.ESTUDIANTE };
   if (filter.search) {
     const regex = new RegExp(escapeRegex(filter.search), 'i');
     matchUser.$or = [{ nombre: regex }, { apellido: regex }, { numero_documento: regex }, { email: regex }];
@@ -100,7 +101,7 @@ export async function listarEstudiantes(filter: ListarEstudiantesFilter, rolSoli
 }
 
 export async function obtenerFicha360(studentId: string, rolSolicitante: Rol) {
-  const estudiante = await User.findOne({ _id: studentId, rol: ROLES.ESTUDIANTE });
+  const estudiante = await User.findOne({ _id: studentId, roles: ROLES.ESTUDIANTE });
   if (!estudiante) throw new ApiError(404, 'El usuario no existe o no tiene rol ESTUDIANTE.');
 
   const [perfilDoc, acudientes, matriculas] = await Promise.all([
@@ -255,7 +256,7 @@ export async function importarEstudiantesCsv(buffer: Buffer, registradoPorId: Ty
         tipo_documento: tipoDocumento,
         numero_documento: numeroDocumento,
         email: r.email,
-        rol: ROLES.ESTUDIANTE,
+        roles: [ROLES.ESTUDIANTE],
         debe_cambiar_password: true,
       });
       student.password = numeroDocumento;
@@ -419,7 +420,7 @@ export async function crearEstudianteCompleto(
       numero_documento: numDocEstudiante,
       email: emailEstudiante,
       telefono: input.telefono?.trim() || null,
-      rol: ROLES.ESTUDIANTE,
+      roles: [ROLES.ESTUDIANTE],
       debe_cambiar_password: true,
     });
     studentUser.password = claveEstudiante;
@@ -509,16 +510,13 @@ export async function crearEstudianteCompleto(
             numero_documento: guardian.numero_documento,
             email: guardian.email,
             telefono: guardian.telefono_principal,
-            rol: ROLES.ACUDIENTE,
+            roles: [ROLES.ACUDIENTE],
             debe_cambiar_password: true,
           });
           userAcudiente.password = claveAcudiente;
           await userAcudiente.save({ session });
-        } else if (userAcudiente.rol !== ROLES.ACUDIENTE) {
-          throw new ApiError(
-            409,
-            `El documento ${guardian.numero_documento} ya pertenece a un usuario con rol ${userAcudiente.rol}; no se puede habilitar como acudiente.`
-          );
+        } else {
+          await concederRolAcudiente(userAcudiente, session);
         }
 
         if (!guardian.user_id) {

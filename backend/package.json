@@ -10,6 +10,7 @@
     "seed": "tsx scripts/seed.ts",
     "seed:demo": "tsx scripts/seedDemoCompleto.ts",
     "seed:subjects": "tsx scripts/seedSubjects.ts",
+    "migrate:roles-multiples": "tsx scripts/migrateRolesMultiples.ts",
     "migrate:superadmin-to-admin": "tsx scripts/migrateSuperadminToAdmin.ts",
     "migrate:m05-anio-lectivo": "tsx scripts/migrateM05AnioLectivo.ts",
     "migrate:folio-al-matricular": "tsx scripts/migrateFolioAlMatricular.ts",

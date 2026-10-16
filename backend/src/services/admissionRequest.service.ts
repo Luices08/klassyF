@@ -199,7 +199,7 @@ export async function aprobarSolicitud(
       // raro), se desambigua con un alias "+numero_documento" que sigue llegando al mismo
       // buzon (email.unique en el modelo no distingue "es el mismo acudiente").
       email: await emailUnicoParaEstudiante(solicitud.acudiente_email, solicitud.numero_documento, session),
-      rol: ROLES.ESTUDIANTE,
+      roles: [ROLES.ESTUDIANTE],
       debe_cambiar_password: true,
     });
     student.password = solicitud.numero_documento;

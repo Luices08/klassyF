@@ -48,3 +48,14 @@ export function puedeGestionarRol(operadorRol: Rol, objetivoRol: Rol): boolean {
   if (operadorRol === ROLES.ADMIN) return true;
   return (JERARQUIA_ROLES[operadorRol] ?? 0) > (JERARQUIA_ROLES[objetivoRol] ?? 0);
 }
+
+/**
+ * Gestionar a una persona con varios roles exige poder gestionar todos: quien tiene DOCENTE y COORDINADOR no queda al
+ * alcance de otro DOCENTE ni de otro COORDINADOR, por el rango más alto que tenga.
+ */
+export function puedeGestionarRoles(operadorRol: Rol, objetivoRoles: readonly Rol[]): boolean {
+  return objetivoRoles.every((rol) => puedeGestionarRol(operadorRol, rol));
+}
+
+/** Roles que se pueden combinar con los de personal en la misma persona (p. ej. una docente que además es madre de un estudiante). */
+export const ROLES_ADICIONALES_PERMITIDOS: readonly Rol[] = [ROLES.ACUDIENTE];

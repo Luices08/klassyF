@@ -119,9 +119,9 @@ function normalizarDependencias(entrada: Array<{ clave?: string; nombre: string;
 }
 
 async function validarFirmante(usuarioId: string, rolEsperado: 'ADMIN' | 'SECRETARIA', etiqueta: string): Promise<void> {
-  const u = await User.findById(usuarioId).select('rol estado');
+  const u = await User.findById(usuarioId).select('roles estado');
   if (!u || u.estado !== 'activo') throw new ApiError(400, `El usuario elegido para ${etiqueta} no existe o está inactivo.`);
-  if (u.rol !== rolEsperado) throw new ApiError(400, `Para ${etiqueta} se elige un usuario con rol ${rolEsperado === 'ADMIN' ? 'Administrador' : 'Secretaría'}.`);
+  if (!u.roles.includes(rolEsperado)) throw new ApiError(400, `Para ${etiqueta} se elige un usuario con rol ${rolEsperado === 'ADMIN' ? 'Administrador' : 'Secretaría'}.`);
 }
 
 /** La política por documento vive en cada tipo: se cambia ahí, solo en los tipos que existen y no están archivados. */

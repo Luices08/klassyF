@@ -53,7 +53,7 @@ async function seedAdmin(): Promise<void> {
     tipo_documento: process.env.SEED_ADMIN_TIPO_DOCUMENTO,
     numero_documento: process.env.SEED_ADMIN_NUMERO_DOCUMENTO,
     email,
-    rol: ROLES.ADMIN,
+    roles: [ROLES.ADMIN],
     estado: 'activo',
   });
   user.password = process.env.SEED_ADMIN_PASSWORD as string;

@@ -5,6 +5,7 @@ import StudentGuardian, { StudentGuardianDocument } from '../models/studentGuard
 import User from '../models/user.model';
 import { ROLES } from '../constants/roles';
 import ApiError from '../utils/ApiError';
+import { concederRolAcudiente } from '../utils/concederRolAcudiente';
 import runTransaction from '../utils/runTransaction';
 import { registrarEvento } from './audit.service';
 
@@ -40,21 +41,15 @@ interface CuentaPortal {
 }
 
 /**
- * Dato único: si ya hay un `User` con ese documento se reutiliza, nunca se duplica. Una persona que
- * ya es personal del colegio (otro rol) no se convierte en acudiente por esta vía: el portal M27
- * resuelve al acudiente por `user_id` + rol ACUDIENTE, y mezclar roles en un mismo usuario no existe.
+ * Dato único: si ya hay un `User` con ese documento se reutiliza, nunca se duplica. Si ya es personal del colegio
+ * se le agrega el rol ACUDIENTE (`concederRolAcudiente`) y elige perfil al iniciar sesión.
  * La contraseña temporal es el número de documento (decisión de producto); `debe_cambiar_password`
  * obliga a cambiarla en el primer ingreso.
  */
 async function asegurarCuentaPortal(guardian: GuardianDocument, session: ClientSession): Promise<CuentaPortal> {
   const existente = await User.findOne({ numero_documento: guardian.numero_documento }).session(session);
   if (existente) {
-    if (existente.rol !== ROLES.ACUDIENTE) {
-      throw new ApiError(
-        409,
-        `El documento ${guardian.numero_documento} ya pertenece a un usuario con rol ${existente.rol}; no se puede habilitar como acudiente.`
-      );
-    }
+    await concederRolAcudiente(existente, session);
     return { usuarioId: existente._id, creada: false };
   }
 
@@ -72,7 +67,7 @@ async function asegurarCuentaPortal(guardian: GuardianDocument, session: ClientS
     numero_documento: guardian.numero_documento,
     email: guardian.email,
     telefono: guardian.telefono_principal,
-    rol: ROLES.ACUDIENTE,
+    roles: [ROLES.ACUDIENTE],
     debe_cambiar_password: true,
   });
   usuario.password = guardian.numero_documento;
@@ -81,7 +76,7 @@ async function asegurarCuentaPortal(guardian: GuardianDocument, session: ClientS
 }
 
 async function obtenerEstudiante(studentId: string) {
-  const student = await User.findOne({ _id: studentId, rol: ROLES.ESTUDIANTE });
+  const student = await User.findOne({ _id: studentId, roles: ROLES.ESTUDIANTE });
   if (!student) throw new ApiError(404, 'El usuario no existe o no tiene rol ESTUDIANTE.');
   return student;
 }

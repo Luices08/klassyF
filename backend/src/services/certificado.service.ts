@@ -72,7 +72,7 @@ type MatriculaCompleta = Omit<EnrollmentDocument, 'student_id' | 'group_id' | 'a
 async function cargarMatricula(enrollmentId: string): Promise<MatriculaCompleta> {
   const matricula = Types.ObjectId.isValid(enrollmentId)
     ? await Enrollment.findById(enrollmentId)
-        .populate('student_id', 'nombre apellido tipo_documento numero_documento rol')
+        .populate('student_id', 'nombre apellido tipo_documento numero_documento roles')
         .populate({ path: 'group_id', select: 'nomenclatura sede_id jornada_id grade_id', populate: [{ path: 'sede_id', select: 'nombre' }, { path: 'jornada_id', select: 'nombre hora_inicio hora_fin' }, { path: 'grade_id', select: 'nombre nivel' }] })
         .populate('academic_year_id', 'year')
     : null;
@@ -128,7 +128,7 @@ function epsDelPerfil(perfil: { eps?: string | null; autorizacion_datos_sensible
  */
 export async function matriculasExpedibles(studentId: string, usuario: UserDocument, ip?: string | null) {
   exigirSecretaria(usuario);
-  const estudiante = Types.ObjectId.isValid(studentId) ? await User.findOne({ _id: studentId, rol: ROLES.ESTUDIANTE }).select('nombre apellido tipo_documento numero_documento') : null;
+  const estudiante = Types.ObjectId.isValid(studentId) ? await User.findOne({ _id: studentId, roles: ROLES.ESTUDIANTE }).select('nombre apellido tipo_documento numero_documento') : null;
   if (!estudiante) throw new ApiError(404, 'Estudiante no encontrado.');
   const [ofrecidos, perfil, acudientes, institucion, matriculas] = await Promise.all([
     tiposActivos(),

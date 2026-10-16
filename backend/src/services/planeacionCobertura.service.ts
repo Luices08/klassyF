@@ -48,7 +48,7 @@ export async function cargarCoberturas(
   if (lideres.length === 0) return [];
 
   const docentesActivos = new Set(
-    (await User.find({ _id: { $in: lideres.map((l) => l.docente_id) }, rol: ROLES.DOCENTE, estado: ESTADO_ACTIVO }).select('_id').lean()).map((u) => String(u._id))
+    (await User.find({ _id: { $in: lideres.map((l) => l.docente_id) }, roles: ROLES.DOCENTE, estado: ESTADO_ACTIVO }).select('_id').lean()).map((u) => String(u._id))
   );
 
   return lideres.map((l) => {

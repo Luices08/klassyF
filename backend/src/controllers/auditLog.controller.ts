@@ -22,7 +22,7 @@ export const listAuditLogs = catchAsync<unknown, unknown, unknown, ListAuditLogs
       .sort({ createdAt: -1 })
       .skip((page - 1) * limit)
       .limit(limit)
-      .populate('usuario_id', 'nombre apellido numero_documento rol'),
+      .populate('usuario_id', 'nombre apellido numero_documento roles'),
     AuditLog.countDocuments(filter),
   ]);
 

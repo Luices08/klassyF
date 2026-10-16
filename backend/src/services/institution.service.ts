@@ -72,7 +72,7 @@ export async function setupInstitution({
   if (institucion.administrador_id) {
     const administrador = await User.findById(institucion.administrador_id);
     if (!administrador) throw new ApiError(404, 'administrador_id no corresponde a un usuario existente.');
-    if (administrador.rol !== ROLES.ADMIN) {
+    if (!administrador.roles.includes(ROLES.ADMIN)) {
       throw new ApiError(400, 'El usuario referenciado en administrador_id no tiene rol ADMIN.');
     }
   }

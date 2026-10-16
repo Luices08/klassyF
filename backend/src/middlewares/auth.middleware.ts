@@ -31,6 +31,12 @@ export const authenticate = catchAsync(async (req, _res, next) => {
     throw new ApiError(401, 'La sesión ya no es válida, inicia sesión nuevamente.');
   }
 
+  // Un token que no trae perfil (p. ej. el de selección de perfil) no abre sesión, y el perfil debe seguir siendo uno de sus roles.
+  if (!payload.rol || !user.roles.includes(payload.rol)) {
+    throw new ApiError(401, 'La sesión ya no es válida, inicia sesión nuevamente.');
+  }
+  user.rol = payload.rol;
+
   req.user = user;
   next();
 });

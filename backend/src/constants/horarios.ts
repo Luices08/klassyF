@@ -101,3 +101,37 @@ export const ESTADOS_HORARIO = ['GENERANDO', 'FALLIDO', 'BORRADOR', 'PUBLICADO',
 /** Una generación que lleva más que esto en GENERANDO se da por interrumpida (el tope del motor es 60 s). */
 export const MINUTOS_GENERACION_INTERRUMPIDA = 5;
 export type EstadoHorario = (typeof ESTADOS_HORARIO)[number];
+
+/**
+ * Colores pastel con los que los horarios distinguen una asignatura de otra (pantalla y PDF). Es una paleta aparte de la guía
+ * visual: ahí el color significa un estado, aquí solo separa materias. Los matices están repartidos por ángulo áureo, así que
+ * dos posiciones seguidas son siempre muy distintas; el texto va siempre en el color de títulos y `borde` perfila la celda.
+ * Cada asignatura toma uno según su posición entre las del horario (`asignarColoresAsignaturas`).
+ */
+export interface ColorAsignatura {
+  fondo: string;
+  borde: string;
+}
+
+export const PALETA_ASIGNATURAS: readonly ColorAsignatura[] = [
+  { fondo: '#F7DDD4', borde: '#D29B89' },
+  { fondo: '#C3F4DD', borde: '#89D2B0' },
+  { fondo: '#F1D4F7', borde: '#C689D2' },
+  { fondo: '#EDF4C3', borde: '#C9D289' },
+  { fondo: '#D4E8F7', borde: '#89B3D2' },
+  { fondo: '#F4C3D1', borde: '#D2899E' },
+  { fondo: '#D4F7D4', borde: '#89D289' },
+  { fondo: '#D1C3F4', borde: '#9E89D2' },
+  { fondo: '#F7E8D4', borde: '#D2B489' },
+  { fondo: '#C3F4EE', borde: '#89D2C9' },
+  { fondo: '#F7D4F1', borde: '#D289C6' },
+  { fondo: '#DDF4C3', borde: '#B0D289' },
+  { fondo: '#D4DDF7', borde: '#899BD2' },
+  { fondo: '#F4C5C3', borde: '#D28C89' },
+  { fondo: '#D4F7E0', borde: '#89D2A1' },
+  { fondo: '#E1C3F4', borde: '#B789D2' },
+  { fondo: '#F7F4D4', borde: '#D2CC89' },
+  { fondo: '#C3E9F4', borde: '#89C3D2' },
+  { fondo: '#F7D4E5', borde: '#D289AD' },
+  { fondo: '#CDF4C3', borde: '#98D289' },
+];

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { PanelInsumos } from '../../components/horarios/PanelInsumos';
+import { PanelPublicados } from '../../components/horarios/PanelPublicados';
 import { PanelTiempoLibre } from '../../components/horarios/PanelTiempoLibre';
 import { PanelVariables } from '../../components/horarios/PanelVariables';
 import { PanelVersiones } from '../../components/horarios/PanelVersiones';
@@ -23,6 +24,7 @@ const PESTANAS = [
   { key: 'variables', label: 'Variables' },
   { key: 'tiempo-libre', label: 'Tiempo libre' },
   { key: 'versiones', label: 'Generar y publicar' },
+  { key: 'publicados', label: 'Publicados' },
 ];
 
 /**
@@ -103,9 +105,13 @@ export function HorariosPage() {
       {listo && (
         <>
           <Tabs items={PESTANAS} value={pestana} onChange={setPestana} />
-          {(insumosQuery.isLoading || variablesQuery.isLoading) && <Spinner />}
-          {insumosQuery.isError && <Alert tone="error">{errorMessage(insumosQuery.error)}</Alert>}
-          {variablesQuery.isError && <Alert tone="error">{errorMessage(variablesQuery.error)}</Alert>}
+          {/* Lo publicado es de toda la sede, no de la jornada elegida: no espera los insumos de una jornada. */}
+          <TabPanel active={pestana} tabKey="publicados">
+            <PanelPublicados anioId={anio?._id ?? ''} anioNombre={anio?.nombre ?? ''} sedeId={sede?._id ?? ''} sedeNombre={sede?.nombre ?? ''} />
+          </TabPanel>
+          {pestana !== 'publicados' && (insumosQuery.isLoading || variablesQuery.isLoading) && <Spinner />}
+          {pestana !== 'publicados' && insumosQuery.isError && <Alert tone="error">{errorMessage(insumosQuery.error)}</Alert>}
+          {pestana !== 'publicados' && variablesQuery.isError && <Alert tone="error">{errorMessage(variablesQuery.error)}</Alert>}
 
           {insumos && variablesQuery.data && (
             <>

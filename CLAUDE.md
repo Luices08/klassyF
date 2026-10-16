@@ -556,6 +556,30 @@ Diseño en `doc/Analisis_M09_Horarios.md`. Backend `/horarios` (`horario.control
   (`HORARIO_OTRA_JORNADA_DESFASADO`); con borrador se avisa (`..._EN_BORRADOR`). Al regenerar una jornada, conviene regenerar la otra para que ambas queden coherentes.
 - **Tiempo libre (`PanelTiempoLibre`)**: la pestaña lista lo ya registrado y la tabla (malla) **solo se abre a pedido** («Abrir tabla» en un registro o «Agregar tiempo libre»), con el docente o los grados de ese registro. Antes mostraba siempre la malla del primer docente y parecía vacía al volver a la pestaña aunque lo guardado estuviera bien.
 - **No es una optimización conjunta:** las dos jornadas no se resuelven a la vez (una puede dejar a la otra sin solución); es el orden de generación lo que decide quién cede.
+- **Los bloques mandan sobre las preferencias blandas** (`utils/motorHorarios/bloques.ts`, `sesiones.ts#ajustarBloquesDeLaSemana`, `evaluacion.ts`). Un bloque de 2 h (patrón `DISTRIBUCION_BLOQUES`) solo vale si queda
+  **entero entre dos descansos**; antes, una preferencia blanda (p. ej. «no seguidas») le ganaba a «no cruzar el descanso» y salían 3–4 h seguidas de la misma materia con el bloque montado sobre el recreo. Ahora:
+  (1) **partir es una decisión de estructura, no de resultado**: `expandirSesiones` ajusta los bloques de cada asignación a los tramos sin descanso de la semana (`tramosDeSemana`, `ajustarBloquesATramos`: mayor a menor,
+  cada uno en el tramo más justo, y el que no cabe se parte por la mitad) **y a la capacidad del grupo y del docente** (sus franjas NO disponibles duras). Solo depende de los insumos, nunca de lo que haya generado el motor,
+  porque publicar, editar a mano y `carga_cambio` vuelven a expandir y deben reconstruir exactamente las mismas sesiones (`${asignacion}#${indice}`). Un patrón partido se avisa con `BLOQUES_PARTIDOS`
+  (`BLOQUES_NO_CUADRAN` sigue siendo «el patrón no suma las horas»); `diagnosticarCapacidad` ya no declara imposible un bloque que no cabe: se parte.
+  (2) **Reglas propias del motor, sin variable ni switch y nunca DURAS** (constantes en `evaluacion.ts`): `PESO_BLOQUE_PARTIDO` = 1000 (un bloque montado sobre un descanso, incidencia `BLOQUE_PARTIDO`),
+  `PESO_ASIGNATURA_SEGUIDA` = 250 (dos sesiones de la misma asignatura en horas contiguas del grupo, `ASIGNATURA_SEGUIDA`: un bloque de 2 h elegido es una sola sesión y no cuenta) y `PESO_ASIGNATURA_MISMO_DIA` = 40 (la misma asignatura dos veces el mismo día, solo suma al costo).
+  Son más caros que cualquier peso blando de una variable (1–10 por incidencia) por eso respetar el bloque gana, y más baratos que `PESO_DURO`. El generador además poda del dominio las posiciones que cruzan un descanso (`sinMontar`).
+  Una regla nueva de este tipo va en `evaluacion.ts` con su código en `CodigoIncidencia`, no como `VariableHorario`.
+- **Colores pastel por asignatura** (`PALETA_ASIGNATURAS` en `constants/horarios.ts`, 20 pares `fondo`/`borde`; `utils/coloresHorario.ts#asignarColoresAsignaturas`): es la **única excepción pedida por el usuario** a «no agregar colores
+  nuevos» y vale solo para distinguir asignaturas en los horarios (UI y PDF), no es un token de la guía. El color se reparte por el orden de los ids (el de creación): agregar una asignatura no cambia el de las demás. `construirCatalogo` lo
+  trae en `catalogo.asignaturas[].color` (y `docentes[].nombre_corto`, el nombre abreviado para las hojas totales); **en pantallas y PDF de toda la sede** el mapa se calcula sobre la unión de las jornadas
+  (`listarPublicadosDeSede`) para que «Matemáticas» sea del mismo color en la mañana y en la tarde. El frontend los pinta con `style` (son dinámicos, no clases de Tailwind) y siempre acompañados del nombre: el color nunca es la única señal.
+- **Hojas totales y PDF de toda la sede** (`horarioPdf.service.ts`): `GET /horarios/:id/pdf?vista=` acepta además de `GRUPO`/`DOCENTE`/`GENERAL` las vistas **`TOTAL_GRUPOS`** (una hoja con todos los grupos de la jornada en filas y
+  los días × periodos en columnas, estilo «horario total» de asc Horarios pero con el diseño de Klassy; si no cabe en una página se reparte pareja) y **`COMPLETO`** (hoja total de grupos + hoja total de docentes + una página por docente +
+  una por grupo, con marcadores para saltar), y `GET /horarios/sede/pdf?academic_year_id=&sede_id=` junta **todas las jornadas publicadas de la sede en un solo PDF** (solo ADMIN/COORDINADOR; la ruta va **antes** de `/:id/pdf`
+  o Express la tomaría como un id). Los totales, `COMPLETO` y `GRUPO`/`DOCENTE` sin elegir uno (todos los grupos o todos los docentes en un archivo) solo los bajan ADMIN/COORDINADOR; con un grupo o docente concreto conservan su permiso de siempre (docente, estudiante y acudiente solo lo suyo, y solo publicado). Limitación a propósito: la página de un docente es **por jornada** (un docente en
+  dos jornadas tiene una en cada bloque; no se fusionan en una sola hoja).
+- **Pestaña «Publicados»** (`HorariosPage`, `PanelPublicados`; `GET /horarios/publicados?academic_year_id=&sede_id=` → `listarPublicadosDeSede`, hook `usePublicadosDeSede`, descarga `descargarPdfSede`): una tarjeta por jornada con lo publicado
+  (grupos, docentes, asignaturas, fecha), el visor con las cuatro vistas (hoja total de grupos, hoja total de docentes, un grupo, un docente; `MallaHorario` con `HojaTotal`) y los botones de PDF (toda la sede, la jornada, cada hoja).
+  `LeyendaAsignaturas` muestra la sigla, el color y el nombre de las asignaturas que salen en esa versión y también está en la pestaña de versiones.
+- **Pruebas:** `tests/motorHorarios.test.ts` (partir bloques por tramos y por tiempo libre, bloque sobre el descanso penalizado sin ser duro, materia seguida vs. mismo día, generación sin variables que deja los bloques enteros y sin materia seguida) y `tests/horarioPdf.test.ts` (paleta estable, páginas de cada vista, sede completa, 404).
+  La interfaz de «Publicados» se revisó en un navegador real con la API simulada (no hay base de datos en el entorno de pruebas): las pruebas de integración del módulo no se pudieron correr.
 
 ### M13 (Asistencia) — estado: núcleo completo
 

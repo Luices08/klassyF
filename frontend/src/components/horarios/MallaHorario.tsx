@@ -1,9 +1,10 @@
-import { Fragment } from 'react';
+import { Fragment, type CSSProperties, type ReactNode } from 'react';
 import { NOMBRES_DIA_SEMANA } from '../../types/domain';
 import type { CatalogoHorario, EstructuraSemana, SesionHorario } from '../../types/horarios';
 import { LockIcon } from '../ui/icons';
 
-export type VistaHorario = 'GRUPO' | 'DOCENTE' | 'GENERAL';
+/** GENERAL es la hoja total de los docentes; TOTAL_GRUPOS, la de los grupos. */
+export type VistaHorario = 'GRUPO' | 'DOCENTE' | 'GENERAL' | 'TOTAL_GRUPOS';
 
 interface MallaHorarioProps {
   estructura: EstructuraSemana;
@@ -29,7 +30,7 @@ function useNombres(catalogo: CatalogoHorario) {
   const asignatura = new Map(catalogo.asignaturas.map((s) => [s._id, s]));
   const grupo = new Map(catalogo.grupos.map((g) => [g._id, g.etiqueta]));
   const grupoCorto = new Map(catalogo.grupos.map((g) => [g._id, g.etiqueta_corta]));
-  const docente = new Map(catalogo.docentes.map((d) => [d._id, d.nombre]));
+  const docente = new Map(catalogo.docentes.map((d) => [d._id, d]));
   const espacio = new Map(catalogo.espacios.map((e) => [e._id, e.nombre]));
   const reunion = new Map(catalogo.reuniones.map((r) => [r._id, r.nombre]));
   return {
@@ -37,25 +38,38 @@ function useNombres(catalogo: CatalogoHorario) {
       s.subject_id ? (asignatura.get(s.subject_id)?.nombre ?? 'Asignatura') : (reunion.get(s.reunion_variable_id ?? '') ?? 'Reunión'),
     corto: (s: SesionHorario) =>
       s.subject_id ? (asignatura.get(s.subject_id)?.abreviatura ?? '—') : (reunion.get(s.reunion_variable_id ?? '') ?? 'Reunión'),
+    color: (s: SesionHorario) => (s.subject_id ? asignatura.get(s.subject_id)?.color : undefined),
     grupo: (id: string | null) => (id ? (grupo.get(id) ?? '') : ''),
     grupoCorto: (id: string | null) => (id ? (grupoCorto.get(id) ?? '') : ''),
-    docentes: (s: SesionHorario) => s.docente_ids.map((d) => docente.get(d) ?? '').join(', '),
+    docentes: (s: SesionHorario) => s.docente_ids.map((d) => docente.get(d)?.nombre ?? '').join(', '),
+    docentesCortos: (s: SesionHorario) => s.docente_ids.map((d) => docente.get(d)?.nombre_corto ?? '').join(' / '),
     espacio: (id: string | null) => (id ? (espacio.get(id) ?? '') : ''),
   };
 }
 
 const celdaBase = 'rounded-md px-2 py-1.5 text-left text-xs leading-tight';
-const tono = (conflicto: boolean, reunion: boolean) =>
-  conflicto ? 'bg-danger-soft text-danger ring-1 ring-danger/40' : reunion ? 'bg-warning-soft text-ink' : 'bg-primary-soft text-ink';
+
+/**
+ * Cómo se ve una sesión: un conflicto, en rojo; una reunión, en el tono de advertencia; una clase, en el color pastel de su
+ * asignatura (viene del catálogo, es un dato y por eso va en `style`; sin color cae al azul suave de siempre).
+ */
+function aspecto(color: { fondo: string; borde: string } | undefined, conflicto: boolean, reunion: boolean): { clase: string; estilo?: CSSProperties } {
+  if (conflicto) return { clase: 'bg-danger-soft text-danger ring-1 ring-danger/40' };
+  if (reunion) return { clase: 'border border-warning/40 bg-warning-soft text-ink' };
+  if (!color) return { clase: 'border border-transparent bg-primary-soft text-ink' };
+  return { clase: 'border text-ink', estilo: { backgroundColor: color.fondo, borderColor: color.borde } };
+}
 
 /**
  * Horario de un grupo o de un docente: periodos de la jornada en filas y días hábiles en columnas, con los bloques de
- * varias horas en una sola celda alta. La vista GENERAL es la "sábana": un docente por fila y cada día × periodo en
- * columnas, con el grupo que atiende.
+ * varias horas en una sola celda alta. Las vistas GENERAL y TOTAL_GRUPOS son las hojas totales (como las impresas): un docente
+ * o un grupo por fila y cada día × periodo en columnas.
  */
 export function MallaHorario({ estructura, sesiones, catalogo, vista, entidadId, enConflicto, edicion }: MallaHorarioProps) {
   const nombres = useNombres(catalogo);
-  if (vista === 'GENERAL') return <Sabana estructura={estructura} sesiones={sesiones} catalogo={catalogo} enConflicto={enConflicto} nombres={nombres} />;
+  if (vista === 'GENERAL' || vista === 'TOTAL_GRUPOS') {
+    return <HojaTotal por={vista === 'GENERAL' ? 'DOCENTE' : 'GRUPO'} estructura={estructura} sesiones={sesiones} catalogo={catalogo} enConflicto={enConflicto} nombres={nombres} />;
+  }
 
   const propias = sesiones.filter((s) => (vista === 'GRUPO' ? s.group_id === entidadId : s.docente_ids.includes(entidadId)));
   const duracionSeleccionada = edicion?.seleccionadaId ? sesiones.find((s) => s._id === edicion.seleccionadaId)?.duracion : undefined;
@@ -120,7 +134,8 @@ export function MallaHorario({ estructura, sesiones, catalogo, vista, entidadId,
                               {s.espacio_id && <p className="text-muted">{nombres.espacio(s.espacio_id)}</p>}
                             </>
                           );
-                          const clases = `${celdaBase} flex-1 ${tono(enConflicto.has(s.clave), !s.subject_id)} ${seleccionada ? 'ring-2 ring-primary' : intercambiable ? 'outline-dashed outline-1 outline-primary/60' : ''}`;
+                          const { clase, estilo } = aspecto(nombres.color(s), enConflicto.has(s.clave), !s.subject_id);
+                          const clases = `${celdaBase} flex-1 ${clase} ${seleccionada ? 'ring-2 ring-primary' : intercambiable ? 'outline-dashed outline-1 outline-primary/60' : ''}`;
                           return edicion ? (
                             <button
                               key={s._id}
@@ -128,12 +143,13 @@ export function MallaHorario({ estructura, sesiones, catalogo, vista, entidadId,
                               disabled={edicion.ocupado}
                               onClick={() => (intercambiable ? edicion.onIntercambiar(s) : edicion.onSeleccionar(seleccionada ? null : s))}
                               className={`${clases} flex w-full flex-col items-start justify-start hover:ring-1 hover:ring-primary/50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary`}
+                              style={estilo}
                               title={seleccionada ? 'Clic para soltar la selección' : intercambiable ? 'Clic para intercambiar con la seleccionada' : 'Clic para seleccionar y mover'}
                             >
                               {contenido}
                             </button>
                           ) : (
-                            <div key={s._id} className={clases} title={nombres.titulo(s)}>
+                            <div key={s._id} className={clases} style={estilo} title={nombres.titulo(s)}>
                               {contenido}
                             </div>
                           );
@@ -161,28 +177,92 @@ export function MallaHorario({ estructura, sesiones, catalogo, vista, entidadId,
   );
 }
 
-function Sabana({
+/**
+ * Hoja total: una fila por docente o por grupo y, en columnas, cada día con sus periodos. Un bloque de varias horas ocupa varias
+ * columnas; si en una fila dos sesiones se pisan (un conflicto en un borrador) se dibuja hora por hora para no perder ninguna.
+ */
+function HojaTotal({
+  por,
   estructura,
   sesiones,
   catalogo,
   enConflicto,
   nombres,
-}: Omit<MallaHorarioProps, 'vista' | 'entidadId'> & { nombres: ReturnType<typeof useNombres> }) {
-  // docente → "dia-periodo" → sesiones que lo ocupan (contando todas las horas del bloque)
-  const ocupacion = new Map<string, Map<string, SesionHorario[]>>();
-  for (const s of sesiones) {
-    for (const d of s.docente_ids) {
-      const delDocente = ocupacion.get(d) ?? new Map<string, SesionHorario[]>();
+}: Omit<MallaHorarioProps, 'vista' | 'entidadId'> & { por: 'DOCENTE' | 'GRUPO'; nombres: ReturnType<typeof useNombres> }) {
+  const filas =
+    por === 'DOCENTE'
+      ? catalogo.docentes.map((d) => ({ id: d._id, etiqueta: d.nombre, propias: sesiones.filter((s) => s.docente_ids.includes(d._id)) }))
+      : catalogo.grupos.map((g) => ({ id: g._id, etiqueta: g.etiqueta_corta || g.etiqueta, propias: sesiones.filter((s) => s.group_id === g._id) }));
+
+  // Línea entre días y un espacio en el descanso, como en la hoja impresa.
+  const separador = (p: number) => (p === 0 ? 'border-l border-border' : estructura.periodos[p]?.descanso_antes ? 'border-l-4 border-soft' : '');
+
+  const contenido = (s: SesionHorario) =>
+    por === 'GRUPO'
+      ? { principal: nombres.corto(s), secundario: nombres.docentesCortos(s) }
+      : s.group_id
+        ? { principal: nombres.grupoCorto(s.group_id), secundario: nombres.corto(s) }
+        : { principal: 'Reun.', secundario: nombres.titulo(s) };
+
+  const celda = (s: SesionHorario[], span: number, key: string, p: number): ReactNode => {
+    const { clase, estilo } = aspecto(nombres.color(s[0]!), s.length > 1 || s.some((x) => enConflicto.has(x.clave)), s.every((x) => !x.subject_id));
+    return (
+      <td key={key} colSpan={span} className={`px-0.5 py-0.5 text-center ${separador(p)}`}>
+        <div
+          className={`rounded px-1 py-1 leading-tight ${clase}`}
+          style={estilo}
+          title={s.map((x) => `${nombres.titulo(x)} · ${nombres.grupo(x.group_id) || 'sin grupo'} · ${nombres.docentes(x)}`).join('\n')}
+        >
+          {s.map((x, i) => {
+            const { principal, secundario } = contenido(x);
+            return (
+              <span key={i} className="block">
+                <span className="block font-semibold">{principal}</span>
+                <span className="block text-[10px] font-normal text-body">{secundario}</span>
+              </span>
+            );
+          })}
+        </div>
+      </td>
+    );
+  };
+
+  function celdasDeFila(propias: SesionHorario[], id: string): ReactNode[] {
+    const inicioEn = new Map<string, SesionHorario>();
+    const cubierta = new Set<string>();
+    let seTraslapan = false;
+    for (const s of propias) {
       for (let k = 0; k < s.duracion; k += 1) {
         const clave = `${s.dia}-${s.periodo + k}`;
-        delDocente.set(clave, [...(delDocente.get(clave) ?? []), s]);
+        if (inicioEn.has(clave) || cubierta.has(clave)) seTraslapan = true;
+        if (k === 0) inicioEn.set(clave, s);
+        else cubierta.add(clave);
       }
-      ocupacion.set(d, delDocente);
     }
-  }
 
-  // Línea entre días y un espacio en el descanso, como en la sábana impresa.
-  const separador = (p: number) => (p === 0 ? 'border-l border-border' : estructura.periodos[p]?.descanso_antes ? 'border-l-4 border-soft' : '');
+    const celdas: ReactNode[] = [];
+    for (const d of estructura.dias) {
+      for (let p = 0; p < estructura.periodos.length; p += 1) {
+        const clave = `${d}-${p}`;
+        const key = `${id}-${clave}`;
+        if (seTraslapan) {
+          const aqui = propias.filter((s) => s.dia === d && p >= s.periodo && p < s.periodo + s.duracion);
+          celdas.push(aqui.length > 0 ? celda(aqui, 1, key, p) : <td key={key} className={separador(p)} />);
+          continue;
+        }
+        const empieza = inicioEn.get(clave);
+        if (empieza) {
+          // Un bloque no sigue más allá del día: se corta si la jornada termina antes.
+          const span = Math.min(empieza.duracion, estructura.periodos.length - p);
+          celdas.push(celda([empieza], span, key, p));
+          p += span - 1;
+        } else if (!cubierta.has(clave)) {
+          celdas.push(<td key={key} className={separador(p)} />);
+        }
+      }
+    }
+    return celdas;
+  }
 
   return (
     <div className="overflow-x-auto rounded-xl border border-border bg-surface">
@@ -190,7 +270,7 @@ function Sabana({
         <thead>
           <tr className="bg-primary-soft">
             <th rowSpan={2} className="sticky left-0 z-10 bg-primary-soft px-3 py-2 text-left text-label text-body">
-              Docente
+              {por === 'DOCENTE' ? 'Docente' : 'Grupo'}
             </th>
             {estructura.dias.map((d) => (
               <th key={d} colSpan={estructura.periodos.length} className="border-l border-border px-2 py-1 text-center text-label text-body">
@@ -200,36 +280,20 @@ function Sabana({
           </tr>
           <tr className="bg-primary-soft">
             {estructura.dias.map((d) =>
-              estructura.periodos.map((_, p) => (
-                <th key={`${d}-${p}`} className={`w-12 px-1 pb-1 text-center font-normal text-muted ${separador(p)}`}>
-                  {p + 1}
+              estructura.periodos.map((per, p) => (
+                <th key={`${d}-${p}`} className={`min-w-[3.25rem] px-1 pb-1 text-center font-normal text-muted ${separador(p)}`}>
+                  <span className="block text-ink">{p + 1}</span>
+                  <span className="block text-[9px]">{per.hora_inicio}</span>
                 </th>
               ))
             )}
           </tr>
         </thead>
         <tbody>
-          {catalogo.docentes.map((doc) => (
-            <tr key={doc._id} className="border-t border-border">
-              <td className="sticky left-0 z-10 whitespace-nowrap bg-surface px-3 py-1 font-medium text-ink">{doc.nombre}</td>
-              {estructura.dias.map((d) =>
-                estructura.periodos.map((_, p) => {
-                  const aqui = ocupacion.get(doc._id)?.get(`${d}-${p}`) ?? [];
-                  const conflicto = aqui.length > 1 || aqui.some((s) => enConflicto.has(s.clave));
-                  return (
-                    <td key={`${d}-${p}`} className={`px-0.5 py-0.5 text-center ${separador(p)}`}>
-                      {aqui.length > 0 && (
-                        <div
-                          className={`rounded px-1 py-1 ${tono(conflicto, aqui.every((s) => !s.subject_id))}`}
-                          title={aqui.map((s) => `${nombres.titulo(s)} · ${nombres.grupo(s.group_id) || 'sin grupo'}`).join('\n')}
-                        >
-                          {aqui.map((s) => (s.group_id ? nombres.grupoCorto(s.group_id) : nombres.corto(s))).join(' / ')}
-                        </div>
-                      )}
-                    </td>
-                  );
-                })
-              )}
+          {filas.map((fila) => (
+            <tr key={fila.id} className="border-t border-border">
+              <td className="sticky left-0 z-10 whitespace-nowrap bg-surface px-3 py-1 font-medium text-ink">{fila.etiqueta}</td>
+              {celdasDeFila(fila.propias, fila.id)}
             </tr>
           ))}
         </tbody>

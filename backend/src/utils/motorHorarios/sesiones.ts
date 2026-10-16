@@ -1,5 +1,6 @@
 import { Franja } from '../franjas';
 import { resolverVariables } from './alcance';
+import { ajustarBloquesATramos, tramosDeSemana } from './bloques';
 import { AsignacionMotor, Aviso, EspacioMotor, EstructuraSemana, SesionMotor, VariableDeTipo, VariableMotor } from './tipos';
 
 /**
@@ -21,12 +22,12 @@ export function construirEstructura(diasHabiles: readonly number[], franjas: rea
 }
 
 /** Parte unas horas en bloques según el patrón; si el patrón no suma esas horas se usa su bloque mayor y se avisa. */
-function partirEnBloques(horas: number, bloques: readonly number[] | null, maxBloque: number): { bloques: number[]; cuadra: boolean } {
+function partirEnBloques(horas: number, bloques: readonly number[] | null): { bloques: number[]; cuadra: boolean } {
   if (!bloques || bloques.length === 0) return { bloques: Array.from({ length: horas }, () => 1), cuadra: true };
   const suma = bloques.reduce((s, b) => s + b, 0);
-  if (suma === horas && bloques.every((b) => b <= maxBloque)) return { bloques: [...bloques], cuadra: true };
+  if (suma === horas) return { bloques: [...bloques], cuadra: true };
 
-  const tamano = Math.min(Math.max(...bloques), maxBloque);
+  const tamano = Math.max(...bloques);
   const resultado: number[] = [];
   let resto = horas;
   while (resto > 0) {
@@ -35,6 +36,43 @@ function partirEnBloques(horas: number, bloques: readonly number[] | null, maxBl
     resto -= b;
   }
   return { bloques: resultado, cuadra: false };
+}
+
+/**
+ * Un bloque de varias horas debe quedar entero entre dos descansos (y dentro del tiempo libre del docente). Si los bloques
+ * de un grupo, o de un docente, no caben así en la semana, los que sobran se parten: es más importante respetar el bloque
+ * que su largo. Sale solo de la carga y de la estructura de la jornada, nunca de un horario generado, para que publicar o
+ * editar vuelva a dar las mismas sesiones.
+ */
+function ajustarBloquesDeLaSemana(
+  bloquesPorAsignacion: Map<string, number[]>,
+  asignaciones: readonly AsignacionMotor[],
+  variables: readonly VariableMotor[],
+  estructura: EstructuraSemana
+): void {
+  const reajustar = (delas: readonly AsignacionMotor[], tramos: readonly number[]) => {
+    const bloques = delas.flatMap((a) => (bloquesPorAsignacion.get(a.id) ?? []).map((tamano) => ({ asignacion: a.id, tamano })));
+    const ajustados = ajustarBloquesATramos(bloques, tramos);
+    for (const a of delas) bloquesPorAsignacion.set(a.id, ajustados.filter((b) => b.asignacion === a.id).map((b) => b.tamano));
+  };
+  const porClave = (clave: (a: AsignacionMotor) => string) => {
+    const mapa = new Map<string, AsignacionMotor[]>();
+    for (const a of asignaciones) mapa.set(clave(a), [...(mapa.get(clave(a)) ?? []), a]);
+    return mapa;
+  };
+
+  const tramosLibres = tramosDeSemana(estructura);
+  for (const delGrupo of porClave((a) => a.group_id).values()) reajustar(delGrupo, tramosLibres);
+
+  for (const [docente, delDocente] of porClave((a) => a.docente_id)) {
+    const bloqueadas = new Set<string>();
+    const sujeto = { group_id: null, grade_id: null, subject_id: null, docente_ids: [docente] };
+    for (const v of resolverVariables(variables, sujeto)) {
+      if (v.tipo !== 'DISPONIBILIDAD' || v.severidad !== 'DURA' || v.docente_ids.length === 0) continue;
+      for (const c of v.parametros.celdas) if (c.valor === 'NO_DISPONIBLE') bloqueadas.add(`${c.dia}-${c.periodo}`);
+    }
+    reajustar(delDocente, bloqueadas.size === 0 ? tramosLibres : tramosDeSemana(estructura, bloqueadas));
+  }
 }
 
 /**
@@ -48,24 +86,39 @@ export function expandirSesiones(
 ): { sesiones: SesionMotor[]; avisos: Aviso[] } {
   const sesiones: SesionMotor[] = [];
   const avisos: Aviso[] = [];
-  const maxBloque = Math.max(1, estructura.periodos.length);
+  const maxBloque = Math.max(1, ...tramosDeSemana(estructura));
 
-  for (const a of asignaciones) {
-    if (a.horas_semanales <= 0) continue;
+  const conCarga = asignaciones.filter((a) => a.horas_semanales > 0);
+  const pedidos = new Map<string, number[]>();
+  for (const a of conCarga) {
     const sujeto = { group_id: a.group_id, grade_id: a.grade_id, subject_id: a.subject_id, docente_ids: [a.docente_id] };
-    const vigentes = resolverVariables(variables, sujeto);
-    const distribucion = vigentes.find((v): v is VariableDeTipo<'DISTRIBUCION_BLOQUES'> => v.tipo === 'DISTRIBUCION_BLOQUES');
-    const espacio = vigentes.find((v): v is VariableDeTipo<'ESPACIO_REQUERIDO'> => v.tipo === 'ESPACIO_REQUERIDO');
-
-    const { bloques, cuadra } = partirEnBloques(a.horas_semanales, distribucion?.parametros.bloques ?? null, maxBloque);
+    const distribucion = resolverVariables(variables, sujeto).find((v): v is VariableDeTipo<'DISTRIBUCION_BLOQUES'> => v.tipo === 'DISTRIBUCION_BLOQUES');
+    const { bloques, cuadra } = partirEnBloques(a.horas_semanales, distribucion?.parametros.bloques ?? null);
     if (!cuadra && distribucion) {
       avisos.push({
         codigo: 'BLOQUES_NO_CUADRAN',
         mensaje: `El patrón de bloques [${distribucion.parametros.bloques.join(', ')}] no suma las ${a.horas_semanales} horas de la asignación ${a.id}; se usó [${bloques.join(', ')}].`,
       });
     }
+    pedidos.set(a.id, bloques);
+  }
+  const bloquesPorAsignacion = new Map([...pedidos].map(([id, bloques]) => [id, [...bloques]]));
+  ajustarBloquesDeLaSemana(bloquesPorAsignacion, conCarga, variables, estructura);
 
-    bloques
+  for (const a of conCarga) {
+    const finales = bloquesPorAsignacion.get(a.id)!;
+    const orden = (bloques: readonly number[]) => [...bloques].sort((x, y) => y - x).join(', ');
+    if (orden(finales) !== orden(pedidos.get(a.id)!)) {
+      avisos.push({
+        codigo: 'BLOQUES_PARTIDOS',
+        mensaje: `Los bloques [${orden(pedidos.get(a.id)!)}] de la asignación ${a.id} no caben enteros entre descansos y en el tiempo libre de su docente; se partieron en [${orden(finales)}] para no montar un bloque sobre el descanso.`,
+      });
+    }
+
+    const sujeto = { group_id: a.group_id, grade_id: a.grade_id, subject_id: a.subject_id, docente_ids: [a.docente_id] };
+    const espacio = resolverVariables(variables, sujeto).find((v): v is VariableDeTipo<'ESPACIO_REQUERIDO'> => v.tipo === 'ESPACIO_REQUERIDO');
+
+    [...finales]
       .sort((x, y) => y - x)
       .forEach((duracion, indice) => {
         sesiones.push({
@@ -125,38 +178,10 @@ export function diagnosticarCapacidad(
 
   const horasPorGrupo = new Map<string, number>();
   const horasPorDocente = new Map<string, number>();
-  const bloquesPorGrupo = new Map<string, number>();
-  const bloquesPorDocente = new Map<string, number>();
   for (const s of sesiones) {
-    // Solo cuentan los bloques que el descanso no puede partir: los demás caben en cualquier par de periodos seguidos.
-    const enteroEnTramo = s.duracion > 1 && resolverVariables(variables, s).some((v) => v.tipo === 'RECREO_NO_INTERRUMPE' && v.severidad === 'DURA');
-    if (s.group_id) {
-      horasPorGrupo.set(s.group_id, (horasPorGrupo.get(s.group_id) ?? 0) + s.duracion);
-      if (enteroEnTramo) bloquesPorGrupo.set(s.group_id, (bloquesPorGrupo.get(s.group_id) ?? 0) + 1);
-    }
-    for (const d of s.docente_ids) {
-      horasPorDocente.set(d, (horasPorDocente.get(d) ?? 0) + s.duracion);
-      if (enteroEnTramo) bloquesPorDocente.set(d, (bloquesPorDocente.get(d) ?? 0) + 1);
-    }
+    if (s.group_id) horasPorGrupo.set(s.group_id, (horasPorGrupo.get(s.group_id) ?? 0) + s.duracion);
+    for (const d of s.docente_ids) horasPorDocente.set(d, (horasPorDocente.get(d) ?? 0) + s.duracion);
   }
-
-  // Cuántos bloques dobles caben como máximo en una semana: por día, cada tramo entre descansos admite floor(largo/2).
-  const tramos: number[] = [];
-  estructura.periodos.forEach((p, i) => {
-    if (i === 0 || p.descanso_antes) tramos.push(0);
-    tramos[tramos.length - 1] = (tramos[tramos.length - 1] ?? 0) + 1;
-  });
-  const bloquesPorSemana = estructura.dias.length * tramos.reduce((suma, largo) => suma + Math.floor(largo / 2), 0);
-  const revisarBloques = (quien: string, bloques: number) => {
-    if (bloques > bloquesPorSemana) {
-      avisos.push({
-        codigo: 'BLOQUES_NO_CABEN',
-        mensaje: `${quien} necesita ${bloques} bloques de 2 o más horas y, como el descanso no puede partirlos, en la semana solo caben ${bloquesPorSemana}. Reparte la carga o cambia el patrón de bloques.`,
-      });
-    }
-  };
-  for (const [grupo, bloques] of bloquesPorGrupo) revisarBloques(`El grupo ${grupo}`, bloques);
-  for (const [docente, bloques] of bloquesPorDocente) revisarBloques(`El docente ${docente}`, bloques);
 
   for (const [grupo, horas] of horasPorGrupo) {
     if (horas > totalPeriodos) {

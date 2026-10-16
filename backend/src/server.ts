@@ -1,6 +1,7 @@
 import app from './app';
 import { connectDB } from './config/db';
 import { env } from './config/env';
+import { iniciarPlanificadorNotificaciones } from './services/planificadorNotificaciones.service';
 
 async function start(): Promise<void> {
   await connectDB();
@@ -8,6 +9,8 @@ async function start(): Promise<void> {
   const server = app.listen(env.port, () => {
     console.log(`[server] Klassy nucleo institucional escuchando en puerto ${env.port} (${env.nodeEnv})`);
   });
+
+  iniciarPlanificadorNotificaciones();
 
   const shutdown = (signal: string): void => {
     console.log(`[server] ${signal} recibido, cerrando servidor...`);

@@ -1,7 +1,7 @@
 /**
  * Avisos que dependen del calendario (M28): cierre de periodo próximo, recuperaciones y desarrollo institucional que se acercan, y
- * actividades programadas que se publican hoy. No hay planificador interno: se programa UNA vez al día en el servidor (cron). Es
- * idempotente mientras el aviso siga sin leer: agrupa en la misma alerta.
+ * actividades programadas que se publican hoy. El servidor ya los corre solo una vez al día
+ * (`planificadorNotificaciones.service`); este script es solo para lanzarlos a mano. Es idempotente mientras el aviso siga sin leer.
  *
  * Uso: npm run notificar:diario
  */

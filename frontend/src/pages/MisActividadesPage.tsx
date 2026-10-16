@@ -167,8 +167,8 @@ export function MisActividadesPage() {
       {!enVistaDetalle && (
         <>
           <PageHeader
-            title="Mis actividades"
-            subtitle="Tareas, evaluaciones, trabajos y proyectos que tus docentes publicaron para tu grupo."
+            title="Mis asignaturas"
+            subtitle="Selecciona la asignatura que deseas consultar y accede a sus actividades, evaluaciones y proyectos."
           />
 
           {isLoading ? (

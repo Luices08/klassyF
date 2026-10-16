@@ -14,6 +14,8 @@ export interface EstiloAsignatura {
   Icon: ComponentType<{ className?: string }>;
   contenedorClases: string;
   bordeClases: string;
+  barraSuperiorClases: string;
+  barraColor: string;
 }
 
 function normalizarTexto(txt: string): string {
@@ -24,7 +26,7 @@ function normalizarTexto(txt: string): string {
 }
 
 /**
- * Determina el icono, fondo suave y borde delgado temático de una asignatura de acuerdo a su nombre o área.
+ * Determina el icono, fondo suave, borde delgado y barrita superior temática de una asignatura.
  * Compartido entre docentes y estudiantes para garantizar consistencia visual y no duplicar código.
  */
 export function obtenerEstiloAsignatura(nombre: string, areaNombre?: string): EstiloAsignatura {
@@ -35,6 +37,8 @@ export function obtenerEstiloAsignatura(nombre: string, areaNombre?: string): Es
       Icon: CalculatorIcon,
       contenedorClases: 'bg-blue-50 text-blue-600',
       bordeClases: '!border-blue-200 hover:!border-blue-300',
+      barraSuperiorClases: 'border-t-4 border-t-blue-500',
+      barraColor: 'bg-blue-500',
     };
   }
   if (norm.includes('contab') || norm.includes('financ') || norm.includes('econom') || norm.includes('comerc')) {
@@ -42,6 +46,8 @@ export function obtenerEstiloAsignatura(nombre: string, areaNombre?: string): Es
       Icon: CalculatorIcon,
       contenedorClases: 'bg-slate-100 text-slate-700',
       bordeClases: '!border-slate-300 hover:!border-slate-400',
+      barraSuperiorClases: 'border-t-4 border-t-slate-500',
+      barraColor: 'bg-slate-500',
     };
   }
   if (
@@ -55,6 +61,8 @@ export function obtenerEstiloAsignatura(nombre: string, areaNombre?: string): Es
       Icon: BookIcon,
       contenedorClases: 'bg-purple-50 text-purple-600',
       bordeClases: '!border-purple-200 hover:!border-purple-300',
+      barraSuperiorClases: 'border-t-4 border-t-purple-500',
+      barraColor: 'bg-purple-500',
     };
   }
   if (
@@ -68,6 +76,8 @@ export function obtenerEstiloAsignatura(nombre: string, areaNombre?: string): Es
       Icon: FlaskIcon,
       contenedorClases: 'bg-emerald-50 text-emerald-600',
       bordeClases: '!border-emerald-200 hover:!border-emerald-300',
+      barraSuperiorClases: 'border-t-4 border-t-emerald-500',
+      barraColor: 'bg-emerald-500',
     };
   }
   if (
@@ -82,6 +92,8 @@ export function obtenerEstiloAsignatura(nombre: string, areaNombre?: string): Es
       Icon: GlobeIcon,
       contenedorClases: 'bg-amber-50 text-amber-600',
       bordeClases: '!border-amber-200 hover:!border-amber-300',
+      barraSuperiorClases: 'border-t-4 border-t-amber-500',
+      barraColor: 'bg-amber-500',
     };
   }
   if (
@@ -95,6 +107,8 @@ export function obtenerEstiloAsignatura(nombre: string, areaNombre?: string): Es
       Icon: MonitorIcon,
       contenedorClases: 'bg-sky-50 text-sky-600',
       bordeClases: '!border-sky-200 hover:!border-sky-300',
+      barraSuperiorClases: 'border-t-4 border-t-sky-500',
+      barraColor: 'bg-sky-500',
     };
   }
   if (norm.includes('art') || norm.includes('dibuj') || norm.includes('music') || norm.includes('danz') || norm.includes('teatr')) {
@@ -102,6 +116,8 @@ export function obtenerEstiloAsignatura(nombre: string, areaNombre?: string): Es
       Icon: PaletteIcon,
       contenedorClases: 'bg-rose-50 text-rose-600',
       bordeClases: '!border-rose-200 hover:!border-rose-300',
+      barraSuperiorClases: 'border-t-4 border-t-rose-500',
+      barraColor: 'bg-rose-500',
     };
   }
   if (norm.includes('educacion fisica') || norm.includes('deport') || norm.includes('recreac') || norm.includes('ludic')) {
@@ -109,6 +125,8 @@ export function obtenerEstiloAsignatura(nombre: string, areaNombre?: string): Es
       Icon: ActivityIcon,
       contenedorClases: 'bg-indigo-50 text-indigo-600',
       bordeClases: '!border-indigo-200 hover:!border-indigo-300',
+      barraSuperiorClases: 'border-t-4 border-t-indigo-500',
+      barraColor: 'bg-indigo-500',
     };
   }
   if (norm.includes('ingl') || norm.includes('idiom') || norm.includes('extranj') || norm.includes('franc')) {
@@ -116,6 +134,8 @@ export function obtenerEstiloAsignatura(nombre: string, areaNombre?: string): Es
       Icon: MessageCircleIcon,
       contenedorClases: 'bg-teal-50 text-teal-600',
       bordeClases: '!border-teal-200 hover:!border-teal-300',
+      barraSuperiorClases: 'border-t-4 border-t-teal-500',
+      barraColor: 'bg-teal-500',
     };
   }
 
@@ -123,5 +143,7 @@ export function obtenerEstiloAsignatura(nombre: string, areaNombre?: string): Es
     Icon: BookIcon,
     contenedorClases: 'bg-primary-soft text-primary',
     bordeClases: '!border-blue-200 hover:!border-blue-300',
+    barraSuperiorClases: 'border-t-4 border-t-primary',
+    barraColor: 'bg-primary',
   };
 }

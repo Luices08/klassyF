@@ -963,6 +963,41 @@ export async function listarPublicadosDeSede(academicYearId: string, sedeId: str
   return { publicados, colores: Object.fromEntries(colores) };
 }
 
+/**
+ * Las clases que el horario de una jornada le asigna a un espacio (M10 las pinta en su malla): el publicado o, si no hay,
+ * el borrador más reciente (marcado como tal). Las posiciones son índices de periodo entre las franjas `CLASE`.
+ */
+export async function ocupacionDeEspacio(academicYearId: string, jornadaId: string, espacioId: string) {
+  const horarios = await Horario.find({ academic_year_id: academicYearId, jornada_id: jornadaId, estado: { $in: ['PUBLICADO', 'BORRADOR'] } })
+    .sort({ version: -1 })
+    .lean();
+  const elegido = horarios.find((h) => h.estado === 'PUBLICADO') ?? horarios[0];
+  if (!elegido) return { horario: null, sesiones: [] };
+
+  const propias = elegido.sesiones.filter((x) => x.espacio_id && String(x.espacio_id) === espacioId);
+  const catalogo = await construirCatalogo({
+    grupos: propias.flatMap((x) => (x.group_id ? [String(x.group_id)] : [])),
+    docentes: propias.flatMap((x) => x.docente_ids.map(String)),
+    asignaturas: propias.flatMap((x) => (x.subject_id ? [String(x.subject_id)] : [])),
+    espacios: [],
+    reuniones: propias.flatMap((x) => (x.reunion_variable_id ? [String(x.reunion_variable_id)] : [])),
+  });
+  return {
+    horario: { _id: String(elegido._id), version: elegido.version, estado: elegido.estado },
+    sesiones: propias.map((x) => ({
+      dia: x.dia,
+      periodo: x.periodo,
+      duracion: x.duracion,
+      asignatura:
+        catalogo.asignaturas.find((a) => a._id === String(x.subject_id))?.nombre ??
+        catalogo.reuniones.find((r) => r._id === String(x.reunion_variable_id))?.nombre ??
+        'Reunión',
+      grupo: catalogo.grupos.find((g) => g._id === String(x.group_id))?.etiqueta ?? null,
+      docentes: x.docente_ids.map((d) => catalogo.docentes.find((c) => c._id === String(d))?.nombre ?? '').filter(Boolean),
+    })),
+  };
+}
+
 /** Una versión con lo necesario para pintarla: estructura de la jornada y nombres de lo que aparece en sus sesiones. */
 export async function obtenerHorario(id: string, filtro?: (s: { group_id: Types.ObjectId | null; docente_ids: Types.ObjectId[] }) => boolean) {
   const encontrado = await Horario.findById(id).lean();

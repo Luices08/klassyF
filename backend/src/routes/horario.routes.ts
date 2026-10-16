@@ -26,6 +26,7 @@ router.delete('/variables/:id', validate(v.eliminarVariable), horario.eliminarVa
 
 router.get('/insumos', validate(v.obtenerInsumos), horario.obtenerInsumos);
 router.get('/publicados', validate(v.porSede), horario.listarPublicados);
+router.get('/espacio-ocupacion', validate(v.ocupacionDeEspacio), horario.ocupacionDeEspacio);
 
 router.get('/', validate(v.listarHorarios), horario.listarHorarios);
 router.post('/generar', validate(v.generarHorario), horario.generarHorario);

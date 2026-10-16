@@ -474,7 +474,7 @@ Backend `/espacios` (modelo `Espacio`), frontend `/admin/espacios` (`EspaciosPag
   marcados con "sobrecupo".
 - `areas_exclusivas` y `recursos`/`computadores_operativos` se guardan y se editan, pero **aún no los consume nadie**: los
   usará el motor de horarios (M09). La malla semanal se arma **por espacio y jornada** con los días y franjas reales de la jornada (ver
-  arriba) y solo muestra ocupación por grupo titular; la ocupación por asignatura llega con M09.
+  arriba) y muestra el grupo titular y, desde M09, **las clases que el horario asigna al espacio** (`GET /horarios/espacio-ocupacion?academic_year_id=&jornada_id=&espacio_id=`, `ocupacionDeEspacio`: el horario publicado o, si no hay, el último borrador, marcado como tal; `MallaOcupacionEspacio`).
 
 ### M06 (Plan de estudios) y M08 (Carga docente) — reglas que no se ven en un solo archivo
 

@@ -223,3 +223,8 @@ export interface MiHorario extends DetalleHorario {
   vista: 'GRUPO' | 'DOCENTE';
   entidad_id: string;
 }
+
+export interface OcupacionDeEspacio {
+  horario: { _id: string; version: number; estado: EstadoHorario } | null;
+  sesiones: Array<{ dia: number; periodo: number; duracion: number; asignatura: string; grupo: string | null; docentes: string[] }>;
+}

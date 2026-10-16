@@ -44,6 +44,8 @@ import {
   type EstadoMatricula,
   type TipoDocumentoMatricula,
 } from '../../types/domain';
+import { SelectBuscable } from '../../components/ui/SelectBuscable';
+import { opcionesDeGrupos } from '../../lib/opcionesBuscables';
 
 const ESTADOS_TERMINALES: EstadoMatricula[] = ['RETIRADO', 'ANULADO'];
 
@@ -581,16 +583,18 @@ export function EnrollmentDetailPage() {
         isSubmitting={cambiarGrupo.isPending}
       >
         {cambiarGrupo.isError && <Alert tone="error">{errorMessage(cambiarGrupo.error)}</Alert>}
-        <Select label="Grupo destino" required value={nuevoGrupo} onChange={(e) => setNuevoGrupo(e.target.value)}>
-          <option value="">Selecciona...</option>
-          {(groupsQuery.data ?? [])
-            .filter((g) => g._id !== (typeof enrollment.group_id === 'string' ? enrollment.group_id : enrollment.group_id._id))
-            .map((g) => (
-              <option key={g._id} value={g._id}>
-                {g.nomenclatura} ({g.cupos_ocupados}/{g.max_capacity})
-              </option>
-            ))}
-        </Select>
+        <SelectBuscable
+          label="Grupo destino"
+          required
+          value={nuevoGrupo}
+          onChange={setNuevoGrupo}
+          placeholder="Buscar grupo…"
+          vacioLabel="Selecciona..."
+          opciones={opcionesDeGrupos(
+            (groupsQuery.data ?? []).filter((g) => g._id !== (typeof enrollment.group_id === 'string' ? enrollment.group_id : enrollment.group_id._id)),
+            { conCupos: true }
+          )}
+        />
       </Drawer>
 
       <Drawer

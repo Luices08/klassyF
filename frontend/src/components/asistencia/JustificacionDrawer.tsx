@@ -2,12 +2,13 @@ import { useState, type FormEvent } from 'react';
 import { Alert, errorMessage } from '../ui/Alert';
 import { Drawer } from '../ui/Drawer';
 import { Select, Textarea } from '../ui/Field';
+import { SelectBuscable } from '../ui/SelectBuscable';
 import { useCrearJustificacion, useInasistencias } from '../../hooks/useAsistencia';
 import { useEnrollmentsList } from '../../hooks/useEnrollments';
 import { useGroups } from '../../hooks/useGroups';
 import { useStudentGuardians } from '../../hooks/useGuardians';
 import { formatoFechaCalendario } from '../../lib/fechas';
-import type { Group } from '../../types/domain';
+import { opcionesDeGrupos, opcionesDePersonas } from '../../lib/opcionesBuscables';
 
 /** Falla ya identificada (desde la planilla): se salta la búsqueda de grupo, estudiante y falla. */
 export interface InasistenciaInicial {
@@ -22,8 +23,6 @@ interface JustificacionDrawerProps {
   inicial?: InasistenciaInicial;
   onClose: () => void;
 }
-
-const etiquetaGrupo = (g: Group) => `${typeof g.grade_id === 'object' ? g.grade_id.nombre : ''} ${g.nomenclatura}`.trim();
 
 const TIPOS_SOPORTE = '.pdf,.jpg,.jpeg,.png,.webp';
 
@@ -89,39 +88,31 @@ export function JustificacionDrawer({ academicYearId, inicial, onClose }: Justif
 
       {!inicial && (
         <>
-          <Select
+          <SelectBuscable
             label="Grupo"
             value={groupId}
-            onChange={(e) => {
-              setGroupId(e.target.value);
+            onChange={(id) => {
+              setGroupId(id);
               setStudentElegido('');
               setInasistenciaKey('');
             }}
-          >
-            <option value="">Selecciona un grupo…</option>
-            {grupos.map((g) => (
-              <option key={g._id} value={g._id}>
-                {etiquetaGrupo(g)}
-              </option>
-            ))}
-          </Select>
-          <Select
+            placeholder="Buscar grupo…"
+            vacioLabel="Selecciona un grupo…"
+            opciones={opcionesDeGrupos(grupos)}
+          />
+          <SelectBuscable
             label="Estudiante"
             value={studentElegido}
             disabled={!groupId}
-            onChange={(e) => {
-              setStudentElegido(e.target.value);
+            onChange={(id) => {
+              setStudentElegido(id);
               setInasistenciaKey('');
               setAcudienteId('');
             }}
-          >
-            <option value="">Selecciona un estudiante…</option>
-            {estudiantes.map((s) => (
-              <option key={s._id} value={s._id}>
-                {s.apellido} {s.nombre}
-              </option>
-            ))}
-          </Select>
+            placeholder="Buscar por nombre o documento…"
+            vacioLabel="Selecciona un estudiante…"
+            opciones={opcionesDePersonas(estudiantes)}
+          />
           <Select
             label="Inasistencia"
             value={inasistenciaKey}

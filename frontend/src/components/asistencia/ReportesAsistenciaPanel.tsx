@@ -3,9 +3,11 @@ import { Alert, errorMessage } from '../ui/Alert';
 import { Button } from '../ui/Button';
 import { Card, CardHeader } from '../ui/Card';
 import { Input, Select } from '../ui/Field';
+import { SelectBuscable } from '../ui/SelectBuscable';
 import { descargarPdfAsistencia, useClasesAsistencia } from '../../hooks/useAsistencia';
 import { useEnrollmentsList } from '../../hooks/useEnrollments';
 import { useGroups } from '../../hooks/useGroups';
+import { opcionesDeGrupos, opcionesDePersonas } from '../../lib/opcionesBuscables';
 import type { Rol } from '../../types/api';
 import type { AcademicYear } from '../../types/domain';
 
@@ -67,8 +69,6 @@ function SelectorPeriodo({ id, anio, value, onChange, conTodos }: { id: string; 
   );
 }
 
-const etiquetaGrupo = (grado: string, grupo: string) => `${grado} ${grupo}`.trim();
-
 /**
  * Reportes en PDF de asistencia. Cada rol ve solo los que puede sacar: el docente la planilla de sus clases y el
  * consolidado del grupo que dirige; coordinación y administración todos; secretaría la planilla y la ficha del estudiante.
@@ -119,14 +119,15 @@ export function ReportesAsistenciaPanel({ anio, rol }: { anio: AcademicYear; rol
         }
       >
         <div className="sm:col-span-2">
-          <Select id="clase-planilla" label="Clase" value={claseKey} onChange={(e) => setClaseKey(e.target.value)}>
-            <option value="">Selecciona una clase…</option>
-            {clases.map((c) => (
-              <option key={`${c.group_id}|${c.subject_id}`} value={`${c.group_id}|${c.subject_id}`}>
-                {c.grupo} · {c.asignatura} — {c.docente}
-              </option>
-            ))}
-          </Select>
+          <SelectBuscable
+            id="clase-planilla"
+            label="Clase"
+            value={claseKey}
+            onChange={setClaseKey}
+            placeholder="Buscar por grupo, asignatura o docente…"
+            vacioLabel="Selecciona una clase…"
+            opciones={clases.map((c) => ({ value: `${c.group_id}|${c.subject_id}`, label: `${c.grupo} · ${c.asignatura}`, detalle: c.docente }))}
+          />
         </div>
         <Select id="alcance-planilla" label="Alcance" value={alcancePlanilla} onChange={(e) => setAlcancePlanilla(e.target.value as 'mes' | 'periodo')}>
           <option value="periodo">Un periodo (una hoja por mes)</option>
@@ -146,20 +147,15 @@ export function ReportesAsistenciaPanel({ anio, rol }: { anio: AcademicYear; rol
           deshabilitado={!grupoConsolidado}
           descargar={() => descargarPdfAsistencia('consolidado-grupo', { group_id: grupoConsolidado, periodo_numero: periodoConsolidado }, 'consolidado-grupo.pdf')}
         >
-          <Select id="grupo-consolidado" label="Grupo" value={grupoConsolidado} onChange={(e) => setGrupoConsolidado(e.target.value)}>
-            <option value="">Selecciona un grupo…</option>
-            {esCoordinacion
-              ? grupos.map((g) => (
-                  <option key={g._id} value={g._id}>
-                    {etiquetaGrupo(typeof g.grade_id === 'object' ? g.grade_id.nombre : '', g.nomenclatura)}
-                  </option>
-                ))
-              : gruposDeClases.map(([id, etiqueta]) => (
-                  <option key={id} value={id}>
-                    {etiqueta}
-                  </option>
-                ))}
-          </Select>
+          <SelectBuscable
+            id="grupo-consolidado"
+            label="Grupo"
+            value={grupoConsolidado}
+            onChange={setGrupoConsolidado}
+            placeholder="Buscar grupo…"
+            vacioLabel="Selecciona un grupo…"
+            opciones={esCoordinacion ? opcionesDeGrupos(grupos) : gruposDeClases.map(([id, etiqueta]) => ({ value: id, label: etiqueta }))}
+          />
           <SelectorPeriodo id="periodo-consolidado" anio={anio} value={periodoConsolidado} onChange={setPeriodoConsolidado} conTodos />
         </TarjetaReporte>
       )}
@@ -187,30 +183,28 @@ export function ReportesAsistenciaPanel({ anio, rol }: { anio: AcademicYear; rol
             )
           }
         >
-          <Select
+          <SelectBuscable
             id="grupo-ficha"
             label="Grupo"
             value={grupoFicha}
-            onChange={(e) => {
-              setGrupoFicha(e.target.value);
+            onChange={(id) => {
+              setGrupoFicha(id);
               setEstudianteFicha('');
             }}
-          >
-            <option value="">Selecciona un grupo…</option>
-            {grupos.map((g) => (
-              <option key={g._id} value={g._id}>
-                {etiquetaGrupo(typeof g.grade_id === 'object' ? g.grade_id.nombre : '', g.nomenclatura)}
-              </option>
-            ))}
-          </Select>
-          <Select id="estudiante-ficha" label="Estudiante" value={estudianteFicha} disabled={!grupoFicha} onChange={(e) => setEstudianteFicha(e.target.value)}>
-            <option value="">Selecciona un estudiante…</option>
-            {estudiantes.map((s) => (
-              <option key={s._id} value={s._id}>
-                {s.apellido} {s.nombre}
-              </option>
-            ))}
-          </Select>
+            placeholder="Buscar grupo…"
+            vacioLabel="Selecciona un grupo…"
+            opciones={opcionesDeGrupos(grupos)}
+          />
+          <SelectBuscable
+            id="estudiante-ficha"
+            label="Estudiante"
+            value={estudianteFicha}
+            disabled={!grupoFicha}
+            onChange={setEstudianteFicha}
+            placeholder="Buscar por nombre o documento…"
+            vacioLabel="Selecciona un estudiante…"
+            opciones={opcionesDePersonas(estudiantes)}
+          />
           <SelectorPeriodo id="periodo-ficha" anio={anio} value={periodoFicha} onChange={setPeriodoFicha} conTodos />
         </TarjetaReporte>
       )}

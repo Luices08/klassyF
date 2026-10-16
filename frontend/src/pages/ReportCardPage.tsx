@@ -20,6 +20,8 @@ import {
   type ReportCardQuery,
 } from '../hooks/useReportCard';
 import { useUsers } from '../hooks/useUsers';
+import { SelectBuscable } from '../components/ui/SelectBuscable';
+import { opcionesDeGrupos, opcionesDePersonas } from '../lib/opcionesBuscables';
 
 const STAFF_ROLES = ['ADMIN', 'COORDINADOR', 'SECRETARIA', 'DOCENTE'] as const;
 
@@ -91,14 +93,15 @@ export function ReportCardPage() {
           {isStudent ? (
             <Input label="Estudiante" value={studentId} disabled hint="Tu propio boletín" />
           ) : canBrowseStudents && studentsQuery.data ? (
-            <Select label="Estudiante" value={studentId} onChange={(e) => setStudentId(e.target.value)} required>
-              <option value="">Selecciona...</option>
-              {studentsQuery.data.map((s) => (
-                <option key={s._id} value={s._id}>
-                  {s.nombre} {s.apellido} · {s.numero_documento}
-                </option>
-              ))}
-            </Select>
+            <SelectBuscable
+              label="Estudiante"
+              value={studentId}
+              onChange={setStudentId}
+              required
+              placeholder="Buscar por nombre o documento…"
+              vacioLabel="Selecciona..."
+              opciones={opcionesDePersonas(studentsQuery.data)}
+            />
           ) : (
             <Input
               label="ID del estudiante"
@@ -138,15 +141,14 @@ export function ReportCardPage() {
           <CardHeader title="Imprimir los boletines de un grupo" />
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-4 sm:items-end">
             <div className="sm:col-span-3">
-              <Select label="Grupo" value={grupoId} onChange={(e) => setGrupoId(e.target.value)}>
-                <option value="">Selecciona...</option>
-                {(groupsQuery.data ?? []).map((g) => (
-                  <option key={g._id} value={g._id}>
-                    {typeof g.grade_id === 'object' ? g.grade_id.nombre : ''} {g.nomenclatura}
-                    {typeof g.sede_id === 'object' ? ` · ${g.sede_id.nombre}` : ''}
-                  </option>
-                ))}
-              </Select>
+              <SelectBuscable
+                label="Grupo"
+                value={grupoId}
+                onChange={setGrupoId}
+                placeholder="Buscar grupo…"
+                vacioLabel="Selecciona..."
+                opciones={opcionesDeGrupos(groupsQuery.data ?? [])}
+              />
             </div>
             <Button type="button" variant="outline" disabled={!grupoId || !academicYearId} isLoading={descargando === 'grupo'} onClick={() => void bajarPdf('grupo')}>
               <FileTextIcon className="h-4 w-4" />

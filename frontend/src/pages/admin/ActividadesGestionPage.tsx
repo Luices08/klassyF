@@ -11,6 +11,8 @@ import { useActividades } from '../../hooks/useActividades';
 import { useAnioDeTrabajo } from '../../hooks/useAniosLectivos';
 import { useGroups } from '../../hooks/useGroups';
 import { TIPOS_ACTIVIDAD, NOMBRES_TIPO_ACTIVIDAD, type TipoActividad, formatoInstante } from '../../lib/actividades';
+import { SelectBuscable } from '../../components/ui/SelectBuscable';
+import { opcionesDeGrupos } from '../../lib/opcionesBuscables';
 
 /**
  * Supervisión de coordinación: lo que cada grupo tiene programado, de todos sus docentes, para vigilar la carga. No
@@ -36,15 +38,14 @@ export function ActividadesGestionPage() {
 
       <Card>
         <div className="grid grid-cols-1 gap-4 p-4 sm:grid-cols-3">
-          <Select label="Grupo" value={grupoId} onChange={(e) => setGrupoId(e.target.value)}>
-            <option value="">Selecciona un grupo…</option>
-            {(grupos.data ?? []).map((g) => (
-              <option key={g._id} value={g._id}>
-                {typeof g.grade_id === 'object' ? `${g.grade_id.nombre} · ` : ''}
-                {g.nomenclatura}
-              </option>
-            ))}
-          </Select>
+          <SelectBuscable
+            label="Grupo"
+            value={grupoId}
+            onChange={setGrupoId}
+            placeholder="Buscar grupo…"
+            vacioLabel="Selecciona un grupo…"
+            opciones={opcionesDeGrupos(grupos.data ?? [])}
+          />
           <Select label="Periodo" value={periodo} onChange={(e) => setPeriodo(e.target.value)}>
             <option value="">Todos</option>
             {(anio?.periodos ?? []).map((p) => (

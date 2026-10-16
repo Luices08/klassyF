@@ -3,17 +3,14 @@ import { useGroups } from '../../hooks/useGroups';
 import { useOtorgarProrroga } from '../../hooks/useAniosLectivos';
 import { useUsers } from '../../hooks/useUsers';
 import { aInputFechaHora } from '../../lib/fechas';
-import type { AcademicYear, Group } from '../../types/domain';
+import { opcionesDeGrupos, opcionesDePersonas } from '../../lib/opcionesBuscables';
+import type { AcademicYear } from '../../types/domain';
 import { Alert, errorMessage } from '../ui/Alert';
 import { Drawer } from '../ui/Drawer';
 import { Input, Select } from '../ui/Field';
+import { SelectBuscable } from '../ui/SelectBuscable';
 
 const HORAS_POR_DEFECTO = 24;
-
-function etiquetaGrupo(g: Group): string {
-  const grado = typeof g.grade_id === 'string' ? '' : g.grade_id.nombre;
-  return `${grado} ${g.nomenclatura}`.trim();
-}
 
 interface ProrrogaDrawerProps {
   open: boolean;
@@ -79,28 +76,24 @@ function FormularioProrroga({ anio, periodoInicial, onClose }: ProrrogaDrawerPro
         ))}
       </Select>
 
-      <Select label="Docente" value={docenteId} onChange={(e) => setDocenteId(e.target.value)}>
-        <option value="">Cualquier docente del grupo</option>
-        {docentesQuery.data?.map((d) => (
-          <option key={d._id} value={d._id}>
-            {d.nombre} {d.apellido}
-          </option>
-        ))}
-      </Select>
+      <SelectBuscable
+        label="Docente"
+        value={docenteId}
+        onChange={setDocenteId}
+        placeholder="Buscar por nombre o documento…"
+        vacioLabel="Cualquier docente del grupo"
+        opciones={opcionesDePersonas(docentesQuery.data ?? [])}
+      />
 
-      <Select
+      <SelectBuscable
         label="Grupo"
         value={grupoId}
-        onChange={(e) => setGrupoId(e.target.value)}
+        onChange={setGrupoId}
+        placeholder="Buscar grupo…"
+        vacioLabel="Todos los grupos del docente"
+        opciones={opcionesDeGrupos(gruposQuery.data ?? [])}
         hint="Si eliges docente y grupo, la prórroga aplica solo al docente en ese grupo."
-      >
-        <option value="">Todos los grupos del docente</option>
-        {gruposQuery.data?.map((g) => (
-          <option key={g._id} value={g._id}>
-            {etiquetaGrupo(g)}
-          </option>
-        ))}
-      </Select>
+      />
 
       {sinDestinatario && <Alert tone="warning">Elige al menos un docente o un grupo.</Alert>}
 

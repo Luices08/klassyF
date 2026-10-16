@@ -23,6 +23,8 @@ import {
   useRevisarPazYSalvo,
 } from '../../hooks/usePazYSalvo';
 import { formatoFechaHora } from '../../lib/fechas';
+import { SelectBuscable } from '../../components/ui/SelectBuscable';
+import { opcionesDeGrupos } from '../../lib/opcionesBuscables';
 
 const PAGE_SIZE = 25;
 
@@ -137,21 +139,17 @@ export function PazYSalvoPage() {
           <Card>
             <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
               <Input label="Buscar" placeholder="Nombre o documento" value={busquedaInput} onChange={(e) => setBusquedaInput(e.target.value)} />
-              <Select
+              <SelectBuscable
                 label="Grupo"
                 value={grupo}
-                onChange={(e) => {
-                  setGrupo(e.target.value);
+                onChange={(id) => {
+                  setGrupo(id);
                   setPage(1);
                 }}
-              >
-                <option value="">Todos</option>
-                {(grupos.data ?? []).map((g) => (
-                  <option key={g._id} value={g._id}>
-                    {g.nomenclatura}
-                  </option>
-                ))}
-              </Select>
+                placeholder="Buscar grupo…"
+                vacioLabel="Todos"
+                opciones={opcionesDeGrupos(grupos.data ?? [])}
+              />
               <Select
                 label="Estado"
                 value={estado}

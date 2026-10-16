@@ -1,4 +1,4 @@
-import { obtenerEstiloAsignatura } from '../../lib/asignaturasEstilos';
+import { colorPastelDeAsignatura, obtenerEstiloAsignatura } from '../../lib/asignaturasEstilos';
 import { diasParaEntrega, formatoDiaCorto } from '../../lib/actividades';
 import { ContadorInsignia } from '../notificaciones/ContadorInsignia';
 import { Chip } from '../ui/Badge';
@@ -61,6 +61,7 @@ export function CatalogoAsignaturasEstudiante({ asignaturas, onSeleccionarAsigna
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
         {asignaturas.map((asig) => {
           const { Icon } = obtenerEstiloAsignatura(asig.nombre, asig.areaNombre);
+          const color = colorPastelDeAsignatura(asig.nombre);
           const hechas = asig.entregadas + asig.calificadas;
           const alDia = asig.pendientes === 0;
 
@@ -77,14 +78,18 @@ export function CatalogoAsignaturasEstudiante({ asignaturas, onSeleccionarAsigna
               tabIndex={0}
               role="button"
               aria-label={`Abrir las actividades de ${asig.nombre}`}
-              className="group relative flex cursor-pointer flex-col gap-4 rounded-2xl border border-border bg-surface p-5 shadow-xs transition-all hover:border-primary hover:shadow-md focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2"
+              style={{ borderColor: color.borde }}
+              className="group relative flex cursor-pointer flex-col gap-4 rounded-2xl border-2 bg-surface p-5 shadow-xs transition-all hover:shadow-md focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2"
             >
               <span className="absolute -right-2 -top-2">
                 <ContadorInsignia valor={asig.novedades} />
               </span>
 
               <div className="flex items-start gap-3">
-                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-primary-soft text-primary">
+                <div
+                  className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl"
+                  style={{ backgroundColor: color.fondo, color: color.icono }}
+                >
                   <Icon className="h-6 w-6" />
                 </div>
                 <div className="min-w-0 flex-1">

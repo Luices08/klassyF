@@ -91,6 +91,12 @@ export const listarPublicados = catchAsync<unknown, unknown, unknown, { academic
   res.status(200).json({ success: true, data: await horarioService.listarPublicadosDeSede(req.query.academic_year_id, req.query.sede_id) });
 });
 
+export const ocupacionDeEspacio = catchAsync<unknown, unknown, unknown, { academic_year_id: string; jornada_id: string; espacio_id: string }>(async (req, res) => {
+  res
+    .status(200)
+    .json({ success: true, data: await horarioService.ocupacionDeEspacio(req.query.academic_year_id, req.query.jornada_id, req.query.espacio_id) });
+});
+
 export const obtenerHorario = catchAsync<IdParams>(async (req, res) => {
   res.status(200).json({ success: true, data: await horarioService.obtenerHorarioConRevision(req.params.id) });
 });

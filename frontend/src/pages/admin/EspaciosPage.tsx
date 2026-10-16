@@ -256,6 +256,7 @@ export function EspaciosPage() {
           />
           <MallaOcupacionEspacio
             espacio={espacioMalla}
+            anioId={anio?._id ?? ''}
             jornada={jornadaMalla}
             onConfigurarFranjas={() => jornadaMalla && setConfigurandoFranjas(jornadaMalla)}
           />

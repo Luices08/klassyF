@@ -159,6 +159,10 @@ export const porSede: ValidationSchema = {
   query: Joi.object({ academic_year_id: objectId.required(), sede_id: objectId.required() }),
 };
 
+export const ocupacionDeEspacio: ValidationSchema = {
+  query: Joi.object({ academic_year_id: objectId.required(), jornada_id: objectId.required(), espacio_id: objectId.required() }),
+};
+
 export const obtenerHorario: ValidationSchema = { params: Joi.object({ id: objectId.required() }) };
 
 export const publicarHorario: ValidationSchema = {

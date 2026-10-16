@@ -131,7 +131,15 @@ export function HorariosPage() {
                 <PanelTiempoLibre contexto={contexto} estructura={insumos.estructura} grados={grados} catalogo={insumos.catalogo} variables={variablesQuery.data} />
               </TabPanel>
               <TabPanel active={pestana} tabKey="versiones">
-                <PanelVersiones contexto={contexto} puedeGenerar={insumos.total_sesiones > 0 && anio?.estado !== 'CERRADO'} />
+                <PanelVersiones
+                  key={jornada?._id}
+                  contexto={contexto}
+                  puedeGenerar={insumos.total_sesiones > 0 && anio?.estado !== 'CERRADO'}
+                  onIrAJornada={(sedeDestino, jornadaDestino) => {
+                    setSedeId(sedeDestino);
+                    setJornadaId(jornadaDestino);
+                  }}
+                />
               </TabPanel>
             </>
           )}

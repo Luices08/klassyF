@@ -49,6 +49,7 @@ import {
   generarEnHilo,
   Incidencia,
 } from '../utils/motorHorarios';
+import { aMinutos } from '../utils/franjas';
 import runTransaction from '../utils/runTransaction';
 import { registrarEvento } from './audit.service';
 
@@ -230,6 +231,19 @@ async function avisosDeDocentes(
   return avisos;
 }
 
+/** Una clase que un docente ya tiene en el horario de otra jornada, con la hora real en que ocurre. */
+interface CrucePosible {
+  sede_id: string;
+  dia: number;
+  inicio: string;
+  fin: string;
+  jornada_id: string;
+  donde: string;
+  version: number;
+  clase: string;
+}
+type CrucesDeOtrasJornadas = Map<string, CrucePosible[]>;
+
 /**
  * Un docente que dicta en dos jornadas que se cruzan (p. ej. Mañana para secundaria y Única para media técnica) no puede estar en
  * dos clases a la misma hora. Cada jornada se genera por separado, así que al armar esta se leen los horarios ya hechos de las
@@ -242,8 +256,8 @@ async function restriccionesDeOtrasJornadas(
   academicYearId: Types.ObjectId,
   jornada: JornadaOperativaDocument,
   estructura: ReturnType<typeof construirEstructura>
-): Promise<{ variables: VariableMotor[]; avisos: Aviso[]; respetadas: Set<string> }> {
-  const vacio = { variables: [], avisos: [], respetadas: new Set<string>() };
+): Promise<{ variables: VariableMotor[]; avisos: Aviso[]; respetadas: Set<string>; cruces: CrucesDeOtrasJornadas }> {
+  const vacio = { variables: [], avisos: [], respetadas: new Set<string>(), cruces: new Map<string, CrucePosible[]>() };
   if (docenteIds.length === 0) return vacio;
 
   const jornadasOtras = (await JornadaOperativa.find({ _id: { $ne: jornada._id } })).filter((j) => jornadasSeTraslapan(jornada, j));
@@ -259,7 +273,9 @@ async function restriccionesDeOtrasJornadas(
   const avisos: Aviso[] = [];
   const respetadas = new Set<string>();
   const porDocente = new Map<string, Array<{ dia: number; inicio: string; fin: string }>>();
+  const cruces: CrucesDeOtrasJornadas = new Map();
   const docentes = new Set(docenteIds);
+  const sesionesDeOtras: Array<{ otra: JornadaOperativaDocument; donde: string; version: number; sesiones: Array<{ group_id: Types.ObjectId | null; subject_id: Types.ObjectId | null; docente_ids: string[]; dia: number; periodo: number; duracion: number }> }> = [];
 
   for (const otra of jornadasOtras) {
     const delasJornada = horarios.filter((h) => String(h.jornada_id) === String(otra._id));
@@ -285,6 +301,34 @@ async function restriccionesDeOtrasJornadas(
     for (const o of ocupacionesDeSesiones(sesiones, periodos)) {
       porDocente.set(o.docente_id, [...(porDocente.get(o.docente_id) ?? []), { dia: o.dia, inicio: o.inicio, fin: o.fin }]);
     }
+    sesionesDeOtras.push({
+      otra,
+      donde,
+      version: elegido.version,
+      sesiones: elegido.sesiones.map((x, i) => ({ group_id: x.group_id ?? null, subject_id: x.subject_id ?? null, docente_ids: sesiones[i]!.docente_ids, dia: x.dia, periodo: x.periodo, duracion: x.duracion })),
+    });
+  }
+
+  // Con qué clase concreta (grupo, asignatura, jornada) choca cada hora del docente: es lo que dice el conflicto para poder ir a resolverlo allá.
+  const catalogoOtras = await construirCatalogo({
+    grupos: sesionesDeOtras.flatMap((j) => j.sesiones.map((x) => (x.group_id ? String(x.group_id) : ''))).filter(Boolean),
+    docentes: [],
+    asignaturas: sesionesDeOtras.flatMap((j) => j.sesiones.map((x) => (x.subject_id ? String(x.subject_id) : ''))).filter(Boolean),
+    espacios: [],
+    reuniones: [],
+  });
+  for (const { otra, donde, version, sesiones } of sesionesDeOtras) {
+    const periodos = construirEstructura(otra.dias_habiles, otra.franjas).periodos;
+    for (const x of sesiones) {
+      const grupo = catalogoOtras.grupos.find((g) => g._id === String(x.group_id))?.etiqueta ?? 'un grupo';
+      const asignatura = catalogoOtras.asignaturas.find((a) => a._id === String(x.subject_id))?.nombre ?? 'una reunión';
+      for (const o of ocupacionesDeSesiones([x], periodos)) {
+        cruces.set(o.docente_id, [
+          ...(cruces.get(o.docente_id) ?? []),
+          { sede_id: String(otra.sede_id), dia: o.dia, inicio: o.inicio, fin: o.fin, jornada_id: String(otra._id), donde, version, clase: `${asignatura} de ${grupo}` },
+        ]);
+      }
+    }
   }
 
   const variables: VariableMotor[] = [];
@@ -303,7 +347,7 @@ async function restriccionesDeOtrasJornadas(
       parametros: { celdas },
     });
   }
-  return { variables, avisos, respetadas };
+  return { variables, avisos, respetadas, cruces };
 }
 
 /** Salones titulares (M10): grupos sin salón o con uno que ya no sirve (eliminado, en mantenimiento, inactivo o de otra sede). */
@@ -519,20 +563,60 @@ async function cargarContexto(academicYearId: string, jornadaId: string) {
     avisos: avisos.map((a) => ({ ...a, mensaje: humanizar(a.mensaje) })),
     huella: huellaFranjas(jornada),
     planPorGrupo,
+    cruces: otrasJornadas.cruces,
   };
 }
 
-function aIncidencias(incidencias: readonly Incidencia[], humanizar: (t: string) => string) {
+type SesionPosicionada = { clave: string; dia: number; periodo: number; duracion: number };
+
+const NOMBRES_DIA_ISO = ['', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado', 'domingo'];
+
+/**
+ * `sesiones` trae dónde quedó cada clase de ESTA jornada: con eso, un cruce con otra jornada dice qué clase del docente choca
+ * (asignatura, grupo, jornada y versión) en vez de solo «1 franja no disponible».
+ */
+function aIncidencias(incidencias: readonly Incidencia[], ctx: Pick<Awaited<ReturnType<typeof cargarContexto>>, 'humanizar' | 'cruces' | 'estructura' | 'catalogo'>, sesiones: readonly SesionPosicionada[]) {
+  const porClave = new Map(sesiones.map((s) => [s.clave, s]));
   return incidencias.map((i) => {
     // `ext:` = franja ocupada en otra jornada: no es una variable guardada, así que no se enlaza y el mensaje lo dice.
     const deOtraJornada = i.variable_id?.startsWith('ext:') ?? false;
+    let mensaje = i.mensaje;
+    let jornadaCruce: string | null = null;
+    let sedeCruce: string | null = null;
+    if (deOtraJornada) {
+      const docenteId = i.variable_id!.slice('ext:'.length);
+      const docente = ctx.catalogo.docentes.find((d) => d._id === docenteId)?.nombre ?? 'El docente';
+      const detalles: string[] = [];
+      for (const clave of i.sesion_ids) {
+        const aqui = porClave.get(clave);
+        const primero = aqui ? ctx.estructura.periodos[aqui.periodo] : undefined;
+        const ultimo = aqui ? ctx.estructura.periodos[aqui.periodo + aqui.duracion - 1] : undefined;
+        if (!aqui || !primero || !ultimo) continue;
+        const dia = aqui.dia;
+        const choca = (ctx.cruces.get(docenteId) ?? []).find(
+          (c) => c.dia === dia && aMinutos(primero.hora_inicio) < aMinutos(c.fin) && aMinutos(c.inicio) < aMinutos(ultimo.hora_fin)
+        );
+        if (!choca) continue;
+        jornadaCruce ??= choca.jornada_id;
+        sedeCruce ??= choca.sede_id;
+        detalles.push(
+          `${docente} ya tiene ${choca.clase} el ${NOMBRES_DIA_ISO[dia] ?? ''} de ${choca.inicio} a ${choca.fin} en ${choca.donde} (versión ${choca.version}), a la misma hora que ${ctx.humanizar(clave.split('#')[0]!)} aquí`
+        );
+      }
+      mensaje =
+        detalles.length > 0
+          ? `Cruce con otra jornada: ${[...new Set(detalles)].join('; ')}. Si quieres dejar esta clase donde está, fíjala y regenera la otra jornada: ahí se respeta lo fijado.`
+          : `Cruce con la otra jornada del docente. ${ctx.humanizar(i.mensaje)}`;
+    }
     return {
       codigo: i.codigo,
       variable_id: deOtraJornada ? null : i.variable_id,
       dura: i.dura,
       magnitud: i.magnitud,
       claves_sesion: i.sesion_ids,
-      mensaje: humanizar(deOtraJornada ? `Cruce con la otra jornada del docente. ${i.mensaje}` : i.mensaje),
+      mensaje: deOtraJornada ? mensaje : ctx.humanizar(mensaje),
+      jornada_cruce_id: jornadaCruce,
+      sede_cruce_id: sedeCruce,
     };
   });
 }
@@ -806,7 +890,7 @@ async function completarGeneracion(
           }),
           conflictos_duros: resultado.conflictos_duros,
           penalizacion_blanda: resultado.penalizacion_blanda,
-          incidencias: aIncidencias(resultado.incidencias, ctx.humanizar),
+          incidencias: aIncidencias(resultado.incidencias, ctx, resultado.ubicaciones.map((u) => ({ clave: u.sesion_id, dia: u.dia, periodo: u.periodo, duracion: sesionPorId.get(u.sesion_id)!.duracion }))),
           avisos: [...avisos, ...resultado.avisos.map((a) => ({ ...a, mensaje: ctx.humanizar(a.mensaje) }))],
           generacion: resultado.estadisticas,
         },
@@ -877,6 +961,41 @@ export async function listarPublicadosDeSede(academicYearId: string, sedeId: str
   });
   const colores = asignarColoresAsignaturas(horarios.flatMap((h) => h.sesiones.flatMap((s) => (s.subject_id ? [String(s.subject_id)] : []))));
   return { publicados, colores: Object.fromEntries(colores) };
+}
+
+/**
+ * Las clases que el horario de una jornada le asigna a un espacio (M10 las pinta en su malla): el publicado o, si no hay,
+ * el borrador más reciente (marcado como tal). Las posiciones son índices de periodo entre las franjas `CLASE`.
+ */
+export async function ocupacionDeEspacio(academicYearId: string, jornadaId: string, espacioId: string) {
+  const horarios = await Horario.find({ academic_year_id: academicYearId, jornada_id: jornadaId, estado: { $in: ['PUBLICADO', 'BORRADOR'] } })
+    .sort({ version: -1 })
+    .lean();
+  const elegido = horarios.find((h) => h.estado === 'PUBLICADO') ?? horarios[0];
+  if (!elegido) return { horario: null, sesiones: [] };
+
+  const propias = elegido.sesiones.filter((x) => x.espacio_id && String(x.espacio_id) === espacioId);
+  const catalogo = await construirCatalogo({
+    grupos: propias.flatMap((x) => (x.group_id ? [String(x.group_id)] : [])),
+    docentes: propias.flatMap((x) => x.docente_ids.map(String)),
+    asignaturas: propias.flatMap((x) => (x.subject_id ? [String(x.subject_id)] : [])),
+    espacios: [],
+    reuniones: propias.flatMap((x) => (x.reunion_variable_id ? [String(x.reunion_variable_id)] : [])),
+  });
+  return {
+    horario: { _id: String(elegido._id), version: elegido.version, estado: elegido.estado },
+    sesiones: propias.map((x) => ({
+      dia: x.dia,
+      periodo: x.periodo,
+      duracion: x.duracion,
+      asignatura:
+        catalogo.asignaturas.find((a) => a._id === String(x.subject_id))?.nombre ??
+        catalogo.reuniones.find((r) => r._id === String(x.reunion_variable_id))?.nombre ??
+        'Reunión',
+      grupo: catalogo.grupos.find((g) => g._id === String(x.group_id))?.etiqueta ?? null,
+      docentes: x.docente_ids.map((d) => catalogo.docentes.find((c) => c._id === String(d))?.nombre ?? '').filter(Boolean),
+    })),
+  };
 }
 
 /** Una versión con lo necesario para pintarla: estructura de la jornada y nombres de lo que aparece en sus sesiones. */
@@ -951,7 +1070,7 @@ export async function publicarHorario(id: string, confirmPassword: string, { usu
   );
   horario.conflictos_duros = revision.conflictos_duros;
   horario.penalizacion_blanda = revision.penalizacion_blanda;
-  horario.set('incidencias', aIncidencias(revision.incidencias, ctx.humanizar));
+  horario.set('incidencias', aIncidencias(revision.incidencias, ctx, horario.sesiones.map((x) => ({ clave: x.clave, dia: x.dia, periodo: x.periodo, duracion: x.duracion }))));
   if (revision.conflictos_duros > 0) {
     await horario.save();
     const cambios = revision.sin_ubicar.length > 0 ? ' La carga académica o las variables cambiaron desde que se generó.' : '';
@@ -1046,7 +1165,7 @@ export async function editarSesion(id: string, sesionId: string, input: EditarSe
   }
   horario.conflictos_duros = revision.conflictos_duros;
   horario.penalizacion_blanda = revision.penalizacion_blanda;
-  horario.set('incidencias', aIncidencias(revision.incidencias, ctx.humanizar));
+  horario.set('incidencias', aIncidencias(revision.incidencias, ctx, horario.sesiones.map((x) => ({ clave: x.clave, dia: x.dia, periodo: x.periodo, duracion: x.duracion }))));
   await horario.save();
 
   await registrarEvento({

@@ -5,6 +5,7 @@ import type {
   Horario,
   InsumosHorario,
   MiHorario,
+  OcupacionDeEspacio,
   PublicadosDeSede,
   VistaPdfHorario,
   ResumenHorario,
@@ -67,6 +68,16 @@ export function usePublicadosDeSede(anioId: string, sedeId: string) {
     queryKey: ['horarios', 'publicados', anioId, sedeId],
     queryFn: () => api.get<PublicadosDeSede>('/horarios/publicados', { academic_year_id: anioId, sede_id: sedeId }),
     enabled: Boolean(anioId && sedeId),
+  });
+}
+
+/** Las clases que el horario de una jornada le asigna a un espacio (publicado o, si no hay, el último borrador). */
+export function useOcupacionDeEspacio(anioId: string, jornadaId: string, espacioId: string) {
+  return useQuery({
+    queryKey: ['horarios', 'espacio-ocupacion', anioId, jornadaId, espacioId],
+    queryFn: () =>
+      api.get<OcupacionDeEspacio>('/horarios/espacio-ocupacion', { academic_year_id: anioId, jornada_id: jornadaId, espacio_id: espacioId }),
+    enabled: Boolean(anioId && jornadaId && espacioId),
   });
 }
 

@@ -26,7 +26,7 @@ export function DashboardPage() {
   // El acudiente no tiene panel de accesos: su inicio es el portal.
   if (user.rol === 'ACUDIENTE') return <Navigate to="/portal" replace />;
 
-  const links = NAV_ITEMS.filter((item) => item.to !== '/panel' && (!item.roles || item.roles.includes(user.rol)));
+  const links = NAV_ITEMS.filter((item) => item.to !== '/panel' && !item.soloEncabezado && (!item.roles || item.roles.includes(user.rol)));
 
   return (
     <div className="space-y-4">

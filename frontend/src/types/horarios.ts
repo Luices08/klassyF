@@ -166,6 +166,8 @@ export interface IncidenciaHorario {
   magnitud: number;
   claves_sesion: string[];
   mensaje: string;
+  jornada_cruce_id?: string | null;
+  sede_cruce_id?: string | null;
 }
 
 export interface ResumenHorario {
@@ -220,4 +222,9 @@ export interface MiHorario extends DetalleHorario {
   titulo: string;
   vista: 'GRUPO' | 'DOCENTE';
   entidad_id: string;
+}
+
+export interface OcupacionDeEspacio {
+  horario: { _id: string; version: number; estado: EstadoHorario } | null;
+  sesiones: Array<{ dia: number; periodo: number; duracion: number; asignatura: string; grupo: string | null; docentes: string[] }>;
 }

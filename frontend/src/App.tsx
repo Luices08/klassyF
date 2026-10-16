@@ -55,6 +55,7 @@ import { UsersPage } from './pages/admin/UsersPage';
 import { DocumentosReferenciaPage } from './pages/admin/DocumentosReferenciaPage';
 import { RevisionPlaneacionPage } from './pages/admin/RevisionPlaneacionPage';
 import { PlaneacionDocentePage } from './pages/PlaneacionDocentePage';
+import { PortalAcudientePage } from './pages/PortalAcudientePage';
 
 export default function App() {
   return (
@@ -155,6 +156,9 @@ export default function App() {
           </Route>
           <Route element={<ProtectedRoute allowedRoles={['DOCENTE']} />}>
             <Route path="/docente/ajustes-razonables" element={<MisAjustesPage />} />
+          </Route>
+          <Route element={<ProtectedRoute allowedRoles={['ACUDIENTE']} />}>
+            <Route path="/portal" element={<PortalAcudientePage />} />
           </Route>
           <Route element={<ProtectedRoute allowedRoles={['ESTUDIANTE']} />}>
             <Route path="/mis-actividades" element={<MisActividadesPage />} />

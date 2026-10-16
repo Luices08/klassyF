@@ -355,7 +355,7 @@ async function estudiantesDeFiltro(filtro: FiltroExpedientes): Promise<Types.Obj
   if (filtro.group_id && Types.ObjectId.isValid(filtro.group_id)) consulta.group_id = filtro.group_id;
   if (filtro.q && filtro.q.trim().length >= 2) {
     const patron = new RegExp(filtro.q.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
-    const coincidentes = await User.find({ rol: ROLES.ESTUDIANTE, $or: [{ nombre: patron }, { apellido: patron }, { numero_documento: patron }] })
+    const coincidentes = await User.find({ roles: ROLES.ESTUDIANTE, $or: [{ nombre: patron }, { apellido: patron }, { numero_documento: patron }] })
       .select('_id')
       .limit(200);
     consulta.student_id = { $in: coincidentes.map((u) => u._id) };

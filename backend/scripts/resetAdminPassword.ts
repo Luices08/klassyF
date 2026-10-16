@@ -18,7 +18,7 @@ async function run(): Promise<void> {
   await mongoose.connect(env.mongoUri);
   console.log('[reset-admin] Conectado a MongoDB.');
 
-  const admin = await User.findOne({ rol: ROLES.ADMIN }).sort({ createdAt: 1 });
+  const admin = await User.findOne({ roles: ROLES.ADMIN }).sort({ createdAt: 1 });
   if (!admin) {
     console.error('[reset-admin] No hay ningun usuario ADMIN en la base de datos. Corre "npm run seed" primero.');
     process.exitCode = 1;

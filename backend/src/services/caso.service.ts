@@ -523,7 +523,7 @@ export async function declararImpedimento(id: string, datos: { usuario_id?: stri
   if (objetivoId !== String(usuario._id) && usuario.rol !== ROLES.ADMIN) {
     throw new ApiError(403, 'Solo un administrador aparta a otra persona del caso.');
   }
-  const objetivo = await User.findOne({ _id: objetivoId, rol: ROLES.COORDINADOR_CONVIVENCIA });
+  const objetivo = await User.findOne({ _id: objetivoId, roles: ROLES.COORDINADOR_CONVIVENCIA });
   if (!objetivo) throw new ApiError(400, 'Solo se aparta a un coordinador de convivencia (el administrador siempre puede auditar el caso).');
   if (caso.impedidos.some((i) => String(i.usuario_id) === objetivoId)) throw new ApiError(409, 'Esa persona ya está apartada de este caso.');
 

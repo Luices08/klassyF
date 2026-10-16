@@ -58,6 +58,8 @@ export interface CreateUserInput {
   telefono?: string;
   password: string;
   rol: Rol;
+  /** Todos los perfiles de la persona (si se manda, manda sobre `rol`). */
+  roles?: Rol[];
   sedes_ids?: string[];
 }
 
@@ -79,7 +81,9 @@ export interface UpdateUserInput {
   numero_documento: string;
   email: string;
   telefono?: string;
-  rol: Rol;
+  rol?: Rol;
+  /** Lista completa de perfiles: con solo `rol` el servidor reemplaza todos. */
+  roles?: Rol[];
   sedes_ids?: string[];
   /** Si se llena, resetea la contraseña del usuario; nunca se lee la anterior (esta hasheada). */
   password?: string;

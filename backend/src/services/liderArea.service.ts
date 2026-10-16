@@ -81,7 +81,7 @@ export async function listarLideresArea(filtro: { area_id?: string; incluir_inac
 }
 
 async function exigirDocenteActivo(docenteId: string): Promise<void> {
-  if (!(await User.exists({ _id: docenteId, rol: ROLES.DOCENTE, estado: ESTADO_ACTIVO }))) {
+  if (!(await User.exists({ _id: docenteId, roles: ROLES.DOCENTE, estado: ESTADO_ACTIVO }))) {
     throw new ApiError(400, 'El líder del área debe ser un docente activo.');
   }
 }

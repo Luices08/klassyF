@@ -1,7 +1,7 @@
 import { ParamsDictionary } from 'express-serve-static-core';
 import { FilterQuery, Types } from 'mongoose';
 import { EstadoUsuario, Rol, TIPOS_DOCUMENTO, TipoDocumento } from '../constants/enums';
-import { ROLES, ROLES_LIST, puedeGestionarRol } from '../constants/roles';
+import { ROLES, ROLES_ADICIONALES_PERMITIDOS, ROLES_LIST, ROLES_STAFF, puedeGestionarRol, puedeGestionarRoles } from '../constants/roles';
 import ActivitySubmission from '../models/activitySubmission.model';
 import AdmissionRequest from '../models/admissionRequest.model';
 import LiderArea from '../models/liderArea.model';
@@ -45,25 +45,51 @@ interface CreateUserBody {
   email: string;
   telefono?: string;
   password: string;
-  rol: Rol;
+  /** Un solo rol (forma anterior) o varios: la persona escoge con cuál entrar al iniciar sesión. */
+  rol?: Rol;
+  roles?: Rol[];
   estado?: EstadoUsuario;
   sedes_ids?: string[];
 }
 
-export const createUser = catchAsync<unknown, unknown, CreateUserBody>(async (req, res) => {
-  if (req.body.rol === ROLES.ESTUDIANTE || req.body.rol === ROLES.ACUDIENTE) {
+/**
+ * Roles que esta vista puede asignar: al menos uno de personal; ACUDIENTE solo como adicional (el acudiente "puro" y el
+ * estudiante nacen en el módulo escolar). Quien opera debe poder gestionar cada uno.
+ */
+function validarRolesAsignables(operador: Rol, roles: Rol[]): void {
+  if (new Set(roles).size !== roles.length) throw new ApiError(400, 'Hay roles repetidos.');
+  if (roles.includes(ROLES.ESTUDIANTE)) {
+    throw new ApiError(400, 'Los estudiantes no se crean ni se combinan con otros roles desde esta vista. Se gestionan desde el módulo escolar (Estudiantes y Matrículas).');
+  }
+  if (!roles.some((r) => ROLES_STAFF.includes(r))) {
     throw new ApiError(
       400,
-      'Los estudiantes y acudientes no se crean desde esta vista. Se gestionan desde el módulo escolar (Estudiantes y Matrículas).'
+      'Los acudientes no se crean desde esta vista. Se gestionan desde el módulo escolar; aquí solo se le agrega el rol ACUDIENTE a alguien del personal.'
     );
   }
-  if (!req.user || !puedeGestionarRol(req.user.rol, req.body.rol)) {
-    throw new ApiError(403, `Tu rol (${req.user?.rol}) no tiene permisos para crear usuarios con rol ${req.body.rol}.`);
-  }
+  const noPermitido = roles.find((r) => !ROLES_STAFF.includes(r) && !ROLES_ADICIONALES_PERMITIDOS.includes(r));
+  if (noPermitido) throw new ApiError(400, `El rol ${noPermitido} no se asigna desde esta vista.`);
+  const sinPermiso = roles.find((r) => !puedeGestionarRol(operador, r));
+  if (sinPermiso) throw new ApiError(403, `Tu rol (${operador}) no tiene permisos para asignar el rol ${sinPermiso}.`);
+}
+
+export const createUser = catchAsync<unknown, unknown, CreateUserBody>(async (req, res) => {
+  const roles = req.body.roles ?? (req.body.rol ? [req.body.rol] : []);
+  if (!req.user) throw new ApiError(401, 'Usuario no autenticado.');
+  validarRolesAsignables(req.user.rol, roles);
   await exigirSedesExistentes(req.body.sedes_ids);
 
-  const { password, ...rest } = req.body;
-  const user = new User({ ...rest, debe_cambiar_password: true });
+  // Una persona, un solo registro: si el documento ya existe se le agrega el rol, no se crea otro usuario.
+  const existente = await User.findOne({ numero_documento: req.body.numero_documento }).select('nombre apellido roles');
+  if (existente) {
+    throw new ApiError(
+      409,
+      `Ya existe un usuario con ese documento (${existente.nombre} ${existente.apellido}, ${existente.roles.join(' + ')}). Edítalo y agrégale el rol en lugar de crear otro registro.`
+    );
+  }
+
+  const { password, rol: _rol, roles: _roles, ...rest } = req.body;
+  const user = new User({ ...rest, roles, debe_cambiar_password: true });
   user.password = password;
   await user.save();
 
@@ -72,7 +98,7 @@ export const createUser = catchAsync<unknown, unknown, CreateUserBody>(async (re
     accion: 'USUARIO_CREADO',
     entidad: 'User',
     entidad_id: user._id,
-    detalle: `${user.nombre} ${user.apellido} (${user.rol})`,
+    detalle: `${user.nombre} ${user.apellido} (${user.roles.join(', ')})`,
     ip: req.ip,
   });
 
@@ -103,10 +129,11 @@ export const listUsers = catchAsync<unknown, unknown, unknown, ListUsersQuery>(a
       .map((r) => r.trim())
       .filter((r): r is Rol => (ROLES_LIST as readonly string[]).includes(r));
 
+    // `roles` es un arreglo: coincide si la persona tiene alguno de los pedidos.
     if (rolesList.length === 1) {
-      filter.rol = rolesList[0];
+      filter.roles = rolesList[0];
     } else if (rolesList.length > 1) {
-      filter.rol = { $in: rolesList };
+      filter.roles = { $in: rolesList };
     }
   }
   if (req.query.estado) filter.estado = filtroPorEstado(req.query.estado);
@@ -153,7 +180,9 @@ interface UpdateUserBody {
   numero_documento?: string;
   email?: string;
   telefono?: string;
+  /** Forma anterior: reemplaza todos los roles por uno. */
   rol?: Rol;
+  roles?: Rol[];
   password?: string;
   sedes_ids?: string[];
 }
@@ -165,17 +194,25 @@ export const updateUser = catchAsync<UserParams, unknown, UpdateUserBody>(async 
   if (String(user._id) === String(req.user?._id)) {
     throw new ApiError(400, 'Para editar tus propios datos o tu contraseña, usa la opción en Mi cuenta.');
   }
-  if (!req.user || !puedeGestionarRol(req.user.rol, user.rol)) {
-    throw new ApiError(403, `Tu rol (${req.user?.rol}) no tiene permisos para editar un usuario con rol ${user.rol}.`);
+  if (!req.user || !puedeGestionarRoles(req.user.rol, user.roles)) {
+    throw new ApiError(403, `Tu rol (${req.user?.rol}) no tiene permisos para editar un usuario con rol ${user.roles.join(' + ')}.`);
   }
 
-  if (req.body.rol && !puedeGestionarRol(req.user.rol, req.body.rol)) {
-    throw new ApiError(403, `Tu rol (${req.user?.rol}) no tiene permisos para asignar el rol ${req.body.rol}.`);
+  const nuevosRoles = req.body.roles ?? (req.body.rol ? [req.body.rol] : undefined);
+  if (nuevosRoles) {
+    // Un acudiente "puro" (sin rol de personal) se conserva tal cual: su rol lo gestiona el módulo escolar.
+    const esAcudientePuro = user.roles.every((r) => r === ROLES.ACUDIENTE || r === ROLES.ESTUDIANTE);
+    if (esAcudientePuro) throw new ApiError(400, 'Los roles de estudiantes y acudientes se gestionan desde el módulo escolar.');
+    validarRolesAsignables(req.user.rol, nuevosRoles);
+    if (user.roles.includes(ROLES.ADMIN) && !nuevosRoles.includes(ROLES.ADMIN) && (await esUnicoAdmin(req.params.id, true))) {
+      throw new ApiError(400, 'No puedes quitarle el rol de administrador al único administrador activo del sistema.');
+    }
   }
   await exigirSedesExistentes(req.body.sedes_ids);
 
-  const { password, ...rest } = req.body;
+  const { password, rol: _rol, roles: _roles, ...rest } = req.body;
   Object.assign(user, rest);
+  if (nuevosRoles) user.roles = nuevosRoles;
   if (password) {
     user.password = password;
     user.debe_cambiar_password = true;
@@ -188,7 +225,7 @@ export const updateUser = catchAsync<UserParams, unknown, UpdateUserBody>(async 
     accion: 'USUARIO_ACTUALIZADO',
     entidad: 'User',
     entidad_id: user._id,
-    detalle: Object.keys(rest).join(', '),
+    detalle: [...Object.keys(rest), ...(nuevosRoles ? ['roles'] : [])].join(', '),
     ip: req.ip,
   });
 
@@ -197,7 +234,7 @@ export const updateUser = catchAsync<UserParams, unknown, UpdateUserBody>(async 
 
 /** true si, quitando `excluirId`, no queda ningun otro ADMIN (activo, si `soloActivos`). */
 async function esUnicoAdmin(excluirId: string, soloActivos: boolean): Promise<boolean> {
-  const filtro: Record<string, unknown> = { rol: ROLES.ADMIN, _id: { $ne: excluirId } };
+  const filtro: Record<string, unknown> = { roles: ROLES.ADMIN, _id: { $ne: excluirId } };
   if (soloActivos) filtro.estado = 'activo';
   const otrosAdmins = await User.countDocuments(filtro);
   return otrosAdmins === 0;
@@ -215,10 +252,10 @@ export const actualizarEstadoUsuario = catchAsync<UserParams, unknown, Actualiza
   if (String(user._id) === String(req.user?._id)) {
     throw new ApiError(400, 'No puedes cambiar el estado de tu propio usuario.');
   }
-  if (!req.user || !puedeGestionarRol(req.user.rol, user.rol)) {
-    throw new ApiError(403, `Tu rol (${req.user?.rol}) no tiene permisos para cambiar el estado de un usuario con rol ${user.rol}.`);
+  if (!req.user || !puedeGestionarRoles(req.user.rol, user.roles)) {
+    throw new ApiError(403, `Tu rol (${req.user?.rol}) no tiene permisos para cambiar el estado de un usuario con rol ${user.roles.join(' + ')}.`);
   }
-  if (user.rol === ROLES.ADMIN && req.body.estado === 'inactivo' && (await esUnicoAdmin(req.params.id, true))) {
+  if (user.roles.includes(ROLES.ADMIN) && req.body.estado === 'inactivo' && (await esUnicoAdmin(req.params.id, true))) {
     throw new ApiError(400, 'No puedes desactivar al único administrador activo del sistema.');
   }
 
@@ -274,10 +311,10 @@ export const eliminarUsuario = catchAsync<UserParams>(async (req, res) => {
   if (String(user._id) === String(req.user?._id)) {
     throw new ApiError(400, 'No puedes eliminar tu propio usuario.');
   }
-  if (!req.user || !puedeGestionarRol(req.user.rol, user.rol)) {
-    throw new ApiError(403, `Tu rol (${req.user?.rol}) no tiene permisos para eliminar a un usuario con rol ${user.rol}.`);
+  if (!req.user || !puedeGestionarRoles(req.user.rol, user.roles)) {
+    throw new ApiError(403, `Tu rol (${req.user?.rol}) no tiene permisos para eliminar a un usuario con rol ${user.roles.join(' + ')}.`);
   }
-  if (user.rol === ROLES.ADMIN && (await esUnicoAdmin(req.params.id, false))) {
+  if (user.roles.includes(ROLES.ADMIN) && (await esUnicoAdmin(req.params.id, false))) {
     throw new ApiError(400, 'No puedes eliminar al único administrador del sistema.');
   }
 
@@ -316,8 +353,8 @@ export const resetearPassword = catchAsync<UserParams>(async (req, res) => {
   if (String(user._id) === String(req.user?._id)) {
     throw new ApiError(400, 'Para cambiar tu propia contraseña, usa la opción en Mi cuenta.');
   }
-  if (!req.user || !puedeGestionarRol(req.user.rol, user.rol)) {
-    throw new ApiError(403, `Tu rol (${req.user?.rol}) no tiene permisos para resetear la contraseña de un usuario con rol ${user.rol}.`);
+  if (!req.user || !puedeGestionarRoles(req.user.rol, user.roles)) {
+    throw new ApiError(403, `Tu rol (${req.user?.rol}) no tiene permisos para resetear la contraseña de un usuario con rol ${user.roles.join(' + ')}.`);
   }
 
   const passwordTemporal = generarPasswordTemporal();
@@ -346,8 +383,8 @@ export const cerrarSesiones = catchAsync<UserParams>(async (req, res) => {
   if (String(user._id) === String(req.user?._id)) {
     throw new ApiError(400, 'No puedes cerrar tus propias sesiones desde aquí.');
   }
-  if (!req.user || !puedeGestionarRol(req.user.rol, user.rol)) {
-    throw new ApiError(403, `Tu rol (${req.user?.rol}) no tiene permisos para cerrar las sesiones de un usuario con rol ${user.rol}.`);
+  if (!req.user || !puedeGestionarRoles(req.user.rol, user.roles)) {
+    throw new ApiError(403, `Tu rol (${req.user?.rol}) no tiene permisos para cerrar las sesiones de un usuario con rol ${user.roles.join(' + ')}.`);
   }
 
   user.version_sesion += 1;
@@ -405,7 +442,7 @@ export const cambiarMiPassword = catchAsync<unknown, unknown, CambiarMiPasswordB
     ip: req.ip,
   });
 
-  const token = generateToken(user);
+  const token = generateToken(user, req.user!.rol);
 
   res.status(200).json({ success: true, data: { token } });
 });
@@ -477,7 +514,7 @@ export const bulkImportUsers = catchAsync(async (req, res) => {
         numero_documento: numeroDocumento,
         email: registro.email,
         telefono: registro.telefono || undefined,
-        rol,
+        roles: [rol as Rol],
         sedes_ids: sedesIds,
         debe_cambiar_password: true,
       });

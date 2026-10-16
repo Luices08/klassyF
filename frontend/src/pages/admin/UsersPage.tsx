@@ -60,6 +60,12 @@ function sedeIdsDe(u: User): string[] {
   return u.sedes_ids.map((s) => (typeof s === 'string' ? s : s._id));
 }
 
+/** Perfiles de la persona (un solo registro puede tener varios); los usuarios anteriores a los perfiles múltiples solo traen `rol`. */
+const rolesDe = (u: User): Rol[] => (u.roles?.length ? u.roles : [u.rol]);
+
+/** El rol de personal de la persona; ACUDIENTE solo si no tiene otro (el acudiente se agrega como perfil adicional). */
+const rolPrincipalDe = (u: User): Rol => rolesDe(u).find((r) => r !== 'ACUDIENTE') ?? 'ACUDIENTE';
+
 function userToEditForm(u: User): Omit<UpdateUserInput, 'id'> {
   return {
     nombre: u.nombre,
@@ -68,10 +74,25 @@ function userToEditForm(u: User): Omit<UpdateUserInput, 'id'> {
     numero_documento: u.numero_documento,
     email: u.email,
     telefono: u.telefono ?? '',
-    rol: u.rol,
+    rol: rolPrincipalDe(u),
     sedes_ids: sedeIdsDe(u),
     password: '',
   };
+}
+
+/** Casilla para darle a una persona del personal también el perfil de acudiente (M27): un solo usuario, dos perfiles. */
+function PerfilAcudienteCheckbox({ checked, onChange }: { checked: boolean; onChange: (v: boolean) => void }) {
+  return (
+    <div className="rounded-lg ring-1 ring-inset ring-border p-3">
+      <label className="flex items-center gap-2 text-sm font-medium text-body">
+        <input type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} className="h-4 w-4 rounded border-border text-primary focus:ring-primary" />
+        También es acudiente
+      </label>
+      <p className="mt-1 text-xs text-muted">
+        Entra con la misma cédula y elige con qué perfil ingresa. Sus estudiantes a cargo se vinculan en la ficha del estudiante (Acudientes → Habilitar portal).
+      </p>
+    </div>
+  );
 }
 
 /** Checkbox list de sedes autorizadas (M02): vacio = acceso global (uso tipico de ADMIN). */
@@ -152,33 +173,40 @@ export function UsersPage() {
   const createUser = useCreateUser();
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [form, setForm] = useState<CreateUserInput>(EMPTY_FORM);
+  const [creaAcudiente, setCreaAcudiente] = useState(false);
 
   const assignableRoles = ROLES_STAFF.filter((r) => currentUser && puedeGestionarRol(currentUser.rol, r));
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     createUser.reset();
-    await createUser.mutateAsync(form);
+    await createUser.mutateAsync({ ...form, roles: creaAcudiente ? [form.rol, 'ACUDIENTE'] : [form.rol] });
     setForm(EMPTY_FORM);
+    setCreaAcudiente(false);
     setDrawerOpen(false);
   }
 
   const [usuarioEditando, setUsuarioEditando] = useState<User | null>(null);
   const [formEditar, setFormEditar] = useState<Omit<UpdateUserInput, 'id'>>({ ...EMPTY_FORM });
+  const [editaAcudiente, setEditaAcudiente] = useState(false);
   const actualizarUsuario = useUpdateUser();
 
   function abrirEditar(u: User) {
     actualizarUsuario.reset();
     setUsuarioEditando(u);
     setFormEditar(userToEditForm(u));
+    setEditaAcudiente(rolesDe(u).includes('ACUDIENTE') && rolPrincipalDe(u) !== 'ACUDIENTE');
   }
 
   async function handleEditar(e: FormEvent) {
     e.preventDefault();
     if (!usuarioEditando) return;
     actualizarUsuario.reset();
-    const { password, ...rest } = formEditar;
-    await actualizarUsuario.mutateAsync({ id: usuarioEditando._id, ...rest, ...(password ? { password } : {}) });
+    const { password, rol: rolElegido, ...rest } = formEditar;
+    const rol = rolElegido ?? rolPrincipalDe(usuarioEditando);
+    // Siempre se manda la lista completa de perfiles: con solo `rol` el servidor reemplazaría todos y quitaría el de acudiente.
+    const roles: Rol[] = editaAcudiente && rol !== 'ACUDIENTE' && rol !== 'ESTUDIANTE' ? [rol, 'ACUDIENTE'] : [rol];
+    await actualizarUsuario.mutateAsync({ id: usuarioEditando._id, ...rest, roles, ...(password ? { password } : {}) });
     setUsuarioEditando(null);
   }
 
@@ -237,7 +265,7 @@ export function UsersPage() {
   function puedeGestionar(u: User): boolean {
     if (!currentUser) return false;
     if (u._id === currentUser.id) return false;
-    return puedeGestionarRol(currentUser.rol, u.rol);
+    return rolesDe(u).every((r) => puedeGestionarRol(currentUser.rol, r));
   }
 
   const paginaInfo = usersQuery.data;
@@ -326,7 +354,11 @@ export function UsersPage() {
                     </Td>
                     <Td>{u.email}</Td>
                     <Td>
-                      <RolBadge value={u.rol} />
+                      <div className="flex flex-wrap gap-1">
+                        {rolesDe(u).map((r) => (
+                          <RolBadge key={r} value={r} />
+                        ))}
+                      </div>
                     </Td>
                     <Td>
                       {sedeIdsDe(u).length === 0 ? (
@@ -474,6 +506,7 @@ export function UsersPage() {
             </option>
           ))}
         </Select>
+        <PerfilAcudienteCheckbox checked={creaAcudiente} onChange={setCreaAcudiente} />
         <SedesCheckboxList
           sedes={sedes}
           seleccionadas={form.sedes_ids ?? []}
@@ -538,12 +571,13 @@ export function UsersPage() {
           value={formEditar.rol}
           onChange={(e) => setFormEditar((f) => ({ ...f, rol: e.target.value as Rol }))}
         >
-          {ROLES.filter((r) => currentUser && (puedeGestionarRol(currentUser.rol, r) || r === usuarioEditando?.rol)).map((r) => (
+          {ROLES.filter((r) => currentUser && (puedeGestionarRol(currentUser.rol, r) || r === formEditar.rol)).map((r) => (
             <option key={r} value={r}>
               {r}
             </option>
           ))}
         </Select>
+        {formEditar.rol !== 'ACUDIENTE' && formEditar.rol !== 'ESTUDIANTE' && <PerfilAcudienteCheckbox checked={editaAcudiente} onChange={setEditaAcudiente} />}
         <SedesCheckboxList
           sedes={sedes}
           seleccionadas={formEditar.sedes_ids ?? []}

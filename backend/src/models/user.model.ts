@@ -14,7 +14,8 @@ export interface IUser {
   telefono: string | null;
   foto_url: string | null;
   password_hash: string;
-  rol: Rol;
+  /** Roles que el usuario puede asumir (M02): una persona, un solo registro; el perfil con el que entra se elige al iniciar sesión. */
+  roles: Rol[];
   estado: EstadoUsuario;
   /** Sedes autorizadas (M02): vacio = acceso global (uso tipico de ADMIN). */
   sedes_ids: Types.ObjectId[];
@@ -37,10 +38,18 @@ export interface IUserMethods {
   comparePassword(candidate: string): Promise<boolean>;
 }
 
-export type UserDocument = HydratedDocument<IUser, IUserMethods>;
-type UserModel = Model<IUser, {}, IUserMethods>;
+/**
+ * `rol` no se guarda: es el perfil con el que la persona entró a esta sesión (lo fija `authenticate` desde el token), o su
+ * primer rol si el documento se leyó fuera de una petición. Todo el código que decide permisos sigue leyendo `req.user.rol`.
+ */
+export interface IUserVirtuals {
+  rol: Rol;
+}
 
-const userSchema = new Schema<IUser, UserModel, IUserMethods>(
+export type UserDocument = HydratedDocument<IUser, IUserMethods & IUserVirtuals>;
+type UserModel = Model<IUser, {}, IUserMethods, IUserVirtuals>;
+
+const userSchema = new Schema<IUser, UserModel, IUserMethods, {}, IUserVirtuals>(
   {
     nombre: { type: String, required: true, trim: true },
     apellido: { type: String, required: true, trim: true },
@@ -58,14 +67,26 @@ const userSchema = new Schema<IUser, UserModel, IUserMethods>(
     telefono: { type: String, default: null, trim: true },
     foto_url: { type: String, default: null },
     password_hash: { type: String, required: true, select: false },
-    rol: { type: String, enum: ROLES, required: true },
+    roles: {
+      type: [{ type: String, enum: ROLES }],
+      required: true,
+      validate: [
+        { validator: (roles: Rol[]) => roles.length > 0, message: 'El usuario debe tener al menos un rol.' },
+        { validator: (roles: Rol[]) => new Set(roles).size === roles.length, message: 'Hay roles repetidos.' },
+        {
+          // Un estudiante es un menor con matrícula: no puede ser además personal ni acudiente.
+          validator: (roles: Rol[]) => !roles.includes('ESTUDIANTE') || roles.length === 1,
+          message: 'Un estudiante no puede tener otros roles.',
+        },
+      ],
+    },
     estado: { type: String, enum: ESTADOS_USUARIO, default: 'activo' },
     sedes_ids: {
       type: [{ type: Schema.Types.ObjectId, ref: 'Campus' }],
       default: [],
       validate: {
         validator(this: UserDocument, sedes: Types.ObjectId[]) {
-          return !ROLES_CON_SEDE_OBLIGATORIA.includes(this.rol) || sedes.length > 0;
+          return !this.roles.some((r) => ROLES_CON_SEDE_OBLIGATORIA.includes(r)) || sedes.length > 0;
         },
         message: 'Este rol debe tener al menos una sede asignada.',
       },
@@ -81,6 +102,17 @@ const userSchema = new Schema<IUser, UserModel, IUserMethods>(
   { timestamps: true }
 );
 
+userSchema.index({ roles: 1 });
+
+userSchema
+  .virtual('rol')
+  .get(function getRol(this: UserDocument) {
+    return (this.$locals.rolActivo as Rol | undefined) ?? this.roles?.[0];
+  })
+  .set(function setRol(this: UserDocument, valor: Rol) {
+    this.$locals.rolActivo = valor;
+  });
+
 // Virtual de escritura: permite `user.password = 'texto-plano'` y lo hashea en pre-validate.
 userSchema
   .virtual('password')
@@ -95,6 +127,10 @@ userSchema
 // password_hash corre ANTES de los hooks de save, asi que el hash debe
 // existir para cuando Mongoose valide el documento.
 userSchema.pre('validate', async function hashPassword(this: UserDocument, next) {
+  // Atajo de creación: `new User({ rol: 'DOCENTE' })` equivale a `roles: ['DOCENTE']`.
+  if ((!this.roles || this.roles.length === 0) && this.$locals.rolActivo) {
+    this.roles = [this.$locals.rolActivo as Rol];
+  }
   if (!this.email || this.email.trim() === '') {
     this.email = undefined;
   }
@@ -112,11 +148,13 @@ userSchema.methods.comparePassword = function comparePassword(
 
 userSchema.set('toJSON', {
   virtuals: false,
-  transform: (_doc, ret) => {
+  transform: (doc, ret) => {
     const obj = ret as unknown as Record<string, unknown>;
     delete obj.password_hash;
     delete obj.version_sesion;
     delete obj.__v;
+    // Compatibilidad con las pantallas que leen `rol`: el perfil activo, o el primero.
+    obj.rol = (doc as unknown as UserDocument).rol;
     return obj;
   },
 });

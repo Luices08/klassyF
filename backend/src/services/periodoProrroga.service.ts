@@ -46,7 +46,7 @@ export async function otorgarProrroga(
 
   if (input.docente_id) {
     const docente = await User.findById(input.docente_id);
-    if (!docente || docente.rol !== 'DOCENTE') throw new ApiError(400, 'docente_id no corresponde a un docente.');
+    if (!docente || !docente.roles.includes('DOCENTE')) throw new ApiError(400, 'docente_id no corresponde a un docente.');
   }
   if (input.group_id) {
     const grupo = await Group.findById(input.group_id);

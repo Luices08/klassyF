@@ -44,12 +44,14 @@ export function entradaDeElementos(
   config: ConfiguracionCertificadosDocument,
   politica: PoliticaDeCertificado,
   usuario: UserDocument,
-  presencia: Record<ElementoAutenticacion, boolean>
+  presencia: Record<ElementoAutenticacion, boolean>,
+  autoservicio = false
 ): EntradaElementos {
   return {
     politica,
     tieneImagen: presencia,
-    puedeAplicar: { rectoria: puedeAplicarFirmaRectoria(config, usuario), secretaria: true, sello: true },
+    // Sin una persona de la institución al expedir, la firma de Rectoría solo se estampa si el ADMIN delegó esa firma (la más sensible).
+    puedeAplicar: { rectoria: autoservicio ? config.permitir_firma_rectoria_a_secretaria : puedeAplicarFirmaRectoria(config, usuario), secretaria: true, sello: true },
     tieneFirmante: { rectoria: Boolean(config.rectoria.usuario_id), secretaria: Boolean(config.secretaria.usuario_id), sello: true },
   };
 }
@@ -119,9 +121,9 @@ function normalizarDependencias(entrada: Array<{ clave?: string; nombre: string;
 }
 
 async function validarFirmante(usuarioId: string, rolEsperado: 'ADMIN' | 'SECRETARIA', etiqueta: string): Promise<void> {
-  const u = await User.findById(usuarioId).select('rol estado');
+  const u = await User.findById(usuarioId).select('roles estado');
   if (!u || u.estado !== 'activo') throw new ApiError(400, `El usuario elegido para ${etiqueta} no existe o está inactivo.`);
-  if (u.rol !== rolEsperado) throw new ApiError(400, `Para ${etiqueta} se elige un usuario con rol ${rolEsperado === 'ADMIN' ? 'Administrador' : 'Secretaría'}.`);
+  if (!u.roles.includes(rolEsperado)) throw new ApiError(400, `Para ${etiqueta} se elige un usuario con rol ${rolEsperado === 'ADMIN' ? 'Administrador' : 'Secretaría'}.`);
 }
 
 /** La política por documento vive en cada tipo: se cambia ahí, solo en los tipos que existen y no están archivados. */

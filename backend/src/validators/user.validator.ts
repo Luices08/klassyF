@@ -7,6 +7,10 @@ const sedesIds = Joi.array().items(objectId);
 // Foto de perfil como data URI (base64), tope ~300KB para no inflar el documento.
 const fotoUrl = Joi.string().dataUri().max(400_000).allow(null);
 
+const rolesAsignados = Joi.array()
+  .items(Joi.string().valid(...ROLES))
+  .min(1);
+
 export const createUser: ValidationSchema = {
   body: Joi.object({
     nombre: Joi.string().required(),
@@ -18,12 +22,11 @@ export const createUser: ValidationSchema = {
     email: Joi.string().email().required(),
     telefono: Joi.string().allow(''),
     password: Joi.string().min(8).required(),
-    rol: Joi.string()
-      .valid(...ROLES)
-      .required(),
+    rol: Joi.string().valid(...ROLES),
+    roles: rolesAsignados,
     estado: Joi.string().valid(...ESTADOS_USUARIO),
     sedes_ids: sedesIds,
-  }),
+  }).or('rol', 'roles'),
 };
 
 const roleOrRolesString = Joi.string().custom((value, helpers) => {
@@ -60,6 +63,7 @@ export const updateUser: ValidationSchema = {
     email: Joi.string().email(),
     telefono: Joi.string().allow(''),
     rol: Joi.string().valid(...ROLES),
+    roles: rolesAsignados,
     sedes_ids: sedesIds,
     // Reseteo de contraseña: el admin asigna una nueva, nunca se expone la anterior (esta hasheada).
     password: Joi.string().min(8),

@@ -73,7 +73,7 @@ export async function createEnrollment(
   const puedeForzar = Boolean(input.forzar_sobrecupo) && actor.rol === ROLES.ADMIN;
 
   return runTransaction(async (session) => {
-    const student = await User.findOne({ _id: student_id, rol: ROLES.ESTUDIANTE }).session(session);
+    const student = await User.findOne({ _id: student_id, roles: ROLES.ESTUDIANTE }).session(session);
     if (!student) {
       throw new ApiError(404, 'El estudiante no existe o el usuario no tiene rol ESTUDIANTE.');
     }

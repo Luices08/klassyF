@@ -49,6 +49,21 @@ que ya se han dado en el proyecto para que no haya que repetirlas cada vez.
   `{ numero_documento, password }` (`numero_documento` ya es único por usuario en el schema, no
   hace falta también el tipo de documento). El campo `email` del usuario sigue existiendo en el
   modelo, pero no se usa para autenticar.
+- **Una persona, un usuario, varios perfiles.** `User.roles` es un arreglo (índice multikey): es la relación muchos a muchos entre usuarios y
+  roles, embebida en el propio documento en vez de una colección pivote aparte (los roles son un enum cerrado, no una entidad con datos propios, y
+  así el documento sigue siendo único por `numero_documento`). Una docente que además es madre de un estudiante es **un** registro con
+  `roles: ['DOCENTE','ACUDIENTE']`. `ESTUDIANTE` no se combina con nada; `ACUDIENTE` solo se suma como rol adicional a otro (o es el único).
+  `user.rol` **no se guarda**: es un virtual que vale el **perfil activo** de la sesión (el `rol` del JWT, que `authenticate` pone en
+  `$locals.rolActivo`) o, sin sesión, `roles[0]`; todo el código que ya leía `req.user.rol` sigue funcionando. Bases anteriores:
+  **`npm run migrate:roles-multiples`** (convierte `rol` → `roles`; mientras no se corra, los usuarios viejos no pueden iniciar sesión).
+- **Flujo de login** (`auth.controller.ts`, `accesoPerfil.service.ts`): `POST /auth/login` valida documento y contraseña; si solo hay un perfil
+  habilitado abre la sesión; si hay varios responde `{ requiere_seleccion_perfil, seleccion_token, perfiles, usuario }` y el frontend
+  (`LoginPage` + `SelectorPerfil`) deja elegir. El `seleccion_token` dura 5 minutos, tiene `purpose: 'seleccion_perfil'` y **no lleva `rol`**, así que
+  no abre ninguna sesión por sí solo; `POST /auth/seleccionar-perfil` lo canjea por la sesión. Ya con sesión, `POST /auth/cambiar-perfil`
+  (botones «Entrar como …» de `CambiadorDePerfil` en el encabezado) emite un token nuevo con otro perfil y se audita (`PERFIL_CAMBIADO`). Al abrir
+  y cerrar sesión se limpia la caché de TanStack Query para que un perfil no vea datos del otro. Qué perfil puede entrar es por perfil, no por
+  persona (`motivoSinAccesoAlPerfil`): solo el de estudiante espera a la matrícula formalizada; el acudiente entra aunque su hijo siga preinscrito.
+  `rutaInicialDe` (frontend) lleva al ACUDIENTE a `/portal` y a los demás a `/panel`.
 
 ## 3. Alcance estricto por módulo (M01–M32)
 
@@ -122,6 +137,11 @@ Backend `/users` (modelo `User`), frontend `/admin/users` (`UsersPage`).
   `COORDINADOR_CONVIVENCIA`: rango 70 (solo un ADMIN lo gestiona), sede obligatoria (`ROLES_CON_SEDE_OBLIGATORIA`) y sin herencia de ningún
   otro rol. Sus funciones en este alcance son el seguimiento psicosocial (observaciones confidenciales) y las remisiones a orientación que
   recibe de convivencia. **El PIAR vive en M16** (ver su sección): orientación lo lidera. Tampoco ve la salud administrativa del estudiante en M03; dentro de un expediente M16 abierto lee EPS y régimen de M03 sin copiarlos.
+- **Roles múltiples en la jerarquía** (`puedeGestionarRoles`, `constants/roles.ts`): para gestionar a un usuario hay que poder gestionar **todos** sus
+  roles (una docente que también es acudiente solo la gestiona quien gestiona a `DOCENTE`). Crear/editar acepta `roles` (gana sobre `rol`; un
+  `PATCH` con solo `rol` reemplaza todos los perfiles, por eso `UsersPage` manda siempre la lista completa); la casilla «También es acudiente» solo
+  aparece para personal y se limita a `ROLES_ADICIONALES_PERMITIDOS`. Vincular a alguien como acudiente (M03, `concederRolAcudiente`) le **suma**
+  el rol ACUDIENTE si ya existe como personal; si es estudiante, 409.
 - **Secretaría en M02**: mantiene la consulta global del directorio de usuarios, pero todas las acciones sobre
   roles jerárquicamente iguales o superiores (`ADMIN`, `COORDINADOR`, `DOCENTE`, `SECRETARIA`) quedan bloqueadas
   tanto en frontend (`IconButton disabled` con tooltip explicativo) como en backend (403 con mensaje de
@@ -992,13 +1012,42 @@ Botón flotante en `AppShell` (`components/asistente/AsistenteFlotante.tsx`) que
 - **Pendiente, a propósito:** que el estudiante o el acudiente suban su propio paz y salvo desde un portal (M27: hoy lo sube el personal o, si se habilitó, el docente); avisos a los docentes al terminar el periodo final (M28);
   confirmación masiva por grupo; filtrar la bandeja por grupo en pantalla (el endpoint ya lo acepta).
 
+### M27 (Portal del acudiente) — estado: núcleo completo
+
+Backend `/portal` (`portalAcudiente.routes.ts` → `portalAcudiente.controller.ts` → `portalAcudiente.service.ts`; validador `portalAcudiente.validator.ts`),
+frontend `PortalAcudientePage` (`/portal`, solo perfil ACUDIENTE) con `hooks/usePortal.ts` y `components/portal/`. Reglas que no se ven leyendo un solo archivo:
+
+- **Cero datos propios: el portal solo lee y reusa.** Notas = `notasEstudiante.service` (M12, `misNotas`); inasistencias = `listarInasistencias` (M13);
+  convivencia = `observadorDelEstudianteParaAcudiente` (M14, mismas reglas de `observadorParaLaFamilia` que el estudiante: nunca confidenciales ni el detalle
+  de una falta II/III; se audita `CONVIVENCIA_OBSERVADOR_CONSULTADO_POR_ACUDIENTE`); documentos = checklist de M04 (`construirDetalle`, `cargarDocumento`);
+  certificados = M26 (`expedirCertificado`, `dibujarCertificadoEmitido`). Las pantallas de notas y observador del estudiante y del acudiente comparten componentes
+  (`TarjetaNotasAsignatura` con `paraFamilia`, `ObservadorFamilia`): un cambio se hace una vez.
+- **Acceso por vínculo, siempre en el servidor.** Todas las rutas exigen perfil activo ACUDIENTE; cada ruta de un hijo vuelve a comprobar `Guardian(user_id, estado≠inactivo)`
+  + `StudentGuardian` (`exigirAcudienteDe`). Un estudiante que no es hijo suyo responde **404** (igual que si no existiera). El vínculo lo crea secretaría en M03
+  («Habilitar portal»); sin vínculo el acudiente ve la lista vacía. El hijo seleccionado viaja en la URL (`?hijo=&pestana=`) y cada pestaña lleva `key` con el id
+  del estudiante, así cambiarlo recarga todo.
+- **Qué ve según la matrícula** (`matriculaVigente`): con matrícula CONDICIONAL o DEFINITIVA, notas/inasistencias/convivencia; con la preinscripción en revisión solo
+  Documentos (la pestaña por defecto) y un aviso en las demás. Boletín: no tiene pestaña propia; el `/report-card` existente ya lo sirve al ACUDIENTE publicado.
+- **Documentos pendientes** (`POST /portal/hijos/:id/documentos/:tipo`, multipart `file`): mismo guardado que secretaría y la preinscripción pública
+  (`guardarArchivoDeDocumento`, 5 MB, firma de bytes). Solo mientras la matrícula es PREINSCRITO/CONDICIONAL (`ESTADOS_QUE_ADMITEN_DOCUMENTOS`) y un APROBADO no se
+  reemplaza. El documento queda `CARGADO` y aparece en «Documentos por revisar» de secretaría; la auditoría (`DOCUMENTO_CARGADO`) lleva el usuario acudiente.
+- **Certificados de autoservicio (M26)**: `TipoCertificado.autoservicio_acudiente` (**apagado por defecto**; solo el ADMIN lo enciende en «Tipos de documento»; no
+  se admite en un tipo con la fuente `DEPENDENCIAS`, p. ej. el paz y salvo, que sigue siendo de secretaría). El acudiente solo manda tipo + destinatario: el contenido,
+  las firmas y el consecutivo salen del mismo `expedirCertificado` de secretaría (`autoservicio=true`), con la política de firmas del tipo; la de Rectoría solo se
+  estampa si `permitir_firma_rectoria_a_secretaria` está encendido. Máximo `MAX_CERTIFICADOS_AUTOSERVICIO_POR_DIA` (3) por estudiante y tipo cada 24 h (429). Un tipo con
+  valoraciones sigue respondiendo 409 hasta que exista M19. Las opciones de destinatario que leen la EPS (`fuente_entidad`) no se ofrecen en el portal. Los emitidos se
+  reimprimen con `dibujarCertificadoEmitido` y quedan en el historial de secretaría.
+- **Pruebas:** `tests/rolesMultiples.test.ts`, `tests/certificadosAutoservicio.test.ts` y `tests/integracion/portalAcudiente.int.test.ts` (base real; no se pudo correr donde no había binario de MongoDB).
+- **Pendiente, a propósito:** pestaña de boletín en el portal; justificar inasistencias desde el portal (la API de M13 ya está lista); aviso al acudiente de documentos rechazados o notas publicadas (M28);
+  paz y salvo subido por el acudiente (M04); solicitudes de otros certificados con aprobación humana.
+
 ### Acceso al portal del acudiente (M03 → M02/M27)
 
 - `POST /users/:userId/guardians` acepta `habilitar_portal` (checkbox en el drawer "Vincular acudiente", solo al
   registrar uno nuevo). Sin marcar, M02 no se toca. Marcado, `vincularAcudiente` corre **todo en una transacción**
   (`runTransaction`: acudiente + cuenta + vínculo; si algo falla no queda nada a medias).
-- Dato único: si ya existe un `User` con ese `numero_documento` se reutiliza su id (si su rol no es `ACUDIENTE` →
-  409, no se mezclan roles); si no, se crea con rol `ACUDIENTE`, contraseña temporal = número de documento y
+- Dato único: si ya existe un `User` con ese `numero_documento` se reutiliza su id (409 solo si es estudiante; si es
+  personal se le **suma** el rol ACUDIENTE y elige perfil al entrar); si no, se crea con rol `ACUDIENTE`, contraseña temporal = número de documento y
   `debe_cambiar_password: true`. Requiere correo del acudiente (el `email` de `User` es obligatorio y único).
   El id queda en `Guardian.user_id`, que es lo que usa M27/boletín para ubicar al acudiente.
 
@@ -1078,7 +1127,7 @@ nuevos para lo que ya existe aquí** — extenderlos si falta un caso, no duplic
   mapeo rol→color o estado→color en una página), `Card`/`CardHeader`, `Table`/`TableHead`/`Th`/
   `TableBody`/`Td`/`EmptyRow`, `Drawer` (formularios de creación/edición; su botón principal
   acepta `submitVariant` para casos como confirmar un borrado en rojo), `PageHeader` (título +
-  subtítulo + acción de la página), `Field` (`Input`/`Select`), `MultiSelect` (selector desplegable de selección múltiple con checkboxes, contador y badges de rol/estado; prop opcional `emptyLabel` cuando elegir es obligatorio), `Alert`, `Spinner`, `EstadoEspacioBadge` (M10), `EstadoAsistenciaChip`/`EstadoJustificacionBadge` (M13), `MallaDisponibilidad` (M09: cuadrícula de tiempo libre por clic, disponible/condicional/no disponible), `GuiaColumnas` (guía colapsable de columnas de una carga CSV), `ProgressBar` (barra de avance con tono, ej. semanas lectivas vs. el mínimo de 40), `LineaTiempo` (línea de tiempo vertical con punto, fecha, chips y contenido por registro; la usa el historial de convivencia), `EstadoCasoBadge`/`TipoSituacionBadge` (M15), `EstadoExpedienteBadge`/`EstadoSolicitudApoyoBadge` (M16), `EstadoNotaBadge` (M12: pendiente/borrador/cerrado/definitivo), `EstadoEntregaBadge`/`TipoActividadChip` (M11: programada → entregada → con retraso → calificada; tipo de actividad), `Dropzone` (zona para soltar o elegir un archivo, valida extensión y tamaño en el navegador y muestra el archivo elegido; el servidor siempre confirma el contenido), `VistaPreviaPdf` (M17: muestra un PDF dentro de la página con su botón de descargar; recibe `cargar` que pide el blob con la sesión y `claveConsulta` que lo cachea, y libera el blob al cerrar), `VisorDocumento` (PDF dentro de la pantalla con descargar, imprimir y abrir aparte; certificados M26), `PanelDocumentosPdf` (M07: panel lateral para leer PDF mientras se trabaja en otra cosa: un selector con los documentos —agrupables— y el visor del elegido, que se pide con la sesión y solo al abrirlo; lo usan el plan de área, el plan de aula y el formulario de actividades; `VistaPreviaPdf` acepta `altoVisor` y `Dropzone` una `etiqueta` accesible, ambos opcionales), `EstadoPlanBadge`/`FueraDePlazoChip`/`EstadoVentanaBadge` (M07: estado de un plan; la etiqueta roja «ENTREGADO FUERA DE PLAZO» con fecha y hora; y si la entrega del periodo aún no abre, está abierta o venció), `Switch` (interruptor encendido/apagado para decisiones al momento, con `disabledReason` como tooltip; ej. firmas y sello al expedir en M26), `Tabs`/`TabPanel` (navegación por pestañas con subrayado azul en la activa; reusar en vez de reinventar un switch de pestañas en otra página), `EditorConVariables` (párrafo de texto con los datos del sistema como fichas en lugar de `{{llaves}}`: «Insertar dato» o «/», una ficha se borra de una vez, una sola línea, lo pegado se limpia; guarda el mismo formato `{{modulo.dato}}` de siempre; M26 plantillas), `SelectBuscable` (select con campo de búsqueda: filtra al escribir sin tildes ni mayúsculas, teclado, máx. 100 opciones dibujadas; para listas largas como los docentes), `Stepper` (indicador de pasos para formularios largos por secciones, ej. el asistente de creación de estudiante en M03), e iconos SVG propios en `components/ui/icons.tsx` (no se agregó ninguna librería de iconos).
+  subtítulo + acción de la página), `Field` (`Input`/`Select`), `MultiSelect` (selector desplegable de selección múltiple con checkboxes, contador y badges de rol/estado; prop opcional `emptyLabel` cuando elegir es obligatorio), `Alert`, `Spinner`, `EstadoEspacioBadge` (M10), `EstadoAsistenciaChip`/`EstadoJustificacionBadge` (M13), `MallaDisponibilidad` (M09: cuadrícula de tiempo libre por clic, disponible/condicional/no disponible), `GuiaColumnas` (guía colapsable de columnas de una carga CSV), `ProgressBar` (barra de avance con tono, ej. semanas lectivas vs. el mínimo de 40), `LineaTiempo` (línea de tiempo vertical con punto, fecha, chips y contenido por registro; la usa el historial de convivencia), `EstadoCasoBadge`/`TipoSituacionBadge` (M15), `EstadoExpedienteBadge`/`EstadoSolicitudApoyoBadge` (M16), `EstadoNotaBadge` (M12: pendiente/borrador/cerrado/definitivo), `EstadoEntregaBadge`/`TipoActividadChip` (M11: programada → entregada → con retraso → calificada; tipo de actividad), `Dropzone` (zona para soltar o elegir un archivo, valida extensión y tamaño en el navegador y muestra el archivo elegido; el servidor siempre confirma el contenido), `VistaPreviaPdf` (M17: muestra un PDF dentro de la página con su botón de descargar; recibe `cargar` que pide el blob con la sesión y `claveConsulta` que lo cachea, y libera el blob al cerrar), `VisorDocumento` (PDF dentro de la pantalla con descargar, imprimir y abrir aparte; certificados M26), `PanelDocumentosPdf` (M07: panel lateral para leer PDF mientras se trabaja en otra cosa: un selector con los documentos —agrupables— y el visor del elegido, que se pide con la sesión y solo al abrirlo; lo usan el plan de área, el plan de aula y el formulario de actividades; `VistaPreviaPdf` acepta `altoVisor` y `Dropzone` una `etiqueta` accesible, ambos opcionales), `EstadoPlanBadge`/`FueraDePlazoChip`/`EstadoVentanaBadge` (M07: estado de un plan; la etiqueta roja «ENTREGADO FUERA DE PLAZO» con fecha y hora; y si la entrega del periodo aún no abre, está abierta o venció), `Switch` (interruptor encendido/apagado para decisiones al momento, con `disabledReason` como tooltip; ej. firmas y sello al expedir en M26), `Tabs`/`TabPanel` (navegación por pestañas con subrayado azul en la activa; reusar en vez de reinventar un switch de pestañas en otra página), `EditorConVariables` (párrafo de texto con los datos del sistema como fichas en lugar de `{{llaves}}`: «Insertar dato» o «/», una ficha se borra de una vez, una sola línea, lo pegado se limpia; guarda el mismo formato `{{modulo.dato}}` de siempre; M26 plantillas), `SelectBuscable` (select con campo de búsqueda: filtra al escribir sin tildes ni mayúsculas, teclado, máx. 100 opciones dibujadas; para listas largas como los docentes), `Stepper` (indicador de pasos para formularios largos por secciones, ej. el asistente de creación de estudiante en M03), `SelectorPerfil` (login con varios roles: tarjetas por perfil, `components/auth/`), `CambiadorDePerfil` (botones «Entrar como …» en el encabezado), `FilaDocumentoSubible` (fila de un documento de matrícula con su estado y botón de subir; la usan la preinscripción pública y el portal M27, validación en `lib/documentosMatricula.ts`), `TarjetaNotasAsignatura`/`ObservadorFamilia` (notas y observador, compartidos entre estudiante y acudiente), `SelectorEstudiante` (selector global de hijos del portal M27), e iconos SVG propios en `components/ui/icons.tsx` (no se agregó ninguna librería de iconos).
 - **Contenedor global y densidad** (`components/layout/AppShell.tsx`): el `<main>` centra el
   contenido en `max-w-7xl` (no `max-w-5xl`) para que las tablas anchas (Usuarios, Grupos) no
   scrolleen antes de tiempo en pantallas grandes. Cada página usa `space-y-4` (no `space-y-6`)

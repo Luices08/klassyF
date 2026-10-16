@@ -70,12 +70,31 @@ export interface AuthUser {
   apellido: string;
   email: string;
   numero_documento: string;
+  /** Perfil con el que se abrió la sesión (uno de `roles`). */
   rol: Rol;
+  /** Todos los perfiles de la persona: un solo registro puede ser, por ejemplo, DOCENTE y ACUDIENTE. */
+  roles: Rol[];
   estado?: 'activo' | 'inactivo';
   debe_cambiar_password?: boolean;
 }
 
+/** Sesión abierta: el login (o la elección de perfil) entrega el token y el usuario con el perfil activo. */
 export interface LoginResponse extends ApiEnvelopeBase {
   token: string;
   user: AuthUser;
+}
+
+/** La contraseña fue correcta pero la persona tiene varios perfiles: debe elegir con cuál entra. */
+export interface LoginRequiereSeleccion extends ApiEnvelopeBase {
+  requiere_seleccion_perfil: true;
+  /** Vale 5 minutos y solo sirve para elegir perfil (no abre sesión). */
+  seleccion_token: string;
+  perfiles: Rol[];
+  usuario: { nombre: string; apellido: string };
+}
+
+export interface SeleccionPerfilPendiente {
+  seleccion_token: string;
+  perfiles: Rol[];
+  usuario: { nombre: string; apellido: string };
 }

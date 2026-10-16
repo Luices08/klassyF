@@ -196,6 +196,10 @@ export const PALABRAS_CLAVE_POR_RUTA: Record<string, { descripcion: string; clav
     claves: ['remisiones', 'orientacion', 'psicologia', 'atencion psicosocial'],
   },
   '/mis-actividades': { descripcion: 'Tus actividades y entregas.', claves: ['mis actividades', 'mis tareas', 'entregar tarea', 'pendientes'] },
+  '/portal': {
+    descripcion: 'Portal del acudiente: notas, inasistencias, convivencia, documentos de matrícula y certificados de tus estudiantes a cargo.',
+    claves: ['portal', 'portal del acudiente', 'mis hijos', 'mi hijo', 'notas de mi hijo', 'inasistencias de mi hijo', 'fallas de mi hijo', 'subir documentos', 'documentos pendientes', 'documentos de matricula', 'constancia de estudio', 'certificado de estudio', 'descargar certificado', 'observador de mi hijo'],
+  },
   '/mis-notas': { descripcion: 'Tus notas por asignatura.', claves: ['mis notas', 'ver mis notas', 'cuanto llevo', 'mis calificaciones'] },
   '/mi-observador': { descripcion: 'Tu observador.', claves: ['mi observador', 'mis observaciones', 'mis faltas'] },
 };

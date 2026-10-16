@@ -4,6 +4,7 @@ import { RolBadge } from '../ui/Badge';
 import { LogOutIcon } from '../ui/icons';
 import { useAuth } from '../../context/AuthContext';
 import { useInstitution } from '../../hooks/useInstitution';
+import { CambiadorDePerfil } from './CambiadorDePerfil';
 import { ForcedPasswordChangeGate } from './ForcedPasswordChangeGate';
 import { NAV_ITEMS } from './navigation';
 
@@ -48,6 +49,7 @@ export function AppShell() {
             <header className="flex h-16 items-center justify-between border-b border-border bg-surface px-4 sm:px-6">
               <span className="text-h3 text-primary sm:hidden">Klassy</span>
               <div className="ml-auto flex items-center gap-4">
+                <CambiadorDePerfil />
                 <div className="text-right">
                   <p className="text-sm font-semibold text-ink">
                     {user.nombre} {user.apellido}

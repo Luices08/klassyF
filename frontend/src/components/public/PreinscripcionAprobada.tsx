@@ -1,19 +1,18 @@
-import { type ChangeEvent, useRef, useState } from 'react';
+import { useState } from 'react';
 import {
   useDescargarComprobante,
   useSubirDocumentoPreinscripcion,
   type CredencialesPreinscripcion,
 } from '../../hooks/useAdmissionRequests';
+import { AYUDA_ARCHIVO_DOCUMENTO, validarArchivoDocumento } from '../../lib/documentosMatricula';
 import { diasHastaFinDelDia, formatoFechaCalendario } from '../../lib/fechas';
-import type { DocumentoPreinscripcion, PreinscripcionDetalle, TipoDocumentoMatricula } from '../../types/domain';
+import type { PreinscripcionDetalle, TipoDocumentoMatricula } from '../../types/domain';
 import { Alert, errorMessage } from '../ui/Alert';
-import { Chip, EstadoDocumentoBadge } from '../ui/Badge';
+import { Chip } from '../ui/Badge';
 import { Button } from '../ui/Button';
-import { FileTextIcon, UploadIcon } from '../ui/icons';
+import { FilaDocumentoSubible } from '../ui/FilaDocumentoSubible';
+import { FileTextIcon } from '../ui/icons';
 import { ProgressBar } from '../ui/ProgressBar';
-
-const MAX_BYTES = 5 * 1024 * 1024;
-const TIPOS_ACEPTADOS = ['application/pdf', 'image/jpeg', 'image/png', 'image/webp'];
 
 interface PreinscripcionAprobadaProps {
   detalle: PreinscripcionDetalle;
@@ -34,52 +33,6 @@ function Dato({ etiqueta, children }: { etiqueta: string; children: React.ReactN
       <dt className="text-label uppercase tracking-wide text-muted">{etiqueta}</dt>
       <dd className="mt-0.5 text-sm font-medium text-ink">{children}</dd>
     </div>
-  );
-}
-
-interface FilaDocumentoProps {
-  documento: DocumentoPreinscripcion;
-  puedeSubir: boolean;
-  subiendo: boolean;
-  onArchivo: (tipo: TipoDocumentoMatricula, e: ChangeEvent<HTMLInputElement>) => void;
-}
-
-function FilaDocumento({ documento, puedeSubir, subiendo, onArchivo }: FilaDocumentoProps) {
-  const inputRef = useRef<HTMLInputElement>(null);
-  // Un documento ya aprobado por secretaría no se reemplaza; el resto sí (p. ej. tras un rechazo).
-  const editable = puedeSubir && documento.estado !== 'APROBADO';
-
-  return (
-    <li className="flex flex-wrap items-center justify-between gap-2 py-3">
-      <div className="min-w-0">
-        <p className="text-sm font-medium text-ink">{documento.nombre}</p>
-        {documento.comentario && <p className="mt-0.5 text-xs text-danger">Motivo del rechazo: {documento.comentario}</p>}
-      </div>
-      <div className="flex items-center gap-2">
-        <EstadoDocumentoBadge value={documento.estado} />
-        {editable && (
-          <>
-            <input
-              ref={inputRef}
-              type="file"
-              accept=".pdf,.jpg,.jpeg,.png,.webp"
-              className="hidden"
-              onChange={(e) => onArchivo(documento.tipo_documento, e)}
-            />
-            <Button
-              type="button"
-              variant="soft-edit"
-              isLoading={subiendo}
-              onClick={() => inputRef.current?.click()}
-              aria-label={`${documento.estado === 'PENDIENTE' ? 'Subir' : 'Reemplazar'} ${documento.nombre}`}
-            >
-              <UploadIcon className="h-4 w-4" />
-              {documento.estado === 'PENDIENTE' ? 'Subir' : 'Reemplazar'}
-            </Button>
-          </>
-        )}
-      </div>
-    </li>
   );
 }
 
@@ -107,21 +60,11 @@ export function PreinscripcionAprobada({ detalle, credenciales }: Preinscripcion
     setTimeout(() => URL.revokeObjectURL(url), 10_000);
   }
 
-  function handleArchivo(tipoDocumento: TipoDocumentoMatricula, e: ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    e.target.value = '';
-    if (!file) return;
+  function handleArchivo(tipoDocumento: TipoDocumentoMatricula, file: File) {
     subir.reset();
-    setErrorArchivo(null);
-
-    if (!TIPOS_ACEPTADOS.includes(file.type)) {
-      setErrorArchivo('Solo se aceptan archivos PDF, JPG, PNG o WEBP.');
-      return;
-    }
-    if (file.size > MAX_BYTES) {
-      setErrorArchivo('El archivo supera el máximo de 5 MB.');
-      return;
-    }
+    const problema = validarArchivoDocumento(file);
+    setErrorArchivo(problema);
+    if (problema) return;
     subir.mutate({ credenciales, tipoDocumento, file });
   }
 
@@ -196,7 +139,7 @@ export function PreinscripcionAprobada({ detalle, credenciales }: Preinscripcion
 
           {detalle.puede_subir_documentos && (
             <p className="mt-2 text-xs text-muted">
-              PDF, JPG, PNG o WEBP de máximo 5 MB. La matrícula se legaliza cuando la secretaría aprueba todos los documentos.
+              {AYUDA_ARCHIVO_DOCUMENTO} La matrícula se legaliza cuando la secretaría aprueba todos los documentos.
             </p>
           )}
           {(errorArchivo || subir.isError) && (
@@ -207,12 +150,15 @@ export function PreinscripcionAprobada({ detalle, credenciales }: Preinscripcion
 
           <ul className="mt-1 divide-y divide-border">
             {detalle.documentos.map((d) => (
-              <FilaDocumento
+              <FilaDocumentoSubible
                 key={d.tipo_documento}
-                documento={d}
-                puedeSubir={detalle.puede_subir_documentos}
+                nombre={d.nombre}
+                estado={d.estado}
+                comentario={d.comentario}
+                // Un documento ya aprobado por secretaría no se reemplaza; el resto sí (p. ej. tras un rechazo).
+                editable={detalle.puede_subir_documentos && d.estado !== 'APROBADO'}
                 subiendo={subir.isPending && subir.variables?.tipoDocumento === d.tipo_documento}
-                onArchivo={handleArchivo}
+                onArchivo={(file) => handleArchivo(d.tipo_documento, file)}
               />
             ))}
           </ul>

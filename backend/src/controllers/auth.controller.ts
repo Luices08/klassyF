@@ -1,10 +1,9 @@
-import { ROLES } from '../constants/roles';
-import Enrollment from '../models/enrollment.model';
-import Guardian from '../models/guardian.model';
-import StudentGuardian from '../models/studentGuardian.model';
-import User from '../models/user.model';
+import { Response } from 'express';
+import { Rol } from '../constants/enums';
+import User, { UserDocument } from '../models/user.model';
+import { perfilesDisponibles } from '../services/accesoPerfil.service';
 import { registrarEvento } from '../services/audit.service';
-import { generateToken } from '../services/token.service';
+import { generarTokenSeleccionPerfil, generateToken, verificarTokenSeleccionPerfil } from '../services/token.service';
 import ApiError from '../utils/ApiError';
 import catchAsync from '../utils/catchAsync';
 
@@ -53,71 +52,79 @@ export const login = catchAsync<unknown, unknown, LoginBody>(async (req, res) =>
     throw new ApiError(401, 'Credenciales invalidas.');
   }
 
-  // Verificación de matrícula formal: preinscritos no tienen acceso al portal interno
-  if (user.rol === ROLES.ESTUDIANTE) {
-    const matriculas = await Enrollment.find({ student_id: user._id });
-    if (matriculas.length > 0) {
-      const tieneActiva = matriculas.some((m) =>
-        ['MATRICULADO_DEFINITIVO', 'MATRICULADO_CONDICIONAL'].includes(m.estado)
-      );
-      if (!tieneActiva) {
-        throw new ApiError(
-          403,
-          'Tu preinscripción está en revisión y aún no ha sido formalizada por secretaría. Puedes consultar el estado en la página pública.'
-        );
-      }
-    }
-  }
-
-  if (user.rol === ROLES.ACUDIENTE) {
-    const guardian = await Guardian.findOne({ user_id: user._id });
-    if (guardian) {
-      const vinculos = await StudentGuardian.find({ guardian_id: guardian._id });
-      const studentIds = vinculos.map((v) => v.student_id);
-      if (studentIds.length > 0) {
-        const matriculas = await Enrollment.find({ student_id: { $in: studentIds } });
-        if (matriculas.length > 0) {
-          const tieneActiva = matriculas.some((m) =>
-            ['MATRICULADO_DEFINITIVO', 'MATRICULADO_CONDICIONAL'].includes(m.estado)
-          );
-          if (!tieneActiva) {
-            throw new ApiError(
-              403,
-              'La preinscripción de tu aspirante aún no ha sido formalizada por secretaría. Puedes consultar el estado en la página pública.'
-            );
-          }
-        }
-      }
-    }
-  }
+  const perfiles = await perfilesDisponibles(user);
 
   user.intentos_fallidos = 0;
   user.bloqueado_hasta = null;
   user.ultimo_login = new Date();
   await user.save();
 
-  await registrarEvento({
-    usuario_id: user._id,
-    accion: 'LOGIN_EXITOSO',
-    entidad: 'User',
-    entidad_id: user._id,
-    ip,
-  });
-
-  const token = generateToken(user);
+  // Con un solo perfil se abre la sesión de una vez; con varios, la persona elige (sin repetir la contraseña).
+  if (perfiles.length === 1) {
+    await abrirSesion(res, user, perfiles[0] as Rol, ip);
+    return;
+  }
 
   res.status(200).json({
     success: true,
-    token,
+    requiere_seleccion_perfil: true,
+    seleccion_token: generarTokenSeleccionPerfil(user),
+    perfiles,
+    usuario: { nombre: user.nombre, apellido: user.apellido },
+  });
+});
+
+interface SeleccionarPerfilBody {
+  seleccion_token: string;
+  rol: Rol;
+}
+
+export const seleccionarPerfil = catchAsync<unknown, unknown, SeleccionarPerfilBody>(async (req, res) => {
+  const { sub, ver } = verificarTokenSeleccionPerfil(req.body.seleccion_token);
+  const user = await User.findById(sub);
+  if (!user || user.estado !== 'activo' || user.version_sesion !== ver) {
+    throw new ApiError(401, 'La selección de perfil ya no es válida, vuelve a iniciar sesión.');
+  }
+  const perfiles = await perfilesDisponibles(user);
+  if (!perfiles.includes(req.body.rol)) throw new ApiError(403, 'No tienes ese perfil habilitado.');
+
+  await abrirSesion(res, user, req.body.rol, req.ip ?? null);
+});
+
+/** Cambia de perfil sin volver a escribir la contraseña (menú del usuario); entrega una sesión nueva. */
+export const cambiarPerfil = catchAsync<unknown, unknown, { rol: Rol }>(async (req, res) => {
+  const user = await User.findById(req.user!._id);
+  if (!user) throw new ApiError(404, 'Usuario no encontrado.');
+  const perfiles = await perfilesDisponibles(user);
+  if (!perfiles.includes(req.body.rol)) throw new ApiError(403, 'No tienes ese perfil habilitado.');
+
+  await abrirSesion(res, user, req.body.rol, req.ip ?? null, 'PERFIL_CAMBIADO');
+});
+
+async function abrirSesion(res: Response, user: UserDocument, rol: Rol, ip: string | null, accion: 'LOGIN_EXITOSO' | 'PERFIL_CAMBIADO' = 'LOGIN_EXITOSO'): Promise<void> {
+  user.rol = rol;
+  await registrarEvento({
+    usuario_id: user._id,
+    accion,
+    entidad: 'User',
+    entidad_id: user._id,
+    detalle: `Perfil ${rol}`,
+    ip,
+  });
+
+  res.status(200).json({
+    success: true,
+    token: generateToken(user, rol),
     user: {
       id: user._id,
       nombre: user.nombre,
       apellido: user.apellido,
       email: user.email,
       numero_documento: user.numero_documento,
-      rol: user.rol,
+      rol,
+      roles: user.roles,
       estado: user.estado,
       debe_cambiar_password: user.debe_cambiar_password,
     },
   });
-});
+}

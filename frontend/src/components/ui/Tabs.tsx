@@ -3,6 +3,8 @@ import type { ReactNode } from 'react';
 export interface TabItem {
   key: string;
   label: string;
+  /** Novedades de la pestaña (punto rojo con número); opcional. */
+  contador?: number;
 }
 
 export interface TabsProps {
@@ -32,6 +34,11 @@ export function Tabs({ items, active, value, onChange }: TabsProps) {
               }`}
             >
               {item.label}
+              {item.contador ? (
+                <span className="ml-1.5 inline-flex min-w-[18px] items-center justify-center rounded-full bg-danger px-1 text-[10px] font-semibold leading-[18px] text-white">
+                  {item.contador > 99 ? '99+' : item.contador}
+                </span>
+              ) : null}
             </button>
           );
         })}

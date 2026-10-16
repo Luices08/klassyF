@@ -17,6 +17,7 @@ import {
   LayersIcon,
   SlidersIcon,
   UserIcon,
+  MegaphoneIcon,
   UsersIcon,
 } from '../ui/icons';
 
@@ -43,6 +44,7 @@ export const NAV_ITEMS: NavItem[] = [
   { to: '/portal', label: 'Portal del acudiente', icon: UsersIcon, roles: ['ACUDIENTE'] },
   { to: '/report-card', label: 'Boletín', icon: FileTextIcon },
   { to: '/mi-horario', label: 'Mi horario', icon: ClockIcon, roles: ['DOCENTE', 'ESTUDIANTE', 'ACUDIENTE'] },
+  { to: '/anuncios', label: 'Anuncios', icon: MegaphoneIcon },
   { to: '/mi-cuenta', label: 'Mi cuenta', icon: UserIcon },
   { to: '/admin/setup', label: 'Configuración institucional', icon: SlidersIcon, roles: STRUCTURAL_ADMINS },
   { to: '/admin/sedes', label: 'Sedes y jornadas', icon: BuildingIcon, roles: STRUCTURAL_ADMINS },

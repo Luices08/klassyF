@@ -1,4 +1,5 @@
 import { HydratedDocument, Types } from 'mongoose';
+import { avisarFaltaGrave } from './notificacionesEventos.service';
 import {
   ContextoObservacion,
   EstadoCompromiso,
@@ -486,6 +487,12 @@ export async function registrarFalta(input: RegistrarFaltaInput, usuario: UserDo
   });
   if (solicitudId) {
     await registrarEvento({ usuario_id: usuario._id, accion: 'SOLICITUD_CASO_REGISTRADA', entidad: 'SolicitudCaso', entidad_id: solicitudId, ip });
+  }
+  // Una Tipo I (aunque se remita) se queda en el observador: solo II y III son alerta para la familia.
+  if (falta.gravedad !== 'I') {
+    for (const o of creadas) {
+      await avisarFaltaGrave({ observacionId: o._id, estudianteId: o.student_id, sedeId: solicitud?.sede_id ?? null, hayCaso: Boolean(solicitud) });
+    }
   }
   return { registros: creadas.map((o) => vista(o, 'COMPLETA')), remitida };
 }

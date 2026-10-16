@@ -1,4 +1,5 @@
 import fs from 'fs/promises';
+import { avisarEntregaNueva } from './notificacionesEventos.service';
 import path from 'path';
 import { Types } from 'mongoose';
 import { EstadoActividadEstudiante, FORMATOS_EVIDENCIA } from '../constants/actividades';
@@ -290,6 +291,8 @@ export async function registrarEntrega(
     detalle: `Actividad ${String(actividad._id)}${ventana.tardia ? ' (con retraso)' : ''}${previa ? ' (reemplaza una entrega anterior)' : ''}.`,
     ip,
   });
+  // Reemplazar una entrega propia no es un hecho nuevo para el docente.
+  if (!previa) await avisarEntregaNueva(actividad, asignacion.docente_id);
   return vistaEntrega(entrega as unknown as EntregaPlana);
 }
 

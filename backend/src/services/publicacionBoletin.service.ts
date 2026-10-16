@@ -1,4 +1,5 @@
 import { Types } from 'mongoose';
+import { avisarBoletinPublicado } from './notificacionesEventos.service';
 import { ESTADOS_MATRICULA_ACTIVOS } from '../constants/enums';
 import AcademicYear from '../models/academicYear.model';
 import Enrollment from '../models/enrollment.model';
@@ -93,6 +94,7 @@ export async function establecerPublicacionGrupo(
     detalle: `periodo ${ref.periodo_numero}: ${publicado ? 'publicado' : 'retirado'}`,
     ip,
   });
+  if (publicado) await avisarBoletinPublicado({ groupId: ref.group_id, academicYearId: ref.academic_year_id, periodo: ref.periodo_numero });
   return obtenerPublicacion(ref);
 }
 

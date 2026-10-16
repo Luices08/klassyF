@@ -1,4 +1,5 @@
 import { Types } from 'mongoose';
+import { avisarPlanEnRevision, avisarPlanRevisado } from './notificacionesEventos.service';
 import { DecisionRevision, EstadoPlanVista, MAX_COMENTARIO_REVISION, NOMBRES_ESTADO_PLAN } from '../constants/planeacion';
 import { ROLES } from '../constants/roles';
 import AcademicYear from '../models/academicYear.model';
@@ -261,6 +262,7 @@ export async function radicarPlanDeArea(input: RadicarPlanAreaInput, archivo: Pd
     detalle: `${lider.area_id.nombre} (${textoDeAlcance(alcanceDeLider(lider))}), versión ${numero}.`,
     ip,
   });
+  await avisarPlanEnRevision();
   return obtenerPlanDeArea(String(plan._id), usuario);
 }
 
@@ -297,6 +299,8 @@ export async function revisarPlanDeArea(id: string, input: RevisarPlanInput, rev
     detalle: `Plan de área → ${nuevoEstado}.`,
     ip,
   });
+  const lider = await LiderArea.findById(plan.lider_area_id).select('docente_id area_id').lean();
+  if (lider) await avisarPlanRevisado({ _id: plan._id, docenteId: lider.docente_id, decision: input.decision, areaId: lider.area_id });
   return obtenerPlanDeArea(id, revisor);
 }
 

@@ -50,6 +50,7 @@ import type {
   TeacherAssignment,
   TipoAsignacionDocente,
 } from '../../types/domain';
+import { opcionesDeGrupos, opcionesDePersonas } from '../../lib/opcionesBuscables';
 
 const TIPO_LABELS: Record<TipoAsignacionDocente, string> = {
   CLASE: 'Clase Regular',
@@ -196,6 +197,7 @@ export function TeacherAssignmentsPage() {
   const { data: todasLasAsignaciones = [] } = useTeacherAssignments({ academic_year_id: anioActivoId });
 
   const { data: docentes = [] } = useUsers({ rol: 'DOCENTE', estado: 'activo' });
+  const opcionesDocentes = useMemo(() => opcionesDePersonas(docentes), [docentes]);
   const { data: grupos = [] } = useGroups({ academic_year_id: anioActivoId, estado: 'ACTIVE' });
   const { data: asignaturas = [] } = useSubjects({ estado: 'activo' });
   const { data: areas = [] } = useAreas();
@@ -946,11 +948,7 @@ export function TeacherAssignmentsPage() {
                 }}
                 placeholder="Buscar por nombre o documento…"
                 vacioLabel="Seleccione un docente..."
-                opciones={docentes.map((d) => ({
-                  value: d._id,
-                  label: `${d.apellido}, ${d.nombre}`,
-                  detalle: d.numero_documento,
-                }))}
+                opciones={opcionesDocentes}
               />
             </div>
 
@@ -1006,23 +1004,14 @@ export function TeacherAssignmentsPage() {
                     1. Dirección de Grupo (Titularidad Formativa)
                   </h4>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <Select
+                    <SelectBuscable
                       label="Grupo a Dirigir"
                       value={docenteDireccionGroupId}
-                      onChange={(e) => setDocenteDireccionGroupId(e.target.value)}
-                    >
-                      <option value="">Ninguno (No es director de grupo)</option>
-                      {gruposFiltradosDocente.map((g) => {
-                        const sNom = typeof g.sede_id === 'object' && g.sede_id ? g.sede_id.nombre : '';
-                        const jNom = typeof g.jornada_id === 'object' && g.jornada_id ? g.jornada_id.nombre : '';
-                        const extra = [sNom, jNom].filter(Boolean).join(' — ');
-                        return (
-                          <option key={g._id} value={g._id}>
-                            Grupo {g.nomenclatura}{extra ? ` (${extra})` : ''}
-                          </option>
-                        );
-                      })}
-                    </Select>
+                      onChange={setDocenteDireccionGroupId}
+                      placeholder="Buscar grupo…"
+                      vacioLabel="Ninguno (No es director de grupo)"
+                      opciones={opcionesDeGrupos(gruposFiltradosDocente)}
+                    />
 
                     <Input
                       label="Horas semanales de dirección (Decreto 1850)"
@@ -1456,18 +1445,14 @@ export function TeacherAssignmentsPage() {
                     Director de Grupo (Titular del Salón)
                   </h4>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <Select
+                    <SelectBuscable
                       label="Docente Director"
                       value={cursoDirectorDocenteId}
-                      onChange={(e) => setCursoDirectorDocenteId(e.target.value)}
-                    >
-                      <option value="">Sin Director Asignado</option>
-                      {docentes.map((d) => (
-                        <option key={d._id} value={d._id}>
-                          {d.apellido}, {d.nombre} ({d.numero_documento})
-                        </option>
-                      ))}
-                    </Select>
+                      onChange={setCursoDirectorDocenteId}
+                      placeholder="Buscar por nombre o documento…"
+                      vacioLabel="Sin Director Asignado"
+                      opciones={opcionesDePersonas(docentes)}
+                    />
 
                     <Input
                       label="Horas semanales que suma la dirección"
@@ -1511,25 +1496,20 @@ export function TeacherAssignmentsPage() {
                               <Td className="text-xs text-muted">{areaNom}</Td>
                               <Td className="text-center font-bold text-ink">{horas} h</Td>
                               <Td>
-                                <Select
+                                <SelectBuscable
                                   label="Docente"
                                   value={docenteAsignadoId}
-                                  onChange={(e) => {
-                                    const nuevoId = e.target.value;
+                                  onChange={(nuevoId) => {
                                     setCursoMallaMap((prev) => ({
                                       ...prev,
                                       [subject._id]: nuevoId,
                                     }));
                                   }}
                                   className="max-w-xs"
-                                >
-                                  <option value="">[Sin asignar]</option>
-                                  {docentes.map((d) => (
-                                    <option key={d._id} value={d._id}>
-                                      {d.apellido}, {d.nombre}
-                                    </option>
-                                  ))}
-                                </Select>
+                                  placeholder="Buscar docente…"
+                                  vacioLabel="[Sin asignar]"
+                                  opciones={opcionesDocentes}
+                                />
                               </Td>
                               <Td className="text-center">
                                 {docenteAsignadoId ? (
@@ -1649,19 +1629,15 @@ export function TeacherAssignmentsPage() {
       {tabActiva === 'asignaciones' && (
         <Card>
           <div className="p-4 border-b border-border flex flex-col sm:flex-row gap-3">
-            <Select
+            <SelectBuscable
               label="Filtrar por docente"
               value={filtroDocente}
-              onChange={(e) => setFiltroDocente(e.target.value)}
+              onChange={setFiltroDocente}
               className="max-w-xs"
-            >
-              <option value="">Todos los docentes</option>
-              {docentes.map((d) => (
-                <option key={d._id} value={d._id}>
-                  {d.apellido}, {d.nombre}
-                </option>
-              ))}
-            </Select>
+              placeholder="Buscar por nombre o documento…"
+              vacioLabel="Todos los docentes"
+              opciones={opcionesDocentes}
+            />
 
             <Select
               label="Filtrar por tipo"
@@ -1792,19 +1768,15 @@ export function TeacherAssignmentsPage() {
         <form onSubmit={handleSubmit} className="space-y-4">
           {formError && <Alert tone="error">{formError}</Alert>}
 
-          <Select
+          <SelectBuscable
             label="Docente Titular *"
             value={form.docente_id}
-            onChange={(e) => setForm({ ...form, docente_id: e.target.value })}
+            onChange={(id) => setForm({ ...form, docente_id: id })}
             required
-          >
-            <option value="">Seleccione un docente...</option>
-            {docentes.map((d) => (
-              <option key={d._id} value={d._id}>
-                {d.apellido}, {d.nombre} ({d.numero_documento})
-              </option>
-            ))}
-          </Select>
+            placeholder="Buscar por nombre o documento…"
+            vacioLabel="Seleccione un docente..."
+            opciones={opcionesDocentes}
+          />
 
           <Select
             label="Tipo de Asignación *"

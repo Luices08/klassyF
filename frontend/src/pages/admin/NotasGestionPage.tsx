@@ -18,6 +18,8 @@ import { useAnioDeTrabajo } from '../../hooks/useAniosLectivos';
 import { useGroups } from '../../hooks/useGroups';
 import { type FilaSeguimiento, useDeclararDefinitivas, usePlanilla, useReabrirPlanilla, useSeguimientoNotas } from '../../hooks/useNotas';
 import { useAuth } from '../../context/AuthContext';
+import { SelectBuscable } from '../../components/ui/SelectBuscable';
+import { opcionesDeGrupos } from '../../lib/opcionesBuscables';
 
 const ESTADO_TONO = { ABIERTA: 'orange', CERRADA: 'blue', DEFINITIVA: 'green' } as const;
 const ESTADO_NOMBRE = { ABIERTA: 'Abierta', CERRADA: 'Cerrada por el docente', DEFINITIVA: 'Definitiva' } as const;
@@ -99,15 +101,14 @@ export function NotasGestionPage() {
               </option>
             ))}
           </Select>
-          <Select label="Grupo" value={grupoId} onChange={(e) => setGrupoId(e.target.value)}>
-            <option value="">Todos los grupos</option>
-            {(grupos.data ?? []).map((g) => (
-              <option key={g._id} value={g._id}>
-                {typeof g.grade_id === 'object' ? `${g.grade_id.nombre} · ` : ''}
-                {g.nomenclatura}
-              </option>
-            ))}
-          </Select>
+          <SelectBuscable
+            label="Grupo"
+            value={grupoId}
+            onChange={setGrupoId}
+            placeholder="Buscar grupo…"
+            vacioLabel="Todos los grupos"
+            opciones={opcionesDeGrupos(grupos.data ?? [])}
+          />
         </div>
       </Card>
 

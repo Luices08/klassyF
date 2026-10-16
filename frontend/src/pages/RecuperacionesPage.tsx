@@ -24,6 +24,8 @@ import {
 } from '../hooks/useRecuperaciones';
 import { useMyTeacherLoad } from '../hooks/useTeacherAssignments';
 import { aInputFecha } from '../lib/fechas';
+import { SelectBuscable } from '../components/ui/SelectBuscable';
+import { opcionesDeGrupos } from '../lib/opcionesBuscables';
 
 const TONO_ESTADO: Record<EstadoRecuperacion, Tone> = { PENDIENTE: 'orange', SUPERADA: 'green', NO_SUPERADA: 'red' };
 
@@ -97,13 +99,13 @@ function Listado({ esDocente, anioId, periodos }: { esDocente: boolean; anioId?:
               ))}
             </Select>
           ) : (
-            <Select label="Grupo" value={grupo?._id ?? ''} onChange={(e) => setGrupoId(e.target.value)}>
-              {(grupos.data ?? []).map((g) => (
-                <option key={g._id} value={g._id}>
-                  {g.nomenclatura}
-                </option>
-              ))}
-            </Select>
+            <SelectBuscable
+              label="Grupo"
+              value={grupo?._id ?? ''}
+              onChange={setGrupoId}
+              placeholder="Buscar grupo…"
+              opciones={opcionesDeGrupos(grupos.data ?? [])}
+            />
           )}
           <Select label="Tipo" value={tipo} onChange={(e) => setTipo(e.target.value as TipoRecuperacion)}>
             <option value="PERIODO">Recuperación de periodo</option>

@@ -7,6 +7,8 @@ import { EmptyRow, Table, TableBody, TableHead, Td, Th } from '../ui/Table';
 import { useEstadisticasAsistencia } from '../../hooks/useAsistencia';
 import { useGroups } from '../../hooks/useGroups';
 import type { AcademicYear, DimensionEstadistica } from '../../types/domain';
+import { opcionesDeGrupos } from '../../lib/opcionesBuscables';
+import { SelectBuscable } from '../ui/SelectBuscable';
 
 const DIMENSIONES: Array<{ valor: DimensionEstadistica; etiqueta: string }> = [
   { valor: 'estudiante', etiqueta: 'Por estudiante' },
@@ -59,14 +61,14 @@ export function EstadisticasAsistenciaPanel({ anio }: { anio: AcademicYear }) {
               </option>
             ))}
           </Select>
-          <Select label="Grupo" value={groupId} onChange={(e) => setGroupId(e.target.value)}>
-            <option value="">Todos</option>
-            {grupos.map((g) => (
-              <option key={g._id} value={g._id}>
-                {`${typeof g.grade_id === 'object' ? g.grade_id.nombre : ''} ${g.nomenclatura}`.trim()}
-              </option>
-            ))}
-          </Select>
+          <SelectBuscable
+            label="Grupo"
+            value={groupId}
+            onChange={setGroupId}
+            placeholder="Buscar grupo…"
+            vacioLabel="Todos"
+            opciones={opcionesDeGrupos(grupos)}
+          />
         </div>
       </Card>
 

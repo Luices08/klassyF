@@ -13,6 +13,7 @@ import { Card, CardHeader } from '../ui/Card';
 import { Select } from '../ui/Field';
 import { MallaDisponibilidad } from '../ui/MallaDisponibilidad';
 import { MultiSelect } from '../ui/MultiSelect';
+import { SelectBuscable } from '../ui/SelectBuscable';
 
 interface PanelTiempoLibreProps {
   contexto: ContextoHorario;
@@ -131,14 +132,14 @@ export function PanelTiempoLibre({ contexto, estructura, grados, catalogo, varia
               <option value="GRADOS">Uno o varios grados</option>
             </Select>
             {para === 'DOCENTE' ? (
-              <Select label="Docente" value={docenteId} onChange={(e) => setDocenteId(e.target.value)}>
-                <option value="">{catalogo.docentes.length === 0 ? 'Sin docentes con carga' : 'Elige un docente'}</option>
-                {catalogo.docentes.map((d) => (
-                  <option key={d._id} value={d._id}>
-                    {d.nombre}
-                  </option>
-                ))}
-              </Select>
+              <SelectBuscable
+                label="Docente"
+                value={docenteId}
+                onChange={setDocenteId}
+                placeholder="Buscar docente…"
+                vacioLabel={catalogo.docentes.length === 0 ? 'Sin docentes con carga' : 'Elige un docente'}
+                opciones={catalogo.docentes.map((d) => ({ value: d._id, label: d.nombre }))}
+              />
             ) : (
               <MultiSelect label="Grados" options={grados.map((g) => ({ value: g._id, label: g.nombre }))} selected={gradeIds} onChange={setGradeIds} emptyLabel="Elige los grados" />
             )}

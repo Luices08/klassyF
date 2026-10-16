@@ -21,6 +21,8 @@ import {
   type ModoElemento,
 } from '../../hooks/useCertificados';
 import { useUsers } from '../../hooks/useUsers';
+import { opcionesDePersonas } from '../../lib/opcionesBuscables';
+import { SelectBuscable } from '../ui/SelectBuscable';
 
 /**
  * Quién firma los certificados, con qué imágenes y qué se estampa por defecto en cada documento.
@@ -87,14 +89,15 @@ function FirmanteCard({
       <CardHeader title={titulo} />
       {actualizar.isError && <Alert tone="error">{errorMessage(actualizar.error)}</Alert>}
       {puedeDesignar ? (
-        <Select label="Quién firma" value={firmante.usuario_id ?? ''} onChange={(e) => actualizar.mutate({ [elemento]: { usuario_id: e.target.value || null } })} disabled={actualizar.isPending || usuarios.isLoading}>
-          <option value="">Sin designar</option>
-          {usuarios.data?.map((u) => (
-            <option key={u._id} value={u._id}>
-              {u.nombre} {u.apellido}
-            </option>
-          ))}
-        </Select>
+        <SelectBuscable
+          label="Quién firma"
+          value={firmante.usuario_id ?? ''}
+          onChange={(id) => actualizar.mutate({ [elemento]: { usuario_id: id || null } })}
+          disabled={actualizar.isPending || usuarios.isLoading}
+          placeholder="Buscar por nombre o documento…"
+          vacioLabel="Sin designar"
+          opciones={opcionesDePersonas(usuarios.data ?? [])}
+        />
       ) : (
         <p className="text-sm text-body">
           <span className="font-semibold text-ink">Quién firma: </span>

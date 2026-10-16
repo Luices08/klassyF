@@ -16,6 +16,8 @@ import { Alert, errorMessage } from '../ui/Alert';
 import { Drawer } from '../ui/Drawer';
 import { Select } from '../ui/Field';
 import { MultiSelect } from '../ui/MultiSelect';
+import { opcionesDePersonas } from '../../lib/opcionesBuscables';
+import { SelectBuscable } from '../ui/SelectBuscable';
 
 interface LiderAreaFormDrawerProps {
   area: Area;
@@ -86,14 +88,15 @@ export function LiderAreaFormDrawer({ area, lider, onClose }: LiderAreaFormDrawe
         El líder es el único docente que carga el plan de área de lo que cubre, y sin ese plan aprobado los docentes de esa parte del área no pueden cargar su plan de
         aula. Si en tu colegio un solo jefe lleva el área completa, deja todo en «todos».
       </Alert>
-      <Select label="Docente líder" required value={docenteId} onChange={(e) => setDocenteId(e.target.value)}>
-        <option value="">Selecciona un docente…</option>
-        {(docentes.data ?? []).map((d) => (
-          <option key={d._id} value={d._id}>
-            {d.nombre} {d.apellido}
-          </option>
-        ))}
-      </Select>
+      <SelectBuscable
+        label="Docente líder"
+        required
+        value={docenteId}
+        onChange={setDocenteId}
+        placeholder="Buscar por nombre o documento…"
+        vacioLabel="Selecciona un docente…"
+        opciones={opcionesDePersonas(docentes.data ?? [])}
+      />
       <MultiSelect
         label="Niveles educativos que cubre"
         options={NIVELES_EDUCATIVOS.map((n) => ({ value: n, label: NOMBRES_NIVEL_EDUCATIVO[n] }))}

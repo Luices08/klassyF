@@ -67,6 +67,8 @@ export const NAV_ITEMS: NavItem[] = [
   { to: '/admin/notas', label: 'Seguimiento de notas', icon: FileTextIcon, roles: CURRICULUM_MANAGERS },
   { to: '/admin/creador-planillas', label: 'Creador de planillas', icon: SlidersIcon, roles: STRUCTURAL_ADMINS },
   { to: '/admin/boletin', label: 'Configuración del boletín', icon: FileTextIcon, roles: CURRICULUM_MANAGERS },
+  // M24: el rol abre la puerta; el servidor decide a qué grupos o estudiantes puede citar cada docente.
+  { to: '/reuniones', label: 'Reuniones y citaciones', icon: CalendarIcon, roles: ['ADMIN', 'COORDINADOR', 'DOCENTE'] },
   { to: '/recuperaciones', label: 'Recuperaciones', icon: ClipboardListIcon, roles: ['ADMIN', 'COORDINADOR', 'DOCENTE'] },
   { to: '/docente/mi-carga', label: 'Mi asignación', icon: ClipboardListIcon, roles: ['DOCENTE'] },
   { to: '/docente/planeacion', label: 'Planeación', icon: BookIcon, roles: ['DOCENTE'] },
@@ -138,6 +140,7 @@ export const GRUPOS_NAV: GrupoNav[] = [
       '/admin/boletin',
       '/recuperaciones',
       '/asistencia/gestion',
+      '/reuniones',
     ],
   },
   {

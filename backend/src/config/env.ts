@@ -15,6 +15,8 @@ export interface Env {
   certificadosSecret: string;
   /** M26: URL pública del sitio, para el QR de los certificados. Vacía = se toma del host de la petición. */
   urlPublica: string;
+  /** Salida de correo (SMTP). Sin `host` o sin `remitente` el servidor no envía correos: las citaciones se crean igual y se avisa. */
+  correo: { host: string; puerto: number; seguro: boolean; usuario: string; clave: string; remitente: string };
 }
 
 const nodeEnv = process.env.NODE_ENV || 'development';
@@ -49,4 +51,12 @@ export const env: Env = {
   asistenteModelo: process.env.ASISTENTE_MODELO || 'claude-haiku-5-5',
   certificadosSecret: process.env.CERT_HMAC_SECRET || (enProduccion ? '' : `desarrollo-${jwtSecret}`),
   urlPublica: (process.env.PUBLIC_URL || '').replace(/\/+$/, ''),
+  correo: {
+    host: process.env.SMTP_HOST || '',
+    puerto: Number(process.env.SMTP_PORT) || 587,
+    seguro: process.env.SMTP_SECURE === 'true',
+    usuario: process.env.SMTP_USER || '',
+    clave: process.env.SMTP_PASS || '',
+    remitente: process.env.CORREO_REMITENTE || '',
+  },
 };

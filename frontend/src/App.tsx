@@ -8,6 +8,8 @@ import { NotFoundPage } from './pages/NotFoundPage';
 import { ReportCardPage } from './pages/ReportCardPage';
 import { HomePage } from './pages/public/HomePage';
 import { VerificarCertificadoPage } from './pages/public/VerificarCertificadoPage';
+import { ConfirmarCitacionPage } from './pages/public/ConfirmarCitacionPage';
+import { CitacionesPage } from './pages/CitacionesPage';
 import { CertificadosPage } from './pages/admin/CertificadosPage';
 import { AnioLectivoPage } from './pages/AnioLectivoPage';
 import { ActividadesDocentePage } from './pages/ActividadesDocentePage';
@@ -69,6 +71,8 @@ export default function App() {
       <Route path="/login" element={<LoginPage />} />
       <Route path="/verificar" element={<VerificarCertificadoPage />} />
       <Route path="/verificar/:token" element={<VerificarCertificadoPage />} />
+      {/* Enlace del correo de una citación (M24): el acudiente responde sin iniciar sesión. */}
+      <Route path="/citacion/:token" element={<ConfirmarCitacionPage />} />
 
       <Route element={<ProtectedRoute />}>
         <Route element={<AppShell />}>
@@ -131,6 +135,7 @@ export default function App() {
           </Route>
 
           <Route element={<ProtectedRoute allowedRoles={['ADMIN', 'COORDINADOR', 'DOCENTE']} />}>
+            <Route path="/reuniones" element={<CitacionesPage />} />
             <Route path="/recuperaciones" element={<RecuperacionesPage />} />
           </Route>
 

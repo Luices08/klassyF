@@ -3,8 +3,10 @@ import {
   CLAVES_FORMATO_EVIDENCIA,
   ESTADOS_ACTIVIDAD_ESTUDIANTE,
   MAX_ADJUNTOS_POR_ACTIVIDAD,
+  MAX_ARCHIVOS_POR_ENTREGA,
   MAX_BYTES_CONTENIDO_HTML,
   MAX_CARACTERES_COMENTARIO,
+  MAX_CARACTERES_COMENTARIOS_DOCENTE,
   MAX_VIDEOS_POR_ACTIVIDAD,
   TIPOS_ACTIVIDAD,
 } from '../constants/actividades';
@@ -50,6 +52,9 @@ export const createActivity: ValidationSchema = {
     formatos_permitidos: formatos,
     permite_entrega_tardia: Joi.boolean(),
     permite_multiples_entregas: Joi.boolean(),
+    permite_editor_texto: Joi.boolean(),
+    permite_varios_archivos: Joi.boolean(),
+    comentarios_docente: Joi.string().trim().max(MAX_CARACTERES_COMENTARIOS_DOCENTE).allow(''),
     adjuntos,
     videos,
     // Otras clases del mismo docente (misma asignatura) donde se publica lo mismo.
@@ -73,6 +78,9 @@ export const updateActivity: ValidationSchema = {
     formatos_permitidos: formatos,
     permite_entrega_tardia: Joi.boolean(),
     permite_multiples_entregas: Joi.boolean(),
+    permite_editor_texto: Joi.boolean(),
+    permite_varios_archivos: Joi.boolean(),
+    comentarios_docente: Joi.string().trim().max(MAX_CARACTERES_COMENTARIOS_DOCENTE).allow(''),
     adjuntos,
     videos,
     cerrada: Joi.boolean(),
@@ -133,6 +141,8 @@ export const createSubmission: ValidationSchema = {
   params: Joi.object({ id: objectId.required() }),
   body: Joi.object({
     texto_entrega: Joi.string().max(10000).allow(''),
+    // Lo que el estudiante escribe en el editor (si la actividad lo ofrece); el servicio lo limpia.
+    respuesta_html: Joi.string().max(MAX_BYTES_CONTENIDO_HTML * 2).allow(''),
   }),
 };
 
@@ -162,7 +172,7 @@ export const actualizarConfiguracion: ValidationSchema = {
 
 export const descargarEntrega: ValidationSchema = {
   params: Joi.object({ id: objectId.required() }),
-  query: Joi.object({ intento: Joi.number().integer().min(1) }),
+  query: Joi.object({ intento: Joi.number().integer().min(1), archivo: Joi.number().integer().min(0).max(MAX_ARCHIVOS_POR_ENTREGA - 1) }),
 };
 
 export const descargarAdjunto: ValidationSchema = {

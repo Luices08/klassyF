@@ -25,6 +25,10 @@ export const FORMATOS_EVIDENCIA: Record<FormatoEvidencia, { etiqueta: string; mi
 export const MIMETYPES_EVIDENCIA = new Set<string>(Object.values(FORMATOS_EVIDENCIA).flatMap((f) => f.mimetypes));
 
 export const MAX_BYTES_ENTREGA = 10 * 1024 * 1024;
+/** Cuántos archivos admite una entrega cuando el docente permite varios. */
+export const MAX_ARCHIVOS_POR_ENTREGA = 5;
+/** Texto plano del docente para los estudiantes (indicaciones breves aparte de las instrucciones). */
+export const MAX_CARACTERES_COMENTARIOS_DOCENTE = 1000;
 
 // Valores iniciales de la política de carga del colegio (ConfiguracionActividades); 0 = sin límite.
 export const MAX_EVALUACIONES_POR_DIA_INICIAL = 2;

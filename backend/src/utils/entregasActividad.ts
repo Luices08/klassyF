@@ -154,6 +154,9 @@ export const ETIQUETAS_CAMPOS_ACTIVIDAD: Record<string, string> = {
   formatos_permitidos: 'los formatos de entrega',
   permite_entrega_tardia: 'la entrega tardía',
   permite_multiples_entregas: 'las entregas múltiples',
+  permite_editor_texto: 'el editor de texto de la entrega',
+  permite_varios_archivos: 'la entrega de varios archivos',
+  comentarios_docente: 'los comentarios del docente',
   adjuntos: 'los archivos adjuntos',
   videos: 'los videos',
 };

@@ -45,6 +45,9 @@ export interface VistaActividad {
   formatos_permitidos: FormatoEvidencia[];
   permite_entrega_tardia: boolean;
   permite_multiples_entregas: boolean;
+  permite_editor_texto: boolean;
+  permite_varios_archivos: boolean;
+  comentarios_docente: string;
   cerrada: boolean;
   /** El texto del editor (ya limpiado). Solo viaja en el detalle: los listados no cargan imágenes. */
   contenido_html?: string;
@@ -96,6 +99,9 @@ export async function armarVistas(actividades: ActividadPlana[], ahora = new Dat
       formatos_permitidos: a.formatos_permitidos ?? [],
       permite_entrega_tardia: a.permite_entrega_tardia ?? false,
       permite_multiples_entregas: a.permite_multiples_entregas ?? false,
+      permite_editor_texto: a.permite_editor_texto ?? false,
+      permite_varios_archivos: a.permite_varios_archivos ?? false,
+      comentarios_docente: a.comentarios_docente ?? '',
       cerrada: a.cerrada ?? false,
       ...(conContenido ? { contenido_html: a.contenido_html ?? '' } : {}),
       adjuntos: (a.adjuntos ?? []).map(({ id, ext, nombre, tipo, bytes }) => ({ id, ext, nombre, tipo, bytes })),
@@ -179,6 +185,9 @@ export interface CreateActivityInput {
   formatos_permitidos?: FormatoEvidencia[];
   permite_entrega_tardia?: boolean;
   permite_multiples_entregas?: boolean;
+  permite_editor_texto?: boolean;
+  permite_varios_archivos?: boolean;
+  comentarios_docente?: string;
   adjuntos?: ReferenciaAdjunto[];
   /** Enlaces de YouTube o Vimeo. */
   videos?: string[];
@@ -308,6 +317,9 @@ export async function publicarActividad(input: CreateActivityInput, docente: Use
         formatos_permitidos: requiereEntrega ? (input.formatos_permitidos ?? []) : [],
         permite_entrega_tardia: input.permite_entrega_tardia ?? false,
         permite_multiples_entregas: requiereEntrega ? (input.permite_multiples_entregas ?? false) : false,
+        permite_editor_texto: requiereEntrega ? (input.permite_editor_texto ?? false) : false,
+        permite_varios_archivos: requiereEntrega ? (input.permite_varios_archivos ?? false) : false,
+        comentarios_docente: (input.comentarios_docente ?? '').trim(),
         adjuntos,
         videos,
         publicacion_id: publicacionId,
@@ -347,6 +359,9 @@ export interface UpdateActivityInput {
   formatos_permitidos?: FormatoEvidencia[];
   permite_entrega_tardia?: boolean;
   permite_multiples_entregas?: boolean;
+  permite_editor_texto?: boolean;
+  permite_varios_archivos?: boolean;
+  comentarios_docente?: string;
   adjuntos?: ReferenciaAdjunto[];
   videos?: string[];
   /** true = cerrarla a mano (ya no recibe entregas); false = reabrirla. */
@@ -428,7 +443,7 @@ export async function updateActivity(
     const actual = (actividad as unknown as Record<string, unknown>)[campo];
     const igual =
       actual instanceof Date ? mismaFecha(actual, valor as string | Date) : JSON.stringify(actual ?? null) === JSON.stringify(valor ?? null);
-    if (!igual && ['titulo', 'tipo', 'fecha_apertura', 'fecha_entrega', 'requiere_entrega', 'formatos_permitidos', 'permite_entrega_tardia', 'permite_multiples_entregas'].includes(campo)) {
+    if (!igual && ['titulo', 'tipo', 'fecha_apertura', 'fecha_entrega', 'requiere_entrega', 'formatos_permitidos', 'permite_entrega_tardia', 'permite_multiples_entregas', 'permite_editor_texto', 'permite_varios_archivos', 'comentarios_docente'].includes(campo)) {
       camposCambiados.push(campo);
     }
   }

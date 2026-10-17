@@ -259,7 +259,19 @@ export function MisActividadesPage() {
                   </EmptyRow>
                 )}
                 {visibles.map((a) => (
-                  <tr key={a._id}>
+                  <tr
+                    key={a._id}
+                    tabIndex={0}
+                    aria-label={`Abrir ${a.titulo}`}
+                    className="cursor-pointer transition-colors hover:bg-soft focus:bg-soft focus:outline-none"
+                    onClick={() => navigate(`/mis-actividades/${a._id}`)}
+                    onKeyDown={(e) => {
+                      if (e.target === e.currentTarget && (e.key === 'Enter' || e.key === ' ')) {
+                        e.preventDefault();
+                        navigate(`/mis-actividades/${a._id}`);
+                      }
+                    }}
+                  >
                     <Td>
                       <div className="flex flex-wrap items-center gap-2">
                         <span className="font-semibold text-ink">{a.titulo}</span>
@@ -280,11 +292,8 @@ export function MisActividadesPage() {
                       </div>
                     </Td>
                     <Td className="text-right">
-                      <Button
-                        type="button"
-                        variant={a.puede_entregar ? 'primary' : 'outline'}
-                        onClick={() => navigate(`/mis-actividades/${a._id}`)}
-                      >
+                      {/* El clic lo recibe la fila entera: el botón solo dice qué se puede hacer. */}
+                      <Button type="button" variant={a.puede_entregar ? 'primary' : 'outline'}>
                         {a.puede_entregar ? (a.entrega?.fecha_entrega ? 'Ver o entregar de nuevo' : 'Entregar') : 'Ver'}
                       </Button>
                     </Td>

@@ -2,12 +2,12 @@ import fs from 'fs/promises';
 import { avisarEntregaNueva } from './notificacionesEventos.service';
 import path from 'path';
 import { Types } from 'mongoose';
-import { EstadoActividadEstudiante, FORMATOS_EVIDENCIA } from '../constants/actividades';
+import { EstadoActividadEstudiante, FORMATOS_EVIDENCIA, MAX_ARCHIVOS_POR_ENTREGA } from '../constants/actividades';
 import { ESTADOS_MATRICULA_ACTIVOS } from '../constants/enums';
 import { ROLES } from '../constants/roles';
 import AcademicYear, { AcademicYearDocument } from '../models/academicYear.model';
 import Activity from '../models/activity.model';
-import ActivitySubmission, { IActivitySubmission, IIntentoEntrega } from '../models/activitySubmission.model';
+import ActivitySubmission, { IActivitySubmission, IArchivoEntrega, IIntentoEntrega } from '../models/activitySubmission.model';
 import Enrollment from '../models/enrollment.model';
 import PeriodLock from '../models/periodLock.model';
 import TeacherAssignment from '../models/teacherAssignment.model';
@@ -16,6 +16,7 @@ import ApiError from '../utils/ApiError';
 import { estadoDeEntrega, evaluarVentanaEntrega } from '../utils/actividades';
 import { finDelDia, inicioDelDia } from '../utils/calendarioAcademico';
 import { intentoConsiderado, motivoSinEntrega, requiereElegirIntento } from '../utils/entregasActividad';
+import { sanitizarContenido, textoPlano } from '../utils/contenidoActividad';
 import { detectarEvidencia } from '../utils/evidenciasActividad';
 import { ESTADO_ACTIVO } from '../utils/filtroEstado';
 import { carpetaActividad } from '../utils/uploadPaths';
@@ -47,6 +48,8 @@ export function intentosDe(entrega: EntregaPlana | null): IIntentoEntrega[] {
     {
       numero: 1,
       texto_entrega: entrega.texto_entrega ?? '',
+      respuesta_html: '',
+      archivos: [],
       archivo_path: entrega.archivo_path ?? null,
       archivo_nombre: entrega.archivo_nombre ?? null,
       archivo_formato: entrega.archivo_formato ?? null,
@@ -54,6 +57,20 @@ export function intentosDe(entrega: EntregaPlana | null): IIntentoEntrega[] {
       fecha_entrega: entrega.fecha_entrega,
       con_retraso: entrega.con_retraso ?? false,
       acceso_especial: false,
+    },
+  ];
+}
+
+/** Los archivos de un intento. Los anteriores a las entregas con varios archivos solo guardan uno en los campos `archivo_*`. */
+export function archivosDe(intento: Pick<IIntentoEntrega, 'archivos' | 'archivo_path' | 'archivo_nombre' | 'archivo_formato' | 'archivo_bytes'>): IArchivoEntrega[] {
+  if (intento.archivos && intento.archivos.length > 0) return intento.archivos;
+  if (!intento.archivo_path) return [];
+  return [
+    {
+      path: intento.archivo_path,
+      nombre: intento.archivo_nombre ?? 'entrega',
+      formato: intento.archivo_formato ?? 'PDF',
+      bytes: intento.archivo_bytes ?? 0,
     },
   ];
 }
@@ -82,9 +99,11 @@ export function vistaEntrega(entrega: EntregaPlana | null) {
       con_retraso: i.con_retraso,
       acceso_especial: i.acceso_especial ?? false,
       texto_entrega: i.texto_entrega ?? '',
-      tiene_archivo: Boolean(i.archivo_path),
-      archivo_nombre: i.archivo_nombre ?? null,
-      archivo_formato: i.archivo_formato ?? null,
+      respuesta_html: i.respuesta_html ?? '',
+      tiene_archivo: archivosDe(i).length > 0,
+      archivo_nombre: archivosDe(i)[0]?.nombre ?? null,
+      archivo_formato: archivosDe(i)[0]?.formato ?? null,
+      archivos: archivosDe(i).map((a, indice) => ({ indice, nombre: a.nombre, formato: a.formato, bytes: a.bytes })),
       considerado: considerado?.numero === i.numero,
     })),
     intento_valido: entrega.intento_valido ?? null,
@@ -257,6 +276,7 @@ export async function detalleParaEstudiante(id: string, estudiante: UserDocument
 
 export interface RegistrarEntregaInput {
   texto_entrega?: string;
+  respuesta_html?: string;
 }
 
 /**
@@ -268,10 +288,11 @@ export interface RegistrarEntregaInput {
 export async function registrarEntrega(
   activityId: string,
   input: RegistrarEntregaInput,
-  archivo: ArchivoSubido | undefined,
+  archivoOArchivos: ArchivoSubido | ArchivoSubido[] | undefined,
   estudiante: UserDocument,
   ip?: string | null
 ) {
+  const archivos = Array.isArray(archivoOArchivos) ? archivoOArchivos : archivoOArchivos ? [archivoOArchivos] : [];
   const actividad = await Activity.findById(activityId);
   if (!actividad) throw new ApiError(404, 'Actividad no encontrada.');
   const asignacion = await TeacherAssignment.findById(actividad.teacher_assignment_id);
@@ -315,41 +336,61 @@ export async function registrarEntrega(
 
   const formatos = actividad.formatos_permitidos ?? [];
   const texto = input.texto_entrega?.trim() ?? '';
-  let datosArchivo: { path: string; nombre: string; formato: IIntentoEntrega['archivo_formato']; bytes: number } | null = null;
-  let destino: string | null = null;
+  const conEditor = actividad.permite_editor_texto ?? false;
+  const respuestaHtml = conEditor && input.respuesta_html ? sanitizarContenido(input.respuesta_html) : '';
+  const hayRespuestaEscrita = respuestaHtml !== '' && (textoPlano(respuestaHtml) !== '' || /<img\b/i.test(respuestaHtml));
+  const maxArchivos = actividad.permite_varios_archivos ? MAX_ARCHIVOS_POR_ENTREGA : 1;
+  const datosArchivos: IArchivoEntrega[] = [];
+  const destinos: string[] = [];
 
   if (formatos.length === 0) {
-    if (archivo) throw new ApiError(400, 'Esta actividad se responde por escrito: no recibe archivos.');
-    if (!texto) throw new ApiError(400, 'Escribe tu respuesta para entregar la actividad.');
+    if (archivos.length > 0) throw new ApiError(400, 'Esta actividad se responde por escrito: no recibe archivos.');
+    if (!texto && !hayRespuestaEscrita) throw new ApiError(400, 'Escribe tu respuesta para entregar la actividad.');
   } else {
-    if (!archivo) throw new ApiError(400, 'Adjunta el archivo de tu entrega.');
-    // El mimetype lo declara el cliente: la firma de bytes decide qué es el archivo y de ahí sale la extensión.
-    const evidencia = detectarEvidencia(archivo.mimetype, archivo.originalname, archivo.buffer);
-    if (!evidencia) throw new ApiError(400, 'El archivo no es un PDF, Word, Excel, PowerPoint o imagen válido.');
-    if (!formatos.includes(evidencia.formato)) {
-      throw new ApiError(400, `Esta actividad solo acepta: ${formatos.map((f) => FORMATOS_EVIDENCIA[f].etiqueta).join(', ')}.`);
+    if (archivos.length === 0 && !hayRespuestaEscrita) {
+      throw new ApiError(400, conEditor ? 'Adjunta tu archivo o escribe tu respuesta para entregar.' : 'Adjunta el archivo de tu entrega.');
     }
+    if (archivos.length > maxArchivos) {
+      throw new ApiError(400, maxArchivos === 1 ? 'Esta actividad recibe un solo archivo por entrega.' : `Una entrega admite hasta ${MAX_ARCHIVOS_POR_ENTREGA} archivos.`);
+    }
+    // El mimetype lo declara el cliente: la firma de bytes decide qué es cada archivo y de ahí sale la extensión.
+    const evidencias = archivos.map((archivo) => {
+      const evidencia = detectarEvidencia(archivo.mimetype, archivo.originalname, archivo.buffer);
+      if (!evidencia) throw new ApiError(400, 'El archivo no es un PDF, Word, Excel, PowerPoint o imagen válido.');
+      if (!formatos.includes(evidencia.formato)) {
+        throw new ApiError(400, `Esta actividad solo acepta: ${formatos.map((f) => FORMATOS_EVIDENCIA[f].etiqueta).join(', ')}.`);
+      }
+      return evidencia;
+    });
 
-    const carpeta = carpetaActividad(String(actividad._id));
-    await fs.mkdir(carpeta, { recursive: true });
-    destino = path.join(carpeta, `${String(estudiante._id)}-${ahora.getTime()}${evidencia.ext}`);
-    await fs.writeFile(destino, archivo.buffer);
-    datosArchivo = {
-      path: path.relative(process.cwd(), destino),
-      nombre: archivo.originalname.slice(0, 120),
-      formato: evidencia.formato,
-      bytes: archivo.buffer.length,
-    };
+    if (archivos.length > 0) {
+      const carpeta = carpetaActividad(String(actividad._id));
+      await fs.mkdir(carpeta, { recursive: true });
+      for (const [indice, archivo] of archivos.entries()) {
+        const evidencia = evidencias[indice]!;
+        const destino = path.join(carpeta, `${String(estudiante._id)}-${ahora.getTime()}-${indice}${evidencia.ext}`);
+        await fs.writeFile(destino, archivo.buffer);
+        destinos.push(destino);
+        datosArchivos.push({
+          path: path.relative(process.cwd(), destino),
+          nombre: archivo.originalname.slice(0, 120),
+          formato: evidencia.formato,
+          bytes: archivo.buffer.length,
+        });
+      }
+    }
   }
 
   const numero = intentosPrevios.reduce((mayor, i) => Math.max(mayor, i.numero), 0) + 1;
   const intento: IIntentoEntrega = {
     numero,
     texto_entrega: texto,
-    archivo_path: datosArchivo?.path ?? null,
-    archivo_nombre: datosArchivo?.nombre ?? null,
-    archivo_formato: datosArchivo?.formato ?? null,
-    archivo_bytes: datosArchivo?.bytes ?? null,
+    respuesta_html: respuestaHtml,
+    archivos: datosArchivos,
+    archivo_path: datosArchivos[0]?.path ?? null,
+    archivo_nombre: datosArchivos[0]?.nombre ?? null,
+    archivo_formato: datosArchivos[0]?.formato ?? null,
+    archivo_bytes: datosArchivos[0]?.bytes ?? null,
     fecha_entrega: ahora,
     con_retraso: ventana.tardia,
     acceso_especial: ventana.acceso_especial,
@@ -381,7 +422,7 @@ export async function registrarEntrega(
       { new: true, upsert: true, runValidators: true, setDefaultsOnInsert: true }
     ).lean();
   } catch (err) {
-    if (destino) await fs.rm(destino, { force: true });
+    await Promise.all(destinos.map((d) => fs.rm(d, { force: true })));
     if ((err as { code?: number }).code === 11000) {
       const actual = await ActivitySubmission.findOne({ activity_id: actividad._id, student_id: estudiante._id }).select('calificacion_numerica').lean();
       throw new ApiError(
@@ -491,9 +532,9 @@ export async function elegirIntentoValido(activityId: string, estudianteId: stri
 
 /**
  * Archivo entregado: el propio estudiante, el docente titular, coordinación o administración. Sin `intento` es el que cuenta;
- * con él, cualquiera de los intentos (el docente compara antes de elegir).
+ * con él, cualquiera de los intentos (el docente compara antes de elegir). `archivo` es la posición entre los archivos del intento.
  */
-export async function rutaDeEntrega(entregaId: string, usuario: UserDocument, intento?: number): Promise<{ ruta: string; nombre: string | null }> {
+export async function rutaDeEntrega(entregaId: string, usuario: UserDocument, intento?: number, archivo = 0): Promise<{ ruta: string; nombre: string | null }> {
   const entrega = (await ActivitySubmission.findById(entregaId).lean()) as unknown as EntregaPlana | null;
   if (!entrega) throw new ApiError(404, 'Entrega no encontrada.');
 
@@ -507,6 +548,7 @@ export async function rutaDeEntrega(entregaId: string, usuario: UserDocument, in
 
   const intentos = intentosDe(entrega);
   const elegido = intento != null ? intentos.find((i) => i.numero === intento) : intentoConsiderado(intentos, entrega.intento_valido);
-  if (!elegido?.archivo_path) throw new ApiError(404, 'Entrega no encontrada.');
-  return { ruta: path.resolve(process.cwd(), elegido.archivo_path), nombre: elegido.archivo_nombre };
+  const elegidoArchivo = elegido ? archivosDe(elegido)[archivo] : undefined;
+  if (!elegidoArchivo) throw new ApiError(404, 'Entrega no encontrada.');
+  return { ruta: path.resolve(process.cwd(), elegidoArchivo.path), nombre: elegidoArchivo.nombre };
 }

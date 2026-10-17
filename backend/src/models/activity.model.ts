@@ -2,6 +2,7 @@ import { HydratedDocument, Model, Schema, Types, model } from 'mongoose';
 import {
   CLAVES_FORMATO_EVIDENCIA,
   FormatoEvidencia,
+  MAX_CARACTERES_COMENTARIOS_DOCENTE,
   PROVEEDORES_VIDEO,
   ProveedorVideo,
   TIPOS_ACTIVIDAD,
@@ -59,6 +60,12 @@ export interface IActivity {
   /** Vacío con `requiere_entrega` = respuesta escrita en línea, sin archivo. */
   formatos_permitidos: FormatoEvidencia[];
   permite_entrega_tardia: boolean;
+  /** Recepción: además del comentario, el estudiante puede redactar su respuesta en un editor de texto. */
+  permite_editor_texto: boolean;
+  /** Recepción: el estudiante puede adjuntar varios archivos (hasta MAX_ARCHIVOS_POR_ENTREGA) en una misma entrega. */
+  permite_varios_archivos: boolean;
+  /** Indicaciones breves en texto plano que el docente deja a sus estudiantes. */
+  comentarios_docente: string;
   /** Texto del editor, ya limpiado por el servidor. `descripcion` guarda su versión sin formato para listados y avisos. */
   contenido_html: string;
   adjuntos: IAdjuntoActividad[];
@@ -94,6 +101,9 @@ const activitySchema = new Schema<IActivity, ActivityModel>(
     requiere_entrega: { type: Boolean, default: true },
     formatos_permitidos: { type: [{ type: String, enum: CLAVES_FORMATO_EVIDENCIA }], default: [] },
     permite_entrega_tardia: { type: Boolean, default: false },
+    permite_editor_texto: { type: Boolean, default: false },
+    permite_varios_archivos: { type: Boolean, default: false },
+    comentarios_docente: { type: String, default: '', trim: true, maxlength: MAX_CARACTERES_COMENTARIOS_DOCENTE },
     contenido_html: { type: String, default: '' },
     adjuntos: {
       type: [

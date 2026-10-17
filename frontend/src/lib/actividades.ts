@@ -21,6 +21,11 @@ export const FORMATOS_EVIDENCIA: Array<{ clave: FormatoEvidencia; etiqueta: stri
 ];
 
 export const MAX_BYTES_ENTREGA = 10 * 1024 * 1024;
+/** Cuántos archivos admite una entrega cuando el docente permite varios. */
+export const MAX_ARCHIVOS_POR_ENTREGA = 5;
+
+/** El editor devuelve `<p></p>` vacío: solo cuenta como respuesta si tiene texto o una imagen. */
+export const htmlTieneContenido = (html: string): boolean => html.replace(/<[^>]*>/g, '').trim() !== '' || /<img\b/i.test(html);
 
 // Lo que el docente adjunta como material de apoyo (más formatos que las evidencias del estudiante).
 export type TipoAdjunto = FormatoEvidencia | 'AUDIO' | 'VIDEO';
@@ -57,6 +62,9 @@ export const ETIQUETAS_CAMPO_MODIFICADO: Record<string, string> = {
   contenido_html: 'las instrucciones',
   adjuntos: 'el material de apoyo',
   videos: 'los videos',
+  permite_editor_texto: 'el editor de texto de la entrega',
+  permite_varios_archivos: 'la entrega de varios archivos',
+  comentarios_docente: 'los comentarios del docente',
   fecha_apertura: 'la fecha de publicación',
   fecha_entrega: 'la fecha límite',
   requiere_entrega: 'si se entrega en la plataforma',

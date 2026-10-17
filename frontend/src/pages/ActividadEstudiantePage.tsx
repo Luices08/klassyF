@@ -6,13 +6,16 @@ import { Alert, errorMessage } from '../components/ui/Alert';
 import { Chip, EstadoEntregaBadge, TipoActividadChip } from '../components/ui/Badge';
 import { Button } from '../components/ui/Button';
 import { Card, CardHeader } from '../components/ui/Card';
+import { ContenidoRico } from '../components/ui/ContenidoRico';
 import { Dropzone } from '../components/ui/Dropzone';
+import { DropzoneMultiple } from '../components/ui/DropzoneMultiple';
+import { EditorRico } from '../components/ui/EditorRico';
 import { Textarea } from '../components/ui/Field';
 import { PageHeader } from '../components/ui/PageHeader';
 import { Spinner } from '../components/ui/Spinner';
-import { ArrowLeftIcon } from '../components/ui/icons';
+import { ArrowLeftIcon, PaperclipIcon, XIcon } from '../components/ui/icons';
 import { type ActividadEstudiante, descargarEntrega, useEnviarEntrega, useMiActividad } from '../hooks/useActividades';
-import { MAX_BYTES_ENTREGA, etiquetaDeFormato, extensionesDe, formatoInstante } from '../lib/actividades';
+import { MAX_ARCHIVOS_POR_ENTREGA, MAX_BYTES_ENTREGA, etiquetaDeFormato, extensionesDe, formatoInstante, formatoTamano, htmlTieneContenido } from '../lib/actividades';
 
 /** CU-EST-03: el estudiante lee la actividad completa, entrega su evidencia (o escribe su respuesta), ve su nota y conversa con su docente. */
 export function ActividadEstudiantePage() {
@@ -88,13 +91,16 @@ export function ActividadEstudiantePage() {
                     <dt className="text-xs text-muted">Cómo entregar</dt>
                     <dd className="font-semibold text-ink">
                       {actividad.formatos_permitidos.length > 0
-                        ? `Un archivo: ${actividad.formatos_permitidos.map(etiquetaDeFormato).join(', ')}`
+                        ? `${actividad.permite_varios_archivos ? `Hasta ${MAX_ARCHIVOS_POR_ENTREGA} archivos` : 'Un archivo'}: ${actividad.formatos_permitidos.map(etiquetaDeFormato).join(', ')}${actividad.permite_editor_texto ? ' o escribir tu respuesta' : ''}`
                         : 'Escribe tu respuesta en la plataforma'}
                     </dd>
                   </div>
                 </>
               )}
             </dl>
+            {actividad.comentarios_docente && (
+              <p className="mb-4 whitespace-pre-wrap rounded-lg bg-primary-soft p-3 text-sm text-body">{actividad.comentarios_docente}</p>
+            )}
             <ContenidoDeActividad actividad={actividad} />
           </Card>
 
@@ -126,31 +132,43 @@ function PanelDeEntrega({ actividad }: { actividad: ActividadEstudiante }) {
   const enviar = useEnviarEntrega();
   const { entrega } = actividad;
   const intentos = entrega?.intentos ?? [];
-  const [archivo, setArchivo] = useState<File | null>(null);
+  const [archivos, setArchivos] = useState<File[]>([]);
   const [texto, setTexto] = useState('');
+  const [respuesta, setRespuesta] = useState('');
   const [mensaje, setMensaje] = useState<{ tone: 'success' | 'error'; texto: string } | null>(null);
-  const [descargando, setDescargando] = useState<number | null>(null);
+  const [descargando, setDescargando] = useState<string | null>(null);
 
   const conArchivo = actividad.formatos_permitidos.length > 0;
-  const puedeEnviar = conArchivo ? archivo !== null : texto.trim() !== '';
+  const conEditor = actividad.permite_editor_texto;
+  const variosArchivos = actividad.permite_varios_archivos;
+  const hayRespuesta = conEditor && htmlTieneContenido(respuesta);
+  const puedeEnviar = conArchivo ? archivos.length > 0 || hayRespuesta : hayRespuesta || texto.trim() !== '';
+
+  function agregarArchivos(nuevos: File[]) {
+    setArchivos((previos) => {
+      const unicos = nuevos.filter((n) => !previos.some((p) => p.name === n.name && p.size === n.size));
+      return [...previos, ...unicos].slice(0, MAX_ARCHIVOS_POR_ENTREGA);
+    });
+  }
 
   async function enviarEntrega() {
     setMensaje(null);
     try {
-      await enviar.mutateAsync({ actividadId: actividad._id, archivo, texto_entrega: texto.trim() });
-      setArchivo(null);
+      await enviar.mutateAsync({ actividadId: actividad._id, archivos, texto_entrega: texto.trim(), respuesta_html: hayRespuesta ? respuesta : undefined });
+      setArchivos([]);
       setTexto('');
+      setRespuesta('');
       setMensaje({ tone: 'success', texto: 'Tu entrega quedó registrada.' });
     } catch (error) {
       setMensaje({ tone: 'error', texto: errorMessage(error) });
     }
   }
 
-  async function bajar(numero: number, nombre: string | null) {
+  async function bajar(numero: number, indice: number, nombre: string) {
     if (!entrega) return;
-    setDescargando(numero);
+    setDescargando(`${numero}-${indice}`);
     try {
-      await descargarEntrega(entrega._id, nombre ?? 'mi-entrega', numero);
+      await descargarEntrega(entrega._id, nombre, numero, indice);
     } catch (error) {
       setMensaje({ tone: 'error', texto: errorMessage(error) });
     } finally {
@@ -177,11 +195,16 @@ function PanelDeEntrega({ actividad }: { actividad: ActividadEstudiante }) {
                 {i.acceso_especial && <Chip tone="blue">Plazo personal</Chip>}
                 {intentos.length > 1 && i.considerado && <Chip tone="green">Cuenta para la nota</Chip>}
               </div>
-              {i.tiene_archivo && (
-                <Button type="button" variant="soft-edit" isLoading={descargando === i.numero} onClick={() => void bajar(i.numero, i.archivo_nombre)}>
-                  Descargar {i.archivo_nombre ?? 'mi archivo'}
-                </Button>
+              {i.archivos.length > 0 && (
+                <div className="flex flex-wrap gap-2">
+                  {i.archivos.map((a) => (
+                    <Button key={a.indice} type="button" variant="soft-edit" isLoading={descargando === `${i.numero}-${a.indice}`} onClick={() => void bajar(i.numero, a.indice, a.nombre)}>
+                      Descargar {a.nombre}
+                    </Button>
+                  ))}
+                </div>
               )}
+              {i.respuesta_html && <ContenidoRico html={i.respuesta_html} className="rounded-lg bg-surface p-3" />}
               {i.texto_entrega && <p className="whitespace-pre-wrap rounded-lg bg-surface p-3 text-body">{i.texto_entrega}</p>}
             </li>
           ))}
@@ -192,19 +215,59 @@ function PanelDeEntrega({ actividad }: { actividad: ActividadEstudiante }) {
 
         {actividad.puede_entregar ? (
           <div className="space-y-3">
-            {conArchivo && (
+            {conArchivo && !variosArchivos && (
               <Dropzone
-                file={archivo}
-                onFile={setArchivo}
+                file={archivos[0] ?? null}
+                onFile={(f) => setArchivos(f ? [f] : [])}
                 extensiones={extensionesDe(actividad.formatos_permitidos)}
                 maxBytes={MAX_BYTES_ENTREGA}
                 hint={`${actividad.formatos_permitidos.map(etiquetaDeFormato).join(', ')} · máximo 10 MB`}
                 disabled={enviar.isPending}
               />
             )}
+            {conArchivo && variosArchivos && (
+              <div className="space-y-2">
+                <DropzoneMultiple
+                  extensiones={extensionesDe(actividad.formatos_permitidos)}
+                  maxBytes={MAX_BYTES_ENTREGA}
+                  maxArchivos={MAX_ARCHIVOS_POR_ENTREGA - archivos.length}
+                  disabled={enviar.isPending || archivos.length >= MAX_ARCHIVOS_POR_ENTREGA}
+                  onFiles={agregarArchivos}
+                  etiqueta="Archivos de tu entrega"
+                  hint={`${actividad.formatos_permitidos.map(etiquetaDeFormato).join(', ')} · hasta ${MAX_ARCHIVOS_POR_ENTREGA} archivos de 10 MB`}
+                />
+                {archivos.length > 0 && (
+                  <ul className="space-y-1.5">
+                    {archivos.map((a) => (
+                      <li key={`${a.name}-${a.size}`} className="flex items-center justify-between gap-3 rounded-lg bg-primary-soft px-3 py-2 text-sm">
+                        <span className="flex min-w-0 items-center gap-2 text-primary">
+                          <PaperclipIcon className="h-4 w-4 shrink-0" />
+                          <span className="truncate">{a.name}</span>
+                          <span className="shrink-0 text-xs text-muted">{formatoTamano(a.size)}</span>
+                        </span>
+                        <button
+                          type="button"
+                          aria-label={`Quitar ${a.name}`}
+                          onClick={() => setArchivos((previos) => previos.filter((x) => x !== a))}
+                          className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-primary hover:bg-surface"
+                        >
+                          <XIcon className="h-3.5 w-3.5" />
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            )}
+            {conEditor && (
+              <div className="space-y-1.5">
+                <p className="text-label text-ink">Tu respuesta</p>
+                <EditorRico value={respuesta} onChange={setRespuesta} etiqueta="Tu respuesta" placeholder="Escribe aquí tu respuesta. Puedes pegar imágenes." />
+              </div>
+            )}
             <Textarea
-              label={conArchivo ? 'Comentario para tu docente (opcional)' : 'Tu respuesta'}
-              rows={conArchivo ? 3 : 8}
+              label={conArchivo || conEditor ? 'Comentario para tu docente (opcional)' : 'Tu respuesta'}
+              rows={conArchivo || conEditor ? 3 : 8}
               maxLength={10000}
               value={texto}
               onChange={(e) => setTexto(e.target.value)}

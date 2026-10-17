@@ -49,6 +49,12 @@ export interface Actividad {
   permite_entrega_tardia: boolean;
   /** false = una sola entrega por estudiante; true = puede volver a entregar y el docente elige cuál califica. */
   permite_multiples_entregas: boolean;
+  /** Además del comentario, el estudiante redacta su respuesta en un editor de texto. */
+  permite_editor_texto: boolean;
+  /** Una entrega admite varios archivos. */
+  permite_varios_archivos: boolean;
+  /** Indicaciones breves en texto plano del docente. */
+  comentarios_docente: string;
   /** El docente la cerró a mano: ya no recibe entregas (salvo el plazo personal de un acceso especial). */
   cerrada: boolean;
   /** El texto del editor (ya limpiado por el servidor). Solo viaja en el detalle, no en los listados. */
@@ -80,9 +86,13 @@ export interface IntentoEntrega {
   con_retraso: boolean;
   acceso_especial: boolean;
   texto_entrega: string;
+  /** Lo escrito en el editor de texto (HTML ya limpiado por el servidor). */
+  respuesta_html: string;
   tiene_archivo: boolean;
   archivo_nombre: string | null;
   archivo_formato: FormatoEvidencia | null;
+  /** Cada archivo de la entrega; `indice` es lo que se pide al descargar. */
+  archivos: Array<{ indice: number; nombre: string; formato: FormatoEvidencia; bytes: number }>;
   /** Es el intento que cuenta para la nota (el elegido por el docente o, si no eligió, el último). */
   considerado: boolean;
 }
@@ -274,6 +284,9 @@ export interface DatosActividad {
   /** Enlaces de YouTube o Vimeo. */
   videos?: string[];
   permite_multiples_entregas?: boolean;
+  permite_editor_texto?: boolean;
+  permite_varios_archivos?: boolean;
+  comentarios_docente?: string;
   cerrada?: boolean;
   tipo: TipoActividad;
   componente_siee: string;
@@ -459,8 +472,12 @@ async function bajarConSesion(ruta: string, nombreArchivo: string): Promise<void
 }
 
 /** La evidencia del estudiante; sin `intento` es la que cuenta, con él cualquiera de sus entregas. */
-export function descargarEntrega(entregaId: string, nombreArchivo: string, intento?: number): Promise<void> {
-  return bajarConSesion(`/activities/entregas/${entregaId}/archivo${intento ? `?intento=${intento}` : ''}`, nombreArchivo);
+export function descargarEntrega(entregaId: string, nombreArchivo: string, intento?: number, archivo = 0): Promise<void> {
+  const consulta = new URLSearchParams();
+  if (intento) consulta.set('intento', String(intento));
+  if (archivo > 0) consulta.set('archivo', String(archivo));
+  const texto = consulta.toString();
+  return bajarConSesion(`/activities/entregas/${entregaId}/archivo${texto ? `?${texto}` : ''}`, nombreArchivo);
 }
 
 /** Un archivo de apoyo que el docente adjuntó a la actividad. */
@@ -490,17 +507,19 @@ export function useMisActividades() {
 
 export interface EnviarEntregaInput {
   actividadId: string;
-  archivo: File | null;
+  archivos: File[];
   texto_entrega: string;
+  respuesta_html?: string;
 }
 
 export function useEnviarEntrega() {
   const invalidar = useInvalidarActividades();
   return useMutation({
-    mutationFn: ({ actividadId, archivo, texto_entrega }: EnviarEntregaInput) => {
+    mutationFn: ({ actividadId, archivos, texto_entrega, respuesta_html }: EnviarEntregaInput) => {
       const formData = new FormData();
-      if (archivo) formData.append('file', archivo);
+      for (const archivo of archivos) formData.append('file', archivo);
       formData.append('texto_entrega', texto_entrega);
+      if (respuesta_html) formData.append('respuesta_html', respuesta_html);
       return api.upload<Entrega>(`/activities/${actividadId}/submissions`, formData);
     },
     onSuccess: invalidar,

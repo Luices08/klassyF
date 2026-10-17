@@ -8,10 +8,22 @@ import {
   OrigenNota,
 } from '../constants/actividades';
 
+/** Un archivo de una entrega: vive en disco, aquí solo su referencia. */
+export interface IArchivoEntrega {
+  path: string;
+  nombre: string;
+  formato: FormatoEvidencia;
+  bytes: number;
+}
+
 /** Cada vez que el estudiante entrega queda un intento; los campos de la entrega de abajo reflejan el que cuenta. */
 export interface IIntentoEntrega {
   numero: number;
   texto_entrega: string;
+  /** Lo escrito en el editor de texto (ya limpiado por el servidor); vacío si la actividad no lo ofrece. */
+  respuesta_html: string;
+  /** Todos los archivos de la entrega; los campos `archivo_*` de abajo repiten el primero por compatibilidad. */
+  archivos: IArchivoEntrega[];
   archivo_path: string | null;
   archivo_nombre: string | null;
   archivo_formato: FormatoEvidencia | null;
@@ -94,6 +106,21 @@ const activitySubmissionSchema = new Schema<IActivitySubmission, ActivitySubmiss
           {
             numero: { type: Number, required: true, min: 1 },
             texto_entrega: { type: String, default: '', maxlength: 10000 },
+            respuesta_html: { type: String, default: '' },
+            archivos: {
+              type: [
+                new Schema(
+                  {
+                    path: { type: String, required: true },
+                    nombre: { type: String, required: true },
+                    formato: { type: String, enum: CLAVES_FORMATO_EVIDENCIA, required: true },
+                    bytes: { type: Number, required: true },
+                  },
+                  { _id: false }
+                ),
+              ],
+              default: [],
+            },
             archivo_path: { type: String, default: null },
             archivo_nombre: { type: String, default: null },
             archivo_formato: { type: String, enum: [...CLAVES_FORMATO_EVIDENCIA, null], default: null },

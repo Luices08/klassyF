@@ -4,7 +4,7 @@ import { Button } from '../ui/Button';
 import { Drawer } from '../ui/Drawer';
 import { DropzoneMultiple } from '../ui/DropzoneMultiple';
 import { EditorRico } from '../ui/EditorRico';
-import { Input, Select } from '../ui/Field';
+import { Input, Select, Textarea } from '../ui/Field';
 import { MultiSelect } from '../ui/MultiSelect';
 import { PanelDocumentosPdf } from '../ui/PanelDocumentosPdf';
 import { Spinner } from '../ui/Spinner';
@@ -76,6 +76,9 @@ interface Formulario {
   requiere: boolean;
   formatos: FormatoEvidencia[];
   tardia: boolean;
+  editorTexto: boolean;
+  variosArchivos: boolean;
+  comentarios: string;
   confirmar: boolean;
 }
 
@@ -112,6 +115,9 @@ function formularioInicial(actividad: Actividad | null): Formulario {
       requiere: actividad.requiere_entrega,
       formatos: actividad.formatos_permitidos,
       tardia: actividad.permite_entrega_tardia,
+      editorTexto: actividad.permite_editor_texto ?? false,
+      variosArchivos: actividad.permite_varios_archivos ?? false,
+      comentarios: actividad.comentarios_docente ?? '',
       confirmar: false,
     };
   }
@@ -131,6 +137,9 @@ function formularioInicial(actividad: Actividad | null): Formulario {
     requiere: true,
     formatos: ['PDF'],
     tardia: false,
+    editorTexto: false,
+    variosArchivos: false,
+    comentarios: '',
     confirmar: false,
   };
 }
@@ -170,6 +179,9 @@ function FormularioActividad({
   const bloques = useBloquesDeClase({ teacherAssignmentId, periodoNumero });
   const [mensaje, setMensaje] = useState<string | null>(null);
   const [cargaAbierta, setCargaAbierta] = useState(false);
+  // Lo que no es de todos los días queda recogido; al editar se abre solo si la actividad ya usa algo de ahí.
+  const [masOpciones, setMasOpciones] = useState(() => Boolean(detalle && (detalle.peso_en_componente !== null || detalle.permite_multiples_entregas)));
+  const [verPlanAula, setVerPlanAula] = useState(true);
   const crear = useCrearActividad();
   const actualizar = useActualizarActividad();
   const guardando = crear.isPending || actualizar.isPending;
@@ -222,6 +234,9 @@ function FormularioActividad({
     requiere_entrega: f.requiere,
     formatos_permitidos: f.requiere ? f.formatos : [],
     permite_entrega_tardia: f.requiere && f.tardia,
+    permite_editor_texto: f.requiere && f.editorTexto,
+    permite_varios_archivos: f.requiere && f.formatos.length > 0 && f.variosArchivos,
+    comentarios_docente: f.comentarios.trim(),
     confirmar_alertas: f.confirmar,
   });
 
@@ -241,6 +256,9 @@ function FormularioActividad({
     if (completos.fecha_entrega === original.fecha_entrega) iguales.push('fecha_entrega');
     if (completos.requiere_entrega === original.requiere_entrega) iguales.push('requiere_entrega');
     if (completos.permite_entrega_tardia === original.permite_entrega_tardia) iguales.push('permite_entrega_tardia');
+    if (completos.permite_editor_texto === (original.permite_editor_texto ?? false)) iguales.push('permite_editor_texto');
+    if (completos.permite_varios_archivos === (original.permite_varios_archivos ?? false)) iguales.push('permite_varios_archivos');
+    if (completos.comentarios_docente === (original.comentarios_docente ?? '')) iguales.push('comentarios_docente');
     if (JSON.stringify(completos.formatos_permitidos) === JSON.stringify(original.formatos_permitidos)) iguales.push('formatos_permitidos');
     for (const campo of iguales) delete actuales[campo];
     return actuales;
@@ -314,7 +332,7 @@ function FormularioActividad({
         isSubmitting={guardando}
         submitDisabled={!completo || hayBloqueo || (hayAdvertencia && !f.confirmar)}
       >
-        <div className="grid gap-5 lg:grid-cols-2">
+        <div className={`grid gap-5 ${verPlanAula ? 'lg:grid-cols-2' : ''}`}>
           <div className="space-y-4">
             {mensaje && <Alert tone="error">{mensaje}</Alert>}
             {omitidas.length > 0 && (
@@ -353,6 +371,15 @@ function FormularioActividad({
                 placeholder="Lo que el estudiante debe hacer y cómo se evalúa. Puedes pegar imágenes."
               />
             </div>
+
+            <Textarea
+              label="Comentarios para los estudiantes (opcional)"
+              rows={3}
+              maxLength={1000}
+              value={f.comentarios}
+              hint="Una indicación breve y en texto simple que aparece sobre las instrucciones."
+              onChange={(e) => cambiar('comentarios', e.target.value)}
+            />
 
             <fieldset className="space-y-3 rounded-lg border border-border p-3">
               <legend className="px-1 text-label text-body">Material de apoyo</legend>
@@ -429,6 +456,95 @@ function FormularioActividad({
               </div>
             </fieldset>
 
+            <fieldset className="space-y-3 rounded-lg border border-border p-3">
+              <legend className="px-1 text-label text-body">Recepción de entregas</legend>
+              <label className="flex items-center gap-2 text-sm text-body">
+                <input
+                  type="checkbox"
+                  checked={f.requiere}
+                  disabled={tieneEntregas}
+                  onChange={(e) => cambiar('requiere', e.target.checked)}
+                />
+                Los estudiantes entregan algo en la plataforma
+              </label>
+              {f.requiere ? (
+                <>
+                <div className="space-y-1.5">
+                  <Input
+                    label="Límite de entrega (hora de Colombia)"
+                    type="datetime-local"
+                    value={f.entrega}
+                    min={f.apertura || undefined}
+                    onChange={(e) => {
+                      cambiar('entrega', e.target.value);
+                      cambiar('confirmar', false);
+                    }}
+                  />
+                  <Button type="button" variant="outline" onClick={() => setCargaAbierta(true)} className="inline-flex items-center gap-2">
+                    <CalendarIcon className="h-4 w-4" />
+                    Ver carga de tareas del grupo
+                  </Button>
+                </div>
+                  {fechaEntrega && <AlertasCalendario revision={revision.data} cargando={revision.isFetching} error={revision.error} />}
+            {hayAdvertencia && !hayBloqueo && (
+              <label className="flex items-start gap-2 text-sm text-body">
+                <input type="checkbox" className="mt-0.5" checked={f.confirmar} onChange={(e) => cambiar('confirmar', e.target.checked)} />
+                Entiendo las advertencias y quiero programar la actividad en esta fecha.
+              </label>
+            )}
+
+                  <div>
+                    <p className="mb-1.5 text-label text-body">Formatos que se aceptan</p>
+                    <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-2">
+                      {FORMATOS_EVIDENCIA.map((formato) => (
+                        <label key={formato.clave} className="flex items-center gap-2 text-sm text-body">
+                          <input
+                            type="checkbox"
+                            checked={f.formatos.includes(formato.clave)}
+                            disabled={tieneEntregas}
+                            onChange={() => toggleFormato(formato.clave)}
+                          />
+                          {formato.etiqueta}
+                        </label>
+                      ))}
+                    </div>
+                    {tieneEntregas && <p className="mt-1.5 text-xs text-muted">Los formatos ya no se pueden cambiar: hay estudiantes que entregaron.</p>}
+                    {f.formatos.length === 0 && (
+                      <p className="mt-1.5 text-xs text-muted">Sin formatos marcados, el estudiante responde escribiendo en la plataforma.</p>
+                    )}
+                  </div>
+                  <label className="flex items-center gap-2 text-sm text-body">
+                    <input type="checkbox" checked={f.tardia} onChange={(e) => cambiar('tardia', e.target.checked)} />
+                    Acepta entregas tardías (quedan marcadas «Entregada con retraso»)
+                  </label>
+                  <label className="flex items-center gap-2 text-sm text-body">
+                    <input type="checkbox" checked={f.editorTexto} onChange={(e) => cambiar('editorTexto', e.target.checked)} />
+                    El estudiante puede redactar su respuesta en un editor de texto
+                  </label>
+                  {f.formatos.length > 0 && (
+                    <label className="flex items-center gap-2 text-sm text-body">
+                      <input type="checkbox" checked={f.variosArchivos} onChange={(e) => cambiar('variosArchivos', e.target.checked)} />
+                      El estudiante puede cargar varios archivos en una misma entrega
+                    </label>
+                  )}
+                </>
+              ) : (
+                <p className="text-xs text-muted">Actividad de aula: no recibe archivos. La calificas directamente.</p>
+              )}
+            </fieldset>
+
+            <div className="space-y-3">
+              <Button type="button" variant="outline" aria-expanded={masOpciones} onClick={() => setMasOpciones((v) => !v)}>
+                {masOpciones ? 'Menos opciones de actividad' : 'Más opciones de actividad'}
+              </Button>
+              {masOpciones && (
+                <div className="space-y-4 rounded-lg border border-border p-3">
+                  <Switch
+                    label="Mostrar el plan de aula al lado"
+                    description="Apágalo para ocupar todo el ancho; el plan sigue aprobado y disponible."
+                    checked={verPlanAula}
+                    onChange={setVerPlanAula}
+                  />
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <Select
                 label="Bloque de la planilla"
@@ -462,40 +578,15 @@ function FormularioActividad({
                 onChange={(e) => cambiar('peso', e.target.value)}
               />
             </div>
-
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <Input
                 label="Se publica (hora de Colombia)"
                 type="datetime-local"
                 value={f.apertura}
                 onChange={(e) => cambiar('apertura', e.target.value)}
               />
-              <div className="space-y-1.5">
-                <Input
-                  label="Límite de entrega (hora de Colombia)"
-                  type="datetime-local"
-                  value={f.entrega}
-                  min={f.apertura || undefined}
-                  onChange={(e) => {
-                    cambiar('entrega', e.target.value);
-                    cambiar('confirmar', false);
-                  }}
-                />
-                <Button type="button" variant="outline" onClick={() => setCargaAbierta(true)} className="inline-flex items-center gap-2">
-                  <CalendarIcon className="h-4 w-4" />
-                  Ver carga de tareas del grupo
-                </Button>
-              </div>
-            </div>
 
-            {fechaEntrega && <AlertasCalendario revision={revision.data} cargando={revision.isFetching} error={revision.error} />}
-            {hayAdvertencia && !hayBloqueo && (
-              <label className="flex items-start gap-2 text-sm text-body">
-                <input type="checkbox" className="mt-0.5" checked={f.confirmar} onChange={(e) => cambiar('confirmar', e.target.checked)} />
-                Entiendo las advertencias y quiero programar la actividad en esta fecha.
-              </label>
-            )}
-
+                </div>
             {!actividad && otrasClases.length > 0 && (
               <div className="space-y-1.5">
                 <MultiSelect
@@ -511,72 +602,36 @@ function FormularioActividad({
                 </p>
               </div>
             )}
-
-            <fieldset className="space-y-3 rounded-lg border border-border p-3">
-              <legend className="px-1 text-label text-body">Recepción de entregas</legend>
-              <label className="flex items-center gap-2 text-sm text-body">
-                <input
-                  type="checkbox"
-                  checked={f.requiere}
-                  disabled={tieneEntregas}
-                  onChange={(e) => cambiar('requiere', e.target.checked)}
-                />
-                Los estudiantes entregan algo en la plataforma
-              </label>
-              {f.requiere ? (
-                <>
-                  <div>
-                    <p className="mb-1.5 text-label text-body">Formatos que se aceptan</p>
-                    <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-2">
-                      {FORMATOS_EVIDENCIA.map((formato) => (
-                        <label key={formato.clave} className="flex items-center gap-2 text-sm text-body">
-                          <input
-                            type="checkbox"
-                            checked={f.formatos.includes(formato.clave)}
-                            disabled={tieneEntregas}
-                            onChange={() => toggleFormato(formato.clave)}
-                          />
-                          {formato.etiqueta}
-                        </label>
-                      ))}
-                    </div>
-                    {tieneEntregas && <p className="mt-1.5 text-xs text-muted">Los formatos ya no se pueden cambiar: hay estudiantes que entregaron.</p>}
-                    {f.formatos.length === 0 && (
-                      <p className="mt-1.5 text-xs text-muted">Sin formatos marcados, el estudiante responde escribiendo en la plataforma.</p>
-                    )}
-                  </div>
-                  <label className="flex items-center gap-2 text-sm text-body">
-                    <input type="checkbox" checked={f.tardia} onChange={(e) => cambiar('tardia', e.target.checked)} />
-                    Acepta entregas tardías (quedan marcadas «Entregada con retraso»)
-                  </label>
                   <Switch
                     label="Permite múltiples entregas"
                     description="Si está apagado, cada estudiante entrega una sola vez. Encendido, puede volver a entregar y tú eliges cuál es la válida antes de calificar."
                     checked={f.multiples}
                     onChange={(v) => cambiar('multiples', v)}
                   />
-                </>
-              ) : (
-                <p className="text-xs text-muted">Actividad de aula: no recibe archivos. La calificas directamente.</p>
+
+                </div>
               )}
-            </fieldset>
+            </div>
+
           </div>
 
-          <PanelDocumentosPdf
-            documentos={
-              planAula
-                ? [
-                    {
-                      clave: `plan-aula-${planAula._id}-${planAula.version_actual}`,
-                      titulo: `Tu plan de aula aprobado: ${planAula.titulo}`,
-                      nombreArchivo: planAula.archivo_nombre,
-                      cargar: () => cargarArchivoPlanAula(planAula._id, planAula.version_actual),
-                    },
-                  ]
-                : []
-            }
-            vacio="Aquí verás el plan de aula aprobado de este periodo."
-          />
+          {verPlanAula && (
+            <PanelDocumentosPdf
+              documentos={
+                planAula
+                  ? [
+                      {
+                        clave: `plan-aula-${planAula._id}-${planAula.version_actual}`,
+                        titulo: `Tu plan de aula aprobado: ${planAula.titulo}`,
+                        nombreArchivo: planAula.archivo_nombre,
+                        cargar: () => cargarArchivoPlanAula(planAula._id, planAula.version_actual),
+                      },
+                    ]
+                  : []
+              }
+              vacio="Aquí verás el plan de aula aprobado de este periodo."
+            />
+          )}
         </div>
       </Drawer>
       {cargaAbierta && (

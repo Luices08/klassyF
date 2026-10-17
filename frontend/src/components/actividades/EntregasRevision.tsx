@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { Alert, errorMessage } from '../ui/Alert';
 import { Chip, EstadoEntregaBadge } from '../ui/Badge';
 import { Button } from '../ui/Button';
+import { ContenidoRico } from '../ui/ContenidoRico';
 import { Input } from '../ui/Field';
 import { Spinner } from '../ui/Spinner';
 import { Tabs } from '../ui/Tabs';
@@ -112,7 +113,9 @@ function FilaEntregaEstudiante({ actividad, fila, escala, puedeGestionar }: Fila
   const [nota, setNota] = useState(entrega?.calificacion_numerica?.toString() ?? '');
   const [retro, setRetro] = useState(entrega?.retroalimentacion ?? '');
   const [mensaje, setMensaje] = useState<{ tone: 'success' | 'error'; texto: string } | null>(null);
-  const [descargando, setDescargando] = useState<number | null>(null);
+  const [descargando, setDescargando] = useState<string | null>(null);
+  // Una nota ya puesta se ve fija; «Modificar» la habilita para corregirla.
+  const [editando, setEditando] = useState(false);
   const [verAcceso, setVerAcceso] = useState(false);
 
   const notaNumerica = Number(nota);
@@ -120,14 +123,16 @@ function FilaEntregaEstudiante({ actividad, fila, escala, puedeGestionar }: Fila
   const intentos = entrega?.intentos ?? [];
   const variosIntentos = intentos.length > 1;
   const bloqueadaPorElegir = Boolean(entrega?.requiere_elegir_intento);
+  const calificada = typeof entrega?.calificacion_numerica === 'number';
+  const bloqueado = bloqueadaPorElegir || (calificada && !editando);
   const puedeDarAcceso = actividad.requiere_entrega && typeof entrega?.calificacion_numerica !== 'number';
 
-  async function bajar(numero: number, nombre: string | null) {
+  async function bajar(numero: number, indice: number, nombre: string) {
     if (!entrega) return;
     setMensaje(null);
-    setDescargando(numero);
+    setDescargando(`${numero}-${indice}`);
     try {
-      await descargarEntrega(entrega._id, nombre ?? 'entrega', numero);
+      await descargarEntrega(entrega._id, nombre, numero, indice);
     } catch (error) {
       setMensaje({ tone: 'error', texto: errorMessage(error) });
     } finally {
@@ -153,6 +158,7 @@ function FilaEntregaEstudiante({ actividad, fila, escala, puedeGestionar }: Fila
         calificacion_numerica: notaNumerica,
         retroalimentacion: retro.trim(),
       });
+      setEditando(false);
       setMensaje({ tone: 'success', texto: 'Nota guardada.' });
     } catch (error) {
       setMensaje({ tone: 'error', texto: errorMessage(error) });
@@ -202,12 +208,17 @@ function FilaEntregaEstudiante({ actividad, fila, escala, puedeGestionar }: Fila
                   {i.acceso_especial && <Chip tone="blue">Plazo personal</Chip>}
                   {variosIntentos && i.considerado && <Chip tone="green">Válida</Chip>}
                 </div>
-                {i.tiene_archivo && (
-                  <Button type="button" variant="soft-edit" isLoading={descargando === i.numero} onClick={() => void bajar(i.numero, i.archivo_nombre)}>
-                    Descargar {i.archivo_nombre ?? 'archivo'}
-                  </Button>
+                {i.archivos.length > 0 && (
+                  <div className="flex flex-wrap gap-2">
+                    {i.archivos.map((a) => (
+                      <Button key={a.indice} type="button" variant="soft-edit" isLoading={descargando === `${i.numero}-${a.indice}`} onClick={() => void bajar(i.numero, a.indice, a.nombre)}>
+                        Descargar {a.nombre}
+                      </Button>
+                    ))}
+                  </div>
                 )}
               </div>
+              {i.respuesta_html && <ContenidoRico html={i.respuesta_html} className="rounded-lg bg-surface p-3" />}
               {i.texto_entrega && <p className="whitespace-pre-wrap rounded-lg bg-surface p-3 text-body">{i.texto_entrega}</p>}
             </li>
           ))}
@@ -236,13 +247,34 @@ function FilaEntregaEstudiante({ actividad, fila, escala, puedeGestionar }: Fila
             max={escala?.nota_maxima}
             step="0.1"
             value={nota}
-            disabled={bloqueadaPorElegir}
+            disabled={bloqueado}
             onChange={(e) => setNota(e.target.value)}
           />
-          <Input label="Retroalimentación" value={retro} disabled={bloqueadaPorElegir} onChange={(e) => setRetro(e.target.value)} />
-          <Button type="button" isLoading={calificar.isPending} disabled={!notaValida || bloqueadaPorElegir} onClick={() => void guardarNota()}>
-            Guardar nota
-          </Button>
+          <Input label="Retroalimentación" value={retro} disabled={bloqueado} onChange={(e) => setRetro(e.target.value)} />
+          {bloqueado ? (
+            <Button type="button" variant="outline" onClick={() => setEditando(true)}>
+              Modificar
+            </Button>
+          ) : (
+            <div className="flex gap-2">
+              {calificada && (
+                <Button
+                  type="button"
+                  variant="secondary"
+                  onClick={() => {
+                    setNota(entrega?.calificacion_numerica?.toString() ?? '');
+                    setRetro(entrega?.retroalimentacion ?? '');
+                    setEditando(false);
+                  }}
+                >
+                  Cancelar
+                </Button>
+              )}
+              <Button type="button" isLoading={calificar.isPending} disabled={!notaValida || bloqueadaPorElegir} onClick={() => void guardarNota()}>
+                Guardar nota
+              </Button>
+            </div>
+          )}
         </div>
       ) : (
         typeof entrega?.calificacion_numerica === 'number' && (

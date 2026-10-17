@@ -1,7 +1,7 @@
 import { NextFunction, Request, RequestHandler, Response, Router } from 'express';
 import fs from 'fs';
 import multer from 'multer';
-import { MAX_ARCHIVOS_POR_SUBIDA, MAX_BYTES_ADJUNTO, MAX_BYTES_ENTREGA, MIMETYPES_EVIDENCIA } from '../constants/actividades';
+import { MAX_ARCHIVOS_POR_ENTREGA, MAX_ARCHIVOS_POR_SUBIDA, MAX_BYTES_ADJUNTO, MAX_BYTES_ENTREGA, MIMETYPES_EVIDENCIA } from '../constants/actividades';
 import { Rol } from '../constants/enums';
 import { ROLES } from '../constants/roles';
 import {
@@ -47,12 +47,12 @@ const upload = multer({
     MIMETYPES_EVIDENCIA.has(file.mimetype)
       ? cb(null, true)
       : cb(new ApiError(400, 'Solo se aceptan PDF, Word, Excel, PowerPoint o imágenes (JPG, PNG, WEBP).') as unknown as Error),
-  limits: { fileSize: MAX_BYTES_ENTREGA },
+  limits: { fileSize: MAX_BYTES_ENTREGA, files: MAX_ARCHIVOS_POR_ENTREGA },
 });
 
 // El mensaje genérico del manejador de errores nombra 5 MB (el de matrículas): aquí el tope es otro.
 const subirEntrega: RequestHandler = (req: Request, res: Response, next: NextFunction) => {
-  upload.single('file')(req, res, (err: unknown) => {
+  upload.array('file', MAX_ARCHIVOS_POR_ENTREGA)(req, res, (err: unknown) => {
     if (err instanceof multer.MulterError && err.code === 'LIMIT_FILE_SIZE') {
       return next(new ApiError(400, `El archivo supera el tamaño máximo permitido (${MAX_BYTES_ENTREGA / 1024 / 1024} MB).`));
     }

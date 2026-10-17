@@ -73,13 +73,14 @@ export const listMisActividades = catchAsync<unknown, unknown, unknown, ParsedQs
 );
 
 export const createSubmission = catchAsync<IdParams, unknown, entregaService.RegistrarEntregaInput>(async (req, res) => {
-  const entrega = await entregaService.registrarEntrega(req.params.id, req.body, req.file, req.user!, req.ip);
+  const entrega = await entregaService.registrarEntrega(req.params.id, req.body, req.files as Express.Multer.File[] | undefined, req.user!, req.ip);
   res.status(201).json({ success: true, data: entrega });
 });
 
-export const descargarEntrega = catchAsync<IdParams, unknown, unknown, ParsedQs & { intento?: string }>(async (req, res) => {
+export const descargarEntrega = catchAsync<IdParams, unknown, unknown, ParsedQs & { intento?: string; archivo?: string }>(async (req, res) => {
   const intento = req.query.intento ? Number(req.query.intento) : undefined;
-  const { ruta, nombre } = await entregaService.rutaDeEntrega(req.params.id, req.user!, intento);
+  const archivo = req.query.archivo ? Number(req.query.archivo) : 0;
+  const { ruta, nombre } = await entregaService.rutaDeEntrega(req.params.id, req.user!, intento, archivo);
   res.download(ruta, nombre ?? 'entrega', (err) => {
     if (err && !res.headersSent) res.status(404).json({ success: false, message: 'El archivo de la entrega ya no está disponible.' });
   });

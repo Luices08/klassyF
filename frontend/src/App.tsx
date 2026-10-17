@@ -41,6 +41,7 @@ import { EnrollmentDetailPage } from './pages/admin/EnrollmentDetailPage';
 import { DocumentosPorRevisarPage } from './pages/admin/DocumentosPorRevisarPage';
 import { EnrollmentsPage } from './pages/admin/EnrollmentsPage';
 import { PazYSalvoPage } from './pages/admin/PazYSalvoPage';
+import { TrasladosPage } from './pages/admin/TrasladosPage';
 import { EspaciosPage } from './pages/admin/EspaciosPage';
 import { GradesPage } from './pages/admin/GradesPage';
 import { GrupoFichaPage } from './pages/admin/GrupoFichaPage';
@@ -96,6 +97,7 @@ export default function App() {
           {/* El docente entra a la ruta: el servidor dice si la institución lo habilitó (Configuración institucional). */}
           <Route element={<ProtectedRoute allowedRoles={['ADMIN', 'COORDINADOR', 'SECRETARIA', 'DOCENTE']} />}>
             <Route path="/paz-y-salvo" element={<PazYSalvoPage />} />
+            <Route path="/secretaria/traslados" element={<TrasladosPage />} />
           </Route>
 
           <Route element={<ProtectedRoute allowedRoles={['ADMIN', 'SECRETARIA']} />}>

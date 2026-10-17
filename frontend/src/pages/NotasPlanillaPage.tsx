@@ -178,6 +178,12 @@ export function NotasPlanillaPage() {
       {planilla && asignacion && periodo && (
         <>
           {!planilla.edicion.puede_editar && planilla.edicion.motivo && <Alert tone="info">{planilla.edicion.motivo}</Alert>}
+          {planilla.ingresaron_despues.length > 0 && (
+            <Alert tone="info">
+              No se califican en este periodo porque ingresaron por traslado después de él (secretaría homologa sus notas):{' '}
+              {planilla.ingresaron_despues.map((e) => `${e.apellido}, ${e.nombre}`).join('; ')}.
+            </Alert>
+          )}
           {planilla.bloques.every((b) => b.casillas.length === 0) && (
             <Alert tone="info">
               Esta clase aún no tiene casillas en el periodo. Agrega notas con el botón «+» de cada bloque, o programa actividades en{' '}

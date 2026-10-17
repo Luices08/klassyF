@@ -66,6 +66,11 @@ export const CLAVES_TEXTOS_BOLETIN = [
   'dificultades_ninguna',
   'compromisos_intro',
   'promocion_intro',
+  'homologada',
+  'exenta',
+  'convencion_homologada',
+  'convencion_exenta',
+  'traslado_linea',
 ] as const;
 export type ClaveTextoBoletin = (typeof CLAVES_TEXTOS_BOLETIN)[number];
 

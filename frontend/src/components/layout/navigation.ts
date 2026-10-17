@@ -80,6 +80,7 @@ export const NAV_ITEMS: NavItem[] = [
   // Fin de año (M04): el docente solo lo ve si la institución lo habilitó; el servidor lo decide.
   { to: '/paz-y-salvo', label: 'Paz y salvo de fin de año', icon: CheckCircleIcon, roles: [...STAFF, 'DOCENTE'] },
   { to: '/admin/admisiones', label: 'Admisiones', icon: InboxIcon, roles: STAFF },
+  { to: '/secretaria/traslados', label: 'Traslados y homologación', icon: LayersIcon, roles: STAFF },
   { to: '/secretaria/certificados', label: 'Certificados', icon: FileTextIcon, roles: ['ADMIN', 'SECRETARIA'] },
   { to: '/convivencia/observador', label: 'Observador', icon: EyeIcon, roles: CONVIVENCIA_REGISTRA },
   { to: '/convivencia/catalogo', label: 'Catálogo de convivencia', icon: SlidersIcon, roles: CONVIVENCIA_GESTIONA },
@@ -109,7 +110,7 @@ export const GRUPOS_NAV: GrupoNav[] = [
     clave: 'matriculas',
     label: 'Matrículas y admisiones',
     icon: ClipboardListIcon,
-    rutas: ['/admin/admisiones', '/admin/enrollments', '/admin/documentos-por-revisar', '/paz-y-salvo', '/admin/students', '/secretaria/certificados'],
+    rutas: ['/admin/admisiones', '/admin/enrollments', '/admin/documentos-por-revisar', '/paz-y-salvo', '/secretaria/traslados', '/admin/students', '/secretaria/certificados'],
   },
   {
     clave: 'institucion',

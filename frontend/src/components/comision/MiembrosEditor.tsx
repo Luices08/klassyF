@@ -15,6 +15,37 @@ export function MiembrosEditor({ value, onChange, deshabilitado }: { value: Entr
   const opciones = opcionesDePersonas(usuarios.filter((u) => u.rol !== 'ESTUDIANTE'));
   const cambiar = (i: number, cambios: Partial<EntradaMiembro>) => onChange(value.map((m, k) => (k === i ? { ...m, ...cambios } : m)));
 
+  const cambiarUsuario = (i: number, userId: string | undefined) => {
+    if (!userId) {
+      cambiar(i, { user_id: undefined });
+      return;
+    }
+    const u = usuarios.find((x) => x._id === userId);
+    let cargoAuto = value[i]?.cargo || '';
+    let representaAuto: Representacion = value[i]?.representa ?? 'OTRO';
+
+    if (u) {
+      if (u.rol === 'DOCENTE') {
+        cargoAuto = cargoAuto || 'Docente';
+        representaAuto = 'DOCENTE';
+      } else if (u.rol === 'COORDINADOR') {
+        cargoAuto = cargoAuto || 'Coordinador(a)';
+        representaAuto = 'DIRECTIVO';
+      } else if (u.rol === 'ADMIN') {
+        cargoAuto = cargoAuto || 'Rector(a)';
+        representaAuto = 'DIRECTIVO';
+      } else if (u.rol === 'ORIENTADOR') {
+        cargoAuto = cargoAuto || 'Orientador(a) escolar';
+        representaAuto = 'ORIENTACION';
+      } else if (u.rol === 'ACUDIENTE') {
+        cargoAuto = cargoAuto || 'Representante de Padres';
+        representaAuto = 'PADRES';
+      }
+    }
+
+    cambiar(i, { user_id: userId, cargo: cargoAuto, representa: representaAuto });
+  };
+
   return (
     <div className="space-y-3">
       {value.map((m, i) => {
@@ -25,7 +56,7 @@ export function MiembrosEditor({ value, onChange, deshabilitado }: { value: Entr
               {externo ? (
                 <Input label="Nombre (sin usuario)" value={m.nombre ?? ''} disabled={deshabilitado} onChange={(e) => cambiar(i, { nombre: e.target.value })} />
               ) : (
-                <SelectBuscable label="Usuario" value={m.user_id ?? ''} onChange={(v) => cambiar(i, { user_id: v || undefined })} disabled={deshabilitado} vacioLabel="Elige un usuario" placeholder="Buscar usuario…" opciones={opciones} />
+                <SelectBuscable label="Usuario" value={m.user_id ?? ''} onChange={(v) => cambiarUsuario(i, v || undefined)} disabled={deshabilitado} vacioLabel="Elige un usuario" placeholder="Buscar usuario…" opciones={opciones} />
               )}
             </div>
             <Input label="Cargo" value={m.cargo} maxLength={120} disabled={deshabilitado} onChange={(e) => cambiar(i, { cargo: e.target.value })} />

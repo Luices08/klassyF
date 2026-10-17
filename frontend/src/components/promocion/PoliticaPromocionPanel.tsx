@@ -7,6 +7,7 @@ import { MultiSelect } from '../ui/MultiSelect';
 import { Spinner } from '../ui/Spinner';
 import { Switch } from '../ui/Switch';
 import { useAreas, useSubjects } from '../../hooks/useCatalogoAcademico';
+import { usePoliticaRecuperacion } from '../../hooks/useRecuperaciones';
 import {
   type AccionRegla,
   type AccionSinRegla,
@@ -30,7 +31,6 @@ import { NIVELES_EDUCATIVOS } from '../../types/domain';
 const ACCIONES = Object.keys(NOMBRES_ACCION) as AccionRegla[];
 const ACCIONES_SIN_REGLA: AccionSinRegla[] = ['PENDIENTE_RECUPERACION', 'NO_PROMUEVE', 'ENVIA_A_COMISION'];
 const ACCIONES_PERMITIDAS_CONVIVENCIA: AccionRegla[] = ['ENVIA_A_COMISION', 'NO_RENUEVA_CUPO'];
-const TIPOS = Object.keys(NOMBRES_CONDICION) as TipoCondicion[];
 const MOMENTOS = Object.keys(NOMBRES_MOMENTO_PROMOCION) as MomentoPromocion[];
 const REQUIERE_N: TipoCondicion[] = ['PERDIDAS_AL_MENOS', 'PERDIDAS_COMO_MAXIMO', 'SIN_NOTA_AL_MENOS', 'RECUPERACION_NO_SUPERADA_AL_MENOS', 'FALTAS_CONVIVENCIA_AL_MENOS'];
 const USA_FILTRO: TipoCondicion[] = ['PERDIDAS_AL_MENOS', 'PERDIDAS_COMO_MAXIMO'];
@@ -69,12 +69,29 @@ export function PoliticaPromocionPanel({ academicYearId, puedeEditar }: { academ
 
 function Formulario({ academicYearId, politica, puedeEditar }: { academicYearId: string; politica: PoliticaPromocion; puedeEditar: boolean }) {
   const actualizar = useActualizarPoliticaPromocion(academicYearId);
+  const { data: recupPolitica } = usePoliticaRecuperacion(academicYearId);
   const [b, setB] = useState<PoliticaPromocion>(() => structuredClone(politica));
-  const [mensaje, setMensaje] = useState<{ tone: 'success' | 'error'; texto: string } | null>(null);
+  const [mensaje, setMensaje] = useState<{ tone: 'success' | 'error' | 'info'; texto: string } | null>(null);
   const areas = useAreas().data ?? [];
   const asignaturas = useSubjects().data ?? [];
   const opcionesAreas = areas.map((a) => ({ value: a._id, label: a.nombre }));
   const opcionesAsignaturas = asignaturas.map((s) => ({ value: s._id, label: s.nombre }));
+
+  // Exclusión mutua: si ya es crítica no puede ser permitida/pendiente y viceversa
+  const opcionesAreasCriticas = areas
+    .filter((a) => !b.areas_arrastrables_ids.includes(a._id))
+    .map((a) => ({ value: a._id, label: a.nombre }));
+  const opcionesAreasArrastrables = areas
+    .filter((a) => !b.areas_criticas_ids.includes(a._id))
+    .map((a) => ({ value: a._id, label: a.nombre }));
+
+  const opcionesAsignaturasCriticas = asignaturas
+    .filter((s) => !b.asignaturas_arrastrables_ids.includes(s._id))
+    .map((s) => ({ value: s._id, label: s.nombre }));
+  const opcionesAsignaturasArrastrables = asignaturas
+    .filter((s) => !b.asignaturas_criticas_ids.includes(s._id))
+    .map((s) => ({ value: s._id, label: s.nombre }));
+
   const bloqueado = !puedeEditar;
 
   const cambiarRegla = (i: number, cambios: Partial<ReglaPromocion>) => setB((p) => ({ ...p, reglas: p.reglas.map((r, k) => (k === i ? { ...r, ...cambios } : r)) }));
@@ -95,8 +112,22 @@ function Formulario({ academicYearId, politica, puedeEditar }: { academicYearId:
 
   return (
     <form onSubmit={(e) => void guardar(e)} className="space-y-4">
-      {!puedeEditar && <Alert tone="info">Esta es la política de promoción del colegio (su SIEE). Solo el administrador puede cambiarla{' '}y no en un año cerrado.</Alert>}
+      {!puedeEditar && <Alert tone="info">Esta es la política de promoción del colegio (su SIEE). Solo el administrador puede cambiarla y no en un año cerrado.</Alert>}
       {mensaje && <Alert tone={mensaje.tone}>{mensaje.texto}</Alert>}
+
+      {recupPolitica?.anual && (
+        <Alert tone="info">
+          {recupPolitica.anual.aplica ? (
+            <>
+              <strong>Regla base vinculada con Recuperaciones de fin de año (Módulo 18):</strong> El colegio tiene activa la recuperación final para estudiantes que reprueben hasta <strong>{recupPolitica.anual.max_asignaturas_pendientes} asignatura(s)</strong>. Quien repruebe más de esa cantidad no tiene derecho a recuperación y pierde el año directamente. Las reglas adicionales de abajo solo son necesarias si tu SIEE contempla condiciones especiales adicionales (ej. áreas críticas o ausentismo).
+            </>
+          ) : (
+            <>
+              <strong>Regla base vinculada con Recuperaciones de fin de año (Módulo 18):</strong> El colegio no tiene activa la recuperación de fin de año. Cualquier estudiante que repruebe asignaturas pasará a la acción por defecto configurada abajo.
+            </>
+          )}
+        </Alert>
+      )}
 
       <Card>
         <CardHeader
@@ -128,16 +159,16 @@ function Formulario({ academicYearId, politica, puedeEditar }: { academicYearId:
             <>
               <MultiSelect
                 label="Asignaturas críticas (fundamentales)"
-                options={opcionesAsignaturas}
+                options={opcionesAsignaturasCriticas}
                 selected={b.asignaturas_criticas_ids}
-                onChange={(v) => !bloqueado && setB({ ...b, asignaturas_criticas_ids: v })}
+                onChange={(v) => !bloqueado && setB({ ...b, asignaturas_criticas_ids: v, asignaturas_arrastrables_ids: b.asignaturas_arrastrables_ids.filter((id) => !v.includes(id)) })}
                 allLabel="Ninguna"
               />
               <MultiSelect
                 label="Asignaturas permitidas como pendientes"
-                options={opcionesAsignaturas}
+                options={opcionesAsignaturasArrastrables}
                 selected={b.asignaturas_arrastrables_ids}
-                onChange={(v) => !bloqueado && setB({ ...b, asignaturas_arrastrables_ids: v })}
+                onChange={(v) => !bloqueado && setB({ ...b, asignaturas_arrastrables_ids: v, asignaturas_criticas_ids: b.asignaturas_criticas_ids.filter((id) => !v.includes(id)) })}
                 allLabel="Ninguna"
               />
             </>
@@ -145,44 +176,181 @@ function Formulario({ academicYearId, politica, puedeEditar }: { academicYearId:
             <>
               <MultiSelect
                 label="Áreas críticas (fundamentales)"
-                options={opcionesAreas}
+                options={opcionesAreasCriticas}
                 selected={b.areas_criticas_ids}
-                onChange={(v) => !bloqueado && setB({ ...b, areas_criticas_ids: v })}
+                onChange={(v) => !bloqueado && setB({ ...b, areas_criticas_ids: v, areas_arrastrables_ids: b.areas_arrastrables_ids.filter((id) => !v.includes(id)) })}
                 allLabel="Ninguna"
               />
               <MultiSelect
                 label="Áreas permitidas como pendientes"
-                options={opcionesAreas}
+                options={opcionesAreasArrastrables}
                 selected={b.areas_arrastrables_ids}
-                onChange={(v) => !bloqueado && setB({ ...b, areas_arrastrables_ids: v })}
+                onChange={(v) => !bloqueado && setB({ ...b, areas_arrastrables_ids: v, areas_criticas_ids: b.areas_criticas_ids.filter((id) => !v.includes(id)) })}
                 allLabel="Ninguna"
               />
             </>
+          )}
+
+          {((b.unidad === 'ASIGNATURA' && b.asignaturas_criticas_ids.length > 0) || (b.unidad === 'AREA' && b.areas_criticas_ids.length > 0)) && (
+            <div className="sm:col-span-2 flex flex-wrap items-center justify-between gap-2 rounded-lg bg-primary-soft p-3 text-sm text-primary">
+              <span>
+                Has definido {b.unidad === 'ASIGNATURA' ? `${b.asignaturas_criticas_ids.length} asignatura(s)` : `${b.areas_criticas_ids.length} área(s)`} crítica(s).
+              </span>
+              {puedeEditar && (
+                <Button
+                  type="button"
+                  variant="secondary"
+                  onClick={() => {
+                    const tipoCond = b.unidad === 'ASIGNATURA' ? 'PIERDE_ASIGNATURAS' : 'PIERDE_AREAS';
+                    const yaExiste = b.reglas.some((r) => r.condiciones.some((c) => c.tipo === tipoCond));
+                    if (yaExiste) {
+                      setMensaje({ tone: 'info', texto: 'Ya existe una regla de materias críticas en la lista de abajo.' });
+                      return;
+                    }
+                    const nueva: ReglaPromocion = {
+                      clave: `${claveNueva()}-criticas`,
+                      nombre: `Reprobación por reprobar las ${b.unidad === 'ASIGNATURA' ? 'asignaturas' : 'áreas'} críticas a la vez`,
+                      activa: true,
+                      momentos: ['TRAS_RECUPERACION'],
+                      niveles: [],
+                      grados_ids: [],
+                      condiciones: [
+                        {
+                          tipo: tipoCond,
+                          n: null,
+                          porcentaje: null,
+                          nota: null,
+                          filtro: null,
+                          faltas: null,
+                          modo: 'TODAS',
+                          subject_ids: b.unidad === 'ASIGNATURA' ? [...b.asignaturas_criticas_ids] : [],
+                          area_ids: b.unidad === 'AREA' ? [...b.areas_criticas_ids] : [],
+                          gravedad: null,
+                        },
+                      ],
+                      accion: 'NO_PROMUEVE',
+                    };
+                    setB((p) => ({ ...p, reglas: [...p.reglas, nueva] }));
+                    setMensaje({ tone: 'success', texto: 'Regla de materias críticas agregada automáticamente.' });
+                  }}
+                >
+                  Generar regla para materias críticas
+                </Button>
+              )}
+            </div>
           )}
         </div>
       </Card>
 
       <Card>
         <CardHeader
-          title="Reglas"
-          subtitle="Cada regla se cumple cuando se dan todas sus condiciones. Si varias se disparan a la vez gana la más severa (retiro, no promover, comisión, recuperación)."
+          title="Reglas del SIEE"
+          subtitle="Cada regla se evalúa automáticamente. Puedes cargar las reglas típicas de Colombia con un clic o personalizarlas."
           action={
             puedeEditar && (
-              <Button type="button" variant="soft-edit" onClick={() => setB({ ...b, reglas: [...b.reglas, { clave: claveNueva(), nombre: 'Nueva regla', activa: true, momentos: ['CIERRE', 'TRAS_RECUPERACION'], niveles: [], grados_ids: [], condiciones: [condicionNueva('PERDIDAS_AL_MENOS')], accion: 'NO_PROMUEVE' }] })}>
-                Agregar regla
-              </Button>
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  type="button"
+                  variant="secondary"
+                  onClick={() => {
+                    const topeM18 = recupPolitica?.anual?.aplica ? recupPolitica.anual.max_asignaturas_pendientes : 2;
+                    const nReprobacion = (topeM18 || 2) + 1;
+                    const nuevas: ReglaPromocion[] = [
+                      {
+                        clave: claveNueva(),
+                        nombre: `Reprobación por reprobar ${nReprobacion} o más ${b.unidad === 'ASIGNATURA' ? 'asignaturas' : 'áreas'}`,
+                        activa: true,
+                        momentos: ['CIERRE', 'TRAS_RECUPERACION'],
+                        niveles: [],
+                        grados_ids: [],
+                        condiciones: [
+                          {
+                            tipo: 'PERDIDAS_AL_MENOS',
+                            n: nReprobacion,
+                            porcentaje: null,
+                            nota: null,
+                            filtro: 'TODAS',
+                            faltas: null,
+                            modo: null,
+                            subject_ids: [],
+                            area_ids: [],
+                            gravedad: null,
+                          },
+                        ],
+                        accion: 'NO_PROMUEVE',
+                      },
+                      {
+                        clave: `${claveNueva()}-asist`,
+                        nombre: 'Reprobación por inasistencias injustificadas (> 20%)',
+                        activa: true,
+                        momentos: ['CIERRE', 'TRAS_RECUPERACION'],
+                        niveles: [],
+                        grados_ids: [],
+                        condiciones: [
+                          {
+                            tipo: 'INASISTENCIA_GLOBAL_SUPERA',
+                            n: null,
+                            porcentaje: 20,
+                            nota: null,
+                            filtro: null,
+                            faltas: 'SOLO_INJUSTIFICADAS',
+                            modo: null,
+                            subject_ids: [],
+                            area_ids: [],
+                            gravedad: null,
+                          },
+                        ],
+                        accion: 'NO_PROMUEVE',
+                      },
+                    ];
+                    const tieneCriticas = b.unidad === 'ASIGNATURA' ? b.asignaturas_criticas_ids.length > 0 : b.areas_criticas_ids.length > 0;
+                    if (tieneCriticas) {
+                      nuevas.push({
+                        clave: `${claveNueva()}-criticas`,
+                        nombre: `Reprobación si no supera las ${b.unidad === 'ASIGNATURA' ? 'asignaturas' : 'áreas'} críticas simultáneas`,
+                        activa: true,
+                        momentos: ['TRAS_RECUPERACION'],
+                        niveles: [],
+                        grados_ids: [],
+                        condiciones: [
+                          {
+                            tipo: b.unidad === 'ASIGNATURA' ? 'PIERDE_ASIGNATURAS' : 'PIERDE_AREAS',
+                            n: null,
+                            porcentaje: null,
+                            nota: null,
+                            filtro: null,
+                            faltas: null,
+                            modo: 'TODAS',
+                            subject_ids: b.unidad === 'ASIGNATURA' ? [...b.asignaturas_criticas_ids] : [],
+                            area_ids: b.unidad === 'AREA' ? [...b.areas_criticas_ids] : [],
+                            gravedad: null,
+                          },
+                        ],
+                        accion: 'NO_PROMUEVE',
+                      });
+                    }
+                    setB((p) => ({ ...p, reglas: nuevas }));
+                    setMensaje({ tone: 'success', texto: 'Reglas estándar (Decreto 1290) cargadas automáticamente.' });
+                  }}
+                >
+                  Cargar reglas estándar (Decreto 1290)
+                </Button>
+                <Button type="button" variant="soft-edit" onClick={() => setB({ ...b, reglas: [...b.reglas, { clave: claveNueva(), nombre: 'Nueva regla', activa: true, momentos: ['CIERRE', 'TRAS_RECUPERACION'], niveles: [], grados_ids: [], condiciones: [condicionNueva('PERDIDAS_AL_MENOS')], accion: 'NO_PROMUEVE' }] })}>
+                  Agregar regla personalizada
+                </Button>
+              </div>
             )
           }
         />
-        {b.reglas.length === 0 && <p className="text-sm text-muted">Sin reglas: todos los casos se resuelven con la acción «sin regla» de abajo.</p>}
+        {b.reglas.length === 0 && <p className="text-sm text-muted">Sin reglas personalizadas: todos los casos se resuelven con la regla de Recuperaciones (M18) y la acción por defecto.</p>}
         <div className="space-y-4">
           {b.reglas.map((r, i) => {
             const tieneConvivencia = r.condiciones.some((c) => c.tipo === 'FALTAS_CONVIVENCIA_AL_MENOS');
             return (
               <div key={r.clave} className="space-y-3 rounded-lg border border-border p-4">
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-                  <Input label="Nombre" value={r.nombre} maxLength={120} disabled={bloqueado} onChange={(e) => cambiarRegla(i, { nombre: e.target.value })} />
-                  <Select label="Qué ordena" value={r.accion} disabled={bloqueado} onChange={(e) => cambiarRegla(i, { accion: e.target.value as AccionRegla })}>
+                  <Input label="Nombre de la regla" value={r.nombre} maxLength={120} disabled={bloqueado} onChange={(e) => cambiarRegla(i, { nombre: e.target.value })} />
+                  <Select label="Acción resultante" value={r.accion} disabled={bloqueado} onChange={(e) => cambiarRegla(i, { accion: e.target.value as AccionRegla })}>
                     {ACCIONES.filter((a) => !tieneConvivencia || ACCIONES_PERMITIDAS_CONVIVENCIA.includes(a)).map((a) => (
                       <option key={a} value={a}>
                         {NOMBRES_ACCION[a]}
@@ -196,15 +364,27 @@ function Formulario({ academicYearId, politica, puedeEditar }: { academicYearId:
                   <MultiSelect label="Niveles (vacío = todos)" options={NIVELES_EDUCATIVOS.map((n) => ({ value: n, label: n.charAt(0) + n.slice(1).toLowerCase() }))} selected={r.niveles} onChange={(v) => !bloqueado && cambiarRegla(i, { niveles: v })} allLabel="Todos los niveles" />
                 </div>
                 <div className="space-y-2">
-                  <p className="text-label text-body">Condiciones (todas deben cumplirse)</p>
+                  <p className="text-label text-body">Condiciones (todas deben cumplirse para activar la regla)</p>
                   {r.condiciones.map((c, j) => (
                     <div key={j} className="grid grid-cols-1 items-end gap-3 rounded-lg bg-soft p-3 sm:grid-cols-4">
                       <Select label="Condición" value={c.tipo} disabled={bloqueado} onChange={(e) => cambiarCondicion(i, j, condicionNueva(e.target.value as TipoCondicion))}>
-                        {TIPOS.map((t) => (
-                          <option key={t} value={t}>
-                            {NOMBRES_CONDICION[t]}
-                          </option>
-                        ))}
+                        <optgroup label="── Rendimiento Académico ──">
+                          <option value="PERDIDAS_AL_MENOS">{NOMBRES_CONDICION.PERDIDAS_AL_MENOS}</option>
+                          <option value="PERDIDAS_COMO_MAXIMO">{NOMBRES_CONDICION.PERDIDAS_COMO_MAXIMO}</option>
+                          <option value="PIERDE_ASIGNATURAS">{NOMBRES_CONDICION.PIERDE_ASIGNATURAS}</option>
+                          <option value="PIERDE_AREAS">{NOMBRES_CONDICION.PIERDE_AREAS}</option>
+                          <option value="PROMEDIO_GENERAL_MENOR">{NOMBRES_CONDICION.PROMEDIO_GENERAL_MENOR}</option>
+                        </optgroup>
+                        <optgroup label="── Asistencia / Ausentismo ──">
+                          <option value="INASISTENCIA_GLOBAL_SUPERA">{NOMBRES_CONDICION.INASISTENCIA_GLOBAL_SUPERA}</option>
+                          <option value="INASISTENCIA_ASIGNATURA_SUPERA">{NOMBRES_CONDICION.INASISTENCIA_ASIGNATURA_SUPERA}</option>
+                        </optgroup>
+                        <optgroup label="── Otras Condiciones ──">
+                          <option value="RECUPERACION_NO_SUPERADA_AL_MENOS">{NOMBRES_CONDICION.RECUPERACION_NO_SUPERADA_AL_MENOS}</option>
+                          <option value="SIN_NOTA_AL_MENOS">{NOMBRES_CONDICION.SIN_NOTA_AL_MENOS}</option>
+                          <option value="FALTAS_CONVIVENCIA_AL_MENOS">{NOMBRES_CONDICION.FALTAS_CONVIVENCIA_AL_MENOS}</option>
+                          <option value="TIENE_PIAR">{NOMBRES_CONDICION.TIENE_PIAR}</option>
+                        </optgroup>
                       </Select>
                       {REQUIERE_N.includes(c.tipo) && <Input label="N" type="number" min={0} value={c.n ?? ''} disabled={bloqueado} onChange={(e) => cambiarCondicion(i, j, { n: num(e.target.value) })} />}
                       {USA_PORCENTAJE.includes(c.tipo) && <Input label="Porcentaje" type="number" min={0} max={100} value={c.porcentaje ?? ''} disabled={bloqueado} onChange={(e) => cambiarCondicion(i, j, { porcentaje: num(e.target.value) })} />}

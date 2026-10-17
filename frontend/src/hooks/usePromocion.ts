@@ -56,15 +56,15 @@ export const NOMBRES_ACCION: Record<AccionRegla, string> = {
 };
 
 export const NOMBRES_CONDICION: Record<TipoCondicion, string> = {
-  PERDIDAS_AL_MENOS: 'Pierde al menos N',
-  PERDIDAS_COMO_MAXIMO: 'Pierde algo, pero como máximo N',
-  PIERDE_ASIGNATURAS: 'Pierde asignaturas específicas',
-  PIERDE_AREAS: 'Pierde áreas específicas',
+  PERDIDAS_AL_MENOS: 'Reprueba al menos N materias/áreas',
+  PERDIDAS_COMO_MAXIMO: 'Reprueba entre 1 y N materias/áreas',
+  PIERDE_ASIGNATURAS: 'Reprueba asignaturas específicas',
+  PIERDE_AREAS: 'Reprueba áreas específicas',
   INASISTENCIA_GLOBAL_SUPERA: 'Inasistencia global supera X %',
   INASISTENCIA_ASIGNATURA_SUPERA: 'Inasistencia en alguna asignatura supera X %',
-  PROMEDIO_GENERAL_MENOR: 'Promedio general menor que',
-  SIN_NOTA_AL_MENOS: 'Le faltan notas en al menos N',
-  RECUPERACION_NO_SUPERADA_AL_MENOS: 'No supera la recuperación en al menos N',
+  PROMEDIO_GENERAL_MENOR: 'Promedio general del año menor que',
+  SIN_NOTA_AL_MENOS: 'Le faltan notas anuales en al menos N',
+  RECUPERACION_NO_SUPERADA_AL_MENOS: 'No supera la recuperación final en al menos N',
   FALTAS_CONVIVENCIA_AL_MENOS: 'Faltas de convivencia (al menos N)',
   TIENE_PIAR: 'Tiene un PIAR vigente',
 };

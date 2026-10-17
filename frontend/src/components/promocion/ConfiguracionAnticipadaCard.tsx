@@ -22,23 +22,47 @@ export function ConfiguracionAnticipadaCard({ puedeEditar }: { puedeEditar: bool
   return <Formulario key={JSON.stringify(data)} configuracion={data} puedeEditar={puedeEditar} />;
 }
 
+const PLANTILLAS_DESEMPENO = [
+  { id: 'SUPERIOR', label: 'Desempeño SUPERIOR (Promedio ≥ 4.6, Asignatura ≥ 4.0)', promedio: 4.6, asignatura: 4.0 },
+  { id: 'ALTO', label: 'Desempeño ALTO (Promedio ≥ 4.0, Asignatura ≥ 3.5)', promedio: 4.0, asignatura: 3.5 },
+  { id: 'BASICO', label: 'Desempeño BÁSICO (Promedio ≥ 3.0, Asignatura ≥ 3.0)', promedio: 3.0, asignatura: 3.0 },
+];
+
 function Criterio({ titulo, valor, onChange, bloqueado }: { titulo: string; valor: CriterioNotas; onChange: (c: CriterioNotas) => void; bloqueado: boolean }) {
   return (
     <div className="space-y-3 rounded-lg border border-border p-4">
       <Switch label={titulo} checked={valor.activo} disabled={bloqueado} onChange={(activo) => onChange({ ...valor, activo })} />
       {valor.activo && (
-        <div className="grid grid-cols-2 gap-3">
-          <Input label="Promedio mínimo" type="number" step="any" min={0} value={valor.promedio_minimo} disabled={bloqueado} onChange={(e) => onChange({ ...valor, promedio_minimo: Number(e.target.value) })} />
-          <Input
-            label="Nota mínima por asignatura"
-            type="number"
-            step="any"
-            min={0}
-            value={valor.nota_minima_asignatura ?? ''}
-            hint="Vacío = no se exige"
+        <div className="space-y-3">
+          <Select
+            label="Plantilla rápida según desempeño institucional"
+            value=""
             disabled={bloqueado}
-            onChange={(e) => onChange({ ...valor, nota_minima_asignatura: e.target.value === '' ? null : Number(e.target.value) })}
-          />
+            onChange={(e) => {
+              const p = PLANTILLAS_DESEMPENO.find((x) => x.id === e.target.value);
+              if (p) onChange({ ...valor, promedio_minimo: p.promedio, nota_minima_asignatura: p.asignatura });
+            }}
+          >
+            <option value="">Selecciona para auto-completar según desempeño…</option>
+            {PLANTILLAS_DESEMPENO.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.label}
+              </option>
+            ))}
+          </Select>
+          <div className="grid grid-cols-2 gap-3">
+            <Input label="Promedio mínimo" type="number" step="any" min={0} value={valor.promedio_minimo} disabled={bloqueado} onChange={(e) => onChange({ ...valor, promedio_minimo: Number(e.target.value) })} />
+            <Input
+              label="Nota mínima por asignatura"
+              type="number"
+              step="any"
+              min={0}
+              value={valor.nota_minima_asignatura ?? ''}
+              hint="Vacío = no se exige"
+              disabled={bloqueado}
+              onChange={(e) => onChange({ ...valor, nota_minima_asignatura: e.target.value === '' ? null : Number(e.target.value) })}
+            />
+          </div>
         </div>
       )}
     </div>
@@ -69,31 +93,37 @@ function Formulario({ configuracion, puedeEditar }: { configuracion: Configuraci
         <CardHeader title="Cuándo se puede" subtitle="Por norma se decide durante el primer periodo; cada colegio fija qué periodo se evalúa y hasta cuándo se acepta la solicitud." />
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
           <Switch label="El colegio aplica la promoción anticipada" checked={c.activa} disabled={bloqueado} onChange={(activa) => setC({ ...c, activa })} />
-          <Input label="Periodo cuyas notas se evalúan" type="number" min={1} max={12} value={c.periodo_evaluacion} disabled={bloqueado} onChange={(e) => setC({ ...c, periodo_evaluacion: Number(e.target.value) })} />
-          <Input label="Días para solicitar tras cerrar ese periodo" type="number" min={0} max={365} value={c.dias_ventana_tras_cierre} disabled={bloqueado} onChange={(e) => setC({ ...c, dias_ventana_tras_cierre: Number(e.target.value) })} />
+          <Input label="Periodo cuyas notas se evalúan" type="number" min={1} max={12} value={c.periodo_evaluacion} disabled={bloqueado || !c.activa} onChange={(e) => setC({ ...c, periodo_evaluacion: Number(e.target.value) })} />
+          <Input label="Días para solicitar tras cerrar ese periodo" type="number" min={0} max={365} value={c.dias_ventana_tras_cierre} disabled={bloqueado || !c.activa} onChange={(e) => setC({ ...c, dias_ventana_tras_cierre: Number(e.target.value) })} />
         </div>
       </Card>
+
+      {!c.activa && (
+        <Alert tone="info">
+          La promoción anticipada está actualmente <strong>desactivada</strong> para la institución. Los criterios inferiores están deshabilitados. Activa el interruptor arriba para habilitarlos y configurarlos.
+        </Alert>
+      )}
 
       <Card>
         <CardHeader title="Criterio de notas" subtitle="Se mide con las notas cerradas del periodo de evaluación (promedio simple de las asignaturas)." />
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <Criterio titulo="Rendimiento excepcional" valor={c.rendimiento_excepcional} bloqueado={bloqueado} onChange={(rendimiento_excepcional) => setC({ ...c, rendimiento_excepcional })} />
-          <Criterio titulo="Reiniciantes" valor={c.reiniciantes} bloqueado={bloqueado} onChange={(reiniciantes) => setC({ ...c, reiniciantes })} />
+          <Criterio titulo="Rendimiento excepcional" valor={c.rendimiento_excepcional} bloqueado={bloqueado || !c.activa} onChange={(rendimiento_excepcional) => setC({ ...c, rendimiento_excepcional })} />
+          <Criterio titulo="Reiniciantes" valor={c.reiniciantes} bloqueado={bloqueado || !c.activa} onChange={(reiniciantes) => setC({ ...c, reiniciantes })} />
         </div>
       </Card>
 
       <Card>
         <CardHeader title="Pasos que se exigen" subtitle="La norma pide concepto de la comisión, consentimiento de los padres y decisión del Consejo Directivo; el colegio puede apagar alguno si su SIEE lo permite." />
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-          <Switch label="Concepto de la comisión" checked={c.exige.concepto_comision} disabled={bloqueado} onChange={(v) => setC({ ...c, exige: { ...c.exige, concepto_comision: v } })} />
-          <Switch label="Consentimiento de la familia" checked={c.exige.consentimiento_familia} disabled={bloqueado} onChange={(v) => setC({ ...c, exige: { ...c.exige, consentimiento_familia: v } })} />
-          <Switch label="Decisión del Consejo Directivo" checked={c.exige.decision_consejo_directivo} disabled={bloqueado} onChange={(v) => setC({ ...c, exige: { ...c.exige, decision_consejo_directivo: v } })} />
+          <Switch label="Concepto de la comisión" checked={c.exige.concepto_comision} disabled={bloqueado || !c.activa} onChange={(v) => setC({ ...c, exige: { ...c.exige, concepto_comision: v } })} />
+          <Switch label="Consentimiento de la familia" checked={c.exige.consentimiento_familia} disabled={bloqueado || !c.activa} onChange={(v) => setC({ ...c, exige: { ...c.exige, consentimiento_familia: v } })} />
+          <Switch label="Decisión del Consejo Directivo" checked={c.exige.decision_consejo_directivo} disabled={bloqueado || !c.activa} onChange={(v) => setC({ ...c, exige: { ...c.exige, decision_consejo_directivo: v } })} />
         </div>
       </Card>
 
       <Card>
         <CardHeader title="Notas de los periodos que no cursó" subtitle="Qué pasa con los periodos anteriores al cambio de grado." />
-        <Select label="Tratamiento" value={c.tratamiento_notas} disabled={bloqueado} onChange={(e) => setC({ ...c, tratamiento_notas: e.target.value as TratamientoNotas })}>
+        <Select label="Tratamiento" value={c.tratamiento_notas} disabled={bloqueado || !c.activa} onChange={(e) => setC({ ...c, tratamiento_notas: e.target.value as TratamientoNotas })}>
           {(Object.keys(NOMBRES_TRATAMIENTO) as TratamientoNotas[]).map((t) => (
             <option key={t} value={t}>
               {NOMBRES_TRATAMIENTO[t]}

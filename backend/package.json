@@ -13,6 +13,7 @@
     "migrate:roles-multiples": "tsx scripts/migrateRolesMultiples.ts",
     "notificar:diario": "tsx scripts/notificarDiario.ts",
     "migrate:superadmin-to-admin": "tsx scripts/migrateSuperadminToAdmin.ts",
+    "sembrar:tipos-titulacion": "tsx scripts/sembrarTiposTitulacion.ts",
     "migrate:m05-anio-lectivo": "tsx scripts/migrateM05AnioLectivo.ts",
     "migrate:folio-al-matricular": "tsx scripts/migrateFolioAlMatricular.ts",
     "migrate:matricula-unica": "tsx scripts/migrateMatriculaUnica.ts",

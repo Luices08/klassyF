@@ -12,6 +12,8 @@ export interface ITipoObservacion {
   /** Se copia a cada observación al guardarla: cambiarlo no revela ni oculta lo ya registrado. */
   visible_estudiante: boolean;
   orden: number;
+  /** Tipo que usa el sistema para asentar novedades institucionales: no se edita, desactiva ni elimina, y no se ofrece al registrar a mano. */
+  sistema: boolean;
   estado: EstadoUsuario;
   createdAt: Date;
   updatedAt: Date;
@@ -26,6 +28,7 @@ const tipoObservacionSchema = new Schema<ITipoObservacion, TipoObservacionModel>
     nombre: { type: String, required: true, trim: true, maxlength: 60 },
     visible_estudiante: { type: Boolean, default: false },
     orden: { type: Number, default: 0 },
+    sistema: { type: Boolean, default: false },
     estado: { type: String, enum: ESTADOS_USUARIO, default: 'activo' },
   },
   { timestamps: true }

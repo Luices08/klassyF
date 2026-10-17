@@ -374,13 +374,21 @@ function compromisos(c: Contexto, tituloSeccion: string): void {
 }
 
 /**
- * Casillas para marcar a mano la decisión de promoción del informe final. El sistema aún no tiene las reglas de promoción (M19/M20), así que no la
- * calcula: la imprime para que la comisión la registre. Cuando existan esas reglas, esta sección es el lugar donde saldrá el resultado.
+ * La decisión de promoción del informe final. Si M19 ya cerró al estudiante (y hay algo que decirle a la familia) sale su resultado, con el
+ * acta si lo decidió una instancia; si no, las casillas para que la comisión la marque a mano.
  */
 function promocion(c: Contexto, tituloSeccion: string): void {
-  const { doc, p } = c;
-  if (p.promocion_opciones.length === 0) return;
+  const { doc, p, b } = c;
   const ancho = doc.page.width - MARGEN * 2;
+  if (b.promocion) {
+    titulo(c, tituloSeccion, u(40));
+    doc.font(fuente.n).fontSize(u(8.5)).fillColor(COLOR.cuerpo).text(t(c, 'promocion_intro'), MARGEN, doc.y, { width: ancho });
+    doc.font(fuente.b).fontSize(u(10)).fillColor(COLOR.ink).text(b.promocion.texto + (b.promocion.acta ? ` (acta ${b.promocion.acta})` : ''), MARGEN, doc.y + u(4), { width: ancho });
+    doc.y += u(6);
+    doc.x = MARGEN;
+    return;
+  }
+  if (p.promocion_opciones.length === 0) return;
   titulo(c, tituloSeccion, u(40));
   doc.font(fuente.n).fontSize(u(8.5)).fillColor(COLOR.cuerpo).text(t(c, 'promocion_intro'), MARGEN, doc.y, { width: ancho });
   asegurarEspacio(doc, u(20));

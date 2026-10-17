@@ -54,7 +54,8 @@ export async function listarCatalogo(incluirInactivos: boolean): Promise<Catalog
   await asegurarTiposBase(institucion._id);
   const filtro = { institucion_id: institucion._id, ...(incluirInactivos ? {} : { estado: ESTADO_ACTIVO }) };
   const [tipos, faltas] = await Promise.all([
-    TipoObservacion.find(filtro).sort({ orden: 1, nombre: 1 }),
+    // Quien registra a mano no ve el tipo del sistema; quien configura sí, bloqueado.
+    TipoObservacion.find(incluirInactivos ? filtro : { ...filtro, sistema: { $ne: true } }).sort({ orden: 1, nombre: 1 }),
     FaltaConvivencia.find(filtro).collation({ locale: 'es', numericOrdering: true }).sort({ gravedad: 1, codigo: 1 }),
   ]);
   return { tipos, faltas };
@@ -117,6 +118,7 @@ export async function actualizarTipo(
 ): Promise<TipoObservacionDocument> {
   const tipo = await TipoObservacion.findById(id);
   if (!tipo) throw new ApiError(404, 'Tipo de observación no encontrado.');
+  exigirTipoEditable(tipo);
   tipo.set(input);
   try {
     await tipo.save();
@@ -127,12 +129,20 @@ export async function actualizarTipo(
   return tipo;
 }
 
-export const cambiarEstadoTipo = (id: string, estado: EstadoUsuario, actor: ContextoActor) =>
-  cambiarEstadoDe<TipoObservacionDocument>(TipoObservacion, 'TipoObservacion', id, estado, actor);
+function exigirTipoEditable(tipo: { sistema?: boolean }): void {
+  if (tipo.sistema) throw new ApiError(409, 'Es un tipo que usa el sistema para asentar novedades institucionales: no se modifica.');
+}
+
+export async function cambiarEstadoTipo(id: string, estado: EstadoUsuario, actor: ContextoActor) {
+  const tipo = await TipoObservacion.findById(id).select('sistema');
+  if (tipo) exigirTipoEditable(tipo);
+  return cambiarEstadoDe<TipoObservacionDocument>(TipoObservacion, 'TipoObservacion', id, estado, actor);
+}
 
 export async function eliminarTipo(id: string, actor: ContextoActor): Promise<void> {
   const tipo = await TipoObservacion.findById(id);
   if (!tipo) throw new ApiError(404, 'Tipo de observación no encontrado.');
+  exigirTipoEditable(tipo);
   if (await Observacion.exists({ tipo_id: tipo._id })) {
     throw new ApiError(409, 'El tipo ya tiene observaciones registradas: desactívalo en lugar de eliminarlo.');
   }

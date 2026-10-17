@@ -10,7 +10,8 @@ import { IconButton } from '../../components/ui/IconButton';
 import { PageHeader } from '../../components/ui/PageHeader';
 import { Spinner } from '../../components/ui/Spinner';
 import { EmptyRow, Table, TableBody, TableHead, Td, Th } from '../../components/ui/Table';
-import { BanIcon, EyeIcon, PencilIcon, PlusIcon, RefreshIcon } from '../../components/ui/icons';
+import { BanIcon, EyeIcon, GraduationCapIcon, PencilIcon, PlusIcon, RefreshIcon } from '../../components/ui/icons';
+import { TituloGrupoDrawer } from '../../components/institucion/TituloGrupoDrawer';
 import { useAnioDeTrabajo } from '../../hooks/useAniosLectivos';
 import { useCampuses, useGrades, useJornadas } from '../../hooks/useCatalogs';
 import { useEspacios } from '../../hooks/useEspacios';
@@ -115,6 +116,7 @@ export function GroupsPage() {
 
   // Cambiar el aula titular de un grupo ya creado (M10: reparaciones locativas, reorganización de aforos).
   const [grupoCambiandoAula, setGrupoCambiandoAula] = useState<Group | null>(null);
+  const [grupoTitulo, setGrupoTitulo] = useState<Group | null>(null);
   const [nuevaAulaId, setNuevaAulaId] = useState('');
   const cambiarAula = useCambiarAulaGrupo();
 
@@ -283,6 +285,9 @@ export function GroupsPage() {
                   <Td>
                     <div className="flex items-center justify-end gap-1.5">
                       <IconButton tone="neutral" label="Ver ficha del grupo" icon={<EyeIcon />} onClick={() => navigate(`/admin/groups/${g._id}`)} />
+                      {typeof g.grade_id === 'object' && g.grade_id.numero === 11 && (
+                        <IconButton tone="edit" label="Título de bachiller del grupo" icon={<GraduationCapIcon />} onClick={() => setGrupoTitulo(g)} />
+                      )}
                       {usaEspacios && (
                         <IconButton
                           tone="edit"
@@ -307,6 +312,8 @@ export function GroupsPage() {
           </Table>
         )}
       </Card>
+
+      {grupoTitulo && <TituloGrupoDrawer grupo={grupoTitulo} tituloInstitucion={institutionQuery.data?.titulo_bachiller_defecto ?? 'Bachiller Académico'} onClose={() => setGrupoTitulo(null)} />}
 
       <Drawer
         open={drawerOpen}

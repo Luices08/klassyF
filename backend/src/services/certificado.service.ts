@@ -1,4 +1,5 @@
 import { Types } from 'mongoose';
+import type { ActaDeGrado } from '../models/titulacion.model';
 import { ClaveCertificado, ESTADOS_MATRICULA_EXPEDIBLES, ElementoAutenticacion, MAX_MOTIVO_ANULACION, codigoDeCertificado } from '../constants/certificados';
 import { Rol } from '../constants/enums';
 import { ROLES } from '../constants/roles';
@@ -29,6 +30,7 @@ import { registrarEvento } from './audit.service';
 import { entradaDeElementos, obtenerConfiguracion, presenciaDeImagenes } from './certificadoConfiguracion.service';
 import { datosDeEstudios, obtenerPromocion } from './certificadoEstudios.service';
 import { plantillaVigente, resolverContenido } from './certificadoPlantilla.service';
+import { datosParaDocumento, titulacionDeMatricula, validarYAsentarActa } from './actaGrado.service';
 import { congelarEscudo } from './encabezadoInstitucional.service';
 import { TipoDefinido, nombresDeTipos, tipoPorClave, tiposActivos } from './tipoCertificado.service';
 
@@ -51,7 +53,7 @@ export function claveDeHuella(): string {
   return env.certificadosSecret;
 }
 
-const MOTIVO_SIN_PROMOCION = 'Solo vista previa: falta el concepto de promoción (M19), que aún no está disponible.';
+const MOTIVO_SIN_PROMOCION = 'Solo vista previa: el estudiante aún no tiene un resultado final de promoción (M19). Se habilita cuando se cierra su grupo.';
 
 const noEncontrado = () => new ApiError(404, 'Certificado no encontrado.');
 
@@ -243,12 +245,15 @@ async function prepararDocumento(
   entrada: EntradaExpedicion,
   usuario: UserDocument,
   soloActivo: boolean,
-  autoservicio = false
+  autoservicio = false,
+  /** El acta ya asentada en la transacción de la expedición (documentos de titulación). */
+  acta: ActaDeGrado | null = null
 ): Promise<{ def: TipoDefinido; matricula: MatriculaCompleta; snapshot: SnapshotCertificado; solicitante: SolicitanteResuelto | null; entidadDe: string | null }> {
   // En autoservicio no hay personal de la institución: el portal ya comprobó que el acudiente es de este estudiante.
   if (!autoservicio) exigirSecretaria(usuario);
   const def = await tipoPorClave(entrada.tipo);
   if (autoservicio && def.fuentes.includes('DEPENDENCIAS')) throw new ApiError(409, `«${def.nombre}» exige confirmar dependencias: lo expide Secretaría.`);
+  if (autoservicio && def.fuentes.includes('TITULACION')) throw new ApiError(409, `«${def.nombre}» es un documento de titulación: lo expide Secretaría.`);
   if (autoservicio && !def.autoservicio_acudiente) throw new ApiError(403, `«${def.nombre}» no se genera desde el portal: solicítalo en secretaría.`);
   if (def.estado === 'ARCHIVADO' || (soloActivo && def.estado !== 'ACTIVO')) {
     throw new ApiError(409, def.estado === 'BORRADOR' ? `«${def.nombre}» está en borrador: el administrador debe activarlo antes de expedirlo.` : `«${def.nombre}» está archivado y ya no se expide.`);
@@ -291,6 +296,15 @@ async function prepararDocumento(
 
   const pazYSalvo = def.fuentes.includes('DEPENDENCIAS') ? dependenciasConfirmadas(config.paz_y_salvo.dependencias, entrada.dependencias ?? [], usuario) : undefined;
   const estudios = def.fuentes.includes('VALORACIONES') ? { ...(await datosDeEstudios(matricula, usuario)), promocion: await obtenerPromocion(String(matricula._id)) } : undefined;
+
+  let titulacion: SnapshotCertificado['titulacion'];
+  if (def.fuentes.includes('TITULACION')) {
+    const t = await titulacionDeMatricula(matricula._id);
+    if (t) titulacion = datosParaDocumento(t, acta ?? t.acta ?? null, !soloActivo);
+    else if (soloActivo) throw new ApiError(409, `«${def.nombre}» exige que el estudiante haya aprobado el último grado y tenga su titulación evaluada (cierre de promoción de M19).`);
+    // La vista previa de un borrador se prueba con datos de ejemplo aunque el estudiante elegido no esté en titulación.
+    else titulacion = { titulo: 'Bachiller Académico', estado: def.estados_titulacion?.[0] ?? 'GRADUADO', pendientes: [], acta: { codigo: '(se asigna al expedir)', libro: 0, folio: 0, fecha: new Date().toISOString() } };
+  }
 
   // El responsable legal solo se lee (y se congela) si el texto del documento lo pone: no se copian datos que el documento no usa.
   const acudiente = usaVariablesCon(contenidoDe(plantilla), 'acudiente.') ? await acudientePrincipal(matricula.student_id._id) : null;
@@ -344,6 +358,7 @@ async function prepararDocumento(
     fecha_expedicion: new Date().toISOString(),
     paz_y_salvo: pazYSalvo,
     estudios,
+    titulacion,
     firmas: {
       rectoria: { aplicada: aplicados.rectoria, nombre: nombreRector, cargo: config.rectoria.cargo, usuario_id: config.rectoria.usuario_id ? String(config.rectoria.usuario_id) : null, imagen: aplicados.rectoria ? config.rectoria.imagen : null },
       secretaria: { aplicada: aplicados.secretaria, nombre: nombreSecretaria, cargo: config.secretaria.cargo, usuario_id: config.secretaria.usuario_id ? String(config.secretaria.usuario_id) : null, imagen: aplicados.secretaria ? config.secretaria.imagen : null },
@@ -368,13 +383,24 @@ export async function prepararVistaPrevia(entrada: EntradaExpedicion, usuario: U
  */
 export async function expedirCertificado(entrada: EntradaExpedicion, usuario: UserDocument, ip?: string | null, autoservicio = false): Promise<CertificadoEmitidoDocument> {
   const clave = claveDeHuella();
-  const { def, matricula, snapshot, solicitante, entidadDe } = await prepararDocumento(entrada, usuario, true, autoservicio);
-  // Lo expedido se congela: con un dato ausente no se emite un documento oficial (habría que anularlo para corregirlo).
-  if (def.fuentes.includes('VALORACIONES') && !snapshot.estudios?.promocion) throw new ApiError(409, MOTIVO_SIN_PROMOCION.replace('Solo vista previa: falta', 'No se puede expedir como oficial: falta'));
-  if (def.fuentes.includes('VALORACIONES') && !snapshot.estudios?.completo) throw new ApiError(409, 'Hay asignaturas con periodos sin cerrar: un documento con valoraciones solo se expide con todas ellas completas.');
+  if (!autoservicio) exigirSecretaria(usuario);
+  const tipo = await tipoPorClave(entrada.tipo);
   const anio = new Date().getFullYear();
 
-  const certificado = await runTransaction(async (session) => {
+  // Todo corre en una transacción: el consecutivo del documento y, en la titulación, el número de acta con su libro y folio se consumen
+  // solo si el documento se expide. Cualquier validación que falle los devuelve (el archivo no queda con huecos).
+  const { certificado, snapshot, solicitante, entidadDe } = await runTransaction(async (session) => {
+    let acta: ActaDeGrado | null = null;
+    if (tipo.fuentes.includes('TITULACION')) {
+      const previa = await cargarMatricula(entrada.enrollment_id);
+      if (!puedeVerSede(usuario, previa.group_id.sede_id._id)) throw new ApiError(404, 'Matrícula no encontrada.');
+      acta = (await validarYAsentarActa(tipo, entrada.enrollment_id, session)).acta;
+    }
+    const { def, matricula, snapshot, solicitante, entidadDe } = await prepararDocumento(entrada, usuario, true, autoservicio, acta);
+    // Lo expedido se congela: con un dato ausente no se emite un documento oficial (habría que anularlo para corregirlo).
+    if (def.fuentes.includes('VALORACIONES') && !snapshot.estudios?.promocion) throw new ApiError(409, MOTIVO_SIN_PROMOCION.replace('Solo vista previa:', 'No se puede expedir como oficial:'));
+    if (def.fuentes.includes('VALORACIONES') && !snapshot.estudios?.completo) throw new ApiError(409, 'Hay asignaturas con periodos sin cerrar: un documento con valoraciones solo se expide con todas ellas completas.');
+
     const contador = await Counter.findByIdAndUpdate(`CERT-${def.prefijo}-${anio}`, { $inc: { seq: 1 } }, { new: true, upsert: true, session });
     const consecutivo = contador?.seq ?? 0;
     const codigo = codigoDeCertificado(def.prefijo, anio, consecutivo);
@@ -400,10 +426,10 @@ export async function expedirCertificado(entrada: EntradaExpedicion, usuario: Us
       { session }
     );
     if (!creado) throw new ApiError(500, 'No se pudo expedir el documento.');
-    return creado;
+    return { certificado: creado, snapshot, solicitante, entidadDe };
   });
   const usadas = ['rectoria', 'secretaria'].filter((e) => snapshot.firmas[e as 'rectoria' | 'secretaria'].aplicada).concat(snapshot.firmas.sello.aplicado ? ['sello'] : []);
-  await registrarEvento({ usuario_id: usuario._id, accion: 'CERTIFICADO_EMITIDO', entidad: 'CertificadoEmitido', entidad_id: certificado._id, detalle: `${certificado.codigo}; estampado: ${usadas.join(', ') || 'ninguno'}; solicitante: ${solicitante?.tipo ?? 'sin registro'}${autoservicio ? '; autoservicio (portal)' : ''}${entidadDe ? `; entidad de ${entidadDe} (M03)` : ''}`, ip });
+  await registrarEvento({ usuario_id: usuario._id, accion: 'CERTIFICADO_EMITIDO', entidad: 'CertificadoEmitido', entidad_id: certificado._id, detalle: `${certificado.codigo}; estampado: ${usadas.join(', ') || 'ninguno'}; solicitante: ${solicitante?.tipo ?? 'sin registro'}${autoservicio ? '; autoservicio (portal)' : ''}${entidadDe ? `; entidad de ${entidadDe} (M03)` : ''}${snapshot.titulacion?.acta ? `; acta ${snapshot.titulacion.acta.codigo}` : ''}`, ip });
   return certificado;
 }
 

@@ -1,4 +1,5 @@
 import Joi from 'joi';
+import { MAX_CARACTERES_TITULO_BACHILLER } from '../constants/titulacion';
 import { CALENDARIOS, ESTADOS_USUARIO, MODALIDADES_INSTITUCION, POLITICAS_AFORO_AULA, TIPOS_FRANJA } from '../constants/enums';
 import { ValidationSchema } from '../middlewares/validate.middleware';
 import { CLAVES_IMAGEN_INSTITUCIONAL } from '../constants/imagenesInstitucionales';
@@ -108,6 +109,7 @@ export const actualizarAjustes: ValidationSchema = {
     modalidad: Joi.string().valid(...MODALIDADES_INSTITUCION),
     politica_aforo_aula: Joi.string().valid(...POLITICAS_AFORO_AULA),
     paz_y_salvo_docentes: Joi.boolean(),
+    titulo_bachiller_defecto: Joi.string().trim().min(3).max(MAX_CARACTERES_TITULO_BACHILLER),
   }).min(1),
 };
 

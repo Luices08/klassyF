@@ -48,7 +48,9 @@ export function armarTablaValoraciones(
   intensidades: ReadonlyMap<string, number>,
   semanasLectivas: number | null,
   decimales: number,
-  nacional: (nota: number) => string
+  nacional: (nota: number) => string,
+  /** Notas finales del cierre de promoción (M19), por `area:<id>` o `asignatura:<id>`: mandan sobre el cálculo (incluyen la recuperación final). */
+  notasDelCierre: ReadonlyMap<string, number> = new Map()
 ): Omit<DatosEstudios, 'promocion'> {
   const ordenados = [...periodos].sort((a, b) => a.numero - b.numero);
   const porcentajes = ordenados.map((p) => p.porcentaje);
@@ -61,17 +63,21 @@ export function armarTablaValoraciones(
   const filas: FilaValoracion[] = [];
   let completo = (base?.areas.length ?? 0) > 0;
   for (const area of base?.areas ?? []) {
-    const definitivaArea = notaDefinitiva(
-      ordenados.map((p) => boletinDe(p.numero)?.areas.find((a) => a.area_id === area.area_id)?.nota_area ?? null),
-      porcentajes
-    );
+    const definitivaArea =
+      notasDelCierre.get(`area:${area.area_id}`) ??
+      notaDefinitiva(
+        ordenados.map((p) => boletinDe(p.numero)?.areas.find((a) => a.area_id === area.area_id)?.nota_area ?? null),
+        porcentajes
+      );
     if (definitivaArea === null) completo = false;
     filas.push({ nivel: 'AREA', celdas: [area.nombre, '', '', nota(definitivaArea), equivalencia(definitivaArea)] });
     for (const asignatura of area.asignaturas) {
-      const definitiva = notaDefinitiva(
-        ordenados.map((p) => boletinDe(p.numero)?.areas.find((a) => a.area_id === area.area_id)?.asignaturas.find((s) => s.subject_id === asignatura.subject_id)?.nota_asignatura ?? null),
-        porcentajes
-      );
+      const definitiva =
+        notasDelCierre.get(`asignatura:${asignatura.subject_id}`) ??
+        notaDefinitiva(
+          ordenados.map((p) => boletinDe(p.numero)?.areas.find((a) => a.area_id === area.area_id)?.asignaturas.find((s) => s.subject_id === asignatura.subject_id)?.nota_asignatura ?? null),
+          porcentajes
+        );
       if (definitiva === null) completo = false;
       const semanal = intensidades.get(asignatura.subject_id) ?? null;
       const anual = semanal === null || semanasLectivas === null ? null : Math.round(semanal * semanasLectivas);
@@ -89,7 +95,7 @@ export function armarTablaValoraciones(
       filas,
       pie:
         `IHS: intensidad horaria semanal. IHA: intensidad horaria anual (horas semanales por las semanas lectivas del año). ` +
-        `Calificación final: notas de periodo ponderadas (${pesos}).${completo ? '' : ' Lo que aún no está definido aparece con «—».'}`,
+        `Calificación final: notas de periodo ponderadas (${pesos}), con la recuperación de fin de año cuando la hubo.${completo ? '' : ' Lo que aún no está definido aparece con «—».'}`,
     },
     completo,
   };

@@ -43,6 +43,9 @@ export function snapshotDeMuestra(tipo: Pick<DefinicionCertificado, 'clave' | 'f
     fecha_expedicion: ahoraIso,
     paz_y_salvo: tipo.fuentes.includes('DEPENDENCIAS') ? { dependencias: ['Académica', 'Biblioteca', 'Financiera / Administrativa', 'Inventario y recursos'], verificado_por: 'Laura Gómez' } : undefined,
     estudios: tipo.fuentes.includes('VALORACIONES') ? estudios : undefined,
+    titulacion: tipo.fuentes.includes('TITULACION')
+      ? { titulo: 'Bachiller Académico', estado: 'GRADUADO', pendientes: [], acta: { codigo: 'AG-2026-0045', libro: 2, folio: 37, fecha: ahoraIso } }
+      : undefined,
     firmas: {
       rectoria: { aplicada: false, nombre: null, cargo: 'Rector(a)', usuario_id: null, imagen: null },
       secretaria: { aplicada: false, nombre: null, cargo: 'Secretaría Académica', usuario_id: null, imagen: null },

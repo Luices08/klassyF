@@ -1,5 +1,6 @@
 import Joi from 'joi';
 import { ESTADOS_GRUPO } from '../constants/enums';
+import { MAX_CARACTERES_TITULO_BACHILLER } from '../constants/titulacion';
 import { ValidationSchema } from '../middlewares/validate.middleware';
 import { objectId } from './common.validator';
 
@@ -15,6 +16,7 @@ export const createGroup: ValidationSchema = {
     // (POST /teacher-assignments, tipo DIRECCION_GRUPO), que valida rol docente
     // y mantiene TeacherAssignment como la unica fuente de verdad.
     aula_id: objectId.allow(null),
+    titulo_bachiller: Joi.string().trim().min(3).max(MAX_CARACTERES_TITULO_BACHILLER).allow(null),
   }),
 };
 
@@ -46,6 +48,11 @@ export const cambiarAula: ValidationSchema = {
   body: Joi.object({
     aula_id: objectId.allow(null).required(),
   }),
+};
+
+export const cambiarTitulo: ValidationSchema = {
+  params: Joi.object({ groupId: objectId.required() }),
+  body: Joi.object({ titulo_bachiller: Joi.string().trim().min(3).max(MAX_CARACTERES_TITULO_BACHILLER).allow(null).required() }),
 };
 
 export const groupIdParam: ValidationSchema = {

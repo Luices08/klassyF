@@ -189,6 +189,8 @@ export interface Institution {
   politica_aforo_aula: PoliticaAforoAula;
   /** M04: los docentes también pueden cargar y confirmar el paz y salvo de fin de año. */
   paz_y_salvo_docentes?: boolean;
+  /** M01/M26: título de bachiller que se otorga por defecto; un grupo del último grado puede tener el suyo. */
+  titulo_bachiller_defecto?: string;
   estado: EstadoActivo;
 }
 
@@ -400,6 +402,8 @@ export interface Group {
   max_capacity: number;
   cupos_ocupados: number;
   cupos_disponibles?: number;
+  /** Título de bachiller de este grupo (último grado); null/ausente = hereda el de la institución. */
+  titulo_bachiller?: string | null;
   estado: EstadoGrupo;
   director_grupo_id: string | { _id: string; nombre: string; apellido: string } | null;
 }

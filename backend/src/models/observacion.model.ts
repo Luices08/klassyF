@@ -77,6 +77,8 @@ export interface IObservacion {
   solicitud_id: Types.ObjectId | null;
   /** Un mismo hecho con varios estudiantes crea un registro por estudiante con este id común. */
   evento_id: Types.ObjectId | null;
+  /** Novedad que asentó el sistema (p. ej. promoción anticipada): sirve de soporte legal y no se enmienda ni se anula. */
+  de_sistema: boolean;
   registrado_por: Types.ObjectId;
   /** A quién se atribuye: el propio autor, o el docente en cuyo nombre registró coordinación. */
   autor_id: Types.ObjectId;
@@ -157,6 +159,7 @@ const observacionSchema = new Schema<IObservacion, ObservacionModel>(
     version_estudiante: { type: String, default: '', trim: true, maxlength: MAX_DESCRIPCION_OBSERVACION },
     solicitud_id: { type: Schema.Types.ObjectId, ref: 'SolicitudCaso', default: null },
     evento_id: { type: Schema.Types.ObjectId, default: null },
+    de_sistema: { type: Boolean, default: false },
     registrado_por: { type: Schema.Types.ObjectId, ref: 'User', required: true },
     autor_id: { type: Schema.Types.ObjectId, ref: 'User', required: true },
     contexto: { type: String, enum: CONTEXTOS_OBSERVACION, required: true },

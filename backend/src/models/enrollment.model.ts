@@ -40,6 +40,8 @@ export interface IEnrollment {
   fecha_limite_legalizacion: Date | null;
   motivo_retiro: string | null;
   checklist: Types.DocumentArray<IChecklistItem>;
+  /** Novedades institucionales que el sistema asienta solo (p. ej. promoción anticipada), con la referencia que las respalda. */
+  novedades: Array<{ tipo: string; texto: string; referencia: string; fecha: Date; por: Types.ObjectId }>;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -76,6 +78,21 @@ const enrollmentSchema = new Schema<IEnrollment, EnrollmentModel>(
     fecha_limite_legalizacion: { type: Date, default: null },
     motivo_retiro: { type: String, default: null },
     checklist: { type: [checklistItemSchema], default: [] },
+    novedades: {
+      type: [
+        new Schema(
+          {
+            tipo: { type: String, required: true },
+            texto: { type: String, required: true },
+            referencia: { type: String, required: true },
+            fecha: { type: Date, required: true },
+            por: { type: Schema.Types.ObjectId, ref: 'User', required: true },
+          },
+          { _id: false }
+        ),
+      ],
+      default: [],
+    },
   },
   { timestamps: true }
 );

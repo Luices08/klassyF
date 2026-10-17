@@ -71,6 +71,7 @@ export async function vistaConfiguracion(usuario: UserDocument) {
     secretaria: { usuario_id: config.secretaria.usuario_id ? String(config.secretaria.usuario_id) : null, nombre: nombreCompleto(secretaria), cargo: config.secretaria.cargo, tiene_imagen: Boolean(config.secretaria.imagen), imagen_faltante: Boolean(config.secretaria.imagen) && !presencia.secretaria },
     sello: { tiene_imagen: Boolean(config.sello.imagen), imagen_faltante: Boolean(config.sello.imagen) && !presencia.sello },
     permitir_firma_rectoria_a_secretaria: config.permitir_firma_rectoria_a_secretaria,
+    folios_por_libro_actas: config.folios_por_libro_actas,
     politica: Object.fromEntries(tipos.filter((t) => t.estado !== 'ARCHIVADO').map((t) => [t.clave, t.politica])),
     paz_y_salvo: { dependencias: config.paz_y_salvo.dependencias.map((d) => ({ clave: d.clave, nombre: d.nombre, activa: d.activa })) },
     puede: permisosDe(config, usuario),
@@ -98,6 +99,7 @@ export interface CambiosConfiguracionCertificados {
   rectoria?: CambiosFirmante;
   secretaria?: CambiosFirmante;
   permitir_firma_rectoria_a_secretaria?: boolean;
+  folios_por_libro_actas?: number;
   /** Por clave de tipo; cada tipo recibe solo lo que cambia. */
   politica?: Record<string, Partial<Record<ElementoAutenticacion, ModoElemento>>>;
   /** La lista completa: lo que no venga se elimina; sin `clave` es una dependencia nueva. */
@@ -147,7 +149,7 @@ export async function actualizarConfiguracion(cambios: CambiosConfiguracionCerti
   const permisos = permisosDe(config, usuario);
   if (cambios.rectoria && !permisos.designar.rectoria) throw new ApiError(403, 'Solo el administrador designa a quien firma por Rectoría.');
   if (cambios.secretaria && !permisos.designar.secretaria) throw new ApiError(403, 'No tienes permiso para cambiar quién firma por Secretaría Académica.');
-  if ((cambios.permitir_firma_rectoria_a_secretaria !== undefined || cambios.politica || cambios.paz_y_salvo) && !permisos.ajustes) {
+  if ((cambios.permitir_firma_rectoria_a_secretaria !== undefined || cambios.politica || cambios.paz_y_salvo || cambios.folios_por_libro_actas !== undefined) && !permisos.ajustes) {
     throw new ApiError(403, 'Solo el administrador cambia la delegación, la política por documento y las dependencias del paz y salvo.');
   }
 
@@ -161,6 +163,7 @@ export async function actualizarConfiguracion(cambios: CambiosConfiguracionCerti
     if (firmante.cargo !== undefined) config.set(`${clave}.cargo`, firmante.cargo);
   }
   if (cambios.permitir_firma_rectoria_a_secretaria !== undefined) config.permitir_firma_rectoria_a_secretaria = cambios.permitir_firma_rectoria_a_secretaria;
+  if (cambios.folios_por_libro_actas !== undefined) config.folios_por_libro_actas = cambios.folios_por_libro_actas;
   if (cambios.paz_y_salvo) config.set('paz_y_salvo.dependencias', normalizarDependencias(cambios.paz_y_salvo.dependencias));
   await config.save();
   await registrarEvento({ usuario_id: usuario._id, accion: 'CERTIFICADOS_CONFIGURACION_ACTUALIZADA', entidad: 'ConfiguracionCertificados', entidad_id: config._id, detalle: Object.keys(cambios).join(', '), ip });

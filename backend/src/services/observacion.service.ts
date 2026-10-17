@@ -340,6 +340,7 @@ export async function registrarObservacion(input: RegistrarObservacionInput, usu
   const fecha = exigirFechaDelHecho(input.fecha_hecho);
   const tipo = Types.ObjectId.isValid(input.tipo_id) ? await TipoObservacion.findById(input.tipo_id) : null;
   if (!tipo || tipo.estado === 'inactivo') throw new ApiError(400, 'El tipo de observación no existe o está inactivo.');
+  if (tipo.sistema) throw new ApiError(400, 'Ese tipo lo asienta el sistema; no se registra a mano.');
 
   const autorId = await resolverAutor(usuario, input.en_nombre_de_id);
   // Lo que escribe orientación es seguimiento psicosocial: siempre confidencial, no queda a elección.
@@ -698,6 +699,7 @@ async function cargarParaCorregir(
   if (!convivencia && !coordinadorAcademico && !autor) throw observacionNoEncontrada();
 
   if (obs.estado === 'ANULADA') throw new ApiError(409, 'El registro está anulado y no se puede modificar.');
+  if (obs.de_sistema) throw new ApiError(409, 'Es una novedad institucional que asentó el sistema como soporte legal: no se enmienda ni se anula.');
   await exigirAnioNoCerrado(obs);
   if (obs.solicitud_id && !convivencia) {
     throw new ApiError(409, 'La falta ya se remitió a convivencia: solicita la corrección a coordinación de convivencia.');

@@ -98,5 +98,6 @@ export async function armarBoletinDeMuestra(): Promise<ReportCardResult> {
       fecha: (anio && configuracion.entregas.find((e) => e.academic_year_id === String(anio._id) && e.periodo_numero === p.numero)?.fecha_entrega) || null,
     })),
     director_grupo: 'Director(a) de grupo de muestra',
+    promocion: null,
   };
 }

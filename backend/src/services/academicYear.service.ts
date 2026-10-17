@@ -1,6 +1,9 @@
 import { Types } from 'mongoose';
 import { TRANSICIONES_PERIODO } from '../constants/anioLectivo';
-import { Calendario, EstadoPeriodoAcademico, NivelDesempeno, Rol, TipoEventoCalendario } from '../constants/enums';
+import { Calendario, ESTADOS_MATRICULA_ACTIVOS, EstadoPeriodoAcademico, NivelDesempeno, Rol, TipoEventoCalendario } from '../constants/enums';
+import { RESULTADOS_FINALES } from '../constants/promocion';
+import Enrollment from '../models/enrollment.model';
+import EvaluacionPromocion from '../models/evaluacionPromocionEstudiante.model';
 import Activity from '../models/activity.model';
 import ActivitySubmission from '../models/activitySubmission.model';
 import ColumnaPlanilla from '../models/columnaPlanilla.model';
@@ -442,8 +445,19 @@ export interface VerificacionCierre {
   verificaciones: Array<{ clave: string; descripcion: string; cumple: boolean; detalle: string | null }>;
 }
 
-function evaluarCierre(anio: AcademicYearDocument): VerificacionCierre {
+/** Estudiantes con matrícula activa en el año cuyo cierre de promoción (M19) aún no es un resultado final. */
+async function estudiantesSinPromocionResuelta(anio: AcademicYearDocument): Promise<number> {
+  const [matriculas, finales] = await Promise.all([
+    Enrollment.distinct('student_id', { academic_year_id: anio._id, estado: { $in: ESTADOS_MATRICULA_ACTIVOS } }),
+    EvaluacionPromocion.distinct('student_id', { academic_year_id: anio._id, vigente: true, resultado: { $in: RESULTADOS_FINALES } }),
+  ]);
+  const resueltos = new Set(finales.map(String));
+  return matriculas.filter((s) => !resueltos.has(String(s))).length;
+}
+
+async function evaluarCierre(anio: AcademicYearDocument): Promise<VerificacionCierre> {
   const ahora = Date.now();
+  const sinResolver = await estudiantesSinPromocionResuelta(anio);
 
   const periodosPendientes = anio.periodos.filter((p) => p.estado !== 'CERRADO');
   const recuperacionesAbiertas = anio.eventos.filter(
@@ -475,6 +489,15 @@ function evaluarCierre(anio: AcademicYearDocument): VerificacionCierre {
           ? null
           : `Siguen vigentes: ${recuperacionesAbiertas.map((e) => e.nombre).join(', ')}.`,
     },
+    {
+      clave: 'promocion_resuelta',
+      descripcion: 'Todos los estudiantes con matrícula activa tienen su promoción resuelta',
+      cumple: sinResolver === 0,
+      detalle:
+        sinResolver === 0
+          ? null
+          : `${sinResolver} estudiante(s) sin resultado final de promoción: cierra los grupos, registra las recuperaciones, resuelve las comisiones o las nivelaciones pendientes.`,
+    },
   ];
 
   return { puede_cerrar: verificaciones.every((v) => v.cumple), verificaciones };
@@ -482,7 +505,7 @@ function evaluarCierre(anio: AcademicYearDocument): VerificacionCierre {
 
 /** Paso 1 del cierre de vigencia: que falta (si algo) antes de poder congelar el año. */
 export async function verificarCierre(id: string): Promise<VerificacionCierre> {
-  return evaluarCierre(await cargarAnio(id));
+  return await evaluarCierre(await cargarAnio(id));
 }
 
 export interface CerrarAnioInput {
@@ -508,7 +531,7 @@ export async function cerrarAnio(
     throw new ApiError(400, `Para confirmar escribe el año que vas a cerrar (${anio.year}).`);
   }
 
-  const verificacion = evaluarCierre(anio);
+  const verificacion = await evaluarCierre(anio);
   if (!verificacion.puede_cerrar) {
     throw new ApiError(409, 'El año lectivo aún no cumple las condiciones para cerrarse.', verificacion);
   }

@@ -1,3 +1,5 @@
+import { TIPOS_TITULACION } from '../constants/tiposTitulacion';
+import type { EstadoTitulacion } from '../constants/titulacion';
 import {
   CLAVES_TIPOS_INICIALES,
   DefinicionCertificado,
@@ -46,6 +48,7 @@ const aTipoDefinido = (t: TipoCertificadoDocument): TipoDefinido => ({
   descripcion: t.descripcion ?? '',
   estados_matricula: [...t.estados_matricula],
   fuentes: [...t.fuentes],
+  estados_titulacion: [...(t.estados_titulacion ?? [])],
   variables_obligatorias: [...t.variables_obligatorias],
   politica: { rectoria: t.politica.rectoria, secretaria: t.politica.secretaria, sello: t.politica.sello },
   estado: t.estado,
@@ -164,6 +167,7 @@ export interface EntradaTipo {
   prefijo: string;
   estados_matricula: string[];
   fuentes: FuenteCertificado[];
+  estados_titulacion?: EstadoTitulacion[];
 }
 
 const normalizarEntrada = (e: Pick<EntradaTipo, 'nombre' | 'descripcion' | 'prefijo'>) => ({ nombre: e.nombre.trim(), descripcion: (e.descripcion ?? '').trim(), prefijo: e.prefijo.trim().toUpperCase() });
@@ -188,7 +192,9 @@ export async function crearTipo(entrada: EntradaTipo, usuario: UserDocument, ip?
     ...datos,
     estados_matricula: entrada.estados_matricula,
     fuentes: entrada.fuentes,
+    estados_titulacion: entrada.fuentes.includes('TITULACION') ? (entrada.estados_titulacion ?? []) : [],
     variables_obligatorias: [],
+    autoservicio_acudiente: false,
     politica: structuredClone(POLITICA_PREDETERMINADA),
     estado: 'BORRADOR',
     orden,
@@ -204,6 +210,7 @@ export interface CambiosTipo {
   prefijo?: string;
   estados_matricula?: string[];
   fuentes?: FuenteCertificado[];
+  estados_titulacion?: EstadoTitulacion[];
   variables_obligatorias?: string[];
   autoservicio_acudiente?: boolean;
 }
@@ -234,7 +241,12 @@ export async function actualizarTipo(clave: string, cambios: CambiosTipo, usuari
   if (cambios.fuentes !== undefined && [...cambios.fuentes].sort().join() !== [...tipo.fuentes].sort().join()) {
     if (emitidos > 0 || tipo.estado !== 'BORRADOR') throw new ApiError(409, 'Las fuentes de datos solo se cambian mientras el tipo está en borrador y sin documentos expedidos.');
     tipo.fuentes = cambios.fuentes;
-    if (tipo.fuentes.includes('DEPENDENCIAS')) tipo.autoservicio_acudiente = false;
+    if (tipo.fuentes.includes('DEPENDENCIAS') || tipo.fuentes.includes('TITULACION')) tipo.autoservicio_acudiente = false;
+  }
+  if (cambios.estados_titulacion !== undefined) {
+    // El candado de la expedición: cambiarlo en un tipo activo cambia a quién se le puede dar el diploma, así que lo decide el ADMIN.
+    if (usuario.rol !== ROLES.ADMIN) throw new ApiError(403, 'Solo el administrador define con qué situación de titulación se expide el documento.');
+    tipo.estados_titulacion = cambios.estados_titulacion as typeof tipo.estados_titulacion;
   }
   if (cambios.variables_obligatorias !== undefined) {
     if (usuario.rol !== ROLES.ADMIN) throw new ApiError(403, 'Solo el administrador define qué datos no puede perder el texto del documento.');
@@ -245,6 +257,9 @@ export async function actualizarTipo(clave: string, cambios: CambiosTipo, usuari
   if (cambios.autoservicio_acudiente !== undefined) {
     if (usuario.rol !== ROLES.ADMIN) throw new ApiError(403, 'Solo el administrador decide qué documentos genera el acudiente sin intervención de secretaría.');
     // La confirmación de «sin pendientes» la hace una persona de cada dependencia: no se puede automatizar.
+    if (cambios.autoservicio_acudiente && tipo.fuentes.includes('TITULACION')) {
+      throw new ApiError(409, 'Un documento de titulación (acta, diploma, constancia de culminación) lo expide siempre Secretaría: no puede ser de autoservicio.');
+    }
     if (cambios.autoservicio_acudiente && tipo.fuentes.includes('DEPENDENCIAS')) {
       throw new ApiError(409, 'Un documento que exige confirmar dependencias (paz y salvo) lo expide siempre Secretaría: no puede ser de autoservicio.');
     }
@@ -267,6 +282,7 @@ export async function activarTipo(clave: string, usuario: UserDocument, ip?: str
   }
   const definido = aTipoDefinido(tipo);
   if (definido.estados_matricula.length === 0) throw new ApiError(409, 'Indica con qué estados de matrícula se puede expedir este documento.');
+  if (definido.fuentes.includes('TITULACION') && definido.estados_titulacion?.length === 0) throw new ApiError(409, 'Indica con qué situación de titulación se puede expedir este documento (graduado, graduado extemporáneo o aprobó sin graduar).');
   const vigente = await PlantillaCertificado.findOne({ tipo: clave, estado: 'VIGENTE' });
   const errores = validarContenido(definido, vigente ? contenidoDe(vigente) : contenidoInicial(definido));
   if (errores.length > 0) throw new ApiError(409, 'El texto del documento todavía no cumple lo mínimo para activarlo.', errores);
@@ -302,6 +318,23 @@ export async function eliminarTipo(clave: string, usuario: UserDocument, ip?: st
   await tipo.deleteOne();
   await registrarEvento({ usuario_id: usuario._id, accion: 'CERTIFICADO_TIPO_ELIMINADO', entidad: 'TipoCertificado', entidad_id: tipo._id, detalle: clave, ip });
   return { clave };
+}
+
+/**
+ * Crea (si no existen) los tipos de titulación de partida: acta de grado, diploma y constancia de culminación. Idempotente. Nacen en BORRADOR:
+ * Secretaría ajusta el texto y el ADMIN los activa. Una instalación anterior los pide con `npm run sembrar:tipos-titulacion`.
+ */
+export async function sembrarTiposDeTitulacion(): Promise<string[]> {
+  await asegurarTiposIniciales();
+  const creados: string[] = [];
+  for (const t of TIPOS_TITULACION) {
+    if (await TipoCertificado.exists({ clave: t.clave })) continue;
+    if (await TipoCertificado.exists({ prefijo: t.prefijo })) continue;
+    const orden = ((await TipoCertificado.findOne().sort({ orden: -1 }).select('orden'))?.orden ?? 0) + 1;
+    await TipoCertificado.create({ ...t, estado: 'BORRADOR', orden, autoservicio_acudiente: false, creado_por: null });
+    creados.push(t.clave);
+  }
+  return creados;
 }
 
 /** Las capacidades del tipo con lo que exigen: la pantalla muestra al editar qué mínimos tiene el texto. */

@@ -61,12 +61,20 @@ export interface TablaValoraciones {
   pie: string;
 }
 
+/** Lo que un documento de titulación congela (M19/M26): el título, la situación del estudiante y, si se graduó, el acta en que consta. */
+export interface DatosTitulacion {
+  titulo: string;
+  estado: string;
+  pendientes: string[];
+  acta: { codigo: string; libro: number; folio: number; fecha: string } | null;
+}
+
 export interface DatosEstudios {
   tabla: TablaValoraciones;
   /** Todas las asignaturas tienen sus periodos definitivos. */
   completo: boolean;
-  /** null mientras no exista la fuente (M19): sin él el documento no se expide como oficial. */
-  promocion: { concepto: 'APROBO' | 'NO_APROBO' } | null;
+  /** El concepto del cierre de promoción (M19); null mientras el estudiante no tenga un resultado final: sin él no se expide como oficial. */
+  promocion: { concepto: 'APROBO' | 'NO_APROBO'; texto?: string } | null;
 }
 
 /** Lo que se congela al expedir: el PDF se dibuja SOLO desde aquí y la huella cubre todo, incluidas las firmas elegidas. */
@@ -114,6 +122,8 @@ export interface SnapshotCertificado {
   paz_y_salvo?: { dependencias: string[]; verificado_por: string };
   /** Solo certificado de estudio: la malla con las valoraciones y, cuando exista M19, el concepto de promoción. */
   estudios?: DatosEstudios;
+  /** Solo documentos de titulación (fuente TITULACION). */
+  titulacion?: DatosTitulacion;
   firmas: {
     rectoria: FirmaPersona;
     secretaria: FirmaPersona;

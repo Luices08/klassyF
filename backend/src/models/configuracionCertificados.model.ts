@@ -27,6 +27,8 @@ export interface IConfiguracionCertificados {
   politica?: unknown;
   /** Los tipos de partida ya se sembraron: si el colegio elimina uno, no vuelve a aparecer. */
   tipos_sembrados: boolean;
+  /** Cuántas actas de grado caben en un libro; al llenarse se abre el siguiente (el folio vuelve a 1). */
+  folios_por_libro_actas: number;
   /** Las dependencias que el colegio exige para el paz y salvo (cada una se confirma al expedirlo). */
   paz_y_salvo: { dependencias: DependenciaPazYSalvo[] };
   createdAt: Date;
@@ -67,6 +69,7 @@ const configuracionSchema = new Schema<IConfiguracionCertificados, Configuracion
     permitir_firma_rectoria_a_secretaria: { type: Boolean, default: false },
     politica: { type: Schema.Types.Mixed, default: undefined },
     tipos_sembrados: { type: Boolean, default: false },
+    folios_por_libro_actas: { type: Number, min: 1, max: 5000, default: 100 },
     paz_y_salvo: {
       type: new Schema({ dependencias: { type: [dependenciaSchema], default: () => structuredClone(DEPENDENCIAS_PAZ_Y_SALVO_INICIALES) } }, { _id: false }),
       default: () => ({}),

@@ -37,6 +37,8 @@ async function intensidadesDelGrupo(matricula: MatriculaParaEstudios): Promise<M
   return intensidades;
 }
 
+const ESTADOS_OFICIALES: readonly string[] = ['DEFINITIVO', 'HOMOLOGADA_EXTERNA', 'EXENTA_POR_TRASLADO'];
+
 const NOMBRE_NACIONAL = { SUPERIOR: 'Superior', ALTO: 'Alto', BASICO: 'Básico', BAJO: 'Bajo' } as const;
 
 /**
@@ -58,8 +60,16 @@ export async function datosDeEstudios(matricula: MatriculaParaEstudios, usuario:
         area_id: a.area_id,
         nombre: a.nombre,
         // Un documento oficial solo usa lo que coordinación ya declaró DEFINITIVO: una nota que el docente cerró pero nadie validó no cuenta.
-        nota_area: a.asignaturas.every((s) => s.estado === 'DEFINITIVO') ? a.nota_area : null,
-        asignaturas: a.asignaturas.map((s) => ({ subject_id: s.subject_id, nombre: s.nombre, nota_asignatura: s.estado === 'DEFINITIVO' ? s.nota_asignatura : null })),
+        // Lo homologado por secretaría ya es definitivo (es la nota oficial del colegio de origen) y lo exento no tiene nota que validar.
+        nota_area: a.asignaturas.every((s) => ESTADOS_OFICIALES.includes(s.estado)) ? a.nota_area : null,
+        exenta: a.exenta,
+        asignaturas: a.asignaturas.map((s) => ({
+          subject_id: s.subject_id,
+          nombre: s.nombre,
+          nota_asignatura: ESTADOS_OFICIALES.includes(s.estado) ? s.nota_asignatura : null,
+          exenta: s.estado === 'EXENTA_POR_TRASLADO',
+          homologada: s.estado === 'HOMOLOGADA_EXTERNA',
+        })),
       })),
     });
   }

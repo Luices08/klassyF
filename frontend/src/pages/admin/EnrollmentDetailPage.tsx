@@ -1,5 +1,6 @@
 import { type ChangeEvent, type FormEvent, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
+import { RegistrarSalidaDrawer } from '../../components/salidas/RegistrarSalidaDrawer';
 import { Alert, errorMessage } from '../../components/ui/Alert';
 import { EstadoDocumentoBadge, EstadoMatriculaBadge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
@@ -56,6 +57,7 @@ export function EnrollmentDetailPage() {
   const enrollmentQuery = useEnrollment(id);
 
   const [retirarOpen, setRetirarOpen] = useState<EstadoMatricula | null>(null);
+  const [salidaOpen, setSalidaOpen] = useState(false);
   const [motivo, setMotivo] = useState('');
   const actualizarEstado = useUpdateEnrollmentStatus();
 
@@ -374,7 +376,19 @@ export function EnrollmentDetailPage() {
         </Alert>
       )}
 
-      {enrollment.motivo_retiro && <Alert tone="warning">Motivo de retiro/anulación: {enrollment.motivo_retiro}</Alert>}
+      {enrollment.motivo_retiro && (
+        <Alert tone="warning">
+          Motivo de retiro/anulación: {enrollment.motivo_retiro}
+          {enrollment.estado === 'RETIRADO' && (
+            <>
+              {' '}
+              <button type="button" className="font-semibold underline" onClick={() => navigate(`/secretaria/salidas?matricula=${enrollment._id}`)}>
+                Ver paz y salvo y boletín de retiro
+              </button>
+            </>
+          )}
+        </Alert>
+      )}
 
       <Card>
         <CardHeader
@@ -404,7 +418,8 @@ export function EnrollmentDetailPage() {
                 </Button>
               )}
               {!esTerminal && (
-                <Button variant="soft-danger" onClick={() => setRetirarOpen('RETIRADO')}>
+                // Una preinscrita aún no tiene folio: conserva el retiro simple. Las demás pasan por el registro completo de la salida.
+                <Button variant="soft-danger" onClick={() => (esPreinscrito ? setRetirarOpen('RETIRADO') : setSalidaOpen(true))}>
                   Retirar
                 </Button>
               )}
@@ -513,6 +528,17 @@ export function EnrollmentDetailPage() {
           {renderTablaDocumentos(itemsInstitucional)}
         </Card>
       )}
+
+      <RegistrarSalidaDrawer
+        open={salidaOpen}
+        matriculaId={enrollment._id}
+        descripcionMatricula={`${estudiante ? `${estudiante.nombre} ${estudiante.apellido}` : 'Estudiante'} · Grupo ${grupo}`}
+        onClose={() => setSalidaOpen(false)}
+        onRegistrado={(matriculaId) => {
+          setSalidaOpen(false);
+          navigate(`/secretaria/salidas?matricula=${matriculaId}`);
+        }}
+      />
 
       <Drawer
         open={retirarOpen !== null}

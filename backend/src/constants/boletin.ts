@@ -125,6 +125,11 @@ export const CLAVES_TEXTOS_BOLETIN = [
   'dificultades_ninguna',
   'compromisos_intro',
   'promocion_intro',
+  'homologada',
+  'exenta',
+  'convencion_homologada',
+  'convencion_exenta',
+  'traslado_linea',
 ] as const;
 export type ClaveTextoBoletin = (typeof CLAVES_TEXTOS_BOLETIN)[number];
 
@@ -199,6 +204,12 @@ export const TEXTOS_BOLETIN_INICIALES: Record<ClaveTextoBoletin, string> = {
   dificultades_ninguna: 'El estudiante no presenta asignaturas con desempeño bajo en este periodo.',
   compromisos_intro: 'Compromisos de seguimiento acordados con el estudiante y la familia:',
   promocion_intro: 'Decisión de promoción:',
+  homologada: 'Homologada',
+  exenta: 'Exenta',
+  convencion_homologada:
+    '(H) Nota homologada: proviene de la institución de procedencia del estudiante (traslado) y se convirtió a la escala de valoración de este colegio.',
+  convencion_exenta: 'E: Asignatura exenta por traslado: la institución de procedencia no la impartía; no tiene nota y no cuenta en el promedio ni en la promoción.',
+  traslado_linea: 'Ingresó por traslado el {fecha}, procedente de {institucion}; cursa en este colegio desde el {periodo}.',
 };
 
 /** Cómo sale el boletín mientras el colegio no lo personalice. */

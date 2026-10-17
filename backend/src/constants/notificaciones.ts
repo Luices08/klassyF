@@ -36,6 +36,10 @@ export const EVENTOS_NOTIFICACION = [
   'ACTIVIDAD_NUEVA',
   'JUSTIFICACION_REVISADA',
   'RECORDATORIO_CALENDARIO',
+  'CITACION_NUEVA',
+  'CITACION_REPROGRAMADA',
+  'CITACION_CANCELADA',
+  'CITACION_RESPONDIDA',
 ] as const;
 export type EventoNotificacion = (typeof EVENTOS_NOTIFICACION)[number];
 
@@ -59,6 +63,11 @@ export const METADATOS_EVENTO: Record<EventoNotificacion, MetadatoEvento> = {
   ACTIVIDAD_NUEVA: { severidad: 'INFO', canales: ['CAMPANITA'] },
   JUSTIFICACION_REVISADA: { severidad: 'INFO', canales: ['CAMPANITA'] },
   RECORDATORIO_CALENDARIO: { severidad: 'INFO', canales: ['CAMPANITA'] },
+  // El correo de una citación no pasa por aquí: lo envía la cola de M24 (`colaCorreo.service`), que sí reintenta y lleva su propio estado.
+  CITACION_NUEVA: { severidad: 'IMPORTANTE', canales: ['CAMPANITA'] },
+  CITACION_REPROGRAMADA: { severidad: 'IMPORTANTE', canales: ['CAMPANITA'] },
+  CITACION_CANCELADA: { severidad: 'IMPORTANTE', canales: ['CAMPANITA'] },
+  CITACION_RESPONDIDA: { severidad: 'INFO', canales: ['CAMPANITA'] },
 };
 
 /**

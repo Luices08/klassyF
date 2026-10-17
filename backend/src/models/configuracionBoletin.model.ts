@@ -33,6 +33,10 @@ export interface IConfiguracionBoletin {
   /** Instancia, procedimiento y plazo para pedir aclaraciones o presentar reclamaciones, tal como los define el SIEE. */
   canal_reclamaciones: string;
   mostrar_puesto: boolean;
+  /** SIEE: el boletín parcial de retiro incluye también las notas parciales de corte del periodo en curso (sin cerrar). Apagado: solo lo cerrado. */
+  incluir_corte_en_retiro: boolean;
+  /** SIEE: el PDF del boletín parcial de retiro solo se entrega con el paz y salvo de salida aprobado. */
+  exigir_paz_y_salvo_en_retiro: boolean;
   entregas: Types.DocumentArray<IEntregaBoletin>;
   plantilla: PlantillaBoletin | null;
   createdAt: Date;
@@ -132,6 +136,8 @@ const configuracionBoletinSchema = new Schema<IConfiguracionBoletin, Configuraci
     institucion_id: { type: Schema.Types.ObjectId, ref: 'Institution', required: true, unique: true },
     canal_reclamaciones: { type: String, trim: true, maxlength: MAX_LONGITUD_CANAL_RECLAMACIONES, default: '' },
     mostrar_puesto: { type: Boolean, default: true },
+    incluir_corte_en_retiro: { type: Boolean, default: false },
+    exigir_paz_y_salvo_en_retiro: { type: Boolean, default: false },
     entregas: { type: [entregaSchema], default: [] },
     plantilla: { type: plantillaSchema, default: null },
   },

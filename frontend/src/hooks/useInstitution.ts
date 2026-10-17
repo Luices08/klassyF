@@ -8,6 +8,7 @@ import type {
   ModalidadInstitucion,
   Periodo,
   PoliticaAforoAula,
+  PoliticaCupoSalida,
   SetupInstitutionResult,
 } from '../types/domain';
 
@@ -69,6 +70,7 @@ export interface AjustesInstitucionInput {
   modalidad?: ModalidadInstitucion;
   politica_aforo_aula?: PoliticaAforoAula;
   paz_y_salvo_docentes?: boolean;
+  politica_cupo_salida?: PoliticaCupoSalida;
 }
 
 /** Ajustes de funcionamiento (modalidad, aforo, paz y salvo): bloques propios, sin contraseña. */

@@ -3,6 +3,7 @@ import { ParamsDictionary } from 'express-serve-static-core';
 import { ParsedQs } from 'qs';
 import { env } from '../config/env';
 import { TipoDocumentoMatricula } from '../constants/enums';
+import * as respuestasCitacion from '../services/citacionRespuesta.service';
 import * as portal from '../services/portalAcudiente.service';
 import ApiError from '../utils/ApiError';
 import catchAsync from '../utils/catchAsync';
@@ -56,4 +57,13 @@ export const certificadoPdf = catchAsync<HijoParams & { certificadoId: string }>
   res.setHeader('Content-Type', 'application/pdf');
   res.setHeader('Content-Disposition', `inline; filename="${nombreArchivo}"`);
   res.send(buffer);
+});
+
+export const citaciones = catchAsync<HijoParams>(async (req, res) => {
+  res.status(200).json({ success: true, data: await respuestasCitacion.citacionesDeHijo(req.user!, req.params.studentId) });
+});
+
+export const responderCitacion = catchAsync<HijoParams & { destinatarioId: string }, unknown, { respuesta: 'CONFIRMADA' | 'NO_ASISTIRA' }>(async (req, res) => {
+  const data = await respuestasCitacion.responderDesdePortal(req.user!, req.params.studentId, req.params.destinatarioId, req.body.respuesta);
+  res.status(200).json({ success: true, data });
 });

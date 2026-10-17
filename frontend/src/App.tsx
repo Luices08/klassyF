@@ -8,6 +8,8 @@ import { NotFoundPage } from './pages/NotFoundPage';
 import { ReportCardPage } from './pages/ReportCardPage';
 import { HomePage } from './pages/public/HomePage';
 import { VerificarCertificadoPage } from './pages/public/VerificarCertificadoPage';
+import { ConfirmarCitacionPage } from './pages/public/ConfirmarCitacionPage';
+import { CitacionesPage } from './pages/CitacionesPage';
 import { CertificadosPage } from './pages/admin/CertificadosPage';
 import { AnioLectivoPage } from './pages/AnioLectivoPage';
 import { ActividadesDocentePage } from './pages/ActividadesDocentePage';
@@ -41,6 +43,8 @@ import { EnrollmentDetailPage } from './pages/admin/EnrollmentDetailPage';
 import { DocumentosPorRevisarPage } from './pages/admin/DocumentosPorRevisarPage';
 import { EnrollmentsPage } from './pages/admin/EnrollmentsPage';
 import { PazYSalvoPage } from './pages/admin/PazYSalvoPage';
+import { SalidasPage } from './pages/admin/SalidasPage';
+import { TrasladosPage } from './pages/admin/TrasladosPage';
 import { EspaciosPage } from './pages/admin/EspaciosPage';
 import { GradesPage } from './pages/admin/GradesPage';
 import { GrupoFichaPage } from './pages/admin/GrupoFichaPage';
@@ -67,6 +71,8 @@ export default function App() {
       <Route path="/login" element={<LoginPage />} />
       <Route path="/verificar" element={<VerificarCertificadoPage />} />
       <Route path="/verificar/:token" element={<VerificarCertificadoPage />} />
+      {/* Enlace del correo de una citación (M24): el acudiente responde sin iniciar sesión. */}
+      <Route path="/citacion/:token" element={<ConfirmarCitacionPage />} />
 
       <Route element={<ProtectedRoute />}>
         <Route element={<AppShell />}>
@@ -96,6 +102,12 @@ export default function App() {
           {/* El docente entra a la ruta: el servidor dice si la institución lo habilitó (Configuración institucional). */}
           <Route element={<ProtectedRoute allowedRoles={['ADMIN', 'COORDINADOR', 'SECRETARIA', 'DOCENTE']} />}>
             <Route path="/paz-y-salvo" element={<PazYSalvoPage />} />
+            <Route path="/secretaria/traslados" element={<TrasladosPage />} />
+          </Route>
+
+          {/* Retiros y traslados: el servidor limita a secretaría por sede. */}
+          <Route element={<ProtectedRoute allowedRoles={['ADMIN', 'COORDINADOR', 'SECRETARIA']} />}>
+            <Route path="/secretaria/salidas" element={<SalidasPage />} />
           </Route>
 
           <Route element={<ProtectedRoute allowedRoles={['ADMIN', 'SECRETARIA']} />}>
@@ -123,6 +135,7 @@ export default function App() {
           </Route>
 
           <Route element={<ProtectedRoute allowedRoles={['ADMIN', 'COORDINADOR', 'DOCENTE']} />}>
+            <Route path="/reuniones" element={<CitacionesPage />} />
             <Route path="/recuperaciones" element={<RecuperacionesPage />} />
           </Route>
 

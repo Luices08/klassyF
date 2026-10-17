@@ -25,6 +25,7 @@ import {
 } from '../utils/certificados';
 import { contenidoDe, usaVariablesCon } from '../utils/plantillaCertificado';
 import { runTransaction } from '../utils/runTransaction';
+import { exigirPazYSalvoDeSalidaAprobado } from './pazYSalvoSalida.service';
 import { registrarEvento } from './audit.service';
 import { entradaDeElementos, obtenerConfiguracion, presenciaDeImagenes } from './certificadoConfiguracion.service';
 import { datosDeEstudios, obtenerPromocion } from './certificadoEstudios.service';
@@ -258,6 +259,9 @@ async function prepararDocumento(
   if (!def.estados_matricula.includes(matricula.estado)) {
     throw new ApiError(409, `«${def.nombre}» no se puede expedir con la matrícula en estado ${matricula.estado}.`);
   }
+
+  // Documentos de salida: con la matrícula retirada, el paz y salvo de salida debe estar aprobado (la vista previa sí se ve).
+  if (soloActivo && def.fuentes.includes('PAZ_Y_SALVO_SALIDA')) await exigirPazYSalvoDeSalidaAprobado(matricula._id, def.nombre);
 
   const [institucion, config] = await Promise.all([Institution.findOne(), obtenerConfiguracion()]);
   if (!institucion) throw new ApiError(409, 'Configura primero la institución antes de expedir certificados.');

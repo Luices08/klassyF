@@ -15,6 +15,10 @@ export async function motivoSinAccesoAlPerfil(user: UserDocument, rol: Rol): Pro
   if (rol === ROLES.ESTUDIANTE) {
     const matriculas = await Enrollment.find({ student_id: user._id });
     if (matriculas.length > 0 && !matriculas.some((m) => ESTADOS_MATRICULA_ACTIVA.includes(m.estado))) {
+      // Quien salió del colegio (M04) no tiene una preinscripción en revisión: se le dice lo que pasó.
+      if (!matriculas.some((m) => m.estado === 'PREINSCRITO') && matriculas.some((m) => m.estado === 'RETIRADO')) {
+        return 'Tu matrícula fue retirada o trasladada, así que ya no tienes acceso a las actividades y notas del aula. Pide tus documentos en secretaría.';
+      }
       return 'Tu preinscripción está en revisión y aún no ha sido formalizada por secretaría. Puedes consultar el estado en la página pública.';
     }
   }

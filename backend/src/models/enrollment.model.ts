@@ -11,6 +11,7 @@ import {
   TipoDocumentoMatricula,
   TipoIngreso,
 } from '../constants/enums';
+import { TIPOS_SALIDA, TipoSalida } from '../constants/salidas';
 
 export interface IChecklistItem {
   tipo_documento: TipoDocumentoMatricula;
@@ -21,6 +22,44 @@ export interface IChecklistItem {
   comentario: string | null;
   fecha_carga: Date | null;
   revisado_por: Types.ObjectId | null;
+}
+
+/** Soporte documental de la salida (carta de retiro, constancia de la institución receptora...). Mientras no exista el archivo general (M29) vive en disco. */
+export interface ISoporteSalida {
+  _id: Types.ObjectId;
+  nombre: string;
+  archivo_path: string;
+  mimetype: string;
+  tamano: number;
+  cargado_por: Types.ObjectId;
+  fecha: Date;
+}
+
+/**
+ * Cómo y cuándo terminó la matrícula (retiro o traslado). Es un asiento histórico: una vez registrada no se edita (solo se agregan soportes y se
+ * libera el cupo); un dato mal registrado se aclara en la auditoría, no se reescribe.
+ */
+export interface ISalidaMatricula {
+  tipo: TipoSalida;
+  /** Desde este día el estudiante ya no es del aula: lo anterior (notas, asistencia) se conserva y lo posterior no se cuenta. */
+  fecha_efectiva: Date;
+  motivo: string;
+  observaciones: string;
+  institucion_receptora: { nombre: string; codigo_dane: string; municipio: string } | null;
+  estado_previo: EstadoMatricula;
+  registrado_por: Types.ObjectId;
+  fecha_registro: Date;
+  cupo_liberado: boolean;
+  fecha_cupo_liberado: Date | null;
+  soportes: Types.DocumentArray<ISoporteSalida>;
+}
+
+/** Un tramo del paso del estudiante por un grupo en el año: sirve para saber en qué grupo estaba cualquier día, aunque después cambie o se retire. */
+export interface ITramoTrayectoria {
+  group_id: Types.ObjectId;
+  desde: Date;
+  /** null mientras sigue en ese grupo. */
+  hasta: Date | null;
 }
 
 export interface IEnrollment {
@@ -39,6 +78,9 @@ export interface IEnrollment {
   /** Plazo para entregar documentos y legalizar el cupo mientras la matricula esta PREINSCRITO. */
   fecha_limite_legalizacion: Date | null;
   motivo_retiro: string | null;
+  /** null mientras la matrícula sigue; las anteriores a este campo que estén RETIRADO tampoco la tienen. */
+  salida: ISalidaMatricula | null;
+  trayectoria: Types.DocumentArray<ITramoTrayectoria>;
   checklist: Types.DocumentArray<IChecklistItem>;
   createdAt: Date;
   updatedAt: Date;
@@ -61,6 +103,44 @@ const checklistItemSchema = new Schema<IChecklistItem>(
   { _id: false }
 );
 
+const soporteSalidaSchema = new Schema<ISoporteSalida>({
+  nombre: { type: String, required: true },
+  archivo_path: { type: String, required: true },
+  mimetype: { type: String, required: true },
+  tamano: { type: Number, required: true },
+  cargado_por: { type: Schema.Types.ObjectId, ref: 'User', required: true },
+  fecha: { type: Date, required: true },
+});
+
+const salidaSchema = new Schema<ISalidaMatricula>(
+  {
+    tipo: { type: String, enum: TIPOS_SALIDA, required: true },
+    fecha_efectiva: { type: Date, required: true },
+    motivo: { type: String, required: true, trim: true },
+    observaciones: { type: String, default: '', trim: true },
+    institucion_receptora: {
+      type: new Schema({ nombre: { type: String, required: true, trim: true }, codigo_dane: { type: String, default: '', trim: true }, municipio: { type: String, default: '', trim: true } }, { _id: false }),
+      default: null,
+    },
+    estado_previo: { type: String, enum: ESTADOS_MATRICULA, required: true },
+    registrado_por: { type: Schema.Types.ObjectId, ref: 'User', required: true },
+    fecha_registro: { type: Date, required: true },
+    cupo_liberado: { type: Boolean, default: false },
+    fecha_cupo_liberado: { type: Date, default: null },
+    soportes: { type: [soporteSalidaSchema], default: [] },
+  },
+  { _id: false }
+);
+
+const tramoTrayectoriaSchema = new Schema<ITramoTrayectoria>(
+  {
+    group_id: { type: Schema.Types.ObjectId, ref: 'Group', required: true },
+    desde: { type: Date, required: true },
+    hasta: { type: Date, default: null },
+  },
+  { _id: false }
+);
+
 const enrollmentSchema = new Schema<IEnrollment, EnrollmentModel>(
   {
     student_id: { type: Schema.Types.ObjectId, ref: 'User', required: true },
@@ -75,6 +155,8 @@ const enrollmentSchema = new Schema<IEnrollment, EnrollmentModel>(
     fecha_limite_compromiso: { type: Date, default: null },
     fecha_limite_legalizacion: { type: Date, default: null },
     motivo_retiro: { type: String, default: null },
+    salida: { type: salidaSchema, default: null },
+    trayectoria: { type: [tramoTrayectoriaSchema], default: [] },
     checklist: { type: [checklistItemSchema], default: [] },
   },
   { timestamps: true }
@@ -99,6 +181,29 @@ enrollmentSchema.pre('validate', function validarFolio(this: IEnrollment, next) 
   if (ESTADOS_MATRICULA_CON_FOLIO.includes(this.estado) && !this.folio_matricula) {
     return next(new Error('Una matrícula formalizada debe tener folio asignado.'));
   }
+  next();
+});
+
+// La salida es un asiento histórico: lo que dice quién, cuándo y por qué no se reescribe (los soportes y el cupo sí avanzan).
+const CAMPOS_INMUTABLES_DE_SALIDA = ['salida.tipo', 'salida.fecha_efectiva', 'salida.motivo', 'salida.estado_previo', 'salida.registrado_por', 'salida.fecha_registro'];
+enrollmentSchema.pre('save', function protegerSalida(this: EnrollmentDocument, next) {
+  if (!this.isNew && CAMPOS_INMUTABLES_DE_SALIDA.some((campo) => this.isModified(campo))) {
+    return next(new Error('La salida registrada de una matrícula no se modifica.'));
+  }
+  next();
+});
+
+// Primer tramo de la trayectoria: el grupo en el que nace la matrícula. Los cambios de grupo y la salida lo cierran y abren otros.
+enrollmentSchema.pre('validate', function abrirTrayectoria(this: EnrollmentDocument, next) {
+  if (this.isNew && this.trayectoria.length === 0) {
+    this.trayectoria.push({ group_id: this.group_id, desde: this.fecha_matricula ?? new Date(), hasta: null });
+  }
+  next();
+});
+
+// Una matrícula con folio es un asiento del Libro de Matrícula: no se borra (se retira o se anula, y queda).
+enrollmentSchema.pre('deleteOne', { document: true, query: false }, function noBorrarAsientos(this: EnrollmentDocument, next) {
+  if (this.folio_matricula) return next(new Error('Una matrícula con folio es un asiento del Libro de Matrícula y no se elimina.'));
   next();
 });
 

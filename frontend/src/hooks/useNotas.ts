@@ -77,6 +77,8 @@ export interface Planilla {
   /** El molde del colegio aplicado a esta clase: cada bloque con sus casillas. */
   bloques: BloquePlanilla[];
   estudiantes: FilaPlanilla[];
+  /** Ingresaron por traslado después de este periodo: no se califican (su nota es homologada). */
+  ingresaron_despues: Array<{ _id: string; nombre: string; apellido: string; numero_documento: string }>;
   resumen: Record<EstadoNota, number>;
   edicion: {
     puede_editar: boolean;

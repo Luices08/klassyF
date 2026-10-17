@@ -27,6 +27,7 @@ import { registrarEvento } from './audit.service';
 import { obtenerPlantillaPlanilla, PlantillaPlanilla } from './configuracionPlanilla.service';
 import { matriculasActivas } from './attendance.service';
 import { assertPeriodNotLocked } from './periodLock.service';
+import { ingresaronDespuesDe } from './trasladoConsulta.service';
 
 // --- Contexto de una planilla: una clase (asignación docente) en un periodo ---
 
@@ -74,6 +75,8 @@ export interface ContextoPlanilla {
   /** Actividades primero (por fecha de entrega) y luego las notas sueltas (por orden de creación). */
   casillas: CasillaDeClase[];
   estudiantes: EstudianteDePlanilla[];
+  /** Matriculados en el grupo que ingresaron por traslado después de este periodo: no se califican aquí (sus notas las homologa secretaría). */
+  ingresaron_despues: EstudianteDePlanilla[];
   /** Notas de actividad ya calificadas: `${actividad}|${estudiante}` -> nota. */
   notasActividad: Map<string, number>;
   /** Lo que el estudiante entregó en cada actividad (M11): `${actividad}|${estudiante}` -> estado y si hay archivo. */
@@ -91,12 +94,19 @@ export async function cargarContextoPlanilla(asignacion: TeacherAssignmentDocume
   const periodo = anio.periodos.find((p) => p.numero === periodoNumero);
   if (!periodo) throw new ApiError(400, `El año lectivo ${anio.year} no tiene periodo ${periodoNumero}.`);
 
-  const [actividades, sueltas, matriculas, registros] = await Promise.all([
+  const [actividades, sueltas, matriculas, registros, despues] = await Promise.all([
     Activity.find({ teacher_assignment_id: asignacion._id, periodo_numero: periodoNumero }).sort({ fecha_entrega: 1 }).lean(),
     ColumnaPlanilla.find({ teacher_assignment_id: asignacion._id, periodo_numero: periodoNumero }).sort({ orden: 1, createdAt: 1 }).lean(),
     matriculasActivas(asignacion.group_id),
     CalificacionAsignatura.find({ teacher_assignment_id: asignacion._id, periodo_numero: periodoNumero }).lean(),
+    ingresaronDespuesDe(asignacion.academic_year_id, periodoNumero),
   ]);
+  const estudianteDe = (m: (typeof matriculas)[number]): EstudianteDePlanilla => ({
+    _id: String(m.student_id._id),
+    nombre: m.student_id.nombre,
+    apellido: m.student_id.apellido,
+    numero_documento: m.student_id.numero_documento,
+  });
   const entregadas =
     actividades.length === 0
       ? []
@@ -133,12 +143,8 @@ export async function cargarContextoPlanilla(asignacion: TeacherAssignmentDocume
         requiere_entrega: false,
       })),
     ],
-    estudiantes: matriculas.map((m) => ({
-      _id: String(m.student_id._id),
-      nombre: m.student_id.nombre,
-      apellido: m.student_id.apellido,
-      numero_documento: m.student_id.numero_documento,
-    })),
+    estudiantes: matriculas.filter((m) => !despues.has(String(m.student_id._id))).map(estudianteDe),
+    ingresaron_despues: matriculas.filter((m) => despues.has(String(m.student_id._id))).map(estudianteDe),
     notasActividad: new Map(calificadas.map((c) => [`${String(c.activity_id)}|${String(c.student_id)}`, c.calificacion_numerica as number])),
     entregas: new Map(
       entregadas.map((c) => [`${String(c.activity_id)}|${String(c.student_id)}`, { estado: estadoDeEntrega(c), tiene_archivo: Boolean(c.archivo_path) }])
@@ -220,6 +226,8 @@ export interface Planilla {
   /** El molde del colegio aplicado a esta clase: cada bloque con sus casillas. */
   bloques: BloquePlanilla[];
   estudiantes: FilaPlanilla[];
+  /** Llegaron por traslado después de este periodo: no tienen fila (no se les califica), se dicen para que el docente no los busque. */
+  ingresaron_despues: EstudianteDePlanilla[];
   resumen: Record<EstadoNota, number>;
   edicion: {
     puede_editar: boolean;
@@ -331,6 +339,7 @@ export async function obtenerPlanilla(asignacionId: string, periodoNumero: numbe
     },
     bloques: armarBloques(ctx),
     estudiantes: filas,
+    ingresaron_despues: ctx.ingresaron_despues,
     resumen,
     edicion: {
       puede_editar: puedeEditar,
@@ -712,14 +721,10 @@ export async function declararDefinitivas(input: DefinitivasInput, usuario: User
   }).lean();
   const contextos = await contextosDeAsignaciones(asignaciones.map((a) => a._id));
 
-  const [registros, matriculas] = await Promise.all([
+  const [registros, estudiantesDe] = await Promise.all([
     CalificacionAsignatura.find({ teacher_assignment_id: { $in: asignaciones.map((a) => a._id) }, periodo_numero: input.periodo_numero }).select('teacher_assignment_id estado').lean(),
-    Enrollment.aggregate<{ _id: Types.ObjectId; n: number }>([
-      { $match: { group_id: { $in: asignaciones.map((a) => a.group_id) }, estado: { $in: ESTADOS_MATRICULA_ACTIVOS } } },
-      { $group: { _id: '$group_id', n: { $sum: 1 } } },
-    ]),
+    estudiantesACalificarPorGrupo(input.academic_year_id, asignaciones.map((a) => a.group_id), input.periodo_numero),
   ]);
-  const estudiantesDe = new Map(matriculas.map((m) => [String(m._id), m.n]));
 
   const omitidas: Array<{ teacher_assignment_id: string; asignatura: string; grupo: string; motivo: string }> = [];
   const aDefinitivas: Types.ObjectId[] = [];
@@ -757,6 +762,23 @@ export async function declararDefinitivas(input: DefinitivasInput, usuario: User
   return { definitivas: aDefinitivas.length, omitidas };
 }
 
+/**
+ * Cuántos estudiantes de cada grupo tiene que calificar el docente en el periodo: los matriculados, menos los que llegaron por traslado
+ * después (sus notas de ese periodo las homologa secretaría). Es la cuenta contra la que se mide si una planilla está toda cerrada.
+ */
+async function estudiantesACalificarPorGrupo(anioId: string, gruposIds: Array<Types.ObjectId | null | undefined>, periodoNumero: number): Promise<Map<string, number>> {
+  const [matriculas, despues] = await Promise.all([
+    Enrollment.find({ group_id: { $in: gruposIds }, estado: { $in: ESTADOS_MATRICULA_ACTIVOS } }).select('group_id student_id').lean(),
+    ingresaronDespuesDe(anioId, periodoNumero),
+  ]);
+  const cuenta = new Map<string, number>();
+  for (const m of matriculas) {
+    if (despues.has(String(m.student_id))) continue;
+    cuenta.set(String(m.group_id), (cuenta.get(String(m.group_id)) ?? 0) + 1);
+  }
+  return cuenta;
+}
+
 // --- Seguimiento de coordinación ---
 
 export interface SeguimientoQuery {
@@ -789,16 +811,13 @@ export async function seguimiento(query: SeguimientoQuery): Promise<FilaSeguimie
   if (asignaciones.length === 0) return [];
   const ids = asignaciones.map((a) => a._id);
 
-  const [contextos, registros, matriculas, actividades, sueltas] = await Promise.all([
+  const [contextos, registros, estudiantesDe, actividades, sueltas] = await Promise.all([
     contextosDeAsignaciones(ids),
     CalificacionAsignatura.aggregate<{ _id: { a: Types.ObjectId; e: EstadoNota }; n: number }>([
       { $match: { teacher_assignment_id: { $in: ids }, periodo_numero: query.periodo_numero } },
       { $group: { _id: { a: '$teacher_assignment_id', e: '$estado' }, n: { $sum: 1 } } },
     ]),
-    Enrollment.aggregate<{ _id: Types.ObjectId; n: number }>([
-      { $match: { group_id: { $in: asignaciones.map((a) => a.group_id) }, estado: { $in: ESTADOS_MATRICULA_ACTIVOS } } },
-      { $group: { _id: '$group_id', n: { $sum: 1 } } },
-    ]),
+    estudiantesACalificarPorGrupo(query.academic_year_id, asignaciones.map((a) => a.group_id), query.periodo_numero),
     Activity.aggregate<{ _id: Types.ObjectId; n: number }>([
       { $match: { teacher_assignment_id: { $in: ids }, periodo_numero: query.periodo_numero } },
       { $group: { _id: '$teacher_assignment_id', n: { $sum: 1 } } },
@@ -808,7 +827,6 @@ export async function seguimiento(query: SeguimientoQuery): Promise<FilaSeguimie
       { $group: { _id: '$teacher_assignment_id', n: { $sum: 1 } } },
     ]),
   ]);
-  const estudiantesDe = new Map(matriculas.map((m) => [String(m._id), m.n]));
   const actividadesDe = new Map(actividades.map((a) => [String(a._id), a.n]));
   const sueltasDe = new Map(sueltas.map((a) => [String(a._id), a.n]));
   const cuenta = (id: Types.ObjectId, estado: EstadoNota) => registros.find((r) => String(r._id.a) === String(id) && r._id.e === estado)?.n ?? 0;

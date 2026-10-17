@@ -335,3 +335,45 @@ export async function avisarActividadesPublicadasHoy(ahora = new Date()): Promis
   }
   return { avisos };
 }
+
+/**
+ * M24: una citación se creó, cambió de fecha/lugar o se canceló → campanita y punto del acudiente con portal, por estudiante. El correo
+ * es aparte (`colaCorreo.service`); un acudiente sin cuenta de portal solo recibe el correo.
+ */
+export function avisarCitacion(
+  citacion: { _id: Id; titulo: string; fechaLegible: string },
+  evento: 'CITACION_NUEVA' | 'CITACION_REPROGRAMADA' | 'CITACION_CANCELADA',
+  destinatarios: Array<{ student_id: Id; user_id: Id | null }>
+): Promise<void> {
+  return sinRomper('citación', async () => {
+    const conPortal = destinatarios.filter((d) => d.user_id);
+    const estudiantes = await User.find({ _id: { $in: conPortal.map((d) => d.student_id) } }).select('nombre apellido').lean();
+    const nombres = new Map(estudiantes.map((e) => [String(e._id), nombreCompleto(e)]));
+    for (const d of conPortal) {
+      const estudianteId = String(d.student_id);
+      await avisar({
+        destinatarios: [d.user_id as Id],
+        rol: ROLES.ACUDIENTE,
+        evento,
+        entidad_id: `${String(citacion._id)}:${estudianteId}`,
+        datos: { nombre: citacion.titulo, estudiante: nombres.get(estudianteId), cuando: citacion.fechaLegible },
+        ruta: '/portal',
+      });
+      await sumarInsignia({ destinatarios: [d.user_id as Id], rol: ROLES.ACUDIENTE, ruta: '/portal', pestana: pestanaDeHijo('citaciones', estudianteId) });
+    }
+  });
+}
+
+/** M24: un acudiente confirmó o declinó → quien convocó ve una sola alerta agrupada («5 acudientes respondieron a…») que abre la citación. */
+export function avisarCitacionRespondida(citacion: { _id: Id; titulo: string; convocante_id: Id; convocante_rol: Rol }): Promise<void> {
+  return sinRomper('respuesta a citación', async () => {
+    await avisar({
+      destinatarios: [citacion.convocante_id],
+      rol: citacion.convocante_rol,
+      evento: 'CITACION_RESPONDIDA',
+      entidad_id: String(citacion._id),
+      datos: { nombre: citacion.titulo },
+      ruta: `/reuniones?citacion=${String(citacion._id)}`,
+    });
+  });
+}

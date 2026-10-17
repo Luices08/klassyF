@@ -97,6 +97,7 @@ export async function armarPlanillaDeMuestra(academicYearId: string): Promise<Pl
     },
     bloques: armarBloques(ctx),
     estudiantes: filas,
+    ingresaron_despues: [],
     resumen,
     // Editable a propósito: el Excel de muestra sale con las celdas de entrada abiertas, igual que el que baja el docente.
     // La pantalla no ofrece guardar, así que para ella sigue siendo solo de consulta.

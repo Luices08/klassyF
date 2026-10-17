@@ -1,4 +1,5 @@
 import { useSearchParams } from 'react-router-dom';
+import { PortalCitaciones } from '../components/portal/PortalCitaciones';
 import { PortalCertificados } from '../components/portal/PortalCertificados';
 import { PortalConvivencia } from '../components/portal/PortalConvivencia';
 import { PortalDocumentos } from '../components/portal/PortalDocumentos';
@@ -14,8 +15,8 @@ import { TabPanel, Tabs } from '../components/ui/Tabs';
 import { useContadoresDePestana } from '../hooks/useNotificaciones';
 import { type HijoDelPortal, useHijos } from '../hooks/usePortal';
 
-type Pestana = 'notas' | 'inasistencias' | 'convivencia' | 'documentos' | 'certificados';
-const PESTANAS: Pestana[] = ['notas', 'inasistencias', 'convivencia', 'documentos', 'certificados'];
+type Pestana = 'notas' | 'inasistencias' | 'convivencia' | 'citaciones' | 'documentos' | 'certificados';
+const PESTANAS: Pestana[] = ['notas', 'inasistencias', 'convivencia', 'citaciones', 'documentos', 'certificados'];
 
 // Mientras la matrícula no esté formalizada no hay notas, asistencia ni observador: solo documentos.
 const MATRICULA_ACADEMICA = ['MATRICULADO_CONDICIONAL', 'MATRICULADO_DEFINITIVO'];
@@ -65,7 +66,7 @@ export function PortalAcudientePage() {
   if (!hijos || hijos.length === 0) {
     return (
       <div className="space-y-4">
-        <PageHeader title="Portal del acudiente" subtitle="Notas, inasistencias, convivencia, documentos y certificados de tus estudiantes a cargo." />
+        <PageHeader title="Portal del acudiente" subtitle="Notas, inasistencias, convivencia, citaciones, documentos y certificados de tus estudiantes a cargo." />
         <Alert tone="info">Todavía no tienes estudiantes vinculados a tu cuenta. Pide a la secretaría académica que los vincule.</Alert>
       </div>
     );
@@ -98,7 +99,7 @@ function PortalDeHijo({
 
   return (
     <div className="space-y-4">
-      <PageHeader title="Portal del acudiente" subtitle="Notas, inasistencias, convivencia, documentos y certificados de tus estudiantes a cargo." />
+      <PageHeader title="Portal del acudiente" subtitle="Notas, inasistencias, convivencia, citaciones, documentos y certificados de tus estudiantes a cargo." />
 
       <SelectorEstudiante hijos={hijos} seleccionado={hijo.student_id} onElegir={(id) => elegir({ hijo: id })} />
       <ResumenEstudiante hijo={hijo} />
@@ -108,6 +109,7 @@ function PortalDeHijo({
           { key: 'notas', label: 'Notas' },
           { key: 'inasistencias', label: 'Inasistencias', contador: contadorDe('inasistencias') },
           { key: 'convivencia', label: 'Convivencia', contador: contadorDe('convivencia') },
+          { key: 'citaciones', label: 'Citaciones', contador: contadorDe('citaciones') },
           { key: 'documentos', label: hijo.documentos_pendientes > 0 ? `Documentos (${hijo.documentos_pendientes})` : 'Documentos', contador: contadorDe('documentos') },
           { key: 'certificados', label: 'Certificados' },
         ]}
@@ -124,6 +126,9 @@ function PortalDeHijo({
       </TabPanel>
       <TabPanel active={pestana} tabKey="convivencia">
         {academica ? <PortalConvivencia key={hijo.student_id} studentId={hijo.student_id} /> : <Alert tone="info">El observador estará disponible cuando la matrícula esté formalizada.</Alert>}
+      </TabPanel>
+      <TabPanel active={pestana} tabKey="citaciones">
+        <PortalCitaciones key={hijo.student_id} studentId={hijo.student_id} />
       </TabPanel>
       <TabPanel active={pestana} tabKey="documentos">
         <PortalDocumentos key={hijo.student_id} studentId={hijo.student_id} />

@@ -9,6 +9,7 @@ import {
   POLITICAS_AFORO_AULA,
   PoliticaAforoAula,
 } from '../constants/enums';
+import { POLITICAS_CUPO_SALIDA, PoliticaCupoSalida } from '../constants/salidas';
 
 export interface ILimitesCargaDocente {
   PREESCOLAR: number;
@@ -47,6 +48,8 @@ export interface IInstitution {
   politica_aforo_aula: PoliticaAforoAula;
   /** M04: los docentes también pueden cargar y confirmar el paz y salvo de fin de año (si no, solo el personal de matrículas). */
   paz_y_salvo_docentes: boolean;
+  /** M04: cuándo se libera el cupo del grupo cuando un estudiante se retira o se traslada. */
+  politica_cupo_salida: PoliticaCupoSalida;
   /** M08: Topes maximos de carga horaria semanal por nivel segun Decreto 1850 / PEI institucional */
   limites_carga_docente?: ILimitesCargaDocente;
   /** M06: Tope maximo de horas semanales del Plan de Estudios por nivel (antes quemado en el frontend). */
@@ -93,6 +96,7 @@ const institutionSchema = new Schema<IInstitution, InstitutionModel>(
     modalidad: { type: String, enum: MODALIDADES_INSTITUCION, default: 'PRESENCIAL' },
     politica_aforo_aula: { type: String, enum: POLITICAS_AFORO_AULA, default: 'BLOQUEAR' },
     paz_y_salvo_docentes: { type: Boolean, default: false },
+    politica_cupo_salida: { type: String, enum: POLITICAS_CUPO_SALIDA, default: 'INMEDIATA' },
     limites_carga_docente: {
       type: new Schema<ILimitesCargaDocente>(
         {

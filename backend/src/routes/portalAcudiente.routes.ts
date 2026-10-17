@@ -5,6 +5,7 @@ import { authenticate, checkRole } from '../middlewares/auth.middleware';
 import { subirDocumentoMatricula } from '../middlewares/subidaDocumentosMatricula.middleware';
 import validate from '../middlewares/validate.middleware';
 import * as v from '../validators/portalAcudiente.validator';
+import * as vCitacion from '../validators/citacion.validator';
 
 const router = Router();
 
@@ -19,6 +20,10 @@ router.get('/hijos/:studentId/convivencia', validate(v.conHijo), ctrl.convivenci
 
 router.get('/hijos/:studentId/documentos', validate(v.conHijo), ctrl.documentos);
 router.post('/hijos/:studentId/documentos/:tipoDocumento', validate(v.subirDocumento), subirDocumentoMatricula.single('file'), ctrl.subirDocumento);
+
+// M24: citaciones del colegio al acudiente, con su botón de confirmar asistencia
+router.get('/hijos/:studentId/citaciones', validate(v.conHijo), ctrl.citaciones);
+router.post('/hijos/:studentId/citaciones/:destinatarioId/respuesta', validate(vCitacion.responderEnPortal), ctrl.responderCitacion);
 
 router.get('/hijos/:studentId/certificados', validate(v.conHijo), ctrl.certificados);
 router.post('/hijos/:studentId/certificados', validate(v.generarCertificado), ctrl.generarCertificado);

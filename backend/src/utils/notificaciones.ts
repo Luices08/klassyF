@@ -12,6 +12,8 @@ export interface DatosNotificacion {
   /** Nombre de un evento del calendario. */
   nombre?: string;
   decision?: 'APROBADA' | 'RECHAZADA';
+  /** Fecha y hora ya escritas (hora de Colombia) de una citación. */
+  cuando?: string;
 }
 
 const plural = (n: number, uno: string, varios: string) => (n === 1 ? uno : varios);
@@ -82,6 +84,23 @@ export function renderizarNotificacion(evento: EventoNotificacion, contador: num
       return {
         titulo: 'Próximamente',
         mensaje: `${datos.nombre ?? 'Un evento del calendario'} ${datos.dias === 0 ? 'es hoy' : `empieza en ${datos.dias ?? '?'} ${plural(datos.dias ?? 0, 'día', 'días')}`}.`,
+      };
+    case 'CITACION_NUEVA':
+      return {
+        titulo: 'Nueva citación',
+        mensaje: `Te citaron a «${datos.nombre ?? 'una reunión'}»${datos.estudiante ? ` por ${datos.estudiante}` : ''}${datos.cuando ? `: ${datos.cuando}` : ''}. Confirma tu asistencia en el portal.`,
+      };
+    case 'CITACION_REPROGRAMADA':
+      return {
+        titulo: 'Citación reprogramada',
+        mensaje: `Cambió la fecha o el lugar de «${datos.nombre ?? 'la reunión'}»${datos.estudiante ? ` por ${datos.estudiante}` : ''}${datos.cuando ? `: ${datos.cuando}` : ''}. Confirma de nuevo tu asistencia.`,
+      };
+    case 'CITACION_CANCELADA':
+      return { titulo: 'Citación cancelada', mensaje: `Se canceló «${datos.nombre ?? 'la reunión'}»${datos.estudiante ? ` por ${datos.estudiante}` : ''}.` };
+    case 'CITACION_RESPONDIDA':
+      return {
+        titulo: 'Respuestas a tu citación',
+        mensaje: `${n} ${plural(n, 'acudiente respondió', 'acudientes respondieron')} a «${datos.nombre ?? 'tu citación'}».`,
       };
   }
 }

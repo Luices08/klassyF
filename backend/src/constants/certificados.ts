@@ -17,11 +17,12 @@ export const PATRON_CLAVE_CERTIFICADO = /^[A-Z0-9_]{2,40}$/;
  *   documento solo admite vista previa: lo expedido se congela, así que no se emite oficial con un dato ausente.
  * - DEPENDENCIAS: la confirmación de «sin pendientes» en cada dependencia configurada del paz y salvo.
  */
-export const FUENTES_CERTIFICADO = ['VALORACIONES', 'DEPENDENCIAS'] as const;
+export const FUENTES_CERTIFICADO = ['VALORACIONES', 'DEPENDENCIAS', 'PAZ_Y_SALVO_SALIDA'] as const;
 export type FuenteCertificado = (typeof FUENTES_CERTIFICADO)[number];
 export const ETIQUETA_FUENTE: Record<FuenteCertificado, { nombre: string; descripcion: string }> = {
   VALORACIONES: { nombre: 'Valoraciones y promoción', descripcion: 'Incluye la tabla de notas finales y el concepto de promoción. Solo se expide con todas las notas definitivas.' },
   DEPENDENCIAS: { nombre: 'Dependencias (paz y salvo)', descripcion: 'Al expedir se confirma que no hay pendientes en cada dependencia activa.' },
+  PAZ_Y_SALVO_SALIDA: { nombre: 'Paz y salvo de salida', descripcion: 'Documento de salida: con la matrícula retirada o trasladada solo se expide cuando el paz y salvo de salida está aprobado.' },
 };
 
 /** Un tipo pasa por estos estados: BORRADOR (se redacta, no se expide) → ACTIVO (se ofrece) → ARCHIVADO (no se ofrece; lo expedido sigue verificándose). */

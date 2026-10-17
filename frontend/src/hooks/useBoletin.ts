@@ -111,6 +111,10 @@ export interface PlantillaBoletin {
 export interface ConfiguracionBoletin {
   canal_reclamaciones: string;
   mostrar_puesto: boolean;
+  /** SIEE: el boletín parcial de retiro incluye las notas de corte del periodo en curso (provisionales). */
+  incluir_corte_en_retiro: boolean;
+  /** SIEE: el boletín parcial de retiro solo se entrega con el paz y salvo de salida aprobado. */
+  exigir_paz_y_salvo_en_retiro: boolean;
   entregas: EntregaBoletin[];
   /** Siempre completa: lo que el colegio no personalizó viene con el diseño original. */
   plantilla: PlantillaBoletin;

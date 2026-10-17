@@ -81,6 +81,7 @@ export const NAV_ITEMS: NavItem[] = [
   { to: '/paz-y-salvo', label: 'Paz y salvo de fin de año', icon: CheckCircleIcon, roles: [...STAFF, 'DOCENTE'] },
   { to: '/admin/admisiones', label: 'Admisiones', icon: InboxIcon, roles: STAFF },
   { to: '/secretaria/traslados', label: 'Traslados y homologación', icon: LayersIcon, roles: STAFF },
+  { to: '/secretaria/salidas', label: 'Retiros y traslados', icon: DoorIcon, roles: ['ADMIN', 'COORDINADOR', 'SECRETARIA'] },
   { to: '/secretaria/certificados', label: 'Certificados', icon: FileTextIcon, roles: ['ADMIN', 'SECRETARIA'] },
   { to: '/convivencia/observador', label: 'Observador', icon: EyeIcon, roles: CONVIVENCIA_REGISTRA },
   { to: '/convivencia/catalogo', label: 'Catálogo de convivencia', icon: SlidersIcon, roles: CONVIVENCIA_GESTIONA },
@@ -110,7 +111,7 @@ export const GRUPOS_NAV: GrupoNav[] = [
     clave: 'matriculas',
     label: 'Matrículas y admisiones',
     icon: ClipboardListIcon,
-    rutas: ['/admin/admisiones', '/admin/enrollments', '/admin/documentos-por-revisar', '/paz-y-salvo', '/secretaria/traslados', '/admin/students', '/secretaria/certificados'],
+    rutas: ['/admin/admisiones', '/admin/enrollments', '/admin/documentos-por-revisar', '/paz-y-salvo', '/secretaria/traslados', '/secretaria/salidas', '/admin/students', '/secretaria/certificados'],
   },
   {
     clave: 'institucion',

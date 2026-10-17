@@ -12,6 +12,7 @@ export const ACTIVIDADES_DIR = path.join(UPLOADS_ROOT, 'actividades');
 export const PAZ_Y_SALVO_DIR = path.join(UPLOADS_ROOT, 'paz-y-salvo');
 export const PLANEACION_DIR = path.join(UPLOADS_ROOT, 'planeacion');
 export const TRASLADOS_DIR = path.join(UPLOADS_ROOT, 'traslados');
+export const SALIDAS_DIR = path.join(UPLOADS_ROOT, 'salidas');
 
 /** Carpeta de una matricula puntual, para aislar sus documentos del resto. */
 export function carpetaMatricula(enrollmentId: string): string {
@@ -21,6 +22,11 @@ export function carpetaMatricula(enrollmentId: string): string {
 /** Soportes de un traslado (certificado de notas de origen, constancia de retiro...), una carpeta por traslado. */
 export function carpetaTraslado(trasladoId: string): string {
   return path.join(TRASLADOS_DIR, trasladoId);
+}
+
+/** Soportes de la salida (retiro o traslado) de una matrícula, una carpeta por matrícula. */
+export function carpetaSalida(enrollmentId: string): string {
+  return path.join(SALIDAS_DIR, enrollmentId);
 }
 
 /** Paz y salvo de fin de año (M04), una carpeta por año lectivo. */

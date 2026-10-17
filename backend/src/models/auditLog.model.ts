@@ -31,6 +31,17 @@ export const ACCIONES_AUDITORIA = [
   'PAZ_Y_SALVO_CONFIRMADO',
   'PAZ_Y_SALVO_RECHAZADO',
   'PAZ_Y_SALVO_DESCARGADO',
+  // Retiro y traslado durante el año (M04, con paz y salvo de salida de M26 y boletín parcial de M17)
+  'SALIDA_MATRICULA_REGISTRADA',
+  'SALIDA_CUPO_LIBERADO',
+  'SALIDA_SOPORTE_CARGADO',
+  'SALIDA_SOPORTE_DESCARGADO',
+  'SALIDA_BOLETIN_PARCIAL_GENERADO',
+  'PAZ_Y_SALVO_SALIDA_ABIERTO',
+  'PAZ_Y_SALVO_SALIDA_APROBADO',
+  'PAZ_Y_SALVO_SALIDA_BLOQUEADO',
+  'PAZ_Y_SALVO_SALIDA_EXCEPCION',
+  'PAZ_Y_SALVO_SALIDA_ANULADO',
   // Traslados extemporáneos y homologación de notas (M04/M26, M32 para las escalas externas)
   'TRASLADO_REGISTRADO',
   'TRASLADO_ACTUALIZADO',
@@ -266,6 +277,18 @@ const auditLogSchema = new Schema<IAuditLog, AuditLogModel>(
 
 auditLogSchema.index({ usuario_id: 1, createdAt: -1 });
 auditLogSchema.index({ accion: 1, createdAt: -1 });
+
+// M31: la bitácora solo se escribe. Corregir o borrar un evento sería reescribir la historia, así que el modelo lo impide.
+const MENSAJE_BITACORA = 'La bitácora de auditoría es de solo escritura: sus eventos no se modifican ni se eliminan.';
+auditLogSchema.pre('save', function bitacoraSoloEscritura(next) {
+  if (!this.isNew) return next(new Error(MENSAJE_BITACORA));
+  next();
+});
+for (const operacion of ['updateOne', 'updateMany', 'findOneAndUpdate', 'replaceOne', 'findOneAndReplace', 'deleteOne', 'deleteMany', 'findOneAndDelete'] as const) {
+  auditLogSchema.pre(operacion, function rechazar(next) {
+    next(new Error(MENSAJE_BITACORA));
+  });
+}
 
 export const AuditLog = model<IAuditLog, AuditLogModel>('AuditLog', auditLogSchema);
 export default AuditLog;

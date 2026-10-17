@@ -166,6 +166,10 @@ export const PALABRAS_CLAVE_POR_RUTA: Record<string, { descripcion: string; clav
     descripcion: 'Traslados extemporáneos de estudiantes y homologación de las notas del colegio de procedencia.',
     claves: ['traslado', 'traslados', 'homologacion', 'homologar', 'notas homologadas', 'exenta', 'exento por traslado', 'colegio de procedencia', 'llego a mitad de ano', 'escala de otro colegio'],
   },
+  '/secretaria/salidas': {
+    descripcion: 'Retiro o traslado de un estudiante durante el año: fecha efectiva, paz y salvo de salida y boletín parcial de retiro.',
+    claves: ['retiro', 'retirar', 'retirar estudiante', 'traslado a otro colegio', 'salida de estudiante', 'se fue del colegio', 'paz y salvo de salida', 'boletin de retiro', 'liberar cupo', 'desertor'],
+  },
   '/admin/admisiones': {
     descripcion: 'Solicitudes de admisión y preinscripciones.',
     claves: ['admisiones', 'admision', 'preinscripcion', 'aspirantes', 'solicitudes de cupo'],

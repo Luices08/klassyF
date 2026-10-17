@@ -5,7 +5,8 @@ import { Card, CardHeader } from '../ui/Card';
 import { Select } from '../ui/Field';
 import { Switch } from '../ui/Switch';
 import { useActualizarAjustesInstitucion } from '../../hooks/useInstitution';
-import { MODALIDADES_INSTITUCION, NOMBRES_MODALIDAD, type Institution, type ModalidadInstitucion, type PoliticaAforoAula } from '../../types/domain';
+import { NOMBRES_POLITICA_CUPO_SALIDA } from '../../hooks/useSalidas';
+import { MODALIDADES_INSTITUCION, NOMBRES_MODALIDAD, POLITICAS_CUPO_SALIDA, type Institution, type ModalidadInstitucion, type PoliticaAforoAula, type PoliticaCupoSalida } from '../../types/domain';
 
 interface BloqueProps {
   titulo: string;
@@ -41,15 +42,17 @@ export function AjustesInstitucion({ institution }: { institution: Institution }
   const guardarModalidad = useActualizarAjustesInstitucion();
   const guardarAforo = useActualizarAjustesInstitucion();
   const guardarPazYSalvo = useActualizarAjustesInstitucion();
+  const guardarCupoSalida = useActualizarAjustesInstitucion();
 
   const [modalidad, setModalidad] = useState<ModalidadInstitucion>(institution.modalidad ?? 'PRESENCIAL');
   const [aforo, setAforo] = useState<PoliticaAforoAula>(institution.politica_aforo_aula ?? 'BLOQUEAR');
   const [pazYSalvo, setPazYSalvo] = useState(institution.paz_y_salvo_docentes ?? false);
+  const [cupoSalida, setCupoSalida] = useState<PoliticaCupoSalida>(institution.politica_cupo_salida ?? 'INMEDIATA');
 
   const esVirtual = (institution.modalidad ?? 'PRESENCIAL') === 'VIRTUAL';
 
   return (
-    <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+    <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 xl:grid-cols-4">
       <BloqueAjuste
         titulo="Modalidad"
         subtitulo="Presencial o virtual."
@@ -106,6 +109,28 @@ export function AjustesInstitucion({ institution }: { institution: Institution }
           label="Los docentes pueden cargar y confirmar el paz y salvo"
           description="Apagado: solo secretaría, coordinación y administración. Encendido: cada docente también lo hace para los estudiantes de sus grupos. Quien ya lo tiene confirmado no lo vuelve a subir al matricularse."
         />
+      </BloqueAjuste>
+
+      <BloqueAjuste
+        titulo="Cupo de quien sale"
+        subtitulo="Cuándo se libera el cupo del grupo en un retiro o traslado."
+        modificado={cupoSalida !== (institution.politica_cupo_salida ?? 'INMEDIATA')}
+        guardando={guardarCupoSalida.isPending}
+        error={guardarCupoSalida.error}
+        onGuardar={() => guardarCupoSalida.mutate({ politica_cupo_salida: cupoSalida })}
+      >
+        <Select
+          label="Liberar el cupo"
+          value={cupoSalida}
+          onChange={(e) => setCupoSalida(e.target.value as PoliticaCupoSalida)}
+          hint="Con la segunda opción el cupo se retiene hasta que todas las dependencias del paz y salvo de salida estén aprobadas. Aplica a las salidas que se registren desde ahora."
+        >
+          {POLITICAS_CUPO_SALIDA.map((p) => (
+            <option key={p} value={p}>
+              {NOMBRES_POLITICA_CUPO_SALIDA[p]}
+            </option>
+          ))}
+        </Select>
       </BloqueAjuste>
     </div>
   );

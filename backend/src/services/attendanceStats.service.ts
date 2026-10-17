@@ -4,6 +4,7 @@ import AttendanceJustification from '../models/attendanceJustification.model';
 import Group from '../models/group.model';
 import Subject from '../models/subject.model';
 import User, { UserDocument } from '../models/user.model';
+import { finDelDia } from '../utils/calendarioAcademico';
 import { filtroAlcanceAsistencia } from './attendance.service';
 import { mapaDeEstados } from './attendanceState.service';
 
@@ -118,6 +119,8 @@ export interface ConsultaEstadistica {
   group_id?: string;
   subject_id?: string;
   student_id?: string;
+  /** Solo cuenta lo registrado hasta este día inclusive (por ejemplo, la fecha efectiva del retiro de un estudiante). */
+  hasta?: Date;
 }
 
 export interface FilaEstadistica extends TotalesAsistencia {
@@ -164,6 +167,7 @@ export async function calcularEstadisticas(consulta: ConsultaEstadistica, alcanc
     ...(consulta.periodo_numero ? { periodo_numero: consulta.periodo_numero } : {}),
     ...(consulta.group_id ? { group_id: new Types.ObjectId(consulta.group_id) } : {}),
     ...(consulta.subject_id ? { subject_id: new Types.ObjectId(consulta.subject_id) } : {}),
+    ...(consulta.hasta ? { fecha: { $lte: finDelDia(consulta.hasta) } } : {}),
     ...alcance,
   };
 

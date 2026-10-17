@@ -32,8 +32,10 @@ import { runTransaction } from '../utils/runTransaction';
 import { registrarEvento } from './audit.service';
 import { generateFolioMatricula } from './folio.service';
 import { aprobarItemConPazYSalvo, pazYSalvoConfirmadoPrevio } from './pazYSalvo.service';
+import { aplicarSalida } from './salidaMatricula.service';
 import { crearDesdeMatricula } from './solicitudApoyo.service';
 
+// Un RETIRADO que venía matriculado libera su cupo en `aplicarSalida` (según la política de la institución); aquí llega solo quien se retira siendo PREINSCRITO.
 const ESTADOS_QUE_LIBERAN_CUPO: EstadoMatricula[] = ['RETIRADO', 'ANULADO'];
 const ESTADOS_TERMINALES: EstadoMatricula[] = ['RETIRADO', 'ANULADO'];
 
@@ -254,7 +256,7 @@ export interface FormalizacionOpciones {
 
 /**
  * Cambia el estado de una matricula (formalizacion, retiro, anulacion).
- * Exige motivo para RETIRADO y ANULADO; libera el cupo del grupo en ambos casos.
+ * Exige motivo para RETIRADO y ANULADO. Anular libera el cupo del grupo; retirar a quien ya estaba matriculado pasa por `aplicarSalida` (cupo según la política de la institución).
  *
  * El folio del Libro de Matricula se asigna aqui, en la transicion
  * PREINSCRITO -> MATRICULADO_*, y no antes: un aspirante que desiste no debe
@@ -288,6 +290,13 @@ export async function updateEnrollmentStatus(
       throw new ApiError(409, `No se puede modificar una matricula que ya esta en estado ${estadoAnterior}.`);
     }
 
+    // Retirar a quien ya estaba matriculado es una salida (M04): deja fecha efectiva, tipo y paz y salvo. Con los datos mínimos es un retiro de hoy;
+    // el registro completo (traslado, fecha anterior, institución receptora) lo hace `registrarSalida`.
+    if (nuevoEstado === 'RETIRADO' && estadoAnterior !== 'PREINSCRITO') {
+      await aplicarSalida(enrollment, { tipo: 'RETIRO', motivo: motivo as string }, actor, session);
+      return enrollment;
+    }
+
     // Una matricula con folio ya es un asiento del Libro: no vuelve a preinscrita.
     if (nuevoEstado === 'PREINSCRITO' && enrollment.folio_matricula) {
       throw new ApiError(409, 'Una matrícula con folio asignado no puede volver a PREINSCRITO.');
@@ -309,6 +318,8 @@ export async function updateEnrollmentStatus(
       enrollment.numero_folio = numero_folio;
       // La fecha de matricula es la de la formalizacion, no la de la preinscripcion.
       enrollment.fecha_matricula = new Date();
+      const primerTramo = enrollment.trayectoria.length === 1 ? enrollment.trayectoria[0] : undefined;
+      if (primerTramo) primerTramo.desde = enrollment.fecha_matricula;
       detalleFolio = ` — folio ${folio_matricula}`;
     }
 
@@ -392,6 +403,12 @@ export async function cambiarGrupo(
       { session }
     );
 
+    // La trayectoria conserva el paso por el grupo anterior: desde cuándo y hasta cuándo estuvo en cada uno.
+    const ahora = new Date();
+    const abierto = [...enrollment.trayectoria].reverse().find((t) => t.hasta === null);
+    if (abierto) abierto.hasta = ahora;
+    else enrollment.trayectoria.push({ group_id: grupoAnteriorId, desde: enrollment.fecha_matricula, hasta: ahora });
+    enrollment.trayectoria.push({ group_id: nuevoGrupo._id, desde: ahora, hasta: null });
     enrollment.group_id = nuevoGrupo._id;
     await enrollment.save({ session });
 

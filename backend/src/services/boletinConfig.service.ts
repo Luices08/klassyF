@@ -19,6 +19,8 @@ export interface EntregaInput {
 export interface CambiosConfiguracionBoletin {
   canal_reclamaciones?: string;
   mostrar_puesto?: boolean;
+  incluir_corte_en_retiro?: boolean;
+  exigir_paz_y_salvo_en_retiro?: boolean;
   /** Reemplaza la lista completa de fechas de entrega. */
   entregas?: EntregaInput[];
   /** Reemplaza el diseño completo del boletín; lo que falte se completa con el diseño original. */
@@ -28,6 +30,8 @@ export interface CambiosConfiguracionBoletin {
 export interface ConfiguracionBoletinVista {
   canal_reclamaciones: string;
   mostrar_puesto: boolean;
+  incluir_corte_en_retiro: boolean;
+  exigir_paz_y_salvo_en_retiro: boolean;
   entregas: Array<{ academic_year_id: string; periodo_numero: number; fecha_entrega: Date }>;
   /** Siempre completa: lo que el colegio no personalizó viene con el diseño original. */
   plantilla: PlantillaBoletin;
@@ -42,6 +46,8 @@ export async function leerConfiguracionBoletin(): Promise<ConfiguracionBoletinVi
   return {
     canal_reclamaciones: guardada?.canal_reclamaciones ?? '',
     mostrar_puesto: guardada?.mostrar_puesto ?? true,
+    incluir_corte_en_retiro: guardada?.incluir_corte_en_retiro ?? false,
+    exigir_paz_y_salvo_en_retiro: guardada?.exigir_paz_y_salvo_en_retiro ?? false,
     entregas: (guardada?.entregas ?? []).map((e) => ({ academic_year_id: String(e.academic_year_id), periodo_numero: e.periodo_numero, fecha_entrega: e.fecha_entrega })),
     plantilla: completarPlantilla(guardada?.plantilla),
   };
@@ -99,6 +105,8 @@ export async function actualizarConfiguracionBoletin(
 
   if (cambios.canal_reclamaciones !== undefined) configuracion.canal_reclamaciones = cambios.canal_reclamaciones;
   if (cambios.mostrar_puesto !== undefined) configuracion.mostrar_puesto = cambios.mostrar_puesto;
+  if (cambios.incluir_corte_en_retiro !== undefined) configuracion.incluir_corte_en_retiro = cambios.incluir_corte_en_retiro;
+  if (cambios.exigir_paz_y_salvo_en_retiro !== undefined) configuracion.exigir_paz_y_salvo_en_retiro = cambios.exigir_paz_y_salvo_en_retiro;
   if (cambios.entregas) configuracion.set('entregas', cambios.entregas);
   if (cambios.plantilla) {
     validarEscudo(cambios.plantilla.escudo?.url);

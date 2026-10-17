@@ -38,6 +38,7 @@ import studentRoutes from './student.routes';
 import studyPlanRoutes from './studyPlan.routes';
 import subjectRoutes from './subject.routes';
 import teacherAssignmentRoutes from './teacherAssignment.routes';
+import salidaRoutes from './salida.routes';
 import trasladoRoutes from './traslado.routes';
 import userRoutes from './user.routes';
 import ventanaPlanesRoutes from './ventanaPlanes.routes';
@@ -62,6 +63,8 @@ router.use('/enrollments', enrollmentRoutes);
 router.use('/paz-y-salvo', pazYSalvoRoutes);
 // Traslados extemporáneos y homologación de notas (M04/M26), con las escalas de otras instituciones (M32)
 router.use('/traslados', trasladoRoutes);
+// Retiro y traslado durante el año, con su paz y salvo de salida y el boletín parcial de retiro (M04/M26/M17)
+router.use('/salidas', salidaRoutes);
 
 // M10: Espacios fisicos (aulas, laboratorios, canchas)
 router.use('/espacios', espacioRoutes);

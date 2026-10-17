@@ -27,7 +27,7 @@ import {
 } from '../../hooks/useCertificados';
 import { useAuth } from '../../context/AuthContext';
 
-const FUENTES: FuenteCertificado[] = ['VALORACIONES', 'DEPENDENCIAS'];
+const FUENTES: FuenteCertificado[] = ['VALORACIONES', 'DEPENDENCIAS', 'PAZ_Y_SALVO_SALIDA'];
 const ESTADO_TONO: Record<EstadoTipoCertificado, Tone> = { BORRADOR: 'orange', ACTIVO: 'green', ARCHIVADO: 'neutral' };
 const ESTADO_NOMBRE: Record<EstadoTipoCertificado, string> = { BORRADOR: 'Borrador', ACTIVO: 'Activo', ARCHIVADO: 'Archivado' };
 

@@ -1,5 +1,6 @@
 import Joi from 'joi';
 import { CALENDARIOS, ESTADOS_USUARIO, MODALIDADES_INSTITUCION, POLITICAS_AFORO_AULA, TIPOS_FRANJA } from '../constants/enums';
+import { POLITICAS_CUPO_SALIDA } from '../constants/salidas';
 import { ValidationSchema } from '../middlewares/validate.middleware';
 import { CLAVES_IMAGEN_INSTITUCIONAL } from '../constants/imagenesInstitucionales';
 import { objectId } from './common.validator';
@@ -108,6 +109,7 @@ export const actualizarAjustes: ValidationSchema = {
     modalidad: Joi.string().valid(...MODALIDADES_INSTITUCION),
     politica_aforo_aula: Joi.string().valid(...POLITICAS_AFORO_AULA),
     paz_y_salvo_docentes: Joi.boolean(),
+    politica_cupo_salida: Joi.string().valid(...POLITICAS_CUPO_SALIDA),
   }).min(1),
 };
 

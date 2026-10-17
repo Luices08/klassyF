@@ -41,6 +41,7 @@ import { EnrollmentDetailPage } from './pages/admin/EnrollmentDetailPage';
 import { DocumentosPorRevisarPage } from './pages/admin/DocumentosPorRevisarPage';
 import { EnrollmentsPage } from './pages/admin/EnrollmentsPage';
 import { PazYSalvoPage } from './pages/admin/PazYSalvoPage';
+import { SalidasPage } from './pages/admin/SalidasPage';
 import { TrasladosPage } from './pages/admin/TrasladosPage';
 import { EspaciosPage } from './pages/admin/EspaciosPage';
 import { GradesPage } from './pages/admin/GradesPage';
@@ -98,6 +99,11 @@ export default function App() {
           <Route element={<ProtectedRoute allowedRoles={['ADMIN', 'COORDINADOR', 'SECRETARIA', 'DOCENTE']} />}>
             <Route path="/paz-y-salvo" element={<PazYSalvoPage />} />
             <Route path="/secretaria/traslados" element={<TrasladosPage />} />
+          </Route>
+
+          {/* Retiros y traslados: el servidor limita a secretaría por sede. */}
+          <Route element={<ProtectedRoute allowedRoles={['ADMIN', 'COORDINADOR', 'SECRETARIA']} />}>
+            <Route path="/secretaria/salidas" element={<SalidasPage />} />
           </Route>
 
           <Route element={<ProtectedRoute allowedRoles={['ADMIN', 'SECRETARIA']} />}>

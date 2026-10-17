@@ -615,6 +615,22 @@ export async function generateReportCard(
   return armarBoletin(contexto, student);
 }
 
+/**
+ * El boletín de un periodo de un estudiante que ya no está en las listas vivas del aula (retiro o traslado, M04), en el grupo que tenía entonces:
+ * el mismo cálculo del boletín del periodo, sin la comprobación de matrícula activa ni de publicación (quien lo pide es el personal, para el
+ * boletín parcial de retiro). Solo lee: lo cerrado, las recuperaciones y las notas homologadas, igual que `generateReportCard`.
+ */
+export async function boletinDePeriodoDeEstudiante(
+  student: UserDocument,
+  academicYear: AcademicYearDocument,
+  groupId: unknown,
+  periodoNumero: number
+): Promise<ReportCardResult> {
+  const grupo = await cargarGrupoPoblado(groupId);
+  const contexto = await cargarContextoGrupo(academicYear, grupo, periodoNumero, String(student._id));
+  return armarBoletin(contexto, student);
+}
+
 export interface BoletinesDeGrupoParams {
   group_id: string;
   academic_year_id: string;

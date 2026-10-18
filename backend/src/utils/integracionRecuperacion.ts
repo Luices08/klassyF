@@ -33,10 +33,11 @@ export const INTEGRACION_INICIAL: IntegracionPeriodo = {
 /** Completa lo que falte (una política guardada antes de que existiera la integración no la trae). */
 export function integracionDe(parcial: Partial<IntegracionPeriodo> | null | undefined): IntegracionPeriodo {
   // Campo por campo (no `...parcial`): llega a veces como subdocumento de Mongoose y un spread copiaría sus internos.
+  const modo = parcial?.modo ?? INTEGRACION_INICIAL.modo;
   return {
-    modo: parcial?.modo ?? INTEGRACION_INICIAL.modo,
+    modo,
     bloque_clave: parcial?.bloque_clave ?? INTEGRACION_INICIAL.bloque_clave,
-    peso: parcial?.peso ?? INTEGRACION_INICIAL.peso,
+    peso: modo === 'CASILLA_ADICIONAL' ? (parcial?.peso ?? INTEGRACION_INICIAL.peso) : null,
     solo_si_mejora: parcial?.solo_si_mejora ?? INTEGRACION_INICIAL.solo_si_mejora,
     tope_aprobatoria: parcial?.tope_aprobatoria ?? INTEGRACION_INICIAL.tope_aprobatoria,
     cuenta_en_boletin: parcial?.cuenta_en_boletin ?? INTEGRACION_INICIAL.cuenta_en_boletin,
@@ -52,7 +53,9 @@ export function validarIntegracion(integracion: IntegracionPeriodo, clavesBloque
   if (bloque && clavesBloques && !clavesBloques.includes(bloque)) {
     return `El bloque «${bloque}» no existe en el molde de notas de este año lectivo.`;
   }
-  if (peso !== null && (!(peso > 0) || peso > 100)) return 'El peso de la recuperación debe estar entre 0 y 100 (% del bloque).';
+  if (modo === 'CASILLA_ADICIONAL' && peso !== null && (!(peso > 0) || peso > 100)) {
+    return 'El peso de la recuperación debe estar entre 0 y 100 (% del bloque).';
+  }
   return null;
 }
 

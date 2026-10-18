@@ -137,6 +137,28 @@ export function fechaTextual(iso: string): string {
   return dia === 1 ? `al primer (1) día del mes de ${mes} de ${anio}` : `a los ${enLetras(dia)} (${dia}) días del mes de ${mes} de ${anio}`;
 }
 
+const ESTADO_TITULACION_TEXTO: Record<string, string> = {
+  GRADUADO: 'graduado(a)',
+  GRADUADO_EXTEMPORANEO: 'graduado(a) por ventanilla',
+  APROBO_NO_GRADUADO: 'aprobó el plan de estudios, con el grado formal pendiente',
+};
+
+/** Variables de los documentos de titulación; vacías en cualquier otro documento. */
+function valoresDeTitulacion(s: SnapshotCertificado): Record<string, string> {
+  const t = s.titulacion;
+  const acta = t?.acta;
+  const asignada = acta !== null && acta !== undefined && acta.libro > 0;
+  return {
+    'titulacion.titulo': t?.titulo ?? '',
+    'titulacion.acta_codigo': acta?.codigo ?? '',
+    'titulacion.acta_libro': asignada ? String(acta.libro) : acta ? '—' : '',
+    'titulacion.acta_folio': asignada ? String(acta.folio) : acta ? '—' : '',
+    'titulacion.fecha_grado': acta ? fechaLarga(acta.fecha) : '',
+    'titulacion.estado': t ? (ESTADO_TITULACION_TEXTO[t.estado] ?? t.estado) : '',
+    'titulacion.pendientes': t && t.pendientes.length > 0 ? t.pendientes.join(' ') : '',
+  };
+}
+
 /** Cada variable del catálogo con su valor; vacío = el dato no existe (el bloque que lo exige no se muestra o no se expide). */
 export function contextoDeVariables(s: SnapshotCertificado, vigenciaDias: number | null): Record<string, string> {
   const e = s.encabezado;
@@ -148,7 +170,7 @@ export function contextoDeVariables(s: SnapshotCertificado, vigenciaDias: number
   const a = s.acudiente;
   const promocion = s.estudios
     ? s.estudios.promocion
-      ? `${s.estudios.promocion.concepto === 'APROBO' ? 'APROBÓ' : 'NO APROBÓ'} el grado ${m.grado}`
+      ? (s.estudios.promocion.texto ?? `${s.estudios.promocion.concepto === 'APROBO' ? 'APROBÓ' : 'NO APROBÓ'} el grado ${m.grado}`)
       : 'PENDIENTE (aún no registrado)'
     : '';
   return {
@@ -184,6 +206,7 @@ export function contextoDeVariables(s: SnapshotCertificado, vigenciaDias: number
     'paz_y_salvo.dependencias': s.paz_y_salvo?.dependencias.join(', ') ?? '',
     'paz_y_salvo.verificado_por': s.paz_y_salvo?.verificado_por ?? '',
     'promocion.texto': promocion,
+    ...valoresDeTitulacion(s),
   };
 }
 

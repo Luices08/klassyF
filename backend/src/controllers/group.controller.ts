@@ -184,3 +184,21 @@ export const obtenerFicha = catchAsync<GroupIdParams>(async (req, res) => {
 export const obtenerHorarioGrupo = catchAsync<GroupIdParams>(async (req, res) => {
   res.status(200).json({ success: true, data: await obtenerHorarioDeGrupo(req.params.groupId) });
 });
+
+// Título de bachiller propio del grupo (colegios técnicos o con articulación: 11-A académico, 11-B técnico). null = vuelve a heredar el de la institución.
+export const cambiarTituloGrupo = catchAsync<CambiarAulaParams, unknown, { titulo_bachiller: string | null }>(async (req, res) => {
+  const group = await Group.findById(req.params.groupId);
+  if (!group) throw new ApiError(404, 'Grupo no encontrado.');
+  await asegurarAnioNoCerrado(String(group.academic_year_id));
+  group.titulo_bachiller = req.body.titulo_bachiller;
+  await group.save();
+  await registrarEvento({
+    usuario_id: req.user?._id,
+    accion: 'GRUPO_TITULO_ACTUALIZADO',
+    entidad: 'Group',
+    entidad_id: group._id,
+    detalle: req.body.titulo_bachiller ? `Título del grupo: ${req.body.titulo_bachiller}` : 'El grupo hereda el título de la institución',
+    ip: req.ip,
+  });
+  res.status(200).json({ success: true, data: group });
+});

@@ -61,7 +61,9 @@ export function armarTablaValoraciones(
   intensidades: ReadonlyMap<string, number>,
   semanasLectivas: number | null,
   decimales: number,
-  nacional: (nota: number) => string
+  nacional: (nota: number) => string,
+  /** Notas finales del cierre de promoción (M19), por `area:<id>` o `asignatura:<id>`: mandan sobre el cálculo (incluyen la recuperación final). */
+  notasDelCierre: ReadonlyMap<string, number> = new Map()
 ): Omit<DatosEstudios, 'promocion'> {
   const ordenados = [...periodos].sort((a, b) => a.numero - b.numero);
   const porcentajes = ordenados.map((p) => p.porcentaje);
@@ -82,7 +84,9 @@ export function armarTablaValoraciones(
     const deArea = ordenados.map((p) => boletinDe(p.numero)?.areas.find((a) => a.area_id === area.area_id));
     const exentosArea = deArea.map((a) => Boolean(a?.exenta));
     const areaExentaTodoElAnio = exentosArea.length > 0 && exentosArea.every(Boolean);
-    const definitivaArea = areaExentaTodoElAnio ? null : notaDefinitiva(deArea.map((a) => a?.nota_area ?? null), porcentajes, exentosArea);
+    const definitivaArea =
+      notasDelCierre.get(`area:${area.area_id}`) ??
+      (areaExentaTodoElAnio ? null : notaDefinitiva(deArea.map((a) => a?.nota_area ?? null), porcentajes, exentosArea));
     if (definitivaArea === null && !areaExentaTodoElAnio) completo = false;
     const areaHomologada = deArea.some((a) => a?.asignaturas.some((s) => s.homologada));
     filas.push({ nivel: 'AREA', celdas: [area.nombre, '', '', celdaNota(definitivaArea, areaExentaTodoElAnio, areaHomologada), equivalencia(definitivaArea)] });
@@ -93,7 +97,9 @@ export function armarTablaValoraciones(
       const homologada = dePeriodos.some((s) => s?.homologada);
       if (exentos.some(Boolean)) hayExentas = true;
       if (homologada) hayHomologadas = true;
-      const definitiva = exentaTodoElAnio ? null : notaDefinitiva(dePeriodos.map((s) => s?.nota_asignatura ?? null), porcentajes, exentos);
+      const definitiva =
+        notasDelCierre.get(`asignatura:${asignatura.subject_id}`) ??
+        (exentaTodoElAnio ? null : notaDefinitiva(dePeriodos.map((s) => s?.nota_asignatura ?? null), porcentajes, exentos));
       if (definitiva === null && !exentaTodoElAnio) completo = false;
       const semanal = intensidades.get(asignatura.subject_id) ?? null;
       const anual = semanal === null || semanasLectivas === null ? null : Math.round(semanal * semanasLectivas);
@@ -117,7 +123,7 @@ export function armarTablaValoraciones(
       filas,
       pie:
         `IHS: intensidad horaria semanal. IHA: intensidad horaria anual (horas semanales por las semanas lectivas del año). ` +
-        `Calificación final: notas de periodo ponderadas (${pesos}).${completo ? '' : ' Lo que aún no está definido aparece con «—».'}` +
+        `Calificación final: notas de periodo ponderadas (${pesos}), con la recuperación de fin de año cuando la hubo.${completo ? '' : ' Lo que aún no está definido aparece con «—».'}` +
         (hayHomologadas ? ' (H): incluye notas homologadas de la institución de procedencia por traslado, convertidas a la escala de la institución.' : '') +
         (hayExentas ? ' E: exenta por traslado (no se cursó en la institución de procedencia); los periodos exentos no entran en la calificación final.' : ''),
     },

@@ -1,3 +1,4 @@
+import { ESTADOS_TITULACION } from '../constants/titulacion';
 import { HydratedDocument, Model, Schema, Types, model } from 'mongoose';
 import {
   DefinicionCertificado,
@@ -46,6 +47,7 @@ const tipoSchema = new Schema<ITipoCertificado, TipoCertificadoModel>(
     descripcion: { type: String, default: '', trim: true, maxlength: MAX_DESCRIPCION_TIPO },
     estados_matricula: { type: [{ type: String, enum: ESTADOS_MATRICULA_EXPEDIBLES }], default: [] },
     fuentes: { type: [{ type: String, enum: FUENTES_CERTIFICADO }], default: [] },
+    estados_titulacion: { type: [{ type: String, enum: ESTADOS_TITULACION }], default: [] },
     variables_obligatorias: { type: [String], default: [] },
     politica: { type: politicaSchema, required: true },
     estado: { type: String, enum: ESTADOS_TIPO_CERTIFICADO, default: 'BORRADOR' },

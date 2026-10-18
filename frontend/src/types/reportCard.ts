@@ -101,6 +101,8 @@ export interface ReportCard {
   canal_reclamaciones: string;
   /** Nombre del director del grupo, para la firma del boletín. */
   director_grupo: string | null;
+  /** Decisión de promoción de M19 (solo en el informe final); null = casillas en blanco. */
+  promocion: { resultado: string; texto: string; acta: string | null } | null;
   /** Fecha de entrega de cada periodo del año; null = aún sin fijar. */
   calendario_entregas: Array<{ periodo: string; fecha: string | null }>;
   /** Si el estudiante ingresó por traslado extemporáneo (M04). */

@@ -14,6 +14,8 @@ export interface IGroup {
   director_grupo_id: Types.ObjectId | null;
   /** Salon titular (M10), opcional: las instituciones que no registran espacios crean grupos sin aula. */
   aula_id: Types.ObjectId | null;
+  /** Título de bachiller de este grupo (último grado); null = hereda `Institution.titulo_bachiller_defecto`. */
+  titulo_bachiller: string | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -37,6 +39,7 @@ const groupSchema = new Schema<IGroup, GroupModel>(
     estado: { type: String, enum: ESTADOS_GRUPO, default: 'ACTIVE' },
     director_grupo_id: { type: Schema.Types.ObjectId, ref: 'User', default: null },
     aula_id: { type: Schema.Types.ObjectId, ref: 'Espacio', default: null },
+    titulo_bachiller: { type: String, trim: true, maxlength: 80, default: null },
   },
   { timestamps: true }
 );

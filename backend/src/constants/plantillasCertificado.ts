@@ -129,7 +129,8 @@ const CONTENIDO_BASE: Record<string, Omit<ContenidoPlantilla, 'titulo' | 'destin
 const contenidoGenerico = (def: Pick<DefinicionCertificado, 'fuentes'>): Omit<ContenidoPlantilla, 'titulo' | 'destinatarios' | 'frase_otro'> => {
   const valoraciones = def.fuentes.includes('VALORACIONES');
   const dependencias = def.fuentes.includes('DEPENDENCIAS');
-  const verbo = valoraciones ? 'cursó en esta institución' : '{{matricula.situacion}} en esta institución en';
+  const titulacion = def.fuentes.includes('TITULACION');
+  const verbo = valoraciones || titulacion ? 'cursó en esta institución' : '{{matricula.situacion}} en esta institución en';
   const cola = valoraciones ? ', con las siguientes valoraciones finales:' : '.';
   return {
     vigencia_dias: null,
@@ -138,6 +139,12 @@ const contenidoGenerico = (def: Pick<DefinicionCertificado, 'fuentes'>): Omit<Co
       bloque('formula', 'FORMULA', 'HACE CONSTAR'),
       bloque('cuerpo', 'CUERPO', `Que {{estudiante.nombre_completo}}, identificado(a) con {{estudiante.documento}}, ${verbo} ${UBICACION}${cola}`),
       ...(valoraciones ? [bloque('notas', 'TABLA_NOTAS', ''), bloque('promocion', 'DESTACADO', 'Concepto de promoción: {{promocion.texto}}.')] : []),
+      ...(titulacion
+        ? [
+            bloque('grado', 'DESTACADO', 'Se le otorgó el título de {{titulacion.titulo}}, según Acta de Grado No. {{titulacion.acta_codigo}}, libro {{titulacion.acta_libro}}, folio {{titulacion.acta_folio}}, de fecha {{titulacion.fecha_grado}}.', hay('titulacion.acta_codigo')),
+            bloque('pendiente', 'CUERPO', 'Aprobó la totalidad del plan de estudios, y se encuentra pendiente de grado formal por el cumplimiento de requisitos reglamentarios. {{titulacion.pendientes}}', hay('titulacion.pendientes')),
+          ]
+        : []),
       ...(dependencias
         ? [bloque('dependencias', 'CUERPO', 'Se encuentra a PAZ Y SALVO con la institución en las siguientes dependencias: {{paz_y_salvo.dependencias}}. Verificado por {{paz_y_salvo.verificado_por}}.')]
         : []),

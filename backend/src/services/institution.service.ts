@@ -31,6 +31,7 @@ export interface AjustesInstitucion {
   modalidad?: ModalidadInstitucion;
   politica_aforo_aula?: PoliticaAforoAula;
   paz_y_salvo_docentes?: boolean;
+  titulo_bachiller_defecto?: string;
   politica_cupo_salida?: PoliticaCupoSalida;
 }
 
@@ -217,6 +218,10 @@ export async function actualizarAjustes(
   if (ajustes.paz_y_salvo_docentes !== undefined && ajustes.paz_y_salvo_docentes !== institucion.paz_y_salvo_docentes) {
     institucion.paz_y_salvo_docentes = ajustes.paz_y_salvo_docentes;
     cambios.push(`paz y salvo por docentes ${ajustes.paz_y_salvo_docentes ? 'sí' : 'no'}`);
+  }
+  if (ajustes.titulo_bachiller_defecto !== undefined && ajustes.titulo_bachiller_defecto !== institucion.titulo_bachiller_defecto) {
+    institucion.titulo_bachiller_defecto = ajustes.titulo_bachiller_defecto;
+    cambios.push(`título de bachiller por defecto «${ajustes.titulo_bachiller_defecto}»`);
   }
   if (ajustes.politica_cupo_salida !== undefined && ajustes.politica_cupo_salida !== institucion.politica_cupo_salida) {
     institucion.politica_cupo_salida = ajustes.politica_cupo_salida;

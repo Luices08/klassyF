@@ -70,10 +70,11 @@ export interface AjustesInstitucionInput {
   modalidad?: ModalidadInstitucion;
   politica_aforo_aula?: PoliticaAforoAula;
   paz_y_salvo_docentes?: boolean;
+  titulo_bachiller_defecto?: string;
   politica_cupo_salida?: PoliticaCupoSalida;
 }
 
-/** Ajustes de funcionamiento (modalidad, aforo, paz y salvo): bloques propios, sin contraseña. */
+/** Ajustes de funcionamiento (modalidad, aforo, paz y salvo, cupo de salida, título de bachiller): bloques propios, sin contraseña. */
 export function useActualizarAjustesInstitucion() {
   const queryClient = useQueryClient();
   return useMutation({

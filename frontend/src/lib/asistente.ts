@@ -138,6 +138,22 @@ export const PALABRAS_CLAVE_POR_RUTA: Record<string, { descripcion: string; clav
     descripcion: 'Política de recuperaciones del colegio y registro de resultados.',
     claves: ['recuperacion', 'recuperaciones', 'recuperar', 'nivelacion', 'refuerzo', 'perdio la materia', 'recuperacion de fin de año', 'siee'],
   },
+  '/admin/promocion': {
+    descripcion: 'Promoción y cierre del año: política del colegio (SIEE), cierre de la promoción por grupo y paso de los estudiantes al año siguiente.',
+    claves: ['promocion', 'promover', 'cierre del año', 'cerrar el año', 'reprobar', 'perdio el año', 'no promovido', 'repitente', 'año siguiente', 'rollover', 'pre matricula', 'reservar cupos', 'reglas de promocion', 'siee'],
+  },
+  '/admin/promocion-anticipada': {
+    descripcion: 'Promoción anticipada de estudiantes destacados y reiniciantes, con consentimiento, resolución rectoral y paso de grado.',
+    claves: ['promocion anticipada', 'adelantar de grado', 'saltar de grado', 'reiniciante', 'resolucion rectoral', 'subir de grado', 'rendimiento excepcional'],
+  },
+  '/comision': {
+    descripcion: 'Comisión de evaluación y promoción: tablero de riesgo académico, sesiones, votaciones, compromisos y actas firmadas.',
+    claves: ['comision de evaluacion', 'comision de promocion', 'consejo academico', 'consejo directivo', 'acta', 'firmar acta', 'sesion', 'semaforo', 'riesgo academico', 'reprobacion masiva', 'compromisos'],
+  },
+  '/secretaria/titulacion': {
+    descripcion: 'Titulación de bachiller: servicio social, Saber 11, carpeta académica y quién se gradúa.',
+    claves: ['titulacion', 'graduacion', 'graduar', 'bachiller', 'servicio social', 'saber 11', 'pruebas saber', 'grado por ventanilla', 'acta de grado', 'diploma', 'graduandos'],
+  },
   '/docente/notas': {
     descripcion: 'Planilla de notas de tus clases.',
     claves: ['planilla de notas', 'poner notas', 'calificar', 'registrar notas', 'subir notas'],

@@ -102,7 +102,7 @@ export function redactarCertificado(s: SnapshotCertificado): TextoCertificado {
       preambulo,
       formula: 'CERTIFICA',
       cuerpo: `Que ${nombre}, identificado(a) con ${documento}, cursó en esta institución ${ubicacion}, con las siguientes valoraciones finales:`,
-      concepto: promocion ? `Concepto de promoción: ${promocion.concepto === 'APROBO' ? 'APROBÓ' : 'NO APROBÓ'} el grado ${m.grado}.` : 'Concepto de promoción: PENDIENTE (aún no registrado).',
+      concepto: promocion ? `Concepto de promoción: ${promocion.texto ?? `${promocion.concepto === 'APROBO' ? 'APROBÓ' : 'NO APROBÓ'} el grado ${m.grado}`}.` : 'Concepto de promoción: PENDIENTE (aún no registrado).',
       cierre,
     };
   }

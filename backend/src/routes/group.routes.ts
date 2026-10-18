@@ -3,6 +3,7 @@ import { ROLES } from '../constants/roles';
 import {
   actualizarEstadoGrupo,
   cambiarAulaGrupo,
+  cambiarTituloGrupo,
   createGroup,
   listGroups,
   obtenerFicha,
@@ -48,6 +49,14 @@ router.patch(
   checkRole(ROLES.ADMIN, ROLES.COORDINADOR),
   validate(groupValidator.cambiarAula),
   cambiarAulaGrupo
+);
+
+// M01/M26: título de bachiller propio del grupo (técnico, SENA…); null = hereda el de la institución.
+router.patch(
+  '/:groupId/titulo',
+  checkRole(ROLES.ADMIN, ROLES.COORDINADOR),
+  validate(groupValidator.cambiarTitulo),
+  cambiarTituloGrupo
 );
 
 export default router;

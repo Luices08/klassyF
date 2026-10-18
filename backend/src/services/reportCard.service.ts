@@ -1,12 +1,14 @@
 import { TipoFraseBoletin } from '../constants/boletin';
 import { ESTADOS_MATRICULA_ACTIVOS, MetodoCalculoEvaluacion, NivelDesempeno } from '../constants/enums';
 import { ESTADOS_NOTA_CERRADOS } from '../constants/notas';
+import { ResultadoPromocion, TEXTO_PROMOCION_BOLETIN } from '../constants/promocion';
 import { ROLES } from '../constants/roles';
 import AcademicYear, { AcademicYearDocument, IEscalaEvaluacion } from '../models/academicYear.model';
 import Area, { AreaDocument } from '../models/area.model';
 import CalificacionAsignatura from '../models/calificacionAsignatura.model';
 import { CampusDocument } from '../models/campus.model';
 import Enrollment from '../models/enrollment.model';
+import EvaluacionPromocion from '../models/evaluacionPromocionEstudiante.model';
 import FraseDesempeno from '../models/fraseDesempeno.model';
 import Group, { GroupDocument } from '../models/group.model';
 import Institution from '../models/institution.model';
@@ -130,6 +132,11 @@ export interface ReportCardResult {
   calendario_entregas: Array<{ periodo: string; fecha: Date | null }>;
   /** Nombre del director del grupo del estudiante, para la firma del boletín. */
   director_grupo: string | null;
+  /**
+   * Decisión de promoción de M19, solo en el boletín del último periodo y cuando ya hay algo que decir a la familia (ver `TEXTO_PROMOCION_BOLETIN`);
+   * null = el informe imprime las casillas para marcarla a mano.
+   */
+  promocion: { resultado: ResultadoPromocion; texto: string; acta: string | null } | null;
   /** El estudiante ingresó por traslado (M04): sale en el boletín junto a la convención de las notas homologadas. */
   traslado: { fecha_ingreso: Date; periodo_ingreso: number; nombre_periodo_ingreso: string; institucion: string } | null;
 }
@@ -217,6 +224,7 @@ interface ContextoGrupo {
   directorGrupo: string | null;
   mostrarPuesto: boolean;
   totalEstudiantes: number;
+  promocionDe: (studentId: string) => ReportCardResult['promocion'];
 }
 
 async function cargarContextoGrupo(
@@ -242,13 +250,22 @@ async function cargarContextoGrupo(
   if (estudianteExtraId && !studentIds.includes(estudianteExtraId)) studentIds.push(estudianteExtraId);
 
   const studyPlan = await StudyPlan.findOne({ academic_year_id: anio._id });
+  const idDe = (entidad: unknown): string | null => {
+    if (!entidad) return null;
+    if (typeof entidad === 'object' && '_id' in (entidad as Record<string, unknown>)) return String((entidad as Record<string, unknown>)._id);
+    return String(entidad);
+  };
+  const gradeId = idDe(grupo.grade_id) ?? '';
+  const sedeId = idDe(grupo.sede_id);
+  const jornadaId = idDe(grupo.jornada_id);
+
   const gradoPlan =
     obtenerGradoPlanEfectivo(
       studyPlan,
-      String(grupo.grade_id),
-      grupo.sede_id ? String(grupo.sede_id) : null,
-      grupo.jornada_id ? String(grupo.jornada_id) : null
-    ) ?? studyPlan?.grades.find((g) => String(g.grade_id) === String(grupo.grade_id));
+      gradeId,
+      sedeId,
+      jornadaId
+    ) ?? studyPlan?.grades.find((g) => String(g.grade_id) === gradeId);
   const personalizacion = gradoPlan?.personalizaciones_grupo.find((p) => String(p.group_id) === String(grupo._id));
 
   // Malla efectiva del grupo (M06): asignaturas de la Configuracion General
@@ -310,6 +327,17 @@ async function cargarContextoGrupo(
   const recuperacionDe = new Map(recuperadas.map((r) => [`${String(r.subject_id)}|${String(r.student_id)}`, r]));
 
   const { porEstudiante: asistenciaTotales, fallasPorAsignatura } = await resumenAsistenciaParaBoletin(grupo._id, periodoNumero);
+
+  // La decisión de promoción solo tiene sentido en el informe final: se lee una vez por grupo.
+  const esInformeFinal = periodoNumero === Math.max(...anio.periodos.map((p) => p.numero));
+  const cierres = esInformeFinal ? await EvaluacionPromocion.find({ academic_year_id: anio._id, student_id: { $in: studentIds }, vigente: true }).lean() : [];
+  const promocionPor = new Map<string, NonNullable<ReportCardResult['promocion']>>();
+  for (const c of cierres) {
+    const texto = TEXTO_PROMOCION_BOLETIN[c.resultado];
+    if (!texto) continue;
+    const acta = (c.detalle as { decision_instancia?: { acta?: string } } | undefined)?.decision_instancia?.acta ?? null;
+    promocionPor.set(String(c.student_id), { resultado: c.resultado, texto, acta });
+  }
 
   // Traslados (M04/M26): lo que el estudiante no cursó aquí entra como nota homologada o exenta, y manda sobre cualquier otra.
   const [homologadaDe, traslados] = await Promise.all([
@@ -491,6 +519,7 @@ async function cargarContextoGrupo(
     directorGrupo,
     mostrarPuesto: configuracion.mostrar_puesto,
     totalEstudiantes: allComputed.length,
+    promocionDe: (id) => promocionPor.get(id) ?? null,
   };
 }
 
@@ -537,6 +566,7 @@ function armarBoletin(ctx: ContextoGrupo, student: UserDocument): ReportCardResu
     canal_reclamaciones: ctx.canalReclamaciones,
     calendario_entregas: ctx.calendarioEntregas,
     director_grupo: ctx.directorGrupo,
+    promocion: ctx.promocionDe(String(student._id)),
     traslado: ctx.trasladoDe(String(student._id)),
   };
 }

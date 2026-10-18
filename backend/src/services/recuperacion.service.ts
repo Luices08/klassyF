@@ -8,6 +8,7 @@ import CalificacionAsignatura from '../models/calificacionAsignatura.model';
 import Enrollment from '../models/enrollment.model';
 import Group from '../models/group.model';
 import NotaHomologada from '../models/notaHomologada.model';
+import PromocionAnticipada from '../models/promocionAnticipada.model';
 import Recuperacion, { RecuperacionDocument } from '../models/recuperacion.model';
 import Subject from '../models/subject.model';
 import TeacherAssignment, { TeacherAssignmentDocument } from '../models/teacherAssignment.model';
@@ -28,6 +29,7 @@ import {
   VentanaRecuperacion,
 } from '../utils/recuperaciones';
 import { integracionDe, IntegracionPeriodo, integrarRecuperacion, ResultadoIntegracion } from '../utils/integracionRecuperacion';
+import { periodosParaPromediar } from '../utils/promocionAnticipada';
 import { asignacionDelDocente } from './activity.service';
 import { registrarEvento } from './audit.service';
 import { cargarAnio, obtenerPolitica } from './configuracionRecuperaciones.service';
@@ -44,7 +46,7 @@ interface NotasDeEstudiante {
   exentos: Set<number>;
 }
 
-interface ContextoNotas {
+export interface ContextoNotas {
   anio: AcademicYearDocument;
   politica: PoliticaRecuperacion;
   aprobatoria: number;
@@ -52,13 +54,15 @@ interface ContextoNotas {
   /** `${asignación}|${estudiante}` */
   notas: Map<string, NotasDeEstudiante>;
   recuperaciones: Map<string, RecuperacionDocument>;
+  /** `${asignación}|${estudiante}` → periodos que no entran a su promedio anual (promoción anticipada con DEJAR_SIN_NOTA). */
+  omitidos: Map<string, Set<number>>;
 }
 
-const clave = (asignacionId: unknown, estudianteId: unknown): string => `${String(asignacionId)}|${String(estudianteId)}`;
-const claveRecuperacion = (asignacionId: unknown, estudianteId: unknown, tipo: TipoRecuperacion, periodo: number): string =>
+export const clave = (asignacionId: unknown, estudianteId: unknown): string => `${String(asignacionId)}|${String(estudianteId)}`;
+export const claveRecuperacion = (asignacionId: unknown, estudianteId: unknown, tipo: TipoRecuperacion, periodo: number): string =>
   `${clave(asignacionId, estudianteId)}|${tipo}|${periodo}`;
 
-async function cargarContextoNotas(anio: AcademicYearDocument, asignacionIds: Types.ObjectId[]): Promise<ContextoNotas> {
+export async function cargarContextoNotas(anio: AcademicYearDocument, asignacionIds: Types.ObjectId[]): Promise<ContextoNotas> {
   const politicaDoc = await obtenerPolitica(anio);
   const escala = escalaEfectiva(anio.escala_evaluacion);
   const [calificaciones, recuperaciones, asignaciones, homologadas] = await Promise.all([
@@ -108,6 +112,8 @@ async function cargarContextoNotas(anio: AcademicYearDocument, asignacionIds: Ty
     }
   }
 
+  const omitidos = await aplicarPromocionAnticipada(anio, asignacionIds, notas);
+
   return {
     anio,
     politica: politicaDoc.toObject() as unknown as PoliticaRecuperacion,
@@ -115,15 +121,53 @@ async function cargarContextoNotas(anio: AcademicYearDocument, asignacionIds: Ty
     decimales: escala.precision_decimales,
     notas,
     recuperaciones: recuperacionesPorClave,
+    omitidos,
   };
 }
 
+/**
+ * Un estudiante que subió de grado por promoción anticipada no cursó los primeros periodos del grado nuevo: lo que el colegio resolvió para cada
+ * asignatura (nota copiada, nivelación o periodo sin nota) ocupa ese lugar. Una nota realmente cerrada en el grupo nuevo siempre manda.
+ * Sin trámites aplicados no hace nada.
+ */
+async function aplicarPromocionAnticipada(anio: AcademicYearDocument, asignacionIds: Types.ObjectId[], notas: Map<string, NotasDeEstudiante>): Promise<Map<string, Set<number>>> {
+  const omitidos = new Map<string, Set<number>>();
+  const aplicadas = await PromocionAnticipada.find({ academic_year_id: anio._id, estado: 'APLICADA' }).lean();
+  if (aplicadas.length === 0) return omitidos;
+  const asignaciones = await TeacherAssignment.find({ _id: { $in: asignacionIds } }).select('subject_id group_id').lean();
+
+  for (const tramite of aplicadas) {
+    if (!tramite.aplicacion) continue;
+    const noCursados = Array.from({ length: tramite.reglas.periodo_evaluacion }, (_, i) => i + 1);
+    for (const asignacion of asignaciones) {
+      if (String(asignacion.group_id) !== String(tramite.aplicacion.grupo_destino_id)) continue;
+      const resuelta = tramite.aplicacion.notas.find((n) => String(n.subject_id) === String(asignacion.subject_id));
+      if (!resuelta) continue;
+      const k = clave(asignacion._id, tramite.student_id);
+      const entrada = notas.get(k) ?? { cerradas: new Map(), efectivas: new Map(), exentos: new Set<number>() };
+      for (const periodo of noCursados) {
+        if (entrada.cerradas.has(periodo)) continue;
+        if (resuelta.modo === 'SIN_NOTA') {
+          omitidos.set(k, (omitidos.get(k) ?? new Set()).add(periodo));
+          continue;
+        }
+        const valor = resuelta.modo === 'COPIADA' ? resuelta.nota : (resuelta.nivelacion?.nota ?? null);
+        if (valor !== null && valor !== undefined) entrada.efectivas.set(periodo, valor);
+      }
+      notas.set(k, entrada);
+    }
+  }
+  return omitidos;
+}
+
 /** La definitiva del año de una asignatura, o null si algún periodo aún no tiene nota cerrada. */
-function definitivaAnual(ctx: ContextoNotas, asignacionId: unknown, estudianteId: unknown): number | null {
+export function definitivaAnual(ctx: ContextoNotas, asignacionId: unknown, estudianteId: unknown): number | null {
   const entrada = ctx.notas.get(clave(asignacionId, estudianteId));
   if (!entrada) return null;
+  // Un periodo «sin nota» sale del promedio: su porcentaje se reparte entre los restantes porque `notaAnual` normaliza por lo que queda.
+  const vigentes = periodosParaPromediar(ctx.anio.periodos, ctx.omitidos.get(clave(asignacionId, estudianteId)) ?? new Set());
   return notaAnual(
-    ctx.anio.periodos.map((p) => ({ porcentaje: p.porcentaje, nota: entrada.efectivas.get(p.numero) ?? null, exento: entrada.exentos.has(p.numero) })),
+    vigentes.map((p) => ({ porcentaje: p.porcentaje, nota: entrada.efectivas.get(p.numero) ?? null, exento: entrada.exentos.has(p.numero) })),
     ctx.decimales
   );
 }

@@ -15,6 +15,11 @@ import { AnioLectivoPage } from './pages/AnioLectivoPage';
 import { ActividadesDocentePage } from './pages/ActividadesDocentePage';
 import { NotasPlanillaPage } from './pages/NotasPlanillaPage';
 import { RecuperacionesPage } from './pages/RecuperacionesPage';
+import { PromocionPage } from './pages/admin/PromocionPage';
+import { PromocionAnticipadaPage } from './pages/admin/PromocionAnticipadaPage';
+import { ComisionPage } from './pages/admin/ComisionPage';
+import { TitulacionPage } from './pages/admin/TitulacionPage';
+import { SesionComisionPage } from './pages/SesionComisionPage';
 import { ObservacionesBoletinPage } from './pages/ObservacionesBoletinPage';
 import { AsistenciaPage } from './pages/AsistenciaPage';
 import { GestionAsistenciaPage } from './pages/GestionAsistenciaPage';
@@ -128,6 +133,8 @@ export default function App() {
             <Route path="/admin/actividades/:id" element={<ActividadRevisionPage />} />
             <Route path="/admin/notas" element={<NotasGestionPage />} />
             <Route path="/admin/boletin" element={<ConfiguracionBoletinPage />} />
+            <Route path="/admin/promocion" element={<PromocionPage />} />
+            <Route path="/admin/promocion-anticipada" element={<PromocionAnticipadaPage />} />
           </Route>
 
           <Route element={<ProtectedRoute allowedRoles={['DOCENTE', 'ESTUDIANTE', 'ACUDIENTE']} />}>
@@ -162,6 +169,14 @@ export default function App() {
             <Route path="/convivencia/casos" element={<CasosConvivenciaPage />} />
             <Route path="/convivencia/comite" element={<ComitePage />} />
             <Route path="/convivencia/solicitudes" element={<SolicitudesCasoPage />} />
+          </Route>
+          {/* Comisión de evaluación (M20): quien integra una sesión la ve y la firma; el servidor decide qué sesiones le corresponden. */}
+          <Route element={<ProtectedRoute allowedRoles={['ADMIN', 'COORDINADOR', 'COORDINADOR_CONVIVENCIA', 'ORIENTADOR', 'DOCENTE', 'ACUDIENTE']} />}>
+            <Route path="/comision" element={<ComisionPage />} />
+            <Route path="/comision/sesiones/:id" element={<SesionComisionPage />} />
+          </Route>
+          <Route element={<ProtectedRoute allowedRoles={['ADMIN', 'COORDINADOR', 'SECRETARIA']} />}>
+            <Route path="/secretaria/titulacion" element={<TitulacionPage />} />
           </Route>
           <Route element={<ProtectedRoute allowedRoles={['ADMIN', 'ORIENTADOR']} />}>
             <Route path="/orientacion/remisiones" element={<OrientacionPage />} />

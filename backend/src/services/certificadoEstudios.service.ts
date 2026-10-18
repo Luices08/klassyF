@@ -1,5 +1,6 @@
 import { Types } from 'mongoose';
 import AcademicYear from '../models/academicYear.model';
+import Grade from '../models/grade.model';
 import StudyPlan from '../models/studyPlan.model';
 import { UserDocument } from '../models/user.model';
 import ApiError from '../utils/ApiError';
@@ -8,18 +9,28 @@ import { armarTablaValoraciones } from '../utils/certificadoEstudios';
 import { calcularResumenSemanas } from '../utils/calendarioAcademico';
 import { escalaEfectiva } from '../utils/escalaEvaluacion';
 import { desempenoCualitativo } from '../utils/siee';
+import { ESTADO_ACTIVO } from '../utils/filtroEstado';
+import { conceptoOficial } from '../utils/promocion';
+import { obtenerCierreVigente } from './evaluacionPromocion.service';
 import { generateReportCard } from './reportCard.service';
 
 /**
- * Concepto de promoción del estudiante en ese año. Es de M19 (promoción y cierre), que aún no existe: mientras devuelva
- * `null` el certificado de estudio solo admite vista previa. Cuando M19 guarde la decisión, se lee aquí y el documento
- * se habilita sin tocar nada más (no se escribe a mano: sería duplicar lo que M19 va a registrar).
+ * El concepto de promoción del estudiante en ese año: sale del cierre vigente de M19 (`EvaluacionPromocionEstudiante`). Solo un resultado
+ * final lo tiene; mientras el grupo no se cierre, o el estudiante siga pendiente de recuperación o en comisión, devuelve `null` y el
+ * certificado de estudio solo admite vista previa (lo expedido se congela, así que no se emite oficial con un dato que aún puede cambiar).
  */
-export async function obtenerPromocion(_matriculaId: string): Promise<DatosEstudios['promocion']> {
-  return null;
+export async function obtenerPromocion(matriculaId: string): Promise<DatosEstudios['promocion']> {
+  const cierre = await obtenerCierreVigente(matriculaId);
+  if (!cierre) return null;
+  const grado = await Grade.findById(cierre.grado_id).select('nombre numero');
+  if (!grado) return null;
+  const siguiente = await Grade.findOne({ numero: grado.numero + 1, estado: ESTADO_ACTIVO }).select('nombre');
+  const detalle = cierre.detalle as { arrastres?: Array<{ nombre: string }> };
+  return conceptoOficial(cierre.resultado, grado.nombre, siguiente?.nombre ?? null, (detalle.arrastres ?? []).map((a) => a.nombre));
 }
 
 export interface MatriculaParaEstudios {
+  _id?: Types.ObjectId;
   student_id: { _id: Types.ObjectId };
   group_id: { _id: Types.ObjectId; grade_id: { _id: Types.ObjectId } };
   academic_year_id: { _id: Types.ObjectId };
@@ -74,6 +85,13 @@ export async function datosDeEstudios(matricula: MatriculaParaEstudios, usuario:
     });
   }
 
+  // Si el estudiante ya tiene su cierre de promoción (M19), las notas finales salen de ahí: una sola fuente, con la recuperación incluida.
+  const cierre = matricula._id ? await obtenerCierreVigente(matricula._id) : null;
+  const notasDelCierre = new Map<string, number>();
+  const entrada = cierre?.entrada as { asignaturas?: Array<{ subject_id: string; nota_final: number | null }>; areas?: Array<{ area_id: string; nota_final: number | null }> } | undefined;
+  for (const a of entrada?.asignaturas ?? []) if (a.nota_final !== null) notasDelCierre.set(`asignatura:${a.subject_id}`, a.nota_final);
+  for (const a of entrada?.areas ?? []) if (a.nota_final !== null) notasDelCierre.set(`area:${a.area_id}`, a.nota_final);
+
   const escala = anio.escala_evaluacion ?? null;
   return armarTablaValoraciones(
     anio.periodos.map((p) => ({ numero: p.numero, nombre: p.nombre, porcentaje: p.porcentaje })),
@@ -82,6 +100,7 @@ export async function datosDeEstudios(matricula: MatriculaParaEstudios, usuario:
     calcularResumenSemanas(anio.periodos, anio.eventos).semanas_lectivas,
     // Los decimales y los rangos son los que la institución definió en M05; aquí no se fija ninguno.
     escalaEfectiva(escala).precision_decimales,
-    (nota) => NOMBRE_NACIONAL[desempenoCualitativo(nota, escala).nivel]
+    (nota) => NOMBRE_NACIONAL[desempenoCualitativo(nota, escala).nivel],
+    notasDelCierre
   );
 }

@@ -49,6 +49,13 @@ export const VARIABLES_CERTIFICADO: VariableCertificado[] = [
   { clave: 'paz_y_salvo.dependencias', etiqueta: 'Dependencias verificadas', origen: 'Paz y salvo', ejemplo: 'Académica, Biblioteca, Financiera / Administrativa', fuente: 'DEPENDENCIAS' },
   { clave: 'paz_y_salvo.verificado_por', etiqueta: 'Quién verificó', origen: 'Paz y salvo', ejemplo: 'Laura Gómez', fuente: 'DEPENDENCIAS' },
   { clave: 'promocion.texto', etiqueta: 'Concepto de promoción', origen: 'M19 Promoción', ejemplo: 'APROBÓ el grado Quinto', fuente: 'VALORACIONES' },
+  { clave: 'titulacion.titulo', etiqueta: 'Título que se otorga', origen: 'M01 / M19 Titulación', ejemplo: 'Bachiller Académico', fuente: 'TITULACION' },
+  { clave: 'titulacion.acta_codigo', etiqueta: 'Número del acta de grado', origen: 'M26 Actas de grado', ejemplo: 'AG-2026-0045', fuente: 'TITULACION' },
+  { clave: 'titulacion.acta_libro', etiqueta: 'Libro de actas', origen: 'M26 Actas de grado', ejemplo: '2', fuente: 'TITULACION' },
+  { clave: 'titulacion.acta_folio', etiqueta: 'Folio del acta', origen: 'M26 Actas de grado', ejemplo: '37', fuente: 'TITULACION' },
+  { clave: 'titulacion.fecha_grado', etiqueta: 'Fecha del acta de grado', origen: 'M26 Actas de grado', ejemplo: '28 de noviembre de 2026', fuente: 'TITULACION' },
+  { clave: 'titulacion.estado', etiqueta: 'Situación de titulación', origen: 'M19 Titulación', ejemplo: 'graduado(a)', fuente: 'TITULACION' },
+  { clave: 'titulacion.pendientes', etiqueta: 'Requisitos pendientes (vacío si no hay)', origen: 'M19 Titulación', ejemplo: 'Debe 40 horas de servicio social', fuente: 'TITULACION' },
 ];
 
 export const CLAVES_VARIABLES = new Set(VARIABLES_CERTIFICADO.map((v) => v.clave));

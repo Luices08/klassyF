@@ -1,3 +1,4 @@
+import { ESTADOS_TITULACION } from '../constants/titulacion';
 import Joi from 'joi';
 import {
   ELEMENTOS_AUTENTICACION,
@@ -79,6 +80,7 @@ export const actualizarConfiguracion: ValidationSchema = {
     rectoria: firmante,
     secretaria: firmante,
     permitir_firma_rectoria_a_secretaria: Joi.boolean(),
+    folios_por_libro_actas: Joi.number().integer().min(1).max(5000),
     paz_y_salvo: Joi.object({
       dependencias: Joi.array()
         .items(Joi.object({ clave: Joi.string().trim().max(40), nombre: Joi.string().trim().min(2).max(MAX_NOMBRE_DEPENDENCIA).required(), activa: Joi.boolean().required() }))
@@ -144,6 +146,7 @@ const camposTipo = {
   prefijo: Joi.string().trim().uppercase().pattern(PATRON_PREFIJO_CERTIFICADO).messages({ 'string.pattern.base': 'El prefijo lleva de 2 a 4 letras (A-Z), por ejemplo CC.' }),
   estados_matricula: Joi.array().items(Joi.string().valid(...ESTADOS_MATRICULA_EXPEDIBLES)).min(1).unique(),
   fuentes: Joi.array().items(Joi.string().valid(...FUENTES_CERTIFICADO)).unique(),
+  estados_titulacion: Joi.array().items(Joi.string().valid(...ESTADOS_TITULACION)).unique(),
 };
 
 const conClaveDeTipo = Joi.object({ tipo: tipo.required() });
@@ -155,6 +158,7 @@ export const crearTipo: ValidationSchema = {
     prefijo: camposTipo.prefijo.required(),
     estados_matricula: camposTipo.estados_matricula.required(),
     fuentes: camposTipo.fuentes.default([]),
+    estados_titulacion: camposTipo.estados_titulacion.default([]),
   }),
 };
 

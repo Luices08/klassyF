@@ -50,6 +50,7 @@ function boletin(areas: number, sobre: Partial<ReportCardResult> = {}): ReportCa
     fecha_entrega: new Date('2026-07-10T00:00:00.000Z'),
     canal_reclamaciones: 'Escriba a coordinación académica dentro de los 5 días hábiles siguientes a la entrega.',
     director_grupo: 'Marta Gómez',
+    promocion: null,
     calendario_entregas: [
       { periodo: 'Periodo 1', fecha: new Date('2026-04-10T00:00:00.000Z') },
       { periodo: 'Periodo 2', fecha: null },
@@ -156,6 +157,16 @@ describe('renderizarBoletines', () => {
       expect(pdf.subarray(0, 5).toString()).toBe('%PDF-');
       // Con las diez secciones activas cada boletín ocupa más de una hoja, y el siguiente empieza en hoja nueva.
       expect(paginas(pdf)).toBeGreaterThanOrEqual(2);
+    });
+
+    it('la sección de promoción dibuja el resultado de M19 cuando existe y las casillas en blanco cuando no', async () => {
+      const secciones = PLANTILLA_BOLETIN_INICIAL.secciones.map((s) => ({ ...s, visible: s.clave === 'PROMOCION' }));
+      const plantilla = conPlantilla({ secciones });
+      const conResultado = await renderizarBoletines([boletin(1, { promocion: { resultado: 'PROMOVIDO', texto: 'Promovido al grado siguiente', acta: 'ACE-2026-001' } })], null, plantilla);
+      const enBlanco = await renderizarBoletines([boletin(1)], null, plantilla);
+      expect(conResultado.subarray(0, 5).toString()).toBe('%PDF-');
+      expect(enBlanco.subarray(0, 5).toString()).toBe('%PDF-');
+      expect(conResultado.equals(enBlanco)).toBe(false);
     });
 
     it('sin firmas definidas, la sección de firmas no dibuja nada', async () => {

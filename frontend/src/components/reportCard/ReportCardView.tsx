@@ -228,6 +228,13 @@ export function ReportCardView({ reportCard }: { reportCard: ReportCard }) {
         </div>
       )}
 
+      {reportCard.promocion && (
+        <Alert tone={reportCard.promocion.resultado === 'NO_PROMOVIDO' ? 'warning' : 'info'}>
+          <strong>Decisión de promoción:</strong> {reportCard.promocion.texto}
+          {reportCard.promocion.acta && ` (acta ${reportCard.promocion.acta})`}
+        </Alert>
+      )}
+
       {(reportCard.fecha_entrega || reportCard.canal_reclamaciones) && (
         <Card>
           {reportCard.fecha_entrega && (

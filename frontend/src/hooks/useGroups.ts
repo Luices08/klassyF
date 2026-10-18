@@ -61,6 +61,17 @@ export function useActualizarEstadoGrupo() {
   });
 }
 
+/** Título de bachiller de un grupo del último grado (M01): null = hereda el de la institución. */
+export function useCambiarTituloGrupo() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ groupId, titulo_bachiller }: { groupId: string; titulo_bachiller: string | null }) => api.patch<Group>(`/groups/${groupId}/titulo`, { titulo_bachiller }),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['groups'] });
+    },
+  });
+}
+
 export interface CambiarAulaGrupoInput {
   groupId: string;
   /** null = quitar el salón titular del grupo. */

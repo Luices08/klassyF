@@ -40,6 +40,11 @@
   --text-label--font-weight: 500;
 }
 
+html,
+body {
+  height: 100%;
+}
+
 body {
   @apply bg-soft text-body antialiased;
   font-feature-settings: 'ss01';

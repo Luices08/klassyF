@@ -33,6 +33,10 @@ import portalAcudienteRoutes from './portalAcudiente.routes';
 import planAreaRoutes from './planArea.routes';
 import planAulaRoutes from './planAula.routes';
 import publicRoutes from './public.routes';
+import promocionRoutes from './promocion.routes';
+import promocionAnticipadaRoutes from './promocionAnticipada.routes';
+import comisionRoutes from './comision.routes';
+import titulacionRoutes from './titulacion.routes';
 import recuperacionRoutes from './recuperacion.routes';
 import reportCardRoutes from './reportCard.routes';
 import studentRoutes from './student.routes';
@@ -128,6 +132,18 @@ router.use('/boletines', boletinRoutes);
 
 // M18: Recuperaciones — política del colegio (por periodo y de fin de año), candidatos y registro de intentos
 router.use('/recuperaciones', recuperacionRoutes);
+
+// M19: Promoción y cierre del año — política del SIEE (reglas de promoción, arrastre, PIAR)
+router.use('/promocion', promocionRoutes);
+
+// M19 (fase 6): promoción anticipada — trámite, consentimiento, resolución rectoral y aplicación al grado siguiente
+router.use('/promocion-anticipada', promocionAnticipadaRoutes);
+
+// M26/M19: titulación de bachiller — servicio social, Saber 11, carpeta académica y situación de graduación
+router.use('/titulacion', titulacionRoutes);
+
+// M20: Comisión de Evaluación y Promoción — tablero de riesgo, sesiones, votos, compromisos y actas
+router.use('/comision', comisionRoutes);
 
 // M27: Portal del acudiente — lo de cada hijo (notas, inasistencias, convivencia), sus documentos de matrícula y certificados de autoservicio
 router.use('/portal', portalAcudienteRoutes);

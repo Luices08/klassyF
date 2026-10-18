@@ -1,3 +1,4 @@
+import { reevaluarPendientes } from './titulacion.service';
 import { Types } from 'mongoose';
 import { ESTADOS_MATRICULA_ACTIVOS, Rol } from '../constants/enums';
 import { COMENTARIO_APROBACION_AUTOMATICA, EstadoPazYSalvo, FiltroEstadoPazYSalvo } from '../constants/pazYSalvo';
@@ -232,6 +233,8 @@ export async function revisarPazYSalvo(
   await registro.save();
 
   if (input.estado === 'CONFIRMADO') await aprobarEnMatriculasPosteriores(registro, actor.id);
+  // M26: un paz y salvo confirmado puede ser lo último que le faltaba a quien aprobó el último grado (grado por ventanilla).
+  if (input.estado === 'CONFIRMADO') await reevaluarPendientes(studentId, 'Paz y salvo confirmado', null);
   else if (revocaConfirmacion) await devolverEnMatriculasPosteriores(registro);
 
   await registrarEvento({

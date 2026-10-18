@@ -81,6 +81,11 @@ const TEXTOS_FIJOS: Record<ClaveTextoBoletin, { etiqueta: string; marcas?: strin
   dificultades_ninguna: { etiqueta: 'Dificultades: cuando no hay ninguna' },
   compromisos_intro: { etiqueta: 'Compromisos: frase de introducción' },
   promocion_intro: { etiqueta: 'Promoción: frase de introducción' },
+  homologada: { etiqueta: 'Traslado: palabra «Homologada»' },
+  exenta: { etiqueta: 'Traslado: palabra «Exenta»' },
+  convencion_homologada: { etiqueta: 'Traslado: convención de la nota homologada (H)' },
+  convencion_exenta: { etiqueta: 'Traslado: convención de la asignatura exenta (E)' },
+  traslado_linea: { etiqueta: 'Traslado: línea de ingreso', marcas: '{fecha} {institucion} {periodo}' },
 };
 
 /** Casilla de verificación con su texto: el patrón que ya usan las demás pantallas. */

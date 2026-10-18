@@ -154,15 +154,37 @@ export interface NotaDePeriodo {
   porcentaje: number;
   /** null = ese periodo aún no tiene nota cerrada. */
   nota: number | null;
+  /** Exento por traslado: el estudiante no lo cursó (ni aquí ni en la institución de procedencia) y no entra al promedio del año. */
+  exento?: boolean;
 }
 
-/** La definitiva del año de una asignatura: promedio de los periodos por su porcentaje. Si falta uno no hay definitiva (no se promedia lo que falta). */
+/**
+ * La definitiva del año de una asignatura: promedio de los periodos por su porcentaje. Si falta uno no hay definitiva (no se promedia lo
+ * que falta). Solo se promedia sobre los periodos efectivamente cursados o evaluados: los exentos por traslado salen y su porcentaje se
+ * reparte entre los demás. Una asignatura exenta en todos los periodos no tiene definitiva.
+ */
 export function notaAnual(periodos: readonly NotaDePeriodo[], decimales: number): number | null {
-  if (periodos.length === 0 || periodos.some((p) => p.nota === null)) return null;
-  const totalPorcentaje = periodos.reduce((suma, p) => suma + p.porcentaje, 0);
+  const evaluados = periodos.filter((p) => !p.exento);
+  if (evaluados.length === 0 || evaluados.some((p) => p.nota === null)) return null;
+  const totalPorcentaje = evaluados.reduce((suma, p) => suma + p.porcentaje, 0);
   if (totalPorcentaje <= 0) return null;
-  const ponderada = periodos.reduce((suma, p) => suma + (p.nota as number) * p.porcentaje, 0) / totalPorcentaje;
+  const ponderada = evaluados.reduce((suma, p) => suma + (p.nota as number) * p.porcentaje, 0) / totalPorcentaje;
   return redondear(ponderada, decimales);
+}
+
+export interface DefinitivaParaReprobacion {
+  /** null = aún sin definitiva. */
+  nota: number | null;
+  /** Exenta por traslado todo el año: no se cursó. */
+  exenta: boolean;
+}
+
+/**
+ * Cuántas asignaturas reprobó el estudiante en el año. Es el conteo que usarán la Comisión de Evaluación y Promoción (M19/M20) y el tope de
+ * la recuperación anual (M18): una asignatura exenta por traslado no se cursó, así que nunca cuenta como reprobada (ni como un cero).
+ */
+export function contarReprobadas(definitivas: readonly DefinitivaParaReprobacion[], notaAprobatoria: number): number {
+  return definitivas.filter((d) => !d.exenta && d.nota !== null && necesitaRecuperar(d.nota, notaAprobatoria)).length;
 }
 
 export interface VentanaRecuperacion {

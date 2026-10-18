@@ -5,7 +5,7 @@ import { api } from '../lib/apiClient';
 
 /** La clave de un tipo de documento: es un dato del colegio (se crean, editan y eliminan), no una lista fija. */
 export type ClaveCertificado = string;
-export type FuenteCertificado = 'VALORACIONES' | 'DEPENDENCIAS';
+export type FuenteCertificado = 'VALORACIONES' | 'DEPENDENCIAS' | 'PAZ_Y_SALVO_SALIDA';
 export type EstadoTipoCertificado = 'BORRADOR' | 'ACTIVO' | 'ARCHIVADO';
 export const CLAVE_DESTINATARIO_OTRO = 'OTRO';
 export type ElementoAutenticacion = 'rectoria' | 'secretaria' | 'sello';
@@ -447,6 +447,7 @@ export const descargarVistaPreviaPlantilla = (tipo: ClaveCertificado, contenido:
 export const ETIQUETA_FUENTE: Record<FuenteCertificado, { nombre: string; descripcion: string }> = {
   VALORACIONES: { nombre: 'Valoraciones y promoción', descripcion: 'Incluye la tabla de notas finales y el concepto de promoción. Solo se expide con todas las notas definitivas.' },
   DEPENDENCIAS: { nombre: 'Dependencias (paz y salvo)', descripcion: 'Al expedir se confirma que no hay pendientes en cada dependencia activa.' },
+  PAZ_Y_SALVO_SALIDA: { nombre: 'Paz y salvo de salida', descripcion: 'Documento de salida: con la matrícula retirada o trasladada solo se expide cuando el paz y salvo de salida está aprobado.' },
 };
 
 export interface PermisosTipo {

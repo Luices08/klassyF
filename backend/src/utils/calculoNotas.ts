@@ -120,15 +120,41 @@ export interface AsignaturaParaArea {
   nota: number | null;
   /** Solo cuenta con el método PONDERADO (M06); con ARITMETICO todas pesan igual. */
   porcentaje: number | null;
+  /** Exenta por traslado: no se cursó, así que no pesa ni cuenta como faltante (nunca es un cero). */
+  exenta?: boolean;
 }
 
-/** Nota del área según el método configurado en M06. Si falta la nota de alguna asignatura, el área no se calcula. */
+/**
+ * El peso real de cada asignatura dentro del área. Las exentas pesan 0 y su porcentaje se reparte entre las cursadas en proporción a
+ * los suyos (si un área PONDERADA tiene Química 60% y Física 40% y Física es exenta, Química pasa a pesar 100%). Sin exentas no cambia
+ * nada: es exactamente la ponderación de M06.
+ */
+export function porcentajesEnArea(asignaturas: readonly AsignaturaParaArea[], metodo: MetodoCalculoEvaluacion): number[] {
+  const cursadas = asignaturas.filter((a) => !a.exenta);
+  if (cursadas.length === 0) return asignaturas.map(() => 0);
+  const hayExentas = cursadas.length < asignaturas.length;
+  const sumaCursadas = cursadas.reduce((suma, a) => suma + (a.porcentaje ?? 0), 0);
+  // Ponderado sin peso en lo que queda (todo el % estaba en las exentas): se reparte por igual antes que dividir entre cero.
+  if (metodo !== 'PONDERADO' || (hayExentas && sumaCursadas <= 0)) return asignaturas.map((a) => (a.exenta ? 0 : 100 / cursadas.length));
+  if (!hayExentas) return asignaturas.map((a) => a.porcentaje ?? 0);
+  return asignaturas.map((a) => (a.exenta ? 0 : ((a.porcentaje ?? 0) / sumaCursadas) * 100));
+}
+
+/**
+ * Nota del área según el método configurado en M06. Si falta la nota de alguna asignatura cursada, el área no se calcula. Las exentas por
+ * traslado se dejan fuera y su peso se redistribuye; un área con todas sus asignaturas exentas no tiene nota (y no entra al promedio).
+ */
 export function calcularNotaArea(asignaturas: readonly AsignaturaParaArea[], metodo: MetodoCalculoEvaluacion): number | null {
-  if (asignaturas.length === 0 || asignaturas.some((a) => a.nota === null)) return null;
-  if (metodo === 'PONDERADO') {
-    return round2(asignaturas.reduce((suma, a) => suma + (a.nota as number) * ((a.porcentaje ?? 0) / 100), 0));
-  }
-  return round2(asignaturas.reduce((suma, a) => suma + (a.nota as number), 0) / asignaturas.length);
+  const cursadas = asignaturas.filter((a) => !a.exenta);
+  if (cursadas.length === 0 || cursadas.some((a) => a.nota === null)) return null;
+  if (metodo !== 'PONDERADO') return round2(cursadas.reduce((suma, a) => suma + (a.nota as number), 0) / cursadas.length);
+  const pesos = porcentajesEnArea(asignaturas, metodo);
+  return round2(asignaturas.reduce((suma, a, i) => (a.exenta ? suma : suma + (a.nota as number) * ((pesos[i] as number) / 100)), 0));
+}
+
+/** El área no tiene nada que cursar: todas sus asignaturas son exentas por traslado. */
+export function areaExenta(asignaturas: readonly AsignaturaParaArea[]): boolean {
+  return asignaturas.length > 0 && asignaturas.every((a) => a.exenta);
 }
 
 /** Promedio aritmético de las notas de área; sin todas las áreas no hay promedio general. */

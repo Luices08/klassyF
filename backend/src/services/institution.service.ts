@@ -1,6 +1,7 @@
 import { Types } from 'mongoose';
 import { ROLES } from '../constants/roles';
 import { Calendario, EstadoUsuario, ModalidadInstitucion, PoliticaAforoAula } from '../constants/enums';
+import { PoliticaCupoSalida } from '../constants/salidas';
 import AcademicYear, { AcademicYearDocument } from '../models/academicYear.model';
 import Campus, { CampusDocument } from '../models/campus.model';
 import Institution, { ILimitesCargaDocente, ILimitesHorasPlanEstudios, InstitutionDocument } from '../models/institution.model';
@@ -31,6 +32,7 @@ export interface AjustesInstitucion {
   politica_aforo_aula?: PoliticaAforoAula;
   paz_y_salvo_docentes?: boolean;
   titulo_bachiller_defecto?: string;
+  politica_cupo_salida?: PoliticaCupoSalida;
 }
 
 export interface SetupInstitutionInput {
@@ -220,6 +222,10 @@ export async function actualizarAjustes(
   if (ajustes.titulo_bachiller_defecto !== undefined && ajustes.titulo_bachiller_defecto !== institucion.titulo_bachiller_defecto) {
     institucion.titulo_bachiller_defecto = ajustes.titulo_bachiller_defecto;
     cambios.push(`título de bachiller por defecto «${ajustes.titulo_bachiller_defecto}»`);
+  }
+  if (ajustes.politica_cupo_salida !== undefined && ajustes.politica_cupo_salida !== institucion.politica_cupo_salida) {
+    institucion.politica_cupo_salida = ajustes.politica_cupo_salida;
+    cambios.push(`cupo de quien sale ${ajustes.politica_cupo_salida}`);
   }
   if (cambios.length === 0) return institucion;
 

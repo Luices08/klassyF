@@ -178,6 +178,18 @@ export const PALABRAS_CLAVE_POR_RUTA: Record<string, { descripcion: string; clav
     descripcion: 'Paz y salvo de fin de año de los estudiantes, para su matrícula del año siguiente.',
     claves: ['paz y salvo', 'pazysalvo', 'fin de ano', 'estar a paz y salvo', 'debe libros', 'renovar matricula'],
   },
+  '/secretaria/traslados': {
+    descripcion: 'Traslados extemporáneos de estudiantes y homologación de las notas del colegio de procedencia.',
+    claves: ['traslado', 'traslados', 'homologacion', 'homologar', 'notas homologadas', 'exenta', 'exento por traslado', 'colegio de procedencia', 'llego a mitad de ano', 'escala de otro colegio'],
+  },
+  '/reuniones': {
+    descripcion: 'Citaciones a acudientes: reunión de entrega de boletines o citación particular por comportamiento o rendimiento, con correo y confirmación de asistencia.',
+    claves: ['citacion', 'citar acudiente', 'reunion de padres', 'reunion de acudientes', 'entrega de boletines', 'citar padres', 'confirmar asistencia', 'agenda de reuniones', 'convocar'],
+  },
+  '/secretaria/salidas': {
+    descripcion: 'Retiro o traslado de un estudiante durante el año: fecha efectiva, paz y salvo de salida y boletín parcial de retiro.',
+    claves: ['retiro', 'retirar', 'retirar estudiante', 'traslado a otro colegio', 'salida de estudiante', 'se fue del colegio', 'paz y salvo de salida', 'boletin de retiro', 'liberar cupo', 'desertor'],
+  },
   '/admin/admisiones': {
     descripcion: 'Solicitudes de admisión y preinscripciones.',
     claves: ['admisiones', 'admision', 'preinscripcion', 'aspirantes', 'solicitudes de cupo'],

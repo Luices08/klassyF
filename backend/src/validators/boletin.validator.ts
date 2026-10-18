@@ -79,6 +79,8 @@ export const actualizarConfiguracion: ValidationSchema = {
   body: Joi.object({
     canal_reclamaciones: Joi.string().trim().allow('').max(MAX_LONGITUD_CANAL_RECLAMACIONES),
     mostrar_puesto: Joi.boolean(),
+    incluir_corte_en_retiro: Joi.boolean(),
+    exigir_paz_y_salvo_en_retiro: Joi.boolean(),
     plantilla,
     entregas: Joi.array().items(
       Joi.object({

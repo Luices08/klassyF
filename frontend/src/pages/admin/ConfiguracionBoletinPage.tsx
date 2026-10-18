@@ -5,6 +5,7 @@ import { Button } from '../../components/ui/Button';
 import { Card, CardHeader } from '../../components/ui/Card';
 import { Input, Select, Textarea } from '../../components/ui/Field';
 import { PageHeader } from '../../components/ui/PageHeader';
+import { Switch } from '../../components/ui/Switch';
 import { Spinner } from '../../components/ui/Spinner';
 import { Tabs } from '../../components/ui/Tabs';
 import { DisenoBoletin } from '../../components/boletin/DisenoBoletin';
@@ -146,6 +147,8 @@ function EntregaYReclamaciones({ puedeEditar }: { puedeEditar: boolean }) {
 
   const [canal, setCanal] = useState('');
   const [mostrarPuesto, setMostrarPuesto] = useState(true);
+  const [incluirCorte, setIncluirCorte] = useState(false);
+  const [exigirPazYSalvo, setExigirPazYSalvo] = useState(false);
   const [fechas, setFechas] = useState<Record<number, string>>({});
   const [guardado, setGuardado] = useState(false);
 
@@ -154,6 +157,8 @@ function EntregaYReclamaciones({ puedeEditar }: { puedeEditar: boolean }) {
     if (!configuracion) return;
     setCanal(configuracion.canal_reclamaciones);
     setMostrarPuesto(configuracion.mostrar_puesto);
+    setIncluirCorte(configuracion.incluir_corte_en_retiro ?? false);
+    setExigirPazYSalvo(configuracion.exigir_paz_y_salvo_en_retiro ?? false);
     setFechas(
       Object.fromEntries(configuracion.entregas.filter((e) => e.academic_year_id === anioId).map((e) => [e.periodo_numero, aInputFecha(e.fecha_entrega)]))
     );
@@ -167,7 +172,7 @@ function EntregaYReclamaciones({ puedeEditar }: { puedeEditar: boolean }) {
     const delAnio: EntregaBoletin[] = Object.entries(fechas)
       .filter(([, fecha]) => fecha)
       .map(([numero, fecha]) => ({ academic_year_id: anioId, periodo_numero: Number(numero), fecha_entrega: fecha }));
-    await actualizar.mutateAsync({ canal_reclamaciones: canal, mostrar_puesto: mostrarPuesto, entregas: [...deOtrosAnios, ...delAnio] });
+    await actualizar.mutateAsync({ canal_reclamaciones: canal, mostrar_puesto: mostrarPuesto, incluir_corte_en_retiro: incluirCorte, exigir_paz_y_salvo_en_retiro: exigirPazYSalvo, entregas: [...deOtrosAnios, ...delAnio] });
     setGuardado(true);
   }
 
@@ -238,6 +243,32 @@ function EntregaYReclamaciones({ puedeEditar }: { puedeEditar: boolean }) {
           />
           Mostrar el puesto del estudiante en el grupo
         </label>
+      </Card>
+
+      <Card>
+        <CardHeader title="Boletín parcial de retiro" subtitle="Lo que el SIEE autoriza entregar cuando un estudiante sale durante el año." />
+        <div className="space-y-4">
+          <Switch
+            checked={incluirCorte}
+            disabled={!puedeEditar}
+            onChange={(v) => {
+              setGuardado(false);
+              setIncluirCorte(v);
+            }}
+            label="Incluir las notas de corte del periodo en curso"
+            description="Apagado: el boletín solo trae las definitivas oficiales de los periodos cerrados. Encendido: suma el avance parcial del periodo en que salió, marcado como provisional y sin entrar al acumulado."
+          />
+          <Switch
+            checked={exigirPazYSalvo}
+            disabled={!puedeEditar}
+            onChange={(v) => {
+              setGuardado(false);
+              setExigirPazYSalvo(v);
+            }}
+            label="Exigir el paz y salvo de salida aprobado para entregarlo"
+            description="Encendido: el PDF del boletín de retiro no se genera mientras alguna dependencia siga pendiente o bloqueada. Consulta la norma vigente antes de condicionar documentos académicos a deudas."
+          />
+        </div>
       </Card>
 
       {actualizar.isError && <Alert tone="error">{errorMessage(actualizar.error)}</Alert>}

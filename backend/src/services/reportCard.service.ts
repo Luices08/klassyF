@@ -22,7 +22,8 @@ import Subject, { SubjectDocument } from '../models/subject.model';
 import TeacherAssignment from '../models/teacherAssignment.model';
 import User, { UserDocument } from '../models/user.model';
 import ApiError from '../utils/ApiError';
-import { calcularNotaArea, calcularPromedioGeneral } from '../utils/calculoNotas';
+import { areaExenta, calcularNotaArea, calcularPromedioGeneral, porcentajesEnArea } from '../utils/calculoNotas';
+import { EstadoNotaTraslado } from '../constants/traslados';
 import { escalaEfectiva, type ResultadoDesempeno } from '../utils/escalaEvaluacion';
 import { ESTADO_ACTIVO } from '../utils/filtroEstado';
 import { integracionDe } from '../utils/integracionRecuperacion';
@@ -30,6 +31,7 @@ import { obtenerGradoPlanEfectivo } from '../utils/horasPlanEstudios';
 import { resumenAsistenciaParaBoletin } from './attendanceStats.service';
 import { leerConfiguracionBoletin } from './boletinConfig.service';
 import { exigirBoletinDisponible } from './publicacionBoletin.service';
+import { detalleDeHomologacion, homologadasDelPeriodo, trasladosDeEstudiantes } from './trasladoConsulta.service';
 import { desempenoCualitativo, round2 } from '../utils/siee';
 
 export interface ReportCardParams {
@@ -51,7 +53,11 @@ export interface ReportCardAsignatura {
   porcentaje_en_area: number;
   /** null mientras el docente no cierre la planilla de la asignatura: el boletín solo muestra resultados cerrados. */
   nota_asignatura: number | null;
-  estado: 'SIN_CERRAR' | 'CERRADO' | 'DEFINITIVO';
+  /**
+   * HOMOLOGADA_EXTERNA: la nota la registró secretaría desde la institución de procedencia (traslado), es definitiva del periodo.
+   * EXENTA_POR_TRASLADO: no se cursó; no tiene nota, no es pendiente y no pesa en el área (su porcentaje se reparte entre las cursadas).
+   */
+  estado: 'SIN_CERRAR' | 'CERRADO' | 'DEFINITIVO' | EstadoNotaTraslado;
   desempeno: ResultadoDesempeno | null;
   fallas_asignatura: number;
   componentes: ReportCardComponente[];
@@ -63,6 +69,8 @@ export interface ReportCardAsignatura {
   observacion_docente: string | null;
   /** La recuperación del periodo (M18), si la hubo: `nota_asignatura` ya la incluye cuando `cuenta` es cierto; si no, solo se anota. */
   recuperacion: { nota_original: number; nota_resultante: number; estado: string; cuenta: boolean; detalle: string } | null;
+  /** De dónde sale una nota homologada (nota y escala de origen) o por qué es exenta: es la nota al pie del boletín. */
+  homologacion: { estado: EstadoNotaTraslado; detalle: string } | null;
 }
 
 export interface ReportCardArea {
@@ -71,6 +79,8 @@ export interface ReportCardArea {
   /** null si alguna asignatura del área aún no está cerrada. */
   nota_area: number | null;
   desempeno_area: ResultadoDesempeno | null;
+  /** Todas sus asignaturas son exentas por traslado en este periodo: no tiene nota y no entra en el promedio general. */
+  exenta: boolean;
   asignaturas: ReportCardAsignatura[];
 }
 
@@ -127,6 +137,8 @@ export interface ReportCardResult {
    * null = el informe imprime las casillas para marcarla a mano.
    */
   promocion: { resultado: ResultadoPromocion; texto: string; acta: string | null } | null;
+  /** El estudiante ingresó por traslado (M04): sale en el boletín junto a la convención de las notas homologadas. */
+  traslado: { fecha_ingreso: Date; periodo_ingreso: number; nombre_periodo_ingreso: string; institucion: string } | null;
 }
 
 async function assertCanViewReportCard(student: UserDocument, requestingUser: UserDocument): Promise<void> {
@@ -205,6 +217,7 @@ interface ContextoGrupo {
   asistenciaTotales: Awaited<ReturnType<typeof resumenAsistenciaParaBoletin>>['porEstudiante'];
   fraseDe: (nivel: NivelDesempeno, tipo: TipoFraseBoletin) => string;
   observacionDe: (subjectId: string, studentId: string) => string | null;
+  trasladoDe: (studentId: string) => ReportCardResult['traslado'];
   fechaEntrega: Date | null;
   canalReclamaciones: string;
   calendarioEntregas: ReportCardResult['calendario_entregas'];
@@ -326,6 +339,12 @@ async function cargarContextoGrupo(
     promocionPor.set(String(c.student_id), { resultado: c.resultado, texto, acta });
   }
 
+  // Traslados (M04/M26): lo que el estudiante no cursó aquí entra como nota homologada o exenta, y manda sobre cualquier otra.
+  const [homologadaDe, traslados] = await Promise.all([
+    homologadasDelPeriodo(anio._id, periodoNumero, studentIds),
+    trasladosDeEstudiantes(anio._id, studentIds),
+  ]);
+
   const [frases, observaciones, configuracion, directorGrupo, institucion] = await Promise.all([
     FraseDesempeno.find().lean(),
     ObservacionBoletin.find({ group_id: grupo._id, academic_year_id: anio._id, periodo_numero: periodoNumero }).lean(),
@@ -364,7 +383,31 @@ async function cargarContextoGrupo(
       // equivalente (100/n) solo a modo informativo, el calculo usa promedio simple.
       const pesoEquivalente = entries.length > 0 ? round2(100 / entries.length) : 0;
 
-      const asignaturas: ReportCardAsignatura[] = entries.map(({ subject, porcentaje }) => {
+      const exentas = entries.map(({ subject }) => homologadaDe.get(`${String(subject._id)}|${studentId}`)?.estado === 'EXENTA_POR_TRASLADO');
+      // Lo que pesa cada una de verdad: con exentas, su porcentaje se reparte entre las cursadas (nunca un cero ni una división entre cero).
+      const pesosReales = porcentajesEnArea(entries.map((e, i) => ({ nota: null, porcentaje: e.porcentaje, exenta: exentas[i] })), metodo);
+
+      const asignaturas: ReportCardAsignatura[] = entries.map(({ subject, porcentaje }, indice) => {
+        const homologada = homologadaDe.get(`${String(subject._id)}|${studentId}`);
+        if (homologada) {
+          const exenta = homologada.estado === 'EXENTA_POR_TRASLADO';
+          const desempenoHomologado = exenta || homologada.nota === null ? null : desempenoCualitativo(homologada.nota, escalaEvaluacion);
+          return {
+            subject_id: String(subject._id),
+            nombre: subject.nombre,
+            porcentaje_en_area: round2(pesosReales[indice] ?? 0),
+            nota_asignatura: exenta ? null : homologada.nota,
+            estado: homologada.estado,
+            desempeno: desempenoHomologado,
+            fallas_asignatura: 0,
+            componentes: [],
+            descripcion: desempenoHomologado ? fraseGuardada.get(`${desempenoHomologado.nivel}|DESCRIPCION`) ?? '' : '',
+            recomendacion: desempenoHomologado ? fraseGuardada.get(`${desempenoHomologado.nivel}|RECOMENDACION`) ?? '' : '',
+            observacion_docente: null,
+            recuperacion: null,
+            homologacion: { estado: homologada.estado, detalle: detalleDeHomologacion(homologada) },
+          };
+        }
         const registro = cerradoPor.get(`${String(subject._id)}|${studentId}`);
         const recuperada = registro?.resultado ? recuperacionDe.get(`${String(subject._id)}|${studentId}`) : undefined;
         const cuentaRecuperacion = recuperada ? integracionDe(recuperada.integracion).cuenta_en_boletin : false;
@@ -375,7 +418,7 @@ async function cargarContextoGrupo(
         return {
           subject_id: String(subject._id),
           nombre: subject.nombre,
-          porcentaje_en_area: metodo === 'PONDERADO' ? porcentaje ?? 0 : pesoEquivalente,
+          porcentaje_en_area: exentas.some(Boolean) ? round2(pesosReales[indice] ?? 0) : metodo === 'PONDERADO' ? porcentaje ?? 0 : pesoEquivalente,
           nota_asignatura: nota,
           estado: registro ? (registro.estado as 'CERRADO' | 'DEFINITIVO') : 'SIN_CERRAR',
           desempeno,
@@ -398,24 +441,27 @@ async function cargarContextoGrupo(
                   detalle: recuperada.detalle,
                 }
               : null,
+          homologacion: null,
         };
       });
 
-      const notaArea = calcularNotaArea(
-        asignaturas.map((a) => ({ nota: a.nota_asignatura, porcentaje: a.porcentaje_en_area })),
-        metodo
-      );
+      // El área se calcula con el porcentaje configurado en M06 (no el redistribuido que se muestra): la redistribución la hace el motor.
+      const paraArea = entries.map((e, i) => ({ nota: asignaturas[i]?.nota_asignatura ?? null, porcentaje: metodo === 'PONDERADO' ? e.porcentaje ?? 0 : pesoEquivalente, exenta: exentas[i] }));
+      const notaArea = calcularNotaArea(paraArea, metodo);
 
       areasResult.push({
         area_id: String(area._id),
         nombre: area.nombre,
         nota_area: notaArea,
         desempeno_area: notaArea === null ? null : desempenoCualitativo(notaArea, escalaEvaluacion),
+        exenta: areaExenta(paraArea),
         asignaturas,
       });
     }
 
-    return { studentId, areas: areasResult, promedio: calcularPromedioGeneral(areasResult.map((a) => a.nota_area)), pendientes };
+    // Un área exenta por traslado no se cursó: no entra al promedio (y no lo deja incompleto).
+    const promedio = calcularPromedioGeneral(areasResult.filter((a) => !a.exenta).map((a) => a.nota_area));
+    return { studentId, areas: areasResult, promedio, pendientes };
   }
 
   // ---- 3. Ranking (competition ranking: empatados comparten puesto) ----
@@ -453,6 +499,17 @@ async function cargarContextoGrupo(
     asistenciaTotales,
     fraseDe: (nivel, tipo) => fraseGuardada.get(`${nivel}|${tipo}`) ?? '',
     observacionDe: (subjectId, studentId) => observacionGuardada.get(`${subjectId}|${studentId}`) ?? null,
+    trasladoDe: (studentId) => {
+      const t = traslados.get(studentId);
+      if (!t) return null;
+      const entrada = anio.periodos.find((p) => p.numero === t.periodo_ingreso);
+      return {
+        fecha_ingreso: t.fecha_ingreso,
+        periodo_ingreso: t.periodo_ingreso,
+        nombre_periodo_ingreso: entrada?.nombre || `Periodo ${t.periodo_ingreso}`,
+        institucion: t.institucion_procedencia.nombre,
+      };
+    },
     fechaEntrega: entrega?.fecha_entrega ?? null,
     canalReclamaciones: configuracion.canal_reclamaciones,
     calendarioEntregas: anio.periodos.map((p) => ({
@@ -510,6 +567,7 @@ function armarBoletin(ctx: ContextoGrupo, student: UserDocument): ReportCardResu
     calendario_entregas: ctx.calendarioEntregas,
     director_grupo: ctx.directorGrupo,
     promocion: ctx.promocionDe(String(student._id)),
+    traslado: ctx.trasladoDe(String(student._id)),
   };
 }
 
@@ -584,6 +642,22 @@ export async function generateReportCard(
   }
 
   const contexto = await cargarContextoGrupo(academicYear, group, params.periodo_numero, String(student._id));
+  return armarBoletin(contexto, student);
+}
+
+/**
+ * El boletín de un periodo de un estudiante que ya no está en las listas vivas del aula (retiro o traslado, M04), en el grupo que tenía entonces:
+ * el mismo cálculo del boletín del periodo, sin la comprobación de matrícula activa ni de publicación (quien lo pide es el personal, para el
+ * boletín parcial de retiro). Solo lee: lo cerrado, las recuperaciones y las notas homologadas, igual que `generateReportCard`.
+ */
+export async function boletinDePeriodoDeEstudiante(
+  student: UserDocument,
+  academicYear: AcademicYearDocument,
+  groupId: unknown,
+  periodoNumero: number
+): Promise<ReportCardResult> {
+  const grupo = await cargarGrupoPoblado(groupId);
+  const contexto = await cargarContextoGrupo(academicYear, grupo, periodoNumero, String(student._id));
   return armarBoletin(contexto, student);
 }
 

@@ -54,12 +54,13 @@ export async function armarBoletinDeMuestra(): Promise<ReportCardResult> {
       recomendacion: textoDe(nivel, 'RECOMENDACION'),
       observacion_docente: indice === 1 ? OBSERVACION_DE_MUESTRA : null,
       recuperacion: null,
+      homologacion: null,
     };
   };
 
   const area = (indice: number, nombre: string, a: ReportCardAsignatura, b: ReportCardAsignatura): ReportCardArea => {
     const nota = round2(((a.nota_asignatura ?? 0) + (b.nota_asignatura ?? 0)) / 2);
-    return { area_id: `muestra-area-${indice}`, nombre, nota_area: nota, desempeno_area: desempenoCualitativo(nota, escalaDelAnio), asignaturas: [a, b] };
+    return { area_id: `muestra-area-${indice}`, nombre, nota_area: nota, desempeno_area: desempenoCualitativo(nota, escalaDelAnio), exenta: false, asignaturas: [a, b] };
   };
 
   const areas = [
@@ -99,5 +100,6 @@ export async function armarBoletinDeMuestra(): Promise<ReportCardResult> {
     })),
     director_grupo: 'Director(a) de grupo de muestra',
     promocion: null,
+    traslado: null,
   };
 }

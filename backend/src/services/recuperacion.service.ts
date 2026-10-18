@@ -1,10 +1,13 @@
 import { Types } from 'mongoose';
+import { ESTADOS_MATRICULA_ACTIVOS } from '../constants/enums';
 import { ESTADOS_NOTA_CERRADOS } from '../constants/notas';
 import { PERIODO_DE_RECUPERACION_ANUAL, TipoRecuperacion } from '../constants/recuperaciones';
 import { ROLES } from '../constants/roles';
 import { AcademicYearDocument } from '../models/academicYear.model';
 import CalificacionAsignatura from '../models/calificacionAsignatura.model';
+import Enrollment from '../models/enrollment.model';
 import Group from '../models/group.model';
+import NotaHomologada from '../models/notaHomologada.model';
 import PromocionAnticipada from '../models/promocionAnticipada.model';
 import Recuperacion, { RecuperacionDocument } from '../models/recuperacion.model';
 import Subject from '../models/subject.model';
@@ -14,6 +17,7 @@ import ApiError from '../utils/ApiError';
 import { escalaEfectiva, validarNotaDentroDeEscala } from '../utils/escalaEvaluacion';
 import { ESTADO_ACTIVO } from '../utils/filtroEstado';
 import {
+  contarReprobadas,
   estadoDeRecuperacion,
   evaluarVentana,
   mejorNota,
@@ -36,8 +40,10 @@ import { cargarContextoPlanilla, notaDeCasilla } from './notas.service';
 interface NotasDeEstudiante {
   /** Nota cerrada de cada periodo, tal como la dejó la planilla (M12). */
   cerradas: Map<number, number>;
-  /** Nota de cada periodo ya con la recuperación de periodo aplicada. */
+  /** Nota de cada periodo ya con la recuperación de periodo aplicada (y la homologada de los periodos anteriores a un traslado). */
   efectivas: Map<number, number>;
+  /** Periodos en que la asignatura es exenta por traslado: no entran a la definitiva del año. */
+  exentos: Set<number>;
 }
 
 export interface ContextoNotas {
@@ -59,9 +65,11 @@ export const claveRecuperacion = (asignacionId: unknown, estudianteId: unknown, 
 export async function cargarContextoNotas(anio: AcademicYearDocument, asignacionIds: Types.ObjectId[]): Promise<ContextoNotas> {
   const politicaDoc = await obtenerPolitica(anio);
   const escala = escalaEfectiva(anio.escala_evaluacion);
-  const [calificaciones, recuperaciones] = await Promise.all([
+  const [calificaciones, recuperaciones, asignaciones, homologadas] = await Promise.all([
     CalificacionAsignatura.find({ teacher_assignment_id: { $in: asignacionIds }, estado: { $in: ESTADOS_NOTA_CERRADOS } }).lean(),
     Recuperacion.find({ teacher_assignment_id: { $in: asignacionIds }, academic_year_id: anio._id }),
+    TeacherAssignment.find({ _id: { $in: asignacionIds } }).select('subject_id group_id').lean(),
+    NotaHomologada.find({ academic_year_id: anio._id }).select('student_id subject_id periodo_numero estado nota').lean(),
   ]);
 
   const recuperacionesPorClave = new Map<string, RecuperacionDocument>();
@@ -73,13 +81,35 @@ export async function cargarContextoNotas(anio: AcademicYearDocument, asignacion
   for (const c of calificaciones) {
     if (!c.resultado) continue;
     const k = clave(c.teacher_assignment_id, c.student_id);
-    const entrada = notas.get(k) ?? { cerradas: new Map(), efectivas: new Map() };
+    const entrada = notas.get(k) ?? { cerradas: new Map(), efectivas: new Map(), exentos: new Set<number>() };
     entrada.cerradas.set(c.periodo_numero, c.resultado.nota_asignatura);
     const recuperada = recuperacionesPorClave.get(claveRecuperacion(c.teacher_assignment_id, c.student_id, 'PERIODO', c.periodo_numero));
     // Una recuperación que el colegio configuró como «solo anotar» no cambia la nota del periodo ni la definitiva del año.
     const cuenta = recuperada && integracionDe(recuperada.integracion).cuenta_en_boletin;
     entrada.efectivas.set(c.periodo_numero, (cuenta ? recuperada?.nota_resultante : null) ?? c.resultado.nota_asignatura);
     notas.set(k, entrada);
+  }
+
+  // Traslados: lo homologado cuenta en la definitiva del año (no es candidato a recuperar el periodo: no lo cerró un docente) y lo exento no entra.
+  if (homologadas.length > 0) {
+    const matriculas = await Enrollment.find({
+      academic_year_id: anio._id,
+      student_id: { $in: [...new Set(homologadas.map((h) => String(h.student_id)))] },
+      estado: { $in: ESTADOS_MATRICULA_ACTIVOS },
+    })
+      .select('student_id group_id')
+      .lean();
+    const grupoDe = new Map(matriculas.map((m) => [String(m.student_id), String(m.group_id)]));
+    const asignacionDe = new Map(asignaciones.map((a) => [`${String(a.group_id)}|${String(a.subject_id)}`, a._id]));
+    for (const h of homologadas) {
+      const asignacionId = asignacionDe.get(`${grupoDe.get(String(h.student_id)) ?? ''}|${String(h.subject_id)}`);
+      if (!asignacionId) continue;
+      const k = clave(asignacionId, h.student_id);
+      const entrada = notas.get(k) ?? { cerradas: new Map(), efectivas: new Map(), exentos: new Set<number>() };
+      if (h.estado === 'EXENTA_POR_TRASLADO') entrada.exentos.add(h.periodo_numero);
+      else if (h.nota !== null) entrada.efectivas.set(h.periodo_numero, h.nota);
+      notas.set(k, entrada);
+    }
   }
 
   const omitidos = await aplicarPromocionAnticipada(anio, asignacionIds, notas);
@@ -114,7 +144,7 @@ async function aplicarPromocionAnticipada(anio: AcademicYearDocument, asignacion
       const resuelta = tramite.aplicacion.notas.find((n) => String(n.subject_id) === String(asignacion.subject_id));
       if (!resuelta) continue;
       const k = clave(asignacion._id, tramite.student_id);
-      const entrada = notas.get(k) ?? { cerradas: new Map(), efectivas: new Map() };
+      const entrada = notas.get(k) ?? { cerradas: new Map(), efectivas: new Map(), exentos: new Set<number>() };
       for (const periodo of noCursados) {
         if (entrada.cerradas.has(periodo)) continue;
         if (resuelta.modo === 'SIN_NOTA') {
@@ -137,17 +167,20 @@ export function definitivaAnual(ctx: ContextoNotas, asignacionId: unknown, estud
   // Un periodo «sin nota» sale del promedio: su porcentaje se reparte entre los restantes porque `notaAnual` normaliza por lo que queda.
   const vigentes = periodosParaPromediar(ctx.anio.periodos, ctx.omitidos.get(clave(asignacionId, estudianteId)) ?? new Set());
   return notaAnual(
-    vigentes.map((p) => ({ porcentaje: p.porcentaje, nota: entrada.efectivas.get(p.numero) ?? null })),
+    vigentes.map((p) => ({ porcentaje: p.porcentaje, nota: entrada.efectivas.get(p.numero) ?? null, exento: entrada.exentos.has(p.numero) })),
     ctx.decimales
   );
 }
 
 /** Cuántas asignaturas del grupo tiene perdidas el estudiante al cierre del año (para el tope de la recuperación anual). */
 function asignaturasPerdidas(ctx: ContextoNotas, asignacionesDelGrupo: Types.ObjectId[], estudianteId: unknown): number {
-  return asignacionesDelGrupo.filter((id) => {
-    const nota = definitivaAnual(ctx, id, estudianteId);
-    return nota !== null && necesitaRecuperar(nota, ctx.aprobatoria);
-  }).length;
+  return contarReprobadas(
+    asignacionesDelGrupo.map((id) => {
+      const exentos = ctx.notas.get(clave(id, estudianteId))?.exentos ?? new Set<number>();
+      return { nota: definitivaAnual(ctx, id, estudianteId), exenta: ctx.anio.periodos.length > 0 && ctx.anio.periodos.every((p) => exentos.has(p.numero)) };
+    }),
+    ctx.aprobatoria
+  );
 }
 
 // --- Listado de quién debe recuperar ---

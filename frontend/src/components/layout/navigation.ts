@@ -67,6 +67,8 @@ export const NAV_ITEMS: NavItem[] = [
   { to: '/admin/notas', label: 'Seguimiento de notas', icon: FileTextIcon, roles: CURRICULUM_MANAGERS },
   { to: '/admin/creador-planillas', label: 'Creador de planillas', icon: SlidersIcon, roles: STRUCTURAL_ADMINS },
   { to: '/admin/boletin', label: 'Configuración del boletín', icon: FileTextIcon, roles: CURRICULUM_MANAGERS },
+  // M24: el rol abre la puerta; el servidor decide a qué grupos o estudiantes puede citar cada docente.
+  { to: '/reuniones', label: 'Reuniones y citaciones', icon: CalendarIcon, roles: ['ADMIN', 'COORDINADOR', 'DOCENTE'] },
   { to: '/recuperaciones', label: 'Recuperaciones', icon: ClipboardListIcon, roles: ['ADMIN', 'COORDINADOR', 'DOCENTE'] },
   { to: '/admin/promocion', label: 'Promoción y cierre del año', icon: GraduationCapIcon, roles: GROUP_MANAGERS },
   { to: '/admin/promocion-anticipada', label: 'Promoción anticipada', icon: GraduationCapIcon, roles: GROUP_MANAGERS },
@@ -84,6 +86,8 @@ export const NAV_ITEMS: NavItem[] = [
   // Fin de año (M04): el docente solo lo ve si la institución lo habilitó; el servidor lo decide.
   { to: '/paz-y-salvo', label: 'Paz y salvo de fin de año', icon: CheckCircleIcon, roles: [...STAFF, 'DOCENTE'] },
   { to: '/admin/admisiones', label: 'Admisiones', icon: InboxIcon, roles: STAFF },
+  { to: '/secretaria/traslados', label: 'Traslados y homologación', icon: LayersIcon, roles: STAFF },
+  { to: '/secretaria/salidas', label: 'Retiros y traslados', icon: DoorIcon, roles: ['ADMIN', 'COORDINADOR', 'SECRETARIA'] },
   { to: '/secretaria/certificados', label: 'Certificados', icon: FileTextIcon, roles: ['ADMIN', 'SECRETARIA'] },
   { to: '/convivencia/observador', label: 'Observador', icon: EyeIcon, roles: CONVIVENCIA_REGISTRA },
   { to: '/convivencia/catalogo', label: 'Catálogo de convivencia', icon: SlidersIcon, roles: CONVIVENCIA_GESTIONA },
@@ -113,7 +117,7 @@ export const GRUPOS_NAV: GrupoNav[] = [
     clave: 'matriculas',
     label: 'Matrículas y admisiones',
     icon: ClipboardListIcon,
-    rutas: ['/admin/admisiones', '/admin/enrollments', '/admin/documentos-por-revisar', '/paz-y-salvo', '/admin/students', '/secretaria/certificados', '/secretaria/titulacion'],
+    rutas: ['/admin/admisiones', '/admin/enrollments', '/admin/documentos-por-revisar', '/paz-y-salvo', '/secretaria/traslados', '/secretaria/salidas', '/admin/students', '/secretaria/certificados', '/secretaria/titulacion'],
   },
   {
     clave: 'institucion',
@@ -143,6 +147,7 @@ export const GRUPOS_NAV: GrupoNav[] = [
       '/admin/promocion-anticipada',
       '/comision',
       '/asistencia/gestion',
+      '/reuniones',
     ],
   },
   {

@@ -169,6 +169,10 @@ export const NOMBRES_MODALIDAD: Record<ModalidadInstitucion, string> = {
 export const POLITICAS_AFORO_AULA = ['BLOQUEAR', 'ADVERTIR'] as const;
 export type PoliticaAforoAula = (typeof POLITICAS_AFORO_AULA)[number];
 
+/** M04: cuándo se libera el cupo del grupo cuando un estudiante se retira o se traslada. */
+export const POLITICAS_CUPO_SALIDA = ['INMEDIATA', 'AL_APROBAR_PAZ_Y_SALVO'] as const;
+export type PoliticaCupoSalida = (typeof POLITICAS_CUPO_SALIDA)[number];
+
 export interface Institution {
   _id: string;
   nombre: string;
@@ -191,6 +195,8 @@ export interface Institution {
   paz_y_salvo_docentes?: boolean;
   /** M01/M26: título de bachiller que se otorga por defecto; un grupo del último grado puede tener el suyo. */
   titulo_bachiller_defecto?: string;
+  /** M04: cuándo se libera el cupo de quien sale durante el año; por defecto, al registrar la salida. */
+  politica_cupo_salida?: PoliticaCupoSalida;
   estado: EstadoActivo;
 }
 

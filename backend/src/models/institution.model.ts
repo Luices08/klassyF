@@ -10,6 +10,7 @@ import {
   POLITICAS_AFORO_AULA,
   PoliticaAforoAula,
 } from '../constants/enums';
+import { POLITICAS_CUPO_SALIDA, PoliticaCupoSalida } from '../constants/salidas';
 
 export interface ILimitesCargaDocente {
   PREESCOLAR: number;
@@ -50,6 +51,8 @@ export interface IInstitution {
   paz_y_salvo_docentes: boolean;
   /** Título de bachiller que se otorga por defecto (M01); un grupo de último grado puede sobrescribirlo (`Group.titulo_bachiller`). */
   titulo_bachiller_defecto: string;
+  /** M04: cuándo se libera el cupo del grupo cuando un estudiante se retira o se traslada. */
+  politica_cupo_salida: PoliticaCupoSalida;
   /** M08: Topes maximos de carga horaria semanal por nivel segun Decreto 1850 / PEI institucional */
   limites_carga_docente?: ILimitesCargaDocente;
   /** M06: Tope maximo de horas semanales del Plan de Estudios por nivel (antes quemado en el frontend). */
@@ -97,6 +100,7 @@ const institutionSchema = new Schema<IInstitution, InstitutionModel>(
     politica_aforo_aula: { type: String, enum: POLITICAS_AFORO_AULA, default: 'BLOQUEAR' },
     paz_y_salvo_docentes: { type: Boolean, default: false },
     titulo_bachiller_defecto: { type: String, trim: true, maxlength: MAX_CARACTERES_TITULO_BACHILLER, default: TITULO_BACHILLER_INICIAL },
+    politica_cupo_salida: { type: String, enum: POLITICAS_CUPO_SALIDA, default: 'INMEDIATA' },
     limites_carga_docente: {
       type: new Schema<ILimitesCargaDocente>(
         {

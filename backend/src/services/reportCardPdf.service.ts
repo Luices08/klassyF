@@ -225,6 +225,7 @@ function areas(c: Contexto, tituloSeccion: string): void {
     if (a.descripcion && asig.descripcion) lista.push([p.rotulos.descripcion, asig.descripcion]);
     if (a.recomendacion && asig.recomendacion) lista.push([p.rotulos.recomendacion, asig.recomendacion]);
     if (a.observacion && asig.observacion_docente) lista.push([p.rotulos.observacion, asig.observacion_docente]);
+    if (asig.homologacion) lista.push([asig.homologacion.estado === 'EXENTA_POR_TRASLADO' ? t(c, 'exenta') : t(c, 'homologada'), asig.homologacion.detalle]);
     if (asig.recuperacion) {
       const r = asig.recuperacion;
       lista.push(['Recuperación', r.cuenta ? `nota del periodo ${nota(r.nota_original)}, con la recuperación ${nota(r.nota_resultante)}.` : `presentada (${nota(r.nota_resultante)}); la nota del periodo se conserva en ${nota(r.nota_original)}.`]);
@@ -237,7 +238,7 @@ function areas(c: Contexto, tituloSeccion: string): void {
     const y = doc.y;
     doc.rect(MARGEN, y, ancho, u(17)).fill(COLOR.suave);
     doc.font(fuente.b).fontSize(u(9)).fillColor(COLOR.ink).text(area.nombre.toUpperCase(), MARGEN + 6, y + u(5), { width: anchoNombre - 6, lineBreak: false });
-    if (a.nota_area && a.nota) doc.text(nota(area.nota_area), xNota, y + u(5), { width: anchoNota, align: 'center', lineBreak: false });
+    if (a.nota_area && a.nota) doc.text(area.exenta ? 'E' : nota(area.nota_area), xNota, y + u(5), { width: anchoNota, align: 'center', lineBreak: false });
     if (a.nota_area && a.desempeno) doc.font(fuente.n).text(area.desempeno_area?.etiqueta ?? '', xNivel, y + u(5), { width: anchoNivel, align: 'center', lineBreak: false });
     doc.y = y + u(21);
 
@@ -245,8 +246,9 @@ function areas(c: Contexto, tituloSeccion: string): void {
       asegurarEspacio(doc, u(40));
       const filaY = doc.y;
       doc.font(fuente.b).fontSize(u(9)).fillColor(COLOR.ink).text(asig.nombre, MARGEN + 6, filaY, { width: anchoNombre - 6, lineBreak: false });
-      if (a.nota) doc.font(fuente.b).text(nota(asig.nota_asignatura), xNota, filaY, { width: anchoNota, align: 'center', lineBreak: false });
-      if (a.desempeno) doc.font(fuente.n).fillColor(COLOR.cuerpo).text(asig.desempeno?.etiqueta ?? t(c, 'sin_cerrar'), xNivel, filaY, { width: anchoNivel, align: 'center', lineBreak: false });
+      if (a.nota) doc.font(fuente.b).text(notaDeAsignatura(asig), xNota, filaY, { width: anchoNota, align: 'center', lineBreak: false });
+      const nivel = asig.estado === 'EXENTA_POR_TRASLADO' ? t(c, 'exenta') : asig.desempeno?.etiqueta ?? t(c, 'sin_cerrar');
+      if (a.desempeno) doc.font(fuente.n).fillColor(COLOR.cuerpo).text(nivel, xNivel, filaY, { width: anchoNivel, align: 'center', lineBreak: false });
       if (a.fallas) doc.font(fuente.n).fillColor(COLOR.cuerpo).text(asig.fallas_asignatura > 0 ? `${asig.fallas_asignatura} ${t(c, 'falla')}` : '', xFallas, filaY, { width: anchoFallas, align: 'center', lineBreak: false });
       doc.y = filaY + u(13);
 
@@ -268,6 +270,32 @@ function areas(c: Contexto, tituloSeccion: string): void {
   }
   if (b.areas.length === 0) {
     doc.font(fuente.n).fontSize(u(9)).fillColor(COLOR.tenue).text(t(c, 'sin_malla'), MARGEN, doc.y);
+  }
+  convencionesTraslado(c);
+}
+
+/** «4.20 (H)» si la nota se homologó del colegio de origen; «E» si la asignatura es exenta por traslado. */
+function notaDeAsignatura(asig: AsignaturaVista): string {
+  if (asig.estado === 'EXENTA_POR_TRASLADO') return 'E';
+  return asig.estado === 'HOMOLOGADA_EXTERNA' ? `${nota(asig.nota_asignatura)} (H)` : nota(asig.nota_asignatura);
+}
+
+/** Las notas al pie del traslado: de dónde viene el estudiante y qué significan (H) y E. Solo salen si el boletín las usa. */
+function convencionesTraslado(c: Contexto): void {
+  const { doc, b } = c;
+  const todas = b.areas.flatMap((a) => a.asignaturas);
+  const lineas = [
+    b.traslado && t(c, 'traslado_linea', { fecha: fechaLarga(b.traslado.fecha_ingreso), institucion: b.traslado.institucion, periodo: b.traslado.nombre_periodo_ingreso }),
+    todas.some((x) => x.estado === 'HOMOLOGADA_EXTERNA') && t(c, 'convencion_homologada'),
+    todas.some((x) => x.estado === 'EXENTA_POR_TRASLADO') && t(c, 'convencion_exenta'),
+  ].filter((x): x is string => Boolean(x && x.trim()));
+  if (lineas.length === 0) return;
+  const ancho = doc.page.width - MARGEN * 2;
+  doc.moveDown(0.3);
+  for (const linea of lineas) {
+    const alto = doc.font(fuente.i).fontSize(u(7.5)).heightOfString(linea, { width: ancho });
+    asegurarEspacio(doc, alto + 2);
+    doc.font(fuente.i).fontSize(u(7.5)).fillColor(COLOR.tenue).text(linea, MARGEN, doc.y, { width: ancho });
   }
 }
 

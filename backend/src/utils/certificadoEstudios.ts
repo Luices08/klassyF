@@ -16,7 +16,17 @@ export interface BoletinDePeriodo {
     area_id: string;
     nombre: string;
     nota_area: number | null;
-    asignaturas: Array<{ subject_id: string; nombre: string; nota_asignatura: number | null }>;
+    /** Todas sus asignaturas son exentas por traslado en ese periodo. */
+    exenta?: boolean;
+    asignaturas: Array<{
+      subject_id: string;
+      nombre: string;
+      nota_asignatura: number | null;
+      /** Exenta por traslado en ese periodo: no cuenta ni como nota ni como faltante. */
+      exenta?: boolean;
+      /** La nota de ese periodo se homologó de la institución de procedencia. */
+      homologada?: boolean;
+    }>;
   }>;
 }
 
@@ -30,11 +40,14 @@ export interface PeriodoDelAnio {
  * Nota final de un conjunto de periodos: cada nota pesa el porcentaje que el año lectivo (M05) le asignó. Sin todas las
  * notas cerradas no hay definitiva (nunca se promedia lo que falta). Como el promedio por periodo es lineal, ponderar las
  * notas de área da lo mismo que recalcular el área con las definitivas de sus asignaturas, sea cual sea su método (M06).
+ * Los periodos exentos por traslado (`exentos[i]`) no entran: su porcentaje se reparte entre los cursados o evaluados.
  */
-export function notaDefinitiva(notas: ReadonlyArray<number | null>, porcentajes: readonly number[]): number | null {
-  const totalPeso = porcentajes.reduce((suma, p) => suma + p, 0);
-  if (notas.length === 0 || notas.length !== porcentajes.length || totalPeso <= 0 || notas.some((n) => n === null)) return null;
-  return round2((notas as number[]).reduce((suma, n, i) => suma + n * (porcentajes[i] as number), 0) / totalPeso);
+export function notaDefinitiva(notas: ReadonlyArray<number | null>, porcentajes: readonly number[], exentos: readonly boolean[] = []): number | null {
+  if (notas.length === 0 || notas.length !== porcentajes.length) return null;
+  const evaluados = notas.map((n, i) => ({ n, p: porcentajes[i] as number })).filter((_, i) => !exentos[i]);
+  const totalPeso = evaluados.reduce((suma, x) => suma + x.p, 0);
+  if (evaluados.length === 0 || totalPeso <= 0 || evaluados.some((x) => x.n === null)) return null;
+  return round2(evaluados.reduce((suma, x) => suma + (x.n as number) * x.p, 0) / totalPeso);
 }
 
 /**
@@ -62,28 +75,43 @@ export function armarTablaValoraciones(
   const base = boletinDe(ordenados[0]?.numero ?? -1);
   const filas: FilaValoracion[] = [];
   let completo = (base?.areas.length ?? 0) > 0;
+  let hayHomologadas = false;
+  let hayExentas = false;
+  // «E» marca lo exento todo el año (no se cursó y no tiene nota); «(H)» lo que tiene algún periodo homologado.
+  const celdaNota = (definitiva: number | null, exentaTodoElAnio: boolean, homologada: boolean) =>
+    exentaTodoElAnio ? 'E' : `${nota(definitiva)}${homologada && definitiva !== null ? ' (H)' : ''}`;
   for (const area of base?.areas ?? []) {
+    const deArea = ordenados.map((p) => boletinDe(p.numero)?.areas.find((a) => a.area_id === area.area_id));
+    const exentosArea = deArea.map((a) => Boolean(a?.exenta));
+    const areaExentaTodoElAnio = exentosArea.length > 0 && exentosArea.every(Boolean);
     const definitivaArea =
       notasDelCierre.get(`area:${area.area_id}`) ??
-      notaDefinitiva(
-        ordenados.map((p) => boletinDe(p.numero)?.areas.find((a) => a.area_id === area.area_id)?.nota_area ?? null),
-        porcentajes
-      );
-    if (definitivaArea === null) completo = false;
-    filas.push({ nivel: 'AREA', celdas: [area.nombre, '', '', nota(definitivaArea), equivalencia(definitivaArea)] });
+      (areaExentaTodoElAnio ? null : notaDefinitiva(deArea.map((a) => a?.nota_area ?? null), porcentajes, exentosArea));
+    if (definitivaArea === null && !areaExentaTodoElAnio) completo = false;
+    const areaHomologada = deArea.some((a) => a?.asignaturas.some((s) => s.homologada));
+    filas.push({ nivel: 'AREA', celdas: [area.nombre, '', '', celdaNota(definitivaArea, areaExentaTodoElAnio, areaHomologada), equivalencia(definitivaArea)] });
     for (const asignatura of area.asignaturas) {
+      const dePeriodos = deArea.map((a) => a?.asignaturas.find((s) => s.subject_id === asignatura.subject_id));
+      const exentos = dePeriodos.map((s) => Boolean(s?.exenta));
+      const exentaTodoElAnio = exentos.every(Boolean);
+      const homologada = dePeriodos.some((s) => s?.homologada);
+      if (exentos.some(Boolean)) hayExentas = true;
+      if (homologada) hayHomologadas = true;
       const definitiva =
         notasDelCierre.get(`asignatura:${asignatura.subject_id}`) ??
-        notaDefinitiva(
-          ordenados.map((p) => boletinDe(p.numero)?.areas.find((a) => a.area_id === area.area_id)?.asignaturas.find((s) => s.subject_id === asignatura.subject_id)?.nota_asignatura ?? null),
-          porcentajes
-        );
-      if (definitiva === null) completo = false;
+        (exentaTodoElAnio ? null : notaDefinitiva(dePeriodos.map((s) => s?.nota_asignatura ?? null), porcentajes, exentos));
+      if (definitiva === null && !exentaTodoElAnio) completo = false;
       const semanal = intensidades.get(asignatura.subject_id) ?? null;
       const anual = semanal === null || semanasLectivas === null ? null : Math.round(semanal * semanasLectivas);
       filas.push({
         nivel: 'ASIGNATURA',
-        celdas: [asignatura.nombre, semanal === null ? '—' : String(semanal), anual === null ? '—' : String(anual), nota(definitiva), equivalencia(definitiva)],
+        celdas: [
+          asignatura.nombre,
+          semanal === null ? '—' : String(semanal),
+          anual === null ? '—' : String(anual),
+          celdaNota(definitiva, exentaTodoElAnio, homologada),
+          equivalencia(definitiva),
+        ],
       });
     }
   }
@@ -95,7 +123,9 @@ export function armarTablaValoraciones(
       filas,
       pie:
         `IHS: intensidad horaria semanal. IHA: intensidad horaria anual (horas semanales por las semanas lectivas del año). ` +
-        `Calificación final: notas de periodo ponderadas (${pesos}), con la recuperación de fin de año cuando la hubo.${completo ? '' : ' Lo que aún no está definido aparece con «—».'}`,
+        `Calificación final: notas de periodo ponderadas (${pesos}), con la recuperación de fin de año cuando la hubo.${completo ? '' : ' Lo que aún no está definido aparece con «—».'}` +
+        (hayHomologadas ? ' (H): incluye notas homologadas de la institución de procedencia por traslado, convertidas a la escala de la institución.' : '') +
+        (hayExentas ? ' E: exenta por traslado (no se cursó en la institución de procedencia); los periodos exentos no entran en la calificación final.' : ''),
     },
     completo,
   };

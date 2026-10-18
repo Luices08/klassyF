@@ -22,7 +22,7 @@ export interface ReportCardComponente {
 }
 
 /** El boletín solo muestra resultados cerrados por el docente (o ya definitivos). */
-export type EstadoCierreAsignatura = 'SIN_CERRAR' | 'CERRADO' | 'DEFINITIVO';
+export type EstadoCierreAsignatura = 'SIN_CERRAR' | 'CERRADO' | 'DEFINITIVO' | 'HOMOLOGADA_EXTERNA' | 'EXENTA_POR_TRASLADO';
 
 export interface ReportCardAsignatura {
   subject_id: string;
@@ -41,6 +41,8 @@ export interface ReportCardAsignatura {
   observacion_docente: string | null;
   /** Recuperación del periodo (M18), si la hubo. Con `cuenta`, `nota_asignatura` ya la incluye. */
   recuperacion: { nota_original: number; nota_resultante: number; estado: string; cuenta: boolean; detalle: string } | null;
+  /** Traslado extemporáneo: la nota viene del colegio de procedencia (`HOMOLOGADA_EXTERNA`) o la asignatura no se cursó allá (`EXENTA_POR_TRASLADO`). */
+  homologacion: { estado: 'HOMOLOGADA_EXTERNA' | 'EXENTA_POR_TRASLADO'; detalle: string } | null;
 }
 
 /** Un nivel de la escala del colegio con su equivalencia nacional (Superior/Alto/Básico/Bajo). */
@@ -56,6 +58,8 @@ export interface ReportCardArea {
   area_id: string;
   nombre: string;
   nota_area: number | null;
+  /** Todas sus asignaturas son exentas por traslado: no tiene nota ni entra al promedio. */
+  exenta: boolean;
   desempeno_area: Desempeno | null;
   asignaturas: ReportCardAsignatura[];
 }
@@ -101,4 +105,6 @@ export interface ReportCard {
   promocion: { resultado: string; texto: string; acta: string | null } | null;
   /** Fecha de entrega de cada periodo del año; null = aún sin fijar. */
   calendario_entregas: Array<{ periodo: string; fecha: string | null }>;
+  /** Si el estudiante ingresó por traslado extemporáneo (M04). */
+  traslado: { fecha_ingreso: string; periodo_ingreso: number; nombre_periodo_ingreso: string; institucion: string } | null;
 }

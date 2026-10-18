@@ -14,6 +14,8 @@ import * as institutionValidator from '../validators/institution.validator';
 import validate from '../middlewares/validate.middleware';
 import * as admissionValidator from '../validators/admissionRequest.validator';
 import * as certificadoValidator from '../validators/certificado.validator';
+import { consultarPublica as consultarCitacion, responderPublica as responderCitacion } from '../controllers/citacion.controller';
+import * as citacionValidator from '../validators/citacion.validator';
 
 const router = Router();
 
@@ -30,6 +32,11 @@ const subirEnMemoria = multer({ storage: multer.memoryStorage(), limits: { fileS
 // Verificación de certificados (M26): más estricto que la lectura normal, porque quien adivina códigos no debe poder probarlos a ritmo libre.
 const verificacionLimiter = rateLimit({ windowMs: 15 * 60_000, max: 40, standardHeaders: true, legacyHeaders: false });
 router.get('/certificados/verificar', verificacionLimiter, validate(certificadoValidator.verificarPublico), verificarPublico);
+
+// Respuesta a una citación desde el correo (M24): el token del enlace es la credencial. Mismo cuidado que la verificación de certificados.
+const citacionLimiter = rateLimit({ windowMs: 15 * 60_000, max: 60, standardHeaders: true, legacyHeaders: false });
+router.get('/citaciones/:token', citacionLimiter, validate(citacionValidator.conToken), consultarCitacion);
+router.post('/citaciones/:token/respuesta', citacionLimiter, validate(citacionValidator.responderPorToken), responderCitacion);
 
 router.get('/institution-info', lecturaLimiter, obtenerInfoPublica);
 router.get('/grades', lecturaLimiter, listarGradosPublicos);

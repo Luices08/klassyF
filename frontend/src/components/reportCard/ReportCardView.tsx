@@ -28,7 +28,9 @@ function Detalle({ rotulo, texto }: { rotulo: string; texto: string }) {
 }
 
 function AsignaturaRow({ asignatura }: { asignatura: ReportCardAsignatura }) {
-  const tieneTexto = asignatura.descripcion || asignatura.recomendacion || asignatura.observacion_docente || asignatura.recuperacion;
+  const exenta = asignatura.estado === 'EXENTA_POR_TRASLADO';
+  const homologada = asignatura.estado === 'HOMOLOGADA_EXTERNA';
+  const tieneTexto = asignatura.homologacion || asignatura.descripcion || asignatura.recomendacion || asignatura.observacion_docente || asignatura.recuperacion;
   return (
     <div className="rounded-lg border border-border p-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -37,11 +39,14 @@ function AsignaturaRow({ asignatura }: { asignatura: ReportCardAsignatura }) {
           <p className="text-xs text-muted">{asignatura.porcentaje_en_area}% del área</p>
         </div>
         <div className="flex items-center gap-2">
-          {asignatura.nota_asignatura === null || asignatura.desempeno === null ? (
+          {exenta ? (
+            <Chip tone="orange">Exenta (E)</Chip>
+          ) : asignatura.nota_asignatura === null || asignatura.desempeno === null ? (
             <Chip tone="neutral">Sin cerrar</Chip>
           ) : (
             <>
               <span className="text-lg font-bold text-ink">{asignatura.nota_asignatura.toFixed(2)}</span>
+              {homologada && <Chip tone="green">H</Chip>}
               <DesempenoBadge value={asignatura.desempeno} />
             </>
           )}
@@ -59,6 +64,7 @@ function AsignaturaRow({ asignatura }: { asignatura: ReportCardAsignatura }) {
       )}
       {tieneTexto && (
         <div className="mt-3 space-y-1 border-t border-border pt-2">
+          {asignatura.homologacion && <Detalle rotulo={exenta ? 'Exenta por traslado' : 'Nota homologada'} texto={asignatura.homologacion.detalle} />}
           {asignatura.recuperacion && (
             <Detalle
               rotulo="Recuperación"
@@ -84,7 +90,9 @@ function AreaSection({ area }: { area: ReportCardArea }) {
       <div className="mb-3 flex items-center justify-between gap-3">
         <h3 className="text-sm font-bold uppercase tracking-wide text-body">{area.nombre}</h3>
         <div className="flex items-center gap-2">
-          {area.nota_area === null || area.desempeno_area === null ? (
+          {area.exenta ? (
+            <Chip tone="orange">Exenta (E)</Chip>
+          ) : area.nota_area === null || area.desempeno_area === null ? (
             <Chip tone="neutral">Sin calcular</Chip>
           ) : (
             <>
@@ -113,6 +121,12 @@ export function ReportCardView({ reportCard }: { reportCard: ReportCard }) {
         <Alert tone="info">
           Este boletín aún no es oficial: solo muestra las asignaturas cuya planilla ya cerró el docente.
           {reportCard.pendientes.length > 0 && <> Faltan: {reportCard.pendientes.join(', ')}.</>}
+        </Alert>
+      )}
+      {reportCard.traslado && (
+        <Alert tone="info">
+          Ingresó por traslado el {formatoFechaCalendario(reportCard.traslado.fecha_ingreso)}, procedente de {reportCard.traslado.institucion}; cursa en este colegio desde el{' '}
+          {reportCard.traslado.nombre_periodo_ingreso}. (H) nota homologada de la institución de procedencia, convertida a la escala de este colegio. (E) asignatura exenta: no tiene nota y no cuenta en el promedio ni en la promoción.
         </Alert>
       )}
       <Card>

@@ -245,3 +245,21 @@ describe('secciones que pide la guía de boletines, fuente y tamaño de letra', 
     expect(paginas(await renderizarBoletines([boletin(2)], null))).toBe(1);
   });
 });
+
+describe('traslados: notas homologadas y exentas', () => {
+  it('dibuja (H), E, el detalle de origen y las convenciones al pie sin fallar', async () => {
+    const b = boletin(1, {
+      traslado: { fecha_ingreso: new Date('2026-05-04T00:00:00.000Z'), periodo_ingreso: 2, nombre_periodo_ingreso: 'Segundo periodo', institucion: 'Colegio de Origen' },
+    });
+    b.areas[0] = {
+      ...(b.areas[0] as ReportCardResult['areas'][number]),
+      asignaturas: [
+        asignatura(1, { estado: 'HOMOLOGADA_EXTERNA', homologacion: { estado: 'HOMOLOGADA_EXTERNA', detalle: 'Trimestre 1: 8,5 (1 a 10) → 4.3.' } }),
+        asignatura(2, { estado: 'EXENTA_POR_TRASLADO', nota_asignatura: null, desempeno: null, homologacion: { estado: 'EXENTA_POR_TRASLADO', detalle: 'No se impartía.' } }),
+      ],
+    };
+    const pdf = await renderizarBoletines([b], null);
+    expect(pdf.subarray(0, 5).toString()).toBe('%PDF-');
+    expect(paginas(pdf)).toBe(1);
+  });
+});

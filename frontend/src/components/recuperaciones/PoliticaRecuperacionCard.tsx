@@ -56,7 +56,14 @@ function Formulario({ academicYearId, politica, puedeEditar }: { academicYearId:
     setMensaje(null);
     try {
       const { bloques_molde: _bloques, ...politicaAEnviar } = borrador;
-      await actualizar.mutateAsync(politicaAEnviar);
+      const integracion = { ...politicaAEnviar.periodo.integracion };
+      if (integracion.modo !== 'CASILLA_ADICIONAL') {
+        integracion.peso = null;
+      }
+      await actualizar.mutateAsync({
+        ...politicaAEnviar,
+        periodo: { ...politicaAEnviar.periodo, integracion },
+      });
       setMensaje({ tone: 'success', texto: 'Política de recuperaciones actualizada.' });
     } catch (err) {
       setMensaje({ tone: 'error', texto: errorMessage(err) });

@@ -10,10 +10,12 @@ export const ESTADOS_QUE_EXIGEN_REINGRESO: EstadoEstudiante[] = ['RETIRADO', 'IN
  * Dónde está un estudiante frente a la matrícula del año. La matrícula viva manda sobre el estado del expediente
  * (un retirado que ya reingresó figura matriculado); sin perfil se asume ACTIVO, como el default del modelo.
  */
-export function situacionDeEstudiante(datos: { tieneMatriculaViva: boolean; estadoPerfil?: EstadoEstudiante; usuarioActivo: boolean }): SituacionEstudiante {
+export function situacionDeEstudiante(datos: { tieneMatriculaViva: boolean; estadoPerfil?: EstadoEstudiante; usuarioActivo: boolean; retiradoEnElAnio?: boolean }): SituacionEstudiante {
   if (datos.tieneMatriculaViva) return 'MATRICULADO';
   if (datos.estadoPerfil === 'GRADUADO') return 'GRADUADO';
   if (!datos.usuarioActivo) return 'USUARIO_INACTIVO';
   if (datos.estadoPerfil && ESTADOS_QUE_EXIGEN_REINGRESO.includes(datos.estadoPerfil)) return 'REINGRESO';
+  // Un retiro anterior al módulo de salidas dejó el expediente en ACTIVO: la matrícula RETIRADA del año es la que lo delata.
+  if (datos.retiradoEnElAnio) return 'REINGRESO';
   return 'DISPONIBLE';
 }

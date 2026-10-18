@@ -18,6 +18,11 @@ describe('situacionDeEstudiante', () => {
     expect(situacionDeEstudiante({ ...base, estadoPerfil: 'INACTIVO' })).toBe('REINGRESO');
   });
 
+  it('una matrícula retirada en el año es reingreso aunque el expediente siga ACTIVO (retiros anteriores al módulo de salidas)', () => {
+    expect(situacionDeEstudiante({ ...base, estadoPerfil: 'ACTIVO', retiradoEnElAnio: true })).toBe('REINGRESO');
+    expect(situacionDeEstudiante({ ...base, retiradoEnElAnio: true, tieneMatriculaViva: true })).toBe('MATRICULADO');
+  });
+
   it('el graduado y el usuario inactivo no entran a disponibles ni a reingreso', () => {
     expect(situacionDeEstudiante({ ...base, estadoPerfil: 'GRADUADO' })).toBe('GRADUADO');
     expect(situacionDeEstudiante({ ...base, usuarioActivo: false, estadoPerfil: 'RETIRADO' })).toBe('USUARIO_INACTIVO');

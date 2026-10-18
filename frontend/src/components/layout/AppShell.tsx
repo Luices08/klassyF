@@ -51,7 +51,7 @@ export function AppShell() {
 
   return (
     <ForcedPasswordChangeGate>
-      <div className="h-dvh overflow-hidden bg-soft">
+      <div className="fixed inset-0 overflow-hidden bg-soft">
         <div className="flex h-full">
           <aside className="hidden w-64 shrink-0 border-r border-border bg-surface sm:flex sm:flex-col">
             <div className="flex h-16 shrink-0 items-center px-6">

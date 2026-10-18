@@ -17,6 +17,7 @@ import {
   useActualizarPoliticaRecuperacion,
   usePoliticaRecuperacion,
 } from '../../hooks/useRecuperaciones';
+import { usePoliticaPromocion } from '../../hooks/usePromocion';
 
 const EFECTOS = Object.keys(NOMBRES_EFECTO) as EfectoRecuperacion[];
 const MOMENTOS = Object.keys(NOMBRES_MOMENTO) as MomentoRecuperacion[];
@@ -38,6 +39,8 @@ function Formulario({ academicYearId, politica, puedeEditar }: { academicYearId:
   const actualizar = useActualizarPoliticaRecuperacion(academicYearId);
   const [borrador, setBorrador] = useState<PoliticaRecuperacion>(() => structuredClone(politica));
   const [mensaje, setMensaje] = useState<{ tone: 'success' | 'error'; texto: string } | null>(null);
+  // Si Promoción ya define la recuperación final, esos tres datos se cambian allá (el servidor rechaza cambiarlos aquí).
+  const delegadaAPromocion = usePoliticaPromocion(academicYearId).data?.umbrales?.recuperacion_hasta != null;
   const ultimo = Math.max(...borrador.periodos.map((r) => r.periodo_numero));
   const bloques = borrador.bloques_molde ?? [];
   const integracion = borrador.periodo.integracion;
@@ -208,17 +211,20 @@ function Formulario({ academicYearId, politica, puedeEditar }: { academicYearId:
       <Card>
         <CardHeader title="Recuperación de fin de año" subtitle="Para quien termina el año con una asignatura perdida (definitiva ponderada por los periodos)." />
         <div className="space-y-4">
+          {delegadaAPromocion && (
+            <Alert tone="info">Si hay recuperación, hasta cuántas asignaturas y qué nota queda se definen en «Promoción y cierre de año». Aquí solo se ven.</Alert>
+          )}
           <Switch
             label="El colegio tiene recuperación de fin de año"
             checked={borrador.anual.aplica}
-            disabled={!puedeEditar}
+            disabled={!puedeEditar || delegadaAPromocion}
             onChange={(aplica) => setBorrador((b) => ({ ...b, anual: { ...b.anual, aplica } }))}
           />
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
             <Select
               label="Efecto en la nota"
               value={borrador.anual.efecto}
-              disabled={!puedeEditar || !borrador.anual.aplica}
+              disabled={!puedeEditar || delegadaAPromocion || !borrador.anual.aplica}
               onChange={(e) => setBorrador((b) => ({ ...b, anual: { ...b.anual, efecto: e.target.value as EfectoRecuperacion } }))}
             >
               {EFECTOS.map((x) => (
@@ -243,7 +249,7 @@ function Formulario({ academicYearId, politica, puedeEditar }: { academicYearId:
               max={50}
               hint="0 = sin tope"
               value={borrador.anual.max_asignaturas_pendientes}
-              disabled={!puedeEditar || !borrador.anual.aplica}
+              disabled={!puedeEditar || delegadaAPromocion || !borrador.anual.aplica}
               onChange={(e) => setBorrador((b) => ({ ...b, anual: { ...b.anual, max_asignaturas_pendientes: Number(e.target.value) } }))}
             />
           </div>

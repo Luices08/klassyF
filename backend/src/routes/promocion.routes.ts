@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { ROLES } from '../constants/roles';
-import { actualizarPolitica, cerrarGrupo, listarEvaluaciones, obtenerPolitica, reevaluarEstudiante, simularGrupo, simularRollover, ejecutarRollover, verificarIntegridad } from '../controllers/promocion.controller';
+import { actualizarPolitica, cerrarGrupo, listarEvaluaciones, obtenerPolitica, reevaluarEstudiante, simularCaso, simularGrupo, simularRollover, ejecutarRollover, verificarIntegridad } from '../controllers/promocion.controller';
 import { authenticate, checkRole } from '../middlewares/auth.middleware';
 import validate from '../middlewares/validate.middleware';
 import * as promocionValidator from '../validators/promocion.validator';
@@ -13,6 +13,9 @@ router.use(authenticate);
 // solo el administrador la cambia.
 router.get('/politica/:academic_year_id', validate(promocionValidator.anioParam), obtenerPolitica);
 router.put('/politica/:academic_year_id', checkRole(ROLES.ADMIN), validate(promocionValidator.actualizarPolitica), actualizarPolitica);
+
+// «Pruébalo»: prueba la política en borrador con un estudiante inventado; no escribe nada.
+router.post('/politica/:academic_year_id/simular-caso', checkRole(ROLES.ADMIN, ROLES.COORDINADOR), validate(promocionValidator.simularCaso), simularCaso);
 
 // Simulación y consulta de cierres: coordinación y administración (el servicio vuelve a comprobarlo). Cerrar y corregir: solo ADMIN, con contraseña.
 router.get('/simulacion', checkRole(ROLES.ADMIN, ROLES.COORDINADOR), validate(promocionValidator.simulacion), simularGrupo);

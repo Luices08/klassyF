@@ -9,6 +9,7 @@ import {
   politicaInicial,
   validarPolitica,
 } from '../src/utils/promocion';
+import { entradaDeCasoSimulado } from '../src/utils/simulacionPromocion';
 
 const asig = (id: string, nota: number | null, extra: Partial<AsignaturaEntrada> = {}): AsignaturaEntrada => ({
   subject_id: id,
@@ -227,5 +228,114 @@ describe('conceptoOficial (lo que lee M26)', () => {
 
   it('un resultado que aún puede cambiar no es un concepto oficial', () => {
     for (const r of ['PENDIENTE_RECUPERACION', 'EN_COMISION', 'RETIRO_PROPUESTO', 'INCOMPLETO'] as const) expect(conceptoOficial(r, 'Sexto', 'Séptimo')).toBeNull();
+  });
+});
+
+describe('tarjetas declarativas: unidad AMBAS, umbrales e inasistencia', () => {
+  const ambas = (extra: Partial<PoliticaPromocion> = {}): PoliticaPromocion =>
+    politica([], {
+      unidad: 'AMBAS',
+      umbrales: { recuperacion_hasta: 2, reprueba_desde_areas: 2, efecto_nota_recuperacion: 'LIMITA_A_APROBATORIA' },
+      ...extra,
+    });
+  it('1 o 2 asignaturas perdidas van a recuperación; 3 o más no se promueven', () => {
+    expect(evaluarPromocion(entrada([asig('a', 2), asig('b', 4)]), ambas(), 'CIERRE').resultado).toBe('PENDIENTE_RECUPERACION');
+    const sinAreas = ambas({ umbrales: { recuperacion_hasta: 2, reprueba_desde_areas: null, efecto_nota_recuperacion: 'LIMITA_A_APROBATORIA' } });
+    expect(evaluarPromocion(entrada([asig('a', 2), asig('b', 2)], { max_recuperables: 2 }), sinAreas, 'CIERRE').resultado).toBe('PENDIENTE_RECUPERACION');
+    expect(evaluarPromocion(entrada([asig('a', 2), asig('b', 2), asig('c', 2)], { max_recuperables: 2 }), sinAreas, 'CIERRE').resultado).toBe('NO_PROMOVIDO');
+  });
+
+  it('con AMBAS, perder el umbral de áreas reprueba aunque las asignaturas no lleguen a 3', () => {
+    const e = entrada([asig('a', 2), asig('b', 2)], { max_recuperables: 2 });
+    const r = evaluarPromocion(e, ambas(), 'CIERRE');
+    expect(r.resultado).toBe('NO_PROMOVIDO');
+    expect(r.reglas_disparadas.map((x) => x.clave)).toContain('auto-reprueba-areas');
+    expect(evaluarPromocion(e, ambas({ umbrales: { recuperacion_hasta: 2, reprueba_desde_areas: null, efecto_nota_recuperacion: 'LIMITA_A_APROBATORIA' } }), 'CIERRE').resultado).toBe('PENDIENTE_RECUPERACION');
+  });
+
+  it('tras la recuperación: si sigue perdiendo no se promueve; si supera, se promueve por recuperación', () => {
+    const pol = ambas({ umbrales: { recuperacion_hasta: 2, reprueba_desde_areas: null, efecto_nota_recuperacion: 'LIMITA_A_APROBATORIA' } });
+    expect(evaluarPromocion(entrada([asig('a', 2, { nota_final: 3 })]), pol, 'TRAS_RECUPERACION').resultado).toBe('PROMOVIDO_POR_RECUPERACION');
+    expect(evaluarPromocion(entrada([asig('a', 2)]), pol, 'TRAS_RECUPERACION').resultado).toBe('NO_PROMOVIDO');
+  });
+
+  it('el tope de recuperación con AMBAS cuenta asignaturas, no áreas', () => {
+    const pol = ambas({ umbrales: { recuperacion_hasta: 1, reprueba_desde_areas: null, efecto_nota_recuperacion: 'LIMITA_A_APROBATORIA' } });
+    const r = evaluarPromocion(entrada([asig('a', 2)], { max_recuperables: 1 }), pol, 'CIERRE');
+    expect(r.resultado).toBe('PENDIENTE_RECUPERACION');
+    expect(r.a_recuperar.every((u) => u.tipo === 'ASIGNATURA')).toBe(true);
+  });
+
+  it('la inasistencia reprueba solo al superar el porcentaje (25 % exacto no reprueba)', () => {
+    const pol = ambas({ inasistencia: { activa: true, porcentaje: 25, faltas: 'SOLO_INJUSTIFICADAS' } });
+    expect(evaluarPromocion(entrada([asig('a', 4)], { inasistencia_global_injustificada_pct: 25 }), pol, 'CIERRE').resultado).toBe('PROMOVIDO');
+    expect(evaluarPromocion(entrada([asig('a', 4)], { inasistencia_global_injustificada_pct: 25.1 }), pol, 'CIERRE').resultado).toBe('NO_PROMOVIDO');
+    expect(evaluarPromocion(entrada([asig('a', 4)], { inasistencia_global_injustificada_pct: 40 }), { ...pol, inasistencia: { ...pol.inasistencia, activa: false } }, 'CIERRE').resultado).toBe('PROMOVIDO');
+  });
+
+  it('un estudiante con PIAR que reprueba pasa a la comisión', () => {
+    const pol = ambas({ piar: { derivar_a_comision: true } });
+    expect(evaluarPromocion(entrada([asig('a', 2), asig('b', 2), asig('c', 2)], { tiene_piar: true, max_recuperables: 2 }), pol, 'CIERRE').resultado).toBe('EN_COMISION');
+  });
+
+  it('el arrastre con AMBAS solo mira asignaturas', () => {
+    const pol = ambas({ umbrales: { recuperacion_hasta: 2, reprueba_desde_areas: null, efecto_nota_recuperacion: 'LIMITA_A_APROBATORIA' }, asignaturas_arrastrables_ids: ['a'], arrastre: { admite: true, max_unidades: 1, condicion: 'NINGUNA', nota_minima: null, hasta_periodo: 1, si_incumple: 'SOLO_ALERTA' } });
+    expect(evaluarPromocion(entrada([asig('a', 2)]), pol, 'TRAS_RECUPERACION').resultado).toBe('PROMOVIDO_CON_ARRASTRE');
+    expect(evaluarPromocion(entrada([asig('b', 2)]), pol, 'TRAS_RECUPERACION').resultado).toBe('NO_PROMOVIDO');
+  });
+
+  it('una política anterior (sin umbrales ni inasistencia) se evalúa como siempre', () => {
+    const vieja = { ...politica([]), umbrales: undefined, inasistencia: undefined } as unknown as PoliticaPromocion;
+    expect(evaluarPromocion(entrada([asig('a', 2)]), vieja, 'CIERRE').resultado).toBe('PENDIENTE_RECUPERACION');
+  });
+
+  it('validación: umbral de áreas solo con AMBAS y claves reservadas', () => {
+    expect(validarPolitica(politica([], { unidad: 'ASIGNATURA', umbrales: { recuperacion_hasta: 2, reprueba_desde_areas: 2, efecto_nota_recuperacion: 'REEMPLAZA' } }))).toMatch(/áreas/);
+    expect(validarPolitica(politica([regla({ clave: 'auto-inasistencia', condiciones: [{ tipo: 'TIENE_PIAR' }], accion: 'ENVIA_A_COMISION' })]))).toMatch(/reservada/);
+    expect(validarPolitica(ambas())).toBeNull();
+  });
+});
+
+describe('materias imprescindibles y simulador «Pruébalo»', () => {
+  const base = (efecto: PoliticaPromocion['imprescindibles']['efecto']): PoliticaPromocion =>
+    politica([], {
+      unidad: 'ASIGNATURA',
+      asignaturas_criticas_ids: ['mat'],
+      imprescindibles: { efecto },
+      umbrales: { recuperacion_hasta: 2, reprueba_desde_areas: null, efecto_nota_recuperacion: 'LIMITA_A_APROBATORIA' },
+    });
+  const e = (id: string) => entrada([asig(id, 2)], { max_recuperables: 2 });
+
+  it('perder una imprescindible: pierde el año, va a comisión o recupera según lo elegido', () => {
+    expect(evaluarPromocion(e('mat'), base('NO_PROMUEVE'), 'CIERRE').resultado).toBe('NO_PROMOVIDO');
+    expect(evaluarPromocion(e('mat'), base('COMISION'), 'CIERRE').resultado).toBe('EN_COMISION');
+    expect(evaluarPromocion(e('mat'), base('RECUPERA'), 'CIERRE').resultado).toBe('PENDIENTE_RECUPERACION');
+    expect(evaluarPromocion(e('otra'), base('NO_PROMUEVE'), 'CIERRE').resultado).toBe('PENDIENTE_RECUPERACION');
+  });
+
+  it('una política anterior (efecto null) no deriva nada de las críticas', () => {
+    expect(evaluarPromocion(e('mat'), base(null), 'CIERRE').resultado).toBe('PENDIENTE_RECUPERACION');
+  });
+
+  it('con PIAR, perder una imprescindible también pasa a la comisión', () => {
+    const pol = { ...base('NO_PROMUEVE'), piar: { derivar_a_comision: true } };
+    expect(evaluarPromocion(entrada([asig('mat', 2)], { tiene_piar: true, max_recuperables: 2 }), pol, 'CIERRE').resultado).toBe('EN_COMISION');
+  });
+
+  it('el simulador arma el caso y llega al mismo resultado que el motor', () => {
+    const pol = base('NO_PROMUEVE');
+    const caso = { perdidas_asignaturas: 1, perdidas_areas: 0, incluye_imprescindible: true, inasistencia_pct: 0, tiene_piar: false, momento: 'CIERRE' as const };
+    const rec = { aplica: true, max_asignaturas_pendientes: 0 };
+    expect(evaluarPromocion(entradaDeCasoSimulado(caso, pol, rec, 3), pol, 'CIERRE').resultado).toBe('NO_PROMOVIDO');
+    expect(evaluarPromocion(entradaDeCasoSimulado({ ...caso, incluye_imprescindible: false }, pol, rec, 3), pol, 'CIERRE').resultado).toBe('PENDIENTE_RECUPERACION');
+    expect(evaluarPromocion(entradaDeCasoSimulado({ ...caso, perdidas_asignaturas: 3, incluye_imprescindible: false }, pol, rec, 3), pol, 'CIERRE').resultado).toBe('NO_PROMOVIDO');
+    expect(evaluarPromocion(entradaDeCasoSimulado({ ...caso, perdidas_asignaturas: 0, incluye_imprescindible: false, inasistencia_pct: 30 }, { ...pol, inasistencia: { activa: true, porcentaje: 25, faltas: 'SOLO_INJUSTIFICADAS' } }, rec, 3), { ...pol, inasistencia: { activa: true, porcentaje: 25, faltas: 'SOLO_INJUSTIFICADAS' } }, 'CIERRE').resultado).toBe('NO_PROMOVIDO');
+  });
+
+  it('sin tope en la política, el simulador usa la recuperación vigente de M18', () => {
+    const pol = { ...base('RECUPERA'), umbrales: { recuperacion_hasta: null, reprueba_desde_areas: null, efecto_nota_recuperacion: 'LIMITA_A_APROBATORIA' as const } };
+    const caso = { perdidas_asignaturas: 1, perdidas_areas: 0, incluye_imprescindible: false, inasistencia_pct: 0, tiene_piar: false, momento: 'CIERRE' as const };
+    expect(entradaDeCasoSimulado(caso, pol, { aplica: false, max_asignaturas_pendientes: 0 }, 3).admite_recuperacion_final).toBe(false);
+    expect(entradaDeCasoSimulado(caso, pol, { aplica: true, max_asignaturas_pendientes: 2 }, 3).max_recuperables).toBe(2);
   });
 });

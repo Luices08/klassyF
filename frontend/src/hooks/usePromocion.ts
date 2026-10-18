@@ -4,7 +4,9 @@ import { api } from '../lib/apiClient';
 // --- Tipos (espejo de las respuestas de /promocion) ---
 
 export type MomentoPromocion = 'CIERRE' | 'TRAS_RECUPERACION';
-export type UnidadPromocion = 'ASIGNATURA' | 'AREA';
+export type UnidadPromocion = 'ASIGNATURA' | 'AREA' | 'AMBAS';
+export type EfectoNotaRecuperacion = 'LIMITA_A_APROBATORIA' | 'REEMPLAZA';
+export type EfectoImprescindibles = 'NO_PROMUEVE' | 'RECUPERA' | 'COMISION';
 export type AccionRegla = 'PROPONE_RETIRO' | 'NO_PROMUEVE' | 'ENVIA_A_COMISION' | 'PENDIENTE_RECUPERACION' | 'NO_RENUEVA_CUPO';
 export type AccionSinRegla = 'PENDIENTE_RECUPERACION' | 'NO_PROMUEVE' | 'ENVIA_A_COMISION';
 export type ResultadoPromocion =
@@ -88,6 +90,7 @@ export interface CondicionRegla {
   porcentaje?: number | null;
   nota?: number | null;
   filtro?: 'TODAS' | 'CRITICAS' | 'NO_CRITICAS' | null;
+  unidad?: 'ASIGNATURA' | 'AREA' | null;
   faltas?: 'SOLO_INJUSTIFICADAS' | 'TODAS' | null;
   modo?: 'ALGUNA' | 'TODAS' | null;
   subject_ids?: string[];
@@ -114,6 +117,11 @@ export interface PoliticaPromocion {
   asignaturas_arrastrables_ids: string[];
   areas_arrastrables_ids: string[];
   reglas: ReglaPromocion[];
+  inasistencia: { activa: boolean; porcentaje: number; faltas: 'SOLO_INJUSTIFICADAS' | 'TODAS' };
+  /** `recuperacion_hasta` null = aún sin definir aquí (rige lo que tenga Recuperaciones). Se refleja en la recuperación anual de M18. */
+  umbrales: { recuperacion_hasta: number | null; reprueba_desde_areas: number | null; efecto_nota_recuperacion: EfectoNotaRecuperacion };
+  /** Qué pasa con quien pierde una materia/área imprescindible. null = política anterior (no deriva nada). */
+  imprescindibles: { efecto: EfectoImprescindibles | null };
   sin_regla: { cierre: AccionSinRegla; tras_recuperacion: AccionSinRegla };
   arrastre: { admite: boolean; max_unidades: number; condicion: CondicionArrastre; nota_minima: number | null; hasta_periodo: number; si_incumple: ConsecuenciaArrastre };
   piar: { derivar_a_comision: boolean };
@@ -270,5 +278,31 @@ export function useEjecutarRollover() {
       void queryClient.invalidateQueries({ queryKey: ['enrollments'] });
       void queryClient.invalidateQueries({ queryKey: ['groups'] });
     },
+  });
+}
+
+export interface CasoSimulado {
+  perdidas_asignaturas: number;
+  perdidas_areas: number;
+  incluye_imprescindible: boolean;
+  inasistencia_pct: number;
+  tiene_piar: boolean;
+  momento: MomentoPromocion;
+}
+
+export interface ResultadoCasoSimulado {
+  resultado: ResultadoPromocion;
+  momento: MomentoPromocion;
+  motivos: string[];
+  reglas_disparadas: Array<{ clave: string; nombre: string; accion: AccionRegla }>;
+  no_renueva_cupo: boolean;
+  a_recuperar: string[];
+  perdidas: number;
+}
+
+/** «Pruébalo»: lo que decidiría el motor con la política en borrador (sin guardar) para un estudiante inventado. */
+export function useSimularCaso(academicYearId?: string) {
+  return useMutation({
+    mutationFn: (input: { politica: PoliticaPromocion; caso: CasoSimulado }) => api.post<ResultadoCasoSimulado>(`/promocion/politica/${academicYearId}/simular-caso`, input),
   });
 }

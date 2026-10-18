@@ -2,8 +2,11 @@
 // promueve y cuándo no; por eso nada de esto está quemado: es una política configurable por año lectivo que el motor evalúa.
 import { TIPOS_SITUACION } from './convivencia';
 
-/** Qué se cuenta como «perdido» al aplicar las reglas: cada asignatura o cada área (la nota del área sale de los pesos de M06). */
-export const UNIDADES_PROMOCION = ['ASIGNATURA', 'AREA'] as const;
+/**
+ * Qué se cuenta como «perdido» al aplicar las reglas: cada asignatura, cada área (la nota del área sale de los pesos de M06) o ambas a la vez
+ * (lo habitual bajo el Decreto 1290: «3 asignaturas o 2 áreas»).
+ */
+export const UNIDADES_PROMOCION = ['ASIGNATURA', 'AREA', 'AMBAS'] as const;
 export type UnidadPromocion = (typeof UNIDADES_PROMOCION)[number];
 
 /** Cuándo se evalúa: al cerrar el año (antes de la recuperación final) o ya con las notas de la recuperación final aplicadas. */
@@ -88,6 +91,31 @@ export type CondicionArrastre = (typeof CONDICIONES_ARRASTRE)[number];
 /** Qué pasa si el estudiante no cumple la condición del arrastre en el plazo. */
 export const CONSECUENCIAS_INCUMPLIR_ARRASTRE = ['SOLO_ALERTA', 'ENVIA_A_COMISION', 'PIERDE_PROMOCION'] as const;
 export type ConsecuenciaIncumplirArrastre = (typeof CONSECUENCIAS_INCUMPLIR_ARRASTRE)[number];
+
+/** Qué nota queda al aprobar la recuperación final: la mínima aprobatoria o la nota real. Se refleja en `anual.efecto` de M18. */
+export const EFECTOS_NOTA_RECUPERACION = ['LIMITA_A_APROBATORIA', 'REEMPLAZA'] as const;
+export type EfectoNotaRecuperacion = (typeof EFECTOS_NOTA_RECUPERACION)[number];
+
+/**
+ * Qué pasa con quien pierde una materia (o área) imprescindible. `RECUPERA` = ninguna regla propia: va a recuperación como las demás.
+ * `null` = política anterior a esta opción, que no derivaba nada (se conserva su comportamiento hasta que se guarde de nuevo).
+ */
+export const EFECTOS_IMPRESCINDIBLES = ['NO_PROMUEVE', 'RECUPERA', 'COMISION'] as const;
+export type EfectoImprescindibles = (typeof EFECTOS_IMPRESCINDIBLES)[number];
+
+/** Claves de las reglas que el motor deriva de las tarjetas de la política (no se guardan en `reglas[]`; una regla propia no puede usarlas). */
+export const CLAVE_REGLA_INASISTENCIA = 'auto-inasistencia';
+export const CLAVE_REGLA_REPRUEBA_ASIGNATURAS = 'auto-reprueba-asignaturas';
+export const CLAVE_REGLA_REPRUEBA_AREAS = 'auto-reprueba-areas';
+export const CLAVE_REGLA_IMPRESCINDIBLE_ASIGNATURAS = 'auto-imprescindible-asignaturas';
+export const CLAVE_REGLA_IMPRESCINDIBLE_AREAS = 'auto-imprescindible-areas';
+export const CLAVES_REGLAS_DERIVADAS: readonly string[] = [
+  CLAVE_REGLA_INASISTENCIA,
+  CLAVE_REGLA_REPRUEBA_ASIGNATURAS,
+  CLAVE_REGLA_REPRUEBA_AREAS,
+  CLAVE_REGLA_IMPRESCINDIBLE_ASIGNATURAS,
+  CLAVE_REGLA_IMPRESCINDIBLE_AREAS,
+];
 
 export const MAX_REGLAS_PROMOCION = 40;
 export const MAX_CONDICIONES_POR_REGLA = 8;

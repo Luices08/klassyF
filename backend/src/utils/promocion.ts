@@ -2,8 +2,16 @@ import {
   ACCIONES_PERMITIDAS_POR_CONVIVENCIA,
   AccionRegla,
   AccionSinRegla,
+  CLAVES_REGLAS_DERIVADAS,
+  CLAVE_REGLA_INASISTENCIA,
+  CLAVE_REGLA_REPRUEBA_AREAS,
+  CLAVE_REGLA_REPRUEBA_ASIGNATURAS,
   CondicionArrastre,
   ConsecuenciaIncumplirArrastre,
+  CLAVE_REGLA_IMPRESCINDIBLE_AREAS,
+  CLAVE_REGLA_IMPRESCINDIBLE_ASIGNATURAS,
+  EfectoImprescindibles,
+  EfectoNotaRecuperacion,
   FaltasComputables,
   FiltroCriticidad,
   MAX_CONDICIONES_POR_REGLA,
@@ -17,6 +25,8 @@ import {
   UnidadPromocion,
 } from '../constants/promocion';
 
+const EFECTOS_IMPRESCINDIBLES_VALIDOS: readonly string[] = ['NO_PROMUEVE', 'RECUPERA', 'COMISION'];
+
 /** Una condición con la forma única de todas: el tipo dice qué campos usa (`validarPolitica` exige los que le tocan). */
 export interface Condicion {
   tipo: TipoCondicion;
@@ -27,6 +37,8 @@ export interface Condicion {
   /** Nota (promedio general). */
   nota?: number | null;
   filtro?: FiltroCriticidad | null;
+  /** En conteos de pérdidas con unidad `AMBAS`: cuenta solo asignaturas o solo áreas. Vacío = todas las perdidas. */
+  unidad?: 'ASIGNATURA' | 'AREA' | null;
   faltas?: FaltasComputables | null;
   modo?: ModoLista | null;
   subject_ids?: string[];
@@ -58,6 +70,25 @@ export interface PoliticaArrastre {
   si_incumple: ConsecuenciaIncumplirArrastre;
 }
 
+/** Tarjeta «Inasistencia»: reprobación directa por fallas. El motor la convierte en una regla (`reglasEfectivas`). */
+export interface PoliticaInasistencia {
+  activa: boolean;
+  /** Máximo permitido (0–100); se reprueba al superarlo. */
+  porcentaje: number;
+  faltas: FaltasComputables;
+}
+
+/**
+ * Tarjeta «Umbrales»: según cuántas unidades pierde el estudiante. `recuperacion_hasta` = con hasta N unidades tiene derecho a la recuperación
+ * final (0 = sin recuperación) y se refleja en M18; desde N+1 reprueba. `null` = el colegio aún no lo configuró por aquí (política anterior).
+ */
+export interface PoliticaUmbrales {
+  recuperacion_hasta: number | null;
+  /** Solo con unidad `AMBAS`: con esta cantidad de áreas perdidas reprueba (las asignaturas usan `recuperacion_hasta + 1`). */
+  reprueba_desde_areas: number | null;
+  efecto_nota_recuperacion: EfectoNotaRecuperacion;
+}
+
 export interface PoliticaPromocion {
   unidad: UnidadPromocion;
   /** Con unidad ÁREA: si perder una asignatura del área la da por perdida aunque su nota (por pesos) apruebe. */
@@ -67,6 +98,10 @@ export interface PoliticaPromocion {
   asignaturas_arrastrables_ids: string[];
   areas_arrastrables_ids: string[];
   reglas: Regla[];
+  inasistencia: PoliticaInasistencia;
+  umbrales: PoliticaUmbrales;
+  /** Qué pasa con quien pierde una materia o área imprescindible (las «críticas»). `null` = política anterior: no deriva nada. */
+  imprescindibles: { efecto: EfectoImprescindibles | null };
   /** Qué hacer con quien pierde algo y no dispara ninguna regla. */
   sin_regla: { cierre: AccionSinRegla; tras_recuperacion: AccionSinRegla };
   arrastre: PoliticaArrastre;
@@ -108,6 +143,9 @@ export function politicaInicial(): PoliticaPromocion {
     asignaturas_arrastrables_ids: [],
     areas_arrastrables_ids: [],
     reglas: [],
+    inasistencia: { activa: false, porcentaje: 25, faltas: 'SOLO_INJUSTIFICADAS' },
+    umbrales: { recuperacion_hasta: null, reprueba_desde_areas: null, efecto_nota_recuperacion: 'LIMITA_A_APROBATORIA' },
+    imprescindibles: { efecto: 'NO_PROMUEVE' },
     sin_regla: { cierre: 'PENDIENTE_RECUPERACION', tras_recuperacion: 'NO_PROMUEVE' },
     arrastre: { admite: false, max_unidades: 1, condicion: 'NINGUNA', nota_minima: null, hasta_periodo: 1, si_incumple: 'SOLO_ALERTA' },
     piar: { derivar_a_comision: false },
@@ -138,7 +176,19 @@ function problemaDeCondicion(c: Condicion): string | null {
 export function validarPolitica(p: PoliticaPromocion, ultimoPeriodo?: number): string | null {
   if (p.reglas.length > MAX_REGLAS_PROMOCION) return `Máximo ${MAX_REGLAS_PROMOCION} reglas.`;
   const claves = new Set<string>();
+  const ina = p.inasistencia;
+  if (ina && ina.activa && (typeof ina.porcentaje !== 'number' || ina.porcentaje < 0 || ina.porcentaje > 100)) return 'El porcentaje máximo de inasistencia debe estar entre 0 y 100.';
+  if (p.imprescindibles?.efecto && !EFECTOS_IMPRESCINDIBLES_VALIDOS.includes(p.imprescindibles.efecto)) return 'El efecto de las materias imprescindibles no es válido.';
+  const um = p.umbrales;
+  if (um) {
+    if (um.recuperacion_hasta !== null && (!Number.isInteger(um.recuperacion_hasta) || um.recuperacion_hasta < 0)) return 'Indica con cuántas unidades perdidas se puede recuperar (0 o más).';
+    if (um.reprueba_desde_areas !== null) {
+      if (p.unidad !== 'AMBAS') return 'El umbral de áreas aparte solo aplica cuando se evalúa por asignaturas y áreas a la vez.';
+      if (!Number.isInteger(um.reprueba_desde_areas) || um.reprueba_desde_areas < 1) return 'El umbral de áreas debe ser 1 o más.';
+    }
+  }
   for (const r of p.reglas) {
+    if (CLAVES_REGLAS_DERIVADAS.includes(r.clave)) return `La clave «${r.clave}» está reservada para las reglas automáticas.`;
     if (!PATRON_CLAVE_REGLA.test(r.clave)) return `La clave de la regla «${r.nombre}» no es válida.`;
     if (claves.has(r.clave)) return `La clave «${r.clave}» está repetida.`;
     claves.add(r.clave);
@@ -253,12 +303,12 @@ function esArrastrable(subjectId: string, areaId: string, p: PoliticaPromocion):
   return p.asignaturas_arrastrables_ids.includes(subjectId) || p.areas_arrastrables_ids.includes(areaId);
 }
 
-/** Las asignaturas o áreas que el estudiante tiene perdidas en ese momento, según la unidad de la política. */
+/** Las asignaturas y/o áreas que el estudiante tiene perdidas en ese momento, según la unidad de la política. */
 export function unidadesPerdidas(e: EntradaPromocion, p: PoliticaPromocion, momento: MomentoPromocion): UnidadPerdida[] {
   const pierde = (nota: number | null) => nota !== null && nota < e.nota_aprobatoria;
   const asignaturasPerdidas = e.asignaturas.filter((a) => pierde(notaDe(a, momento)));
-  if (p.unidad === 'ASIGNATURA') {
-    return asignaturasPerdidas.map((a) => ({
+  const comoAsignaturas = (): UnidadPerdida[] =>
+    asignaturasPerdidas.map((a) => ({
       tipo: 'ASIGNATURA' as const,
       id: a.subject_id,
       nombre: a.nombre,
@@ -266,32 +316,81 @@ export function unidadesPerdidas(e: EntradaPromocion, p: PoliticaPromocion, mome
       critica: esCritica(a.subject_id, a.area_id, p),
       arrastrable: esArrastrable(a.subject_id, a.area_id, p),
     }));
-  }
-  const areasConAsignaturaPerdida = new Set(asignaturasPerdidas.map((a) => a.area_id));
-  return e.areas
-    .filter((a) => pierde(notaDe(a, momento)) || (p.area_pierde_con_asignatura_perdida && areasConAsignaturaPerdida.has(a.area_id)))
-    .map((a) => ({
-      tipo: 'AREA' as const,
-      id: a.area_id,
-      nombre: a.nombre,
-      nota: notaDe(a, momento),
-      critica: p.areas_criticas_ids.includes(a.area_id),
-      arrastrable: p.areas_arrastrables_ids.includes(a.area_id),
-    }));
+  const comoAreas = (): UnidadPerdida[] => {
+    const areasConAsignaturaPerdida = new Set(asignaturasPerdidas.map((a) => a.area_id));
+    return e.areas
+      .filter((a) => pierde(notaDe(a, momento)) || (p.area_pierde_con_asignatura_perdida && areasConAsignaturaPerdida.has(a.area_id)))
+      .map((a) => ({
+        tipo: 'AREA' as const,
+        id: a.area_id,
+        nombre: a.nombre,
+        nota: notaDe(a, momento),
+        critica: p.areas_criticas_ids.includes(a.area_id),
+        arrastrable: p.areas_arrastrables_ids.includes(a.area_id),
+      }));
+  };
+  if (p.unidad === 'ASIGNATURA') return comoAsignaturas();
+  if (p.unidad === 'AREA') return comoAreas();
+  return [...comoAsignaturas(), ...comoAreas()];
 }
 
-const cuenta = (lista: UnidadPerdida[], filtro: FiltroCriticidad | null | undefined): number =>
-  filtro === 'CRITICAS' ? lista.filter((u) => u.critica).length : filtro === 'NO_CRITICAS' ? lista.filter((u) => !u.critica).length : lista.length;
+/**
+ * Las unidades que cuentan para el tope de recuperación y el arrastre: las de la unidad de la política y, con `AMBAS`, solo las asignaturas
+ * (la recuperación final de M18 es por asignatura; las áreas tienen su propio umbral de reprobación).
+ */
+const unidadesDeTope = (perdidas: UnidadPerdida[], p: PoliticaPromocion): UnidadPerdida[] => (p.unidad === 'AMBAS' ? perdidas.filter((u) => u.tipo === 'ASIGNATURA') : perdidas);
+
+/** Las reglas que salen de las tarjetas «Inasistencia» y «Umbrales», sumadas a las propias del colegio. Pura: no se guardan en `reglas[]`. */
+export function reglasEfectivas(p: PoliticaPromocion): Regla[] {
+  const derivadas: Regla[] = [];
+  const base = { activa: true, momentos: ['CIERRE', 'TRAS_RECUPERACION'] as MomentoPromocion[], niveles: [], grados_ids: [], accion: 'NO_PROMUEVE' as const };
+  const hasta = p.umbrales?.recuperacion_hasta ?? null;
+  if (hasta !== null && hasta >= 1) {
+    if (p.unidad === 'AREA') {
+      derivadas.push({ ...base, clave: CLAVE_REGLA_REPRUEBA_AREAS, nombre: `Pierde ${hasta + 1} o más áreas`, condiciones: [{ tipo: 'PERDIDAS_AL_MENOS', n: hasta + 1, filtro: 'TODAS', unidad: 'AREA' }] });
+    } else {
+      derivadas.push({ ...base, clave: CLAVE_REGLA_REPRUEBA_ASIGNATURAS, nombre: `Pierde ${hasta + 1} o más asignaturas`, condiciones: [{ tipo: 'PERDIDAS_AL_MENOS', n: hasta + 1, filtro: 'TODAS', unidad: 'ASIGNATURA' }] });
+    }
+  }
+  const desdeAreas = p.umbrales?.reprueba_desde_areas ?? null;
+  if (p.unidad === 'AMBAS' && desdeAreas !== null) {
+    derivadas.push({ ...base, clave: CLAVE_REGLA_REPRUEBA_AREAS, nombre: `Pierde ${desdeAreas} o más áreas`, condiciones: [{ tipo: 'PERDIDAS_AL_MENOS', n: desdeAreas, filtro: 'TODAS', unidad: 'AREA' }] });
+  }
+  const efecto = p.imprescindibles?.efecto ?? null;
+  if (efecto === 'NO_PROMUEVE' || efecto === 'COMISION') {
+    const reglaImprescindible = { ...base, accion: efecto === 'NO_PROMUEVE' ? ('NO_PROMUEVE' as const) : ('ENVIA_A_COMISION' as const) };
+    if (p.unidad !== 'AREA' && p.asignaturas_criticas_ids.length > 0) {
+      derivadas.push({ ...reglaImprescindible, clave: CLAVE_REGLA_IMPRESCINDIBLE_ASIGNATURAS, nombre: 'Pierde una asignatura imprescindible', condiciones: [{ tipo: 'PIERDE_ASIGNATURAS', modo: 'ALGUNA', subject_ids: [...p.asignaturas_criticas_ids] }] });
+    }
+    if (p.unidad !== 'ASIGNATURA' && p.areas_criticas_ids.length > 0) {
+      derivadas.push({ ...reglaImprescindible, clave: CLAVE_REGLA_IMPRESCINDIBLE_AREAS, nombre: 'Pierde un área imprescindible', condiciones: [{ tipo: 'PIERDE_AREAS', modo: 'ALGUNA', area_ids: [...p.areas_criticas_ids] }] });
+    }
+  }
+  if (p.inasistencia?.activa) {
+    derivadas.push({
+      ...base,
+      clave: CLAVE_REGLA_INASISTENCIA,
+      nombre: `Inasistencia superior al ${p.inasistencia.porcentaje} %`,
+      condiciones: [{ tipo: 'INASISTENCIA_GLOBAL_SUPERA', porcentaje: p.inasistencia.porcentaje, faltas: p.inasistencia.faltas }],
+    });
+  }
+  return [...derivadas, ...p.reglas];
+}
+
+const cuenta = (lista: UnidadPerdida[], filtro: FiltroCriticidad | null | undefined, unidad?: 'ASIGNATURA' | 'AREA' | null): number => {
+  const de = unidad ? lista.filter((u) => u.tipo === unidad) : lista;
+  return filtro === 'CRITICAS' ? de.filter((u) => u.critica).length : filtro === 'NO_CRITICAS' ? de.filter((u) => !u.critica).length : de.length;
+};
 
 const GRAVEDAD_ORDEN = ['I', 'II', 'III'];
 
 function cumpleCondicion(c: Condicion, e: EntradaPromocion, perdidas: UnidadPerdida[], momento: MomentoPromocion): boolean {
   switch (c.tipo) {
     case 'PERDIDAS_AL_MENOS':
-      return cuenta(perdidas, c.filtro) >= (c.n as number);
+      return cuenta(perdidas, c.filtro, c.unidad) >= (c.n as number);
     case 'PERDIDAS_COMO_MAXIMO':
       // «Como máximo n» exige además que haya perdido algo: de lo contrario toda regla de arrastre se cumpliría con cero.
-      return cuenta(perdidas, c.filtro) >= 1 && cuenta(perdidas, c.filtro) <= (c.n as number) && (c.filtro !== 'NO_CRITICAS' || perdidas.every((u) => !u.critica));
+      return cuenta(perdidas, c.filtro, c.unidad) >= 1 && cuenta(perdidas, c.filtro, c.unidad) <= (c.n as number) && (c.filtro !== 'NO_CRITICAS' || perdidas.every((u) => !u.critica));
     case 'PIERDE_ASIGNATURAS': {
       const perdidasIds = new Set(e.asignaturas.filter((a) => (notaDe(a, momento) ?? Infinity) < e.nota_aprobatoria).map((a) => a.subject_id));
       const lista = c.subject_ids ?? [];
@@ -354,7 +453,7 @@ export function evaluarPromocion(e: EntradaPromocion, p: PoliticaPromocion, mome
   salida.perdidas = unidadesPerdidas(e, p, momento);
   salida.sin_nota = e.asignaturas.filter((a) => notaDe(a, momento) === null).map((a) => a.nombre);
 
-  for (const r of p.reglas) {
+  for (const r of reglasEfectivas(p)) {
     if (!r.activa || !r.momentos.includes(momento) || !reglaAplicaAlGrado(r, e)) continue;
     if (r.condiciones.every((c) => cumpleCondicion(c, e, salida.perdidas, momento))) salida.reglas_disparadas.push({ clave: r.clave, nombre: r.nombre, accion: r.accion });
   }
@@ -362,7 +461,7 @@ export function evaluarPromocion(e: EntradaPromocion, p: PoliticaPromocion, mome
 
   const decisivas = salida.reglas_disparadas.filter((r) => r.accion !== 'NO_RENUEVA_CUPO');
   const ganadora = PRECEDENCIA_ACCIONES.map((a) => decisivas.find((r) => r.accion === a)).find((r) => r !== undefined);
-  const tieneRecuperable = momento === 'CIERRE' && e.admite_recuperacion_final && (e.max_recuperables === 0 || salida.perdidas.length <= e.max_recuperables);
+  const tieneRecuperable = momento === 'CIERRE' && e.admite_recuperacion_final && (e.max_recuperables === 0 || unidadesDeTope(salida.perdidas, p).length <= e.max_recuperables);
 
   let resultado: ResultadoPromocion | null = null;
   let porRegla = false;
@@ -385,7 +484,7 @@ export function evaluarPromocion(e: EntradaPromocion, p: PoliticaPromocion, mome
       const accion = tieneRecuperable || p.sin_regla.cierre !== 'PENDIENTE_RECUPERACION' ? p.sin_regla.cierre : p.sin_regla.tras_recuperacion;
       resultado = RESULTADO_DE_ACCION[accion];
       salida.motivos.push(`Pierde ${salida.perdidas.length} sin que una regla lo decida: se aplica la acción por defecto.`);
-    } else if (p.arrastre.admite && salida.perdidas.length <= p.arrastre.max_unidades && salida.perdidas.every((u) => u.arrastrable)) {
+    } else if (p.arrastre.admite && unidadesDeTope(salida.perdidas, p).length <= p.arrastre.max_unidades && unidadesDeTope(salida.perdidas, p).every((u) => u.arrastrable)) {
       resultado = 'PROMOVIDO_CON_ARRASTRE';
       salida.motivos.push('Debe solo asignaturas que el colegio permite arrastrar.');
     } else {
@@ -406,8 +505,8 @@ export function evaluarPromocion(e: EntradaPromocion, p: PoliticaPromocion, mome
   }
 
   salida.resultado = resultado;
-  if (resultado === 'PENDIENTE_RECUPERACION') salida.a_recuperar = salida.perdidas;
-  if (resultado === 'PROMOVIDO_CON_ARRASTRE') salida.arrastres = salida.perdidas;
+  if (resultado === 'PENDIENTE_RECUPERACION') salida.a_recuperar = unidadesDeTope(salida.perdidas, p).length > 0 ? unidadesDeTope(salida.perdidas, p) : salida.perdidas;
+  if (resultado === 'PROMOVIDO_CON_ARRASTRE') salida.arrastres = unidadesDeTope(salida.perdidas, p);
   return salida;
 }
 

@@ -4,6 +4,8 @@ import {
   ACCIONES_REGLA,
   CONDICIONES_ARRASTRE,
   CONSECUENCIAS_INCUMPLIR_ARRASTRE,
+  EFECTOS_IMPRESCINDIBLES,
+  EFECTOS_NOTA_RECUPERACION,
   FALTAS_COMPUTABLES,
   FILTROS_CRITICIDAD,
   MAX_CARACTERES_TEXTO_SIEE_PROMOCION,
@@ -41,6 +43,7 @@ const condicion = Joi.object({
   modo: Joi.string()
     .valid(...MODOS_LISTA)
     .allow(null),
+  unidad: Joi.string().valid('ASIGNATURA', 'AREA').allow(null),
   subject_ids: ids,
   area_ids: ids,
   gravedad: Joi.string().trim().max(10).allow(null),
@@ -70,9 +73,7 @@ export const anioParam: ValidationSchema = {
 
 // Que las claves no se repitan, que cada condición traiga lo que su tipo necesita y que las faltas de convivencia no reprueben lo valida
 // `validarPolitica` (utils/promocion.ts), que también necesita los periodos del año.
-export const actualizarPolitica: ValidationSchema = {
-  params: Joi.object({ academic_year_id: objectId.required() }),
-  body: Joi.object({
+const cuerpoPolitica = Joi.object({
     unidad: Joi.string()
       .valid(...UNIDADES_PROMOCION)
       .required(),
@@ -82,6 +83,26 @@ export const actualizarPolitica: ValidationSchema = {
     asignaturas_arrastrables_ids: ids,
     areas_arrastrables_ids: ids,
     reglas: Joi.array().items(regla).max(MAX_REGLAS_PROMOCION).required(),
+    inasistencia: Joi.object({
+      activa: Joi.boolean().required(),
+      porcentaje: Joi.number().min(0).max(100).required(),
+      faltas: Joi.string()
+        .valid(...FALTAS_COMPUTABLES)
+        .required(),
+    }).required(),
+    imprescindibles: Joi.object({
+      efecto: Joi.string()
+        .valid(...EFECTOS_IMPRESCINDIBLES)
+        .allow(null)
+        .required(),
+    }).required(),
+    umbrales: Joi.object({
+      recuperacion_hasta: Joi.number().integer().min(0).max(50).allow(null).required(),
+      reprueba_desde_areas: Joi.number().integer().min(1).max(50).allow(null).required(),
+      efecto_nota_recuperacion: Joi.string()
+        .valid(...EFECTOS_NOTA_RECUPERACION)
+        .required(),
+    }).required(),
     sin_regla: Joi.object({ cierre: accionSinRegla, tras_recuperacion: accionSinRegla }).required(),
     arrastre: Joi.object({
       admite: Joi.boolean().required(),
@@ -108,6 +129,28 @@ export const actualizarPolitica: ValidationSchema = {
       carpeta_academica: Joi.object({ activo: Joi.boolean().required(), desde_grado: Joi.number().integer().min(-2).max(10).required() }).required(),
     }).required(),
     texto_siee: Joi.string().trim().allow('').max(MAX_CARACTERES_TEXTO_SIEE_PROMOCION).required(),
+});
+
+export const actualizarPolitica: ValidationSchema = {
+  params: Joi.object({ academic_year_id: objectId.required() }),
+  body: cuerpoPolitica,
+};
+
+/** «Pruébalo»: la política en borrador (sin guardar) y un estudiante hipotético. */
+export const simularCaso: ValidationSchema = {
+  params: Joi.object({ academic_year_id: objectId.required() }),
+  body: Joi.object({
+    politica: cuerpoPolitica.required(),
+    caso: Joi.object({
+      perdidas_asignaturas: Joi.number().integer().min(0).max(30).required(),
+      perdidas_areas: Joi.number().integer().min(0).max(30).required(),
+      incluye_imprescindible: Joi.boolean().required(),
+      inasistencia_pct: Joi.number().min(0).max(100).required(),
+      tiene_piar: Joi.boolean().required(),
+      momento: Joi.string()
+        .valid(...MOMENTOS_PROMOCION)
+        .required(),
+    }).required(),
   }),
 };
 

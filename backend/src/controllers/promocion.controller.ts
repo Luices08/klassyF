@@ -5,6 +5,7 @@ import * as evaluacionService from '../services/evaluacionPromocion.service';
 import * as politicaService from '../services/politicaPromocion.service';
 import * as rolloverService from '../services/rolloverPromocion.service';
 import catchAsync from '../utils/catchAsync';
+import { CasoSimulado } from '../utils/simulacionPromocion';
 
 interface AnioParams extends ParamsDictionary {
   academic_year_id: string;
@@ -18,6 +19,11 @@ export const obtenerPolitica = catchAsync<AnioParams>(async (req, res) => {
 export const actualizarPolitica = catchAsync<AnioParams, unknown, politicaService.CambiosPoliticaPromocion>(async (req, res) => {
   const politica = await politicaService.actualizarPolitica(req.params.academic_year_id, req.body, req.user!, req.ip);
   res.status(200).json({ success: true, data: politica });
+});
+
+export const simularCaso = catchAsync<AnioParams, unknown, { politica: politicaService.CambiosPoliticaPromocion; caso: CasoSimulado }>(async (req, res) => {
+  const data = await politicaService.simularCaso(req.params.academic_year_id, req.body.politica, req.body.caso);
+  res.status(200).json({ success: true, data });
 });
 
 export const simularGrupo = catchAsync<unknown, unknown, unknown, ParsedQs & { academic_year_id: string; group_id: string; momento: MomentoPromocion }>(async (req, res) => {

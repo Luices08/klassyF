@@ -4,6 +4,8 @@ import {
   ACCIONES_REGLA,
   CONDICIONES_ARRASTRE,
   CONSECUENCIAS_INCUMPLIR_ARRASTRE,
+  EFECTOS_IMPRESCINDIBLES,
+  EFECTOS_NOTA_RECUPERACION,
   FALTAS_COMPUTABLES,
   FILTROS_CRITICIDAD,
   MAX_CARACTERES_TEXTO_SIEE_PROMOCION,
@@ -40,6 +42,7 @@ const condicionSchema = new Schema(
     porcentaje: { type: Number, min: 0, max: 100, default: null },
     nota: { type: Number, min: 0, default: null },
     filtro: { type: String, enum: FILTROS_CRITICIDAD, default: null },
+    unidad: { type: String, enum: ['ASIGNATURA', 'AREA'], default: null },
     faltas: { type: String, enum: FALTAS_COMPUTABLES, default: null },
     modo: { type: String, enum: MODOS_LISTA, default: null },
     subject_ids: idsSchema,
@@ -73,6 +76,32 @@ const politicaPromocionSchema = new Schema<IPoliticaPromocion, PoliticaPromocion
     asignaturas_arrastrables_ids: idsSchema,
     areas_arrastrables_ids: idsSchema,
     reglas: { type: [reglaSchema], default: [] },
+    inasistencia: {
+      type: new Schema(
+        {
+          activa: { type: Boolean, default: false },
+          porcentaje: { type: Number, min: 0, max: 100, default: 25 },
+          faltas: { type: String, enum: FALTAS_COMPUTABLES, default: 'SOLO_INJUSTIFICADAS' },
+        },
+        { _id: false }
+      ),
+      default: () => ({}),
+    },
+    imprescindibles: {
+      type: new Schema({ efecto: { type: String, enum: EFECTOS_IMPRESCINDIBLES, default: null } }, { _id: false }),
+      default: () => ({}),
+    },
+    umbrales: {
+      type: new Schema(
+        {
+          recuperacion_hasta: { type: Number, min: 0, max: 50, default: null },
+          reprueba_desde_areas: { type: Number, min: 1, max: 50, default: null },
+          efecto_nota_recuperacion: { type: String, enum: EFECTOS_NOTA_RECUPERACION, default: 'LIMITA_A_APROBATORIA' },
+        },
+        { _id: false }
+      ),
+      default: () => ({}),
+    },
     sin_regla: {
       type: new Schema(
         {

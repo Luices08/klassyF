@@ -34,7 +34,7 @@ export function PromocionPage() {
       />
       {pestana === 'cierre' && <CierreGrupoPanel anioId={anio?._id} anioEstado={anio?.estado} puedeCerrar={esAdmin} />}
       {pestana === 'siguiente' && <RolloverPanel puedeEjecutar={esAdmin} />}
-      {pestana === 'politica' && <PoliticaPromocionPanel academicYearId={anio?._id} puedeEditar={esAdmin && anio?.estado !== 'CERRADO'} />}
+      {pestana === 'politica' && <PoliticaPromocionPanel academicYearId={anio?._id} puedeEditar={esAdmin && anio?.estado !== 'CERRADO'} notaAprobatoria={anio?.escala_evaluacion?.nota_aprobatoria} periodos={anio?.periodos?.length} />}
     </div>
   );
 }

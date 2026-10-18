@@ -17,11 +17,11 @@ import { TipoDefinido, exigirGestionDeTipos, tipoPorClave, todosLosTipos } from 
 
 export { contenidoDe };
 
-/** Redactar el texto de un tipo: el ADMIN en cualquier tipo no archivado; Secretaría solo mientras está en borrador. */
+/** Redactar el texto de un tipo: ADMIN y Secretaría, en cualquier tipo que no esté archivado (`permisosTipo`). */
 function exigirPuedeRedactar(tipo: TipoDefinido, usuario: UserDocument): void {
   exigirGestionDeTipos(usuario);
   if (!permisosTipo(usuario.rol, tipo.estado).editarPlantilla) {
-    throw new ApiError(403, tipo.estado === 'ARCHIVADO' ? 'Un tipo archivado no se edita: actívalo primero.' : 'El texto de un documento activo solo lo edita el administrador.');
+    throw new ApiError(403, tipo.estado === 'ARCHIVADO' ? 'Un tipo archivado no se edita: actívalo primero.' : 'No tienes permiso para editar el texto de este documento.');
   }
 }
 
@@ -105,6 +105,13 @@ export async function publicarPlantilla(tipo: ClaveCertificado, contenido: Conte
   return { tipo, version: creada.version };
 }
 
+/** El texto de partida del documento, sin publicarlo: el editor lo carga en el borrador para revisarlo y ajustarlo antes de publicar. */
+export async function plantillaEstandar(tipo: ClaveCertificado, usuario: UserDocument): Promise<ContenidoPlantilla> {
+  const definido = await tipoPorClave(tipo);
+  exigirPuedeRedactar(definido, usuario);
+  return contenidoInicial(definido);
+}
+
 /** Vuelve a publicar los valores de partida como una versión nueva (la historia no se pierde). */
 export async function restablecerPlantilla(tipo: ClaveCertificado, usuario: UserDocument, ip?: string | null) {
   const definido = await tipoPorClave(tipo);
@@ -113,11 +120,11 @@ export async function restablecerPlantilla(tipo: ClaveCertificado, usuario: User
 }
 
 /** El texto ya resuelto que se congela en el documento. Si un bloque visible necesita un dato que no existe, no se expide. */
-export function resolverContenido(snapshot: SnapshotCertificado, plantilla: Pick<PlantillaCertificadoDocument, 'titulo' | 'bloques' | 'destinatarios' | 'frase_otro' | 'vigencia_dias' | 'version' | 'hash'>): ContenidoResuelto {
+export function resolverContenido(snapshot: SnapshotCertificado, plantilla: Pick<PlantillaCertificadoDocument, 'titulo' | 'bloques' | 'destinatarios' | 'frase_otro' | 'vigencia_dias' | 'diseno' | 'version' | 'hash'>): ContenidoResuelto {
   const contenido = contenidoDe(plantilla);
   const { bloques, errores } = renderizar(contenido, contextoDeVariables(snapshot, contenido.vigencia_dias));
   if (errores.length > 0) throw new ApiError(409, `No se puede expedir: ${errores.join(' ')}`, errores);
-  return { plantilla: { version: plantilla.version, hash: plantilla.hash }, titulo: contenido.titulo, bloques, vigencia_dias: contenido.vigencia_dias };
+  return { plantilla: { version: plantilla.version, hash: plantilla.hash }, titulo: contenido.titulo, bloques, vigencia_dias: contenido.vigencia_dias, ...(contenido.diseno ? { diseno: contenido.diseno } : {}) };
 }
 
 /** Un documento de muestra con el encabezado real del colegio: el estudiante, la matrícula y las notas son inventados. El escudo solo cuando se va a dibujar el PDF. */
@@ -181,6 +188,6 @@ export async function snapshotDeVistaPreviaDePlantilla(tipo: ClaveCertificado, b
   conCierreDeMuestra(base, borrador);
   const { bloques, errores: faltantes } = renderizar(borrador, contextoDeVariables(base, borrador.vigencia_dias));
   if (faltantes.length > 0) throw new ApiError(400, 'La vista previa necesita datos que el colegio aún no tiene.', faltantes);
-  base.contenido = { plantilla: { version: 0, hash: huellaDeContenido(tipo, borrador) }, titulo: borrador.titulo, bloques, vigencia_dias: borrador.vigencia_dias };
+  base.contenido = { plantilla: { version: 0, hash: huellaDeContenido(tipo, borrador) }, titulo: borrador.titulo, bloques, vigencia_dias: borrador.vigencia_dias, ...(borrador.diseno ? { diseno: borrador.diseno } : {}) };
   return base;
 }

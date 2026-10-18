@@ -347,11 +347,11 @@ export function useVerificacionPublica(consulta: ConsultaVerificacion | null) {
 
 export type EstiloBloque = 'PREAMBULO' | 'FORMULA' | 'CUERPO' | 'DESTACADO' | 'TABLA_NOTAS';
 export const ETIQUETA_ESTILO_BLOQUE: Record<EstiloBloque, string> = {
-  PREAMBULO: 'Quién certifica (centrado)',
-  FORMULA: 'Fórmula (HACE CONSTAR / CERTIFICA)',
+  PREAMBULO: 'Quién certifica',
+  FORMULA: 'Frase de apertura (CERTIFICA / HACE CONSTAR)',
   CUERPO: 'Párrafo',
   DESTACADO: 'Párrafo destacado',
-  TABLA_NOTAS: 'Tabla de valoraciones (la entrega el módulo de notas)',
+  TABLA_NOTAS: 'Tabla de valoraciones',
 };
 
 export interface BloquePlantilla {
@@ -370,12 +370,28 @@ export interface OpcionDestinatarioEditable {
   fuente_entidad?: FuenteEntidad | null;
 }
 
+export type FuenteDiseno = 'SANS' | 'SERIF' | 'MONO';
+export type TamanoDiseno = 'PEQUENO' | 'NORMAL' | 'GRANDE';
+export const ETIQUETA_FUENTE_DISENO: Record<FuenteDiseno, string> = { SANS: 'Sin serifa (Helvetica)', SERIF: 'Con serifa (Times)', MONO: 'Monoespaciada (Courier)' };
+export const ETIQUETA_TAMANO_DISENO: Record<TamanoDiseno, string> = { PEQUENO: 'Pequeño', NORMAL: 'Normal', GRANDE: 'Grande' };
+
+/** Cómo se ve el texto del documento (el encabezado, la tabla de notas, las firmas y el QR los pone el sistema). `null` = el de siempre. */
+export interface DisenoPlantilla {
+  fuente: FuenteDiseno;
+  tamano: TamanoDiseno;
+  color_texto: string;
+  color_destacados: string;
+}
+/** Los colores del diseño de siempre: de aquí se parte al empezar a personalizar. */
+export const DISENO_INICIAL: DisenoPlantilla = { fuente: 'SANS', tamano: 'NORMAL', color_texto: '#3F4D61', color_destacados: '#172235' };
+
 export interface ContenidoPlantilla {
   titulo: string;
   bloques: BloquePlantilla[];
   destinatarios: OpcionDestinatarioEditable[];
   frase_otro: string;
   vigencia_dias: number | null;
+  diseno?: DisenoPlantilla | null;
 }
 
 export interface VariableCertificado {
@@ -437,6 +453,9 @@ export function useRestablecerPlantilla() {
     },
   });
 }
+
+/** El texto de partida de un documento, sin publicarlo: se carga en el borrador para revisarlo. */
+export const pedirPlantillaEstandar = (tipo: ClaveCertificado) => api.get<ContenidoPlantilla>(`/certificados/plantillas/${tipo}/estandar`);
 
 /** El PDF de un borrador de plantilla con un estudiante inventado: no guarda nada. */
 export const descargarVistaPreviaPlantilla = (tipo: ClaveCertificado, contenido: ContenidoPlantilla) =>

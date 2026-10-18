@@ -43,6 +43,7 @@ router.get('/plantillas/:tipo/versiones', checkRole(...SECRETARIA_Y_ADMIN), vali
 router.post('/plantillas/:tipo/vista-previa', checkRole(...SECRETARIA_Y_ADMIN), validate(v.vistaPreviaPlantilla), ctrl.vistaPreviaPlantilla);
 // El texto ya resuelto para la vista en vivo del editor (JSON liviano, sin PDF): se pide al dejar de escribir.
 router.post('/plantillas/:tipo/render', checkRole(...SECRETARIA_Y_ADMIN), validate(v.vistaPreviaPlantilla), ctrl.renderizarBorrador);
+router.get('/plantillas/:tipo/estandar', checkRole(...SECRETARIA_Y_ADMIN), validate(v.plantillaConTipo), ctrl.plantillaEstandar);
 router.post('/plantillas/:tipo/restablecer', checkRole(...SECRETARIA_Y_ADMIN), validate(v.plantillaConTipo), ctrl.restablecerPlantilla);
 router.put('/plantillas/:tipo', checkRole(...SECRETARIA_Y_ADMIN), validate(v.publicarPlantilla), ctrl.publicarPlantilla);
 

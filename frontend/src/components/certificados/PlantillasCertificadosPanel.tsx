@@ -2,25 +2,31 @@ import { useEffect, useRef, useState } from 'react';
 import { Alert, errorMessage } from '../ui/Alert';
 import { Chip } from '../ui/Badge';
 import { Button } from '../ui/Button';
-import { Card, CardHeader } from '../ui/Card';
-import { EditorConVariables, type EditorConVariablesHandle } from '../ui/EditorConVariables';
+import { Card } from '../ui/Card';
+import { Drawer } from '../ui/Drawer';
 import { Input, Select } from '../ui/Field';
 import { Spinner } from '../ui/Spinner';
-import { Switch } from '../ui/Switch';
-import { EmptyRow, Table, TableBody, TableHead, Td, Th } from '../ui/Table';
+import { TabPanel, Tabs } from '../ui/Tabs';
 import { VisorDocumento } from '../ui/VisorDocumento';
+import type { EditorConVariablesHandle } from '../ui/EditorConVariables';
+import { DatosDelSistema } from './plantillas/DatosDelSistema';
+import { DisenoPlantillaCard } from './plantillas/DisenoPlantilla';
+import { DestinatariosPlantilla } from './plantillas/DestinatariosPlantilla';
+import { HistorialVersiones } from './plantillas/HistorialVersiones';
+import { ParrafoPlantilla } from './plantillas/ParrafoPlantilla';
+import { PublicarPlantillaDrawer } from './plantillas/PublicarPlantillaDrawer';
 import { VistaEnVivoPlantilla } from './VistaEnVivoPlantilla';
 import {
   ETIQUETA_ESTILO_BLOQUE,
   descargarVistaPreviaPlantilla,
+  pedirPlantillaEstandar,
   usePlantillasCertificados,
   usePublicarPlantilla,
   useRenderPlantilla,
-  useRestablecerPlantilla,
-  useVersionesPlantilla,
   type BloquePlantilla,
   type ClaveCertificado,
   type ContenidoPlantilla,
+  DISENO_INICIAL,
   type PlantillaVigente,
   type VariableCertificado,
 } from '../../hooks/useCertificados';
@@ -31,57 +37,82 @@ import { formatoFechaHora } from '../../lib/fechas';
 /** Los problemas que el servidor lista al rechazar una plantilla (`details`), o el mensaje si no hay lista. */
 const problemasDe = (error: unknown): string[] => (error instanceof ApiError && Array.isArray(error.details) ? (error.details as string[]) : []);
 
+const copiar = (c: ContenidoPlantilla): ContenidoPlantilla => structuredClone(c);
+const contenidoDe = (p: PlantillaVigente): ContenidoPlantilla => ({ titulo: p.titulo, bloques: p.bloques, destinatarios: p.destinatarios, frase_otro: p.frase_otro, vigencia_dias: p.vigencia_dias, diseno: p.diseno ?? null });
+
+/** Lo que cambió respecto a la versión vigente, en palabras de secretaría. */
+function resumenDeCambios(vigente: ContenidoPlantilla, borrador: ContenidoPlantilla): string[] {
+  const cambios: string[] = [];
+  if (vigente.titulo !== borrador.titulo) cambios.push(`Título: «${borrador.titulo}»`);
+  if (vigente.vigencia_dias !== borrador.vigencia_dias) cambios.push(borrador.vigencia_dias ? `Vigencia: ${borrador.vigencia_dias} días` : 'Sin vigencia');
+  const antes = new Map(vigente.bloques.map((b) => [b.id, b]));
+  const nombre = (b: BloquePlantilla) => ETIQUETA_ESTILO_BLOQUE[b.estilo];
+  for (const b of borrador.bloques) {
+    const previo = antes.get(b.id);
+    if (!previo) cambios.push(`Párrafo agregado (${nombre(b)})`);
+    else if (previo.texto !== b.texto || previo.activo !== b.activo || JSON.stringify(previo.condicion) !== JSON.stringify(b.condicion)) cambios.push(`Cambia: ${nombre(b)}`);
+  }
+  for (const b of vigente.bloques) if (!borrador.bloques.some((x) => x.id === b.id)) cambios.push(`Párrafo quitado (${nombre(b)})`);
+  if (vigente.bloques.map((b) => b.id).join() !== borrador.bloques.filter((b) => antes.has(b.id)).map((b) => b.id).join() && borrador.bloques.length === vigente.bloques.length) cambios.push('Cambia el orden de los párrafos');
+  if (JSON.stringify(vigente.diseno ?? null) !== JSON.stringify(borrador.diseno ?? null)) cambios.push(borrador.diseno ? 'Cambia el diseño del texto (letra, tamaño o colores)' : 'Vuelve el diseño original del texto');
+  if (JSON.stringify(vigente.destinatarios) !== JSON.stringify(borrador.destinatarios) || vigente.frase_otro !== borrador.frase_otro) cambios.push('Cambian las opciones de «para quién o para qué se expide»');
+  return cambios;
+}
+
 /**
  * El texto de cada documento. Se redacta con los datos del sistema como fichas («Grado», «Nombre del colegio»…) y se ve el documento
- * mientras se escribe. Cada cambio publicado es una versión nueva (lo ya expedido no cambia). El ADMIN redacta cualquier tipo; Secretaría,
- * solo los que están en borrador.
+ * mientras se escribe. Cada cambio publicado es una versión nueva (lo ya expedido no cambia). ADMIN y Secretaría redactan cualquier tipo
+ * que no esté archivado.
  */
 export function PlantillasCertificadosPanel() {
   const datos = usePlantillasCertificados();
   const [tipo, setTipo] = useState<ClaveCertificado | ''>('');
+  // El editor avisa si tiene cambios sin publicar, para confirmar antes de cambiar de documento.
+  const sinPublicar = useRef(false);
 
   if (datos.isLoading) return <Spinner />;
   if (datos.isError) return <Alert tone="error">{errorMessage(datos.error)}</Alert>;
   if (!datos.data) return null;
   const plantilla = datos.data.plantillas.find((p) => p.tipo === tipo) ?? datos.data.plantillas[0];
-  // Secretaría solo redacta los tipos en borrador: si no hay ninguno, no hay nada que editar aquí.
-  if (!plantilla) return <Alert tone="info">No hay textos que puedas redactar ahora. Crea un tipo nuevo en «Tipos de documento»: queda en borrador y aquí lo redactas; el texto de un documento activo lo edita el administrador.</Alert>;
+  if (!plantilla) return <Alert tone="info">No hay textos que puedas redactar ahora. Crea un tipo nuevo en «Tipos de documento»: aquí redactas su texto.</Alert>;
+
+  const cambiarDocumento = (nuevo: ClaveCertificado) => {
+    if (sinPublicar.current && !window.confirm('Tienes cambios sin publicar en este documento. Si cambias de documento se pierden. ¿Continuar?')) return;
+    setTipo(nuevo);
+  };
 
   return (
-    <div className="space-y-4">
-      <Alert tone="info">
-        Aquí se redacta el texto de cada documento. El encabezado (escudo, nombre, DANE, NIT, resolución, sede, jornada y año), el QR y la huella los pone el sistema con los datos de la institución: no se editan. Para
-        colocar un dato del sistema usa «Insertar dato» o escribe «/». Cada publicación crea una versión nueva; los documentos ya expedidos conservan su texto.
-      </Alert>
-      <Select label="Documento" value={plantilla.tipo} onChange={(e) => setTipo(e.target.value as ClaveCertificado)}>
-        {datos.data.plantillas.map((p) => (
-          <option key={p.tipo} value={p.tipo}>
-            {p.nombre}
-            {p.estado_tipo === 'BORRADOR' ? ' (borrador)' : ''}
-          </option>
-        ))}
-      </Select>
-      {/* La clave reinicia el editor cuando cambia de documento o de versión publicada. */}
-      <EditorPlantilla key={`${plantilla.tipo}:${plantilla.version}`} plantilla={plantilla} variables={datos.data.variables} />
-    </div>
+    // La clave reinicia el editor cuando cambia de documento o de versión publicada.
+    <EditorPlantilla key={`${plantilla.tipo}:${plantilla.version}`} plantilla={plantilla} plantillas={datos.data.plantillas} variables={datos.data.variables} onCambiarDocumento={cambiarDocumento} sinPublicar={sinPublicar} />
   );
 }
 
-const copiar = (c: ContenidoPlantilla): ContenidoPlantilla => structuredClone(c);
-const contenidoDe = (p: PlantillaVigente): ContenidoPlantilla => ({ titulo: p.titulo, bloques: p.bloques, destinatarios: p.destinatarios, frase_otro: p.frase_otro, vigencia_dias: p.vigencia_dias });
-
-function EditorPlantilla({ plantilla, variables }: { plantilla: PlantillaVigente; variables: VariableCertificado[] }) {
+function EditorPlantilla({
+  plantilla,
+  plantillas,
+  variables,
+  onCambiarDocumento,
+  sinPublicar,
+}: {
+  plantilla: PlantillaVigente;
+  plantillas: PlantillaVigente[];
+  variables: VariableCertificado[];
+  onCambiarDocumento: (tipo: ClaveCertificado) => void;
+  sinPublicar: { current: boolean };
+}) {
   const [borrador, setBorrador] = useState<ContenidoPlantilla>(() => copiar(contenidoDe(plantilla)));
+  const [pestana, setPestana] = useState('texto');
   const [nota, setNota] = useState('');
   const [problemas, setProblemas] = useState<string[]>([]);
   const [aviso, setAviso] = useState<{ tono: 'success' | 'error'; texto: string } | null>(null);
+  const [publicando, setPublicando] = useState(false);
+  const [errorPublicar, setErrorPublicar] = useState<string | null>(null);
   const [previa, setPrevia] = useState<{ url: string } | null>(null);
   const [generando, setGenerando] = useState(false);
-  const [verHistorial, setVerHistorial] = useState(false);
+  const [cargandoEstandar, setCargandoEstandar] = useState(false);
   const editores = useRef(new Map<string, EditorConVariablesHandle>());
   const [bloqueEnfocado, setBloqueEnfocado] = useState<string | null>(null);
   const publicar = usePublicarPlantilla();
-  const restablecer = useRestablecerPlantilla();
 
   useEffect(() => {
     const url = previa?.url;
@@ -91,9 +122,10 @@ function EditorPlantilla({ plantilla, variables }: { plantilla: PlantillaVigente
   }, [previa?.url]);
 
   const aplicables = variables.filter((v) => !v.fuente || plantilla.fuentes.includes(v.fuente));
-  const origenes = [...new Set(aplicables.map((v) => v.origen))];
   const obligatorios = new Set(plantilla.requisitos.bloques);
-  const cambiado = JSON.stringify(borrador) !== JSON.stringify(contenidoDe(plantilla));
+  const vigente = contenidoDe(plantilla);
+  const cambiado = JSON.stringify(borrador) !== JSON.stringify(vigente);
+  sinPublicar.current = cambiado;
 
   // Lo que se escribió y aún no se publicó se pierde si se cierra la pestaña: el navegador avisa.
   useEffect(() => {
@@ -128,9 +160,9 @@ function EditorPlantilla({ plantilla, variables }: { plantilla: PlantillaVigente
     if (id) editores.current.get(id)?.insertarVariable(clave);
   };
 
-  const verPrevia = async () => {
-    setProblemas([]);
+  const verPdfExacto = async () => {
     setAviso(null);
+    setProblemas([]);
     setGenerando(true);
     try {
       const { url } = await descargarVistaPreviaPlantilla(plantilla.tipo, borrador);
@@ -143,277 +175,193 @@ function EditorPlantilla({ plantilla, variables }: { plantilla: PlantillaVigente
     }
   };
 
-  const publicarVersion = async () => {
-    setProblemas([]);
+  const cargarEstandar = async () => {
+    if (cambiado && !window.confirm('Se reemplaza lo que tienes sin publicar por el texto estándar sugerido. Nada se publica hasta que tú lo hagas. ¿Continuar?')) return;
     setAviso(null);
+    setCargandoEstandar(true);
     try {
-      const r = await publicar.mutateAsync({ tipo: plantilla.tipo, contenido: borrador, nota });
-      setAviso({ tono: 'success', texto: `Se publicó la versión ${r.version}. Los documentos que se expidan desde ahora usan este texto.` });
-    } catch (err) {
-      setProblemas(problemasDe(err));
-      setAviso({ tono: 'error', texto: errorMessage(err) });
-    }
-  };
-
-  const restablecerPartida = async () => {
-    if (!window.confirm('Se publicará una versión nueva con el texto de partida del sistema. Tus versiones anteriores quedan en el historial. ¿Continuar?')) return;
-    setAviso(null);
-    try {
-      const r = await restablecer.mutateAsync(plantilla.tipo);
-      setAviso({ tono: 'success', texto: `Se restableció el texto de partida como versión ${r.version}.` });
+      // El texto estándar no trae diseño propio: se conserva el que ya se eligió.
+      setBorrador({ ...copiar(await pedirPlantillaEstandar(plantilla.tipo)), diseno: borrador.diseno ?? null });
+      setAviso({ tono: 'success', texto: 'Se cargó el texto estándar sugerido como borrador. Revísalo y ajústalo; no se ha publicado nada.' });
     } catch (err) {
       setAviso({ tono: 'error', texto: errorMessage(err) });
+    } finally {
+      setCargandoEstandar(false);
     }
   };
 
   const descartar = () => {
     if (!window.confirm('Se descartan los cambios que no has publicado y se vuelve al texto vigente. ¿Continuar?')) return;
-    setBorrador(copiar(contenidoDe(plantilla)));
+    setBorrador(copiar(vigente));
     setProblemas([]);
     setAviso(null);
   };
 
-  const claveDe = (etiqueta: string, existentes: string[]): string => {
-    const base = etiqueta.normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase().replace(/[^A-Z0-9]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 30) || 'OPCION';
-    let clave = base === 'OTRO' ? 'OTRA_OPCION' : base;
-    let n = 2;
-    while (existentes.includes(clave)) clave = `${base}_${n++}`;
-    return clave;
+  const publicarVersion = async () => {
+    setProblemas([]);
+    setErrorPublicar(null);
+    try {
+      const r = await publicar.mutateAsync({ tipo: plantilla.tipo, contenido: borrador, nota });
+      setPublicando(false);
+      setAviso({ tono: 'success', texto: `Se publicó la versión ${r.version}. Los documentos que se expidan desde ahora usan este texto.` });
+    } catch (err) {
+      setProblemas(problemasDe(err));
+      setErrorPublicar(errorMessage(err));
+    }
   };
 
   return (
-    <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:items-start">
-      <div className="space-y-4">
-        <Card className="space-y-4">
-          <CardHeader title={`${plantilla.nombre} · versión ${plantilla.version}`} subtitle={`Publicada el ${formatoFechaHora(plantilla.publicada_at)}. Mínimos que debe conservar: ${plantilla.requisitos.fuente}.`} />
-          <div className="grid gap-3 sm:grid-cols-3">
-            <div className="sm:col-span-2">
-              <Input label="Título del documento" value={borrador.titulo} onChange={(e) => setBorrador((b) => ({ ...b, titulo: e.target.value }))} maxLength={100} />
+    <div className="space-y-4">
+      <Card className="sticky top-0 z-20 space-y-3">
+        <div className="flex flex-wrap items-end justify-between gap-3">
+          <div className="flex flex-wrap items-end gap-3">
+            <div className="min-w-56">
+              <Select label="Documento" value={plantilla.tipo} onChange={(e) => onCambiarDocumento(e.target.value as ClaveCertificado)}>
+                {plantillas.map((p) => (
+                  <option key={p.tipo} value={p.tipo}>
+                    {p.nombre}
+                    {p.estado_tipo === 'BORRADOR' ? ' (borrador)' : ''}
+                  </option>
+                ))}
+              </Select>
             </div>
-            <Input
-              label="Vigencia (días)"
-              type="number"
-              min={1}
-              max={365}
-              value={borrador.vigencia_dias ?? ''}
-              onChange={(e) => setBorrador((b) => ({ ...b, vigencia_dias: e.target.value === '' ? null : Number(e.target.value) }))}
-              hint="Vacío = sin vigencia. Al verificar el QR, pasado ese plazo dice «vigencia cumplida»."
-            />
+            <div className="flex flex-wrap items-center gap-2 pb-2">
+              <Chip tone={plantilla.estado_tipo === 'ACTIVO' ? 'green' : 'orange'}>{plantilla.estado_tipo === 'ACTIVO' ? 'Activo' : 'Borrador'}</Chip>
+              <Chip tone="blue">Versión {plantilla.version}</Chip>
+              {cambiado && <Chip tone="orange">Cambios sin publicar</Chip>}
+            </div>
           </div>
-        </Card>
+          <div className="flex flex-wrap gap-2">
+            <Button type="button" variant="secondary" onClick={descartar} disabled={!cambiado}>
+              Descartar cambios
+            </Button>
+            <Button type="button" variant="outline" onClick={verPdfExacto} isLoading={generando}>
+              Ver PDF exacto
+            </Button>
+            <Button
+              type="button"
+              onClick={() => {
+                setErrorPublicar(null);
+                setProblemas([]);
+                setPublicando(true);
+              }}
+              disabled={!cambiado}
+            >
+              Publicar…
+            </Button>
+          </div>
+        </div>
+        <p className="text-xs text-muted">
+          Publicada el {formatoFechaHora(plantilla.publicada_at)}. Mínimos que debe conservar: {plantilla.requisitos.fuente}. El encabezado (escudo, nombre, DANE, NIT, resolución, sede, jornada y año), el QR y la huella los pone el sistema: no se editan.
+        </p>
+      </Card>
 
-        <Card className="space-y-3">
-          <CardHeader title="Datos del sistema" subtitle="Haz clic en un dato para colocarlo en el párrafo donde estás escribiendo. El sistema lo toma de su módulo de origen." />
-          <div className="space-y-2">
-            {origenes.map((origen) => (
-              <div key={origen}>
-                <p className="mb-1 text-xs font-semibold text-muted">{origen}</p>
-                <div className="flex flex-wrap gap-1.5">
-                  {aplicables
-                    .filter((v) => v.origen === origen)
-                    .map((v) => (
-                      <button
-                        key={v.clave}
-                        type="button"
-                        title={`Ejemplo: ${v.ejemplo}`}
-                        // El botón no roba el cursor del párrafo.
-                        onMouseDown={(e) => e.preventDefault()}
-                        onClick={() => insertarVariable(v.clave)}
-                        className="rounded-full bg-primary-soft px-3 py-1 text-xs font-medium text-primary hover:bg-primary hover:text-white"
-                      >
-                        {v.etiqueta}
-                      </button>
-                    ))}
-                </div>
-              </div>
+      {aviso && <Alert tone={aviso.tono}>{aviso.texto}</Alert>}
+      {problemas.length > 0 && !publicando && (
+        <Alert tone="error">
+          <ul className="list-disc space-y-1 pl-4">
+            {problemas.map((p) => (
+              <li key={p}>{p}</li>
             ))}
-          </div>
-        </Card>
+          </ul>
+        </Alert>
+      )}
 
-        <Card className="space-y-4">
-          <CardHeader title="Texto del documento" subtitle="Los párrafos se dibujan en este orden." />
-          {borrador.bloques.map((b, indice) => {
-            const esObligatorio = obligatorios.has(b.id);
-            return (
-              <div key={b.id} className={`space-y-2 rounded-lg border p-3 ${b.activo ? 'border-border' : 'border-dashed border-border bg-soft'}`}>
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <p className="flex items-center gap-2 text-sm font-semibold text-ink">
-                    {ETIQUETA_ESTILO_BLOQUE[b.estilo]}
-                    {esObligatorio && <Chip tone="blue">Obligatorio</Chip>}
-                    {!b.activo && <Chip tone="neutral">Oculto</Chip>}
-                  </p>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <Button type="button" variant="secondary" className="px-2 py-0.5 text-xs" disabled={indice === 0} onClick={() => mover(indice, -1)}>
-                      Subir
-                    </Button>
-                    <Button type="button" variant="secondary" className="px-2 py-0.5 text-xs" disabled={indice === borrador.bloques.length - 1} onClick={() => mover(indice, 1)}>
-                      Bajar
-                    </Button>
-                    {!esObligatorio && b.id.startsWith('extra-') && (
-                      <Button type="button" variant="soft-danger" className="px-2 py-0.5 text-xs" onClick={() => setBorrador((x) => ({ ...x, bloques: x.bloques.filter((y) => y.id !== b.id) }))}>
-                        Quitar
-                      </Button>
-                    )}
-                  </div>
+      <Tabs
+        items={[
+          { key: 'texto', label: 'Texto' },
+          { key: 'diseno', label: 'Diseño' },
+          { key: 'destinatarios', label: 'Destinatarios y vigencia' },
+          { key: 'versiones', label: 'Versiones' },
+        ]}
+        active={pestana}
+        onChange={setPestana}
+      />
+
+      {(pestana === 'texto' || pestana === 'diseno') && (
+        <div className="grid gap-4 pt-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:items-start">
+          <div className="space-y-4">
+            {pestana === 'diseno' && <DisenoPlantillaCard diseno={borrador.diseno} onCambiar={(diseno) => setBorrador((b) => ({ ...b, diseno: diseno && JSON.stringify(diseno) === JSON.stringify(DISENO_INICIAL) ? null : diseno }))} />}
+            {pestana === 'texto' && (
+              <>
+            <Card className="space-y-3">
+              <div className="flex flex-wrap items-end justify-between gap-3">
+                <div className="min-w-64 flex-1">
+                  <Input label="Título del documento" value={borrador.titulo} onChange={(e) => setBorrador((b) => ({ ...b, titulo: e.target.value }))} maxLength={100} />
                 </div>
-                {b.estilo === 'TABLA_NOTAS' ? (
-                  <p className="text-xs text-muted">Aquí va la tabla de valoraciones. La arma el módulo de notas con la escala de la institución; este bloque solo fija en qué lugar del documento se coloca.</p>
-                ) : (
-                  <EditorConVariables
-                    ref={(h) => {
-                      if (h) editores.current.set(b.id, h);
-                      else editores.current.delete(b.id);
-                    }}
-                    label={`Texto del párrafo: ${ETIQUETA_ESTILO_BLOQUE[b.estilo]}`}
-                    value={b.texto}
-                    variables={aplicables}
-                    onChange={(texto) => cambiarBloque(b.id, { texto })}
-                    onFocus={() => setBloqueEnfocado(b.id)}
-                  />
-                )}
-                <details className="text-sm" open={Boolean(b.condicion)}>
-                  <summary className="cursor-pointer text-xs font-semibold text-primary">{b.condicion ? 'Se muestra solo en ciertos casos' : 'Mostrar solo en ciertos casos (opcional)'}</summary>
-                  <div className="mt-2 grid gap-3 sm:grid-cols-2">
-                    <Select
-                      label="Se muestra"
-                      value={b.condicion ? b.condicion.tipo : 'SIEMPRE'}
-                      onChange={(e) => cambiarBloque(b.id, { condicion: e.target.value === 'SIEMPRE' ? null : { tipo: e.target.value as 'HAY' | 'NO_HAY', variable: b.condicion?.variable ?? aplicables[0]?.clave ?? '' } })}
-                    >
-                      <option value="SIEMPRE">Siempre</option>
-                      <option value="HAY">Solo si existe este dato…</option>
-                      <option value="NO_HAY">Solo si NO existe este dato…</option>
-                    </Select>
-                    {b.condicion && (
-                      <Select label="Dato" value={b.condicion.variable} onChange={(e) => cambiarBloque(b.id, { condicion: { tipo: b.condicion!.tipo, variable: e.target.value } })}>
-                        {aplicables.map((v) => (
-                          <option key={v.clave} value={v.clave}>
-                            {v.etiqueta}
-                          </option>
-                        ))}
-                      </Select>
-                    )}
-                  </div>
-                </details>
-                <Switch label="Párrafo visible en el documento" checked={b.activo} onChange={(valor) => cambiarBloque(b.id, { activo: valor })} disabled={esObligatorio} disabledReason={esObligatorio ? 'Es obligatorio en este documento.' : null} />
+                <Button type="button" variant="outline" onClick={cargarEstandar} isLoading={cargandoEstandar}>
+                  Cargar texto estándar sugerido
+                </Button>
               </div>
-            );
-          })}
-          <Button type="button" variant="outline" onClick={agregarParrafo} disabled={borrador.bloques.length >= 14}>
-            Agregar párrafo
-          </Button>
-        </Card>
+              <p className="text-xs text-muted">El texto estándar es un punto de partida: se carga como borrador, sin publicarlo, para que lo ajustes a tu SIEE antes de publicar.</p>
+            </Card>
 
-        <Card className="space-y-3">
-          <CardHeader title="Destinatario o motivo" subtitle="Las opciones que ve la secretaria al expedir; la primera es la predeterminada. «Otro (especificar…)» siempre se agrega al final." />
-          {borrador.destinatarios.map((d, i) => (
-            <div key={d.clave} className="grid gap-2 sm:grid-cols-[1fr_2fr_auto] sm:items-end">
-              <Input label="Nombre en el selector" value={d.etiqueta} maxLength={80} onChange={(e) => setBorrador((b) => ({ ...b, destinatarios: b.destinatarios.map((x, j) => (j === i ? { ...x, etiqueta: e.target.value } : x)) }))} />
-              <Input
-                label="Frase del documento"
-                value={d.frase}
-                maxLength={200}
-                onChange={(e) => setBorrador((b) => ({ ...b, destinatarios: b.destinatarios.map((x, j) => (j === i ? { ...x, frase: e.target.value } : x)) }))}
-              />
-              <Button type="button" variant="soft-danger" className="px-3 py-2 text-xs" disabled={borrador.destinatarios.length <= 1} onClick={() => setBorrador((b) => ({ ...b, destinatarios: b.destinatarios.filter((_, j) => j !== i) }))}>
-                Quitar
-              </Button>
-            </div>
-          ))}
-          <Button
-            type="button"
-            variant="outline"
-            disabled={borrador.destinatarios.length >= 12}
-            onClick={() => setBorrador((b) => ({ ...b, destinatarios: [...b.destinatarios, { clave: claveDe(`Nueva opción ${b.destinatarios.length + 1}`, b.destinatarios.map((x) => x.clave)), etiqueta: `Nueva opción ${b.destinatarios.length + 1}`, frase: 'Se expide para ' }] }))}
-          >
-            Agregar opción
-          </Button>
-          <Input label="Frase cuando eligen «Otro»" value={borrador.frase_otro} maxLength={200} onChange={(e) => setBorrador((b) => ({ ...b, frase_otro: e.target.value }))} hint="{texto} es lo que escriba quien expide. Si lo deja vacío se usa la primera opción." />
-        </Card>
+            <DatosDelSistema variables={aplicables} onInsertar={insertarVariable} />
 
-        {aviso && <Alert tone={aviso.tono}>{aviso.texto}</Alert>}
-        {problemas.length > 0 && (
-          <Alert tone="error">
-            <ul className="list-disc space-y-1 pl-4">
-              {problemas.map((p) => (
-                <li key={p}>{p}</li>
+            <Card className="space-y-3">
+              <p className="text-sm text-muted">Los párrafos se dibujan en este orden.</p>
+              {borrador.bloques.map((b, indice) => (
+                <ParrafoPlantilla
+                  key={b.id}
+                  ref={(h) => {
+                    if (h) editores.current.set(b.id, h);
+                    else editores.current.delete(b.id);
+                  }}
+                  bloque={b}
+                  numero={indice + 1}
+                  esObligatorio={obligatorios.has(b.id)}
+                  puedeSubir={indice > 0}
+                  puedeBajar={indice < borrador.bloques.length - 1}
+                  variables={aplicables}
+                  onCambiar={(cambio) => cambiarBloque(b.id, cambio)}
+                  onMover={(delta) => mover(indice, delta)}
+                  onQuitar={() => setBorrador((x) => ({ ...x, bloques: x.bloques.filter((y) => y.id !== b.id) }))}
+                  onEnfocar={() => setBloqueEnfocado(b.id)}
+                />
               ))}
-            </ul>
-          </Alert>
-        )}
-
-        <Card className="space-y-3">
-          <div className="grid gap-3 sm:grid-cols-[1fr_auto] sm:items-end">
-            <Input label="Nota del cambio (opcional)" value={nota} onChange={(e) => setNota(e.target.value)} maxLength={300} placeholder="Ej. Se agrega la vigencia de 30 días" />
-            <div className="flex flex-wrap gap-2">
-              <Button type="button" variant="secondary" onClick={descartar} disabled={!cambiado}>
-                Descartar cambios
+              <Button type="button" variant="outline" onClick={agregarParrafo} disabled={borrador.bloques.length >= 14}>
+                Agregar párrafo
               </Button>
-              <Button type="button" variant="secondary" onClick={verPrevia} isLoading={generando}>
-                Vista previa (PDF)
-              </Button>
-              <Button type="button" onClick={publicarVersion} isLoading={publicar.isPending} disabled={!cambiado}>
-                Publicar versión nueva
-              </Button>
-            </div>
+            </Card>
+              </>
+            )}
           </div>
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <Button type="button" variant="soft-danger" className="px-3 py-1 text-xs" onClick={restablecerPartida} isLoading={restablecer.isPending}>
-              Restablecer el texto de partida
-            </Button>
-            <Button type="button" variant="secondary" className="px-3 py-1 text-xs" onClick={() => setVerHistorial((v) => !v)}>
-              {verHistorial ? 'Ocultar historial' : 'Ver historial de versiones'}
-            </Button>
+
+          <div className="space-y-4 lg:sticky lg:top-28">
+            <Card className="space-y-3">
+              <p className="text-sm font-semibold text-ink">Así se ve</p>
+              <p className="text-xs text-muted">Con datos de muestra; se actualiza al dejar de escribir. «Ver PDF exacto» muestra el documento tal como se imprime.</p>
+              <VistaEnVivoPlantilla datos={vistaEnVivo.data} cargando={vistaEnVivo.isFetching} error={vistaEnVivo.error} diseno={borrador.diseno} />
+            </Card>
           </div>
-          {cambiado && <p className="text-xs text-warning">Tienes cambios sin publicar.</p>}
-        </Card>
+        </div>
+      )}
 
-        {verHistorial && <HistorialVersiones tipo={plantilla.tipo} />}
-      </div>
+      <TabPanel active={pestana} tabKey="destinatarios">
+        <DestinatariosPlantilla borrador={borrador} onCambiar={(cambio) => setBorrador(cambio)} />
+      </TabPanel>
 
-      <div className="space-y-4 lg:sticky lg:top-4">
-        <Card className="space-y-3">
-          <CardHeader title="Así se ve" subtitle="Con datos de muestra; se actualiza al dejar de escribir." />
-          <VistaEnVivoPlantilla datos={vistaEnVivo.data} cargando={vistaEnVivo.isFetching} error={vistaEnVivo.error} />
-        </Card>
-        {previa && (
-          <Card>
-            <VisorDocumento url={previa.url} titulo="Vista previa con un estudiante inventado (no tiene validez)" nombreArchivo="vista-previa-plantilla.pdf" />
-          </Card>
-        )}
-      </div>
+      <TabPanel active={pestana} tabKey="versiones">
+        <HistorialVersiones tipo={plantilla.tipo} />
+      </TabPanel>
+
+      <PublicarPlantillaDrawer
+        open={publicando}
+        nombre={plantilla.nombre}
+        versionNueva={plantilla.version + 1}
+        nota={nota}
+        onNota={setNota}
+        cambios={resumenDeCambios(vigente, borrador)}
+        problemas={problemas}
+        error={errorPublicar}
+        isSubmitting={publicar.isPending}
+        onClose={() => setPublicando(false)}
+        onPublicar={publicarVersion}
+      />
+
+      <Drawer open={Boolean(previa)} size="xl" title="Vista previa con un estudiante inventado" subtitle="No tiene validez: el QR y la huella solo existen al expedir." onClose={() => setPrevia(null)}>
+        {previa && <VisorDocumento url={previa.url} titulo="Así se imprimirá" nombreArchivo="vista-previa-plantilla.pdf" />}
+      </Drawer>
     </div>
-  );
-}
-
-function HistorialVersiones({ tipo }: { tipo: ClaveCertificado }) {
-  const versiones = useVersionesPlantilla(tipo);
-  if (versiones.isLoading) return <Spinner />;
-  if (versiones.isError) return <Alert tone="error">{errorMessage(versiones.error)}</Alert>;
-  return (
-    <Table>
-      <TableHead>
-        <tr>
-          <Th>Versión</Th>
-          <Th>Publicada</Th>
-          <Th>Por</Th>
-          <Th>Nota</Th>
-          <Th>Huella</Th>
-        </tr>
-      </TableHead>
-      <TableBody>
-        {versiones.data?.map((v) => (
-          <tr key={v.version}>
-            <Td className="font-semibold text-ink">
-              v{v.version} {v.estado === 'VIGENTE' && <span className="text-xs font-normal text-success">vigente</span>}
-            </Td>
-            <Td>{formatoFechaHora(v.publicada_at)}</Td>
-            <Td>{v.publicada_por ?? '—'}</Td>
-            <Td>{v.nota || '—'}</Td>
-            <Td className="font-mono text-xs">{v.hash}</Td>
-          </tr>
-        ))}
-        {versiones.data?.length === 0 && <EmptyRow colSpan={5}>Sin versiones.</EmptyRow>}
-      </TableBody>
-    </Table>
   );
 }

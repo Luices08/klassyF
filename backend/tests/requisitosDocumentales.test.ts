@@ -20,10 +20,12 @@ describe('el catálogo sembrado pide exactamente lo mismo que las reglas de siem
             const antes = generarChecklistMatricula(contexto).map((i) => ({ tipo: i.tipo_documento, obligatorio: i.obligatorio, nombre: i.nombre_personalizado }));
             const ahora = seleccionarRequisitos(catalogoInicial, contexto).map((i) => ({ tipo: i.tipo_documento, obligatorio: i.obligatorio, nombre: i.nombre_personalizado }));
             expect(ahora.map((i) => [i.tipo, i.obligatorio])).toEqual(antes.map((i) => [i.tipo, i.obligatorio]));
-            // El nombre con el grado anterior es el de siempre, salvo el sufijo «(cierra la básica…)» de 10° (ahora el colegio lo puede escribir).
+            // El nombre con el grado anterior es el de siempre, salvo el sufijo «(cierra la básica…)» de 10° (ahora el colegio lo puede escribir)
+            // y la redacción «Certificado o boletín» con que el colegio actualizó el texto de partida.
+            const sinBoletin = (n: string) => n.replace('Certificado o boletín', 'Certificado');
             for (const item of ahora) {
               const previo = antes.find((a) => a.tipo === item.tipo);
-              if (previo?.nombre) expect(previo.nombre.startsWith(item.nombre)).toBe(true);
+              if (previo?.nombre) expect(previo.nombre.startsWith(sinBoletin(item.nombre))).toBe(true);
             }
           });
         }

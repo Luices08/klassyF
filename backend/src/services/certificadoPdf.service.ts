@@ -1,7 +1,8 @@
 import PDFDocument from 'pdfkit';
 import QRCode from 'qrcode';
 import { ClaveCertificado } from '../constants/certificados';
-import { ContenidoPlantilla } from '../constants/plantillasCertificado';
+import { ContenidoPlantilla, DISENO_INICIAL, DisenoPlantilla, FuenteDiseno, TamanoDiseno } from '../constants/plantillasCertificado';
+import AuditLog from '../models/auditLog.model';
 import { UserDocument } from '../models/user.model';
 import ApiError from '../utils/ApiError';
 import { redactarCertificado, nombreDeJornada } from '../utils/certificadoTexto';
@@ -88,24 +89,37 @@ function dibujarTablaNotas(doc: Documento, tabla: TablaValoraciones, ancho: numb
   if (tabla.pie) doc.font('Helvetica').fontSize(7.5).fillColor(COLOR.tenue).text(tabla.pie, x0, doc.y + 4, { width: ancho });
 }
 
-/** Dibuja los bloques que resolvió la plantilla vigente al expedir, en su orden. */
-function dibujarBloques(doc: Documento, snapshot: SnapshotCertificado, bloques: BloqueResuelto[], ancho: number): void {
+const FAMILIAS_PDF: Record<FuenteDiseno, { normal: string; negrita: string }> = {
+  SANS: { normal: 'Helvetica', negrita: 'Helvetica-Bold' },
+  SERIF: { normal: 'Times-Roman', negrita: 'Times-Bold' },
+  MONO: { normal: 'Courier', negrita: 'Courier-Bold' },
+};
+const ESCALA_PDF: Record<TamanoDiseno, number> = { PEQUENO: 0.9, NORMAL: 1, GRANDE: 1.1 };
+
+/** El diseño de siempre es el valor inicial del diseño: un documento sin diseño se dibuja exactamente igual que antes. */
+const disenoEfectivo = (d: DisenoPlantilla | undefined): DisenoPlantilla => d ?? DISENO_INICIAL;
+
+/** Dibuja los bloques que resolvió la plantilla vigente al expedir, en su orden, con el diseño con que se expidió. */
+function dibujarBloques(doc: Documento, snapshot: SnapshotCertificado, bloques: BloqueResuelto[], ancho: number, diseno?: DisenoPlantilla): void {
+  const d = disenoEfectivo(diseno);
+  const familia = FAMILIAS_PDF[d.fuente];
+  const escala = ESCALA_PDF[d.tamano];
   bloques.forEach((b, i) => {
     switch (b.estilo) {
       case 'PREAMBULO':
-        doc.moveDown(i === 0 ? 2.5 : 1).font('Helvetica').fontSize(11).fillColor(COLOR.cuerpo).text(b.texto, MARGEN, doc.y, { width: ancho, align: 'center' });
+        doc.moveDown(i === 0 ? 2.5 : 1).font(familia.normal).fontSize(11 * escala).fillColor(d.color_texto).text(b.texto, MARGEN, doc.y, { width: ancho, align: 'center' });
         break;
       case 'FORMULA':
-        doc.moveDown(1.2).font('Helvetica-Bold').fontSize(15).fillColor(COLOR.ink).text(b.texto, MARGEN, doc.y, { width: ancho, align: 'center' });
+        doc.moveDown(1.2).font(familia.negrita).fontSize(15 * escala).fillColor(d.color_destacados).text(b.texto, MARGEN, doc.y, { width: ancho, align: 'center' });
         break;
       case 'DESTACADO':
-        doc.moveDown(1).font('Helvetica-Bold').fontSize(12).fillColor(COLOR.ink).text(b.texto, MARGEN, doc.y, { width: ancho, align: 'left' });
+        doc.moveDown(1).font(familia.negrita).fontSize(12 * escala).fillColor(d.color_destacados).text(b.texto, MARGEN, doc.y, { width: ancho, align: 'left' });
         break;
       case 'TABLA_NOTAS':
         if (snapshot.estudios) dibujarTablaNotas(doc, snapshot.estudios.tabla, ancho);
         break;
       default:
-        doc.moveDown(1).font('Helvetica').fontSize(12).fillColor(COLOR.cuerpo).text(b.texto, MARGEN, doc.y, { width: ancho, align: 'justify', lineGap: 4 });
+        doc.moveDown(1).font(familia.normal).fontSize(12 * escala).fillColor(d.color_texto).text(b.texto, MARGEN, doc.y, { width: ancho, align: 'justify', lineGap: 4 });
     }
   });
 }
@@ -133,7 +147,7 @@ async function dibujar(snapshot: SnapshotCertificado, seguridad: DatosSeguridad)
 
       const ancho = doc.page.width - MARGEN * 2;
       if (snapshot.contenido) {
-        dibujarBloques(doc, snapshot, snapshot.contenido.bloques, ancho);
+        dibujarBloques(doc, snapshot, snapshot.contenido.bloques, ancho, snapshot.contenido.diseno);
       } else {
         // Documentos anteriores a las plantillas: se redactan como cuando se expidieron.
         const texto = redactarCertificado(snapshot);
@@ -206,11 +220,15 @@ async function dibujar(snapshot: SnapshotCertificado, seguridad: DatosSeguridad)
   });
 }
 
+/** La pantalla de expedir vuelve a pedir la vista previa de lo mismo cada vez que se cambia una opción: dentro de esta ventana se audita una sola lectura. */
+const VENTANA_AUDITORIA_VISTA_PREVIA_MS = 10 * 60 * 1000;
+
 export async function generarVistaPreviaPdf(entrada: EntradaExpedicion, usuario: UserDocument, ip?: string | null): Promise<Buffer> {
   const snapshot = await prepararVistaPrevia(entrada, usuario);
   const buffer = await dibujar(snapshot, { codigo: null });
   // Muestra datos reales de un estudiante: se audita aunque no quede nada guardado (sin contenido en el detalle).
-  await registrarEvento({ usuario_id: usuario._id, accion: 'CERTIFICADO_VISTA_PREVIA', entidad: 'Enrollment', entidad_id: entrada.enrollment_id, detalle: entrada.tipo, ip });
+  const yaAuditada = await AuditLog.exists({ usuario_id: usuario._id, accion: 'CERTIFICADO_VISTA_PREVIA', entidad_id: entrada.enrollment_id, detalle: entrada.tipo, createdAt: { $gte: new Date(Date.now() - VENTANA_AUDITORIA_VISTA_PREVIA_MS) } });
+  if (!yaAuditada) await registrarEvento({ usuario_id: usuario._id, accion: 'CERTIFICADO_VISTA_PREVIA', entidad: 'Enrollment', entidad_id: entrada.enrollment_id, detalle: entrada.tipo, ip });
   return buffer;
 }
 

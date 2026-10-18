@@ -4,6 +4,7 @@ import { Chip } from '../ui/Badge';
 import { Button } from '../ui/Button';
 import { Spinner } from '../ui/Spinner';
 import { Table, TableBody, TableHead, Td, Th } from '../ui/Table';
+import { UploadIcon } from '../ui/icons';
 import { useDocumentosPrevistos } from '../../hooks/useEnrollments';
 import type { TipoIngreso } from '../../types/domain';
 
@@ -74,7 +75,10 @@ export function DocumentosPrevistos({ groupId, tipoIngreso, studentId, archivos 
                           </button>
                         </div>
                       ) : (
-                        <label className="inline-flex items-center gap-1 cursor-pointer text-xs font-medium text-primary hover:underline">
+                        <label
+                          className="inline-flex h-7 w-7 cursor-pointer items-center justify-center rounded-full bg-soft text-body hover:bg-border/80 hover:text-primary transition shadow-xs"
+                          title="Adjuntar archivo digital (opcional)"
+                        >
                           <input
                             type="file"
                             className="hidden"
@@ -84,7 +88,7 @@ export function DocumentosPrevistos({ groupId, tipoIngreso, studentId, archivos 
                               if (f) onArchivoChange(d.tipo_documento, f);
                             }}
                           />
-                          Adjuntar archivo
+                          <UploadIcon className="h-3.5 w-3.5" />
                         </label>
                       )
                     ) : (

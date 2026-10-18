@@ -3,7 +3,10 @@ import { CLAVE_DESTINATARIO_OTRO, ClaveCertificado, DefinicionCertificado, ETIQU
 import {
   BloquePlantilla,
   ContenidoPlantilla,
+  DisenoPlantilla,
   ESTILOS_BLOQUE,
+  FUENTES_DISENO,
+  TAMANOS_DISENO,
   MAX_BLOQUES,
   MAX_DESTINATARIOS,
   MAX_TEXTO_BLOQUE,
@@ -22,6 +25,35 @@ export const variablesDeTexto = (texto: string): string[] => [...texto.matchAll(
 
 const etiquetaDe = (clave: string): string => VARIABLES_CERTIFICADO.find((v) => v.clave === clave)?.etiqueta ?? clave;
 const origenDe = (clave: string): string => VARIABLES_CERTIFICADO.find((v) => v.clave === clave)?.origen ?? '';
+
+// --- Diseño del texto ---
+
+const COLOR_HEX = /^#[0-9A-Fa-f]{6}$/;
+/** Contraste mínimo del texto sobre el papel blanco (WCAG AA para texto normal): un documento oficial se imprime y se fotocopia. */
+export const CONTRASTE_MINIMO = 4.5;
+
+const luminancia = (hex: string): number => {
+  const canal = (i: number) => {
+    const c = parseInt(hex.slice(1 + i * 2, 3 + i * 2), 16) / 255;
+    return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+  };
+  return 0.2126 * canal(0) + 0.7152 * canal(1) + 0.0722 * canal(2);
+};
+
+/** Cuántas veces más oscuro que el papel blanco es un color (1 = igual de claro, 21 = negro). */
+export const contrasteSobreBlanco = (hex: string): number => 1.05 / (luminancia(hex) + 0.05);
+
+export function problemasDeDiseno(d: DisenoPlantilla | null | undefined): string[] {
+  if (!d) return [];
+  const errores: string[] = [];
+  if (!(FUENTES_DISENO as readonly string[]).includes(d.fuente)) errores.push('El tipo de letra del diseño no es válido.');
+  if (!(TAMANOS_DISENO as readonly string[]).includes(d.tamano)) errores.push('El tamaño de letra del diseño no es válido.');
+  for (const [campo, nombre] of [['color_texto', 'del texto'], ['color_destacados', 'de las frases destacadas']] as const) {
+    if (!COLOR_HEX.test(d[campo])) errores.push(`El color ${nombre} no es válido.`);
+    else if (contrasteSobreBlanco(d[campo]) < CONTRASTE_MINIMO) errores.push(`El color ${nombre} es muy claro para leerse sobre el papel blanco: elige uno más oscuro.`);
+  }
+  return errores;
+}
 
 // --- Validación (lo que se exige al publicar) ---
 
@@ -97,18 +129,21 @@ export function validarContenido(tipo: Pick<DefinicionCertificado, 'fuentes' | '
     if (d.fuente_entidad && !d.frase.includes(MARCA_ENTIDAD)) errores.push(`La frase de «${d.etiqueta}» toma la entidad de otro módulo: debe llevar ${MARCA_ENTIDAD} donde va su nombre.`);
     if (!d.fuente_entidad && d.frase.includes(MARCA_ENTIDAD)) errores.push(`La frase de «${d.etiqueta}» lleva ${MARCA_ENTIDAD} pero la opción no indica de dónde sale la entidad.`);
   }
+  errores.push(...problemasDeDiseno(c.diseno));
   if (!c.frase_otro.includes('{texto}') || c.frase_otro.length > 200) errores.push('La frase de «Otro» debe contener {texto} y no pasar de 200 caracteres.');
   return errores;
 }
 
 /** Lo que define el contenido de una versión, sin los datos de control (se usa con el documento de la base y con uno armado a mano). */
-export const contenidoDe = (p: { titulo: string; bloques: BloquePlantilla[]; destinatarios: ContenidoPlantilla['destinatarios']; frase_otro: string; vigencia_dias?: number | null }): ContenidoPlantilla => ({
+export const contenidoDe = (p: { titulo: string; bloques: BloquePlantilla[]; destinatarios: ContenidoPlantilla['destinatarios']; frase_otro: string; vigencia_dias?: number | null; diseno?: DisenoPlantilla | null }): ContenidoPlantilla => ({
   titulo: p.titulo,
   bloques: p.bloques.map((b) => ({ id: b.id, estilo: b.estilo, texto: b.texto, condicion: b.condicion ? { variable: b.condicion.variable, tipo: b.condicion.tipo } : null, activo: b.activo })),
   // `fuente_entidad` solo viaja cuando la opción la tiene: así la huella de una plantilla anterior no cambia.
   destinatarios: p.destinatarios.map((d) => ({ clave: d.clave, etiqueta: d.etiqueta, frase: d.frase, ...(d.fuente_entidad ? { fuente_entidad: d.fuente_entidad } : {}) })),
   frase_otro: p.frase_otro,
   vigencia_dias: p.vigencia_dias ?? null,
+  // Solo viaja cuando hay diseño: así la huella de una plantilla anterior (sin diseño) no cambia.
+  ...(p.diseno ? { diseno: { fuente: p.diseno.fuente, tamano: p.diseno.tamano, color_texto: p.diseno.color_texto, color_destacados: p.diseno.color_destacados } } : {}),
 });
 
 /** Si algún bloque activo usa una variable con ese prefijo (`acudiente.`): así solo se leen y congelan los datos que el documento realmente pone. */
@@ -116,8 +151,11 @@ export const usaVariablesCon = (c: Pick<ContenidoPlantilla, 'bloques'>, prefijo:
   c.bloques.some((b) => b.activo && b.estilo !== 'TABLA_NOTAS' && variablesDeTexto(b.texto).some((v) => v.startsWith(prefijo)));
 
 /** Huella del contenido de una versión: identifica qué texto exacto produjo un documento. */
-export const huellaDeContenido = (clave: ClaveCertificado, c: ContenidoPlantilla): string =>
-  createHash('sha256').update(serializacionEstable({ clave, ...c })).digest('hex');
+export const huellaDeContenido = (clave: ClaveCertificado, c: ContenidoPlantilla): string => {
+  // Sin diseño (ausente o null) la huella es la de siempre: el cliente manda `diseno: null` y una versión anterior no lo guardó.
+  const { diseno, ...resto } = c;
+  return createHash('sha256').update(serializacionEstable({ clave, ...resto, ...(diseno ? { diseno } : {}) })).digest('hex');
+};
 
 // --- Valores de las variables a partir de lo que se congela al expedir ---
 

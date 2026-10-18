@@ -518,7 +518,7 @@ export async function verificarIntegridad(id: string, usuario: UserDocument) {
 }
 
 export async function anularCertificado(id: string, motivo: string, usuario: UserDocument, ip?: string | null) {
-  if (usuario.rol !== ROLES.ADMIN) throw new ApiError(403, 'Solo el administrador anula certificados.');
+  // Secretaría también anula: con el rector ausente es quien corrige un documento mal expedido. `cargarCertificado` exige ADMIN o Secretaría y la limita a sus sedes.
   const certificado = await cargarCertificado(id, usuario);
   if (certificado.estado === 'ANULADO') throw new ApiError(409, 'El certificado ya está anulado.');
   const limpio = motivo.trim().slice(0, MAX_MOTIVO_ANULACION);

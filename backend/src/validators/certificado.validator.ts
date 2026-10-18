@@ -17,7 +17,7 @@ import {
   TIPOS_SOLICITANTE,
   PATRON_PREFIJO_CERTIFICADO,
 } from '../constants/certificados';
-import { ESTILOS_BLOQUE, MAX_BLOQUES, MAX_DESTINATARIOS, MAX_TEXTO_BLOQUE } from '../constants/plantillasCertificado';
+import { ESTILOS_BLOQUE, FUENTES_DISENO, TAMANOS_DISENO, MAX_BLOQUES, MAX_DESTINATARIOS, MAX_TEXTO_BLOQUE } from '../constants/plantillasCertificado';
 import { ValidationSchema } from '../middlewares/validate.middleware';
 import { objectId } from './common.validator';
 
@@ -130,6 +130,12 @@ const contenidoPlantilla = Joi.object({
     .required(),
   frase_otro: Joi.string().trim().max(200).required(),
   vigencia_dias: Joi.number().integer().min(1).max(365).allow(null).required(),
+  diseno: Joi.object({
+    fuente: Joi.string().valid(...FUENTES_DISENO).required(),
+    tamano: Joi.string().valid(...TAMANOS_DISENO).required(),
+    color_texto: Joi.string().pattern(/^#[0-9A-Fa-f]{6}$/).required(),
+    color_destacados: Joi.string().pattern(/^#[0-9A-Fa-f]{6}$/).required(),
+  }).allow(null),
 });
 
 const conTipo = Joi.object({ tipo: tipo.required() });

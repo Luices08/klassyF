@@ -54,12 +54,12 @@ export const NOMBRES_DOCUMENTO_MATRICULA: Record<TipoDocumentoMatricula, string>
   CERTIFICADO_AUDIOMETRIA_VISION: 'Certificado de tamizaje visual y auditivo',
   DOCUMENTO_ACUDIENTE: 'Copia de documento del acudiente',
   PAZ_Y_SALVO_SIMAT: 'Constancia de retiro / liberación de SIMAT y paz y salvo',
-  CERTIFICADOS_NOTAS_ANTERIORES: 'Certificados de notas de años anteriores (un solo PDF)',
-  CERTIFICADO_QUINTO_PRIMARIA: 'Certificado de 5° de básica primaria',
+  CERTIFICADOS_NOTAS_ANTERIORES: 'Certificados o boletines de notas de años anteriores (un solo PDF)',
+  CERTIFICADO_QUINTO_PRIMARIA: 'Certificado o boletín de 5° de básica primaria',
   SERVICIO_SOCIAL_ESTUDIANTIL: 'Constancia de Servicio Social Obligatorio',
   CUSTODIA_LEGAL_O_PODER: 'Custodia legal / patria potestad / poder especial',
   DIAGNOSTICO_MEDICO_INCLUSION: 'Diagnóstico médico / valoración de inclusión (PIAR)',
-  CERTIFICADO_GRADO_ANTERIOR: 'Certificado del grado anterior',
+  CERTIFICADO_GRADO_ANTERIOR: 'Certificado o boletín final del grado anterior',
   PAZ_Y_SALVO_ANIO_ANTERIOR: 'Paz y salvo de fin de año (año anterior)',
   OTRO_DOCUMENTO: 'Otro documento institucional',
 };
@@ -75,9 +75,10 @@ export const INDICACIONES_DOCUMENTO_MATRICULA: Record<TipoDocumentoMatricula, st
   CUSTODIA_LEGAL_O_PODER: 'Soporte legal de custodia, sentencia o poder notarial si el acudiente no es padre ni madre (opcional).',
 
   PAZ_Y_SALVO_SIMAT: 'Constancia oficial de retiro/liberación en SIMAT y paz y salvo expedido por la institución educativa de procedencia.',
-  CERTIFICADOS_NOTAS_ANTERIORES: 'Certificados oficiales de calificaciones de cada uno de los grados cursados a la fecha (en un solo PDF consolidado).',
-  CERTIFICADO_QUINTO_PRIMARIA: 'Certificado oficial de culminación y aprobación del ciclo de Básica Primaria (5°).',
-  CERTIFICADO_GRADO_ANTERIOR: 'Certificado oficial final de notas y aprobación del grado inmediatamente anterior.',
+  CERTIFICADOS_NOTAS_ANTERIORES:
+    'Certificados oficiales de calificaciones o boletines finales de cada uno de los grados cursados a la fecha (en un solo PDF consolidado). Si ingresa por traslado a mitad de año, incluye el boletín con las notas de los periodos cursados este año.',
+  CERTIFICADO_QUINTO_PRIMARIA: 'Certificado oficial de culminación o boletín final de aprobación del ciclo de Básica Primaria (5°).',
+  CERTIFICADO_GRADO_ANTERIOR: 'Certificado oficial final de notas o boletín con constancia de aprobación del grado inmediatamente anterior.',
   SERVICIO_SOCIAL_ESTUDIANTIL: 'Constancia de horas de servicio social obligatorio cursadas en el colegio anterior (exclusivo para 11°).',
   PAZ_Y_SALVO_ANIO_ANTERIOR:
     'Para quien ya estudió aquí: paz y salvo con la institución al terminar el año anterior. Si ya se confirmó en el módulo «Paz y salvo de fin de año», se aprueba solo.',

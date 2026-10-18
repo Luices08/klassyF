@@ -139,7 +139,7 @@ export function HistorialCertificados() {
                     <Button variant="secondary" className="px-3 py-1 text-xs" onClick={() => verificar(c)}>
                       Verificar
                     </Button>
-                    {user?.rol === 'ADMIN' && c.estado === 'VIGENTE' && (
+                    {(user?.rol === 'ADMIN' || user?.rol === 'SECRETARIA') && c.estado === 'VIGENTE' && (
                       <Button variant="soft-danger" className="px-3 py-1 text-xs" onClick={() => setAnulando(c)}>
                         Anular
                       </Button>

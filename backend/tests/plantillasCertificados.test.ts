@@ -5,7 +5,7 @@ import { CLAVES_VARIABLES, VARIABLES_CERTIFICADO } from '../src/constants/variab
 import { SnapshotCertificado } from '../src/utils/certificados';
 import { snapshotDeMuestra } from '../src/utils/muestraCertificado';
 import { enLetras } from '../src/utils/numerosEnLetras';
-import { contextoDeVariables, fechaTextual, huellaDeContenido, renderizar, validarContenido, variablesDeTexto, vigenciaEnTexto } from '../src/utils/plantillaCertificado';
+import { contenidoDe, contextoDeVariables, contrasteSobreBlanco, fechaTextual, huellaDeContenido, problemasDeDiseno, renderizar, validarContenido, variablesDeTexto, vigenciaEnTexto } from '../src/utils/plantillaCertificado';
 
 const encabezado: SnapshotCertificado['encabezado'] = {
   institucion: 'Colegio de Prueba',
@@ -326,5 +326,32 @@ describe('opciones del selector que toman la entidad de otro módulo', () => {
   it('la huella de una plantilla sin entidades no cambia por existir el campo', () => {
     const a = contenidoInicial('CERTIFICADO_MATRICULA');
     expect(JSON.stringify(a.destinatarios)).not.toContain('fuente_entidad');
+  });
+});
+
+describe('diseño del texto de la plantilla', () => {
+  const diseno = { fuente: 'SERIF' as const, tamano: 'GRANDE' as const, color_texto: '#222222', color_destacados: '#0B3D91' };
+
+  it('sin diseño la huella es la de siempre, y con diseño cambia', () => {
+    const base = contenidoInicial('CONSTANCIA_ESTUDIO');
+    expect(contenidoDe(base)).toEqual(base);
+    expect(huellaDeContenido('CONSTANCIA_ESTUDIO', { ...base, diseno: null })).toBe(huellaDeContenido('CONSTANCIA_ESTUDIO', base));
+    expect(contenidoDe({ ...base, diseno: null })).not.toHaveProperty('diseno');
+    expect(huellaDeContenido('CONSTANCIA_ESTUDIO', contenidoDe({ ...base, diseno }))).not.toBe(huellaDeContenido('CONSTANCIA_ESTUDIO', contenidoDe(base)));
+  });
+
+  it('acepta un diseño legible y rechaza colores claros o inválidos', () => {
+    expect(problemasDeDiseno(null)).toEqual([]);
+    expect(problemasDeDiseno(diseno)).toEqual([]);
+    expect(problemasDeDiseno({ ...diseno, color_texto: '#BBBBBB' })).toHaveLength(1);
+    expect(problemasDeDiseno({ ...diseno, color_destacados: 'azul' })).toEqual(['El color de las frases destacadas no es válido.']);
+    expect(contrasteSobreBlanco('#000000')).toBeCloseTo(21, 0);
+    expect(contrasteSobreBlanco('#FFFFFF')).toBeCloseTo(1, 1);
+  });
+
+  it('validarContenido incluye los problemas del diseño', () => {
+    const tipo = tipoDe('CONSTANCIA_ESTUDIO');
+    expect(validarContenido(tipo, { ...contenidoInicial('CONSTANCIA_ESTUDIO'), diseno })).toEqual([]);
+    expect(validarContenido(tipo, { ...contenidoInicial('CONSTANCIA_ESTUDIO'), diseno: { ...diseno, color_texto: '#EEEEEE' } })).toHaveLength(1);
   });
 });

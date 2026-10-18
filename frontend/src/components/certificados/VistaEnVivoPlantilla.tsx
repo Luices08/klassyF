@@ -1,16 +1,22 @@
 import { Alert, errorMessage } from '../ui/Alert';
 import { Spinner } from '../ui/Spinner';
-import type { RenderPlantilla } from '../../hooks/useCertificados';
-import { ETIQUETA_JORNADA } from '../../hooks/useCertificados';
+import type { DisenoPlantilla, FuenteDiseno, RenderPlantilla, TamanoDiseno } from '../../hooks/useCertificados';
+import { DISENO_INICIAL, ETIQUETA_JORNADA } from '../../hooks/useCertificados';
+
+const FAMILIA_CSS: Record<FuenteDiseno, string> = { SANS: 'Helvetica, Arial, sans-serif', SERIF: '"Times New Roman", Times, serif', MONO: '"Courier New", Courier, monospace' };
+const ESCALA_CSS: Record<TamanoDiseno, number> = { PEQUENO: 0.9, NORMAL: 1, GRANDE: 1.1 };
 
 /**
  * El documento tal como quedará, con datos de muestra, mientras se redacta. Es una aproximación en pantalla: el encabezado oficial (escudo,
  * DANE, NIT, resolución), el QR y las firmas los pone el sistema al dibujar el PDF; el botón «Vista previa (PDF)» muestra el documento exacto.
  */
-export function VistaEnVivoPlantilla({ datos, cargando, error }: { datos: RenderPlantilla | undefined; cargando: boolean; error: unknown }) {
+export function VistaEnVivoPlantilla({ datos, cargando, error, diseno }: { datos: RenderPlantilla | undefined; cargando: boolean; error: unknown; diseno?: DisenoPlantilla | null }) {
   if (error && !datos) return <Alert tone="error">{errorMessage(error)}</Alert>;
   if (!datos) return <Spinner label="Preparando la vista…" />;
   const e = datos.encabezado;
+  // Solo el cuerpo cambia con el diseño; el encabezado y las firmas conservan su estilo, como en el PDF.
+  const d = diseno ?? DISENO_INICIAL;
+  const estiloCuerpo = (px: number, color: string, negrita = false) => ({ fontFamily: FAMILIA_CSS[d.fuente], fontSize: `${px * ESCALA_CSS[d.tamano]}px`, color, fontWeight: negrita ? 700 : 400 });
 
   return (
     <div className="space-y-3">
@@ -33,19 +39,19 @@ export function VistaEnVivoPlantilla({ datos, cargando, error }: { datos: Render
             switch (b.estilo) {
               case 'PREAMBULO':
                 return (
-                  <p key={i} className="text-center">
+                  <p key={i} className="text-center" style={estiloCuerpo(13, d.color_texto)}>
                     {b.texto}
                   </p>
                 );
               case 'FORMULA':
                 return (
-                  <p key={i} className="py-1 text-center text-base font-bold text-ink">
+                  <p key={i} className="py-1 text-center" style={estiloCuerpo(17, d.color_destacados, true)}>
                     {b.texto}
                   </p>
                 );
               case 'DESTACADO':
                 return (
-                  <p key={i} className="font-bold text-ink">
+                  <p key={i} style={estiloCuerpo(14, d.color_destacados, true)}>
                     {b.texto}
                   </p>
                 );
@@ -53,7 +59,7 @@ export function VistaEnVivoPlantilla({ datos, cargando, error }: { datos: Render
                 return datos.tabla ? <TablaDeMuestra key={i} tabla={datos.tabla} /> : null;
               default:
                 return (
-                  <p key={i} className="text-justify">
+                  <p key={i} className="text-justify" style={estiloCuerpo(14, d.color_texto)}>
                     {b.texto}
                   </p>
                 );

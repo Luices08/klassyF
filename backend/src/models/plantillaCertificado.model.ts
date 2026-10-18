@@ -1,6 +1,6 @@
 import { HydratedDocument, Model, Schema, Types, model } from 'mongoose';
 import { ClaveCertificado, FUENTES_ENTIDAD } from '../constants/certificados';
-import { ESTILOS_BLOQUE, ContenidoPlantilla } from '../constants/plantillasCertificado';
+import { ESTILOS_BLOQUE, FUENTES_DISENO, TAMANOS_DISENO, ContenidoPlantilla } from '../constants/plantillasCertificado';
 
 export const ESTADOS_PLANTILLA = ['VIGENTE', 'ARCHIVADA'] as const;
 export type EstadoPlantilla = (typeof ESTADOS_PLANTILLA)[number];
@@ -45,6 +45,11 @@ const destinatarioSchema = new Schema(
   { _id: false }
 );
 
+const disenoSchema = new Schema(
+  { fuente: { type: String, enum: FUENTES_DISENO, required: true }, tamano: { type: String, enum: TAMANOS_DISENO, required: true }, color_texto: { type: String, required: true }, color_destacados: { type: String, required: true } },
+  { _id: false }
+);
+
 const plantillaSchema = new Schema<IPlantillaCertificado, PlantillaCertificadoModel>(
   {
     tipo: { type: String, required: true },
@@ -55,6 +60,7 @@ const plantillaSchema = new Schema<IPlantillaCertificado, PlantillaCertificadoMo
     destinatarios: { type: [destinatarioSchema], default: [] },
     frase_otro: { type: String, required: true },
     vigencia_dias: { type: Number, default: null },
+    diseno: { type: disenoSchema, default: null },
     hash: { type: String, required: true },
     nota: { type: String, default: '', maxlength: 300 },
     publicada_por: { type: Schema.Types.ObjectId, ref: 'User', default: null },
@@ -64,7 +70,7 @@ const plantillaSchema = new Schema<IPlantillaCertificado, PlantillaCertificadoMo
 );
 
 // Una versión publicada no se edita: lo único que cambia es su estado (VIGENTE → ARCHIVADA).
-const CAMPOS_INMUTABLES = ['tipo', 'version', 'titulo', 'bloques', 'destinatarios', 'frase_otro', 'vigencia_dias', 'hash', 'publicada_por', 'publicada_at'];
+const CAMPOS_INMUTABLES = ['tipo', 'version', 'titulo', 'bloques', 'destinatarios', 'frase_otro', 'vigencia_dias', 'diseno', 'hash', 'publicada_por', 'publicada_at'];
 plantillaSchema.pre('save', function protegerVersion(next) {
   if (!this.isNew && CAMPOS_INMUTABLES.some((campo) => this.isModified(campo))) return next(new Error('Una versión publicada de la plantilla no se puede modificar: se publica una nueva.'));
   next();

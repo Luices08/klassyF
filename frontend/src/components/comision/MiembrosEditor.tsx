@@ -21,25 +21,27 @@ export function MiembrosEditor({ value, onChange, deshabilitado }: { value: Entr
       return;
     }
     const u = usuarios.find((x) => x._id === userId);
-    let cargoAuto = value[i]?.cargo || '';
-    let representaAuto: Representacion = value[i]?.representa ?? 'OTRO';
+    let cargoAuto = '';
+    let representaAuto: Representacion = 'OTRO';
 
     if (u) {
       if (u.rol === 'DOCENTE') {
-        cargoAuto = cargoAuto || 'Docente';
+        cargoAuto = 'Docente';
         representaAuto = 'DOCENTE';
       } else if (u.rol === 'COORDINADOR') {
-        cargoAuto = cargoAuto || 'Coordinador(a)';
+        cargoAuto = 'Coordinador(a)';
         representaAuto = 'DIRECTIVO';
       } else if (u.rol === 'ADMIN') {
-        cargoAuto = cargoAuto || 'Rector(a)';
+        cargoAuto = 'Rector(a)';
         representaAuto = 'DIRECTIVO';
       } else if (u.rol === 'ORIENTADOR') {
-        cargoAuto = cargoAuto || 'Orientador(a) escolar';
+        cargoAuto = 'Orientador(a) escolar';
         representaAuto = 'ORIENTACION';
       } else if (u.rol === 'ACUDIENTE') {
-        cargoAuto = cargoAuto || 'Representante de Padres';
+        cargoAuto = 'Representante de Padres';
         representaAuto = 'PADRES';
+      } else {
+        cargoAuto = u.rol;
       }
     }
 

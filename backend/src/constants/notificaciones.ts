@@ -40,6 +40,7 @@ export const EVENTOS_NOTIFICACION = [
   'CITACION_REPROGRAMADA',
   'CITACION_CANCELADA',
   'CITACION_RESPONDIDA',
+  'SESION_COMISION_CONVOCADA',
 ] as const;
 export type EventoNotificacion = (typeof EVENTOS_NOTIFICACION)[number];
 
@@ -68,6 +69,7 @@ export const METADATOS_EVENTO: Record<EventoNotificacion, MetadatoEvento> = {
   CITACION_REPROGRAMADA: { severidad: 'IMPORTANTE', canales: ['CAMPANITA'] },
   CITACION_CANCELADA: { severidad: 'IMPORTANTE', canales: ['CAMPANITA'] },
   CITACION_RESPONDIDA: { severidad: 'INFO', canales: ['CAMPANITA'] },
+  SESION_COMISION_CONVOCADA: { severidad: 'IMPORTANTE', canales: ['CAMPANITA'] },
 };
 
 /**

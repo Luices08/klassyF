@@ -25,6 +25,7 @@ export const datosDeConfiguracion = (c: ConfiguracionPromocionAnticipadaDocument
     activa: plano.activa,
     periodo_evaluacion: plano.periodo_evaluacion,
     dias_ventana_tras_cierre: plano.dias_ventana_tras_cierre,
+    grados_excluidos_ids: (plano.grados_excluidos_ids ?? []).map(String),
     rendimiento_excepcional: plano.rendimiento_excepcional,
     reiniciantes: plano.reiniciantes,
     exige: plano.exige,

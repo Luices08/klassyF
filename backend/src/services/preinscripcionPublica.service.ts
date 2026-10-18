@@ -113,6 +113,7 @@ export async function subirDocumento(
   const archivoPath = await guardarArchivoDeDocumento(String(enrollment._id), tipoDocumento, archivo);
   const actualizada = await cargarDocumento(String(enrollment._id), tipoDocumento, archivoPath, {
     id: null,
+    tipo: 'FAMILIA',
   });
   // cargarDocumento devuelve la matricula sin poblar: se reutiliza el grupo ya poblado.
   actualizada.group_id = enrollment.group_id;

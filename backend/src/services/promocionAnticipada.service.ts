@@ -140,6 +140,9 @@ export async function solicitar(e: EntradaSolicitud, usuario: UserDocument, ip?:
   const grupo = await Group.findById(matricula.group_id);
   const grado = grupo ? await Grade.findById(grupo.grade_id) : null;
   if (!grupo || !grado) throw new ApiError(404, 'No se encontró el grupo o el grado de la matrícula.');
+  if (config.grados_excluidos_ids && config.grados_excluidos_ids.some((id) => String(id) === String(grado._id))) {
+    throw new ApiError(409, `El grado ${grado.nombre} está excluido de la promoción anticipada según el SIEE.`);
+  }
   if (!(await gradoSiguiente(grado))) throw new ApiError(409, `No existe un grado activo después de ${grado.nombre}.`);
   if (await EvaluacionPromocion.exists({ academic_year_id: anio._id, student_id: matricula.student_id, vigente: true })) {
     throw new ApiError(409, 'El estudiante ya tiene cierre de promoción del año: la anticipada solo aplica antes de él.');
@@ -154,9 +157,29 @@ export async function solicitar(e: EntradaSolicitud, usuario: UserDocument, ip?:
     throw new ApiError(409, 'El estudiante no es reiniciante: no ingresó como repitente ni no fue promovido en este grado el año anterior.');
   }
 
+  let asignaturasReprobadasPreviamente: Set<string> | undefined;
+  if (e.tipo === 'REINICIANTE' && criterio.nota_minima_asignaturas_reprobadas != null) {
+    asignaturasReprobadasPreviamente = new Set<string>();
+    const evalPrevia = await EvaluacionPromocion.findOne({
+      student_id: matricula.student_id,
+      grado_id: grado._id,
+      academic_year_id: { $ne: matricula.academic_year_id },
+      vigente: true,
+      resultado: 'NO_PROMOVIDO',
+    }).sort({ createdAt: -1 });
+
+    if (evalPrevia && typeof evalPrevia.detalle === 'object' && evalPrevia.detalle !== null) {
+      const perdidas = (evalPrevia.detalle as { perdidas?: Array<{ id?: string; nombre?: string; tipo?: string }> }).perdidas ?? [];
+      for (const p of perdidas) {
+        if (p.id) asignaturasReprobadasPreviamente.add(String(p.id));
+        if (p.nombre) asignaturasReprobadasPreviamente.add(p.nombre.trim().toLowerCase());
+      }
+    }
+  }
+
   const decimales = escalaEfectiva(anio.escala_evaluacion).precision_decimales;
   const notas: NotaDeAsignatura[] = (await notasCerradas(anio, matricula.group_id, matricula.student_id)).map((n) => ({ subject_id: n.subject_id, nombre: n.nombre, nota: n.porPeriodo.get(periodo.numero) ?? null }));
-  const resultado = evaluarCriterio(notas, criterio, decimales);
+  const resultado = evaluarCriterio(notas, criterio, decimales, asignaturasReprobadasPreviamente);
   if (!resultado.cumple) throw new ApiError(409, `El estudiante no cumple el criterio del colegio: ${resultado.motivos.join(' ')}`, { motivos: resultado.motivos });
 
   let tramite: PromocionAnticipadaDocument;

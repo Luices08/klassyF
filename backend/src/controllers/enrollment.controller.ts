@@ -88,8 +88,12 @@ export const cargarDocumento = catchAsync<ChecklistParams>(async (req, res) => {
   if (!file) throw new ApiError(400, 'Debes adjuntar un archivo en el campo "file".');
 
   const archivoPath = await guardarArchivoDeDocumento(req.params.id, req.params.tipoDocumento, file);
+  // `aprobar` llega como campo del formulario multipart (después de multer): «ya verifiqué el original».
+  const aprobar = req.body?.aprobar === 'true' || req.body?.aprobar === true;
   const enrollment = await enrollmentService.cargarDocumento(req.params.id, req.params.tipoDocumento, archivoPath, {
     id: req.user!._id,
+    tipo: 'PERSONAL',
+    aprobar,
   });
   res.status(200).json({ success: true, data: enrollment });
 });

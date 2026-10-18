@@ -87,7 +87,7 @@ describe('M04: documentos de matrícula y paz y salvo de fin de año', () => {
     it('con todo aprobado pasa sola a definitiva y la transición manual también queda permitida', async () => {
       const matricula = await matricularAntiguo(e.estudiante);
       for (const item of (await Enrollment.findById(matricula._id))!.checklist) {
-        await cargarDocumento(String(matricula._id), item.tipo_documento, 'ruta/falsa.pdf', { id: e.secretaria._id });
+        await cargarDocumento(String(matricula._id), item.tipo_documento, 'ruta/falsa.pdf', { id: e.secretaria._id, tipo: 'PERSONAL' });
         await revisarDocumento(String(matricula._id), item.tipo_documento, { estado: 'APROBADO' }, { id: e.secretaria._id });
       }
       expect((await Enrollment.findById(matricula._id))!.estado).toBe('MATRICULADO_DEFINITIVO');
@@ -98,8 +98,8 @@ describe('M04: documentos de matrícula y paz y salvo de fin de año', () => {
     it('lista lo cargado y sin revisar, del más antiguo al más reciente, y deja de listar lo revisado', async () => {
       const a = await matricularAntiguo(e.estudiante);
       const b = await matricularAntiguo(e.otroEstudiante);
-      await cargarDocumento(String(a._id), 'FOTO', 'ruta/a.pdf', { id: e.secretaria._id });
-      await cargarDocumento(String(b._id), 'CARNE_EPS', 'ruta/b.pdf', { id: e.secretaria._id });
+      await cargarDocumento(String(a._id), 'FOTO', 'ruta/a.pdf', { id: e.secretaria._id, tipo: 'PERSONAL' });
+      await cargarDocumento(String(b._id), 'CARNE_EPS', 'ruta/b.pdf', { id: e.secretaria._id, tipo: 'PERSONAL' });
 
       const antes = await listarDocumentosPorRevisar({ academic_year_id: anioSiguiente });
       expect(antes.total).toBe(2);
@@ -170,7 +170,7 @@ describe('M04: documentos de matrícula y paz y salvo de fin de año', () => {
       await revisarPazYSalvo(como(e.secretaria), String(e.tercerEstudiante._id), anioActual, { estado: 'CONFIRMADO' });
       const matricula = await matricularAntiguo(e.tercerEstudiante);
       await Enrollment.updateOne({ _id: matricula._id }, { $pull: { checklist: { tipo_documento: 'PAZ_Y_SALVO_ANIO_ANTERIOR' } } });
-      await sincronizarRequisitosMatricula(String(matricula._id), { id: e.secretaria._id });
+      await sincronizarRequisitosMatricula(String(matricula._id), { id: e.secretaria._id, tipo: 'PERSONAL' });
       expect(await itemPazYSalvo(matricula._id)).toMatchObject({ estado: 'APROBADO' });
     });
   });

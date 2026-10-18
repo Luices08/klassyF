@@ -6,7 +6,6 @@ import {
   ESTADOS_MATRICULA,
   EstadoDocumentoMatricula,
   EstadoMatricula,
-  TIPOS_DOCUMENTO_MATRICULA,
   TIPOS_INGRESO,
   TipoDocumentoMatricula,
   TipoIngreso,
@@ -16,12 +15,18 @@ import { TIPOS_SALIDA, TipoSalida } from '../constants/salidas';
 export interface IChecklistItem {
   tipo_documento: TipoDocumentoMatricula;
   nombre_personalizado?: string | null;
+  /** Copia de lo que decía el catálogo al agregar el documento (null en los anteriores: se lee de las constantes de partida). */
+  indicacion?: string | null;
+  categoria?: string | null;
   obligatorio?: boolean;
   estado: EstadoDocumentoMatricula;
   archivo_path: string | null;
   comentario: string | null;
   fecha_carga: Date | null;
   revisado_por: Types.ObjectId | null;
+  /** Quién subió el archivo: la familia (sitio público o portal) o el personal. null en los anteriores. */
+  cargado_por_tipo?: 'FAMILIA' | 'PERSONAL' | null;
+  cargado_por?: Types.ObjectId | null;
 }
 
 /** Soporte documental de la salida (carta de retiro, constancia de la institución receptora...). Mientras no exista el archivo general (M29) vive en disco. */
@@ -93,14 +98,18 @@ type EnrollmentModel = Model<IEnrollment>;
 
 const checklistItemSchema = new Schema<IChecklistItem>(
   {
-    tipo_documento: { type: String, enum: TIPOS_DOCUMENTO_MATRICULA, required: true },
+    tipo_documento: { type: String, trim: true, match: /^[A-Z0-9_]{2,60}$/, required: true },
     nombre_personalizado: { type: String, default: null },
+    indicacion: { type: String, default: null },
+    categoria: { type: String, default: null },
     obligatorio: { type: Boolean, default: true },
     estado: { type: String, enum: ESTADOS_DOCUMENTO_MATRICULA, default: 'PENDIENTE' },
     archivo_path: { type: String, default: null },
     comentario: { type: String, default: null },
     fecha_carga: { type: Date, default: null },
     revisado_por: { type: Schema.Types.ObjectId, ref: 'User', default: null },
+    cargado_por_tipo: { type: String, enum: ['FAMILIA', 'PERSONAL', null], default: null },
+    cargado_por: { type: Schema.Types.ObjectId, ref: 'User', default: null },
   },
   { _id: false }
 );
@@ -204,7 +213,7 @@ enrollmentSchema.pre('validate', function validarFolio(this: IEnrollment, next) 
 // La salida es un asiento histórico: lo que dice quién, cuándo y por qué no se reescribe (los soportes y el cupo sí avanzan).
 const CAMPOS_INMUTABLES_DE_SALIDA = ['salida.tipo', 'salida.fecha_efectiva', 'salida.motivo', 'salida.estado_previo', 'salida.registrado_por', 'salida.fecha_registro'];
 enrollmentSchema.pre('save', function protegerSalida(this: EnrollmentDocument, next) {
-  if (!this.isNew && CAMPOS_INMUTABLES_DE_SALIDA.some((campo) => this.isModified(campo))) {
+  if (!this.isNew && !this.isModified('estado') && CAMPOS_INMUTABLES_DE_SALIDA.some((campo) => this.isModified(campo))) {
     return next(new Error('La salida registrada de una matrícula no se modifica.'));
   }
   next();

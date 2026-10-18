@@ -1,5 +1,7 @@
 import { type FormEvent, useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
+import { useCampuses } from '../../hooks/useCatalogs';
+import { useInstitution } from '../../hooks/useInstitution';
 import { type EntradaMiembro, type InstanciaSesion, NOMBRES_INSTANCIA, useCrearSesion } from '../../hooks/useComision';
 import { aInputFecha } from '../../lib/fechas';
 import { Alert, errorMessage } from '../ui/Alert';
@@ -20,12 +22,15 @@ export function NuevaSesionDrawer({
   onCreada: (id: string) => void;
 }) {
   const { user } = useAuth();
+  const { data: institucion } = useInstitution();
+  const sedes = useCampuses(institucion?._id).data ?? [];
   const crear = useCrearSesion();
   const [instancia, setInstancia] = useState<InstanciaSesion>('COMISION_EVALUACION');
   const [periodo, setPeriodo] = useState('');
   const [fecha, setFecha] = useState(aInputFecha(new Date().toISOString()));
   const [hora, setHora] = useState('');
-  const [lugar, setLugar] = useState('');
+  const [sedeId, setSedeId] = useState('');
+  const [espacio, setEspacio] = useState('');
   const [orden, setOrden] = useState('');
   const [miembros, setMiembros] = useState<EntradaMiembro[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -34,6 +39,10 @@ export function NuevaSesionDrawer({
   async function enviar(e: FormEvent) {
     e.preventDefault();
     setError(null);
+    const sedeObj = sedes.find((s) => s._id === sedeId);
+    const lugarFinal = sedeObj
+      ? (espacio.trim() ? `${sedeObj.nombre} — ${espacio.trim()}` : sedeObj.nombre)
+      : espacio.trim();
     try {
       const s = await crear.mutateAsync({
         instancia,
@@ -41,7 +50,7 @@ export function NuevaSesionDrawer({
         periodo_numero: periodo ? Number(periodo) : null,
         fecha,
         hora: hora || undefined,
-        lugar: lugar || undefined,
+        lugar: lugarFinal || undefined,
         orden_del_dia: orden || undefined,
         miembros: miembros.map((m) => ({ ...m, user_id: m.user_id ?? null, nombre: m.user_id ? undefined : m.nombre })),
       });
@@ -73,9 +82,15 @@ export function NuevaSesionDrawer({
         </Select>
         <Input label="Fecha" type="date" value={fecha} onChange={(e) => setFecha(e.target.value)} />
         <Input label="Hora" value={hora} maxLength={20} placeholder="2:00 p. m." onChange={(e) => setHora(e.target.value)} />
-        <div className="sm:col-span-2">
-          <Input label="Lugar" value={lugar} maxLength={160} onChange={(e) => setLugar(e.target.value)} />
-        </div>
+        <Select label="Sede institucional (Lugar)" value={sedeId} onChange={(e) => setSedeId(e.target.value)}>
+          <option value="">Elige una sede...</option>
+          {sedes.map((s) => (
+            <option key={s._id} value={s._id}>
+              {s.nombre}
+            </option>
+          ))}
+        </Select>
+        <Input label="Espacio / Sala (opcional)" value={espacio} maxLength={100} placeholder="Ej: Sala de Juntas, Rectoría..." onChange={(e) => setEspacio(e.target.value)} />
       </div>
       <Textarea label="Orden del día" rows={4} maxLength={8000} value={orden} onChange={(e) => setOrden(e.target.value)} hint="Se exige para poder convocar." />
       <div>

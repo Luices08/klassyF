@@ -1,7 +1,7 @@
 import Joi from 'joi';
-import { ESTADOS_DOCUMENTO_MATRICULA, ESTADOS_MATRICULA, TIPOS_DOCUMENTO_MATRICULA, TIPOS_INGRESO } from '../constants/enums';
+import { ESTADOS_DOCUMENTO_MATRICULA, ESTADOS_MATRICULA, TIPOS_INGRESO } from '../constants/enums';
 import { ValidationSchema } from '../middlewares/validate.middleware';
-import { objectId } from './common.validator';
+import { claveDocumento, objectId } from './common.validator';
 
 // Lo que la familia declara sobre apoyos o diagnósticos previos (M16): secretaría transcribe, no valora ni rotula.
 const apoyoDeclarado = Joi.object({
@@ -20,7 +20,8 @@ export const createEnrollment: ValidationSchema = {
       .required(),
     numero_libro: Joi.number().integer().min(1),
     estado_inicial: Joi.string().valid('MATRICULADO_CONDICIONAL', 'MATRICULADO_DEFINITIVO'),
-    fecha_limite_compromiso: Joi.date(),
+    documentacion_completa: Joi.boolean(),
+    fecha_limite_compromiso: Joi.date().allow(null, ''),
     forzar_sobrecupo: Joi.boolean(),
     reingreso: Joi.boolean(),
     apoyo_declarado: apoyoDeclarado,
@@ -69,18 +70,14 @@ export const cambiarGrupo: ValidationSchema = {
 export const cargarDocumento: ValidationSchema = {
   params: Joi.object({
     id: objectId.required(),
-    tipoDocumento: Joi.string()
-      .valid(...TIPOS_DOCUMENTO_MATRICULA)
-      .required(),
+    tipoDocumento: claveDocumento.required(),
   }),
 };
 
 export const revisarDocumento: ValidationSchema = {
   params: Joi.object({
     id: objectId.required(),
-    tipoDocumento: Joi.string()
-      .valid(...TIPOS_DOCUMENTO_MATRICULA)
-      .required(),
+    tipoDocumento: claveDocumento.required(),
   }),
   body: Joi.object({
     estado: Joi.string()
@@ -93,9 +90,7 @@ export const revisarDocumento: ValidationSchema = {
 export const descargarDocumento: ValidationSchema = {
   params: Joi.object({
     id: objectId.required(),
-    tipoDocumento: Joi.string()
-      .valid(...TIPOS_DOCUMENTO_MATRICULA)
-      .required(),
+    tipoDocumento: claveDocumento.required(),
   }),
 };
 
@@ -106,10 +101,8 @@ export const descargarActa: ValidationSchema = {
 export const agregarDocumentoChecklist: ValidationSchema = {
   params: Joi.object({ id: objectId.required() }),
   body: Joi.object({
-    tipo_documento: Joi.string()
-      .valid(...TIPOS_DOCUMENTO_MATRICULA)
-      .required(),
-    nombre_personalizado: Joi.string().trim().max(100).allow('', null),
+    tipo_documento: claveDocumento,
+    nombre_personalizado: Joi.string().trim().max(120).allow('', null),
     obligatorio: Joi.boolean().default(true),
   }),
 };
@@ -117,18 +110,14 @@ export const agregarDocumentoChecklist: ValidationSchema = {
 export const eliminarDocumentoChecklist: ValidationSchema = {
   params: Joi.object({
     id: objectId.required(),
-    tipoDocumento: Joi.string()
-      .valid(...TIPOS_DOCUMENTO_MATRICULA)
-      .required(),
+    tipoDocumento: claveDocumento.required(),
   }),
 };
 
 export const actualizarComentario: ValidationSchema = {
   params: Joi.object({
     id: objectId.required(),
-    tipoDocumento: Joi.string()
-      .valid(...TIPOS_DOCUMENTO_MATRICULA)
-      .required(),
+    tipoDocumento: claveDocumento.required(),
   }),
   body: Joi.object({
     comentario: Joi.string().trim().max(500).allow('', null).optional(),
@@ -137,16 +126,17 @@ export const actualizarComentario: ValidationSchema = {
 
 export const listarDocumentosPrevistos: ValidationSchema = {
   query: Joi.object({
-    group_id: objectId.required(),
+    group_id: objectId.allow('', null),
     tipo_ingreso: Joi.string()
       .valid(...TIPOS_INGRESO)
       .required(),
-    student_id: objectId,
+    student_id: objectId.allow('', null),
   }),
 };
 
 export const listarDocumentosPorRevisar: ValidationSchema = {
   query: Joi.object({
+    subido_por: Joi.string().valid('FAMILIA', 'PERSONAL'),
     academic_year_id: objectId,
     group_id: objectId,
     page: Joi.number().integer().min(1),

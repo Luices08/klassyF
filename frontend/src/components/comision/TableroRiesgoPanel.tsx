@@ -1,4 +1,6 @@
 import { useState } from 'react';
+import { useCampuses, useTodasLasJornadas } from '../../hooks/useCatalogs';
+import { useInstitution } from '../../hooks/useInstitution';
 import { useGroups } from '../../hooks/useGroups';
 import { type NivelRiesgo, useTableroRiesgo } from '../../hooks/useComision';
 import { opcionesDeGrupos } from '../../lib/opcionesBuscables';
@@ -22,11 +24,25 @@ const ORDEN: NivelRiesgo[] = ['ROJO', 'NARANJA', 'AMARILLO', 'VERDE'];
  * los del colegio (pestaña Configuración). No decide nada: la promoción es de M19.
  */
 export function TableroRiesgoPanel({ anioId, periodos }: { anioId?: string; periodos: Array<{ numero: number; nombre: string }> }) {
+  const { data: institucion } = useInstitution();
+  const sedes = useCampuses(institucion?._id).data ?? [];
+  const jornadas = useTodasLasJornadas().data ?? [];
   const grupos = useGroups({ academic_year_id: anioId });
+  const [sedeId, setSedeId] = useState('');
+  const [jornadaId, setJornadaId] = useState('');
   const [periodo, setPeriodo] = useState<number | ''>('');
   const [grupoId, setGrupoId] = useState('');
   const [nivel, setNivel] = useState<NivelRiesgo | ''>('');
   const [ficha, setFicha] = useState<{ id: string; nombre: string } | null>(null);
+
+  const gruposFiltrados = (grupos.data ?? []).filter((g) => {
+    const sId = typeof g.sede_id === 'object' ? g.sede_id._id : g.sede_id;
+    const jId = typeof g.jornada_id === 'object' ? g.jornada_id._id : g.jornada_id;
+    if (sedeId && sId !== sedeId) return false;
+    if (jornadaId && jId !== jornadaId) return false;
+    return true;
+  });
+
   const elegido = periodo || periodos[0]?.numero;
   const tablero = useTableroRiesgo({ academic_year_id: anioId, periodo_numero: elegido || undefined, group_id: grupoId || undefined });
   const filas = (tablero.data?.estudiantes ?? []).filter((e) => !nivel || e.nivel === nivel);
@@ -34,7 +50,7 @@ export function TableroRiesgoPanel({ anioId, periodos }: { anioId?: string; peri
   return (
     <div className="space-y-4">
       <Card>
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
           <Select label="Periodo" value={elegido ?? ''} onChange={(e) => setPeriodo(Number(e.target.value))}>
             {periodos.map((p) => (
               <option key={p.numero} value={p.numero}>
@@ -42,7 +58,23 @@ export function TableroRiesgoPanel({ anioId, periodos }: { anioId?: string; peri
               </option>
             ))}
           </Select>
-          <SelectBuscable label="Grupo" value={grupoId} onChange={setGrupoId} vacioLabel="Todos los grupos" placeholder="Buscar grupo…" opciones={opcionesDeGrupos(grupos.data ?? [])} />
+          <Select label="Sede" value={sedeId} onChange={(e) => { setSedeId(e.target.value); setGrupoId(''); }}>
+            <option value="">Todas las sedes</option>
+            {sedes.map((s) => (
+              <option key={s._id} value={s._id}>
+                {s.nombre}
+              </option>
+            ))}
+          </Select>
+          <Select label="Jornada" value={jornadaId} onChange={(e) => { setJornadaId(e.target.value); setGrupoId(''); }}>
+            <option value="">Todas las jornadas</option>
+            {jornadas.map((j) => (
+              <option key={j._id} value={j._id}>
+                {j.nombre}
+              </option>
+            ))}
+          </Select>
+          <SelectBuscable label="Grupo" value={grupoId} onChange={setGrupoId} vacioLabel="Todos los grupos" placeholder="Buscar grupo…" opciones={opcionesDeGrupos(gruposFiltrados)} />
           <Select label="Nivel de riesgo" value={nivel} onChange={(e) => setNivel(e.target.value as NivelRiesgo | '')}>
             <option value="">Todos</option>
             {ORDEN.map((n) => (

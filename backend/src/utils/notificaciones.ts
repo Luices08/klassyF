@@ -102,5 +102,10 @@ export function renderizarNotificacion(evento: EventoNotificacion, contador: num
         titulo: 'Respuestas a tu citación',
         mensaje: `${n} ${plural(n, 'acudiente respondió', 'acudientes respondieron')} a «${datos.nombre ?? 'tu citación'}».`,
       };
+    case 'SESION_COMISION_CONVOCADA':
+      return {
+        titulo: 'Sesión convocada',
+        mensaje: `Has sido convocado(a) a la sesión de «${datos.nombre ?? 'Comisión'}»${datos.cuando ? ` el ${datos.cuando}` : ''}. Revisa el orden del día y participa.`,
+      };
   }
 }

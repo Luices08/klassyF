@@ -11,13 +11,18 @@ const criterio = Joi.object({
   nota_minima_asignatura: Joi.number().greater(0).allow(null).required(),
 });
 
+const criterioReiniciantes = criterio.keys({
+  nota_minima_asignaturas_reprobadas: Joi.number().greater(0).allow(null).optional(),
+});
+
 export const actualizarConfiguracion: ValidationSchema = {
   body: Joi.object({
     activa: Joi.boolean().required(),
     periodo_evaluacion: Joi.number().integer().min(1).max(12).required(),
     dias_ventana_tras_cierre: Joi.number().integer().min(0).max(365).required(),
+    grados_excluidos_ids: Joi.array().items(objectId).default([]),
     rendimiento_excepcional: criterio.required(),
-    reiniciantes: criterio.required(),
+    reiniciantes: criterioReiniciantes.required(),
     exige: Joi.object({ concepto_comision: Joi.boolean().required(), consentimiento_familia: Joi.boolean().required(), decision_consejo_directivo: Joi.boolean().required() }).required(),
     tratamiento_notas: Joi.string().valid(...TRATAMIENTOS_NOTAS).required(),
   }),

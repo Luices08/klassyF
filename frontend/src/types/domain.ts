@@ -24,6 +24,7 @@ export type TipoIngreso = (typeof TIPOS_INGRESO)[number];
 export const ESTADOS_DOCUMENTO_MATRICULA = ['PENDIENTE', 'CARGADO', 'APROBADO', 'RECHAZADO'] as const;
 export type EstadoDocumentoMatricula = (typeof ESTADOS_DOCUMENTO_MATRICULA)[number];
 
+/** Los documentos con que se sembró el catálogo. El catálogo real es configurable (`/requisitos-documentales`): la clave de un documento es un texto. */
 export const TIPOS_DOCUMENTO_MATRICULA = [
   'DOCUMENTO_IDENTIDAD',
   'FOTO',
@@ -42,7 +43,7 @@ export const TIPOS_DOCUMENTO_MATRICULA = [
   'PAZ_Y_SALVO_ANIO_ANTERIOR',
   'OTRO_DOCUMENTO',
 ] as const;
-export type TipoDocumentoMatricula = (typeof TIPOS_DOCUMENTO_MATRICULA)[number];
+export type TipoDocumentoMatricula = string;
 
 export const NOMBRES_DOCUMENTO_MATRICULA: Record<TipoDocumentoMatricula, string> = {
   DOCUMENTO_IDENTIDAD: 'Documento de identidad del estudiante',
@@ -491,7 +492,11 @@ export interface Area {
 export interface ChecklistItem {
   tipo_documento: TipoDocumentoMatricula;
   nombre_personalizado?: string | null;
+  /** Copia del catálogo al agregar el documento (los anteriores no la tienen: se lee de las constantes de partida). */
+  indicacion?: string | null;
+  categoria?: string | null;
   obligatorio?: boolean;
+  cargado_por_tipo?: 'FAMILIA' | 'PERSONAL' | null;
   estado: EstadoDocumentoMatricula;
   archivo_path: string | null;
   comentario: string | null;
@@ -1323,3 +1328,11 @@ export interface CuadriculaAsistencia {
   /** estudiante -> fecha -> celda; una celda ausente es un día todavía sin registrar. */
   celdas: Record<string, Record<string, CeldaCuadricula>>;
 }
+
+type ItemDeDocumento = { tipo_documento: string; nombre_personalizado?: string | null; indicacion?: string | null; categoria?: string | null };
+
+/** El nombre que se ve de un documento del checklist: el copiado del catálogo o, en los anteriores, el de partida. */
+export const nombreDeItem = (c: ItemDeDocumento): string => c.nombre_personalizado || NOMBRES_DOCUMENTO_MATRICULA[c.tipo_documento] || c.tipo_documento;
+export const indicacionDeItem = (c: ItemDeDocumento): string => c.indicacion || INDICACIONES_DOCUMENTO_MATRICULA[c.tipo_documento] || '';
+export const categoriaDeItem = (c: ItemDeDocumento): CategoriaDocumentoMatricula =>
+  ((c.categoria as CategoriaDocumentoMatricula | null | undefined) ?? CATEGORIAS_DOCUMENTO_MATRICULA[c.tipo_documento]) || 'INSTITUCIONAL';

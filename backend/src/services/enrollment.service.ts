@@ -1,12 +1,6 @@
 import { ClientSession, Types } from 'mongoose';
 import { avisarDocumentoPorRevisar, avisarDocumentoRechazado } from './notificacionesEventos.service';
 import {
-  CATEGORIAS_DOCUMENTO_MATRICULA,
-  generarChecklistMatricula,
-  INDICACIONES_DOCUMENTO_MATRICULA,
-  NOMBRES_DOCUMENTO_MATRICULA,
-} from '../constants/matriculaChecklist';
-import {
   ESTADOS_MATRICULA_CON_FOLIO,
   ESTADOS_MATRICULA_VIVOS,
   EstadoDocumentoMatricula,
@@ -15,6 +9,7 @@ import {
   Rol,
   TipoDocumentoMatricula,
   TipoIngreso,
+  NivelEducativo,
 } from '../constants/enums';
 import { ROLES } from '../constants/roles';
 import AcademicYear from '../models/academicYear.model';
@@ -28,6 +23,8 @@ import ApiError from '../utils/ApiError';
 import { ESTADOS_QUE_EXIGEN_REINGRESO, SituacionEstudiante, situacionDeEstudiante } from '../utils/situacionEstudiante';
 import { documentosObligatoriosPendientes } from '../utils/documentosMatricula';
 import { resumirLista } from '../utils/horarioCoherencia';
+import { generarChecklistDesdeCatalogo, listarRequisitos } from './requisitoDocumental.service';
+import { nombreDelRequisito } from '../utils/requisitosDocumentales';
 import { runTransaction } from '../utils/runTransaction';
 import { registrarEvento } from './audit.service';
 import { generateFolioMatricula } from './folio.service';
@@ -46,7 +43,8 @@ export interface CreateEnrollmentInput {
   tipo_ingreso: TipoIngreso;
   numero_libro?: number;
   estado_inicial?: 'MATRICULADO_CONDICIONAL' | 'MATRICULADO_DEFINITIVO';
-  fecha_limite_compromiso?: string | Date;
+  documentacion_completa?: boolean;
+  fecha_limite_compromiso?: string | Date | null;
   forzar_sobrecupo?: boolean;
   /** Confirma que quien estaba RETIRADO o INACTIVO en M03 vuelve al colegio: la matrícula lo reactiva. */
   reingreso?: boolean;
@@ -80,7 +78,8 @@ export async function exigirSinMatriculaViva(
  * Crea una matricula ya formalizada (MATRICULADO_*): reserva el cupo
  * (respetando max_capacity salvo override de ADMIN), genera el folio
  * reglamentario (libro/folio) e inicializa el checklist documental segun el
- * nivel del grado del grupo. Las preinscripciones (M04) no pasan por aqui.
+ * nivel del grado del grupo. Si presenta toda la documentación física/digital,
+ * nace como MATRICULADO_DEFINITIVO sin exigir fecha límite de acta de compromiso.
  */
 export async function createEnrollment(
   input: CreateEnrollmentInput,
@@ -88,16 +87,11 @@ export async function createEnrollment(
 ): Promise<EnrollmentDocument> {
   const { student_id, group_id, academic_year_id, tipo_ingreso } = input;
   const numeroLibro = input.numero_libro ?? 1;
-  const estadoInicial = input.estado_inicial ?? 'MATRICULADO_CONDICIONAL';
-
-  // Definitiva es el resultado de tener todos los documentos obligatorios aprobados, no una opción al crear: nace condicional
-  // y pasa sola cuando se aprueba el último (ver `revisarDocumento`).
-  if (estadoInicial === 'MATRICULADO_DEFINITIVO') {
-    throw new ApiError(409, 'Una matrícula nueva empieza como condicional y pasa a definitiva cuando todos sus documentos obligatorios estén aprobados.');
-  }
+  const esDefinitiva = Boolean(input.documentacion_completa || input.estado_inicial === 'MATRICULADO_DEFINITIVO');
+  const estadoInicial: EstadoMatricula = esDefinitiva ? 'MATRICULADO_DEFINITIVO' : 'MATRICULADO_CONDICIONAL';
 
   if (estadoInicial === 'MATRICULADO_CONDICIONAL' && !input.fecha_limite_compromiso) {
-    throw new ApiError(400, 'fecha_limite_compromiso es obligatoria para una matrícula condicional.');
+    throw new ApiError(400, 'La fecha límite del acta de compromiso es obligatoria para una matrícula condicional (con documentos pendientes).');
   }
 
   const puedeForzar = Boolean(input.forzar_sobrecupo) && actor.rol === ROLES.ADMIN;
@@ -155,7 +149,7 @@ export async function createEnrollment(
     }
     const vinculoAcudiente = await StudentGuardian.findOne({ student_id, es_principal: true }).session(session);
 
-    const itemsGenerados = generarChecklistMatricula({
+    const itemsGenerados = await generarChecklistDesdeCatalogo({
       nivel: grade.nivel,
       numeroGrado: grade.numero,
       tipoIngreso: tipo_ingreso,
@@ -163,16 +157,22 @@ export async function createEnrollment(
       parentescoAcudiente: vinculoAcudiente?.parentesco,
     });
 
-    const checklist = itemsGenerados.map((item) => ({
-      tipo_documento: item.tipo_documento,
-      nombre_personalizado: item.nombre_personalizado ?? null,
-      obligatorio: item.obligatorio,
-      estado: 'PENDIENTE' as EstadoDocumentoMatricula,
-      archivo_path: null,
-      comentario: null,
-      fecha_carga: null,
-      revisado_por: null,
-    }));
+    const checklist = itemsGenerados.map((item) => {
+      const aprobadoAlCrear = esDefinitiva && item.obligatorio;
+      return {
+        tipo_documento: item.tipo_documento,
+        nombre_personalizado: item.nombre_personalizado ?? null,
+        indicacion: item.indicacion ?? null,
+        categoria: item.categoria ?? null,
+        obligatorio: item.obligatorio,
+        estado: (aprobadoAlCrear ? 'APROBADO' : 'PENDIENTE') as EstadoDocumentoMatricula,
+        archivo_path: null,
+        comentario: aprobadoAlCrear ? 'Documentación física completa verificada en secretaría al formalizar' : null,
+        fecha_carga: aprobadoAlCrear ? new Date() : null,
+        revisado_por: aprobadoAlCrear ? new Types.ObjectId(actor.id) : null,
+        fecha_revision: aprobadoAlCrear ? new Date() : null,
+      };
+    });
 
     // Quien ya estudió aquí no sube de nuevo el paz y salvo si el del año anterior ya está confirmado.
     const itemPazYSalvo = checklist.find((c) => c.tipo_documento === 'PAZ_Y_SALVO_ANIO_ANTERIOR');
@@ -193,7 +193,7 @@ export async function createEnrollment(
           tipo_ingreso,
           estado: estadoInicial,
           fecha_matricula: new Date(),
-          fecha_limite_compromiso: estadoInicial === 'MATRICULADO_CONDICIONAL' ? input.fecha_limite_compromiso : null,
+          fecha_limite_compromiso: estadoInicial === 'MATRICULADO_CONDICIONAL' && input.fecha_limite_compromiso ? new Date(input.fecha_limite_compromiso) : null,
           checklist,
         },
       ],
@@ -523,24 +523,46 @@ export async function obtenerEnrollment(id: string): Promise<EnrollmentDocument>
   return enrollment;
 }
 
+/** Quién sube el archivo. `aprobar` solo vale para el personal: significa «ya verifiqué el original», así que no queda esperando revisión. */
+export interface ActorCargaDocumento {
+  /** null = la familia subió el documento desde el sitio público, sin sesión. */
+  id: string | Types.ObjectId | null;
+  tipo: 'FAMILIA' | 'PERSONAL';
+  aprobar?: boolean;
+}
+
+/** Con todo lo obligatorio aprobado, la matrícula condicional pasa sola a definitiva. Devuelve el texto de la transición (vacío si no hubo). */
+function promoverSiCompleto(enrollment: EnrollmentDocument): string {
+  const todoAprobado = enrollment.checklist.filter((c) => c.obligatorio !== false).every((c) => c.estado === 'APROBADO');
+  if (!todoAprobado || enrollment.estado !== 'MATRICULADO_CONDICIONAL') return '';
+  enrollment.estado = 'MATRICULADO_DEFINITIVO';
+  enrollment.fecha_limite_compromiso = null;
+  return ' — checklist completo: matrícula pasa a MATRICULADO_DEFINITIVO';
+}
+
 export async function cargarDocumento(
   enrollmentId: string,
   tipoDocumento: TipoDocumentoMatricula,
   archivoPath: string,
-  // null = el acudiente subio el documento desde el sitio publico, sin sesion.
-  actor: { id: string | Types.ObjectId | null }
+  actor: ActorCargaDocumento
 ): Promise<EnrollmentDocument> {
   const enrollment = await Enrollment.findById(enrollmentId);
   if (!enrollment) throw new ApiError(404, 'Matricula no encontrada.');
 
   const item = enrollment.checklist.find((c) => c.tipo_documento === tipoDocumento);
-  if (!item) throw new ApiError(400, 'Ese tipo de documento no aplica para el nivel de esta matrícula.');
+  if (!item) throw new ApiError(400, 'Ese tipo de documento no aplica para esta matrícula.');
 
+  const aprobadoAlCargar = actor.tipo === 'PERSONAL' && actor.aprobar === true && actor.id !== null;
   item.archivo_path = archivoPath;
-  item.estado = 'CARGADO';
+  item.cargado_por_tipo = actor.tipo;
+  item.cargado_por = actor.id ? new Types.ObjectId(actor.id) : null;
+  if (item.estado !== 'APROBADO') {
+    item.estado = aprobadoAlCargar ? 'APROBADO' : 'CARGADO';
+    item.comentario = null;
+    item.revisado_por = aprobadoAlCargar ? new Types.ObjectId(actor.id as string) : null;
+  }
   item.fecha_carga = new Date();
-  item.comentario = null;
-  item.revisado_por = null;
+  const transicion = aprobadoAlCargar ? promoverSiCompleto(enrollment) : '';
   await enrollment.save();
 
   await registrarEvento({
@@ -548,9 +570,9 @@ export async function cargarDocumento(
     accion: 'DOCUMENTO_CARGADO',
     entidad: 'Enrollment',
     entidad_id: enrollment._id,
-    detalle: tipoDocumento,
+    detalle: `${tipoDocumento}${aprobadoAlCargar ? ' (aprobado al cargar)' : ''}${transicion}`,
   });
-  await avisarDocumentoPorRevisar();
+  if (!aprobadoAlCargar) await avisarDocumentoPorRevisar(actor.id);
 
   return enrollment;
 }
@@ -602,10 +624,13 @@ export async function revisarDocumento(
 }
 
 export interface AgregarDocumentoChecklistInput {
-  tipo_documento: TipoDocumentoMatricula;
+  /** Clave de un documento del catálogo. Sin ella se agrega un documento adicional con `nombre_personalizado`. */
+  tipo_documento?: TipoDocumentoMatricula;
   nombre_personalizado?: string;
   obligatorio?: boolean;
 }
+
+const claveAdicional = (): string => `OTRO_${Math.random().toString(36).slice(2, 8).toUpperCase().padEnd(6, 'X')}`;
 
 export async function agregarDocumentoChecklist(
   enrollmentId: string,
@@ -615,15 +640,37 @@ export async function agregarDocumentoChecklist(
   const enrollment = await Enrollment.findById(enrollmentId);
   if (!enrollment) throw new ApiError(404, 'Matrícula no encontrada.');
 
-  if (input.tipo_documento !== 'OTRO_DOCUMENTO') {
-    const yaExiste = enrollment.checklist.some((c) => c.tipo_documento === input.tipo_documento);
-    if (yaExiste) throw new ApiError(400, 'Ese tipo de documento ya existe en el checklist de esta matrícula.');
+  let clave: string;
+  let nombre: string;
+  let indicacion: string | null = null;
+  let categoria: string | null = null;
+  let obligatorio = input.obligatorio ?? true;
+
+  // `OTRO_DOCUMENTO` es la clave de siempre para «un documento que no está en la lista»: se trata como adicional.
+  if (input.tipo_documento && input.tipo_documento !== 'OTRO_DOCUMENTO') {
+    const [requisito] = (await listarRequisitos({ estado: 'activo' })).filter((r) => r.clave === input.tipo_documento);
+    if (!requisito) throw new ApiError(400, 'Ese documento no está en el catálogo del colegio o está desactivado.');
+    if (enrollment.checklist.some((c) => c.tipo_documento === requisito.clave)) throw new ApiError(400, 'Ese documento ya existe en el checklist de esta matrícula.');
+    clave = requisito.clave;
+    const grupo = await Group.findById(enrollment.group_id).select('grade_id');
+    const grado = grupo ? await Grade.findById(grupo.grade_id).select('numero') : null;
+    nombre = input.nombre_personalizado?.trim() || nombreDelRequisito(requisito.nombre, grado?.numero ?? 0);
+    indicacion = requisito.indicacion || null;
+    categoria = requisito.categoria;
+    obligatorio = input.obligatorio ?? requisito.obligatorio;
+  } else {
+    nombre = input.nombre_personalizado?.trim() ?? '';
+    if (!nombre) throw new ApiError(400, 'Escribe el nombre del documento adicional.');
+    clave = claveAdicional();
+    categoria = 'INSTITUCIONAL';
   }
 
   enrollment.checklist.push({
-    tipo_documento: input.tipo_documento,
-    nombre_personalizado: input.nombre_personalizado ?? null,
-    obligatorio: input.obligatorio ?? true,
+    tipo_documento: clave,
+    nombre_personalizado: nombre,
+    indicacion,
+    categoria,
+    obligatorio,
     estado: 'PENDIENTE',
     archivo_path: null,
     comentario: null,
@@ -631,7 +678,7 @@ export async function agregarDocumentoChecklist(
     revisado_por: null,
   } as unknown as (typeof enrollment.checklist)[number]);
 
-  if (enrollment.estado === 'MATRICULADO_DEFINITIVO' && input.obligatorio !== false) {
+  if (enrollment.estado === 'MATRICULADO_DEFINITIVO' && obligatorio) {
     enrollment.estado = 'MATRICULADO_CONDICIONAL';
   }
 
@@ -642,7 +689,7 @@ export async function agregarDocumentoChecklist(
     accion: 'DOCUMENTO_CHECKLIST_AGREGADO',
     entidad: 'Enrollment',
     entidad_id: enrollment._id,
-    detalle: input.nombre_personalizado || input.tipo_documento,
+    detalle: nombre,
   });
 
   return enrollment;
@@ -699,7 +746,7 @@ export async function sincronizarRequisitosMatricula(
   const profile = await StudentProfile.findOne({ user_id: enrollment.student_id });
   const vinculoAcudiente = await StudentGuardian.findOne({ student_id: enrollment.student_id, es_principal: true });
 
-  const itemsEsperados = generarChecklistMatricula({
+  const itemsEsperados = await generarChecklistDesdeCatalogo({
     nivel: grade.nivel,
     numeroGrado: grade.numero,
     tipoIngreso: enrollment.tipo_ingreso,
@@ -714,6 +761,8 @@ export async function sincronizarRequisitosMatricula(
       enrollment.checklist.push({
         tipo_documento: item.tipo_documento,
         nombre_personalizado: item.nombre_personalizado ?? null,
+        indicacion: item.indicacion ?? null,
+        categoria: item.categoria ?? null,
         obligatorio: item.obligatorio,
         estado: 'PENDIENTE',
         archivo_path: null,
@@ -782,7 +831,7 @@ export async function actualizarComentarioDocumento(
 }
 
 export interface FiltroDocumentosPrevistos {
-  group_id: string;
+  group_id?: string;
   tipo_ingreso: TipoIngreso;
   student_id?: string;
 }
@@ -790,13 +839,23 @@ export interface FiltroDocumentosPrevistos {
 /**
  * Los documentos que se le pedirán a un estudiante antes de crear la matrícula: es la misma función que arma el checklist
  * al crearla, así que lo que se ve en el formulario es lo que luego se encuentra en el expediente. Con `student_id` se
- * tienen en cuenta su discapacidad y el parentesco de su acudiente principal; sin él, solo grado e ingreso.
+ * tienen en cuenta su discapacidad y el parentesco de su acudiente principal; sin él, solo grado e ingreso. Si aún no
+ * se selecciona grupo, retorna los requisitos base del tipo de ingreso.
  */
 export async function listarDocumentosPrevistos(filtro: FiltroDocumentosPrevistos) {
-  const group = await Group.findById(filtro.group_id);
-  if (!group) throw new ApiError(404, 'Grupo no encontrado.');
-  const grade = await Grade.findById(group.grade_id);
-  if (!grade) throw new ApiError(404, 'Grado no encontrado.');
+  let nivel: NivelEducativo = 'PRIMARIA';
+  let numeroGrado = 1;
+
+  if (filtro.group_id) {
+    const group = await Group.findById(filtro.group_id);
+    if (group) {
+      const grade = await Grade.findById(group.grade_id);
+      if (grade) {
+        nivel = grade.nivel;
+        numeroGrado = grade.numero;
+      }
+    }
+  }
 
   const [profile, vinculoAcudiente] = filtro.student_id
     ? await Promise.all([
@@ -805,22 +864,25 @@ export async function listarDocumentosPrevistos(filtro: FiltroDocumentosPrevisto
       ])
     : [null, null];
 
-  return generarChecklistMatricula({
-    nivel: grade.nivel,
-    numeroGrado: grade.numero,
+  const items = await generarChecklistDesdeCatalogo({
+    nivel,
+    numeroGrado,
     tipoIngreso: filtro.tipo_ingreso,
     tieneDiscapacidad: profile?.tiene_discapacidad,
     parentescoAcudiente: vinculoAcudiente?.parentesco,
-  }).map((item) => ({
+  });
+  return items.map((item) => ({
     tipo_documento: item.tipo_documento,
-    nombre: item.nombre_personalizado || NOMBRES_DOCUMENTO_MATRICULA[item.tipo_documento],
-    indicacion: INDICACIONES_DOCUMENTO_MATRICULA[item.tipo_documento],
-    categoria: CATEGORIAS_DOCUMENTO_MATRICULA[item.tipo_documento],
+    nombre: item.nombre_personalizado,
+    indicacion: item.indicacion,
+    categoria: item.categoria,
     obligatorio: item.obligatorio,
   }));
 }
 
 export interface FiltroDocumentosPorRevisar {
+  /** Solo lo que subió la familia o solo lo que subió el personal. */
+  subido_por?: 'FAMILIA' | 'PERSONAL';
   academic_year_id?: string;
   group_id?: string;
   page?: number;
@@ -836,13 +898,14 @@ export async function listarDocumentosPorRevisar(filtro: FiltroDocumentosPorRevi
   const limit = Math.min(100, Math.max(1, filtro.limit ?? 25));
 
   const match: Record<string, unknown> = { estado: { $nin: ESTADOS_TERMINALES }, 'checklist.estado': 'CARGADO' };
+  const subidoPor = filtro.subido_por ? { 'checklist.cargado_por_tipo': filtro.subido_por } : {};
   if (filtro.academic_year_id) match.academic_year_id = new Types.ObjectId(filtro.academic_year_id);
   if (filtro.group_id) match.group_id = new Types.ObjectId(filtro.group_id);
 
   const [resultado] = await Enrollment.aggregate<{ filas: Array<Record<string, unknown>>; total: Array<{ n: number }> }>([
     { $match: match },
     { $unwind: '$checklist' },
-    { $match: { 'checklist.estado': 'CARGADO' } },
+    { $match: { 'checklist.estado': 'CARGADO', ...subidoPor } },
     {
       $facet: {
         total: [{ $count: 'n' }],
@@ -852,6 +915,7 @@ export async function listarDocumentosPorRevisar(filtro: FiltroDocumentosPorRevi
           { $limit: limit },
           { $lookup: { from: 'users', localField: 'student_id', foreignField: '_id', as: 'estudiante' } },
           { $lookup: { from: 'groups', localField: 'group_id', foreignField: '_id', as: 'grupo' } },
+          { $lookup: { from: 'users', localField: 'checklist.cargado_por', foreignField: '_id', as: 'cargador' } },
           {
             $project: {
               _id: 0,
@@ -862,6 +926,8 @@ export async function listarDocumentosPorRevisar(filtro: FiltroDocumentosPorRevi
               nombre_personalizado: '$checklist.nombre_personalizado',
               obligatorio: '$checklist.obligatorio',
               fecha_carga: '$checklist.fecha_carga',
+              cargado_por_tipo: '$checklist.cargado_por_tipo',
+              cargado_por_nombre: { $concat: [{ $ifNull: [{ $arrayElemAt: ['$cargador.nombre', 0] }, ''] }, ' ', { $ifNull: [{ $arrayElemAt: ['$cargador.apellido', 0] }, ''] }] },
               nombre: { $arrayElemAt: ['$estudiante.nombre', 0] },
               apellido: { $arrayElemAt: ['$estudiante.apellido', 0] },
               numero_documento: { $arrayElemAt: ['$estudiante.numero_documento', 0] },

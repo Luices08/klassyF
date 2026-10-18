@@ -289,22 +289,24 @@ export async function detalleDeSalida(enrollmentId: string, usuario: UserDocumen
 
   const estudiante = matricula.student_id;
   const grupoActual = matricula.group_id;
+  // `.lean()` no aplica el default del esquema: una matrícula anterior a la trayectoria no trae el campo.
+  const tramos = matricula.trayectoria ?? [];
   const [anio, paz, politica, tramosGrupos, conteos] = await Promise.all([
     AcademicYear.findById(matricula.academic_year_id).select('year estado').lean(),
     vistaPazYSalvoDeSalida(matricula._id),
     politicaDeCupo(),
-    Group.find({ _id: { $in: matricula.trayectoria.map((t) => t.group_id) } })
+    Group.find({ _id: { $in: tramos.map((t) => t.group_id) } })
       .populate('grade_id', 'nombre')
       .select('nomenclatura grade_id')
       .lean(),
-    conservadoDe(estudiante._id, matricula.academic_year_id, [matricula.group_id._id, ...matricula.trayectoria.map((t) => t.group_id)], matricula.salida?.fecha_efectiva ?? null),
+    conservadoDe(estudiante._id, matricula.academic_year_id, [matricula.group_id._id, ...tramos.map((t) => t.group_id)], matricula.salida?.fecha_efectiva ?? null),
   ]);
   const registrador = matricula.salida ? await User.findById(matricula.salida.registrado_por).select('nombre apellido').lean() : null;
   const nombresDeGrupos = new Map(tramosGrupos.map((g) => [String(g._id), `${(g.grade_id as unknown as { nombre?: string } | null)?.nombre ?? ''} ${g.nomenclatura}`.trim()]));
   // Una matrícula anterior a la trayectoria tiene un solo tramo: el grupo en el que terminó.
   const trayectoria =
-    matricula.trayectoria.length > 0
-      ? matricula.trayectoria.map((t) => ({ grupo: nombresDeGrupos.get(String(t.group_id)) ?? '', desde: t.desde, hasta: t.hasta }))
+    tramos.length > 0
+      ? tramos.map((t) => ({ grupo: nombresDeGrupos.get(String(t.group_id)) ?? '', desde: t.desde, hasta: t.hasta }))
       : [{ grupo: nombreGrupo(grupoActual), desde: matricula.fecha_matricula, hasta: matricula.salida?.fecha_efectiva ?? null }];
 
   const faltantes: string[] = [];

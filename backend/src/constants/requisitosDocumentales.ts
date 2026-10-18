@@ -70,7 +70,7 @@ export const REQUISITOS_INICIALES: RequisitoInicial[] = [
   base('CERTIFICADO_CRECIMIENTO_DESARROLLO', 11, { niveles: ['PREESCOLAR'] }),
   base('CERTIFICADO_AUDIOMETRIA_VISION', 12, { niveles: ['PREESCOLAR'] }),
   base('CERTIFICADO_QUINTO_PRIMARIA', 20, { grados_numeros: [6], tipos_ingreso: INGRESO_NUEVO }),
-  base('CERTIFICADO_GRADO_ANTERIOR', 21, { nombre: 'Certificado de {grado_anterior}° aprobado', grados_numeros: [2, 3, 4, 5, 7, 8, 9, 10, 11], tipos_ingreso: INGRESO_NUEVO }),
+  base('CERTIFICADO_GRADO_ANTERIOR', 21, { nombre: 'Certificado o boletín de {grado_anterior}° aprobado', grados_numeros: [2, 3, 4, 5, 7, 8, 9, 10, 11], tipos_ingreso: INGRESO_NUEVO }),
   base('CERTIFICADOS_NOTAS_ANTERIORES', 30, { niveles: BASICA_Y_MEDIA, tipos_ingreso: INGRESO_NUEVO }),
   base('PAZ_Y_SALVO_SIMAT', 31, { niveles: BASICA_Y_MEDIA, tipos_ingreso: INGRESO_NUEVO }),
   base('SERVICIO_SOCIAL_ESTUDIANTIL', 32, { grados_numeros: [11], tipos_ingreso: INGRESO_NUEVO }),

@@ -17,11 +17,11 @@ import { TipoDefinido, exigirGestionDeTipos, tipoPorClave, todosLosTipos } from 
 
 export { contenidoDe };
 
-/** Redactar el texto de un tipo: el ADMIN en cualquier tipo no archivado; Secretaría solo mientras está en borrador. */
+/** Redactar el texto de un tipo: ADMIN y Secretaría, en cualquier tipo que no esté archivado (`permisosTipo`). */
 function exigirPuedeRedactar(tipo: TipoDefinido, usuario: UserDocument): void {
   exigirGestionDeTipos(usuario);
   if (!permisosTipo(usuario.rol, tipo.estado).editarPlantilla) {
-    throw new ApiError(403, tipo.estado === 'ARCHIVADO' ? 'Un tipo archivado no se edita: actívalo primero.' : 'El texto de un documento activo solo lo edita el administrador.');
+    throw new ApiError(403, tipo.estado === 'ARCHIVADO' ? 'Un tipo archivado no se edita: actívalo primero.' : 'No tienes permiso para editar el texto de este documento.');
   }
 }
 
@@ -103,6 +103,13 @@ export async function publicarPlantilla(tipo: ClaveCertificado, contenido: Conte
   });
   await registrarEvento({ usuario_id: usuario._id, accion: 'CERTIFICADO_PLANTILLA_PUBLICADA', entidad: 'PlantillaCertificado', entidad_id: creada._id, detalle: `${tipo} v${creada.version}`, ip });
   return { tipo, version: creada.version };
+}
+
+/** El texto de partida del documento, sin publicarlo: el editor lo carga en el borrador para revisarlo y ajustarlo antes de publicar. */
+export async function plantillaEstandar(tipo: ClaveCertificado, usuario: UserDocument): Promise<ContenidoPlantilla> {
+  const definido = await tipoPorClave(tipo);
+  exigirPuedeRedactar(definido, usuario);
+  return contenidoInicial(definido);
 }
 
 /** Vuelve a publicar los valores de partida como una versión nueva (la historia no se pierde). */

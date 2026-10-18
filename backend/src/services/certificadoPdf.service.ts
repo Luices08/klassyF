@@ -2,6 +2,7 @@ import PDFDocument from 'pdfkit';
 import QRCode from 'qrcode';
 import { ClaveCertificado } from '../constants/certificados';
 import { ContenidoPlantilla } from '../constants/plantillasCertificado';
+import AuditLog from '../models/auditLog.model';
 import { UserDocument } from '../models/user.model';
 import ApiError from '../utils/ApiError';
 import { redactarCertificado, nombreDeJornada } from '../utils/certificadoTexto';
@@ -206,11 +207,15 @@ async function dibujar(snapshot: SnapshotCertificado, seguridad: DatosSeguridad)
   });
 }
 
+/** La pantalla de expedir vuelve a pedir la vista previa de lo mismo cada vez que se cambia una opción: dentro de esta ventana se audita una sola lectura. */
+const VENTANA_AUDITORIA_VISTA_PREVIA_MS = 10 * 60 * 1000;
+
 export async function generarVistaPreviaPdf(entrada: EntradaExpedicion, usuario: UserDocument, ip?: string | null): Promise<Buffer> {
   const snapshot = await prepararVistaPrevia(entrada, usuario);
   const buffer = await dibujar(snapshot, { codigo: null });
   // Muestra datos reales de un estudiante: se audita aunque no quede nada guardado (sin contenido en el detalle).
-  await registrarEvento({ usuario_id: usuario._id, accion: 'CERTIFICADO_VISTA_PREVIA', entidad: 'Enrollment', entidad_id: entrada.enrollment_id, detalle: entrada.tipo, ip });
+  const yaAuditada = await AuditLog.exists({ usuario_id: usuario._id, accion: 'CERTIFICADO_VISTA_PREVIA', entidad_id: entrada.enrollment_id, detalle: entrada.tipo, createdAt: { $gte: new Date(Date.now() - VENTANA_AUDITORIA_VISTA_PREVIA_MS) } });
+  if (!yaAuditada) await registrarEvento({ usuario_id: usuario._id, accion: 'CERTIFICADO_VISTA_PREVIA', entidad: 'Enrollment', entidad_id: entrada.enrollment_id, detalle: entrada.tipo, ip });
   return buffer;
 }
 

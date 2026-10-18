@@ -347,11 +347,11 @@ export function useVerificacionPublica(consulta: ConsultaVerificacion | null) {
 
 export type EstiloBloque = 'PREAMBULO' | 'FORMULA' | 'CUERPO' | 'DESTACADO' | 'TABLA_NOTAS';
 export const ETIQUETA_ESTILO_BLOQUE: Record<EstiloBloque, string> = {
-  PREAMBULO: 'Quién certifica (centrado)',
-  FORMULA: 'Fórmula (HACE CONSTAR / CERTIFICA)',
+  PREAMBULO: 'Quién certifica',
+  FORMULA: 'Frase de apertura (CERTIFICA / HACE CONSTAR)',
   CUERPO: 'Párrafo',
   DESTACADO: 'Párrafo destacado',
-  TABLA_NOTAS: 'Tabla de valoraciones (la entrega el módulo de notas)',
+  TABLA_NOTAS: 'Tabla de valoraciones',
 };
 
 export interface BloquePlantilla {
@@ -437,6 +437,9 @@ export function useRestablecerPlantilla() {
     },
   });
 }
+
+/** El texto de partida de un documento, sin publicarlo: se carga en el borrador para revisarlo. */
+export const pedirPlantillaEstandar = (tipo: ClaveCertificado) => api.get<ContenidoPlantilla>(`/certificados/plantillas/${tipo}/estandar`);
 
 /** El PDF de un borrador de plantilla con un estudiante inventado: no guarda nada. */
 export const descargarVistaPreviaPlantilla = (tipo: ClaveCertificado, contenido: ContenidoPlantilla) =>

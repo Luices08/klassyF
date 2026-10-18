@@ -88,13 +88,14 @@ export const activarTipo = catchAsync<{ tipo: ClaveCertificado }>(async (req, re
 export const archivarTipo = catchAsync<{ tipo: ClaveCertificado }>(async (req, res) => ok(res, await tipoService.archivarTipo(req.params.tipo, req.user!, req.ip)));
 export const eliminarTipo = catchAsync<{ tipo: ClaveCertificado }>(async (req, res) => ok(res, await tipoService.eliminarTipo(req.params.tipo, req.user!, req.ip)));
 
-// Plantillas (ADMIN en cualquier tipo no archivado; Secretaría solo en borradores; el servicio lo exige).
+// Plantillas (ADMIN y Secretaría en cualquier tipo no archivado; el servicio lo exige).
 export const listarPlantillas = catchAsync(async (req, res) => ok(res, await plantillaService.listarPlantillas(req.user!)));
 export const versionesDePlantilla = catchAsync<{ tipo: ClaveCertificado }>(async (req, res) => ok(res, await plantillaService.versionesDePlantilla(req.params.tipo, req.user!)));
 export const publicarPlantilla = catchAsync<{ tipo: ClaveCertificado }>(async (req, res) => {
   const { nota, ...contenido } = req.body;
   ok(res, await plantillaService.publicarPlantilla(req.params.tipo, contenido, nota ?? '', req.user!, req.ip), 201);
 });
+export const plantillaEstandar = catchAsync<{ tipo: ClaveCertificado }>(async (req, res) => ok(res, await plantillaService.plantillaEstandar(req.params.tipo, req.user!)));
 export const restablecerPlantilla = catchAsync<{ tipo: ClaveCertificado }>(async (req, res) => ok(res, await plantillaService.restablecerPlantilla(req.params.tipo, req.user!, req.ip), 201));
 export const renderizarBorrador = catchAsync<{ tipo: ClaveCertificado }>(async (req, res) => ok(res, await plantillaService.renderizarBorrador(req.params.tipo, req.body, req.user!)));
 export const vistaPreviaPlantilla = catchAsync<{ tipo: ClaveCertificado }>(async (req, res) => {

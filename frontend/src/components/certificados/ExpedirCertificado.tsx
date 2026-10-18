@@ -8,13 +8,13 @@ import { Switch } from '../ui/Switch';
 import { VisorDocumento } from '../ui/VisorDocumento';
 import { SolicitanteCard } from './SolicitanteCard';
 import { TarjetaEstudiante } from './TarjetaEstudiante';
+import { VistaPreviaExpedicion } from './VistaPreviaExpedicion';
 import {
   CLAVE_DESTINATARIO_OTRO,
   ELEMENTOS_AUTENTICACION,
   ETIQUETA_ELEMENTO,
   ETIQUETA_ESTADO_MATRICULA,
   descargarPdfCertificado,
-  descargarVistaPrevia,
   useConfiguracionCertificados,
   useExpedirCertificado,
   useMatriculasExpedibles,
@@ -48,8 +48,7 @@ export function ExpedirCertificado({ estudianteInicial }: { estudianteInicial?: 
   const [solicitante, setSolicitante] = useState<{ estudiante: string; valor: SolicitanteEntrada } | null>(null);
   const [expedido, setExpedido] = useState<CertificadoExpedido | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [generandoPrevia, setGenerandoPrevia] = useState(false);
-  // El documento se muestra aquí mismo, sin tener que ir al historial ni abrir otra pestaña.
+  // El documento expedido se muestra aquí mismo, en la columna de la derecha, sin tener que ir al historial ni abrir otra pestaña.
   const [visor, setVisor] = useState<{ url: string; titulo: string; archivo: string } | null>(null);
   const zonaVisor = useRef<HTMLDivElement>(null);
 
@@ -114,27 +113,14 @@ export function ExpedirCertificado({ estudianteInicial }: { estudianteInicial?: 
         }
       : null;
 
+  const entradaVista: EntradaExpedicion | null = entrada ? { ...entrada, solicitante: undefined } : null;
+
   const elegirEstudiante = (id: string | undefined) => {
     setEstudianteId(id);
     setBusqueda('');
     setExpedido(null);
     setVisor(null);
     setError(null);
-  };
-
-  const verPrevia = async () => {
-    if (!entrada) return;
-    setError(null);
-    setGenerandoPrevia(true);
-    try {
-      const { url } = await descargarVistaPrevia(entrada);
-      setExpedido(null);
-      setVisor({ url, titulo: 'Vista previa — sin consecutivo, QR ni validez', archivo: 'vista-previa.pdf' });
-    } catch (err) {
-      setError(errorMessage(err));
-    } finally {
-      setGenerandoPrevia(false);
-    }
   };
 
   const expedirDocumento = async () => {
@@ -145,9 +131,20 @@ export function ExpedirCertificado({ estudianteInicial }: { estudianteInicial?: 
       setExpedido(certificado);
       const { url } = await descargarPdfCertificado(certificado._id);
       setVisor({ url, titulo: `${certificado.nombre_tipo} ${certificado.codigo}`, archivo: `${certificado.codigo}.pdf` });
+      // «Expedir y descargar»: además de verlo, el archivo se guarda en el equipo.
+      const enlace = document.createElement('a');
+      enlace.href = url;
+      enlace.download = `${certificado.codigo}.pdf`;
+      enlace.click();
     } catch (err) {
       setError(errorMessage(err));
     }
+  };
+
+  const otroDocumento = () => {
+    setExpedido(null);
+    setVisor(null);
+    setError(null);
   };
 
   const descripcionDeElemento = (elemento: ElementoAutenticacion): string | undefined => {
@@ -158,7 +155,8 @@ export function ExpedirCertificado({ estudianteInicial }: { estudianteInicial?: 
   };
 
   return (
-    <div className="space-y-4">
+    <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:items-start">
+      <div className="space-y-4">
       {estudianteId && matriculas.data ? (
         <TarjetaEstudiante ficha={matriculas.data} matricula={matricula} onCambiar={() => elegirEstudiante(undefined)} />
       ) : (
@@ -205,7 +203,7 @@ export function ExpedirCertificado({ estudianteInicial }: { estudianteInicial?: 
         <Card>
           <CardHeader title="Documento" />
           {matriculas.data.matriculas.length === 0 ? (
-            <Alert tone="warning">No hay matrículas formalizadas de este estudiante en las sedes que tienes asignadas: no hay documentos para expedir.</Alert>
+            <Alert tone="warning">Solo se expiden documentos a estudiantes con matrícula definitiva o condicional. Este estudiante no tiene una matrícula formalizada (o está preinscrito, anulado o retirado) en las sedes que tienes asignadas: no hay documentos para expedir.</Alert>
           ) : (
             <div className="space-y-4">
               <div className="grid gap-3 sm:grid-cols-2">
@@ -311,34 +309,40 @@ export function ExpedirCertificado({ estudianteInicial }: { estudianteInicial?: 
       )}
 
       {error && <Alert tone="error">{error}</Alert>}
-      {expedido && (
-        <Alert tone="success">
-          Se expidió <strong>{expedido.nombre_tipo}</strong> con el código <strong>{expedido.codigo}</strong> (clave de verificación {expedido.huella}). Lo ves abajo; también queda en el historial para reimprimirlo.
-        </Alert>
-      )}
 
       {entrada && (
         <div className="flex flex-wrap items-center justify-end gap-2">
           {faltanDependencias && <p className="mr-auto text-xs text-muted">Confirma todas las dependencias para continuar.</p>}
-          {!faltanDependencias && !restriccion && !solicitanteCompleto(solicitanteActual) && <p className="mr-auto text-xs text-muted">Completa quién solicita el documento para expedirlo.</p>}
-          <Button variant="secondary" onClick={verPrevia} isLoading={generandoPrevia} disabled={faltanDependencias}>
-            Vista previa
-          </Button>
-          {!restriccion && (
-            <Button onClick={expedirDocumento} isLoading={expedir.isPending} disabled={faltanDependencias || !solicitanteCompleto(solicitanteActual)}>
-              Expedir
+          {!faltanDependencias && !restriccion && !expedido && !solicitanteCompleto(solicitanteActual) && <p className="mr-auto text-xs text-muted">Completa quién solicita el documento para expedirlo.</p>}
+          {expedido ? (
+            <Button variant="secondary" onClick={otroDocumento}>
+              Expedir otro documento
             </Button>
+          ) : (
+            !restriccion && (
+              <Button onClick={expedirDocumento} isLoading={expedir.isPending} disabled={faltanDependencias || !solicitanteCompleto(solicitanteActual)}>
+                Expedir y descargar PDF
+              </Button>
+            )
           )}
         </div>
       )}
+      </div>
 
-      {visor && (
-        <div ref={zonaVisor}>
+      <div ref={zonaVisor} className="space-y-4 lg:sticky lg:top-4">
+        {expedido && (
+          <Alert tone="success">
+            Se expidió <strong>{expedido.nombre_tipo}</strong> con el código <strong>{expedido.codigo}</strong> (clave de verificación {expedido.huella}). El PDF se descargó y también queda en el historial para reimprimirlo.
+          </Alert>
+        )}
+        {visor ? (
           <Card>
             <VisorDocumento url={visor.url} titulo={visor.titulo} nombreArchivo={visor.archivo} />
           </Card>
-        </div>
-      )}
+        ) : (
+          <VistaPreviaExpedicion entrada={entradaVista} motivoPausa={faltanDependencias ? 'Confirma todas las dependencias para ver el documento.' : null} />
+        )}
+      </div>
     </div>
   );
 }

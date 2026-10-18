@@ -476,13 +476,11 @@ describe('M26 certificados (con base de datos)', () => {
       await expect(plantillaServicio.publicarPlantilla('PAZ_SALVO', await contenidoVigente('PAZ_SALVO'), '', e.admin)).rejects.toMatchObject({ statusCode: 409 });
     });
 
-    it('el texto de un documento activo solo lo ve y edita el administrador', async () => {
-      // Secretaría solo redacta borradores: de los tipos activos no ve ni publica nada.
-      expect((await plantillaServicio.listarPlantillas(e.secretaria)).plantillas).toEqual([]);
+    it('el texto de un documento lo ven y editan el administrador y la secretaría, no los demás roles', async () => {
+      expect((await plantillaServicio.listarPlantillas(e.secretaria)).plantillas.map((p) => p.tipo)).toEqual(['CONSTANCIA_ESTUDIO', 'CERTIFICADO_MATRICULA', 'PAZ_SALVO', 'CERTIFICADO_ESTUDIOS']);
       await expect(plantillaServicio.listarPlantillas(e.docenteDeClase)).rejects.toMatchObject({ statusCode: 403 });
-      await expect(plantillaServicio.publicarPlantilla('PAZ_SALVO', await contenidoVigente('PAZ_SALVO'), '', e.secretaria)).rejects.toMatchObject({ statusCode: 403 });
-      await expect(plantillaServicio.versionesDePlantilla('PAZ_SALVO', e.secretaria)).rejects.toMatchObject({ statusCode: 403 });
-      await expect(plantillaServicio.restablecerPlantilla('PAZ_SALVO', e.secretaria)).rejects.toMatchObject({ statusCode: 403 });
+      await expect(plantillaServicio.plantillaEstandar('PAZ_SALVO', e.docenteDeClase)).rejects.toMatchObject({ statusCode: 403 });
+      expect((await plantillaServicio.plantillaEstandar('PAZ_SALVO', e.secretaria)).bloques.length).toBeGreaterThan(0);
       const r = await plantillaServicio.listarPlantillas(e.admin);
       expect(r.plantillas.map((p) => p.tipo)).toEqual(['CONSTANCIA_ESTUDIO', 'CERTIFICADO_MATRICULA', 'PAZ_SALVO', 'CERTIFICADO_ESTUDIOS']);
       expect(r.variables.length).toBeGreaterThan(20);

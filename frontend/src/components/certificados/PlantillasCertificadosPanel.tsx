@@ -10,6 +10,7 @@ import { TabPanel, Tabs } from '../ui/Tabs';
 import { VisorDocumento } from '../ui/VisorDocumento';
 import type { EditorConVariablesHandle } from '../ui/EditorConVariables';
 import { DatosDelSistema } from './plantillas/DatosDelSistema';
+import { DisenoPlantillaCard } from './plantillas/DisenoPlantilla';
 import { DestinatariosPlantilla } from './plantillas/DestinatariosPlantilla';
 import { HistorialVersiones } from './plantillas/HistorialVersiones';
 import { ParrafoPlantilla } from './plantillas/ParrafoPlantilla';
@@ -25,6 +26,7 @@ import {
   type BloquePlantilla,
   type ClaveCertificado,
   type ContenidoPlantilla,
+  DISENO_INICIAL,
   type PlantillaVigente,
   type VariableCertificado,
 } from '../../hooks/useCertificados';
@@ -36,7 +38,7 @@ import { formatoFechaHora } from '../../lib/fechas';
 const problemasDe = (error: unknown): string[] => (error instanceof ApiError && Array.isArray(error.details) ? (error.details as string[]) : []);
 
 const copiar = (c: ContenidoPlantilla): ContenidoPlantilla => structuredClone(c);
-const contenidoDe = (p: PlantillaVigente): ContenidoPlantilla => ({ titulo: p.titulo, bloques: p.bloques, destinatarios: p.destinatarios, frase_otro: p.frase_otro, vigencia_dias: p.vigencia_dias });
+const contenidoDe = (p: PlantillaVigente): ContenidoPlantilla => ({ titulo: p.titulo, bloques: p.bloques, destinatarios: p.destinatarios, frase_otro: p.frase_otro, vigencia_dias: p.vigencia_dias, diseno: p.diseno ?? null });
 
 /** Lo que cambió respecto a la versión vigente, en palabras de secretaría. */
 function resumenDeCambios(vigente: ContenidoPlantilla, borrador: ContenidoPlantilla): string[] {
@@ -52,6 +54,7 @@ function resumenDeCambios(vigente: ContenidoPlantilla, borrador: ContenidoPlanti
   }
   for (const b of vigente.bloques) if (!borrador.bloques.some((x) => x.id === b.id)) cambios.push(`Párrafo quitado (${nombre(b)})`);
   if (vigente.bloques.map((b) => b.id).join() !== borrador.bloques.filter((b) => antes.has(b.id)).map((b) => b.id).join() && borrador.bloques.length === vigente.bloques.length) cambios.push('Cambia el orden de los párrafos');
+  if (JSON.stringify(vigente.diseno ?? null) !== JSON.stringify(borrador.diseno ?? null)) cambios.push(borrador.diseno ? 'Cambia el diseño del texto (letra, tamaño o colores)' : 'Vuelve el diseño original del texto');
   if (JSON.stringify(vigente.destinatarios) !== JSON.stringify(borrador.destinatarios) || vigente.frase_otro !== borrador.frase_otro) cambios.push('Cambian las opciones de «para quién o para qué se expide»');
   return cambios;
 }
@@ -177,7 +180,8 @@ function EditorPlantilla({
     setAviso(null);
     setCargandoEstandar(true);
     try {
-      setBorrador(copiar(await pedirPlantillaEstandar(plantilla.tipo)));
+      // El texto estándar no trae diseño propio: se conserva el que ya se eligió.
+      setBorrador({ ...copiar(await pedirPlantillaEstandar(plantilla.tipo)), diseno: borrador.diseno ?? null });
       setAviso({ tono: 'success', texto: 'Se cargó el texto estándar sugerido como borrador. Revísalo y ajústalo; no se ha publicado nada.' });
     } catch (err) {
       setAviso({ tono: 'error', texto: errorMessage(err) });
@@ -266,6 +270,7 @@ function EditorPlantilla({
       <Tabs
         items={[
           { key: 'texto', label: 'Texto' },
+          { key: 'diseno', label: 'Diseño' },
           { key: 'destinatarios', label: 'Destinatarios y vigencia' },
           { key: 'versiones', label: 'Versiones' },
         ]}
@@ -273,9 +278,12 @@ function EditorPlantilla({
         onChange={setPestana}
       />
 
-      <TabPanel active={pestana} tabKey="texto">
-        <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:items-start">
+      {(pestana === 'texto' || pestana === 'diseno') && (
+        <div className="grid gap-4 pt-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:items-start">
           <div className="space-y-4">
+            {pestana === 'diseno' && <DisenoPlantillaCard diseno={borrador.diseno} onCambiar={(diseno) => setBorrador((b) => ({ ...b, diseno: diseno && JSON.stringify(diseno) === JSON.stringify(DISENO_INICIAL) ? null : diseno }))} />}
+            {pestana === 'texto' && (
+              <>
             <Card className="space-y-3">
               <div className="flex flex-wrap items-end justify-between gap-3">
                 <div className="min-w-64 flex-1">
@@ -315,17 +323,19 @@ function EditorPlantilla({
                 Agregar párrafo
               </Button>
             </Card>
+              </>
+            )}
           </div>
 
           <div className="space-y-4 lg:sticky lg:top-28">
             <Card className="space-y-3">
               <p className="text-sm font-semibold text-ink">Así se ve</p>
               <p className="text-xs text-muted">Con datos de muestra; se actualiza al dejar de escribir. «Ver PDF exacto» muestra el documento tal como se imprime.</p>
-              <VistaEnVivoPlantilla datos={vistaEnVivo.data} cargando={vistaEnVivo.isFetching} error={vistaEnVivo.error} />
+              <VistaEnVivoPlantilla datos={vistaEnVivo.data} cargando={vistaEnVivo.isFetching} error={vistaEnVivo.error} diseno={borrador.diseno} />
             </Card>
           </div>
         </div>
-      </TabPanel>
+      )}
 
       <TabPanel active={pestana} tabKey="destinatarios">
         <DestinatariosPlantilla borrador={borrador} onCambiar={(cambio) => setBorrador(cambio)} />

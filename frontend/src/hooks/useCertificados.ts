@@ -370,12 +370,28 @@ export interface OpcionDestinatarioEditable {
   fuente_entidad?: FuenteEntidad | null;
 }
 
+export type FuenteDiseno = 'SANS' | 'SERIF' | 'MONO';
+export type TamanoDiseno = 'PEQUENO' | 'NORMAL' | 'GRANDE';
+export const ETIQUETA_FUENTE_DISENO: Record<FuenteDiseno, string> = { SANS: 'Sin serifa (Helvetica)', SERIF: 'Con serifa (Times)', MONO: 'Monoespaciada (Courier)' };
+export const ETIQUETA_TAMANO_DISENO: Record<TamanoDiseno, string> = { PEQUENO: 'Pequeño', NORMAL: 'Normal', GRANDE: 'Grande' };
+
+/** Cómo se ve el texto del documento (el encabezado, la tabla de notas, las firmas y el QR los pone el sistema). `null` = el de siempre. */
+export interface DisenoPlantilla {
+  fuente: FuenteDiseno;
+  tamano: TamanoDiseno;
+  color_texto: string;
+  color_destacados: string;
+}
+/** Los colores del diseño de siempre: de aquí se parte al empezar a personalizar. */
+export const DISENO_INICIAL: DisenoPlantilla = { fuente: 'SANS', tamano: 'NORMAL', color_texto: '#3F4D61', color_destacados: '#172235' };
+
 export interface ContenidoPlantilla {
   titulo: string;
   bloques: BloquePlantilla[];
   destinatarios: OpcionDestinatarioEditable[];
   frase_otro: string;
   vigencia_dias: number | null;
+  diseno?: DisenoPlantilla | null;
 }
 
 export interface VariableCertificado {

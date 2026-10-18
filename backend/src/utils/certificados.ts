@@ -14,6 +14,7 @@ import {
   PoliticaDeCertificado,
   TipoSolicitante,
 } from '../constants/certificados';
+import type { DisenoPlantilla } from '../constants/plantillasCertificado';
 import { serializacionEstable } from './comiteConvivencia';
 
 /** Imagen ya guardada de una firma o sello: se nombra por su huella, así lo emitido siempre puede volver a imprimirse igual. */
@@ -41,6 +42,8 @@ export interface ContenidoResuelto {
   titulo: string;
   bloques: BloqueResuelto[];
   vigencia_dias: number | null;
+  /** El diseño del texto con el que se expidió (congelado); ausente = el de siempre. */
+  diseno?: DisenoPlantilla;
 }
 
 /** Una fila de la tabla de valoraciones: las celdas ya vienen como texto, M26 no interpreta su contenido. */

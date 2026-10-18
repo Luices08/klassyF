@@ -34,6 +34,28 @@ export interface BloquePlantilla {
   activo: boolean;
 }
 
+export const FUENTES_DISENO = ['SANS', 'SERIF', 'MONO'] as const;
+export type FuenteDiseno = (typeof FUENTES_DISENO)[number];
+export const TAMANOS_DISENO = ['PEQUENO', 'NORMAL', 'GRANDE'] as const;
+export type TamanoDiseno = (typeof TAMANOS_DISENO)[number];
+
+/**
+ * Cómo se ve el texto del documento. Solo el cuerpo: el encabezado institucional, la tabla de valoraciones, las firmas y el QR los pone el
+ * sistema y no cambian. `null` (o ausente) es el diseño de siempre. Va dentro de la versión de la plantilla y se congela en el documento
+ * al expedirlo, así una reimpresión sale idéntica aunque después se cambie.
+ */
+export interface DisenoPlantilla {
+  fuente: FuenteDiseno;
+  tamano: TamanoDiseno;
+  /** Color del texto corrido (preámbulo y párrafos), `#RRGGBB`. */
+  color_texto: string;
+  /** Color de la frase de apertura y de los párrafos destacados, `#RRGGBB`. */
+  color_destacados: string;
+}
+
+/** Los colores del diseño de siempre (los de la guía visual), para partir de ellos al empezar a personalizar. */
+export const DISENO_INICIAL: DisenoPlantilla = { fuente: 'SANS', tamano: 'NORMAL', color_texto: '#3F4D61', color_destacados: '#172235' };
+
 export interface ContenidoPlantilla {
   titulo: string;
   bloques: BloquePlantilla[];
@@ -42,6 +64,8 @@ export interface ContenidoPlantilla {
   frase_otro: string;
   /** Días de vigencia del documento; null = sin vigencia. */
   vigencia_dias: number | null;
+  /** Diseño del texto; ausente o null = el de siempre. */
+  diseno?: DisenoPlantilla | null;
 }
 
 export const MAX_TEXTO_BLOQUE = 1500;

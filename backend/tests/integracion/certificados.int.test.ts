@@ -306,10 +306,10 @@ describe('M26 certificados (con base de datos)', () => {
     await expect(pdf.generarPdfDeCertificado(String(c._id), 'https://colegio.test', e.secretaria)).rejects.toMatchObject({ statusCode: 409 });
   });
 
-  it('un certificado anulado sigue verificándose, pero como anulado; solo el administrador anula', async () => {
+  it('un certificado anulado sigue verificándose, pero como anulado; anulan el administrador y la secretaría, no los demás roles', async () => {
     const c = await expedir();
-    await expect(certificados.anularCertificado(String(c._id), 'Datos mal expedidos', e.secretaria)).rejects.toMatchObject({ statusCode: 403 });
-    await certificados.anularCertificado(String(c._id), 'Datos mal expedidos', e.admin);
+    await expect(certificados.anularCertificado(String(c._id), 'Datos mal expedidos', e.docenteDeClase)).rejects.toMatchObject({ statusCode: 403 });
+    await certificados.anularCertificado(String(c._id), 'Datos mal expedidos', e.secretaria);
     expect(await verificacion.verificarCertificado({ token: c.token_verificacion })).toMatchObject({ resultado: 'ANULADO' });
     await expect(certificados.anularCertificado(String(c._id), 'otra vez', e.admin)).rejects.toMatchObject({ statusCode: 409 });
   });

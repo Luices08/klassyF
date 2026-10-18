@@ -34,13 +34,13 @@ import {
   useUpdateEnrollmentStatus,
 } from '../../hooks/useEnrollments';
 import { useGroups } from '../../hooks/useGroups';
+import { useRequisitosDocumentales } from '../../hooks/useRequisitosDocumentales';
 import { api } from '../../lib/apiClient';
 import { formatoFechaCalendario } from '../../lib/fechas';
 import {
-  CATEGORIAS_DOCUMENTO_MATRICULA,
-  INDICACIONES_DOCUMENTO_MATRICULA,
-  NOMBRES_DOCUMENTO_MATRICULA,
-  TIPOS_DOCUMENTO_MATRICULA,
+  categoriaDeItem,
+  indicacionDeItem,
+  nombreDeItem,
   type ChecklistItem,
   type EstadoMatricula,
   type TipoDocumentoMatricula,
@@ -80,7 +80,11 @@ export function EnrollmentDetailPage() {
   const [comentario, setComentario] = useState('');
 
   const [agregarDocOpen, setAgregarDocOpen] = useState(false);
-  const [nuevoTipoDoc, setNuevoTipoDoc] = useState<TipoDocumentoMatricula>('OTRO_DOCUMENTO');
+  const OTRO = '__OTRO__';
+  const [nuevoTipoDoc, setNuevoTipoDoc] = useState<string>(OTRO);
+  const catalogo = useRequisitosDocumentales('activo');
+  // «Ya verifiqué el original»: lo que el personal sube queda aprobado y no espera revisión de nadie.
+  const [aprobarAlCargar, setAprobarAlCargar] = useState(true);
   const [nuevoNombreDoc, setNuevoNombreDoc] = useState('');
   const [nuevoEsObligatorio, setNuevoEsObligatorio] = useState(true);
   const agregarDocMutation = useAgregarDocumentoChecklist();
@@ -115,12 +119,12 @@ export function EnrollmentDetailPage() {
     agregarDocMutation.reset();
     await agregarDocMutation.mutateAsync({
       id,
-      tipo_documento: nuevoTipoDoc,
-      nombre_personalizado: nuevoTipoDoc === 'OTRO_DOCUMENTO' ? nuevoNombreDoc.trim() || undefined : undefined,
+      tipo_documento: nuevoTipoDoc === OTRO ? undefined : nuevoTipoDoc,
+      nombre_personalizado: nuevoTipoDoc === OTRO ? nuevoNombreDoc.trim() || undefined : undefined,
       obligatorio: nuevoEsObligatorio,
     });
     setAgregarDocOpen(false);
-    setNuevoTipoDoc('OTRO_DOCUMENTO');
+    setNuevoTipoDoc(OTRO);
     setNuevoNombreDoc('');
     setNuevoEsObligatorio(true);
   }
@@ -167,7 +171,7 @@ export function EnrollmentDetailPage() {
   function handleSubirArchivo(tipoDocumento: TipoDocumentoMatricula, e: ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file || !id) return;
-    cargarDocumento.mutate({ id, tipoDocumento, file });
+    cargarDocumento.mutate({ id, tipoDocumento, file, aprobar: aprobarAlCargar });
     e.target.value = '';
   }
 
@@ -204,16 +208,16 @@ export function EnrollmentDetailPage() {
   const documentosCompletos = itemsObligatorios.length > 0 && itemsObligatorios.every((c) => c.estado === 'APROBADO');
 
   const itemsIdentificacionSalud = enrollment.checklist.filter(
-    (c) => (CATEGORIAS_DOCUMENTO_MATRICULA[c.tipo_documento] || 'IDENTIFICACION_SALUD') === 'IDENTIFICACION_SALUD'
+    (c) => categoriaDeItem(c) === 'IDENTIFICACION_SALUD'
   );
   const itemsTrayectoria = enrollment.checklist.filter(
-    (c) => CATEGORIAS_DOCUMENTO_MATRICULA[c.tipo_documento] === 'TRAYECTORIA_ACADEMICA'
+    (c) => categoriaDeItem(c) === 'TRAYECTORIA_ACADEMICA'
   );
   const itemsInclusion = enrollment.checklist.filter(
-    (c) => CATEGORIAS_DOCUMENTO_MATRICULA[c.tipo_documento] === 'INCLUSION_PIAR'
+    (c) => categoriaDeItem(c) === 'INCLUSION_PIAR'
   );
   const itemsInstitucional = enrollment.checklist.filter(
-    (c) => CATEGORIAS_DOCUMENTO_MATRICULA[c.tipo_documento] === 'INSTITUCIONAL'
+    (c) => categoriaDeItem(c) === 'INSTITUCIONAL'
   );
 
   function renderTablaDocumentos(items: ChecklistItem[]) {
@@ -231,19 +235,16 @@ export function EnrollmentDetailPage() {
               <Td className="font-medium text-ink">
                 <div className="flex flex-col gap-0.5">
                   <div className="flex items-center gap-2">
-                    <span className="font-medium text-ink">
-                      {item.nombre_personalizado || NOMBRES_DOCUMENTO_MATRICULA[item.tipo_documento] || item.tipo_documento}
-                    </span>
+                    <span className="font-medium text-ink">{nombreDeItem(item)}</span>
                     {item.obligatorio === false && (
                       <span className="rounded bg-soft px-1.5 py-0.5 text-[10px] font-semibold text-muted">
                         Opcional
                       </span>
                     )}
                   </div>
-                  {INDICACIONES_DOCUMENTO_MATRICULA[item.tipo_documento] && (
-                    <span className="text-xs text-muted">
-                      {INDICACIONES_DOCUMENTO_MATRICULA[item.tipo_documento]}
-                    </span>
+                  {indicacionDeItem(item) && <span className="text-xs text-muted">{indicacionDeItem(item)}</span>}
+                  {item.cargado_por_tipo && item.estado !== 'PENDIENTE' && (
+                    <span className="text-xs text-muted">Subido por {item.cargado_por_tipo === 'FAMILIA' ? 'la familia' : 'el personal'}</span>
                   )}
                 </div>
               </Td>
@@ -463,6 +464,15 @@ export function EnrollmentDetailPage() {
             <RefreshIcon className="h-4 w-4" />
             Actualizar requisitos del grado
           </Button>
+          <label className="flex items-center gap-2 text-xs text-body" title="Si subes un archivo con esto marcado, queda aprobado y no pasa a «Documentos por revisar».">
+            <input
+              type="checkbox"
+              checked={aprobarAlCargar}
+              onChange={(e) => setAprobarAlCargar(e.target.checked)}
+              className="h-4 w-4 rounded border-border text-primary focus:ring-primary"
+            />
+            Ya verifiqué el original: aprobar al subir
+          </label>
           <Button variant="outline" onClick={() => setAgregarDocOpen(true)}>
             <PlusIcon className="h-4 w-4" />
             Añadir documento
@@ -652,17 +662,24 @@ export function EnrollmentDetailPage() {
       >
         {agregarDocMutation.isError && <Alert tone="error">{errorMessage(agregarDocMutation.error)}</Alert>}
         <Select
-          label="Tipo de documento"
+          label="Documento"
           value={nuevoTipoDoc}
-          onChange={(e) => setNuevoTipoDoc(e.target.value as TipoDocumentoMatricula)}
+          onChange={(e) => {
+            setNuevoTipoDoc(e.target.value);
+            const elegido = (catalogo.data ?? []).find((r) => r.clave === e.target.value);
+            if (elegido) setNuevoEsObligatorio(elegido.obligatorio);
+          }}
         >
-          {TIPOS_DOCUMENTO_MATRICULA.map((t) => (
-            <option key={t} value={t}>
-              {NOMBRES_DOCUMENTO_MATRICULA[t]}
-            </option>
-          ))}
+          {(catalogo.data ?? [])
+            .filter((r) => !enrollmentQuery.data?.checklist.some((c) => c.tipo_documento === r.clave))
+            .map((r) => (
+              <option key={r.clave} value={r.clave}>
+                {r.nombre.replace('{grado_anterior}', 'del grado anterior')}
+              </option>
+            ))}
+          <option value={OTRO}>Otro documento (escribir el nombre)</option>
         </Select>
-        {nuevoTipoDoc === 'OTRO_DOCUMENTO' && (
+        {nuevoTipoDoc === OTRO && (
           <Input
             label="Nombre del documento"
             required
@@ -687,7 +704,7 @@ export function EnrollmentDetailPage() {
         title="Observación de Secretaría"
         subtitle={
           editandoObservacion
-            ? `Notas o seguimiento para: ${NOMBRES_DOCUMENTO_MATRICULA[editandoObservacion] || editandoObservacion}`
+            ? `Notas o seguimiento para: ${nombreDeItem(enrollmentQuery.data?.checklist.find((c) => c.tipo_documento === editandoObservacion) ?? { tipo_documento: editandoObservacion })}`
             : undefined
         }
         onClose={() => {

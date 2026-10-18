@@ -148,18 +148,37 @@ async function dibujar(snapshot: SnapshotCertificado, seguridad: DatosSeguridad)
       // Firmas: con el switch apagado queda la línea con nombre y cargo para la firma manuscrita.
       if (doc.y > doc.page.height - 330) doc.addPage();
       const yFirma = doc.y + 95;
-      const columna = ancho / 2;
-      bloqueFirma(doc, MARGEN, columna, yFirma, snapshot.firmas.rectoria, imgRectoria, 'Rectoría');
-      bloqueFirma(doc, MARGEN + columna, columna, yFirma, snapshot.firmas.secretaria, imgSecretaria, 'Secretaría Académica');
-      if (imgSello) {
-        doc.save().opacity(0.9);
-        try {
-          doc.image(imgSello, doc.page.width / 2 - 45, yFirma - 78, { fit: [90, 90], align: 'center', valign: 'center' });
-        } catch {
-          throw new ApiError(409, 'El archivo de la imagen del sello está dañado y no se puede leer. Vuelve a cargar la imagen original en «Firmas y sellos»: se identifica por su contenido y los documentos que la usaron vuelven a abrirse.');
+      const haySecretaria = Boolean(snapshot.firmas.secretaria?.nombre || snapshot.firmas.secretaria?.usuario_id || snapshot.firmas.secretaria?.aplicada);
+
+      if (haySecretaria) {
+        const columna = ancho / 2;
+        bloqueFirma(doc, MARGEN, columna, yFirma, snapshot.firmas.rectoria, imgRectoria, 'Rectoría');
+        bloqueFirma(doc, MARGEN + columna, columna, yFirma, snapshot.firmas.secretaria, imgSecretaria, 'Secretaría Académica');
+        if (imgSello) {
+          doc.save().opacity(0.9);
+          try {
+            doc.image(imgSello, doc.page.width / 2 - 45, yFirma - 78, { fit: [90, 90], align: 'center', valign: 'center' });
+          } catch {
+            throw new ApiError(409, 'El archivo de la imagen del sello está dañado y no se puede leer. Vuelve a cargar la imagen original en «Firmas y sellos»: se identifica por su contenido y los documentos que la usaron vuelven a abrirse.');
+          }
+          doc.restore();
+          doc.opacity(1);
         }
-        doc.restore();
-        doc.opacity(1);
+      } else {
+        const anchoBloque = Math.min(240, ancho * 0.55);
+        const xCentro = MARGEN + (ancho - anchoBloque) / 2;
+        bloqueFirma(doc, xCentro, anchoBloque, yFirma, snapshot.firmas.rectoria, imgRectoria, 'Rectoría');
+        if (imgSello) {
+          doc.save().opacity(0.9);
+          try {
+            const xSello = Math.min(doc.page.width - MARGEN - 90, xCentro + anchoBloque + 20);
+            doc.image(imgSello, xSello, yFirma - 78, { fit: [90, 90], align: 'center', valign: 'center' });
+          } catch {
+            throw new ApiError(409, 'El archivo de la imagen del sello está dañado y no se puede leer. Vuelve a cargar la imagen original en «Firmas y sellos»: se identifica por su contenido y los documentos que la usaron vuelven a abrirse.');
+          }
+          doc.restore();
+          doc.opacity(1);
+        }
       }
 
       // Verificación: el QR solo lleva un token opaco; los datos no viajan en él.

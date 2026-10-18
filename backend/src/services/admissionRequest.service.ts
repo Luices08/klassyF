@@ -1,6 +1,7 @@
 import { ClientSession, Types } from 'mongoose';
 import { Jornada, TipoDocumento } from '../constants/enums';
-import { DIAS_PLAZO_LEGALIZACION, generarChecklistMatricula } from '../constants/matriculaChecklist';
+import { DIAS_PLAZO_LEGALIZACION } from '../constants/matriculaChecklist';
+import { generarChecklistDesdeCatalogo } from './requisitoDocumental.service';
 import { ROLES } from '../constants/roles';
 import AcademicYear from '../models/academicYear.model';
 import AdmissionRequest, { AdmissionRequestDocument } from '../models/admissionRequest.model';
@@ -255,7 +256,7 @@ export async function aprobarSolicitud(
       );
     }
 
-    const itemsGenerados = generarChecklistMatricula({
+    const itemsGenerados = await generarChecklistDesdeCatalogo({
       nivel: grade.nivel,
       numeroGrado: grade.numero,
       tipoIngreso: 'NUEVO',
@@ -265,6 +266,8 @@ export async function aprobarSolicitud(
     const checklist = itemsGenerados.map((item) => ({
       tipo_documento: item.tipo_documento,
       nombre_personalizado: item.nombre_personalizado ?? null,
+      indicacion: item.indicacion ?? null,
+      categoria: item.categoria ?? null,
       obligatorio: item.obligatorio,
       estado: 'PENDIENTE' as const,
       archivo_path: null,

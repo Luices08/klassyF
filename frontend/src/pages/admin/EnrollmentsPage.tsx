@@ -1,5 +1,5 @@
 import { type FormEvent, useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Alert, errorMessage } from '../../components/ui/Alert';
 import { Chip, CupoBadge, EstadoMatriculaBadge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
@@ -7,14 +7,16 @@ import { Card, CardHeader } from '../../components/ui/Card';
 import { Drawer } from '../../components/ui/Drawer';
 import { Input, Select } from '../../components/ui/Field';
 import { IconButton } from '../../components/ui/IconButton';
+import { CatalogoDocumentosMatricula } from '../../components/matriculas/CatalogoDocumentosMatricula';
 import { PageHeader } from '../../components/ui/PageHeader';
+import { Tabs } from '../../components/ui/Tabs';
 import { Spinner } from '../../components/ui/Spinner';
 import { EmptyRow, Table, TableBody, TableHead, Td, Th } from '../../components/ui/Table';
 import { EyeIcon, PlusIcon, SearchIcon } from '../../components/ui/icons';
 import { useAuth } from '../../context/AuthContext';
 import { useAnioDeTrabajo } from '../../hooks/useAniosLectivos';
 import { useCampuses, useGrades, useJornadas } from '../../hooks/useCatalogs';
-import { useCreateEnrollment, useEnrollmentsList, useSituacionEstudiantes, type EnrollmentsFilter } from '../../hooks/useEnrollments';
+import { useCreateEnrollment, useEnrollmentsList, useSituacionEstudiantes, useCargarDocumentoMatricula, type EnrollmentsFilter } from '../../hooks/useEnrollments';
 import { useGroups } from '../../hooks/useGroups';
 import { useInstitution } from '../../hooks/useInstitution';
 import { useCrearEstudianteCompleto } from '../../hooks/useStudents';
@@ -67,6 +69,7 @@ const FORM_VACIO = {
   student_id: '',
   group_id: '',
   tipo_ingreso: 'NUEVO' as TipoIngreso,
+  documentacion_completa: true,
   fecha_limite_compromiso: '',
   forzar_sobrecupo: false,
   apoyo: APOYO_VACIO,
@@ -140,6 +143,10 @@ export function EnrollmentsPage() {
   const listQuery = useEnrollmentsList(filter);
 
   // --- Formalizar matricula ---
+  // `?pestana=cupos` o `?pestana=documentos` abren directo esa sección.
+  const [parametros, setParametros] = useSearchParams();
+  const pestana = ['cupos', 'documentos'].includes(parametros.get('pestana') ?? '') ? (parametros.get('pestana') as 'cupos' | 'documentos') : 'matriculas';
+  const cambiarPestana = (k: string) => setParametros(k === 'matriculas' ? {} : { pestana: k }, { replace: true });
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [matriculaCreadaId, setMatriculaCreadaId] = useState<string | null>(null);
   const [modoMatricula, setModoMatricula] = useState<'existente' | 'expres'>('existente');
@@ -158,6 +165,8 @@ export function EnrollmentsPage() {
   const groupsQuery = useGroups({ academic_year_id: anioId, estado: 'ACTIVE' });
   const createEnrollment = useCreateEnrollment();
   const crearEstudiante = useCrearEstudianteCompleto();
+  const cargarDoc = useCargarDocumentoMatricula();
+  const [archivosDocumentos, setArchivosDocumentos] = useState<Record<string, File>>({});
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -198,13 +207,32 @@ export function EnrollmentsPage() {
         group_id: form.group_id,
         academic_year_id: anioId,
         tipo_ingreso: form.tipo_ingreso,
-        fecha_limite_compromiso: form.fecha_limite_compromiso,
+        documentacion_completa: form.documentacion_completa,
+        estado_inicial: form.documentacion_completa ? 'MATRICULADO_DEFINITIVO' : 'MATRICULADO_CONDICIONAL',
+        fecha_limite_compromiso: form.documentacion_completa ? undefined : form.fecha_limite_compromiso,
         forzar_sobrecupo: form.forzar_sobrecupo,
         reingreso: modoMatricula === 'existente' && esReingreso && reingresoConfirmado ? true : undefined,
         apoyo_declarado: aApoyoDeclarado(form.apoyo),
       });
 
+      // Si se adjuntaron archivos digitales en este drawer, subirlos de inmediato
+      const entradasArchivos = Object.entries(archivosDocumentos);
+      if (entradasArchivos.length > 0) {
+        for (const [tipoDoc, file] of entradasArchivos) {
+          try {
+            await cargarDoc.mutateAsync({
+              id: matricula._id,
+              tipoDocumento: tipoDoc as any,
+              file,
+            });
+          } catch (uploadErr) {
+            console.error(`Error cargando archivo para ${tipoDoc}:`, uploadErr);
+          }
+        }
+      }
+
       setForm(FORM_VACIO);
+      setArchivosDocumentos({});
       setReingresoConfirmado(false);
       void studentsQuery.refetch();
       // Los documentos se cargan y se revisan en el expediente: el drawer ofrece el botón para ir a él.
@@ -218,6 +246,7 @@ export function EnrollmentsPage() {
     setMatriculaCreadaId(null);
     setErrorEnvio(null);
     setForm(FORM_VACIO);
+    setArchivosDocumentos({});
     setFiltroEstudiante('DISPONIBLES');
     setReingresoConfirmado(false);
     createEnrollment.reset();
@@ -226,6 +255,28 @@ export function EnrollmentsPage() {
 
   const esAdmin = user?.rol === 'ADMIN';
   const paginaInfo = listQuery.data;
+
+  const pestanas = (
+    <Tabs
+      items={[
+        { key: 'matriculas', label: 'Matrículas' },
+        { key: 'cupos', label: 'Disponibilidad de cupos' },
+        { key: 'documentos', label: 'Documentos que se piden' },
+      ]}
+      value={pestana}
+      onChange={cambiarPestana}
+    />
+  );
+
+  if (pestana === 'documentos') {
+    return (
+      <div className="space-y-4">
+        <PageHeader title="Matrículas" subtitle="Cupos por sede/jornada/grado, formalización de matrícula y novedades." />
+        {pestanas}
+        <CatalogoDocumentosMatricula />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-4">
@@ -263,9 +314,11 @@ export function EnrollmentsPage() {
           </div>
         }
       />
+      {pestanas}
 
       {!anio && <Alert tone="warning">Aún no hay un año lectivo. Créalo en "Año lectivo".</Alert>}
 
+      {pestana === 'cupos' && (
       <Card>
         <CardHeader
           title="Disponibilidad de cupos"
@@ -326,7 +379,9 @@ export function EnrollmentsPage() {
           </Table>
         )}
       </Card>
+      )}
 
+      {pestana === 'matriculas' && (
       <Card>
         <CardHeader
           title="Matrículas"
@@ -424,6 +479,7 @@ export function EnrollmentsPage() {
           </>
         )}
       </Card>
+      )}
 
       <Drawer
         open={drawerOpen}
@@ -433,10 +489,11 @@ export function EnrollmentsPage() {
           setDrawerOpen(false);
           setMatriculaCreadaId(null);
           setErrorEnvio(null);
+          setArchivosDocumentos({});
         }}
         onSubmit={matriculaCreadaId ? undefined : handleSubmit}
         submitLabel={modoMatricula === 'expres' ? 'Crear estudiante y matricular' : 'Matricular'}
-        isSubmitting={createEnrollment.isPending || crearEstudiante.isPending}
+        isSubmitting={createEnrollment.isPending || crearEstudiante.isPending || cargarDoc.isPending}
         submitDisabled={matriculaBloqueada}
       >
         {matriculaCreadaId ? (
@@ -682,19 +739,76 @@ export function EnrollmentsPage() {
           ))}
         </Select>
 
-        <Input
-          label="Fecha límite del acta de compromiso"
-          type="date"
-          required
-          value={form.fecha_limite_compromiso}
-          onChange={(e) => setForm((f) => ({ ...f, fecha_limite_compromiso: e.target.value }))}
-          hint="La matrícula nace condicional y pasa sola a definitiva cuando todos los documentos obligatorios estén aprobados."
-        />
+        <div className="space-y-2 rounded-lg border border-border bg-subtle/30 p-3">
+          <label className="text-xs font-bold uppercase tracking-wider text-muted block">
+            Estado de la documentación física
+          </label>
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              type="button"
+              onClick={() => setForm((f) => ({ ...f, documentacion_completa: true }))}
+              className={`rounded-md p-2.5 text-left text-xs font-semibold border transition ${
+                form.documentacion_completa
+                  ? 'bg-emerald-50 border-emerald-500 text-emerald-800 shadow-sm ring-1 ring-emerald-500'
+                  : 'bg-surface border-border text-muted hover:text-ink'
+              }`}
+            >
+              <div className="font-bold">
+                Documentación completa
+              </div>
+              <p className="text-[11px] font-normal opacity-80 mt-1 leading-tight">
+                El estudiante entregó todos los documentos físicos. Matrícula definitiva directa.
+              </p>
+            </button>
+            <button
+              type="button"
+              onClick={() => setForm((f) => ({ ...f, documentacion_completa: false }))}
+              className={`rounded-md p-2.5 text-left text-xs font-semibold border transition ${
+                !form.documentacion_completa
+                  ? 'bg-amber-50 border-amber-500 text-amber-800 shadow-sm ring-1 ring-amber-500'
+                  : 'bg-surface border-border text-muted hover:text-ink'
+              }`}
+            >
+              <div className="font-bold">
+                Documentos pendientes
+              </div>
+              <p className="text-[11px] font-normal opacity-80 mt-1 leading-tight">
+                Tiene documentos faltantes. Matrícula condicional sujeta a acta de compromiso.
+              </p>
+            </button>
+          </div>
+
+          {!form.documentacion_completa && (
+            <div className="pt-2">
+              <Input
+                label="Fecha límite del acta de compromiso"
+                type="date"
+                required={!form.documentacion_completa}
+                value={form.fecha_limite_compromiso}
+                onChange={(e) => setForm((f) => ({ ...f, fecha_limite_compromiso: e.target.value }))}
+                hint="Plazo máximo establecido en el acta para presentar los documentos pendientes."
+              />
+            </div>
+          )}
+        </div>
 
         <DocumentosPrevistos
           groupId={form.group_id}
           tipoIngreso={form.tipo_ingreso}
           studentId={modoMatricula === 'existente' ? form.student_id : undefined}
+          archivos={archivosDocumentos}
+          onArchivoChange={(tipoDoc, file) => {
+            setArchivosDocumentos((prev) => {
+              const copy = { ...prev };
+              if (!file) {
+                delete copy[tipoDoc];
+              } else {
+                copy[tipoDoc] = file;
+              }
+              return copy;
+            });
+          }}
+          documentacionCompleta={form.documentacion_completa}
         />
 
         <InformacionApoyoCampos valor={form.apoyo} onChange={(apoyo) => setForm((f) => ({ ...f, apoyo }))} />

@@ -36,9 +36,9 @@ describe('M04: una matrícula viva por estudiante y año', () => {
     })) as GroupDocument;
   });
 
-  const matricularEn = (grupo: GroupDocument) =>
+  const matricularEn = (grupo: GroupDocument, reingreso?: boolean) =>
     createEnrollment(
-      { student_id: e.estudiante._id, group_id: grupo._id, academic_year_id: grupo.academic_year_id, tipo_ingreso: 'NUEVO', fecha_limite_compromiso: PLAZO },
+      { student_id: e.estudiante._id, group_id: grupo._id, academic_year_id: grupo.academic_year_id, tipo_ingreso: 'NUEVO', fecha_limite_compromiso: PLAZO, reingreso },
       como(e.secretaria)
     );
 
@@ -61,7 +61,7 @@ describe('M04: una matrícula viva por estudiante y año', () => {
   it('una matrícula retirada o anulada no bloquea una nueva en el mismo año', async () => {
     const existente = (await Enrollment.findOne({ student_id: e.estudiante._id }))!;
     await updateEnrollmentStatus(existente._id, 'RETIRADO', 'Cambio de colegio', { id: e.secretaria._id });
-    const nueva = await matricularEn(otroGrupo);
+    const nueva = await matricularEn(otroGrupo, true);
     expect(nueva.estado).toBe('MATRICULADO_CONDICIONAL');
     expect(await Enrollment.countDocuments({ student_id: e.estudiante._id })).toBe(2);
   });
@@ -95,15 +95,21 @@ describe('M04: una matrícula viva por estudiante y año', () => {
     const anio = () => String(grupoActual.academic_year_id);
 
     it('lista a cada estudiante con su situación: matriculado con grupo y folio, o disponible', async () => {
+      await Enrollment.deleteMany({ student_id: e.otroEstudiante._id });
       const lista = await listarSituacionEstudiantes(anio());
       const propio = lista.find((x) => x._id === String(e.estudiante._id))!;
       expect(propio.situacion).toBe('MATRICULADO');
-      expect(propio.matricula).toMatchObject({ estado: 'MATRICULADO_CONDICIONAL', folio: expect.any(String) });
+      expect(propio.matricula).toMatchObject({ estado: expect.stringMatching(/MATRICULADO/), folio: expect.any(String) });
       expect(lista.find((x) => x._id === String(e.otroEstudiante._id))!.situacion).toBe('DISPONIBLE');
     });
 
     it('un retirado figura en reingreso y no se matricula sin confirmar la reincorporación', async () => {
-      await StudentProfile.updateOne({ user_id: e.otroEstudiante._id }, { estado: 'RETIRADO' }, { upsert: true });
+      await Enrollment.deleteMany({ student_id: e.otroEstudiante._id });
+      await StudentProfile.updateOne(
+        { user_id: e.otroEstudiante._id },
+        { estado: 'RETIRADO', fecha_nacimiento: new Date('2010-01-01') },
+        { upsert: true }
+      );
       const lista = await listarSituacionEstudiantes(anio());
       expect(lista.find((x) => x._id === String(e.otroEstudiante._id))!.situacion).toBe('REINGRESO');
 

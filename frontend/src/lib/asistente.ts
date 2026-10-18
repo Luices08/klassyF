@@ -167,8 +167,8 @@ export const PALABRAS_CLAVE_POR_RUTA: Record<string, { descripcion: string; clav
     claves: ['gestion de asistencia', 'justificaciones', 'excusas', 'reporte de asistencia', 'ausentismo', 'estados de asistencia'],
   },
   '/admin/enrollments': {
-    descripcion: 'Matrículas y libro de matrícula.',
-    claves: ['matriculas', 'matricula', 'matricular', 'folio', 'libro de matricula'],
+    descripcion: 'Matrículas, libro de matrícula y el catálogo de documentos que se piden al matricular.',
+    claves: ['matriculas', 'matricula', 'matricular', 'folio', 'libro de matricula', 'documentos de matricula', 'documentos que se piden', 'requisitos de matricula', 'configurar documentos'],
   },
   '/admin/documentos-por-revisar': {
     descripcion: 'Bandeja de documentos de matrícula subidos que falta aprobar o rechazar.',

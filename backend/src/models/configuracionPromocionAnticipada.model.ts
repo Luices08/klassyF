@@ -26,13 +26,27 @@ const criterio = (porDefecto: ConfiguracionAnticipada['rendimiento_excepcional']
   default: () => ({}),
 });
 
+const criterioReiniciantes = (porDefecto: ConfiguracionAnticipada['reiniciantes']) => ({
+  type: new Schema(
+    {
+      activo: { type: Boolean, default: porDefecto.activo },
+      promedio_minimo: { type: Number, min: 0.01, default: porDefecto.promedio_minimo },
+      nota_minima_asignatura: { type: Number, min: 0.01, default: porDefecto.nota_minima_asignatura },
+      nota_minima_asignaturas_reprobadas: { type: Number, min: 0.01, default: porDefecto.nota_minima_asignaturas_reprobadas ?? null },
+    },
+    { _id: false }
+  ),
+  default: () => ({}),
+});
+
 const configuracionSchema = new Schema<IConfiguracionPromocionAnticipada, ConfiguracionPromocionAnticipadaModel>(
   {
     activa: { type: Boolean, default: D.activa },
     periodo_evaluacion: { type: Number, min: 1, max: 12, default: D.periodo_evaluacion },
     dias_ventana_tras_cierre: { type: Number, min: 0, max: 365, default: D.dias_ventana_tras_cierre },
+    grados_excluidos_ids: { type: [{ type: Schema.Types.ObjectId, ref: 'Grade' }], default: [] },
     rendimiento_excepcional: criterio(D.rendimiento_excepcional),
-    reiniciantes: criterio(D.reiniciantes),
+    reiniciantes: criterioReiniciantes(D.reiniciantes),
     exige: {
       type: new Schema(
         {

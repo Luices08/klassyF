@@ -5,6 +5,7 @@ import { Card, CardHeader } from '../ui/Card';
 import { Input, Select } from '../ui/Field';
 import { Spinner } from '../ui/Spinner';
 import { Switch } from '../ui/Switch';
+import { useGrades } from '../../hooks/useCatalogs';
 import {
   type ConfiguracionAnticipada,
   type CriterioNotas,
@@ -29,6 +30,7 @@ const PLANTILLAS_DESEMPENO = [
 ];
 
 function Criterio({ titulo, valor, onChange, bloqueado }: { titulo: string; valor: CriterioNotas; onChange: (c: CriterioNotas) => void; bloqueado: boolean }) {
+  const esReiniciante = titulo.toLowerCase().includes('reiniciante');
   return (
     <div className="space-y-3 rounded-lg border border-border p-4">
       <Switch label={titulo} checked={valor.activo} disabled={bloqueado} onChange={(activo) => onChange({ ...valor, activo })} />
@@ -63,6 +65,18 @@ function Criterio({ titulo, valor, onChange, bloqueado }: { titulo: string; valo
               onChange={(e) => onChange({ ...valor, nota_minima_asignatura: e.target.value === '' ? null : Number(e.target.value) })}
             />
           </div>
+          {esReiniciante && (
+            <Input
+              label="Nota mínima en asignaturas reprobadas el año anterior"
+              type="number"
+              step="any"
+              min={0}
+              value={valor.nota_minima_asignaturas_reprobadas ?? ''}
+              hint="Vacío = no se exige nota diferenciada"
+              disabled={bloqueado}
+              onChange={(e) => onChange({ ...valor, nota_minima_asignaturas_reprobadas: e.target.value === '' ? null : Number(e.target.value) })}
+            />
+          )}
         </div>
       )}
     </div>
@@ -71,6 +85,7 @@ function Criterio({ titulo, valor, onChange, bloqueado }: { titulo: string; valo
 
 function Formulario({ configuracion, puedeEditar }: { configuracion: ConfiguracionAnticipada; puedeEditar: boolean }) {
   const actualizar = useActualizarConfiguracionAnticipada();
+  const grados = useGrades();
   const [c, setC] = useState<ConfiguracionAnticipada>(() => structuredClone(configuracion));
   const [mensaje, setMensaje] = useState<{ tone: 'success' | 'error'; texto: string } | null>(null);
   const bloqueado = !puedeEditar;
@@ -95,6 +110,35 @@ function Formulario({ configuracion, puedeEditar }: { configuracion: Configuraci
           <Switch label="El colegio aplica la promoción anticipada" checked={c.activa} disabled={bloqueado} onChange={(activa) => setC({ ...c, activa })} />
           <Input label="Periodo cuyas notas se evalúan" type="number" min={1} max={12} value={c.periodo_evaluacion} disabled={bloqueado || !c.activa} onChange={(e) => setC({ ...c, periodo_evaluacion: Number(e.target.value) })} />
           <Input label="Días para solicitar tras cerrar ese periodo" type="number" min={0} max={365} value={c.dias_ventana_tras_cierre} disabled={bloqueado || !c.activa} onChange={(e) => setC({ ...c, dias_ventana_tras_cierre: Number(e.target.value) })} />
+        </div>
+      </Card>
+
+      <Card>
+        <CardHeader
+          title="Grados excluidos de la promoción anticipada"
+          subtitle="Grados en los cuales el SIEE prohíbe la promoción anticipada (por ejemplo Transición o grado 11°)."
+        />
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
+          {(grados.data ?? []).map((g) => {
+            const excluido = (c.grados_excluidos_ids ?? []).includes(g._id);
+            return (
+              <label key={g._id} className="flex items-center gap-2 rounded border border-border p-2 text-sm hover:bg-surface-elevated cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={excluido}
+                  disabled={bloqueado || !c.activa}
+                  onChange={(e) => {
+                    const nuevos = e.target.checked
+                      ? [...(c.grados_excluidos_ids ?? []), g._id]
+                      : (c.grados_excluidos_ids ?? []).filter((id) => id !== g._id);
+                    setC({ ...c, grados_excluidos_ids: nuevos });
+                  }}
+                  className="rounded border-border text-primary focus:ring-primary"
+                />
+                <span>{g.nombre}</span>
+              </label>
+            );
+          })}
         </div>
       </Card>
 

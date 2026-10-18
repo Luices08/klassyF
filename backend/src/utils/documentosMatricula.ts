@@ -12,7 +12,7 @@ interface ItemDeChecklist {
 export function documentosObligatoriosPendientes(checklist: readonly ItemDeChecklist[]): string[] {
   return checklist
     .filter((c) => c.obligatorio !== false && c.estado !== 'APROBADO')
-    .map((c) => c.nombre_personalizado || NOMBRES_DOCUMENTO_MATRICULA[c.tipo_documento]);
+    .map((c) => c.nombre_personalizado || NOMBRES_DOCUMENTO_MATRICULA[c.tipo_documento] || c.tipo_documento);
 }
 
 /** Con todo lo obligatorio aprobado la matrícula condicional pasa sola a definitiva. */

@@ -106,6 +106,7 @@ export type TipoIngreso = (typeof TIPOS_INGRESO)[number];
 export const ESTADOS_DOCUMENTO_MATRICULA = ['PENDIENTE', 'CARGADO', 'APROBADO', 'RECHAZADO'] as const;
 export type EstadoDocumentoMatricula = (typeof ESTADOS_DOCUMENTO_MATRICULA)[number];
 
+/** Los documentos con que se sembró el catálogo configurable (M04). El catálogo vive en `RequisitoDocumental`: el colegio agrega, edita y desactiva. */
 export const TIPOS_DOCUMENTO_MATRICULA = [
   'DOCUMENTO_IDENTIDAD',
   'FOTO',
@@ -124,7 +125,8 @@ export const TIPOS_DOCUMENTO_MATRICULA = [
   'PAZ_Y_SALVO_ANIO_ANTERIOR',
   'OTRO_DOCUMENTO',
 ] as const;
-export type TipoDocumentoMatricula = (typeof TIPOS_DOCUMENTO_MATRICULA)[number];
+/** La clave de un requisito del catálogo (`RequisitoDocumental.clave`), no una lista cerrada. */
+export type TipoDocumentoMatricula = string;
 
 export const GRUPOS_SANGUINEOS = ['O+', 'O-', 'A+', 'A-', 'B+', 'B-', 'AB+', 'AB-'] as const;
 export type GrupoSanguineo = (typeof GRUPOS_SANGUINEOS)[number];

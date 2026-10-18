@@ -1,8 +1,7 @@
 import Joi from 'joi';
 import { MAX_DESTINATARIO } from '../constants/certificados';
-import { TIPOS_DOCUMENTO_MATRICULA } from '../constants/enums';
 import { ValidationSchema } from '../middlewares/validate.middleware';
-import { objectId } from './common.validator';
+import { claveDocumento, objectId } from './common.validator';
 
 const periodo = Joi.number().integer().min(1).max(12);
 const delHijo = Joi.object({ studentId: objectId.required() });
@@ -20,7 +19,7 @@ export const inasistencias: ValidationSchema = {
 };
 
 export const subirDocumento: ValidationSchema = {
-  params: delHijo.keys({ tipoDocumento: Joi.string().valid(...TIPOS_DOCUMENTO_MATRICULA).required() }),
+  params: delHijo.keys({ tipoDocumento: claveDocumento.required() }),
 };
 
 // Solo viajan la clave del documento y lo elegido en el selector de destinatario: todo lo demás lo arma el servidor (M26).

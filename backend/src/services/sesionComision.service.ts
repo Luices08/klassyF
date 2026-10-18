@@ -20,6 +20,7 @@ import { registrarEvento } from './audit.service';
 import { cargarAnio } from './configuracionRecuperaciones.service';
 import { datosDeConfiguracion, obtenerConfiguracion } from './configuracionComision.service';
 import { aplicarDecisionDeInstancia } from './evaluacionPromocion.service';
+import { avisarSesionConvocada } from './notificacionesEventos.service';
 import { decisionesValidasEn, puedeTratarseEn, registrarDecisionDeSesion } from './promocionAnticipada.service';
 import { evaluarTitulacionDeMatriculas } from './titulacion.service';
 
@@ -172,6 +173,7 @@ export async function convocar(id: string, usuario: UserDocument, ip?: string | 
   sesion.convocada_at = new Date();
   await sesion.save();
   await registrarEvento({ usuario_id: usuario._id, accion: 'COMISION_SESION_CONVOCADA', entidad: 'SesionComision', entidad_id: sesion._id, ip });
+  await avisarSesionConvocada(sesion);
   return sesion;
 }
 

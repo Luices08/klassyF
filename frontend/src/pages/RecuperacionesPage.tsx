@@ -12,6 +12,8 @@ import { EmptyRow, Table, TableBody, TableHead, Td, Th } from '../components/ui/
 import { Tabs } from '../components/ui/Tabs';
 import { useAuth } from '../context/AuthContext';
 import { useAnioDeTrabajo } from '../hooks/useAniosLectivos';
+import { useCampuses, useTodasLasJornadas } from '../hooks/useCatalogs';
+import { useInstitution } from '../hooks/useInstitution';
 import { useGroups } from '../hooks/useGroups';
 import {
   type EstadoRecuperacion,
@@ -61,6 +63,11 @@ export function RecuperacionesPage() {
 }
 
 function Listado({ esDocente, anioId, periodos }: { esDocente: boolean; anioId?: string; periodos: Array<{ numero: number; nombre: string; fecha_inicio: string; fecha_fin: string }> }) {
+  const { data: institucion } = useInstitution();
+  const sedes = useCampuses(institucion?._id).data ?? [];
+  const jornadas = useTodasLasJornadas().data ?? [];
+  const [sedeId, setSedeId] = useState('');
+  const [jornadaId, setJornadaId] = useState('');
   const { data: carga = [] } = useMyTeacherLoad(esDocente ? anioId : undefined);
   const clases = carga.filter((a) => a.tipo_asignacion === 'CLASE');
   const grupos = useGroups({ academic_year_id: esDocente ? undefined : anioId });
@@ -71,8 +78,16 @@ function Listado({ esDocente, anioId, periodos }: { esDocente: boolean; anioId?:
   const [periodoElegido, setPeriodoElegido] = useState<number | null>(null);
   const [registrando, setRegistrando] = useState<FilaRecuperacion | null>(null);
 
+  const gruposFiltrados = (grupos.data ?? []).filter((g) => {
+    const sId = typeof g.sede_id === 'object' ? g.sede_id._id : g.sede_id;
+    const jId = typeof g.jornada_id === 'object' ? g.jornada_id._id : g.jornada_id;
+    if (sedeId && sId !== sedeId) return false;
+    if (jornadaId && jId !== jornadaId) return false;
+    return true;
+  });
+
   const clase = clases.find((c) => c._id === claseId) ?? clases[0];
-  const grupo = (grupos.data ?? []).find((g) => g._id === grupoId) ?? (grupos.data ?? [])[0];
+  const grupo = gruposFiltrados.find((g) => g._id === grupoId) ?? gruposFiltrados[0];
   const periodo = periodos.find((p) => p.numero === periodoElegido) ?? periodos[0];
 
   const filtros = {
@@ -88,7 +103,27 @@ function Listado({ esDocente, anioId, periodos }: { esDocente: boolean; anioId?:
   return (
     <div className="space-y-4">
       <Card>
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <div className={`grid grid-cols-1 gap-4 ${esDocente ? 'sm:grid-cols-3' : 'sm:grid-cols-2 lg:grid-cols-5'}`}>
+          {!esDocente && (
+            <>
+              <Select label="Sede" value={sedeId} onChange={(e) => { setSedeId(e.target.value); setGrupoId(''); }}>
+                <option value="">Todas las sedes</option>
+                {sedes.map((s) => (
+                  <option key={s._id} value={s._id}>
+                    {s.nombre}
+                  </option>
+                ))}
+              </Select>
+              <Select label="Jornada" value={jornadaId} onChange={(e) => { setJornadaId(e.target.value); setGrupoId(''); }}>
+                <option value="">Todas las jornadas</option>
+                {jornadas.map((j) => (
+                  <option key={j._id} value={j._id}>
+                    {j.nombre}
+                  </option>
+                ))}
+              </Select>
+            </>
+          )}
           {esDocente ? (
             <Select label="Clase" value={clase?._id ?? ''} onChange={(e) => setClaseId(e.target.value)}>
               {clases.map((c) => (
@@ -104,7 +139,7 @@ function Listado({ esDocente, anioId, periodos }: { esDocente: boolean; anioId?:
               value={grupo?._id ?? ''}
               onChange={setGrupoId}
               placeholder="Buscar grupo…"
-              opciones={opcionesDeGrupos(grupos.data ?? [])}
+              opciones={opcionesDeGrupos(gruposFiltrados)}
             />
           )}
           <Select label="Tipo" value={tipo} onChange={(e) => setTipo(e.target.value as TipoRecuperacion)}>

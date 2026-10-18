@@ -1,5 +1,6 @@
 import { Types } from 'mongoose';
-import { DIAS_PLAZO_LEGALIZACION, generarChecklistMatricula } from '../constants/matriculaChecklist';
+import { DIAS_PLAZO_LEGALIZACION } from '../constants/matriculaChecklist';
+import { generarChecklistDesdeCatalogo } from './requisitoDocumental.service';
 import { ESTADOS_MATRICULA_ACTIVOS, EstadoDocumentoMatricula, TipoIngreso } from '../constants/enums';
 import { ResultadoPromocion } from '../constants/promocion';
 import { ROLES } from '../constants/roles';
@@ -261,15 +262,17 @@ async function crearPreMatricula(fila: FilaRollover, destino: AcademicYearDocume
       StudentProfile.findOne({ user_id: fila.student_id }).session(session),
       StudentGuardian.findOne({ student_id: fila.student_id, es_principal: true }).session(session),
     ]);
-    const checklist = generarChecklistMatricula({
+    const checklist = (await generarChecklistDesdeCatalogo({
       nivel: grado.nivel,
       numeroGrado: grado.numero,
       tipoIngreso: fila.tipo_ingreso as TipoIngreso,
       tieneDiscapacidad: perfil?.tiene_discapacidad,
       parentescoAcudiente: vinculo?.parentesco,
-    }).map((item) => ({
+    })).map((item) => ({
       tipo_documento: item.tipo_documento,
       nombre_personalizado: item.nombre_personalizado ?? null,
+      indicacion: item.indicacion ?? null,
+      categoria: item.categoria ?? null,
       obligatorio: item.obligatorio,
       estado: 'PENDIENTE' as EstadoDocumentoMatricula,
       archivo_path: null,

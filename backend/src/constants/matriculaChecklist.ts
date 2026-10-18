@@ -131,6 +131,8 @@ export interface ItemChecklistGenerado {
   tipo_documento: TipoDocumentoMatricula;
   obligatorio: boolean;
   nombre_personalizado?: string;
+  indicacion?: string;
+  categoria?: string;
 }
 
 /**
@@ -151,8 +153,9 @@ function certificadoDelGradoAnterior(numeroGrado: number | undefined): ItemCheck
 }
 
 /**
- * Genera el checklist documental preciso e inteligente para un estudiante segun su nivel escolar,
- * grado, tipo de ingreso (antiguo vs nuevo/traslado) y condiciones especiales.
+ * Las reglas con que el sistema armaba el checklist antes de ser configurable. YA NO SE USA para matricular: el checklist sale del catálogo
+ * (`RequisitoDocumental`, utils/requisitosDocumentales.ts). Se conserva como referencia: la prueba de equivalencia comprueba que el catálogo
+ * sembrado pide exactamente lo mismo.
  */
 export function generarChecklistMatricula(params: GenerarChecklistParams): ItemChecklistGenerado[] {
   const items: ItemChecklistGenerado[] = [];

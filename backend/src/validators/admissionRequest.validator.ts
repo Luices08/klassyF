@@ -1,8 +1,8 @@
 import Joi from 'joi';
 import { ESTADOS_SOLICITUD } from '../models/admissionRequest.model';
-import { JORNADAS, TIPOS_DOCUMENTO, TIPOS_DOCUMENTO_MATRICULA } from '../constants/enums';
+import { JORNADAS, TIPOS_DOCUMENTO } from '../constants/enums';
 import { ValidationSchema } from '../middlewares/validate.middleware';
-import { objectId } from './common.validator';
+import { claveDocumento, objectId } from './common.validator';
 
 export const crearSolicitud: ValidationSchema = {
   body: Joi.object({
@@ -47,9 +47,7 @@ export const descargarComprobante: ValidationSchema = {
 
 export const subirDocumentoPublico: ValidationSchema = {
   params: Joi.object({
-    tipoDocumento: Joi.string()
-      .valid(...TIPOS_DOCUMENTO_MATRICULA)
-      .required(),
+    tipoDocumento: claveDocumento.required(),
   }),
   body: Joi.object(credencialesPreinscripcion),
 };

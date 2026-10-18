@@ -2,6 +2,9 @@ import PDFDocument from 'pdfkit';
 import { DecisionDeCaso, NOMBRES_INSTANCIA } from '../constants/comision';
 import Institution from '../models/institution.model';
 import User, { UserDocument } from '../models/user.model';
+import ConfiguracionCertificados from '../models/configuracionCertificados.model';
+import { leerImagenGuardada } from '../utils/almacenImagenes';
+import { ImagenGuardada } from '../utils/certificados';
 import { registrarEvento } from './audit.service';
 import { obtenerSesion } from './sesionComision.service';
 
@@ -11,6 +14,15 @@ const MARGEN = 50;
 
 const formatoFecha = (fecha: Date) => fecha.toLocaleDateString('es-CO', { timeZone: 'UTC', day: '2-digit', month: 'long', year: 'numeric' });
 const formatoFechaHora = (fecha: Date) => fecha.toLocaleString('es-CO', { timeZone: 'America/Bogota' });
+
+async function safeLeerImagen(imagen: ImagenGuardada | null | undefined): Promise<Buffer | null> {
+  if (!imagen) return null;
+  try {
+    return await leerImagenGuardada(imagen, 'imagen');
+  } catch {
+    return null;
+  }
+}
 
 const NOMBRE_DECISION: Record<DecisionDeCaso, string> = {
   PROMOVER: 'Promover al grado siguiente',
@@ -39,7 +51,15 @@ function titulo(doc: Documento, texto: string) {
  */
 export async function generarPdfActaSesion(id: string, usuario: UserDocument): Promise<{ buffer: Buffer; nombreArchivo: string }> {
   const sesion = await obtenerSesion(id, usuario);
-  const institucion = (await Institution.findOne())?.nombre ?? 'Institución Educativa';
+  const [institucionDoc, configCert] = await Promise.all([
+    Institution.findOne(),
+    ConfiguracionCertificados.findOne(),
+  ]);
+  const institucion = institucionDoc?.nombre ?? 'Institución Educativa';
+  const imgRectoria = configCert?.rectoria?.imagen ? await safeLeerImagen(configCert.rectoria.imagen) : null;
+  const imgSecretaria = configCert?.secretaria?.imagen ? await safeLeerImagen(configCert.secretaria.imagen) : null;
+  const imgSello = configCert?.sello?.imagen ? await safeLeerImagen(configCert.sello.imagen) : null;
+
   const estudiantes = await User.find({ _id: { $in: sesion.casos.map((c) => c.student_id) } }).select('nombre apellido numero_documento');
   const nombreEstudiante = new Map(estudiantes.map((e) => [String(e._id), `${e.apellido} ${e.nombre} (${e.numero_documento})`]));
   const nombreMiembro = new Map(sesion.miembros.map((m) => [String(m._id), m.nombre]));
@@ -52,8 +72,9 @@ export async function generarPdfActaSesion(id: string, usuario: UserDocument): P
     doc.on('error', reject);
   });
 
+  const articulo = sesion.instancia === 'COMISION_EVALUACION' ? 'de la' : 'del';
   doc.font('Helvetica-Bold').fontSize(11).fillColor(COLOR.cuerpo).text(institucion);
-  doc.font('Helvetica-Bold').fontSize(16).fillColor(COLOR.ink).text(`Acta del ${NOMBRES_INSTANCIA[sesion.instancia]}`);
+  doc.font('Helvetica-Bold').fontSize(16).fillColor(COLOR.ink).text(`Acta ${articulo} ${NOMBRES_INSTANCIA[sesion.instancia]}`);
   doc.font('Helvetica-Bold').fontSize(11).fillColor(sesion.estado === 'FIRMADA' ? COLOR.primario : COLOR.peligro).text(
     sesion.estado === 'FIRMADA' ? `Acta ${sesion.codigo}` : sesion.estado === 'ANULADA' ? 'SESIÓN ANULADA' : 'BORRADOR: no tiene validez hasta que sea firmada'
   );
@@ -109,9 +130,89 @@ export async function generarPdfActaSesion(id: string, usuario: UserDocument): P
   }
 
   titulo(doc, 'Firmas');
-  for (const m of sesion.miembros.filter((x) => x.asistio)) {
-    doc.text(m.firma ? `${m.nombre} — firmó con su contraseña el ${formatoFechaHora(m.firma.fecha)}` : `${m.nombre} — ${m.user_id ? 'pendiente de firma' : 'firma en papel: ______________________'}`);
+  const asistentes = sesion.miembros.filter((x) => x.asistio);
+  const miembrosFirmas = asistentes.length > 0 ? asistentes : sesion.miembros;
+
+  const ancho = doc.page.width - MARGEN * 2;
+  const columnas = 2;
+  const colAncho = (ancho - 30) / columnas;
+  const altoFila = 85;
+
+  let yFila = doc.y + 20;
+
+  const filasNecesarias = Math.ceil(miembrosFirmas.length / columnas);
+  if (yFila + Math.min(filasNecesarias, 2) * altoFila > doc.page.height - 60) {
+    doc.addPage();
+    yFila = MARGEN + 20;
   }
+
+  miembrosFirmas.forEach((m, idx) => {
+    const colIndex = idx % columnas;
+    if (colIndex === 0 && idx > 0) {
+      yFila += altoFila;
+      if (yFila + altoFila > doc.page.height - 60) {
+        doc.addPage();
+        yFila = MARGEN + 20;
+      }
+    }
+    const xCol = MARGEN + colIndex * (colAncho + 30);
+
+    const esRector = Boolean(
+      m.es_presidente ||
+      m.cargo?.toLowerCase().includes('rector') ||
+      (configCert?.rectoria?.usuario_id && String(m.user_id) === String(configCert.rectoria.usuario_id))
+    );
+    const esSecretaria = Boolean(
+      m.cargo?.toLowerCase().includes('secretar') ||
+      (configCert?.secretaria?.usuario_id && String(m.user_id) === String(configCert.secretaria.usuario_id))
+    );
+    const imgFirma = esRector ? imgRectoria : esSecretaria ? imgSecretaria : null;
+
+    if (imgFirma) {
+      try {
+        doc.image(imgFirma, xCol + 15, yFila, { fit: [colAncho - 30, 42], align: 'center', valign: 'bottom' });
+      } catch {
+        // En caso de que la imagen no se pueda decodificar
+      }
+    } else if (m.firma) {
+      doc.font('Helvetica-Oblique').fontSize(7.5).fillColor(COLOR.primario).text(
+        `Firmado electrónicamente · ${formatoFechaHora(m.firma.fecha)}`,
+        xCol,
+        yFila + 24,
+        { width: colAncho, align: 'center' }
+      );
+    }
+
+    const yLinea = yFila + 46;
+    doc.moveTo(xCol + 10, yLinea).lineTo(xCol + colAncho - 10, yLinea).strokeColor(COLOR.tenue).lineWidth(0.8).stroke();
+    doc.font('Helvetica-Bold').fontSize(9).fillColor(COLOR.ink).text(
+      m.nombre,
+      xCol,
+      yLinea + 4,
+      { width: colAncho, align: 'center' }
+    );
+    doc.font('Helvetica').fontSize(8).fillColor(COLOR.tenue).text(
+      `${m.cargo}${m.es_presidente ? ' (Presidente)' : ''}`,
+      xCol,
+      doc.y,
+      { width: colAncho, align: 'center' }
+    );
+  });
+
+  if (imgSello) {
+    const ySello = Math.min(yFila + 10, doc.page.height - 110);
+    const xSello = doc.page.width - MARGEN - 85;
+    doc.save().opacity(0.85);
+    try {
+      doc.image(imgSello, xSello, ySello, { fit: [75, 75], align: 'center', valign: 'center' });
+    } catch {
+      // Ignorar si hay fallo de imagen del sello
+    }
+    doc.restore();
+    doc.opacity(1);
+  }
+
+  doc.y = yFila + altoFila + 15;
   if (sesion.hash) doc.moveDown(0.4).font('Courier').fontSize(7.5).fillColor(COLOR.tenue).text(`Huella SHA-256: ${sesion.hash}`);
 
   const { start, count } = doc.bufferedPageRange();

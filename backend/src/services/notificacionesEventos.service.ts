@@ -30,8 +30,11 @@ async function sinRomper(que: string, accion: () => Promise<void>): Promise<void
 }
 
 /** Suma el contador del menú a todos los que tienen esos perfiles (y, si se da la sede, atienden esa sede). */
-async function insigniaParaRoles(roles: Rol[], ruta: string, sedeId?: Id, pestana?: string, cantidad?: number): Promise<void> {
-  for (const rol of roles) await sumarInsignia({ destinatarios: await usuariosConRol([rol], sedeId), rol, ruta, pestana, cantidad });
+async function insigniaParaRoles(roles: Rol[], ruta: string, sedeId?: Id, pestana?: string, cantidad?: number, excluir?: Id): Promise<void> {
+  for (const rol of roles) {
+    const destinatarios = (await usuariosConRol([rol], sedeId)).filter((u) => !excluir || String(u) !== String(excluir));
+    await sumarInsignia({ destinatarios, rol, ruta, pestana, cantidad });
+  }
 }
 
 const nombreCompleto = (u: { nombre: string; apellido: string } | null | undefined) => (u ? `${u.nombre} ${u.apellido}` : undefined);
@@ -103,9 +106,10 @@ export function avisarPlanRevisado(plan: { _id: Id; docenteId: Id; decision: 'AP
 }
 
 /** M04: subieron un documento de matrícula (secretaría o acudiente) → bandeja «Documentos por revisar» de secretaría y coordinación. */
-export function avisarDocumentoPorRevisar(): Promise<void> {
+export function avisarDocumentoPorRevisar(subidoPor?: Id | null): Promise<void> {
   return sinRomper('documento por revisar', async () => {
-    await insigniaParaRoles([ROLES.ADMIN, ROLES.COORDINADOR, ROLES.SECRETARIA], '/admin/documentos-por-revisar');
+    // Quien lo subió no necesita un aviso de lo que acaba de hacer.
+    await insigniaParaRoles([ROLES.ADMIN, ROLES.COORDINADOR, ROLES.SECRETARIA], '/admin/documentos-por-revisar', undefined, undefined, undefined, subidoPor ?? undefined);
   });
 }
 
@@ -375,5 +379,39 @@ export function avisarCitacionRespondida(citacion: { _id: Id; titulo: string; co
       datos: { nombre: citacion.titulo },
       ruta: `/reuniones?citacion=${String(citacion._id)}`,
     });
+  });
+}
+
+/** M20: sesión de comisión o consejo convocada → los integrantes con cuenta reciben la alerta en la campanita. */
+export function avisarSesionConvocada(sesion: {
+  _id: Id;
+  instancia: string;
+  fecha: Date;
+  hora?: string | null;
+  lugar?: string | null;
+  miembros: Array<{ user_id?: Id | null }>;
+}): Promise<void> {
+  return sinRomper('sesion convocada', async () => {
+    const userIds = sesion.miembros.map((m) => m.user_id).filter((u): u is Id => Boolean(u));
+    if (userIds.length === 0) return;
+    const usuarios = await User.find({ _id: { $in: userIds } }).select('_id roles').lean();
+    const nombresInstancia: Record<string, string> = {
+      COMISION_EVALUACION: 'Comisión de Evaluación y Promoción',
+      CONSEJO_ACADEMICO: 'Consejo Académico',
+      CONSEJO_DIRECTIVO: 'Consejo Directivo',
+    };
+    const cuando = `${new Date(sesion.fecha).toLocaleDateString('es-CO')}${sesion.hora ? ` a las ${sesion.hora}` : ''}${sesion.lugar ? ` (${sesion.lugar})` : ''}`;
+    for (const u of usuarios) {
+      const rol = u.roles?.[0] ?? ROLES.DOCENTE;
+      await avisar({
+        destinatarios: [u._id],
+        rol,
+        evento: 'SESION_COMISION_CONVOCADA',
+        entidad_id: String(sesion._id),
+        datos: { nombre: nombresInstancia[sesion.instancia] ?? 'Comisión', cuando },
+        ruta: '/admin/comision',
+      });
+      await sumarInsignia({ destinatarios: [u._id], rol, ruta: '/admin/comision', pestana: 'sesiones' });
+    }
   });
 }

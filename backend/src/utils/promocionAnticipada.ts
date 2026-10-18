@@ -17,6 +17,8 @@ export interface CriterioDeNotas {
   promedio_minimo: number;
   /** Nota mínima en cada asignatura; null = no se exige por asignatura. */
   nota_minima_asignatura: number | null;
+  /** Solo para reiniciantes: nota mínima en asignaturas que reprobó el año anterior. null = no se exige. */
+  nota_minima_asignaturas_reprobadas?: number | null;
 }
 
 export interface PasosExigidos {
@@ -31,6 +33,8 @@ export interface ConfiguracionAnticipada {
   periodo_evaluacion: number;
   /** Días después del cierre de ese periodo en que todavía se puede solicitar. */
   dias_ventana_tras_cierre: number;
+  /** Grados excluidos donde el SIEE prohíbe la promoción anticipada. */
+  grados_excluidos_ids?: string[];
   rendimiento_excepcional: CriterioDeNotas;
   reiniciantes: CriterioDeNotas;
   exige: PasosExigidos;
@@ -42,8 +46,9 @@ export const CONFIGURACION_ANTICIPADA_INICIAL: ConfiguracionAnticipada = {
   activa: true,
   periodo_evaluacion: 1,
   dias_ventana_tras_cierre: 30,
+  grados_excluidos_ids: [],
   rendimiento_excepcional: { activo: true, promedio_minimo: 4.6, nota_minima_asignatura: 4 },
-  reiniciantes: { activo: true, promedio_minimo: 4, nota_minima_asignatura: null },
+  reiniciantes: { activo: true, promedio_minimo: 4, nota_minima_asignatura: null, nota_minima_asignaturas_reprobadas: null },
   exige: { concepto_comision: true, consentimiento_familia: true, decision_consejo_directivo: true },
   tratamiento_notas: 'NIVELACION',
 };
@@ -54,6 +59,11 @@ export function validarConfiguracionAnticipada(c: ConfiguracionAnticipada): stri
   for (const [nombre, criterio] of [['rendimiento excepcional', c.rendimiento_excepcional], ['reiniciantes', c.reiniciantes]] as const) {
     if (!(criterio.promedio_minimo > 0)) return `El promedio mínimo de ${nombre} debe ser mayor que cero.`;
     if (criterio.nota_minima_asignatura !== null && !(criterio.nota_minima_asignatura > 0)) return `La nota mínima por asignatura de ${nombre} debe ser mayor que cero o quedar vacía.`;
+  }
+  if (c.reiniciantes.nota_minima_asignaturas_reprobadas !== null && c.reiniciantes.nota_minima_asignaturas_reprobadas !== undefined) {
+    if (!(c.reiniciantes.nota_minima_asignaturas_reprobadas > 0)) {
+      return 'La nota mínima en asignaturas reprobadas de reiniciantes debe ser mayor que cero o quedar vacía.';
+    }
   }
   if (!TRATAMIENTOS_NOTAS.includes(c.tratamiento_notas)) return 'Tratamiento de notas no válido.';
   return null;
@@ -72,7 +82,12 @@ export interface ResultadoCriterio {
 }
 
 /** Aplica el criterio del colegio a las notas cerradas del periodo de evaluación. Sin todas las notas no se decide (nunca se promedia lo que falta). */
-export function evaluarCriterio(notas: readonly NotaDeAsignatura[], criterio: CriterioDeNotas, decimales: number): ResultadoCriterio {
+export function evaluarCriterio(
+  notas: readonly NotaDeAsignatura[],
+  criterio: CriterioDeNotas,
+  decimales: number,
+  asignaturasReprobadasPreviamente?: ReadonlySet<string>
+): ResultadoCriterio {
   if (notas.length === 0) return { cumple: false, promedio: null, motivos: ['El estudiante no tiene asignaturas con notas en el periodo.'] };
   const faltan = notas.filter((n) => n.nota === null);
   if (faltan.length > 0) return { cumple: false, promedio: null, motivos: [`Faltan notas cerradas del periodo en: ${faltan.map((n) => n.nombre).join(', ')}.`] };
@@ -82,6 +97,19 @@ export function evaluarCriterio(notas: readonly NotaDeAsignatura[], criterio: Cr
   if (criterio.nota_minima_asignatura !== null) {
     const bajas = notas.filter((n) => (n.nota as number) < (criterio.nota_minima_asignatura as number));
     if (bajas.length > 0) motivos.push(`Por debajo de ${criterio.nota_minima_asignatura} en: ${bajas.map((n) => n.nombre).join(', ')}.`);
+  }
+  if (criterio.nota_minima_asignaturas_reprobadas != null && asignaturasReprobadasPreviamente && asignaturasReprobadasPreviamente.size > 0) {
+    const reprobadasConNotaBaja = notas.filter(
+      (n) =>
+        (asignaturasReprobadasPreviamente.has(n.subject_id) || asignaturasReprobadasPreviamente.has(n.nombre.trim().toLowerCase())) &&
+        n.nota !== null &&
+        (n.nota as number) < (criterio.nota_minima_asignaturas_reprobadas as number)
+    );
+    if (reprobadasConNotaBaja.length > 0) {
+      motivos.push(
+        `Por debajo de ${criterio.nota_minima_asignaturas_reprobadas} en asignaturas reprobadas el año anterior: ${reprobadasConNotaBaja.map((n) => `${n.nombre} (${n.nota})`).join(', ')}.`
+      );
+    }
   }
   return { cumple: motivos.length === 0, promedio, motivos };
 }

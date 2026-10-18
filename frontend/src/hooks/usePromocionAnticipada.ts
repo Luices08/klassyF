@@ -28,12 +28,14 @@ export interface CriterioNotas {
   activo: boolean;
   promedio_minimo: number;
   nota_minima_asignatura: number | null;
+  nota_minima_asignaturas_reprobadas?: number | null;
 }
 
 export interface ConfiguracionAnticipada {
   activa: boolean;
   periodo_evaluacion: number;
   dias_ventana_tras_cierre: number;
+  grados_excluidos_ids?: string[];
   rendimiento_excepcional: CriterioNotas;
   reiniciantes: CriterioNotas;
   exige: { concepto_comision: boolean; consentimiento_familia: boolean; decision_consejo_directivo: boolean };

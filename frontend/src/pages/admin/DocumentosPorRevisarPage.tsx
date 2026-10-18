@@ -4,6 +4,7 @@ import { Alert, errorMessage } from '../../components/ui/Alert';
 import { Button } from '../../components/ui/Button';
 import { Card } from '../../components/ui/Card';
 import { Drawer } from '../../components/ui/Drawer';
+import { FiltrosRapidos } from '../../components/ui/FiltrosRapidos';
 import { Input } from '../../components/ui/Field';
 import { IconButton } from '../../components/ui/IconButton';
 import { PageHeader } from '../../components/ui/PageHeader';
@@ -14,18 +15,21 @@ import { useAnioDeTrabajo } from '../../hooks/useAniosLectivos';
 import { type DocumentoPorRevisar, useDocumentosPorRevisar, useRevisarDocumentoMatricula } from '../../hooks/useEnrollments';
 import { api } from '../../lib/apiClient';
 import { formatoFechaHora } from '../../lib/fechas';
-import { NOMBRES_DOCUMENTO_MATRICULA } from '../../types/domain';
+import { nombreDeItem } from '../../types/domain';
 
 const PAGE_SIZE = 25;
 
-const nombreDelDocumento = (d: DocumentoPorRevisar) => d.nombre_personalizado || NOMBRES_DOCUMENTO_MATRICULA[d.tipo_documento];
+const nombreDelDocumento = (d: DocumentoPorRevisar) => nombreDeItem(d);
+
+const quienSubio = (d: DocumentoPorRevisar) => (d.cargado_por_tipo === 'FAMILIA' ? 'La familia' : d.cargado_por_tipo === 'PERSONAL' ? d.cargado_por_nombre?.trim() || 'Personal del colegio' : '—');
 
 /** Bandeja de secretaría (M04): los documentos que ya subieron y nadie ha revisado, sin entrar a cada matrícula. */
 export function DocumentosPorRevisarPage() {
   const navigate = useNavigate();
   const { anio, query: aniosQuery } = useAnioDeTrabajo();
   const [page, setPage] = useState(1);
-  const lista = useDocumentosPorRevisar({ academic_year_id: anio?._id, page, limit: PAGE_SIZE });
+  const [subidoPor, setSubidoPor] = useState<'TODOS' | 'FAMILIA' | 'PERSONAL'>('TODOS');
+  const lista = useDocumentosPorRevisar({ academic_year_id: anio?._id, subido_por: subidoPor === 'TODOS' ? undefined : subidoPor, page, limit: PAGE_SIZE });
   const revisar = useRevisarDocumentoMatricula();
 
   const [rechazando, setRechazando] = useState<DocumentoPorRevisar | null>(null);
@@ -47,7 +51,7 @@ export function DocumentosPorRevisarPage() {
     <div className="space-y-4">
       <PageHeader
         title="Documentos por revisar"
-        subtitle={anio ? `Lo que las familias y secretaría ya subieron y falta aprobar o rechazar · año ${anio.year}.` : undefined}
+        subtitle={anio ? `Archivos subidos que nadie ha aprobado ni rechazado · año ${anio.year}. Lo que el personal sube marcando «ya verifiqué el original» no pasa por aquí.` : undefined}
       />
 
       {!anio && <Alert tone="warning">Aún no hay un año lectivo. Crea uno en «Año lectivo» para recibir matrículas.</Alert>}
@@ -55,6 +59,21 @@ export function DocumentosPorRevisarPage() {
 
       {anio && (
         <Card>
+          <div className="mb-3">
+            <FiltrosRapidos
+              ariaLabel="Quién subió el documento"
+              valor={subidoPor}
+              onChange={(k) => {
+                setSubidoPor(k as 'TODOS' | 'FAMILIA' | 'PERSONAL');
+                setPage(1);
+              }}
+              items={[
+                { clave: 'TODOS', etiqueta: 'Todos' },
+                { clave: 'FAMILIA', etiqueta: 'Subidos por familias' },
+                { clave: 'PERSONAL', etiqueta: 'Subidos por el personal' },
+              ]}
+            />
+          </div>
           {lista.isLoading && <Spinner />}
           {lista.isError && <Alert tone="error">{errorMessage(lista.error)}</Alert>}
           {lista.data && (
@@ -65,7 +84,8 @@ export function DocumentosPorRevisarPage() {
                     <Th>Estudiante</Th>
                     <Th>Grupo</Th>
                     <Th>Documento</Th>
-                    <Th>Subido</Th>
+                    <Th>Subido por</Th>
+                    <Th>Fecha</Th>
                     <Th className="text-right">Acciones</Th>
                   </tr>
                 </TableHead>
@@ -83,6 +103,7 @@ export function DocumentosPorRevisarPage() {
                         {nombreDelDocumento(d)}
                         {d.obligatorio === false && <span className="block text-xs text-muted">Opcional</span>}
                       </Td>
+                      <Td>{quienSubio(d)}</Td>
                       <Td>{d.fecha_carga ? formatoFechaHora(d.fecha_carga) : '—'}</Td>
                       <Td>
                         <div className="flex justify-end gap-2">
@@ -100,7 +121,7 @@ export function DocumentosPorRevisarPage() {
                       </Td>
                     </tr>
                   ))}
-                  {lista.data.data.length === 0 && <EmptyRow colSpan={5}>No hay documentos esperando revisión.</EmptyRow>}
+                  {lista.data.data.length === 0 && <EmptyRow colSpan={6}>No hay documentos esperando revisión.</EmptyRow>}
                 </TableBody>
               </Table>
 

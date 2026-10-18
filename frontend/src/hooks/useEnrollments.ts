@@ -8,6 +8,8 @@ export interface CreateEnrollmentInput {
   academic_year_id: string;
   tipo_ingreso: TipoIngreso;
   numero_libro?: number;
+  estado_inicial?: 'MATRICULADO_CONDICIONAL' | 'MATRICULADO_DEFINITIVO';
+  documentacion_completa?: boolean;
   fecha_limite_compromiso?: string;
   forzar_sobrecupo?: boolean;
   /** Confirma la reincorporación de quien estaba RETIRADO o INACTIVO en su expediente. */
@@ -103,8 +105,10 @@ export function useCambiarGrupoMatricula() {
 export function useCargarDocumentoMatricula() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, tipoDocumento, file }: { id: string; tipoDocumento: TipoDocumentoMatricula; file: File }) => {
+    // `aprobar` = «ya verifiqué el original»: el documento queda aprobado y no pasa a la bandeja de revisión.
+    mutationFn: ({ id, tipoDocumento, file, aprobar }: { id: string; tipoDocumento: TipoDocumentoMatricula; file: File; aprobar?: boolean }) => {
       const formData = new FormData();
+      formData.append('aprobar', aprobar ? 'true' : 'false');
       formData.append('file', file);
       return api.upload<Enrollment>(`/enrollments/${id}/checklist/${tipoDocumento}/upload`, formData);
     },
@@ -146,7 +150,8 @@ export function useAgregarDocumentoChecklist() {
       obligatorio,
     }: {
       id: string;
-      tipo_documento: TipoDocumentoMatricula;
+      /** Clave de un documento del catálogo; sin ella se agrega uno adicional con `nombre_personalizado`. */
+      tipo_documento?: TipoDocumentoMatricula;
       nombre_personalizado?: string;
       obligatorio?: boolean;
     }) => api.post<Enrollment>(`/enrollments/${id}/checklist`, { tipo_documento, nombre_personalizado, obligatorio }),
@@ -207,13 +212,15 @@ export interface DocumentoPorRevisar {
   nombre_personalizado: string | null;
   obligatorio?: boolean;
   fecha_carga: string | null;
+  cargado_por_tipo?: 'FAMILIA' | 'PERSONAL' | null;
+  cargado_por_nombre?: string | null;
   nombre: string;
   apellido: string;
   numero_documento: string;
   grupo: string | null;
 }
 
-export function useDocumentosPorRevisar(filter: { academic_year_id?: string; group_id?: string; page?: number; limit?: number }) {
+export function useDocumentosPorRevisar(filter: { academic_year_id?: string; group_id?: string; subido_por?: 'FAMILIA' | 'PERSONAL'; page?: number; limit?: number }) {
   return useQuery({
     queryKey: ['enrollments', 'documentos-por-revisar', filter],
     queryFn: () =>
@@ -238,6 +245,6 @@ export function useDocumentosPrevistos(params: { group_id?: string; tipo_ingreso
   return useQuery({
     queryKey: ['enrollments', 'documentos-previstos', params],
     queryFn: () => api.get<DocumentoPrevisto[]>('/enrollments/documentos-previstos', { ...params }),
-    enabled: Boolean(params.group_id),
+    enabled: Boolean(params.tipo_ingreso),
   });
 }

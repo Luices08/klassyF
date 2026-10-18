@@ -201,7 +201,7 @@ export async function documentosDelHijo(usuario: UserDocument, studentId: string
       const item = matricula.checklist.find((c) => c.tipo_documento === d.tipo_documento);
       return {
         ...d,
-        indicacion: INDICACIONES_DOCUMENTO_MATRICULA[d.tipo_documento] ?? '',
+        indicacion: item?.indicacion || INDICACIONES_DOCUMENTO_MATRICULA[d.tipo_documento] || '',
         fecha_carga: item?.fecha_carga ?? null,
         // Aprobado no se reemplaza; el resto se puede (re)enviar mientras la matrícula siga pidiendo documentos.
         puede_subir: detalle.puede_subir_documentos && d.estado !== 'APROBADO',
@@ -231,7 +231,7 @@ export async function subirDocumentoDelHijo(
   if (item.estado === 'APROBADO') throw new ApiError(409, 'Este documento ya fue aprobado por la secretaría.');
 
   const archivoPath = await guardarArchivoDeDocumento(String(matricula._id), tipoDocumento, archivo);
-  await cargarDocumento(String(matricula._id), tipoDocumento, archivoPath, { id: usuario._id });
+  await cargarDocumento(String(matricula._id), tipoDocumento, archivoPath, { id: usuario._id, tipo: 'FAMILIA' });
   return documentosDelHijo(usuario, studentId);
 }
 

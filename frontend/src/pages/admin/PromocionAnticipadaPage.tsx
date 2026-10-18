@@ -15,6 +15,8 @@ import { EmptyRow, Table, TableBody, TableHead, Td, Th } from '../../components/
 import { Tabs } from '../../components/ui/Tabs';
 import { useAuth } from '../../context/AuthContext';
 import { useAnioDeTrabajo } from '../../hooks/useAniosLectivos';
+import { useCampuses, useTodasLasJornadas } from '../../hooks/useCatalogs';
+import { useInstitution } from '../../hooks/useInstitution';
 import { useEnrollmentsList } from '../../hooks/useEnrollments';
 import { useGroups } from '../../hooks/useGroups';
 import {
@@ -133,6 +135,11 @@ export function PromocionAnticipadaPage() {
 }
 
 function NuevoTramite({ anioId, onClose, onCreado }: { anioId: string; onClose: () => void; onCreado: (t: TramiteAnticipada) => void }) {
+  const { data: institucion } = useInstitution();
+  const sedes = useCampuses(institucion?._id).data ?? [];
+  const jornadas = useTodasLasJornadas().data ?? [];
+  const [sedeId, setSedeId] = useState('');
+  const [jornadaId, setJornadaId] = useState('');
   const grupos = useGroups({ academic_year_id: anioId });
   const solicitar = useSolicitarAnticipada();
   const [grupoId, setGrupoId] = useState('');
@@ -140,6 +147,15 @@ function NuevoTramite({ anioId, onClose, onCreado }: { anioId: string; onClose: 
   const [tipo, setTipo] = useState<TipoAnticipada>('RENDIMIENTO_EXCEPCIONAL');
   const [motivo, setMotivo] = useState('');
   const [error, setError] = useState<string | null>(null);
+
+  const gruposFiltrados = (grupos.data ?? []).filter((g) => {
+    const sId = typeof g.sede_id === 'object' ? g.sede_id._id : g.sede_id;
+    const jId = typeof g.jornada_id === 'object' ? g.jornada_id._id : g.jornada_id;
+    if (sedeId && sId !== sedeId) return false;
+    if (jornadaId && jId !== jornadaId) return false;
+    return true;
+  });
+
   const matriculas = useEnrollmentsList({ academic_year_id: anioId, group_id: grupoId, limit: 100 }, Boolean(grupoId));
   const activas = (matriculas.data?.data ?? []).filter((m) => m.estado !== 'RETIRADO' && m.estado !== 'ANULADO');
 
@@ -157,7 +173,25 @@ function NuevoTramite({ anioId, onClose, onCreado }: { anioId: string; onClose: 
   return (
     <Drawer open title="Nuevo trámite de promoción anticipada" onClose={onClose} onSubmit={(e) => void enviar(e)} submitLabel="Abrir trámite" isSubmitting={solicitar.isPending} submitDisabled={!matriculaId}>
       <Alert tone="info">El sistema revisa las notas cerradas del periodo de evaluación contra el criterio del colegio. Si no las cumple, dirá por qué y no se abre el trámite.</Alert>
-      <SelectBuscable label="Grupo del estudiante" value={grupoId} onChange={(v) => { setGrupoId(v); setMatriculaId(''); }} vacioLabel="Elige un grupo" placeholder="Buscar grupo…" opciones={opcionesDeGrupos(grupos.data ?? [])} />
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <Select label="Sede" value={sedeId} onChange={(e) => { setSedeId(e.target.value); setGrupoId(''); setMatriculaId(''); }}>
+          <option value="">Todas las sedes</option>
+          {sedes.map((s) => (
+            <option key={s._id} value={s._id}>
+              {s.nombre}
+            </option>
+          ))}
+        </Select>
+        <Select label="Jornada" value={jornadaId} onChange={(e) => { setJornadaId(e.target.value); setGrupoId(''); setMatriculaId(''); }}>
+          <option value="">Todas las jornadas</option>
+          {jornadas.map((j) => (
+            <option key={j._id} value={j._id}>
+              {j.nombre}
+            </option>
+          ))}
+        </Select>
+      </div>
+      <SelectBuscable label="Grupo del estudiante" value={grupoId} onChange={(v) => { setGrupoId(v); setMatriculaId(''); }} vacioLabel="Elige un grupo" placeholder="Buscar grupo…" opciones={opcionesDeGrupos(gruposFiltrados)} />
       <SelectBuscable
         label="Estudiante"
         value={matriculaId}

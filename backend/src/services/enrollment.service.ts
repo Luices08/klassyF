@@ -30,6 +30,8 @@ import { registrarEvento } from './audit.service';
 import { generateFolioMatricula } from './folio.service';
 import { aprobarItemConPazYSalvo, pazYSalvoConfirmadoPrevio } from './pazYSalvo.service';
 import { aplicarSalida } from './salidaMatricula.service';
+import { ubicarEstudiantes } from './ubicacionEstudiante.service';
+import { compararGradoElegido, Ubicacion } from '../utils/ubicacionEstudiante';
 import { crearDesdeMatricula } from './solicitudApoyo.service';
 
 // Un RETIRADO que venía matriculado libera su cupo en `aplicarSalida` (según la política de la institución); aquí llega solo quien se retira siendo PREINSCRITO.
@@ -50,6 +52,15 @@ export interface CreateEnrollmentInput {
   reingreso?: boolean;
   /** Lo que la familia declara sobre apoyos o diagnósticos previos (M16): se transcribe, sin valorar ni rotular. */
   apoyo_declarado?: { motivo_declarado: string; aporta_soporte?: boolean; observacion?: string };
+  /** `Grade.numero` del último grado aprobado según el certificado: para quien no tiene historial en el sistema. */
+  ultimo_grado_aprobado?: number | null;
+  /** Por qué se matricula en un grado distinto al que indica su historial o su certificado (p. ej. promoción por decisión). */
+  motivo_grado?: string;
+}
+
+export interface OpcionesCreacionMatricula {
+  /** Compara el grado elegido con el historial y exige un motivo si no coincide. Solo lo activa el formulario de secretaría: los procesos masivos deciden el grado por su propia regla (M19). */
+  verificarGrado?: boolean;
 }
 
 /**
@@ -83,7 +94,8 @@ export async function exigirSinMatriculaViva(
  */
 export async function createEnrollment(
   input: CreateEnrollmentInput,
-  actor: { id: string | Types.ObjectId; rol: Rol }
+  actor: { id: string | Types.ObjectId; rol: Rol },
+  opciones: OpcionesCreacionMatricula = {}
 ): Promise<EnrollmentDocument> {
   const { student_id, group_id, academic_year_id, tipo_ingreso } = input;
   const numeroLibro = input.numero_libro ?? 1;
@@ -128,6 +140,8 @@ export async function createEnrollment(
 
     const grade = await Grade.findById(group.grade_id).session(session);
     if (!grade) throw new ApiError(404, 'Grado no encontrado.');
+
+    const ajusteDeGrado = opciones.verificarGrado ? await verificarGradoDeMatricula({ studentId: String(student_id), academicYearId: String(academic_year_id), grade, input }) : null;
 
     // Check-and-reserve atomico: solo actualiza si el grupo sigue activo y aun hay cupo
     // disponible (salvo que un ADMIN autorice explicitamente la excepcion de sobrecupo — eso
@@ -191,6 +205,7 @@ export async function createEnrollment(
           numero_libro: numeroLibro,
           numero_folio,
           tipo_ingreso,
+          ultimo_grado_aprobado: input.ultimo_grado_aprobado ?? null,
           estado: estadoInicial,
           fecha_matricula: new Date(),
           fecha_limite_compromiso: estadoInicial === 'MATRICULADO_CONDICIONAL' && input.fecha_limite_compromiso ? new Date(input.fecha_limite_compromiso) : null,
@@ -225,6 +240,15 @@ export async function createEnrollment(
       entidad_id: enrollment._id,
       detalle: `Folio ${folio_matricula}, tipo_ingreso ${tipo_ingreso}, estado ${estadoInicial}`,
     });
+    if (ajusteDeGrado) {
+      await registrarEvento({
+        usuario_id: actor.id,
+        accion: 'MATRICULA_GRADO_CON_MOTIVO',
+        entidad: 'Enrollment',
+        entidad_id: enrollment._id,
+        detalle: `${ajusteDeGrado.descripcion}. Motivo: ${ajusteDeGrado.motivo}`,
+      });
+    }
     if (requiereReingreso) {
       await registrarEvento({
         usuario_id: actor.id,
@@ -511,6 +535,76 @@ export async function listarSituacionEstudiantes(academicYearId: string): Promis
           }
         : null,
     };
+  });
+}
+
+/**
+ * Avisa —sin bloquear— cuando el grado elegido no es el que indica el historial del estudiante (o el último grado aprobado que se declaró): pasa
+ * cuando el colegio decide matricular distinto al nivel (promoción por decisión, repitencia voluntaria, un certificado que no cuadra). Quien lo
+ * hace escribe el motivo, que queda en la auditoría. Devuelve null si no hay nada que comparar o el grado coincide.
+ */
+async function verificarGradoDeMatricula(args: {
+  studentId: string;
+  academicYearId: string;
+  grade: { numero: number; nombre: string };
+  input: CreateEnrollmentInput;
+}): Promise<{ descripcion: string; motivo: string } | null> {
+  const { ubicaciones, gradosExistentes, gradoPorNumero } = await ubicarEstudiantes(args.academicYearId, [args.studentId]);
+  const ubicacion = ubicaciones.get(args.studentId);
+  if (!ubicacion) return null;
+  const veredicto = compararGradoElegido({
+    gradoElegido: args.grade.numero,
+    esperado: ubicacion.esperado,
+    ultimoGradoAprobadoDeclarado: args.input.ultimo_grado_aprobado,
+    gradosExistentes,
+  });
+  if (veredicto.resultado !== 'DIFIERE') return null;
+
+  const nombreDe = (n: number | null) => (n === null ? 'ese grado' : gradoPorNumero.get(n)?.nombre ?? `grado ${n}`);
+  const declarado = args.input.ultimo_grado_aprobado;
+  const origen =
+    declarado !== null && declarado !== undefined
+      ? `el último grado aprobado que se declaró (${nombreDe(declarado)})`
+      : 'su historial';
+  const esperadoTexto = veredicto.esperado.lugar === 'EGRESADO' ? 'que ya terminó el último grado' : `que le corresponde ${nombreDe(veredicto.esperado.grado_numero)}`;
+  const descripcion = `Matriculado en ${args.grade.nombre} aunque según ${origen} ${esperadoTexto}`;
+
+  const motivo = args.input.motivo_grado?.trim() ?? '';
+  if (motivo.length < 10) {
+    throw new ApiError(
+      409,
+      `Según ${origen}, ${esperadoTexto}, y lo estás matriculando en ${args.grade.nombre}. Si es una decisión de la institución (por ejemplo, una promoción por decisión), escribe el motivo para matricularlo igual.`,
+      { requiere_motivo_grado: true, grado_elegido: args.grade.nombre, grado_esperado: veredicto.esperado.grado_numero === null ? null : nombreDe(veredicto.esperado.grado_numero) }
+    );
+  }
+  return { descripcion, motivo };
+}
+
+export interface UbicacionDeEstudiante extends Ubicacion {
+  /** `_id` del grado de `grado_numero` (la pestaña donde aparece). */
+  grado_id: string | null;
+  esperado_grado_id: string | null;
+  ultimo_grado_cursado_id: string | null;
+}
+
+export interface EstudiantePorGrado extends SituacionDeEstudianteMatricula {
+  ubicacion: UbicacionDeEstudiante;
+}
+
+/**
+ * Los estudiantes con su situación de matrícula (la misma de «Formalizar matrícula») y el grado donde les toca matricularse, derivado del cierre
+ * de M19 y de las matrículas anteriores. Alimenta la lista «Por grado»: la pantalla agrupa y filtra; aquí no se guarda nada.
+ */
+export async function listarEstudiantesPorGrado(academicYearId: string): Promise<EstudiantePorGrado[]> {
+  const situaciones = await listarSituacionEstudiantes(academicYearId);
+  const { ubicaciones, gradoPorNumero } = await ubicarEstudiantes(
+    academicYearId,
+    situaciones.map((e) => e._id)
+  );
+  const idDe = (n: number | null) => (n === null ? null : gradoPorNumero.get(n)?._id ?? null);
+  return situaciones.map((e) => {
+    const u = ubicaciones.get(e._id) as Ubicacion;
+    return { ...e, ubicacion: { ...u, grado_id: idDe(u.grado_numero), esperado_grado_id: idDe(u.esperado.grado_numero), ultimo_grado_cursado_id: idDe(u.ultimo_grado_cursado) } };
   });
 }
 

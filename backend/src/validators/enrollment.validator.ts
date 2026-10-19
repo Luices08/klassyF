@@ -25,6 +25,8 @@ export const createEnrollment: ValidationSchema = {
     forzar_sobrecupo: Joi.boolean(),
     reingreso: Joi.boolean(),
     apoyo_declarado: apoyoDeclarado,
+    ultimo_grado_aprobado: Joi.number().integer().min(-2).max(11).allow(null),
+    motivo_grado: Joi.string().trim().min(10).max(500),
   }),
 };
 
@@ -40,6 +42,10 @@ export const listEnrollments: ValidationSchema = {
 };
 
 export const situacionEstudiantes: ValidationSchema = {
+  query: Joi.object({ academic_year_id: objectId.required() }),
+};
+
+export const estudiantesPorGrado: ValidationSchema = {
   query: Joi.object({ academic_year_id: objectId.required() }),
 };
 

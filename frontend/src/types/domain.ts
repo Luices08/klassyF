@@ -520,6 +520,29 @@ export interface SituacionEstudianteMatricula {
   matricula: { _id: string; estado: EstadoMatricula; grupo: string; folio: string | null } | null;
 }
 
+export type LugarUbicacion = 'GRADO' | 'EGRESADO' | 'SIN_GRADO';
+
+/** Dónde le toca matricularse a un estudiante, derivado del cierre de M19 y de sus matrículas anteriores (no es un dato guardado). */
+export interface UbicacionEstudiante {
+  /** La pestaña donde aparece: su grado si ya está matriculado o se retiró este año, si no el que dice su historial. */
+  lugar: LugarUbicacion;
+  grado_id: string | null;
+  grado_numero: number | null;
+  /** Lo que dice su historial; difiere de lo anterior si lo matricularon en otro grado (p. ej. promovido por decisión). */
+  esperado: { lugar: LugarUbicacion; grado_numero: number | null };
+  esperado_grado_id: string | null;
+  difiere: boolean;
+  ultimo_grado_cursado: number | null;
+  ultimo_grado_cursado_id: string | null;
+  fuente: 'MATRICULA_ACTUAL' | 'RETIRO_DEL_ANIO' | 'PROMOCION' | 'RETIRO_PREVIO' | 'PROPUESTA' | 'PERFIL_GRADUADO' | 'SIN_HISTORIAL';
+  aviso: string;
+}
+
+/** Un estudiante con su situación de matrícula y su ubicación por grado (GET /enrollments/estudiantes-por-grado). */
+export interface EstudiantePorGrado extends SituacionEstudianteMatricula {
+  ubicacion: UbicacionEstudiante;
+}
+
 export interface Enrollment {
   _id: string;
   student_id: string | { _id: string; nombre: string; apellido: string; numero_documento: string; tipo_documento: TipoDocumento };

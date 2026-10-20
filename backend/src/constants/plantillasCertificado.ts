@@ -150,11 +150,21 @@ const CONTENIDO_BASE: Record<string, Omit<ContenidoPlantilla, 'titulo' | 'destin
  * El texto de partida de un tipo. Los tipos sembrados traen el suyo; uno creado por el colegio arranca con un texto genérico armado con
  * sus fuentes (valoraciones, dependencias) que ya cumple los mínimos, para que se pueda ajustar y no escribir desde cero.
  */
-const contenidoGenerico = (def: Pick<DefinicionCertificado, 'fuentes'>): Omit<ContenidoPlantilla, 'titulo' | 'destinatarios' | 'frase_otro'> => {
+/** Qué ciclo culmina cada grado (el texto de un documento de culminación lo nombra, para que el de primaria y el de básica no digan lo mismo). */
+const CICLO_QUE_CULMINA: Record<number, string> = {
+  0: 'el nivel de educación preescolar (Transición)',
+  5: 'el ciclo de educación básica primaria (grados primero a quinto)',
+  9: 'el ciclo de educación básica secundaria (grados sexto a noveno)',
+};
+
+const contenidoGenerico = (def: Pick<DefinicionCertificado, 'fuentes' | 'grados_numeros'>): Omit<ContenidoPlantilla, 'titulo' | 'destinatarios' | 'frase_otro'> => {
   const valoraciones = def.fuentes.includes('VALORACIONES');
   const dependencias = def.fuentes.includes('DEPENDENCIAS');
   const titulacion = def.fuentes.includes('TITULACION');
-  const verbo = valoraciones || titulacion ? 'cursó en esta institución' : '{{matricula.situacion}} en esta institución en';
+  const culminacion = def.fuentes.includes('CULMINACION');
+  const servicioSocial = def.fuentes.includes('SERVICIO_SOCIAL');
+  const salida = def.fuentes.includes('PAZ_Y_SALVO_SALIDA');
+  const verbo = valoraciones || titulacion || culminacion ? 'cursó en esta institución' : '{{matricula.situacion}} en esta institución en';
   const cola = valoraciones ? ', con las siguientes valoraciones finales:' : '.';
   return {
     vigencia_dias: null,
@@ -169,6 +179,14 @@ const contenidoGenerico = (def: Pick<DefinicionCertificado, 'fuentes'>): Omit<Co
             bloque('pendiente', 'CUERPO', 'Aprobó la totalidad del plan de estudios, y se encuentra pendiente de grado formal por el cumplimiento de requisitos reglamentarios. {{titulacion.pendientes}}', hay('titulacion.pendientes')),
           ]
         : []),
+      ...(culminacion
+        ? [
+            ...(CICLO_QUE_CULMINA[def.grados_numeros?.[0] ?? -99] ? [bloque('ciclo', 'CUERPO', `Y culminó ${CICLO_QUE_CULMINA[def.grados_numeros?.[0] ?? -99]}.`)] : []),
+            bloque('culminacion', 'DESTACADO', 'Concepto de promoción: {{promocion.texto}}.'),
+          ]
+        : []),
+      ...(servicioSocial ? [bloque('servicio_social', 'CUERPO', 'Prestó {{servicio_social.horas}} de servicio social estudiantil obligatorio.', hay('servicio_social.horas'))] : []),
+      ...(salida ? [bloque('retiro', 'CUERPO', '{{matricula.retiro}}', hay('matricula.retiro'))] : []),
       ...(dependencias
         ? [bloque('dependencias', 'CUERPO', 'Se encuentra a PAZ Y SALVO con la institución en las siguientes dependencias: {{paz_y_salvo.dependencias}}. Verificado por {{paz_y_salvo.verificado_por}}.')]
         : []),
@@ -180,7 +198,7 @@ const contenidoGenerico = (def: Pick<DefinicionCertificado, 'fuentes'>): Omit<Co
   };
 };
 
-export function contenidoInicial(def: Pick<DefinicionCertificado, 'clave' | 'nombre' | 'fuentes'>): ContenidoPlantilla {
+export function contenidoInicial(def: Pick<DefinicionCertificado, 'clave' | 'nombre' | 'fuentes'> & Partial<Pick<DefinicionCertificado, 'grados_numeros'>>): ContenidoPlantilla {
   const sembrado = TIPOS_INICIALES.find((t) => t.clave === def.clave);
   if (sembrado && CONTENIDO_BASE[def.clave]) {
     return structuredClone({ titulo: sembrado.nombre, destinatarios: sembrado.destinatarios, frase_otro: sembrado.frase_otro, ...(CONTENIDO_BASE[def.clave] as Omit<ContenidoPlantilla, 'titulo' | 'destinatarios' | 'frase_otro'>) });
@@ -213,7 +231,7 @@ export function requisitosDe(def: Pick<DefinicionCertificado, 'fuentes' | 'varia
   const valoraciones = def.fuentes.includes('VALORACIONES');
   const bloques = ['formula', 'cuerpo', ...(valoraciones ? ['notas', 'promocion'] : [])];
   const variables: Array<string | string[]> = [...IDENTIFICACION, ...FECHA];
-  if (valoraciones) variables.push('promocion.texto');
+  if (valoraciones || def.fuentes.includes('CULMINACION')) variables.push('promocion.texto');
   if (def.fuentes.includes('DEPENDENCIAS')) variables.push('paz_y_salvo.dependencias');
   for (const v of def.variables_obligatorias) if (!variables.includes(v)) variables.push(v);
   return { variables, bloques, fuente: valoraciones ? 'Decreto 180 de 1981 art. 13 (Decreto 1075 de 2015) y documento maestro, M26' : 'Documento maestro, M26' };

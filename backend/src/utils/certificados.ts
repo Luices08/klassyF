@@ -72,6 +72,17 @@ export interface DatosTitulacion {
   acta: { codigo: string; libro: number; folio: number; fecha: string } | null;
 }
 
+/** Culminación de ciclo (Transición, 5°, 9°): el concepto del cierre de promoción de ese grado, que debe ser aprobatorio para expedir. */
+export interface DatosCulminacion {
+  texto: string;
+}
+
+/** Horas de servicio social con soporte verificado (M19) al expedir. */
+export interface DatosServicioSocial {
+  horas: number;
+  requeridas: number | null;
+}
+
 export interface DatosEstudios {
   tabla: TablaValoraciones;
   /** Todas las asignaturas tienen sus periodos definitivos. */
@@ -127,6 +138,10 @@ export interface SnapshotCertificado {
   estudios?: DatosEstudios;
   /** Solo documentos de titulación (fuente TITULACION). */
   titulacion?: DatosTitulacion;
+  /** Solo documentos de culminación de ciclo (fuente CULMINACION). */
+  culminacion?: DatosCulminacion;
+  /** Solo documentos con la fuente SERVICIO_SOCIAL. */
+  servicio_social?: DatosServicioSocial;
   firmas: {
     rectoria: FirmaPersona;
     secretaria: FirmaPersona;

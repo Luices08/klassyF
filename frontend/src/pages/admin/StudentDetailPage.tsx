@@ -1,6 +1,7 @@
 import { type FormEvent, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { HistorialObservaciones } from '../../components/convivencia/HistorialObservaciones';
+import { ExpedienteDigitalTab } from '../../components/estudiantes/ExpedienteDigitalTab';
 import { InclusionResumen } from '../../components/inclusion/InclusionResumen';
 import { ReportCardView } from '../../components/reportCard/ReportCardView';
 import { Alert, errorMessage } from '../../components/ui/Alert';
@@ -23,6 +24,8 @@ import {
   useVincularAcudiente,
 } from '../../hooks/useGuardians';
 import { useReportCard } from '../../hooks/useReportCard';
+import { descargarInformeDescriptivo } from '../../hooks/useValoracionesDescriptivas';
+import { VisorDocumento } from '../../components/ui/VisorDocumento';
 import { useActualizarEstadoPerfil, useStudentFicha360, useUpsertStudentProfile } from '../../hooks/useStudents';
 import { formatoFechaHora } from '../../lib/fechas';
 import {
@@ -126,6 +129,7 @@ export function StudentDetailPage() {
             { key: 'familia', label: 'Núcleo familiar y acudientes' },
             { key: 'historial', label: 'Historial académico' },
             { key: 'bienestar', label: 'Observador y bienestar' },
+            ...(rol === 'ADMIN' || rol === 'COORDINADOR' || rol === 'SECRETARIA' ? [{ key: 'expediente', label: 'Expediente digital' }] : []),
           ]}
           active={tab}
           onChange={setTab}
@@ -141,6 +145,10 @@ export function StudentDetailPage() {
 
         <TabPanel active={tab} tabKey="historial">
           <HistorialTab studentId={estudiante._id} matriculas={matriculas} />
+        </TabPanel>
+
+        <TabPanel active={tab} tabKey="expediente">
+          <ExpedienteDigitalTab studentId={estudiante._id} activa={tab === 'expediente'} />
         </TabPanel>
 
         <TabPanel active={tab} tabKey="bienestar">
@@ -688,6 +696,22 @@ function HistorialTab({
   const [academicYearId, setAcademicYearId] = useState('');
   const [periodo, setPeriodo] = useState(1);
   const [consultar, setConsultar] = useState(false);
+  // Preescolar no tiene boletín numérico: su informe es descriptivo (Decreto 2247/1997) y se ve aquí mismo.
+  const [informe, setInforme] = useState<{ url: string } | null>(null);
+  const [errorInforme, setErrorInforme] = useState<string | null>(null);
+  const [generandoInforme, setGenerandoInforme] = useState(false);
+
+  async function verInformeDescriptivo() {
+    setErrorInforme(null);
+    setGenerandoInforme(true);
+    try {
+      setInforme(await descargarInformeDescriptivo(studentId, academicYearId, periodo));
+    } catch (err) {
+      setErrorInforme(errorMessage(err));
+    } finally {
+      setGenerandoInforme(false);
+    }
+  }
 
   const reportCardQuery = useReportCard(
     consultar ? { student_id: studentId, academic_year_id: academicYearId, periodo } : null
@@ -746,6 +770,14 @@ function HistorialTab({
             Ver boletín
           </Button>
         </div>
+        <div className="mt-3 flex flex-wrap items-center gap-3">
+          <Button type="button" variant="outline" disabled={!academicYearId} isLoading={generandoInforme} onClick={() => void verInformeDescriptivo()}>
+            Informe descriptivo (Preescolar)
+          </Button>
+          <span className="text-xs text-muted">Solo para estudiantes de Preescolar: valoración cualitativa por dimensión, sin notas.</span>
+        </div>
+        {errorInforme && <Alert tone="error">{errorInforme}</Alert>}
+        {informe && <VisorDocumento url={informe.url} titulo={`Informe descriptivo · Periodo ${periodo}`} nombreArchivo={`informe-descriptivo-periodo-${periodo}.pdf`} />}
 
         {reportCardQuery.isFetching && <Spinner label="Calculando boletín..." />}
         {reportCardQuery.isError && <Alert tone="error">{errorMessage(reportCardQuery.error)}</Alert>}

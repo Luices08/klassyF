@@ -13,7 +13,7 @@ import {
   MAX_VIGENCIA_DIAS,
   requisitosDe,
 } from '../constants/plantillasCertificado';
-import { CLAVES_VARIABLES, VARIABLES_CERTIFICADO } from '../constants/variablesCertificado';
+import { CLAVES_VARIABLES, VARIABLES_CERTIFICADO, fuenteDeVariable, variableAplica } from '../constants/variablesCertificado';
 import { serializacionEstable } from './comiteConvivencia';
 import { INGRESOS, NIVELES, TIPOS_DOCUMENTO, fechaLarga, hora12, nombreDeJornada } from './certificadoTexto';
 import { BloqueResuelto, SnapshotCertificado } from './certificados';
@@ -84,7 +84,7 @@ export function validarContenido(tipo: Pick<DefinicionCertificado, 'fuentes' | '
     for (const v of variablesDeTexto(b.texto)) {
       const variable = VARIABLES_CERTIFICADO.find((x) => x.clave === v);
       if (!variable) errores.push(`El bloque «${b.id}» usa la variable desconocida «${v}».`);
-      else if (variable.fuente && !fuentes.includes(variable.fuente)) errores.push(`La variable «${v}» no aplica a este documento: necesita la fuente «${ETIQUETA_FUENTE[variable.fuente].nombre}».`);
+      else if (!variableAplica(variable, fuentes)) errores.push(`La variable «${v}» no aplica a este documento: necesita la fuente «${ETIQUETA_FUENTE[fuenteDeVariable(variable) as keyof typeof ETIQUETA_FUENTE].nombre}».`);
     }
   }
   if (c.bloques.filter((b) => b.estilo === 'TABLA_NOTAS').length > 1) errores.push('Solo puede haber una tabla de valoraciones.');
@@ -210,7 +210,9 @@ export function contextoDeVariables(s: SnapshotCertificado, vigenciaDias: number
     ? s.estudios.promocion
       ? (s.estudios.promocion.texto ?? `${s.estudios.promocion.concepto === 'APROBO' ? 'APROBÓ' : 'NO APROBÓ'} el grado ${m.grado}`)
       : 'PENDIENTE (aún no registrado)'
-    : '';
+    : s.culminacion
+      ? s.culminacion.texto
+      : '';
   return {
     'institucion.nombre': e.institucion,
     'institucion.dane': e.codigo_dane,
@@ -244,6 +246,7 @@ export function contextoDeVariables(s: SnapshotCertificado, vigenciaDias: number
     'paz_y_salvo.dependencias': s.paz_y_salvo?.dependencias.join(', ') ?? '',
     'paz_y_salvo.verificado_por': s.paz_y_salvo?.verificado_por ?? '',
     'promocion.texto': promocion,
+    'servicio_social.horas': s.servicio_social ? `${enLetras(s.servicio_social.horas)} (${s.servicio_social.horas}) horas` : '',
     ...valoresDeTitulacion(s),
   };
 }

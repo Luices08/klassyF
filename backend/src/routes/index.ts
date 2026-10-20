@@ -45,6 +45,7 @@ import studyPlanRoutes from './studyPlan.routes';
 import subjectRoutes from './subject.routes';
 import teacherAssignmentRoutes from './teacherAssignment.routes';
 import salidaRoutes from './salida.routes';
+import valoracionDescriptivaRoutes from './valoracionDescriptiva.routes';
 import trasladoRoutes from './traslado.routes';
 import userRoutes from './user.routes';
 import ventanaPlanesRoutes from './ventanaPlanes.routes';
@@ -74,6 +75,8 @@ router.use('/traslados', trasladoRoutes);
 router.use('/citaciones', citacionRoutes);
 // Retiro y traslado durante el año, con su paz y salvo de salida y el boletín parcial de retiro (M04/M26/M17)
 router.use('/salidas', salidaRoutes);
+// Preescolar: valoración cualitativa y descriptiva (Decreto 2247/1997) y su informe
+router.use('/valoraciones-descriptivas', valoracionDescriptivaRoutes);
 
 // M10: Espacios fisicos (aulas, laboratorios, canchas)
 router.use('/espacios', espacioRoutes);

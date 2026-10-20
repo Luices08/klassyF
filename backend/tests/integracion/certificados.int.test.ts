@@ -31,6 +31,9 @@ vi.hoisted(() => {
 
 const imagen = (nombre: string) => ({ buffer: Buffer.alloc(0), size: 0, mimetype: 'image/png', originalname: nombre }) as unknown as Express.Multer.File;
 
+/** Los tipos de titulación, culminación de ciclo y retiro se siembran solos, en borrador, la primera vez que se usa M26. */
+const CLAVES_COMPLEMENTARIOS = ['ACTA_GRADO', 'DIPLOMA_BACHILLER', 'CONSTANCIA_CULMINACION', 'DIPLOMA_TRANSICION', 'CERTIFICADO_CULMINACION_PRIMARIA', 'CERTIFICADO_CULMINACION_BASICA', 'CERTIFICADO_RETIRO'];
+
 describe('M26 certificados (con base de datos)', () => {
   let e: Escenario;
   let secretariaAcademica: Awaited<ReturnType<typeof crearUsuario>>;
@@ -162,7 +165,7 @@ describe('M26 certificados (con base de datos)', () => {
     expect(delAdmin.puede.ajustes).toBe(true);
     const delaSecretaria = await configuracion.vistaConfiguracion(e.secretaria);
     expect(delaSecretaria.puede).toEqual({ imagen: { rectoria: false, secretaria: true, sello: true }, designar: { rectoria: false, secretaria: true }, ajustes: false });
-    expect(delaSecretaria.tipos.map((t) => t.clave)).toEqual(['CONSTANCIA_ESTUDIO', 'CERTIFICADO_MATRICULA', 'PAZ_SALVO', 'CERTIFICADO_ESTUDIOS']);
+    expect(delaSecretaria.tipos.map((t) => t.clave)).toEqual(['CONSTANCIA_ESTUDIO', 'CERTIFICADO_MATRICULA', 'PAZ_SALVO', 'CERTIFICADO_ESTUDIOS', ...CLAVES_COMPLEMENTARIOS]);
     expect(delaSecretaria.tipos[0]!.destinatarios.at(-1)).toMatchObject({ clave: 'OTRO' });
   });
 
@@ -477,12 +480,12 @@ describe('M26 certificados (con base de datos)', () => {
     });
 
     it('el texto de un documento lo ven y editan el administrador y la secretaría, no los demás roles', async () => {
-      expect((await plantillaServicio.listarPlantillas(e.secretaria)).plantillas.map((p) => p.tipo)).toEqual(['CONSTANCIA_ESTUDIO', 'CERTIFICADO_MATRICULA', 'PAZ_SALVO', 'CERTIFICADO_ESTUDIOS']);
+      expect((await plantillaServicio.listarPlantillas(e.secretaria)).plantillas.map((p) => p.tipo)).toEqual(['CONSTANCIA_ESTUDIO', 'CERTIFICADO_MATRICULA', 'PAZ_SALVO', 'CERTIFICADO_ESTUDIOS', ...CLAVES_COMPLEMENTARIOS]);
       await expect(plantillaServicio.listarPlantillas(e.docenteDeClase)).rejects.toMatchObject({ statusCode: 403 });
       await expect(plantillaServicio.plantillaEstandar('PAZ_SALVO', e.docenteDeClase)).rejects.toMatchObject({ statusCode: 403 });
       expect((await plantillaServicio.plantillaEstandar('PAZ_SALVO', e.secretaria)).bloques.length).toBeGreaterThan(0);
       const r = await plantillaServicio.listarPlantillas(e.admin);
-      expect(r.plantillas.map((p) => p.tipo)).toEqual(['CONSTANCIA_ESTUDIO', 'CERTIFICADO_MATRICULA', 'PAZ_SALVO', 'CERTIFICADO_ESTUDIOS']);
+      expect(r.plantillas.map((p) => p.tipo)).toEqual(['CONSTANCIA_ESTUDIO', 'CERTIFICADO_MATRICULA', 'PAZ_SALVO', 'CERTIFICADO_ESTUDIOS', ...CLAVES_COMPLEMENTARIOS]);
       expect(r.variables.length).toBeGreaterThan(20);
     });
 

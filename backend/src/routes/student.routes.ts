@@ -6,6 +6,7 @@ import {
   crearEstudianteCompleto,
   listarEstudiantes,
   obtenerFicha360,
+  expedienteDigital,
 } from '../controllers/student.controller';
 import { authenticate, checkRole } from '../middlewares/auth.middleware';
 import validate from '../middlewares/validate.middleware';
@@ -34,6 +35,9 @@ router.post(
 );
 
 router.post('/bulk-import', checkRole(...STAFF), upload.single('file'), bulkImportStudents);
+
+// Antes de '/:id': Express tomaría «expediente» como parte de otra ruta. Quién ve qué lo decide el servicio (y cada descarga, el módulo dueño del archivo).
+router.get('/:id/expediente', checkRole(ROLES.ADMIN, ROLES.COORDINADOR, ROLES.SECRETARIA), validate(studentValidator.obtenerFicha360), expedienteDigital);
 
 router.get(
   '/:id',

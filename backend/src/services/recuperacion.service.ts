@@ -33,6 +33,7 @@ import { periodosParaPromediar } from '../utils/promocionAnticipada';
 import { asignacionDelDocente } from './activity.service';
 import { registrarEvento } from './audit.service';
 import { cargarAnio, obtenerPolitica } from './configuracionRecuperaciones.service';
+import { esGrupoSinReprobacion, idsDeGradosSinReprobacion } from './nivelesSinReprobacion.service';
 import { cargarContextoPlanilla, notaDeCasilla } from './notas.service';
 
 // --- Qué nota tiene cada estudiante en cada asignatura (lo cerrado en M12, más lo recuperado en M18) ---
@@ -279,7 +280,10 @@ export async function listarCandidatos(filtros: FiltrosCandidatos, usuario: User
     };
   }
 
-  const asignaciones = await asignacionesAConsultar(filtros, usuario);
+  // En Preescolar nadie reprueba (Decreto 2247/1997): no hay quién recupere.
+  const gradosSinReprobacion = new Set(await idsDeGradosSinReprobacion());
+  const gruposSinReprobacion = new Set((await Group.find({ grade_id: { $in: [...gradosSinReprobacion] } }).select('_id').lean()).map((g) => String(g._id)));
+  const asignaciones = (await asignacionesAConsultar(filtros, usuario)).filter((a) => !gruposSinReprobacion.has(String(a.group_id)));
   for (const a of asignaciones) {
     if (String(a.academic_year_id) !== String(anio._id)) throw new ApiError(400, 'La asignación no pertenece al año lectivo indicado.');
   }
@@ -448,6 +452,7 @@ export async function registrarIntento(
   ip?: string | null
 ): Promise<RecuperacionDocument> {
   const asignacion = await asignacionDelDocente(input.teacher_assignment_id, docente);
+  if (asignacion.group_id && (await esGrupoSinReprobacion(asignacion.group_id))) throw new ApiError(409, 'En Preescolar no se reprueba ni se recupera (Decreto 2247 de 1997).');
   const anio = await cargarAnio(String(asignacion.academic_year_id));
   if (anio.estado !== 'EN_CURSO') throw new ApiError(409, `El año lectivo ${anio.year} no está vigente; no se pueden registrar recuperaciones.`);
 

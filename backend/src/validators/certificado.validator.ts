@@ -1,5 +1,6 @@
 import { ESTADOS_TITULACION } from '../constants/titulacion';
 import Joi from 'joi';
+import { NIVELES_EDUCATIVOS } from '../constants/enums';
 import {
   ELEMENTOS_AUTENTICACION,
   ESTADOS_CERTIFICADO,
@@ -53,6 +54,18 @@ const cuerpoExpedicion = Joi.object({
 // Expedir exige saber a quién se entrega; la vista previa no entrega nada.
 export const expedir: ValidationSchema = { body: cuerpoExpedicion.keys({ solicitante: solicitante.required() }) };
 export const vistaPrevia: ValidationSchema = { body: cuerpoExpedicion };
+
+/** Un lote es de un grupo; el destinatario y las firmas se eligen una vez para todos. */
+export const expedirLote: ValidationSchema = {
+  body: Joi.object({
+    group_id: objectId.required(),
+    tipo: tipo.required(),
+    destinatario: Joi.object({ clave: Joi.string().trim().max(40).required(), otro: Joi.string().trim().max(MAX_DESTINATARIO).allow('', null) }).allow(null),
+    firmas: Joi.object(Object.fromEntries(ELEMENTOS_AUTENTICACION.map((e) => [e, Joi.boolean()]))),
+  }),
+};
+
+export const zipDeLote: ValidationSchema = { body: Joi.object({ ids: Joi.array().items(objectId).min(1).max(100).required() }) };
 
 export const matriculasDelEstudiante: ValidationSchema = { params: Joi.object({ studentId: objectId.required() }) };
 
@@ -153,6 +166,9 @@ const camposTipo = {
   estados_matricula: Joi.array().items(Joi.string().valid(...ESTADOS_MATRICULA_EXPEDIBLES)).min(1).unique(),
   fuentes: Joi.array().items(Joi.string().valid(...FUENTES_CERTIFICADO)).unique(),
   estados_titulacion: Joi.array().items(Joi.string().valid(...ESTADOS_TITULACION)).unique(),
+  // Alcance: vacío = todos los niveles / todos los grados.
+  niveles: Joi.array().items(Joi.string().valid(...NIVELES_EDUCATIVOS)).unique().max(NIVELES_EDUCATIVOS.length),
+  grados_numeros: Joi.array().items(Joi.number().integer().min(-2).max(11)).unique().max(14),
 };
 
 const conClaveDeTipo = Joi.object({ tipo: tipo.required() });
@@ -165,6 +181,8 @@ export const crearTipo: ValidationSchema = {
     estados_matricula: camposTipo.estados_matricula.required(),
     fuentes: camposTipo.fuentes.default([]),
     estados_titulacion: camposTipo.estados_titulacion.default([]),
+    niveles: camposTipo.niveles.default([]),
+    grados_numeros: camposTipo.grados_numeros.default([]),
   }),
 };
 

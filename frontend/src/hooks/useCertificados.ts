@@ -5,7 +5,23 @@ import { api } from '../lib/apiClient';
 
 /** La clave de un tipo de documento: es un dato del colegio (se crean, editan y eliminan), no una lista fija. */
 export type ClaveCertificado = string;
-export type FuenteCertificado = 'VALORACIONES' | 'DEPENDENCIAS' | 'PAZ_Y_SALVO_SALIDA';
+export type FuenteCertificado = 'VALORACIONES' | 'DEPENDENCIAS' | 'PAZ_Y_SALVO_SALIDA' | 'TITULACION' | 'CULMINACION' | 'SERVICIO_SOCIAL';
+
+/** ¿La variable aplica a un tipo con estas fuentes? Sin fuente propia, a todos; con varias, basta una. */
+export const variableAplica = (fuente: FuenteCertificado | FuenteCertificado[] | null | undefined, fuentes: readonly FuenteCertificado[]): boolean => {
+  if (!fuente) return true;
+  return (Array.isArray(fuente) ? fuente : [fuente]).some((f) => fuentes.includes(f));
+};
+
+/** Cómo se le dice al usuario cada situación de titulación (M19). */
+export const ETIQUETA_ESTADO_TITULACION: Record<string, string> = { APROBO_NO_GRADUADO: 'Pendiente de grado (estudios culminados, no graduado)', GRADUADO: 'Graduado', GRADUADO_EXTEMPORANEO: 'Graduado extemporáneo' };
+
+export const NIVELES_EDUCATIVOS_TIPO: Array<{ valor: string; nombre: string }> = [
+  { valor: 'PREESCOLAR', nombre: 'Preescolar' },
+  { valor: 'PRIMARIA', nombre: 'Primaria' },
+  { valor: 'SECUNDARIA', nombre: 'Secundaria' },
+  { valor: 'MEDIA', nombre: 'Media (10° y 11°)' },
+];
 export type EstadoTipoCertificado = 'BORRADOR' | 'ACTIVO' | 'ARCHIVADO';
 export const CLAVE_DESTINATARIO_OTRO = 'OTRO';
 export type ElementoAutenticacion = 'rectoria' | 'secretaria' | 'sello';
@@ -105,6 +121,7 @@ export interface MatriculaExpedible {
   _id: string;
   anio: number;
   grado: string;
+  grado_numero: number | null;
   nivel: string | null;
   grupo: string;
   sede: string;
@@ -286,6 +303,40 @@ export const descargarVistaPrevia = (entrada: EntradaExpedicion) => api.download
 
 export const descargarPdfCertificado = (id: string) => api.downloadBlob(`/certificados/${id}/pdf`);
 
+// --- Emisión por lote (un grupo) ---
+
+export interface FilaLote {
+  student_id: string;
+  enrollment_id: string;
+  estudiante: string;
+  resultado: 'EXPEDIDO' | 'YA_EXPEDIDO' | 'FALLIDO';
+  certificado_id: string | null;
+  codigo: string | null;
+  motivo: string | null;
+}
+
+export interface ResultadoLote {
+  total: number;
+  expedidos: number;
+  ya_expedidos: number;
+  fallidos: number;
+  filas: FilaLote[];
+}
+
+/** Expide el mismo documento a todo un grupo. Cada documento es una expedición normal; los que no cumplen quedan con su motivo. */
+export function useExpedirLote() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (entrada: { group_id: string; tipo: ClaveCertificado; destinatario?: { clave: string; otro?: string | null } | null; firmas: Partial<Record<ElementoAutenticacion, boolean>> }) => api.post<ResultadoLote>('/certificados/lote', entrada),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['certificados'] });
+    },
+  });
+}
+
+/** Los PDF de varios documentos en un ZIP, con la sesión del usuario. */
+export const descargarZipDeCertificados = (ids: string[]) => api.downloadBlob('/certificados/lote/zip', { method: 'POST', body: { ids } });
+
 // --- Historial ---
 
 export function useCertificados(filtro: FiltroCertificados) {
@@ -399,8 +450,8 @@ export interface VariableCertificado {
   etiqueta: string;
   origen: string;
   ejemplo: string;
-  /** Solo tiene sentido en los tipos que usan esa fuente de datos. */
-  fuente?: FuenteCertificado;
+  /** Solo tiene sentido en los tipos que usan esa fuente de datos (un arreglo = basta con una). */
+  fuente?: FuenteCertificado | FuenteCertificado[];
 }
 
 export interface PlantillaVigente extends ContenidoPlantilla {
@@ -467,6 +518,9 @@ export const ETIQUETA_FUENTE: Record<FuenteCertificado, { nombre: string; descri
   VALORACIONES: { nombre: 'Valoraciones y promoción', descripcion: 'Incluye la tabla de notas finales y el concepto de promoción. Solo se expide con todas las notas definitivas.' },
   DEPENDENCIAS: { nombre: 'Dependencias (paz y salvo)', descripcion: 'Al expedir se confirma que no hay pendientes en cada dependencia activa.' },
   PAZ_Y_SALVO_SALIDA: { nombre: 'Paz y salvo de salida', descripcion: 'Documento de salida: con la matrícula retirada o trasladada solo se expide cuando el paz y salvo de salida está aprobado.' },
+  TITULACION: { nombre: 'Libro de grados y titulación (bachiller)', descripcion: 'Toma el título y la situación de graduación del estudiante (solo grado 11). Solo se expide si esa situación es una de las que elijas; el acta se asienta con número, libro y folio.' },
+  CULMINACION: { nombre: 'Culminación de ciclo (promoción del grado)', descripcion: 'Transición, 5° o 9°: solo se expide si el estudiante tiene el cierre de promoción de ese grado con resultado aprobatorio. No pasa por Titulación.' },
+  SERVICIO_SOCIAL: { nombre: 'Servicio social obligatorio', descripcion: 'Pone en el texto las horas de servicio social con soporte verificado del estudiante.' },
 };
 
 export interface PermisosTipo {
@@ -484,6 +538,11 @@ export interface TipoCertificado {
   prefijo: string;
   estados_matricula: string[];
   fuentes: FuenteCertificado[];
+  /** Alcance: vacío = todos los niveles / todos los grados. */
+  niveles: string[];
+  grados_numeros: number[];
+  /** Solo con la fuente de titulación: con qué situación del estudiante se puede expedir. */
+  estados_titulacion: string[];
   variables_obligatorias: string[];
   /** Si el acudiente puede generarlo solo desde el portal (M27). Solo lo cambia el ADMIN. */
   autoservicio_acudiente: boolean;
@@ -497,7 +556,7 @@ export interface TipoCertificado {
 export interface ListaTiposCertificado {
   tipos: TipoCertificado[];
   estados_matricula: string[];
-  variables: Array<{ clave: string; etiqueta: string; fuente: FuenteCertificado | null }>;
+  variables: Array<{ clave: string; etiqueta: string; fuente: FuenteCertificado | FuenteCertificado[] | null }>;
   maximo: number;
 }
 
@@ -507,6 +566,9 @@ export interface EntradaTipoCertificado {
   prefijo: string;
   estados_matricula: string[];
   fuentes: FuenteCertificado[];
+  niveles?: string[];
+  grados_numeros?: number[];
+  estados_titulacion?: string[];
 }
 
 export type CambiosTipoCertificado = Partial<EntradaTipoCertificado> & { variables_obligatorias?: string[]; autoservicio_acudiente?: boolean };

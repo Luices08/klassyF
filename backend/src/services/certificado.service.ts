@@ -1,6 +1,6 @@
 import { Types } from 'mongoose';
 import type { ActaDeGrado } from '../models/titulacion.model';
-import { ClaveCertificado, ESTADOS_MATRICULA_EXPEDIBLES, ElementoAutenticacion, MAX_MOTIVO_ANULACION, codigoDeCertificado } from '../constants/certificados';
+import { ClaveCertificado, ESTADOS_MATRICULA_EXPEDIBLES, ElementoAutenticacion, MAX_MOTIVO_ANULACION, codigoDeCertificado, tipoAplicaAlGrado } from '../constants/certificados';
 import { Rol } from '../constants/enums';
 import { ROLES } from '../constants/roles';
 import { env } from '../config/env';
@@ -32,6 +32,8 @@ import { entradaDeElementos, obtenerConfiguracion, presenciaDeImagenes } from '.
 import { datosDeEstudios, obtenerPromocion } from './certificadoEstudios.service';
 import { plantillaVigente, resolverContenido } from './certificadoPlantilla.service';
 import { datosParaDocumento, titulacionDeMatricula, validarYAsentarActa } from './actaGrado.service';
+import { horasDeServicioSocial } from './titulacion.service';
+import { ETIQUETA_ESTADO_TITULACION } from '../constants/titulacion';
 import { congelarEscudo } from './encabezadoInstitucional.service';
 import { TipoDefinido, nombresDeTipos, tipoPorClave, tiposActivos } from './tipoCertificado.service';
 
@@ -67,7 +69,7 @@ type MatriculaCompleta = Omit<EnrollmentDocument, 'student_id' | 'group_id' | 'a
     nomenclatura: string;
     sede_id: { _id: Types.ObjectId; nombre: string };
     jornada_id: { nombre: string; hora_inicio: string; hora_fin: string };
-    grade_id: { _id: Types.ObjectId; nombre: string; nivel: string };
+    grade_id: { _id: Types.ObjectId; nombre: string; nivel: string; numero: number };
   };
   academic_year_id: { _id: Types.ObjectId; year: number };
 };
@@ -76,7 +78,7 @@ async function cargarMatricula(enrollmentId: string): Promise<MatriculaCompleta>
   const matricula = Types.ObjectId.isValid(enrollmentId)
     ? await Enrollment.findById(enrollmentId)
         .populate('student_id', 'nombre apellido tipo_documento numero_documento roles')
-        .populate({ path: 'group_id', select: 'nomenclatura sede_id jornada_id grade_id', populate: [{ path: 'sede_id', select: 'nombre' }, { path: 'jornada_id', select: 'nombre hora_inicio hora_fin' }, { path: 'grade_id', select: 'nombre nivel' }] })
+        .populate({ path: 'group_id', select: 'nomenclatura sede_id jornada_id grade_id', populate: [{ path: 'sede_id', select: 'nombre' }, { path: 'jornada_id', select: 'nombre hora_inicio hora_fin' }, { path: 'grade_id', select: 'nombre nivel numero' }] })
         .populate('academic_year_id', 'year')
     : null;
   const completa = matricula as unknown as MatriculaCompleta | null;
@@ -87,7 +89,7 @@ async function cargarMatricula(enrollmentId: string): Promise<MatriculaCompleta>
 type GuardianVinculado = { _id: Types.ObjectId; nombre: string; apellido: string; tipo_documento: string; numero_documento: string; telefono_principal: string; estado: string };
 
 /** Los acudientes activos del estudiante (M03), el principal primero. */
-async function acudientesDelEstudiante(studentId: Types.ObjectId) {
+export async function acudientesDelEstudiante(studentId: Types.ObjectId) {
   const vinculos = await StudentGuardian.find({ student_id: studentId }).populate<{ guardian_id: GuardianVinculado | null }>(
     'guardian_id',
     'nombre apellido tipo_documento numero_documento telefono_principal estado'
@@ -145,12 +147,12 @@ export async function matriculasExpedibles(studentId: string, usuario: UserDocum
           nomenclatura: string;
           sede_id: { _id: Types.ObjectId; nombre: string };
           jornada_id: { nombre: string; hora_inicio: string; hora_fin: string };
-          grade_id: { nombre: string; nivel: string };
+          grade_id: { nombre: string; nivel: string; numero: number };
         };
       }>({
         path: 'group_id',
         select: 'nomenclatura grade_id sede_id jornada_id',
-        populate: [{ path: 'grade_id', select: 'nombre nivel' }, { path: 'sede_id', select: 'nombre' }, { path: 'jornada_id', select: 'nombre hora_inicio hora_fin' }],
+        populate: [{ path: 'grade_id', select: 'nombre nivel numero' }, { path: 'sede_id', select: 'nombre' }, { path: 'jornada_id', select: 'nombre hora_inicio hora_fin' }],
       })
       .sort({ createdAt: -1 }),
   ]);
@@ -177,16 +179,35 @@ export async function matriculasExpedibles(studentId: string, usuario: UserDocum
     faltantes,
     matriculas: await Promise.all(
       visibles.map(async (m) => {
-          const tipos = ofrecidos.filter((c) => c.estados_matricula.includes(m.estado));
+          // Solo los documentos que aplican a este estado de matrícula y a este grado (el alcance por nivel y grado del tipo).
+          const tipos = ofrecidos.filter((c) => c.estados_matricula.includes(m.estado) && tipoAplicaAlGrado(c, m.group_id.grade_id?.nivel ?? null, m.group_id.grade_id?.numero ?? null));
           // Documentos que dependen de un módulo aún sin datos: se ofrecen, pero solo como vista previa y con el motivo a la vista.
           const restricciones: Partial<Record<ClaveCertificado, string>> = {};
           for (const c of tipos) {
             if (c.fuentes.includes('VALORACIONES') && (await obtenerPromocion(String(m._id))) === null) restricciones[c.clave] = MOTIVO_SIN_PROMOCION;
+            if (c.fuentes.includes('CULMINACION')) {
+              const promocion = await obtenerPromocion(String(m._id));
+              if (!promocion) restricciones[c.clave] = 'Este grado aún no tiene su cierre de promoción (M19): el documento de culminación se expide cuando el estudiante tiene un resultado final aprobatorio.';
+              else if (promocion.concepto !== 'APROBO') restricciones[c.clave] = 'El estudiante no aprobó este grado: no se expide un documento de culminación.';
+            }
+            if (c.fuentes.includes('TITULACION')) {
+              const t = await titulacionDeMatricula(m._id);
+              if (!t) restricciones[c.clave] = 'Aún no tiene su titulación evaluada: se evalúa al cerrar la promoción del grado 11 con el estudiante aprobado (M19).';
+              else if (!(c.estados_titulacion ?? []).includes(t.estado)) {
+                const pendientes = t.pendientes.map((p) => p.detalle).join(' ');
+                restricciones[c.clave] = `No se puede expedir: su situación es «${ETIQUETA_ESTADO_TITULACION[t.estado]}».${pendientes ? ` ${pendientes}` : ''}`;
+              }
+            }
+            if (c.fuentes.includes('SERVICIO_SOCIAL')) {
+              const ss = await horasDeServicioSocial(m.student_id, (m.academic_year_id as unknown as { _id: Types.ObjectId })._id);
+              if (ss.horas <= 0) restricciones[c.clave] = 'El estudiante no tiene horas de servicio social con soporte verificado.';
+            }
           }
           return {
             _id: String(m._id),
             anio: m.academic_year_id.year,
             grado: m.group_id.grade_id?.nombre ?? '',
+            grado_numero: m.group_id.grade_id?.numero ?? null,
             nivel: m.group_id.grade_id?.nivel ?? null,
             grupo: m.group_id.nomenclatura,
             sede: m.group_id.sede_id.nombre,
@@ -264,6 +285,9 @@ async function prepararDocumento(
   if (!def.estados_matricula.includes(matricula.estado)) {
     throw new ApiError(409, `«${def.nombre}» no se puede expedir con la matrícula en estado ${matricula.estado}.`);
   }
+  if (!tipoAplicaAlGrado(def, matricula.group_id.grade_id?.nivel ?? null, matricula.group_id.grade_id?.numero ?? null)) {
+    throw new ApiError(409, `«${def.nombre}» no aplica al grado ${matricula.group_id.grade_id?.nombre ?? ''}.`);
+  }
 
   // Documentos de salida: con la matrícula retirada, el paz y salvo de salida debe estar aprobado (la vista previa sí se ve).
   if (soloActivo && def.fuentes.includes('PAZ_Y_SALVO_SALIDA')) await exigirPazYSalvoDeSalidaAprobado(matricula._id, def.nombre);
@@ -308,6 +332,23 @@ async function prepararDocumento(
     else if (soloActivo) throw new ApiError(409, `«${def.nombre}» exige que el estudiante haya aprobado el último grado y tenga su titulación evaluada (cierre de promoción de M19).`);
     // La vista previa de un borrador se prueba con datos de ejemplo aunque el estudiante elegido no esté en titulación.
     else titulacion = { titulo: 'Bachiller Académico', estado: def.estados_titulacion?.[0] ?? 'GRADUADO', pendientes: [], acta: { codigo: '(se asigna al expedir)', libro: 0, folio: 0, fecha: new Date().toISOString() } };
+  }
+
+  // Culminación de ciclo: el concepto del cierre de promoción de este grado, que debe ser aprobatorio (en la vista previa se prueba con un texto de ejemplo).
+  let culminacion: SnapshotCertificado['culminacion'];
+  if (def.fuentes.includes('CULMINACION')) {
+    const promocion = await obtenerPromocion(String(matricula._id));
+    if (promocion?.concepto === 'APROBO') culminacion = { texto: promocion.texto ?? `APROBÓ el grado ${matricula.group_id.grade_id.nombre}` };
+    else if (soloActivo) {
+      throw new ApiError(409, promocion ? `El estudiante no aprobó el grado ${matricula.group_id.grade_id.nombre}: no se expide «${def.nombre}».` : `«${def.nombre}» exige el cierre de promoción de este grado con resultado aprobatorio (M19).`);
+    } else culminacion = { texto: `APROBÓ el grado ${matricula.group_id.grade_id.nombre} (ejemplo: aún sin cierre de promoción)` };
+  }
+
+  let servicioSocial: SnapshotCertificado['servicio_social'];
+  if (def.fuentes.includes('SERVICIO_SOCIAL')) {
+    const ss = await horasDeServicioSocial(matricula.student_id._id, matricula.academic_year_id._id);
+    if (ss.horas <= 0 && soloActivo) throw new ApiError(409, `«${def.nombre}» exige horas de servicio social con soporte verificado: el estudiante no tiene.`);
+    servicioSocial = ss;
   }
 
   // El responsable legal solo se lee (y se congela) si el texto del documento lo pone: no se copian datos que el documento no usa.
@@ -363,6 +404,8 @@ async function prepararDocumento(
     paz_y_salvo: pazYSalvo,
     estudios,
     titulacion,
+    culminacion,
+    servicio_social: servicioSocial,
     firmas: {
       rectoria: { aplicada: aplicados.rectoria, nombre: nombreRector, cargo: config.rectoria.cargo, usuario_id: config.rectoria.usuario_id ? String(config.rectoria.usuario_id) : null, imagen: aplicados.rectoria ? config.rectoria.imagen : null },
       secretaria: { aplicada: aplicados.secretaria, nombre: nombreSecretaria, cargo: config.secretaria.cargo, usuario_id: config.secretaria.usuario_id ? String(config.secretaria.usuario_id) : null, imagen: aplicados.secretaria ? config.secretaria.imagen : null },

@@ -1,5 +1,6 @@
 import Joi from 'joi';
 import { NIVELES_EDUCATIVOS } from '../constants/enums';
+import { GRADO_TITULACION } from '../constants/titulacion';
 import {
   ACCIONES_REGLA,
   CONDICIONES_ARRASTRE,
@@ -118,7 +119,8 @@ const cuerpoPolitica = Joi.object({
     }).required(),
     piar: Joi.object({ derivar_a_comision: Joi.boolean().required() }).required(),
     titulacion: Joi.object({
-      grado_titulacion: Joi.number().integer().min(1).max(11).required(),
+      // Se ignora: la titulación es siempre del grado 11. Una política anterior con otro valor sigue guardándose sin error.
+      grado_titulacion: Joi.any().custom(() => GRADO_TITULACION).default(GRADO_TITULACION),
       servicio_social: Joi.object({
         activo: Joi.boolean().required(),
         horas_requeridas: Joi.number().min(1).max(2000).required(),

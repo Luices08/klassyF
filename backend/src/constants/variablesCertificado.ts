@@ -12,9 +12,18 @@ export interface VariableCertificado {
   origen: string;
   /** Cómo se ve con datos de muestra. */
   ejemplo: string;
-  /** Si solo tiene sentido en los tipos que usan esa fuente de datos (la enciende quien configura el tipo). */
-  fuente?: FuenteCertificado;
+  /** Si solo tiene sentido en los tipos que usan esa fuente de datos (la enciende quien configura el tipo). Un arreglo = basta con una de ellas. */
+  fuente?: FuenteCertificado | FuenteCertificado[];
 }
+
+/** ¿La variable aplica a un tipo con estas fuentes? Sin fuente propia, a todos. */
+export const variableAplica = (v: Pick<VariableCertificado, 'fuente'>, fuentes: readonly FuenteCertificado[]): boolean => {
+  if (!v.fuente) return true;
+  return (Array.isArray(v.fuente) ? v.fuente : [v.fuente]).some((f) => fuentes.includes(f));
+};
+
+/** La primera fuente que habilita la variable, para decir cuál falta. */
+export const fuenteDeVariable = (v: Pick<VariableCertificado, 'fuente'>): FuenteCertificado | null => (!v.fuente ? null : Array.isArray(v.fuente) ? (v.fuente[0] ?? null) : v.fuente);
 
 export const VARIABLES_CERTIFICADO: VariableCertificado[] = [
   { clave: 'institucion.nombre', etiqueta: 'Nombre oficial del colegio', origen: 'M01 Institución', ejemplo: 'Colegio de Prueba' },
@@ -48,7 +57,8 @@ export const VARIABLES_CERTIFICADO: VariableCertificado[] = [
   { clave: 'documento.vigencia', etiqueta: 'Vigencia del documento', origen: 'Parámetro de la plantilla', ejemplo: 'treinta (30) días calendario' },
   { clave: 'paz_y_salvo.dependencias', etiqueta: 'Dependencias verificadas', origen: 'Paz y salvo', ejemplo: 'Académica, Biblioteca, Financiera / Administrativa', fuente: 'DEPENDENCIAS' },
   { clave: 'paz_y_salvo.verificado_por', etiqueta: 'Quién verificó', origen: 'Paz y salvo', ejemplo: 'Laura Gómez', fuente: 'DEPENDENCIAS' },
-  { clave: 'promocion.texto', etiqueta: 'Concepto de promoción', origen: 'M19 Promoción', ejemplo: 'APROBÓ el grado Quinto', fuente: 'VALORACIONES' },
+  { clave: 'promocion.texto', etiqueta: 'Concepto de promoción', origen: 'M19 Promoción', ejemplo: 'APROBÓ el grado Quinto', fuente: ['VALORACIONES', 'CULMINACION'] },
+  { clave: 'servicio_social.horas', etiqueta: 'Horas de servicio social verificadas', origen: 'M19 Servicio social', ejemplo: 'ochenta (80) horas', fuente: 'SERVICIO_SOCIAL' },
   { clave: 'titulacion.titulo', etiqueta: 'Título que se otorga', origen: 'M01 / M19 Titulación', ejemplo: 'Bachiller Académico', fuente: 'TITULACION' },
   { clave: 'titulacion.acta_codigo', etiqueta: 'Número del acta de grado', origen: 'M26 Actas de grado', ejemplo: 'AG-2026-0045', fuente: 'TITULACION' },
   { clave: 'titulacion.acta_libro', etiqueta: 'Libro de actas', origen: 'M26 Actas de grado', ejemplo: '2', fuente: 'TITULACION' },

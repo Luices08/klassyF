@@ -1,5 +1,5 @@
 import { Types } from 'mongoose';
-import { EstadoTitulacion, TITULO_BACHILLER_INICIAL } from '../constants/titulacion';
+import { EstadoTitulacion, GRADO_MINIMO_SERVICIO_SOCIAL, GRADO_TITULACION, PATRON_REGISTRO_SABER_11, normalizarRegistroSaber11, TITULO_BACHILLER_INICIAL, VERIFICACIONES_QUE_CUENTAN } from '../constants/titulacion';
 import { ROLES } from '../constants/roles';
 import Enrollment from '../models/enrollment.model';
 import EvaluacionPromocion from '../models/evaluacionPromocionEstudiante.model';
@@ -7,17 +7,20 @@ import Grade from '../models/grade.model';
 import Group, { GroupDocument } from '../models/group.model';
 import Institution from '../models/institution.model';
 import PazYSalvo from '../models/pazYSalvo.model';
-import { CertificadoGradoExterno, RegistroSaber11, RegistroServicioSocial } from '../models/registrosTitulacion.model';
+import { RegistroSaber11, RegistroServicioSocial } from '../models/registrosTitulacion.model';
 import Titulacion, { TitulacionDocument } from '../models/titulacion.model';
 import User, { UserDocument } from '../models/user.model';
 import ApiError from '../utils/ApiError';
 import { conceptoOficial, PoliticaTitulacion } from '../utils/promocion';
-import { estadoDeTitulacion, evaluarRequisitos, gradosSinCertificado } from '../utils/titulacion';
+import { estadoDeTitulacion, evaluarRequisitos } from '../utils/titulacion';
+import { NOMBRES_DOCUMENTO_MATRICULA } from '../constants/matriculaChecklist';
 import { registrarEvento } from './audit.service';
 import { datosDePolitica, obtenerPolitica } from './politicaPromocion.service';
 
 const PUEDEN_REGISTRAR = [ROLES.ADMIN, ROLES.SECRETARIA];
 const PUEDEN_CONSULTAR = [ROLES.ADMIN, ROLES.SECRETARIA, ROLES.COORDINADOR];
+/** Verificar un soporte es una segunda mirada sobre lo que registró Secretaría: también lo hace coordinación. */
+const PUEDEN_VERIFICAR = [ROLES.ADMIN, ROLES.SECRETARIA, ROLES.COORDINADOR];
 
 function exigir(usuario: UserDocument, roles: readonly string[], mensaje: string): void {
   if (!roles.includes(usuario.rol)) throw new ApiError(403, mensaje);
@@ -46,26 +49,35 @@ interface Hechos {
   horas: number;
   saber11: boolean;
   pazYSalvo: boolean;
-  conCertificado: Set<number>;
 }
 
 async function reunirHechos(studentId: Types.ObjectId | string, anioId: Types.ObjectId | string): Promise<Hechos> {
-  const [servicio, saber, paz, externos, propios] = await Promise.all([
-    RegistroServicioSocial.find({ student_id: studentId, estado: 'VIGENTE' }).select('horas').lean(),
+  const [servicio, saber, paz] = await Promise.all([
+    // Solo suman las tandas verificadas o heredadas; las anteriores al soporte no tienen el campo guardado.
+    RegistroServicioSocial.find({ student_id: studentId, estado: 'VIGENTE', $or: [{ verificacion: { $in: VERIFICACIONES_QUE_CUENTAN } }, { verificacion: { $exists: false } }] }).select('horas').lean(),
     RegistroSaber11.exists({ student_id: studentId }),
     PazYSalvo.exists({ student_id: studentId, academic_year_id: anioId, estado: 'CONFIRMADO' }),
-    CertificadoGradoExterno.find({ student_id: studentId }).select('grado_numero').lean(),
-    // Un grado cursado aquí cuenta solo: su cierre de promoción vigente con un resultado de aprobación.
-    EvaluacionPromocion.find({ student_id: studentId, vigente: true }).select('grado_id resultado').lean(),
   ]);
-  const aprobados = propios.filter((c) => ['PROMOVIDO', 'PROMOVIDO_POR_RECUPERACION', 'PROMOVIDO_CON_ARRASTRE'].includes(c.resultado));
-  const grados = await Grade.find({ _id: { $in: aprobados.map((c) => c.grado_id) } }).select('numero').lean();
   return {
     horas: servicio.reduce((suma, r) => suma + r.horas, 0),
     saber11: Boolean(saber),
     pazYSalvo: Boolean(paz),
-    conCertificado: new Set([...externos.map((c) => c.grado_numero), ...grados.map((g) => g.numero)]),
   };
+}
+
+/** El estudiante debe tener o haber tenido matrícula en el grado de titulación (11°): ahí se presenta Saber 11. */
+async function exigirMatriculaEnGradoDeTitulacion(studentId: string): Promise<void> {
+  const matriculas = await Enrollment.find({ student_id: studentId, estado: { $in: ['MATRICULADO_CONDICIONAL', 'MATRICULADO_DEFINITIVO', 'RETIRADO'] } }).select('group_id').lean();
+  const grupos = await Group.find({ _id: { $in: matriculas.map((m) => m.group_id) } }).select('grade_id').lean();
+  const grados = await Grade.find({ _id: { $in: grupos.map((g) => g.grade_id) } }).select('numero').lean();
+  if (!grados.some((g) => g.numero === GRADO_TITULACION)) throw new ApiError(409, `Saber 11 se registra en el grado ${GRADO_TITULACION}: el estudiante aún no tiene matrícula en ese grado.`);
+}
+
+/** Las horas de servicio social con soporte verificado de un estudiante y las que exige el colegio (null = no se exige). Para el documento de M26. */
+export async function horasDeServicioSocial(studentId: string | Types.ObjectId, anioId: string | Types.ObjectId): Promise<{ horas: number; requeridas: number | null }> {
+  const hechos = await reunirHechos(studentId, anioId);
+  const politica = datosDePolitica(await obtenerPolitica(String(anioId))).titulacion;
+  return { horas: hechos.horas, requeridas: politica.servicio_social.activo ? politica.servicio_social.horas_requeridas : null };
 }
 
 // --- Evaluar la titulación ---
@@ -81,7 +93,7 @@ export async function evaluarTitulacionDeMatricula(enrollmentId: string | Types.
   if (!grado || !grupo) return null;
 
   const politica = datosDePolitica(await obtenerPolitica(String(cierre.academic_year_id))).titulacion;
-  if (grado.numero !== politica.grado_titulacion) return null;
+  if (grado.numero !== GRADO_TITULACION) return null;
 
   const aprobo = conceptoOficial(cierre.resultado, grado.nombre, null)?.concepto === 'APROBO';
   const hechos = await reunirHechos(cierre.student_id, cierre.academic_year_id);
@@ -91,7 +103,6 @@ export async function evaluarTitulacionDeMatricula(enrollmentId: string | Types.
       horas_servicio_social: hechos.horas,
       presento_saber_11: hechos.saber11,
       paz_y_salvo_confirmado: hechos.pazYSalvo,
-      grados_sin_certificado: gradosSinCertificado(politica, hechos.conCertificado),
     },
     politica
   );
@@ -159,19 +170,90 @@ export interface EntradaServicioSocial {
   fecha_fin?: Date | null;
 }
 
+/** El archivo ya guardado en disco por el controlador (ruta relativa al proceso, como los soportes de salidas). */
+export interface SoporteServicioSocial {
+  nombre: string;
+  archivo_path: string;
+  mimetype: string;
+  tamano: number;
+}
+
+/** El servicio social se presta en 10° y 11°: el estudiante debe tener o haber tenido matrícula en uno de esos grados (también quien llega por traslado a 11° con horas de otro colegio). */
+async function exigirGradoDeServicioSocial(studentId: string): Promise<void> {
+  const matriculas = await Enrollment.find({ student_id: studentId, estado: { $in: ['MATRICULADO_CONDICIONAL', 'MATRICULADO_DEFINITIVO', 'RETIRADO'] } }).select('group_id').lean();
+  const grupos = await Group.find({ _id: { $in: matriculas.map((m) => m.group_id) } }).select('grade_id').lean();
+  const grados = await Grade.find({ _id: { $in: grupos.map((g) => g.grade_id) } }).select('numero').lean();
+  if (!grados.some((g) => g.numero >= GRADO_MINIMO_SERVICIO_SOCIAL)) {
+    throw new ApiError(409, `El servicio social se presta en los grados ${GRADO_MINIMO_SERVICIO_SOCIAL} y ${GRADO_TITULACION}: el estudiante aún no tiene matrícula en ninguno de ellos.`);
+  }
+}
+
 async function exigirEstudiante(studentId: string): Promise<void> {
   const u = await User.findById(studentId).select('rol roles');
   if (!u || !(u.roles ?? [u.rol]).includes('ESTUDIANTE')) throw new ApiError(404, 'Estudiante no encontrado.');
 }
 
-export async function registrarServicioSocial(entrada: EntradaServicioSocial, usuario: UserDocument, ip?: string | null) {
+export async function registrarServicioSocial(entrada: EntradaServicioSocial, soporte: SoporteServicioSocial, usuario: UserDocument, ip?: string | null) {
   exigir(usuario, PUEDEN_REGISTRAR, 'Solo Secretaría y el administrador registran el servicio social.');
   await exigirEstudiante(entrada.student_id);
   await exigirAlcance(usuario, entrada.student_id);
-  const registro = await RegistroServicioSocial.create({ ...entrada, registrado_por: usuario._id });
+  await exigirGradoDeServicioSocial(entrada.student_id);
+  // Nace PENDIENTE: las horas solo suman cuando alguien verifica el soporte.
+  const registro = await RegistroServicioSocial.create({ ...entrada, soporte, verificacion: 'PENDIENTE', registrado_por: usuario._id });
   await registrarEvento({ usuario_id: usuario._id, accion: 'TITULACION_SERVICIO_SOCIAL_REGISTRADO', entidad: 'RegistroServicioSocial', entidad_id: registro._id, detalle: `${entrada.horas} horas`, ip });
   await reevaluarPendientes(entrada.student_id, 'Servicio social registrado', usuario);
   return registro;
+}
+
+/** Las tandas de horas de un estudiante con su estado de verificación; nunca la ruta del archivo (se baja por `archivoDeServicioSocial`). */
+export async function listarServicioSocial(studentId: string, usuario: UserDocument) {
+  exigir(usuario, PUEDEN_CONSULTAR, 'No tienes acceso a la titulación.');
+  await exigirEstudiante(studentId);
+  await exigirAlcance(usuario, studentId);
+  const registros = await RegistroServicioSocial.find({ student_id: studentId }).sort({ createdAt: -1 }).lean();
+  return registros.map((r) => ({
+    _id: String(r._id),
+    horas: r.horas,
+    entidad: r.entidad,
+    descripcion: r.descripcion,
+    fecha_inicio: r.fecha_inicio,
+    fecha_fin: r.fecha_fin,
+    estado: r.estado,
+    verificacion: r.verificacion ?? 'HEREDADO',
+    tiene_soporte: Boolean(r.soporte),
+    soporte_nombre: r.soporte?.nombre ?? null,
+    verificado_at: r.verificado?.fecha ?? null,
+    motivo_rechazo: r.verificacion === 'RECHAZADO' ? (r.verificado?.motivo ?? '') : null,
+    cuenta: r.estado === 'VIGENTE' && VERIFICACIONES_QUE_CUENTAN.includes(r.verificacion ?? 'HEREDADO'),
+    createdAt: r.createdAt,
+  }));
+}
+
+export async function verificarServicioSocial(id: string, decision: 'VERIFICAR' | 'RECHAZAR', motivo: string, usuario: UserDocument, ip?: string | null) {
+  exigir(usuario, PUEDEN_VERIFICAR, 'Solo Secretaría, coordinación y el administrador verifican el soporte del servicio social.');
+  const registro = await RegistroServicioSocial.findById(id);
+  if (!registro) throw new ApiError(404, 'Registro no encontrado.');
+  await exigirAlcance(usuario, String(registro.student_id));
+  if (registro.estado === 'ANULADO') throw new ApiError(409, 'El registro está anulado.');
+  if (registro.verificacion !== 'PENDIENTE') throw new ApiError(409, 'Solo se verifica un registro con el soporte pendiente de revisar.');
+  if (!registro.soporte) throw new ApiError(409, 'El registro no tiene soporte que verificar.');
+  if (decision === 'RECHAZAR' && motivo.trim().length < 5) throw new ApiError(400, 'Explica por qué se rechaza el soporte (mínimo 5 caracteres).');
+  registro.verificacion = decision === 'VERIFICAR' ? 'VERIFICADO' : 'RECHAZADO';
+  registro.verificado = { por: usuario._id, fecha: new Date(), motivo: motivo.trim() };
+  await registro.save();
+  await registrarEvento({ usuario_id: usuario._id, accion: decision === 'VERIFICAR' ? 'TITULACION_SERVICIO_SOCIAL_VERIFICADO' : 'TITULACION_SERVICIO_SOCIAL_RECHAZADO', entidad: 'RegistroServicioSocial', entidad_id: registro._id, detalle: `${registro.horas} horas`, ip });
+  await reevaluarPendientes(String(registro.student_id), 'Servicio social verificado', usuario);
+  return registro;
+}
+
+/** Datos para servir el soporte con sesión y permiso; cada descarga se audita (el detalle no lleva el contenido). */
+export async function archivoDeServicioSocial(id: string, usuario: UserDocument, ip?: string | null): Promise<{ ruta: string; nombre: string; mimetype: string }> {
+  exigir(usuario, PUEDEN_CONSULTAR, 'No tienes acceso a la titulación.');
+  const registro = await RegistroServicioSocial.findById(id);
+  if (!registro?.soporte) throw new ApiError(404, 'Soporte no encontrado.');
+  await exigirAlcance(usuario, String(registro.student_id));
+  await registrarEvento({ usuario_id: usuario._id, accion: 'TITULACION_SERVICIO_SOCIAL_SOPORTE_DESCARGADO', entidad: 'RegistroServicioSocial', entidad_id: registro._id, detalle: registro.soporte.nombre, ip });
+  return { ruta: registro.soporte.archivo_path, nombre: registro.soporte.nombre, mimetype: registro.soporte.mimetype };
 }
 
 export async function anularServicioSocial(id: string, motivo: string, usuario: UserDocument, ip?: string | null) {
@@ -194,29 +276,18 @@ export async function registrarSaber11(studentId: string, codigo: string, fecha:
   exigir(usuario, PUEDEN_REGISTRAR, 'Solo Secretaría y el administrador registran las pruebas Saber 11.');
   await exigirEstudiante(studentId);
   await exigirAlcance(usuario, studentId);
+  const registroNormalizado = normalizarRegistroSaber11(codigo);
+  if (!PATRON_REGISTRO_SABER_11.test(registroNormalizado)) throw new ApiError(400, 'El número de registro de Saber 11 empieza por AC y lleva de 8 a 12 dígitos (p. ej. AC23245678).');
+  // Saber 11 se presenta en 11°: a un estudiante de 10° o menos no se le registra.
+  await exigirMatriculaEnGradoDeTitulacion(studentId);
   const registro = await RegistroSaber11.findOneAndUpdate(
     { student_id: studentId },
-    { $set: { codigo_registro: codigo, fecha_presentacion: fecha, registrado_por: usuario._id } },
+    { $set: { codigo_registro: registroNormalizado, fecha_presentacion: fecha, registrado_por: usuario._id } },
     { upsert: true, new: true, setDefaultsOnInsert: true }
   );
   await registrarEvento({ usuario_id: usuario._id, accion: 'TITULACION_SABER11_REGISTRADO', entidad: 'RegistroSaber11', entidad_id: registro._id, detalle: 'Presentación registrada', ip });
   await reevaluarPendientes(studentId, 'Saber 11 registrado', usuario);
   return registro;
-}
-
-export async function registrarCertificadoExterno(entrada: { student_id: string; grado_numero: number; institucion_origen: string; anio?: number | null }, usuario: UserDocument, ip?: string | null) {
-  exigir(usuario, PUEDEN_REGISTRAR, 'Solo Secretaría y el administrador completan la carpeta académica.');
-  await exigirEstudiante(entrada.student_id);
-  await exigirAlcance(usuario, entrada.student_id);
-  try {
-    const registro = await CertificadoGradoExterno.create({ ...entrada, registrado_por: usuario._id });
-    await registrarEvento({ usuario_id: usuario._id, accion: 'TITULACION_CERTIFICADO_EXTERNO_REGISTRADO', entidad: 'CertificadoGradoExterno', entidad_id: registro._id, detalle: `Grado ${entrada.grado_numero}`, ip });
-    await reevaluarPendientes(entrada.student_id, 'Carpeta académica completada', usuario);
-    return registro;
-  } catch (err) {
-    if ((err as { code?: number }).code === 11000) throw new ApiError(409, 'Ese grado ya tiene su certificado registrado.');
-    throw err;
-  }
 }
 
 // --- Consultas ---
@@ -225,10 +296,13 @@ export interface RequisitosDeEstudiante {
   estudiante_id: string;
   grado_numero: number | null;
   horas_servicio_social: number;
+  /** Horas registradas con soporte aún sin verificar: no cuentan todavía. */
+  horas_por_verificar: number;
   horas_requeridas: number | null;
   saber_11: { codigo_registro: string; fecha_presentacion: Date | null } | null;
   paz_y_salvo_confirmado: boolean;
-  grados_sin_certificado: number[];
+  /** Documentos obligatorios del checklist de la matrícula que aún no están aprobados. Solo informa: no bloquea la titulación (se resuelve en la matrícula). */
+  documentos_matricula_pendientes: Array<{ nombre: string; estado: string }>;
   pendientes: Array<{ requisito: string; detalle: string }>;
   alertas: Array<{ requisito: string; detalle: string }>;
   titulaciones: Array<{ academic_year_id: string; titulo: string; estado: EstadoTitulacion; pendientes: Array<{ requisito: string; detalle: string }> }>;
@@ -247,20 +321,22 @@ export async function requisitosDeEstudiante(studentId: string, usuario: UserDoc
   const saber = await RegistroSaber11.findOne({ student_id: studentId });
   const titulaciones = await Titulacion.find({ student_id: studentId }).sort({ createdAt: -1 });
 
-  const grados_sin_certificado = politica ? gradosSinCertificado(politica, hechos.conCertificado) : [];
   const { pendientes, alertas } =
     politica && grado
-      ? evaluarRequisitos({ grado_numero: grado.numero, horas_servicio_social: hechos.horas, presento_saber_11: hechos.saber11, paz_y_salvo_confirmado: hechos.pazYSalvo, grados_sin_certificado }, politica)
+      ? evaluarRequisitos({ grado_numero: grado.numero, horas_servicio_social: hechos.horas, presento_saber_11: hechos.saber11, paz_y_salvo_confirmado: hechos.pazYSalvo }, politica)
       : { pendientes: [], alertas: [] };
 
   return {
     estudiante_id: studentId,
     grado_numero: grado?.numero ?? null,
     horas_servicio_social: hechos.horas,
+    horas_por_verificar: (await RegistroServicioSocial.find({ student_id: studentId, estado: 'VIGENTE', verificacion: 'PENDIENTE' }).select('horas').lean()).reduce((s, r) => s + r.horas, 0),
     horas_requeridas: politica?.servicio_social.activo ? politica.servicio_social.horas_requeridas : null,
     saber_11: saber ? { codigo_registro: saber.codigo_registro, fecha_presentacion: saber.fecha_presentacion } : null,
     paz_y_salvo_confirmado: hechos.pazYSalvo,
-    grados_sin_certificado,
+    documentos_matricula_pendientes: (matricula?.checklist ?? [])
+      .filter((d) => d.obligatorio !== false && d.estado !== 'APROBADO')
+      .map((d) => ({ nombre: d.nombre_personalizado || NOMBRES_DOCUMENTO_MATRICULA[d.tipo_documento] || d.tipo_documento, estado: d.estado })),
     pendientes,
     alertas,
     titulaciones: titulaciones.map((t) => ({ academic_year_id: String(t.academic_year_id), titulo: t.titulo, estado: t.estado, pendientes: t.pendientes })),

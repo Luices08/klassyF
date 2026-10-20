@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { CasillaDrawer, type CasillaEnEdicion } from '../components/notas/CasillaDrawer';
 import { ExcelNotas } from '../components/notas/ExcelNotas';
 import { HistorialImportacionesExcel } from '../components/notas/HistorialImportacionesExcel';
+import { PlanillaDescriptiva } from '../components/notas/PlanillaDescriptiva';
 import { PlanillaNotas } from '../components/notas/PlanillaNotas';
 import { ReabrirPlanillaDrawer } from '../components/notas/ReabrirPlanillaDrawer';
 import { Alert, errorMessage } from '../components/ui/Alert';
@@ -56,14 +57,16 @@ export function NotasPlanillaPage() {
   const periodoVigente = periodos.find((p) => aInputFecha(p.fecha_inicio) <= hoy && hoy <= aInputFecha(p.fecha_fin)) ?? periodos[0];
   const periodo = periodos.find((p) => p.numero === periodoElegido) ?? periodoVigente;
 
-  const consulta = usePlanilla({ teacherAssignmentId: asignacion?._id, periodoNumero: periodo?.numero });
+  const grupo = typeof asignacion?.group_id === 'object' ? asignacion.group_id : null;
+  // Preescolar no tiene notas numéricas (Decreto 2247/1997): esa clase se valora con la planilla descriptiva y no pide la numérica.
+  const esPreescolar = typeof grupo?.grade_id === 'object' && grupo.grade_id.nivel === 'PREESCOLAR';
+  const consulta = usePlanilla({ teacherAssignmentId: esPreescolar ? undefined : asignacion?._id, periodoNumero: periodo?.numero });
   const planilla = consulta.data;
   const guardar = useGuardarCeldas();
   const cerrar = useCerrarPlanilla();
   const reabrir = useReabrirPlanilla();
   const casillas = useCasillasMutaciones();
 
-  const grupo = typeof asignacion?.group_id === 'object' ? asignacion.group_id : null;
   const asignatura = typeof asignacion?.subject_id === 'object' ? asignacion.subject_id : null;
   const pendientes = pendientesDe(cerrar.error);
 
@@ -108,7 +111,7 @@ export function NotasPlanillaPage() {
     <div className="space-y-4">
       <PageHeader
         title="Planilla de notas"
-        subtitle="Digita las notas de tus actividades, revisa los promedios y cierra la planilla del periodo."
+        subtitle={esPreescolar ? 'Preescolar se valora de forma cualitativa: nivel de avance y descriptor de cada niño, sin notas numéricas.' : 'Digita las notas de tus actividades, revisa los promedios y cierra la planilla del periodo.'}
         action={
           planilla && (
             <div className="flex flex-wrap gap-2">
@@ -174,6 +177,8 @@ export function NotasPlanillaPage() {
           <Spinner />
         </div>
       )}
+
+      {esPreescolar && asignacion && periodo && <PlanillaDescriptiva key={`descriptiva-${asignacion._id}-${periodo.numero}`} asignacionId={asignacion._id} periodo={periodo.numero} />}
 
       {planilla && asignacion && periodo && (
         <>

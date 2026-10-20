@@ -48,6 +48,9 @@ router.post('/plantillas/:tipo/restablecer', checkRole(...SECRETARIA_Y_ADMIN), v
 router.put('/plantillas/:tipo', checkRole(...SECRETARIA_Y_ADMIN), validate(v.publicarPlantilla), ctrl.publicarPlantilla);
 
 router.get('/estudiantes/:studentId/matriculas', checkRole(...SECRETARIA_Y_ADMIN), validate(v.matriculasDelEstudiante), ctrl.matriculasDelEstudiante);
+// Emisión por lote (un grupo) y su ZIP. Van antes de `/:id`: no son un id.
+router.post('/lote', checkRole(...SECRETARIA_Y_ADMIN), validate(v.expedirLote), ctrl.expedirLote);
+router.post('/lote/zip', checkRole(...SECRETARIA_Y_ADMIN), validate(v.zipDeLote), ctrl.zipDeLote);
 router.post('/vista-previa', checkRole(...SECRETARIA_Y_ADMIN), validate(v.vistaPrevia), ctrl.vistaPrevia);
 
 // Anulación masiva por elemento comprometido: solo ADMIN, con motivo y su contraseña. Va antes de `/:id` para no confundirse con un id.

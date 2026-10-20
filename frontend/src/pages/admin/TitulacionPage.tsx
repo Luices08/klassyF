@@ -33,9 +33,9 @@ export function TitulacionPage() {
 
       {anio && (
         <Card>
-          <CardHeader title="Consultar a un estudiante" subtitle="Antes del grado de titulación solo se avisa (p. ej. el servicio social desde 10°); en ese grado los requisitos bloquean el título." />
+          <CardHeader title="Consultar a un estudiante" subtitle="La titulación es solo del grado 11. Desde 10° se registran las horas de servicio social y solo se avisa; en 11° los requisitos bloquean el título." />
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <SelectorEstudianteDeGrupo anioId={anio._id} onChange={setConsulta} />
+            <SelectorEstudianteDeGrupo anioId={anio._id} onChange={setConsulta} soloGrados={[10, 11]} />
           </div>
           <div className="mt-3 flex justify-end">
             <Button variant="outline" disabled={!consulta} onClick={() => consulta && setAbierto({ id: consulta.student_id, nombre: consulta.nombre })}>

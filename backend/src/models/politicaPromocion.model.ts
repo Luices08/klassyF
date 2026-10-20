@@ -145,7 +145,7 @@ const politicaPromocionSchema = new Schema<IPoliticaPromocion, PoliticaPromocion
           saber_11: { type: new Schema({ activo: { type: Boolean, default: true } }, { _id: false }), default: () => ({}) },
           paz_y_salvo: { type: new Schema({ activo: { type: Boolean, default: true } }, { _id: false }), default: () => ({}) },
           carpeta_academica: {
-            type: new Schema({ activo: { type: Boolean, default: true }, desde_grado: { type: Number, min: -2, max: 10, default: 1 } }, { _id: false }),
+            type: new Schema({ activo: { type: Boolean, default: false }, desde_grado: { type: Number, min: -2, max: 10, default: 1 } }, { _id: false }),
             default: () => ({}),
           },
         },

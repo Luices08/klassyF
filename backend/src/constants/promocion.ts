@@ -27,6 +27,12 @@ export const PRECEDENCIA_ACCIONES: readonly AccionRegla[] = ['PROPONE_RETIRO', '
  * - INCOMPLETO: falta alguna nota anual y ninguna regla alcanzó a decidir; no se puede cerrar al estudiante.
  * - RETIRO_PROPUESTO: el motor sugiere un retiro de oficio (deserción no formalizada); lo confirma una persona en M04.
  */
+/**
+ * Niveles donde ningún estudiante reprueba ni repite grado: en Preescolar la evaluación es cualitativa y el niño avanza según su ritmo de
+ * desarrollo (Decreto 2247 de 1997; validar la numeración con la norma vigente). El motor los promueve sin mirar notas, reglas ni asistencia.
+ */
+export const NIVELES_SIN_REPROBACION: readonly string[] = ['PREESCOLAR'];
+
 export const RESULTADOS_PROMOCION = [
   'PROMOVIDO',
   'PENDIENTE_RECUPERACION',

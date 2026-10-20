@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { TIPOS_INICIALES } from '../src/constants/certificados';
+import { GRADOS_DE_GRADUACION, TIPOS_INICIALES, esDocumentoDeGraduacion, tipoAplicaAlGrado } from '../src/constants/certificados';
+import { TIPOS_TITULACION } from '../src/constants/tiposTitulacion';
 import { ContenidoPlantilla, contenidoInicial as contenidoDeTipo, requisitosDe } from '../src/constants/plantillasCertificado';
-import { CLAVES_VARIABLES, VARIABLES_CERTIFICADO } from '../src/constants/variablesCertificado';
+import { CLAVES_VARIABLES, VARIABLES_CERTIFICADO, variableAplica } from '../src/constants/variablesCertificado';
 import { SnapshotCertificado } from '../src/utils/certificados';
 import { snapshotDeMuestra } from '../src/utils/muestraCertificado';
 import { enLetras } from '../src/utils/numerosEnLetras';
@@ -62,7 +63,7 @@ describe('plantillas de partida', () => {
         for (const v of variablesDeTexto(b.texto)) {
           expect(CLAVES_VARIABLES.has(v), `${clave}/${b.id}: ${v}`).toBe(true);
           const def = VARIABLES_CERTIFICADO.find((x) => x.clave === v)!;
-          expect(!def.fuente || tipoDe(clave).fuentes.includes(def.fuente), `${clave}/${b.id}: ${v}`).toBe(true);
+          expect(variableAplica(def, tipoDe(clave).fuentes), `${clave}/${b.id}: ${v}`).toBe(true);
         }
       }
     }
@@ -353,5 +354,79 @@ describe('diseño del texto de la plantilla', () => {
     const tipo = tipoDe('CONSTANCIA_ESTUDIO');
     expect(validarContenido(tipo, { ...contenidoInicial('CONSTANCIA_ESTUDIO'), diseno })).toEqual([]);
     expect(validarContenido(tipo, { ...contenidoInicial('CONSTANCIA_ESTUDIO'), diseno: { ...diseno, color_texto: '#EEEEEE' } })).toHaveLength(1);
+  });
+});
+
+describe('tipos de culminación, titulación y retiro', () => {
+  const todos = TIPOS_TITULACION;
+
+  it('el alcance por nivel y grado decide a qué matrículas se ofrece cada documento', () => {
+    expect(tipoAplicaAlGrado({}, 'PRIMARIA', 3)).toBe(true);
+    expect(tipoAplicaAlGrado({ niveles: ['PREESCOLAR'], grados_numeros: [0] }, 'PREESCOLAR', 0)).toBe(true);
+    expect(tipoAplicaAlGrado({ niveles: ['PREESCOLAR'], grados_numeros: [0] }, 'PREESCOLAR', -1)).toBe(false);
+    expect(tipoAplicaAlGrado({ niveles: ['MEDIA'], grados_numeros: [11] }, 'MEDIA', 10)).toBe(false);
+    expect(tipoAplicaAlGrado({ grados_numeros: [5] }, null, null)).toBe(false);
+  });
+
+  it('los documentos de titulación son solo del grado 11 y los de culminación llevan el grado que culminan', () => {
+    for (const clave of ['ACTA_GRADO', 'DIPLOMA_BACHILLER', 'CONSTANCIA_CULMINACION']) expect(todos.find((t) => t.clave === clave)?.grados_numeros).toEqual([11]);
+    const grado = (clave: string) => todos.find((t) => t.clave === clave)?.grados_numeros;
+    expect([grado('DIPLOMA_TRANSICION'), grado('CERTIFICADO_CULMINACION_PRIMARIA'), grado('CERTIFICADO_CULMINACION_BASICA')]).toEqual([[0], [5], [9]]);
+  });
+
+  it('cada tipo sembrado tiene un texto de partida que cumple sus propios mínimos', () => {
+    for (const t of todos) {
+      expect(validarContenido(t, contenidoDeTipo(t)), t.clave).toEqual([]);
+    }
+  });
+
+  it('los prefijos y las claves no se repiten entre los de partida y los complementarios', () => {
+    const prefijos = [...TIPOS_INICIALES, ...todos].map((t) => t.prefijo);
+    expect(new Set(prefijos).size).toBe(prefijos.length);
+    const claves = [...TIPOS_INICIALES, ...todos].map((t) => t.clave);
+    expect(new Set(claves).size).toBe(claves.length);
+  });
+});
+
+describe('vista previa de un documento de culminación', () => {
+  const tipoBasica = TIPOS_TITULACION.find((t) => t.clave === 'CERTIFICADO_CULMINACION_BASICA')!;
+  const tipoPrimaria = TIPOS_TITULACION.find((t) => t.clave === 'CERTIFICADO_CULMINACION_PRIMARIA')!;
+
+  it('el estudiante de muestra cursa el grado del documento y trae su concepto de promoción', () => {
+    const basica = snapshotDeMuestra(tipoBasica, encabezado, AHORA);
+    expect(basica.matricula).toMatchObject({ grado: 'Noveno', nivel: 'SECUNDARIA' });
+    expect(snapshotDeMuestra(tipoPrimaria, encabezado, AHORA).matricula).toMatchObject({ grado: 'Quinto', nivel: 'PRIMARIA' });
+    const ctx = contextoDeVariables(basica, null);
+    expect(ctx['promocion.texto']).toBe('APROBÓ el grado Noveno y es PROMOVIDO al grado Décimo');
+    expect(ctx['matricula.grado']).toBe('Noveno');
+  });
+
+  it('el texto de partida de cada ciclo dice cuál culmina', () => {
+    const texto = (t: typeof tipoBasica) => contenidoDeTipo(t).bloques.map((b) => b.texto).join(' ');
+    expect(texto(tipoBasica)).toMatch(/básica secundaria/);
+    expect(texto(tipoPrimaria)).toMatch(/básica primaria/);
+    expect(texto(tipoBasica)).not.toMatch(/básica primaria/);
+  });
+});
+
+describe('emisión por grupo: solo documentos de graduación en Transición, 5°, 9° y 11°', () => {
+  const porClave = (clave: string) => TIPOS_TITULACION.find((t) => t.clave === clave)!;
+
+  it('los grados donde se gradúa son cuatro', () => {
+    expect([...GRADOS_DE_GRADUACION]).toEqual([0, 5, 9, 11]);
+  });
+
+  it('cada grado tiene sus documentos oficiales y nada más', () => {
+    const paraGrado = (n: number) => TIPOS_TITULACION.filter((t) => esDocumentoDeGraduacion(t) && tipoAplicaAlGrado(t, t.niveles?.[0] ?? null, n)).map((t) => t.clave);
+    expect(paraGrado(0)).toEqual(['DIPLOMA_TRANSICION']);
+    expect(paraGrado(5)).toEqual(['CERTIFICADO_CULMINACION_PRIMARIA']);
+    expect(paraGrado(9)).toEqual(['CERTIFICADO_CULMINACION_BASICA']);
+    expect(paraGrado(11)).toEqual(['ACTA_GRADO', 'DIPLOMA_BACHILLER']);
+  });
+
+  it('la constancia de quien aún no se gradúa y los documentos sueltos no son de graduación', () => {
+    expect(esDocumentoDeGraduacion(porClave('CONSTANCIA_CULMINACION'))).toBe(false);
+    expect(esDocumentoDeGraduacion(porClave('CERTIFICADO_RETIRO'))).toBe(false);
+    expect(esDocumentoDeGraduacion(TIPOS_INICIALES[0]!)).toBe(false);
   });
 });

@@ -7,13 +7,16 @@ import { Drawer } from '../ui/Drawer';
 import { Input } from '../ui/Field';
 import { IconButton } from '../ui/IconButton';
 import { MultiSelect } from '../ui/MultiSelect';
+import { Select } from '../ui/Field';
 import { Spinner } from '../ui/Spinner';
 import { Switch } from '../ui/Switch';
 import { EmptyRow, Table, TableBody, TableHead, Td, Th } from '../ui/Table';
 import { BanIcon, CheckIcon, PencilIcon, PlusIcon, TrashIcon } from '../ui/icons';
 import {
   ETIQUETA_ESTADO_MATRICULA,
+  ETIQUETA_ESTADO_TITULACION,
   ETIQUETA_FUENTE,
+  NIVELES_EDUCATIVOS_TIPO,
   useActivarTipoCertificado,
   useActualizarTipoCertificado,
   useArchivarTipoCertificado,
@@ -26,8 +29,16 @@ import {
   type TipoCertificado,
 } from '../../hooks/useCertificados';
 import { useAuth } from '../../context/AuthContext';
+import { useGrades } from '../../hooks/useCatalogs';
 
-const FUENTES: FuenteCertificado[] = ['VALORACIONES', 'DEPENDENCIAS', 'PAZ_Y_SALVO_SALIDA'];
+const FUENTES: FuenteCertificado[] = ['TITULACION', 'CULMINACION', 'SERVICIO_SOCIAL', 'VALORACIONES', 'DEPENDENCIAS', 'PAZ_Y_SALVO_SALIDA'];
+
+/** «Preescolar · Transición»: el alcance de un tipo en palabras (vacío = todos). */
+const textoDeAlcance = (t: Pick<TipoCertificado, 'niveles' | 'grados_numeros'>, nombresDeGrado: Map<number, string>): string => {
+  const niveles = (t.niveles ?? []).map((n) => NIVELES_EDUCATIVOS_TIPO.find((x) => x.valor === n)?.nombre ?? n);
+  const grados = (t.grados_numeros ?? []).map((n) => nombresDeGrado.get(n) ?? `${n}°`);
+  return [...niveles, ...grados].join(' · ') || 'Todos los grados';
+};
 const ESTADO_TONO: Record<EstadoTipoCertificado, Tone> = { BORRADOR: 'orange', ACTIVO: 'green', ARCHIVADO: 'neutral' };
 const ESTADO_NOMBRE: Record<EstadoTipoCertificado, string> = { BORRADOR: 'Borrador', ACTIVO: 'Activo', ARCHIVADO: 'Archivado' };
 
@@ -53,11 +64,13 @@ export function TiposDocumentoPanel() {
   const [editando, setEditando] = useState<TipoCertificado | 'nuevo' | null>(null);
   const [confirmando, setConfirmando] = useState<{ tipo: TipoCertificado; accion: 'archivar' | 'eliminar' } | null>(null);
   const activar = useActivarTipoCertificado();
+  const grados = useGrades();
 
   if (datos.isLoading) return <Spinner />;
   if (datos.isError) return <Alert tone="error">{errorMessage(datos.error)}</Alert>;
   if (!datos.data) return null;
   const lista = datos.data;
+  const nombresDeGrado = new Map((grados.data ?? []).map((g) => [g.numero, g.nombre]));
 
   return (
     <div className="space-y-4">
@@ -83,6 +96,7 @@ export function TiposDocumentoPanel() {
               <Th>Documento</Th>
               <Th>Prefijo</Th>
               <Th>Estado</Th>
+              <Th>Alcance</Th>
               <Th>Usa</Th>
               <Th>Expedidos</Th>
               <Th>Acciones</Th>
@@ -99,9 +113,10 @@ export function TiposDocumentoPanel() {
                 <Td>
                   <Chip tone={ESTADO_TONO[t.estado]}>{ESTADO_NOMBRE[t.estado]}</Chip>
                 </Td>
+                <Td className="text-xs text-body">{textoDeAlcance(t, nombresDeGrado)}</Td>
                 <Td>
                   <div className="flex flex-wrap gap-1">
-                    {t.fuentes.length === 0 ? <span className="text-xs text-muted">Datos del estudiante</span> : t.fuentes.map((f) => <Chip key={f} tone="blue">{ETIQUETA_FUENTE[f].nombre}</Chip>)}
+                    {t.fuentes.length === 0 ? <span className="text-xs text-muted">Datos del estudiante</span> : t.fuentes.map((f) => <Chip key={f} tone="blue">{ETIQUETA_FUENTE[f]?.nombre ?? f}</Chip>)}
                   </div>
                 </Td>
                 <Td>{t.emitidos}</Td>
@@ -123,18 +138,18 @@ export function TiposDocumentoPanel() {
                 </Td>
               </tr>
             ))}
-            {lista.tipos.length === 0 && <EmptyRow colSpan={6}>No hay tipos de documento. Crea el primero con «Nuevo tipo».</EmptyRow>}
+            {lista.tipos.length === 0 && <EmptyRow colSpan={7}>No hay tipos de documento. Crea el primero con «Nuevo tipo».</EmptyRow>}
           </TableBody>
         </Table>
       </Card>
 
-      {editando && <TipoDrawer key={editando === 'nuevo' ? 'nuevo' : editando.clave} tipo={editando === 'nuevo' ? null : editando} lista={lista} onClose={() => setEditando(null)} />}
+      {editando && <TipoDrawer key={editando === 'nuevo' ? 'nuevo' : editando.clave} tipo={editando === 'nuevo' ? null : editando} lista={lista} nombresDeGrado={nombresDeGrado} onClose={() => setEditando(null)} />}
       {confirmando && <ConfirmacionDrawer tipo={confirmando.tipo} accion={confirmando.accion} onClose={() => setConfirmando(null)} />}
     </div>
   );
 }
 
-function TipoDrawer({ tipo, lista, onClose }: { tipo: TipoCertificado | null; lista: ListaTiposCertificado; onClose: () => void }) {
+function TipoDrawer({ tipo, lista, nombresDeGrado, onClose }: { tipo: TipoCertificado | null; lista: ListaTiposCertificado; nombresDeGrado: Map<number, string>; onClose: () => void }) {
   const crear = useCrearTipoCertificado();
   const actualizar = useActualizarTipoCertificado();
   const [nombre, setNombre] = useState(tipo?.nombre ?? '');
@@ -145,6 +160,10 @@ function TipoDrawer({ tipo, lista, onClose }: { tipo: TipoCertificado | null; li
   const [fuentes, setFuentes] = useState<FuenteCertificado[]>(tipo?.fuentes ?? []);
   const [variables, setVariables] = useState<string[]>(tipo?.variables_obligatorias ?? []);
   const [autoservicio, setAutoservicio] = useState(tipo?.autoservicio_acudiente ?? false);
+  // Alcance: un nivel (o todos) y, si hace falta, grados concretos. Vacío = todos.
+  const [nivel, setNivel] = useState(tipo?.niveles?.[0] ?? '');
+  const [grados, setGrados] = useState<string[]>((tipo?.grados_numeros ?? []).map(String));
+  const [estadosTitulacion, setEstadosTitulacion] = useState<string[]>(tipo?.estados_titulacion ?? []);
 
   // El prefijo y las fuentes son parte de los códigos y del contenido: solo cambian en borrador y sin documentos expedidos.
   const bloqueado = tipo !== null && (tipo.estado !== 'BORRADOR' || tipo.emitidos > 0);
@@ -157,7 +176,17 @@ function TipoDrawer({ tipo, lista, onClose }: { tipo: TipoCertificado | null; li
 
   const enviar = async (e: FormEvent) => {
     e.preventDefault();
-    const base = { nombre: nombre.trim(), descripcion: descripcion.trim(), prefijo: prefijo.trim().toUpperCase(), estados_matricula: estados, fuentes };
+    const base = {
+      nombre: nombre.trim(),
+      descripcion: descripcion.trim(),
+      prefijo: prefijo.trim().toUpperCase(),
+      estados_matricula: estados,
+      fuentes,
+      niveles: nivel ? [nivel] : [],
+      grados_numeros: grados.map(Number),
+      // La situación con que se expide la define el administrador al editar; al crear el tipo se envía como parte del alta.
+      ...(fuentes.includes('TITULACION') && (esAdmin || !tipo) ? { estados_titulacion: estadosTitulacion } : {}),
+    };
     if (tipo) {
       await actualizar.mutateAsync({ clave: tipo.clave, cambios: { ...base, ...(esAdmin ? { variables_obligatorias: variables, autoservicio_acudiente: autoservicio && !fuentes.includes('DEPENDENCIAS') } : {}) } });
     } else {
@@ -208,6 +237,25 @@ function TipoDrawer({ tipo, lista, onClose }: { tipo: TipoCertificado | null; li
         emptyLabel="Elige al menos un estado"
       />
       <div className="space-y-3 rounded-lg border border-border p-3">
+        <p className="text-sm font-semibold text-ink">A qué grados se ofrece</p>
+        <Select label="Nivel" value={nivel} onChange={(e) => setNivel(e.target.value)}>
+          <option value="">Todos los niveles</option>
+          {NIVELES_EDUCATIVOS_TIPO.map((n) => (
+            <option key={n.valor} value={n.valor}>
+              {n.nombre}
+            </option>
+          ))}
+        </Select>
+        <MultiSelect
+          label="Grados concretos (opcional)"
+          options={[...nombresDeGrado.entries()].sort((a, b) => a[0] - b[0]).map(([numero, nombre]) => ({ value: String(numero), label: nombre }))}
+          selected={grados}
+          onChange={setGrados}
+          allLabel="Todos los grados del nivel"
+        />
+        <p className="text-xs text-muted">El documento solo se ofrece a matrículas de estos grados. Para uno de culminación (Transición, 5° o 9°) elige el grado que culmina.</p>
+      </div>
+      <div className="space-y-3 rounded-lg border border-border p-3">
         <p className="text-sm font-semibold text-ink">Qué datos de otros módulos usa</p>
         <p className="text-xs text-muted">Sin nada encendido, el documento usa solo los datos del colegio, el estudiante y su matrícula. El sistema nunca inventa datos: el texto solo los coloca.</p>
         {FUENTES.map((f) => (
@@ -222,6 +270,15 @@ function TipoDrawer({ tipo, lista, onClose }: { tipo: TipoCertificado | null; li
           />
         ))}
       </div>
+      {fuentes.includes('TITULACION') && (esAdmin || !tipo) && (
+        <MultiSelect
+          label="Se expide cuando el estudiante está…"
+          options={Object.entries(ETIQUETA_ESTADO_TITULACION).map(([valor, etiqueta]) => ({ value: valor, label: etiqueta }))}
+          selected={estadosTitulacion}
+          onChange={setEstadosTitulacion}
+          emptyLabel="Elige al menos una situación"
+        />
+      )}
       {esAdmin && tipo && (
         <Switch
           label="El acudiente lo genera desde su portal"

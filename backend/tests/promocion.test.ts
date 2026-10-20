@@ -339,3 +339,48 @@ describe('materias imprescindibles y simulador «Pruébalo»', () => {
     expect(entradaDeCasoSimulado(caso, pol, { aplica: true, max_asignaturas_pendientes: 2 }, 3).max_recuperables).toBe(2);
   });
 });
+
+describe('Preescolar: nadie reprueba (Decreto 2247 de 1997)', () => {
+  const duras = politica(
+    [
+      regla({ clave: 'una-perdida', condiciones: [{ tipo: 'PERDIDAS_AL_MENOS', n: 1, filtro: 'TODAS' }], accion: 'NO_PROMUEVE' }),
+      regla({ clave: 'inasistencia', condiciones: [{ tipo: 'PERDIDAS_AL_MENOS', n: 0, filtro: 'TODAS' }], accion: 'PROPONE_RETIRO' }),
+    ],
+    { piar: { derivar_a_comision: true }, sin_regla: { cierre: 'NO_PROMUEVE', tras_recuperacion: 'NO_PROMUEVE' } }
+  );
+  const preescolar = (asignaturas: AsignaturaEntrada[], extra: Partial<EntradaPromocion> = {}) => entrada(asignaturas, { nivel: 'PREESCOLAR', grado_id: 'g0', ...extra });
+
+  it('promueve con la política más estricta, con notas bajas, sin notas y con inasistencia total', () => {
+    for (const e of [
+      preescolar([asig('a', 1), asig('b', 1.5)], { inasistencia_global_total_pct: 90, inasistencia_global_injustificada_pct: 90 }),
+      preescolar([asig('a', null), asig('b', null)]),
+      preescolar([], { tiene_piar: true }),
+    ]) {
+      for (const momento of ['CIERRE', 'TRAS_RECUPERACION'] as const) {
+        const r = evaluarPromocion(e, duras, momento);
+        expect(r.resultado).toBe('PROMOVIDO');
+        expect(r.perdidas).toEqual([]);
+        expect(r.a_recuperar).toEqual([]);
+        expect(r.sin_nota).toEqual([]);
+      }
+    }
+  });
+
+  it('nunca queda INCOMPLETO por falta de notas, y la explicación dice por qué', () => {
+    const r = evaluarPromocion(preescolar([asig('a', null)]), politicaInicial(), 'CIERRE');
+    expect(r.resultado).toBe('PROMOVIDO');
+    expect(r.motivos.join(' ')).toMatch(/Preescolar/);
+  });
+
+  it('no renovar el cupo es de permanencia, no académico: se conserva sin tocar el resultado', () => {
+    const pol = politica([regla({ clave: 'cupo', condiciones: [{ tipo: 'FALTAS_CONVIVENCIA_AL_MENOS', n: 1, gravedad: 'III' }], accion: 'NO_RENUEVA_CUPO' }) as never]);
+    const r = evaluarPromocion(preescolar([asig('a', 1)], { faltas_por_gravedad: { III: 2 } }), pol, 'CIERRE');
+    expect(r.resultado).toBe('PROMOVIDO');
+    expect(r.no_renueva_cupo).toBe(true);
+  });
+
+  it('en primaria la misma política sí reprueba (el nivel es lo que decide)', () => {
+    const soloReprueba = politica([regla({ clave: 'una-perdida', condiciones: [{ tipo: 'PERDIDAS_AL_MENOS', n: 1, filtro: 'TODAS' }], accion: 'NO_PROMUEVE' })]);
+    expect(evaluarPromocion(entrada([asig('a', 1)], { nivel: 'PRIMARIA' }), soloReprueba, 'CIERRE').resultado).toBe('NO_PROMOVIDO');
+  });
+});

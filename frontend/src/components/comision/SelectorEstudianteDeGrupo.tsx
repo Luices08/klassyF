@@ -11,8 +11,9 @@ export interface EstudianteElegido {
 }
 
 /** Elige un estudiante por su grupo (un select de todos los estudiantes del colegio sería ilegible): primero el grupo, luego la persona. */
-export function SelectorEstudianteDeGrupo({ anioId, onChange }: { anioId: string; onChange: (e: EstudianteElegido | null) => void }) {
-  const grupos = useGroups({ academic_year_id: anioId });
+export function SelectorEstudianteDeGrupo({ anioId, onChange, soloGrados }: { anioId: string; onChange: (e: EstudianteElegido | null) => void; /** Números de grado que se ofrecen (p. ej. [10, 11] en Titulación); sin esto, todos. */ soloGrados?: number[] }) {
+  const todos = useGroups({ academic_year_id: anioId });
+  const grupos = { ...todos, data: soloGrados ? (todos.data ?? []).filter((g) => typeof g.grade_id === 'object' && soloGrados.includes(g.grade_id.numero)) : todos.data };
   const [grupoId, setGrupoId] = useState('');
   const [matriculaId, setMatriculaId] = useState('');
   const matriculas = useEnrollmentsList({ academic_year_id: anioId, group_id: grupoId, limit: 100 }, Boolean(grupoId));

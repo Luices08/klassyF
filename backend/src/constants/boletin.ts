@@ -249,3 +249,6 @@ export const PLANTILLA_BOLETIN_INICIAL: PlantillaBoletin = {
   ],
   pie_texto: '',
 };
+
+/** El informe final del año (M33) se publica a las familias aparte del boletín de cada periodo; comparte la publicación con este número de periodo. */
+export const PERIODO_INFORME_FINAL = 0;

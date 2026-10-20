@@ -251,15 +251,10 @@ export interface DestinoResuelto {
   frase: string;
 }
 
-/** Por qué no se puede usar una opción que toma la entidad de otro módulo. */
+/** Lo que se le pide a quien expide cuando elige una opción que lleva una entidad. */
 const SIN_ENTIDAD: Record<FuenteEntidad, string> = {
-  EPS: 'El estudiante no tiene una EPS registrada con la autorización de datos sensibles (M03): elige «Otro» y escribe la entidad.',
+  EPS: 'Escribe el nombre de la EPS que irá en el documento.',
 };
-
-/** Lo que el servicio leyó de otros módulos para las opciones que toman la entidad de ahí (vacío = no hay dato o no hay autorización). */
-export type EntidadesDisponibles = Partial<Record<FuenteEntidad, string | null>>;
-
-export const motivoSinEntidad = (fuente: FuenteEntidad): string => SIN_ENTIDAD[fuente];
 
 /**
  * Convierte lo elegido en el selector en el texto que queda congelado. Sin nada, o con «Otro» sin texto, se asume la
@@ -267,9 +262,8 @@ export const motivoSinEntidad = (fuente: FuenteEntidad): string => SIN_ENTIDAD[f
  */
 export function resolverDestinatario(
   def: { nombre: string; destinatarios: OpcionDestinatario[]; frase_otro: string },
-  solicitado: { clave?: string | null; otro?: string | null } | null | undefined,
-  entidades: EntidadesDisponibles = {}
-): DestinoResuelto | { error: string; sin_dato?: boolean } {
+  solicitado: { clave?: string | null; otro?: string | null } | null | undefined
+): DestinoResuelto | { error: string } {
   const predeterminada = def.destinatarios[0] as (typeof def.destinatarios)[number];
   const clave = solicitado?.clave?.trim() || predeterminada.clave;
   const otro = solicitado?.otro?.trim() ?? '';
@@ -280,8 +274,9 @@ export function resolverDestinatario(
   const opcion = def.destinatarios.find((o) => o.clave === clave);
   if (!opcion) return { error: `«${clave}» no es un destinatario válido para «${def.nombre}».` };
   if (opcion.fuente_entidad) {
-    const entidad = entidades[opcion.fuente_entidad]?.trim();
-    if (!entidad) return { error: SIN_ENTIDAD[opcion.fuente_entidad], sin_dato: true };
+    // La entidad la escribe quien expide, en el mismo documento: no se lee del expediente del estudiante (datos de salud, M03).
+    const entidad = otro;
+    if (!entidad) return { error: SIN_ENTIDAD[opcion.fuente_entidad] };
     return { clave: opcion.clave, etiqueta: entidad, frase: opcion.frase.replace(MARCA_ENTIDAD, entidad) };
   }
   return { clave: opcion.clave, etiqueta: opcion.etiqueta, frase: opcion.frase };

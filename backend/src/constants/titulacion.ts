@@ -21,6 +21,9 @@ export type EstadoTitulacion = (typeof ESTADOS_TITULACION)[number];
  */
 export const GRADO_TITULACION = 11;
 
+/** Los grados en que se presta el servicio social estudiantil obligatorio (décimo y once). */
+export const GRADOS_SERVICIO_SOCIAL: readonly number[] = [10, GRADO_TITULACION];
+
 /**
  * Servicio social estudiantil obligatorio (Ley 115/1994 art. 97, Res. 4210/1996): se presta en los grados 10 y 11 y cada tanda de horas lleva su
  * soporte (certificado de la entidad). Solo suman las horas con soporte verificado; `HEREDADO` son las tandas registradas antes de que existiera

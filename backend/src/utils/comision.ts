@@ -138,3 +138,24 @@ export function actaCompleta(miembros: readonly MiembroParaFirma[], requeridas: 
 export function quorumDeSesion(miembros: readonly { asistio: boolean }[], porcentaje: number): Quorum {
   return calcularQuorum(miembros.length, miembros.filter((m) => m.asistio).length, porcentaje);
 }
+
+/** La causal del SIEE tal como quedó guardada en el cierre de promoción del estudiante (M19): por qué salió ese resultado, para imprimirla en el acta. */
+export interface CausalSiee {
+  motivos: string[];
+  reglas: string[];
+  perdidas: string[];
+}
+
+const textos = (valor: unknown): string[] => (Array.isArray(valor) ? valor.filter((v): v is string => typeof v === 'string' && v.trim() !== '') : []);
+const nombres = (valor: unknown): string[] =>
+  Array.isArray(valor) ? valor.map((v) => (v && typeof v === 'object' ? (v as { nombre?: unknown }).nombre : null)).filter((n): n is string => typeof n === 'string' && n.trim() !== '') : [];
+
+/**
+ * Lee del `detalle` congelado del cierre lo que el acta debe decir: las frases del motor, las reglas del SIEE que se aplicaron y las asignaturas o áreas
+ * perdidas. No recalcula nada: un cierre es inmutable, así que un acta firmada no cambia de contenido con el tiempo. Un detalle que no tiene esa forma
+ * (cierres de otra versión) da listas vacías en lugar de fallar.
+ */
+export function causalDeCierre(detalle: unknown): CausalSiee {
+  const d = detalle && typeof detalle === 'object' ? (detalle as Record<string, unknown>) : {};
+  return { motivos: textos(d.motivos), reglas: nombres(d.reglas_disparadas), perdidas: nombres(d.perdidas) };
+}

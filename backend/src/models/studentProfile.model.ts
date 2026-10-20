@@ -31,6 +31,11 @@ export interface IAutorizacionDatosSensibles {
 export interface IStudentProfile {
   user_id: Types.ObjectId;
   // Identificacion
+  /** El nombre desglosado que exige SIMAT: «nombre» y «apellido» del usuario siguen siendo lo que se muestra. Opcionales: nunca se parten a la fuerza. */
+  primer_nombre?: string;
+  segundo_nombre?: string;
+  primer_apellido?: string;
+  segundo_apellido?: string;
   lugar_expedicion?: string;
   fecha_nacimiento: Date;
   genero?: Genero;
@@ -75,6 +80,10 @@ const autorizacionDatosSensiblesSchema = new Schema<IAutorizacionDatosSensibles>
 const studentProfileSchema = new Schema<IStudentProfile, StudentProfileModel>(
   {
     user_id: { type: Schema.Types.ObjectId, ref: 'User', required: true, unique: true },
+    primer_nombre: { type: String, trim: true, maxlength: 60 },
+    segundo_nombre: { type: String, trim: true, maxlength: 60 },
+    primer_apellido: { type: String, trim: true, maxlength: 60 },
+    segundo_apellido: { type: String, trim: true, maxlength: 60 },
     lugar_expedicion: { type: String, trim: true },
     fecha_nacimiento: { type: Date, required: true },
     genero: { type: String, enum: GENEROS },

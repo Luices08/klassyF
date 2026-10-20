@@ -105,13 +105,8 @@ describe('M26 certificados (con base de datos)', () => {
     expect([apagado.firmas.rectoria.aplicada, apagado.firmas.secretaria.aplicada, apagado.firmas.sello.aplicado]).toEqual([true, false, false]);
   });
 
-  it('la firma de Rectoría nace sin delegar: la secretaría solo la estampa mientras el administrador lo permita', async () => {
-    expect((await configuracion.vistaConfiguracion(e.admin)).permitir_firma_rectoria_a_secretaria).toBe(false);
-    await expect(expedir({ firmas: { rectoria: true } })).rejects.toMatchObject({ statusCode: 409 });
-    await configuracion.actualizarConfiguracion({ permitir_firma_rectoria_a_secretaria: true }, e.admin);
+  it('la secretaría estampa la firma de Rectoría sin necesitar delegación: en el colegio real la secretaría expide los documentos', async () => {
     await expect(expedir({ firmas: { rectoria: true } })).resolves.toBeDefined();
-    await configuracion.actualizarConfiguracion({ permitir_firma_rectoria_a_secretaria: false }, e.admin);
-    await expect(expedir({ firmas: { rectoria: true } })).rejects.toMatchObject({ statusCode: 409 });
     await expect(expedir({ firmas: { rectoria: true } }, e.admin)).resolves.toBeDefined();
   });
 
@@ -122,11 +117,10 @@ describe('M26 certificados (con base de datos)', () => {
     await expect(expedir()).rejects.toThrow(/imagen/);
   });
 
-  it('la delegación, la política, el rector y las dependencias son solo del administrador', async () => {
-    await expect(configuracion.actualizarConfiguracion({ permitir_firma_rectoria_a_secretaria: false }, e.secretaria)).rejects.toMatchObject({ statusCode: 403 });
-    await expect(configuracion.actualizarConfiguracion({ politica: { PAZ_SALVO: { sello: 'NO_APLICA' } } }, e.secretaria)).rejects.toMatchObject({ statusCode: 403 });
+  it('la secretaría ajusta la política y las dependencias; quién es el rector es solo del administrador y los demás roles no tocan nada', async () => {
+    await expect(configuracion.actualizarConfiguracion({ politica: { PAZ_SALVO: { sello: 'NO_APLICA' } } }, e.secretaria)).resolves.toBeDefined();
+    await expect(configuracion.actualizarConfiguracion({ paz_y_salvo: { dependencias: [{ nombre: 'Cafetería', activa: true }] } }, e.secretaria)).resolves.toBeDefined();
     await expect(configuracion.actualizarConfiguracion({ rectoria: { cargo: 'Rectora' } }, e.secretaria)).rejects.toMatchObject({ statusCode: 403 });
-    await expect(configuracion.actualizarConfiguracion({ paz_y_salvo: { dependencias: [{ nombre: 'Cafetería', activa: true }] } }, e.secretaria)).rejects.toMatchObject({ statusCode: 403 });
     await expect(configuracion.actualizarConfiguracion({ permitir_firma_rectoria_a_secretaria: false }, e.docenteDeClase)).rejects.toMatchObject({ statusCode: 403 });
   });
 
@@ -142,17 +136,13 @@ describe('M26 certificados (con base de datos)', () => {
     expect(auditadas).toBe(3);
   });
 
-  it('secretaría carga la firma de Rectoría solo mientras el administrador mantenga la delegación', async () => {
+  it('secretaría carga, ve y quita la imagen de la firma de Rectoría', async () => {
     const png = await QRCode.toBuffer('firma-rector', { margin: 1, width: 200 });
     const archivo = { ...imagen('rector.png'), buffer: png, size: png.length };
-    await expect(configuracion.guardarImagen('rectoria', archivo, e.secretaria)).rejects.toMatchObject({ statusCode: 403 });
-    await configuracion.actualizarConfiguracion({ permitir_firma_rectoria_a_secretaria: true }, e.admin);
     await expect(configuracion.guardarImagen('rectoria', archivo, e.secretaria)).resolves.toBeDefined();
-    await configuracion.actualizarConfiguracion({ permitir_firma_rectoria_a_secretaria: false }, e.admin);
-    await expect(configuracion.guardarImagen('rectoria', archivo, e.secretaria)).rejects.toMatchObject({ statusCode: 403 });
-    await expect(configuracion.quitarImagen('rectoria', e.secretaria)).rejects.toMatchObject({ statusCode: 403 });
-    await expect(configuracion.rutaImagenVigente('rectoria', e.secretaria)).rejects.toMatchObject({ statusCode: 403 });
+    await expect(configuracion.rutaImagenVigente('rectoria', e.secretaria)).resolves.toMatch(/\.png$/);
     await expect(configuracion.rutaImagenVigente('rectoria', e.admin)).resolves.toMatch(/\.png$/);
+    await expect(configuracion.quitarImagen('rectoria', e.secretaria)).resolves.toBeDefined();
   });
 
   it('otros roles no ven ni cargan firmas', async () => {
@@ -164,7 +154,7 @@ describe('M26 certificados (con base de datos)', () => {
     const delAdmin = await configuracion.vistaConfiguracion(e.admin);
     expect(delAdmin.puede.ajustes).toBe(true);
     const delaSecretaria = await configuracion.vistaConfiguracion(e.secretaria);
-    expect(delaSecretaria.puede).toEqual({ imagen: { rectoria: false, secretaria: true, sello: true }, designar: { rectoria: false, secretaria: true }, ajustes: false });
+    expect(delaSecretaria.puede).toEqual({ imagen: { rectoria: true, secretaria: true, sello: true }, designar: { rectoria: false, secretaria: true }, ajustes: true });
     expect(delaSecretaria.tipos.map((t) => t.clave)).toEqual(['CONSTANCIA_ESTUDIO', 'CERTIFICADO_MATRICULA', 'PAZ_SALVO', 'CERTIFICADO_ESTUDIOS', ...CLAVES_COMPLEMENTARIOS]);
     expect(delaSecretaria.tipos[0]!.destinatarios.at(-1)).toMatchObject({ clave: 'OTRO' });
   });
@@ -195,8 +185,9 @@ describe('M26 certificados (con base de datos)', () => {
     expect(porDefecto).toMatchObject({ destinatario: 'A quien interese', destino: { clave: 'A_QUIEN_INTERESE' } });
     const caja = (await expedir({ destinatario: { clave: 'CAJA_COMPENSACION' } })).snapshot as typeof porDefecto;
     expect(caja.destino.frase).toContain('Caja de Compensación Familiar');
-    // La opción de EPS toma el nombre de M03: sin EPS registrada no se puede elegir (ver fichaCertificado.int.test.ts).
-    await expect(expedir({ destinatario: { clave: 'EPS' } })).rejects.toMatchObject({ statusCode: 409 });
+    // La opción de EPS no nombra una entidad: dice «la EPS o la ADRES» (ver fichaCertificado.int.test.ts).
+    const eps = (await expedir({ destinatario: { clave: 'EPS' } })).snapshot as typeof porDefecto;
+    expect(eps.destino.frase).toContain('Entidad Promotora de Salud (EPS) o la ADRES');
     const otro = (await expedir({ destinatario: { clave: 'OTRO', otro: 'Compensar' } })).snapshot as typeof porDefecto;
     expect(otro).toMatchObject({ destinatario: 'Compensar', destino: { frase: 'Se expide para presentar ante Compensar' } });
     await expect(expedir({ destinatario: { clave: 'RETIRO_TRASLADO' } })).rejects.toMatchObject({ statusCode: 400 });
@@ -536,7 +527,7 @@ describe('M26 certificados (con base de datos)', () => {
       const invalido = await contenidoVigente();
       invalido.bloques.find((b) => b.id === 'cuerpo')!.texto = 'Que {{estudiante.edad}}';
       await expect(pdf.generarVistaPreviaDePlantillaPdf('CONSTANCIA_ESTUDIO', invalido, e.admin)).rejects.toMatchObject({ statusCode: 400 });
-      await expect(pdf.generarVistaPreviaDePlantillaPdf('CONSTANCIA_ESTUDIO', await contenidoVigente(), e.secretaria)).rejects.toMatchObject({ statusCode: 403 });
+      await expect(pdf.generarVistaPreviaDePlantillaPdf('CONSTANCIA_ESTUDIO', await contenidoVigente(), e.secretaria)).resolves.toBeDefined();
       await expect(pdf.generarVistaPreviaDePlantillaPdf('CONSTANCIA_ESTUDIO', await contenidoVigente(), e.docenteDeClase)).rejects.toMatchObject({ statusCode: 403 });
     });
 

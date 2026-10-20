@@ -696,6 +696,10 @@ export interface AutorizacionDatosSensibles {
 export interface StudentProfile {
   _id: string;
   user_id: string;
+  primer_nombre?: string | null;
+  segundo_nombre?: string | null;
+  primer_apellido?: string | null;
+  segundo_apellido?: string | null;
   lugar_expedicion?: string | null;
   fecha_nacimiento: string;
   genero?: Genero;

@@ -142,6 +142,10 @@ export const PALABRAS_CLAVE_POR_RUTA: Record<string, { descripcion: string; clav
     descripcion: 'Promoción y cierre del año: política del colegio (SIEE), cierre de la promoción por grupo y paso de los estudiantes al año siguiente.',
     claves: ['promocion', 'promover', 'cierre del año', 'cerrar el año', 'reprobar', 'perdio el año', 'no promovido', 'repitente', 'año siguiente', 'rollover', 'pre matricula', 'reservar cupos', 'reglas de promocion', 'siee'],
   },
+  '/admin/reportes-cierre': {
+    descripcion: 'Reportes de cierre anual: sábana de calificaciones en Excel y PDF por año, sede, jornada, grado o grupo, e informe final del año por grupo con su publicación para las familias, y listados de estudiantes en recuperación final, de retirados del servicio social de décimo y once, la plantilla de cierre para SIMAT el balance anual de inclusión (PIAR) y el libro de calificaciones foliado.',
+    claves: ['sabana', 'sábana', 'sabana de notas', 'matriz de calificaciones', 'calificaciones finales', 'notas finales', 'exportar notas', 'reporte de cierre', 'excel de notas', 'consolidado de notas', 'informe final', 'informe final del año', 'boletín final', 'publicar informe final', 'recuperación final', 'estudiantes en recuperación', 'nivelación', 'retirados', 'desertores', 'deserción', 'servicio social', 'horas de servicio social', 'consolidado de servicio social', 'simat', 'cierre simat', 'plantilla simat', 'reporte al ministerio', 'balance de inclusión', 'balance piar', 'informe anual de inclusión', 'libro de calificaciones', 'registro escolar', 'folios', 'libro de notas'],
+  },
   '/admin/promocion-anticipada': {
     descripcion: 'Promoción anticipada de estudiantes destacados y reiniciantes, con consentimiento, resolución rectoral y paso de grado.',
     claves: ['promocion anticipada', 'adelantar de grado', 'saltar de grado', 'reiniciante', 'resolucion rectoral', 'subir de grado', 'rendimiento excepcional'],

@@ -15,12 +15,12 @@ const NOMBRE_NIVEL_NACIONAL = { SUPERIOR: 'Superior', ALTO: 'Alto', BASICO: 'Bá
 const OPACIDAD_MARCA_DE_AGUA = 0.07;
 
 /** Las tres familias de letra que trae el PDF: normal, negrita y cursiva de cada una. */
-const FUENTES: Record<FuenteBoletin, { n: string; b: string; i: string }> = {
+export const FUENTES: Record<FuenteBoletin, { n: string; b: string; i: string }> = {
   SANS: { n: 'Helvetica', b: 'Helvetica-Bold', i: 'Helvetica-Oblique' },
   SERIF: { n: 'Times-Roman', b: 'Times-Bold', i: 'Times-Italic' },
   MONO: { n: 'Courier', b: 'Courier-Bold', i: 'Courier-Oblique' },
 };
-const ESCALA_TEXTO: Record<TamanoTextoBoletin, number> = { PEQUENO: 0.9, NORMAL: 1, GRANDE: 1.12 };
+export const ESCALA_TEXTO: Record<TamanoTextoBoletin, number> = { PEQUENO: 0.9, NORMAL: 1, GRANDE: 1.12 };
 
 /**
  * La letra y el tamaño del colegio. Son del documento que se está dibujando: `renderizarBoletines` los fija antes de dibujar y todo el dibujo es
@@ -62,7 +62,7 @@ function titulo({ doc, p }: Contexto, texto: string, altoContenido = 24): void {
 }
 
 /** El escudo grande y tenue detrás del contenido: se pinta al abrir cada hoja, sin mover el cursor de texto. */
-function dibujarMarcaDeAgua(doc: Documento, escudo: Buffer, tamano: number): void {
+export function dibujarMarcaDeAgua(doc: Documento, escudo: Buffer, tamano: number): void {
   const lado = Math.min(tamano * 4, doc.page.width - MARGEN * 2, 360);
   const yGuardado = doc.y;
   doc.save();
@@ -508,7 +508,7 @@ function dibujarBoletin(c: Contexto, muestra: boolean): void {
   pie(c);
 }
 
-function nuevoDocumento(papel: PlantillaBoletin['papel']): { doc: Documento; listo: Promise<Buffer> } {
+export function nuevoDocumento(papel: PlantillaBoletin['papel']): { doc: Documento; listo: Promise<Buffer> } {
   const doc = new PDFDocument({ size: papel, margins: { top: MARGEN, left: MARGEN, right: MARGEN, bottom: 50 }, autoFirstPage: false });
   const partes: Buffer[] = [];
   doc.on('data', (parte: Buffer) => partes.push(parte));
@@ -519,7 +519,7 @@ function nuevoDocumento(papel: PlantillaBoletin['papel']): { doc: Documento; lis
   return { doc, listo };
 }
 
-const limpiarNombre = (texto: string): string => texto.normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^A-Za-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+export const limpiarNombre = (texto: string): string => texto.normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^A-Za-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
 
 export interface OpcionesBoletin {
   muestra?: boolean;

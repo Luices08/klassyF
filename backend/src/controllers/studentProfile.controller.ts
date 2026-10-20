@@ -24,6 +24,10 @@ interface AutorizacionDatosSensiblesBody {
 }
 
 interface UpsertProfileBody {
+  primer_nombre?: string;
+  segundo_nombre?: string;
+  primer_apellido?: string;
+  segundo_apellido?: string;
   lugar_expedicion?: string;
   fecha_nacimiento: string | Date;
   genero?: Genero;

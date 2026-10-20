@@ -45,6 +45,10 @@ const FORM_VACIO = {
   numero_documento: '',
   nombre: '',
   apellido: '',
+  primer_nombre: '',
+  segundo_nombre: '',
+  primer_apellido: '',
+  segundo_apellido: '',
   lugar_expedicion: '',
   fecha_nacimiento: '',
   genero: '' as Genero | '',
@@ -145,6 +149,10 @@ export function StudentsPage() {
         apellido: form.apellido.trim(),
         email: form.email.trim() || undefined,
         password: form.password.trim() || undefined,
+        primer_nombre: form.primer_nombre.trim() || undefined,
+        segundo_nombre: form.segundo_nombre.trim() || undefined,
+        primer_apellido: form.primer_apellido.trim() || undefined,
+        segundo_apellido: form.segundo_apellido.trim() || undefined,
         lugar_expedicion: form.lugar_expedicion.trim() || undefined,
         fecha_nacimiento: form.fecha_nacimiento,
         genero: form.genero || undefined,
@@ -355,6 +363,10 @@ export function StudentsPage() {
               value={form.apellido}
               onChange={(e) => setForm((f) => ({ ...f, apellido: e.target.value }))}
             />
+            <Input label="Primer nombre" value={form.primer_nombre} maxLength={60} onChange={(e) => setForm((f) => ({ ...f, primer_nombre: e.target.value }))} hint="Opcional: los reportes oficiales (SIMAT) piden el nombre separado." />
+            <Input label="Segundo nombre" value={form.segundo_nombre} maxLength={60} onChange={(e) => setForm((f) => ({ ...f, segundo_nombre: e.target.value }))} />
+            <Input label="Primer apellido" value={form.primer_apellido} maxLength={60} onChange={(e) => setForm((f) => ({ ...f, primer_apellido: e.target.value }))} />
+            <Input label="Segundo apellido" value={form.segundo_apellido} maxLength={60} onChange={(e) => setForm((f) => ({ ...f, segundo_apellido: e.target.value }))} />
             <Select
               label="Tipo de documento"
               value={form.tipo_documento}

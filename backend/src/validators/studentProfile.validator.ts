@@ -14,6 +14,10 @@ export const upsertProfile: ValidationSchema = {
     userId: objectId.required(),
   }),
   body: Joi.object({
+    primer_nombre: Joi.string().trim().max(60).allow('', null),
+    segundo_nombre: Joi.string().trim().max(60).allow('', null),
+    primer_apellido: Joi.string().trim().max(60).allow('', null),
+    segundo_apellido: Joi.string().trim().max(60).allow('', null),
     lugar_expedicion: Joi.string().allow('', null),
     fecha_nacimiento: Joi.date().required(),
     genero: Joi.string().valid(...GENEROS),

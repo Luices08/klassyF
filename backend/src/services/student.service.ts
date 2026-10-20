@@ -265,6 +265,10 @@ export async function importarEstudiantesCsv(buffer: Buffer, registradoPorId: Ty
 
       await StudentProfile.create({
         user_id: student._id,
+        primer_nombre: r.primer_nombre || undefined,
+        segundo_nombre: r.segundo_nombre || undefined,
+        primer_apellido: r.primer_apellido || undefined,
+        segundo_apellido: r.segundo_apellido || undefined,
         fecha_nacimiento: fechaNacimiento,
         genero,
         rh,
@@ -345,6 +349,10 @@ export interface CrearEstudianteCompletoInput {
   email?: string;
   password?: string;
   telefono?: string;
+  primer_nombre?: string;
+  segundo_nombre?: string;
+  primer_apellido?: string;
+  segundo_apellido?: string;
   lugar_expedicion?: string;
   fecha_nacimiento: string | Date;
   genero?: Genero;
@@ -434,6 +442,10 @@ export async function crearEstudianteCompleto(
       [
         {
           user_id: studentUser._id,
+          primer_nombre: input.primer_nombre?.trim() || undefined,
+          segundo_nombre: input.segundo_nombre?.trim() || undefined,
+          primer_apellido: input.primer_apellido?.trim() || undefined,
+          segundo_apellido: input.segundo_apellido?.trim() || undefined,
           lugar_expedicion: input.lugar_expedicion?.trim() || undefined,
           fecha_nacimiento: new Date(input.fecha_nacimiento),
           genero: input.genero || undefined,

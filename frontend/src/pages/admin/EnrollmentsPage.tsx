@@ -1,11 +1,11 @@
-import { type FormEvent, useEffect, useState } from 'react';
+import { type FormEvent, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Alert, errorMessage } from '../../components/ui/Alert';
 import { Chip, CupoBadge, EstadoMatriculaBadge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import { Card, CardHeader } from '../../components/ui/Card';
 import { Drawer } from '../../components/ui/Drawer';
-import { Input, Select } from '../../components/ui/Field';
+import { Input, Select, Textarea } from '../../components/ui/Field';
 import { IconButton } from '../../components/ui/IconButton';
 import { CatalogoDocumentosMatricula } from '../../components/matriculas/CatalogoDocumentosMatricula';
 import { PageHeader } from '../../components/ui/PageHeader';
@@ -16,10 +16,11 @@ import { EyeIcon, PlusIcon, SearchIcon } from '../../components/ui/icons';
 import { useAuth } from '../../context/AuthContext';
 import { useAnioDeTrabajo } from '../../hooks/useAniosLectivos';
 import { useCampuses, useGrades, useJornadas } from '../../hooks/useCatalogs';
-import { useCreateEnrollment, useEnrollmentsList, useSituacionEstudiantes, useCargarDocumentoMatricula, type EnrollmentsFilter } from '../../hooks/useEnrollments';
+import { useCreateEnrollment, useEnrollmentsList, useEstudiantesPorGrado, useCargarDocumentoMatricula, type EnrollmentsFilter } from '../../hooks/useEnrollments';
 import { useGroups } from '../../hooks/useGroups';
 import { useInstitution } from '../../hooks/useInstitution';
 import { useCrearEstudianteCompleto } from '../../hooks/useStudents';
+import type { EstudiantePorGrado } from '../../types/domain';
 import {
   ESTADOS_MATRICULA,
   PARENTESCOS,
@@ -38,6 +39,8 @@ import { SelectBuscable } from '../../components/ui/SelectBuscable';
 import { opcionesDeGrupos } from '../../lib/opcionesBuscables';
 import { SelectorEstudianteMatricula } from '../../components/matriculas/SelectorEstudianteMatricula';
 import { admiteMatricula, type FiltroEstudiante } from '../../lib/situacionEstudiante';
+import { MatriculaPorGrado } from '../../components/matriculas/MatriculaPorGrado';
+import { gradosOrdenados, tipoDeIngresoSugerido, veredictoDeGrado } from '../../lib/matriculaPorGrado';
 
 const PAGE_SIZE = 20;
 
@@ -73,6 +76,9 @@ const FORM_VACIO = {
   fecha_limite_compromiso: '',
   forzar_sobrecupo: false,
   apoyo: APOYO_VACIO,
+  /** Id del grado cuyo certificado más alto presentó; solo para quien no tiene historial en el sistema. */
+  ultimo_grado_aprobado_id: '',
+  motivo_grado: '',
 
   // Datos estudiante exprés
   expres_tipo_documento: 'TI' as TipoDocumento,
@@ -143,9 +149,11 @@ export function EnrollmentsPage() {
   const listQuery = useEnrollmentsList(filter);
 
   // --- Formalizar matricula ---
-  // `?pestana=cupos` o `?pestana=documentos` abren directo esa sección.
+  // `?pestana=por-grado`, `?pestana=cupos` o `?pestana=documentos` abren directo esa sección.
   const [parametros, setParametros] = useSearchParams();
-  const pestana = ['cupos', 'documentos'].includes(parametros.get('pestana') ?? '') ? (parametros.get('pestana') as 'cupos' | 'documentos') : 'matriculas';
+  const pestana = ['por-grado', 'cupos', 'documentos'].includes(parametros.get('pestana') ?? '')
+    ? (parametros.get('pestana') as 'por-grado' | 'cupos' | 'documentos')
+    : 'matriculas';
   const cambiarPestana = (k: string) => setParametros(k === 'matriculas' ? {} : { pestana: k }, { replace: true });
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [matriculaCreadaId, setMatriculaCreadaId] = useState<string | null>(null);
@@ -153,7 +161,7 @@ export function EnrollmentsPage() {
   const [form, setForm] = useState(FORM_VACIO);
   const [errorEnvio, setErrorEnvio] = useState<string | null>(null);
 
-  const studentsQuery = useSituacionEstudiantes(anioId);
+  const studentsQuery = useEstudiantesPorGrado(anioId);
   const [filtroEstudiante, setFiltroEstudiante] = useState<FiltroEstudiante>('DISPONIBLES');
   const [reingresoConfirmado, setReingresoConfirmado] = useState(false);
   const estudianteElegido = modoMatricula === 'existente' ? studentsQuery.data?.find((e) => e._id === form.student_id) : undefined;
@@ -163,6 +171,33 @@ export function EnrollmentsPage() {
     modoMatricula === 'existente' && Boolean(estudianteElegido) && (!admiteMatricula(estudianteElegido!.situacion) || (esReingreso && !reingresoConfirmado));
   // Solo grupos activos: uno CLOSED ya no admite nuevas matriculas (ver group.controller).
   const groupsQuery = useGroups({ academic_year_id: anioId, estado: 'ACTIVE' });
+  const [gradoDelGrupo, setGradoDelGrupo] = useState('');
+  const grados = useMemo(() => gradosQuery.data ?? [], [gradosQuery.data]);
+  const gruposDelGrado = useMemo(
+    () => (groupsQuery.data ?? []).filter((g) => !gradoDelGrupo || (typeof g.grade_id === 'object' ? g.grade_id._id : g.grade_id) === gradoDelGrupo),
+    [groupsQuery.data, gradoDelGrupo]
+  );
+
+  // Aviso de grado: el servidor lo exige igual (y pide el motivo); aquí solo se adelanta para no enterarse al guardar.
+  const gradoElegido = (() => {
+    const g = groupsQuery.data?.find((x) => x._id === form.group_id)?.grade_id;
+    return g && typeof g === 'object' ? g : null;
+  })();
+  const ubicacionDelElegido = modoMatricula === 'existente' ? (estudianteElegido?.ubicacion ?? null) : null;
+  // Quien no tiene historial (o es un estudiante nuevo) puede traer un certificado: con él se declara su último grado aprobado.
+  const pideGradoAprobado = modoMatricula === 'expres' || ubicacionDelElegido?.esperado.lugar === 'SIN_GRADO';
+  const gradoAprobado = pideGradoAprobado ? grados.find((g) => g._id === form.ultimo_grado_aprobado_id) : undefined;
+  const veredictoGrado = veredictoDeGrado({
+    ubicacion: ubicacionDelElegido,
+    gradoElegido: gradoElegido?.numero ?? null,
+    ultimoGradoAprobado: gradoAprobado?.numero ?? null,
+    numerosDeGrado: new Set(grados.map((g) => g.numero)),
+  });
+  const necesitaMotivoGrado = veredictoGrado === 'DIFIERE';
+  const motivoGradoCompleto = form.motivo_grado.trim().length >= 10;
+  const gradoEsperado = gradoAprobado
+    ? grados.find((g) => g.numero === gradoAprobado.numero + 1)
+    : grados.find((g) => g._id === ubicacionDelElegido?.esperado_grado_id);
   const createEnrollment = useCreateEnrollment();
   const crearEstudiante = useCrearEstudianteCompleto();
   const cargarDoc = useCargarDocumentoMatricula();
@@ -213,6 +248,8 @@ export function EnrollmentsPage() {
         forzar_sobrecupo: form.forzar_sobrecupo,
         reingreso: modoMatricula === 'existente' && esReingreso && reingresoConfirmado ? true : undefined,
         apoyo_declarado: aApoyoDeclarado(form.apoyo),
+        ultimo_grado_aprobado: gradoAprobado?.numero,
+        motivo_grado: necesitaMotivoGrado ? form.motivo_grado.trim() : undefined,
       });
 
       // Si se adjuntaron archivos digitales en este drawer, subirlos de inmediato
@@ -232,6 +269,7 @@ export function EnrollmentsPage() {
       }
 
       setForm(FORM_VACIO);
+      setGradoDelGrupo('');
       setArchivosDocumentos({});
       setReingresoConfirmado(false);
       void studentsQuery.refetch();
@@ -246,11 +284,24 @@ export function EnrollmentsPage() {
     setMatriculaCreadaId(null);
     setErrorEnvio(null);
     setForm(FORM_VACIO);
+    setGradoDelGrupo('');
     setArchivosDocumentos({});
     setFiltroEstudiante('DISPONIBLES');
     setReingresoConfirmado(false);
     createEnrollment.reset();
     crearEstudiante.reset();
+  }
+
+  // Abre el formulario de siempre con el estudiante y el grado de la pestaña ya elegidos; el grupo y lo demás se decide allí.
+  function matricularDesdeLista(estudiante: EstudiantePorGrado, gradoId: string | null) {
+    setModoMatricula('existente');
+    setMatriculaCreadaId(null);
+    setErrorEnvio(null);
+    setReingresoConfirmado(false);
+    setFiltroEstudiante(estudiante.situacion === 'REINGRESO' ? 'REINGRESO' : 'DISPONIBLES');
+    setForm({ ...FORM_VACIO, student_id: estudiante._id, tipo_ingreso: estudiante.situacion === 'REINGRESO' ? 'ANTIGUO' : tipoDeIngresoSugerido(estudiante, gradoId) });
+    setGradoDelGrupo(gradoId ?? '');
+    setDrawerOpen(true);
   }
 
   const esAdmin = user?.rol === 'ADMIN';
@@ -260,6 +311,7 @@ export function EnrollmentsPage() {
     <Tabs
       items={[
         { key: 'matriculas', label: 'Matrículas' },
+        { key: 'por-grado', label: 'Por grado' },
         { key: 'cupos', label: 'Disponibilidad de cupos' },
         { key: 'documentos', label: 'Documentos que se piden' },
       ]}
@@ -381,6 +433,16 @@ export function EnrollmentsPage() {
       </Card>
       )}
 
+      {pestana === 'por-grado' && (
+        <MatriculaPorGrado
+          estudiantes={studentsQuery.data ?? []}
+          grados={grados}
+          cargando={studentsQuery.isLoading || gradosQuery.isLoading}
+          error={studentsQuery.error}
+          onMatricular={matricularDesdeLista}
+        />
+      )}
+
       {pestana === 'matriculas' && (
       <Card>
         <CardHeader
@@ -494,7 +556,7 @@ export function EnrollmentsPage() {
         onSubmit={matriculaCreadaId ? undefined : handleSubmit}
         submitLabel={modoMatricula === 'expres' ? 'Crear estudiante y matricular' : 'Matricular'}
         isSubmitting={createEnrollment.isPending || crearEstudiante.isPending || cargarDoc.isPending}
-        submitDisabled={matriculaBloqueada}
+        submitDisabled={matriculaBloqueada || (necesitaMotivoGrado && !motivoGradoCompleto)}
       >
         {matriculaCreadaId ? (
           <div className="space-y-4">
@@ -551,7 +613,13 @@ export function EnrollmentsPage() {
               setReingresoConfirmado(false);
               const elegido = studentsQuery.data?.find((e) => e._id === id);
               // Quien vuelve ya estudió aquí: el tipo de ingreso natural es ANTIGUO (secretaría lo puede cambiar).
-              setForm((f) => ({ ...f, student_id: id, tipo_ingreso: elegido?.situacion === 'REINGRESO' ? 'ANTIGUO' : f.tipo_ingreso }));
+              setForm((f) => ({
+                ...f,
+                student_id: id,
+                tipo_ingreso: elegido?.situacion === 'REINGRESO' ? 'ANTIGUO' : f.tipo_ingreso,
+                ultimo_grado_aprobado_id: '',
+                motivo_grado: '',
+              }));
             }}
             reingresoConfirmado={reingresoConfirmado}
             onReingresoChange={setReingresoConfirmado}
@@ -717,6 +785,24 @@ export function EnrollmentsPage() {
           </div>
         )}
 
+        <Select
+          label="Grado del grupo"
+          value={gradoDelGrupo}
+          onChange={(e) => {
+            const nuevo = e.target.value;
+            setGradoDelGrupo(nuevo);
+            // Un grupo elegido de otro grado ya no corresponde al filtro.
+            setForm((f) => (f.group_id && groupsQuery.data?.find((g) => g._id === f.group_id && nuevo && (typeof g.grade_id === 'object' ? g.grade_id._id : g.grade_id) !== nuevo) ? { ...f, group_id: '' } : f));
+          }}
+        >
+          <option value="">Todos los grados</option>
+          {gradosOrdenados(grados).map((g) => (
+            <option key={g._id} value={g._id}>
+              {g.nombre}
+            </option>
+          ))}
+        </Select>
+
         <SelectBuscable
           label="Grupo"
           required
@@ -724,8 +810,42 @@ export function EnrollmentsPage() {
           onChange={(id) => setForm((f) => ({ ...f, group_id: id }))}
           placeholder="Buscar grupo…"
           vacioLabel="Selecciona..."
-          opciones={opcionesDeGrupos(groupsQuery.data ?? [], { conCupos: true })}
+          opciones={opcionesDeGrupos(gruposDelGrado, { conCupos: true })}
         />
+
+        {pideGradoAprobado && (
+          <Select
+            label="Último grado aprobado (según su certificado)"
+            value={form.ultimo_grado_aprobado_id}
+            onChange={(e) => setForm((f) => ({ ...f, ultimo_grado_aprobado_id: e.target.value }))}
+            hint="Opcional. No tiene matrículas anteriores aquí: si presenta certificado, el sistema avisa cuando el grado elegido no sigue a ese."
+          >
+            <option value="">No presenta certificado</option>
+            {gradosOrdenados(grados).map((g) => (
+              <option key={g._id} value={g._id}>
+                {g.nombre}
+              </option>
+            ))}
+          </Select>
+        )}
+
+        {necesitaMotivoGrado && gradoElegido && (
+          <div className="space-y-2">
+            <Alert tone="warning">
+              Según {gradoAprobado ? `el último grado aprobado que declaraste (${gradoAprobado.nombre})` : 'su historial'},{' '}
+              {gradoEsperado ? `le corresponde ${gradoEsperado.nombre}` : 'ya terminó el último grado'}, y lo estás matriculando en {gradoElegido.nombre}. Puedes continuar si es una decisión de la
+              institución (por ejemplo, una promoción por decisión): escribe el motivo, que queda en la auditoría.
+            </Alert>
+            <Textarea
+              label="Motivo de matricularlo en este grado"
+              required
+              rows={2}
+              value={form.motivo_grado}
+              onChange={(e) => setForm((f) => ({ ...f, motivo_grado: e.target.value }))}
+              hint="Mínimo 10 caracteres."
+            />
+          </div>
+        )}
 
         <Select
           label="Tipo de ingreso"

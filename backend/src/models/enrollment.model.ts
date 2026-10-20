@@ -83,6 +83,8 @@ export interface IEnrollment {
   /** Plazo para entregar documentos y legalizar el cupo mientras la matricula esta PREINSCRITO. */
   fecha_limite_legalizacion: Date | null;
   motivo_retiro: string | null;
+  /** `Grade.numero` del último grado que el estudiante aprobó según el certificado que presentó; solo lo declara secretaría a quien no tiene historial en el sistema. */
+  ultimo_grado_aprobado: number | null;
   /** null mientras la matrícula sigue; las anteriores a este campo que estén RETIRADO tampoco la tienen. */
   salida: ISalidaMatricula | null;
   trayectoria: Types.DocumentArray<ITramoTrayectoria>;
@@ -166,6 +168,7 @@ const enrollmentSchema = new Schema<IEnrollment, EnrollmentModel>(
     fecha_limite_compromiso: { type: Date, default: null },
     fecha_limite_legalizacion: { type: Date, default: null },
     motivo_retiro: { type: String, default: null },
+    ultimo_grado_aprobado: { type: Number, min: -2, max: 11, default: null },
     salida: { type: salidaSchema, default: null },
     trayectoria: { type: [tramoTrayectoriaSchema], default: [] },
     checklist: { type: [checklistItemSchema], default: [] },

@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../lib/apiClient';
-import type { EstadoDocumentoMatricula, EstadoMatricula, Enrollment, SituacionEstudianteMatricula, TipoDocumentoMatricula, TipoIngreso } from '../types/domain';
+import type { EstadoDocumentoMatricula, EstadoMatricula, Enrollment, EstudiantePorGrado, SituacionEstudianteMatricula, TipoDocumentoMatricula, TipoIngreso } from '../types/domain';
 
 export interface CreateEnrollmentInput {
   student_id: string;
@@ -16,6 +16,10 @@ export interface CreateEnrollmentInput {
   reingreso?: boolean;
   /** Lo que la familia declara sobre apoyos o diagnósticos previos: pasa a la bandeja de orientación (M16). */
   apoyo_declarado?: { motivo_declarado: string; aporta_soporte?: boolean; observacion?: string };
+  /** `Grade.numero` del último grado aprobado según el certificado: para quien no tiene historial en el sistema. */
+  ultimo_grado_aprobado?: number | null;
+  /** Por qué se matricula en un grado distinto al que indica su historial o su certificado. */
+  motivo_grado?: string;
 }
 
 export function useCreateEnrollment() {
@@ -34,6 +38,18 @@ export function useSituacionEstudiantes(anioId: string | undefined) {
   return useQuery({
     queryKey: ['enrollments', 'estudiantes-situacion', anioId],
     queryFn: () => api.get<SituacionEstudianteMatricula[]>('/enrollments/estudiantes-situacion', { academic_year_id: anioId }),
+    enabled: Boolean(anioId),
+  });
+}
+
+/**
+ * Los mismos estudiantes de `useSituacionEstudiantes` con el grado donde les toca matricularse. Comparte la clave `['enrollments', ...]`, así una
+ * matrícula nueva la refresca; es la fuente del formulario de matrícula y de la lista «Por grado».
+ */
+export function useEstudiantesPorGrado(anioId: string | undefined) {
+  return useQuery({
+    queryKey: ['enrollments', 'estudiantes-por-grado', anioId],
+    queryFn: () => api.get<EstudiantePorGrado[]>('/enrollments/estudiantes-por-grado', { academic_year_id: anioId }),
     enabled: Boolean(anioId),
   });
 }

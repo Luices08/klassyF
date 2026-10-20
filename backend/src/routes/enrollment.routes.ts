@@ -15,6 +15,7 @@ import {
   listarDocumentosPrevistos,
   listEnrollments,
   situacionEstudiantes,
+  estudiantesPorGrado,
   revisarDocumento,
   sincronizarRequisitos,
   updateStatus,
@@ -34,6 +35,7 @@ router.post('/', checkRole(...STAFF_MATRICULAS), validate(enrollmentValidator.cr
 router.get('/', checkRole(...STAFF_MATRICULAS), validate(enrollmentValidator.listEnrollments), listEnrollments);
 // Antes de '/:id' para que no la tome como un id.
 router.get('/estudiantes-situacion', checkRole(...STAFF_MATRICULAS), validate(enrollmentValidator.situacionEstudiantes), situacionEstudiantes);
+router.get('/estudiantes-por-grado', checkRole(...STAFF_MATRICULAS), validate(enrollmentValidator.estudiantesPorGrado), estudiantesPorGrado);
 router.get(
   '/documentos-por-revisar',
   checkRole(...STAFF_MATRICULAS),

@@ -9,7 +9,7 @@ import ApiError from '../utils/ApiError';
 import catchAsync from '../utils/catchAsync';
 
 export const createEnrollment = catchAsync<unknown, unknown, CreateEnrollmentInput>(async (req, res) => {
-  const enrollment = await enrollmentService.createEnrollment(req.body, { id: req.user!._id, rol: req.user!.rol });
+  const enrollment = await enrollmentService.createEnrollment(req.body, { id: req.user!._id, rol: req.user!.rol }, { verificarGrado: true });
   res.status(201).json({ success: true, data: enrollment });
 });
 
@@ -29,6 +29,11 @@ export const listEnrollments = catchAsync<unknown, unknown, unknown, ListQuery>(
 
 export const situacionEstudiantes = catchAsync<unknown, unknown, unknown, { academic_year_id: string }>(async (req, res) => {
   const data = await enrollmentService.listarSituacionEstudiantes(req.query.academic_year_id);
+  res.status(200).json({ success: true, data });
+});
+
+export const estudiantesPorGrado = catchAsync<unknown, unknown, unknown, { academic_year_id: string }>(async (req, res) => {
+  const data = await enrollmentService.listarEstudiantesPorGrado(req.query.academic_year_id);
   res.status(200).json({ success: true, data });
 });
 

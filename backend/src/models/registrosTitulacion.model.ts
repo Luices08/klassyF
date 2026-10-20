@@ -1,4 +1,5 @@
 import { HydratedDocument, Model, Schema, Types, model } from 'mongoose';
+import { VERIFICACIONES_SERVICIO_SOCIAL, VerificacionServicioSocial } from '../constants/titulacion';
 
 /** Una tanda de horas de servicio social estudiantil obligatorio (Res. 4210/1996) certificada por la entidad donde se prestó. Secretaría la registra (M26). */
 export interface IRegistroServicioSocial {
@@ -12,6 +13,10 @@ export interface IRegistroServicioSocial {
   /** Una tanda mal registrada no se borra: se anula con motivo y deja de sumar. */
   estado: 'VIGENTE' | 'ANULADO';
   anulacion: { motivo: string; por: Types.ObjectId; fecha: Date } | null;
+  /** El certificado de la entidad (PDF o imagen). Los registros anteriores al soporte no lo tienen. */
+  soporte: { nombre: string; archivo_path: string; mimetype: string; tamano: number } | null;
+  verificacion: VerificacionServicioSocial;
+  verificado: { por: Types.ObjectId; fecha: Date; motivo: string } | null;
   createdAt: Date;
 }
 export type RegistroServicioSocialDocument = HydratedDocument<IRegistroServicioSocial>;
@@ -28,6 +33,16 @@ const servicioSocialSchema = new Schema<IRegistroServicioSocial, Model<IRegistro
     estado: { type: String, enum: ['VIGENTE', 'ANULADO'], default: 'VIGENTE' },
     anulacion: {
       type: new Schema({ motivo: { type: String, required: true }, por: { type: Schema.Types.ObjectId, ref: 'User', required: true }, fecha: { type: Date, required: true } }, { _id: false }),
+      default: null,
+    },
+    soporte: {
+      type: new Schema({ nombre: { type: String, required: true }, archivo_path: { type: String, required: true }, mimetype: { type: String, required: true }, tamano: { type: Number, required: true } }, { _id: false }),
+      default: null,
+    },
+    // El valor de partida es HEREDADO a propósito: lo leen así los documentos que se guardaron antes de que existiera el soporte. Todo registro nuevo lo fija en PENDIENTE al crearse.
+    verificacion: { type: String, enum: VERIFICACIONES_SERVICIO_SOCIAL, default: 'HEREDADO' },
+    verificado: {
+      type: new Schema({ por: { type: Schema.Types.ObjectId, ref: 'User', required: true }, fecha: { type: Date, required: true }, motivo: { type: String, default: '' } }, { _id: false }),
       default: null,
     },
   },

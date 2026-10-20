@@ -2,6 +2,7 @@ import { useSearchParams } from 'react-router-dom';
 import { useState } from 'react';
 import { ConfiguracionCertificadosPanel } from '../../components/certificados/ConfiguracionCertificadosPanel';
 import { ExpedirCertificado } from '../../components/certificados/ExpedirCertificado';
+import { ExpedirPorGrupo } from '../../components/certificados/ExpedirPorGrupo';
 import { HistorialCertificados } from '../../components/certificados/HistorialCertificados';
 import { PlantillasCertificadosPanel } from '../../components/certificados/PlantillasCertificadosPanel';
 import { TiposDocumentoPanel } from '../../components/certificados/TiposDocumentoPanel';
@@ -14,6 +15,7 @@ export function CertificadosPage() {
   const [tab, setTab] = useState('expedir');
   const tabs = [
     { key: 'expedir', label: 'Expedir' },
+    { key: 'lote', label: 'Expedir por grupo' },
     { key: 'historial', label: 'Historial' },
     { key: 'firmas', label: 'Firmas y sellos' },
     // Los tipos de documento y su texto los gestionan Secretaría y el administrador (el servidor decide qué puede cada uno según el estado del tipo).
@@ -27,6 +29,9 @@ export function CertificadosPage() {
       <Tabs items={tabs} active={tab} onChange={setTab} />
       <TabPanel active={tab} tabKey="expedir">
         <ExpedirCertificado estudianteInicial={params.get('estudiante') ?? undefined} />
+      </TabPanel>
+      <TabPanel active={tab} tabKey="lote">
+        <ExpedirPorGrupo />
       </TabPanel>
       <TabPanel active={tab} tabKey="historial">
         <HistorialCertificados />

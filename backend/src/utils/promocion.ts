@@ -17,6 +17,7 @@ import {
   MAX_CONDICIONES_POR_REGLA,
   MAX_REGLAS_PROMOCION,
   ModoLista,
+  NIVELES_SIN_REPROBACION,
   MomentoPromocion,
   PATRON_CLAVE_REGLA,
   PRECEDENCIA_ACCIONES,
@@ -24,6 +25,7 @@ import {
   TipoCondicion,
   UnidadPromocion,
 } from '../constants/promocion';
+import { GRADO_TITULACION } from '../constants/titulacion';
 
 const EFECTOS_IMPRESCINDIBLES_VALIDOS: readonly string[] = ['NO_PROMUEVE', 'RECUPERA', 'COMISION'];
 
@@ -115,7 +117,7 @@ export interface PoliticaPromocion {
  * Los requisitos bloquean la titulación solo en el grado de titulación; antes de él el servicio social solo avisa (`alerta_desde_grado`).
  */
 export interface PoliticaTitulacion {
-  /** Número del grado en que se otorga el título (11 en Colombia). */
+  /** Se ignora: la titulación es siempre del grado `GRADO_TITULACION` (11). Queda en los datos por compatibilidad. */
   grado_titulacion: number;
   servicio_social: { activo: boolean; horas_requeridas: number; alerta_desde_grado: number };
   saber_11: { activo: boolean };
@@ -126,11 +128,12 @@ export interface PoliticaTitulacion {
 
 export function titulacionInicial(): PoliticaTitulacion {
   return {
-    grado_titulacion: 11,
+    grado_titulacion: GRADO_TITULACION,
     servicio_social: { activo: true, horas_requeridas: 80, alerta_desde_grado: 10 },
     saber_11: { activo: true },
     paz_y_salvo: { activo: true },
-    carpeta_academica: { activo: true, desde_grado: 1 },
+    // Apagada de partida: un estudiante que cursó antes de Klassy no tiene cierre de promoción de esos años y quedaría «sin certificado».
+    carpeta_academica: { activo: false, desde_grado: 1 },
   };
 }
 
@@ -212,10 +215,9 @@ export function validarPolitica(p: PoliticaPromocion, ultimoPeriodo?: number): s
     if (p.asignaturas_arrastrables_ids.length === 0 && p.areas_arrastrables_ids.length === 0) return 'Marca qué asignaturas o áreas se pueden deber (p. ej. educación física).';
   }
   const t = p.titulacion;
-  if (!Number.isInteger(t.grado_titulacion) || t.grado_titulacion < 1 || t.grado_titulacion > 11) return 'El grado de titulación debe estar entre 1 y 11.';
   if (t.servicio_social.activo && (!Number.isFinite(t.servicio_social.horas_requeridas) || t.servicio_social.horas_requeridas <= 0)) return 'Indica las horas de servicio social que se exigen.';
-  if (t.servicio_social.alerta_desde_grado > t.grado_titulacion) return 'El aviso de servicio social debe empezar en el grado de titulación o antes.';
-  if (t.carpeta_academica.desde_grado < -2 || t.carpeta_academica.desde_grado >= t.grado_titulacion) return 'La carpeta académica debe empezar en un grado anterior al de titulación.';
+  if (t.servicio_social.alerta_desde_grado > GRADO_TITULACION) return 'El aviso de servicio social debe empezar en el grado de titulación o antes.';
+  if (t.carpeta_academica.desde_grado < -2 || t.carpeta_academica.desde_grado >= GRADO_TITULACION) return 'La carpeta académica debe empezar en un grado anterior al de titulación.';
   return null;
 }
 
@@ -444,12 +446,29 @@ const RESULTADO_DE_ACCION: Record<Exclude<AccionRegla, 'NO_RENUEVA_CUPO'>, Resul
 };
 
 /**
+ * Preescolar: el estudiante siempre es promovido, sin notas ni materias perdidas, y nada de lo que haga la política (umbrales, inasistencia,
+ * críticas, PIAR) puede reprobarlo ni dejarlo pendiente. Lo único que se conserva es `NO_RENUEVA_CUPO`, que es una decisión de permanencia
+ * del colegio y no toca el resultado académico.
+ */
+function promocionSinReprobacion(e: EntradaPromocion, p: PoliticaPromocion, momento: MomentoPromocion, salida: ResultadoMotor): ResultadoMotor {
+  for (const r of reglasEfectivas(p)) {
+    if (r.accion !== 'NO_RENUEVA_CUPO' || !r.activa || !r.momentos.includes(momento) || !reglaAplicaAlGrado(r, e)) continue;
+    if (r.condiciones.every((c) => cumpleCondicion(c, e, [], momento))) salida.reglas_disparadas.push({ clave: r.clave, nombre: r.nombre, accion: r.accion });
+  }
+  salida.no_renueva_cupo = salida.reglas_disparadas.length > 0;
+  salida.resultado = 'PROMOVIDO';
+  salida.motivos.push('Preescolar: se promueve sin evaluación numérica; en este nivel no se reprueba ni se repite grado.');
+  return salida;
+}
+
+/**
  * Decide la situación académica de un estudiante. Pura: no lee la base ni el reloj. Orden:
  * 1) reglas disparadas (gana la de mayor precedencia); 2) sin regla: arrastre si procede y, si no, la acción por defecto de la política;
  * 3) PIAR deriva a comisión si la política lo pide; 4) un estudiante sin nota que ninguna regla decidió queda INCOMPLETO.
  */
 export function evaluarPromocion(e: EntradaPromocion, p: PoliticaPromocion, momento: MomentoPromocion): ResultadoMotor {
   const salida = vacioResultado(momento);
+  if (NIVELES_SIN_REPROBACION.includes(e.nivel)) return promocionSinReprobacion(e, p, momento, salida);
   salida.perdidas = unidadesPerdidas(e, p, momento);
   salida.sin_nota = e.asignaturas.filter((a) => notaDe(a, momento) === null).map((a) => a.nombre);
 

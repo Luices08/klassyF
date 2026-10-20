@@ -14,6 +14,7 @@ import { cargarAnio } from './configuracionRecuperaciones.service';
 import { datosDeConfiguracion, obtenerConfiguracion } from './configuracionComision.service';
 import { armarFila, cargarContextoPlanilla } from './notas.service';
 import { asistenciaPorEstudiante, porcentajeDe } from './promocionContexto.service';
+import { idsDeGradosSinReprobacion } from './nivelesSinReprobacion.service';
 
 export interface FiltrosTablero {
   academic_year_id: string;
@@ -63,11 +64,13 @@ export async function tableroDeRiesgo(filtros: FiltrosTablero, usuario: UserDocu
   const config = datosDeConfiguracion(await obtenerConfiguracion());
   const aprobatoria = escalaEfectiva(anio.escala_evaluacion).nota_aprobatoria;
 
+  // Preescolar no reprueba (Decreto 2247/1997): sus grupos no entran al semáforo de riesgo de perder el año.
+  const gradosSinReprobacion = await idsDeGradosSinReprobacion();
   const grupos = await Group.find({
     academic_year_id: anio._id,
     estado: { $ne: 'CLOSED' },
     ...(filtros.group_id ? { _id: filtros.group_id } : {}),
-    ...(filtros.grade_id ? { grade_id: filtros.grade_id } : {}),
+    grade_id: filtros.grade_id ? (gradosSinReprobacion.includes(String(filtros.grade_id)) ? { $in: [] } : filtros.grade_id) : { $nin: gradosSinReprobacion },
     ...(filtros.sede_id ? { sede_id: filtros.sede_id } : {}),
   }).select('nomenclatura');
   const asignaciones = await TeacherAssignment.find({ academic_year_id: anio._id, group_id: { $in: grupos.map((g) => g._id) }, tipo_asignacion: 'CLASE', estado: ESTADO_ACTIVO });

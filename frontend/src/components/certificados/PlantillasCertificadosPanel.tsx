@@ -22,6 +22,7 @@ import {
   pedirPlantillaEstandar,
   usePlantillasCertificados,
   usePublicarPlantilla,
+  variableAplica,
   useRenderPlantilla,
   type BloquePlantilla,
   type ClaveCertificado,
@@ -121,7 +122,7 @@ function EditorPlantilla({
     };
   }, [previa?.url]);
 
-  const aplicables = variables.filter((v) => !v.fuente || plantilla.fuentes.includes(v.fuente));
+  const aplicables = variables.filter((v) => variableAplica(v.fuente, plantilla.fuentes));
   const obligatorios = new Set(plantilla.requisitos.bloques);
   const vigente = contenidoDe(plantilla);
   const cambiado = JSON.stringify(borrador) !== JSON.stringify(vigente);

@@ -1,4 +1,4 @@
-import { EstadoTitulacion, NOMBRES_REQUISITO, RequisitoTitulacion } from '../constants/titulacion';
+import { EstadoTitulacion, GRADO_TITULACION, NOMBRES_REQUISITO, RequisitoTitulacion } from '../constants/titulacion';
 import { PoliticaTitulacion } from './promocion';
 
 export interface EntradaTitulacion {
@@ -7,8 +7,6 @@ export interface EntradaTitulacion {
   horas_servicio_social: number;
   presento_saber_11: boolean;
   paz_y_salvo_confirmado: boolean;
-  /** Números de los grados anteriores de los que no hay certificado (ni propio aprobado ni externo recibido). */
-  grados_sin_certificado: number[];
 }
 
 export interface RequisitoPendiente {
@@ -32,7 +30,7 @@ const horasFaltantes = (requeridas: number, cumplidas: number): number => Math.m
 export function evaluarRequisitos(e: EntradaTitulacion, p: PoliticaTitulacion): EvaluacionRequisitos {
   const pendientes: RequisitoPendiente[] = [];
   const alertas: RequisitoPendiente[] = [];
-  const bloquea = e.grado_numero >= p.grado_titulacion;
+  const bloquea = e.grado_numero >= GRADO_TITULACION;
   const faltanHoras = horasFaltantes(p.servicio_social.horas_requeridas, e.horas_servicio_social);
 
   if (p.servicio_social.activo && faltanHoras > 0) {
@@ -44,17 +42,7 @@ export function evaluarRequisitos(e: EntradaTitulacion, p: PoliticaTitulacion): 
 
   if (p.saber_11.activo && !e.presento_saber_11) pendientes.push({ requisito: 'SABER_11', detalle: 'No registra la presentación de las pruebas Saber 11.' });
   if (p.paz_y_salvo.activo && !e.paz_y_salvo_confirmado) pendientes.push({ requisito: 'PAZ_Y_SALVO', detalle: 'El paz y salvo institucional no está confirmado.' });
-  if (p.carpeta_academica.activo && e.grados_sin_certificado.length > 0) {
-    pendientes.push({ requisito: 'CARPETA_ACADEMICA', detalle: `Falta el certificado de los grados: ${e.grados_sin_certificado.join(', ')}.` });
-  }
   return { pendientes, alertas };
-}
-
-/** Los grados anteriores al de titulación (desde el que la política indica) que no tienen certificado. */
-export function gradosSinCertificado(p: PoliticaTitulacion, conCertificado: ReadonlySet<number>): number[] {
-  const faltantes: number[] = [];
-  for (let n = p.carpeta_academica.desde_grado; n < p.grado_titulacion; n += 1) if (!conCertificado.has(n)) faltantes.push(n);
-  return faltantes;
 }
 
 /**

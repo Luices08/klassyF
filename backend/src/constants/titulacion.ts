@@ -14,6 +14,40 @@ export const MAX_CARACTERES_TITULO_BACHILLER = 80;
 export const ESTADOS_TITULACION = ['APROBO_NO_GRADUADO', 'GRADUADO', 'GRADUADO_EXTEMPORANEO'] as const;
 export type EstadoTitulacion = (typeof ESTADOS_TITULACION)[number];
 
+/**
+ * La titulación de bachiller es solo del grado 11 (Ley 115/1994: el título lo otorga la educación media). No es configurable: transición,
+ * 5° y 9° culminan un ciclo y se certifican desde M26 tras la promoción regular, nunca por aquí. `PoliticaTitulacion.grado_titulacion`
+ * se conserva en los datos por compatibilidad pero se ignora: siempre vale esto.
+ */
+export const GRADO_TITULACION = 11;
+
+/**
+ * Servicio social estudiantil obligatorio (Ley 115/1994 art. 97, Res. 4210/1996): se presta en los grados 10 y 11 y cada tanda de horas lleva su
+ * soporte (certificado de la entidad). Solo suman las horas con soporte verificado; `HEREDADO` son las tandas registradas antes de que existiera
+ * el soporte: siguen contando para no devolver a nadie a «pendiente de grado», y Secretaría puede adjuntarles el soporte después.
+ */
+export const VERIFICACIONES_SERVICIO_SOCIAL = ['PENDIENTE', 'VERIFICADO', 'RECHAZADO', 'HEREDADO'] as const;
+export type VerificacionServicioSocial = (typeof VERIFICACIONES_SERVICIO_SOCIAL)[number];
+export const VERIFICACIONES_QUE_CUENTAN: readonly VerificacionServicioSocial[] = ['VERIFICADO', 'HEREDADO'];
+export const GRADO_MINIMO_SERVICIO_SOCIAL = 10;
+export const MAX_BYTES_SOPORTE_SERVICIO_SOCIAL = 5 * 1024 * 1024;
+
+/**
+ * Número de registro de la prueba Saber 11 ante el ICFES: «AC» y de 8 a 12 dígitos. Hay dos formas en uso: `AC` + 8 dígitos (AC23245678) y `AC` + año de 4
+ * dígitos + 8 dígitos (AC202612345678). Se guarda en mayúsculas y sin espacios ni guiones.
+ */
+export const PATRON_REGISTRO_SABER_11 = /^AC\d{8,12}$/;
+
+/** Quita lo que no es parte del número (espacios, guiones, puntos) y lo pasa a mayúsculas. */
+export const normalizarRegistroSaber11 = (texto: string): string => texto.replace(/[\s.-]+/g, '').toUpperCase();
+
+/** Cómo se le dice al usuario cada situación (el valor interno no cambia). */
+export const ETIQUETA_ESTADO_TITULACION: Record<EstadoTitulacion, string> = {
+  APROBO_NO_GRADUADO: 'Pendiente de grado',
+  GRADUADO: 'Graduado',
+  GRADUADO_EXTEMPORANEO: 'Graduado extemporáneo',
+};
+
 /** Estados con los que M26 puede expedir el acta de grado y el diploma. */
 export const ESTADOS_TITULACION_QUE_GRADUAN: readonly EstadoTitulacion[] = ['GRADUADO', 'GRADUADO_EXTEMPORANEO'];
 

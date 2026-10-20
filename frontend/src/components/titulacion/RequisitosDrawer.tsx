@@ -3,9 +3,7 @@ import {
   NOMBRES_ESTADO_TITULACION,
   NOMBRES_REQUISITO,
   useReevaluarTitulacion,
-  useRegistrarCertificadoExterno,
   useRegistrarSaber11,
-  useRegistrarServicioSocial,
   useRequisitosEstudiante,
 } from '../../hooks/useTitulacion';
 import { Alert, errorMessage } from '../ui/Alert';
@@ -15,7 +13,13 @@ import { Card, CardHeader } from '../ui/Card';
 import { Drawer } from '../ui/Drawer';
 import { Input } from '../ui/Field';
 import { Spinner } from '../ui/Spinner';
+import { ServicioSocialPanel } from './ServicioSocialPanel';
 import { TONO_ESTADO_TITULACION } from './tonosTitulacion';
+
+/** Saber 11: «AC» y de 8 a 12 dígitos (AC23245678 o AC202612345678). Espeja el servidor, que lo vuelve a comprobar. */
+const PATRON_SABER_11 = /^AC\d{8,12}$/;
+const normalizarSaber11 = (texto: string): string => texto.replace(/[\s.-]+/g, '').toUpperCase();
+const GRADO_TITULACION = 11;
 
 /**
  * Lo que Secretaría necesita ver de un estudiante antes de graduarlo: lo registrado, lo que falta y los avisos (p. ej. servicio social desde 10°).
@@ -25,13 +29,28 @@ export function RequisitosDrawer({ studentId, anioId, nombre, puedeRegistrar, on
   const { data, isLoading, isError, error } = useRequisitosEstudiante(studentId);
   const reevaluar = useReevaluarTitulacion();
   const [mensaje, setMensaje] = useState<{ tone: 'success' | 'error'; texto: string } | null>(null);
+  // La titulación es de 11°: en 10° solo se registra el servicio social (Saber 11 se presenta en 11°).
+  const soloServicioSocial = data?.grado_numero != null && data.grado_numero < GRADO_TITULACION;
 
   return (
-    <Drawer open title="Requisitos de titulación" subtitle={nombre} onClose={onClose} size="lg">
+    <Drawer open title={soloServicioSocial ? 'Servicio social' : 'Requisitos de titulación'} subtitle={nombre} onClose={onClose} size="lg">
       {isLoading && <Spinner />}
       {isError && <Alert tone="error">{errorMessage(error)}</Alert>}
       {mensaje && <Alert tone={mensaje.tone}>{mensaje.texto}</Alert>}
-      {data && (
+      {data && soloServicioSocial && (
+        <>
+          <Alert tone="info">Este estudiante está en {data.grado_numero}°. El servicio social se presta en 10° y 11°: aquí solo se registran sus horas con el certificado de la entidad. Saber 11 y el resto de requisitos son de 11°.</Alert>
+          <Card>
+            <CardHeader title="Estado del servicio social" />
+            <p className="text-sm">
+              <strong>{data.horas_requeridas === null ? 'No se exige' : `${data.horas_servicio_social} de ${data.horas_requeridas} horas`}</strong>
+              {data.horas_por_verificar > 0 ? ` (${data.horas_por_verificar} por verificar)` : ''}
+            </p>
+          </Card>
+          <ServicioSocialPanel studentId={studentId} puedeRegistrar={puedeRegistrar} />
+        </>
+      )}
+      {data && !soloServicioSocial && (
         <>
           <div className="flex flex-wrap gap-2">
             {data.titulaciones.map((t) => (
@@ -57,7 +76,7 @@ export function RequisitosDrawer({ studentId, anioId, nombre, puedeRegistrar, on
             <ul className="space-y-2 text-sm">
               <li className="flex justify-between">
                 <span>Servicio social</span>
-                <strong>{data.horas_requeridas === null ? 'No se exige' : `${data.horas_servicio_social} de ${data.horas_requeridas} horas`}</strong>
+                <strong>{data.horas_requeridas === null ? 'No se exige' : `${data.horas_servicio_social} de ${data.horas_requeridas} horas`}{data.horas_por_verificar > 0 ? ` (${data.horas_por_verificar} por verificar)` : ''}</strong>
               </li>
               <li className="flex justify-between">
                 <span>Saber 11</span>
@@ -66,10 +85,6 @@ export function RequisitosDrawer({ studentId, anioId, nombre, puedeRegistrar, on
               <li className="flex justify-between">
                 <span>Paz y salvo</span>
                 <strong>{data.paz_y_salvo_confirmado ? 'Confirmado' : 'Sin confirmar'}</strong>
-              </li>
-              <li className="flex justify-between">
-                <span>Carpeta académica</span>
-                <strong>{data.grados_sin_certificado.length === 0 ? 'Completa' : `Faltan los grados: ${data.grados_sin_certificado.join(', ')}`}</strong>
               </li>
             </ul>
             {data.pendientes.length > 0 && (
@@ -83,11 +98,24 @@ export function RequisitosDrawer({ studentId, anioId, nombre, puedeRegistrar, on
             )}
           </Card>
 
+          {data.documentos_matricula_pendientes.length > 0 && (
+            <Card>
+              <CardHeader title="Documentos de la matrícula que faltan" subtitle="Solo informa: no bloquea la titulación. Se aprueban en la matrícula del estudiante (Matrículas → su expediente)." />
+              <ul className="list-disc space-y-1 pl-5 text-sm text-body">
+                {data.documentos_matricula_pendientes.map((d) => (
+                  <li key={d.nombre}>
+                    {d.nombre} <span className="text-xs text-muted">({d.estado === 'CARGADO' ? 'cargado, por revisar' : d.estado === 'RECHAZADO' ? 'rechazado' : 'sin cargar'})</span>
+                  </li>
+                ))}
+              </ul>
+            </Card>
+          )}
+
+          <ServicioSocialPanel studentId={studentId} puedeRegistrar={puedeRegistrar} />
+
           {puedeRegistrar && (
             <>
-              <ServicioSocial studentId={studentId} />
               <Saber11 studentId={studentId} actual={data.saber_11?.codigo_registro} />
-              <CertificadoExterno studentId={studentId} />
               <div className="flex justify-end">
                 <Button
                   type="button"
@@ -111,54 +139,17 @@ export function RequisitosDrawer({ studentId, anioId, nombre, puedeRegistrar, on
   );
 }
 
-function ServicioSocial({ studentId }: { studentId: string }) {
-  const registrar = useRegistrarServicioSocial();
-  const [horas, setHoras] = useState('');
-  const [entidad, setEntidad] = useState('');
-  const [descripcion, setDescripcion] = useState('');
-  const [mensaje, setMensaje] = useState<{ tone: 'success' | 'error'; texto: string } | null>(null);
-
-  async function enviar() {
-    setMensaje(null);
-    try {
-      await registrar.mutateAsync({ student_id: studentId, horas: Number(horas), entidad, descripcion: descripcion || undefined });
-      setHoras('');
-      setEntidad('');
-      setDescripcion('');
-      setMensaje({ tone: 'success', texto: 'Horas registradas.' });
-    } catch (err) {
-      setMensaje({ tone: 'error', texto: errorMessage(err) });
-    }
-  }
-
-  return (
-    <Card>
-      <CardHeader title="Registrar horas de servicio social" />
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-        <Input label="Horas" type="number" step="0.5" min={0.5} value={horas} onChange={(e) => setHoras(e.target.value)} />
-        <Input label="Entidad" value={entidad} maxLength={160} onChange={(e) => setEntidad(e.target.value)} />
-        <Input label="Descripción (opcional)" value={descripcion} maxLength={500} onChange={(e) => setDescripcion(e.target.value)} />
-      </div>
-      {mensaje && <div className="mt-3"><Alert tone={mensaje.tone}>{mensaje.texto}</Alert></div>}
-      <div className="mt-3 flex justify-end">
-        <Button type="button" onClick={() => void enviar()} isLoading={registrar.isPending} disabled={!horas || !entidad.trim()}>
-          Registrar
-        </Button>
-      </div>
-    </Card>
-  );
-}
-
 function Saber11({ studentId, actual }: { studentId: string; actual?: string }) {
   const registrar = useRegistrarSaber11();
   const [codigo, setCodigo] = useState(actual ?? '');
   const [fecha, setFecha] = useState('');
   const [mensaje, setMensaje] = useState<{ tone: 'success' | 'error'; texto: string } | null>(null);
+  const valido = PATRON_SABER_11.test(normalizarSaber11(codigo));
 
   async function enviar() {
     setMensaje(null);
     try {
-      await registrar.mutateAsync({ student_id: studentId, codigo_registro: codigo, fecha_presentacion: fecha || null });
+      await registrar.mutateAsync({ student_id: studentId, codigo_registro: normalizarSaber11(codigo), fecha_presentacion: fecha || null });
       setMensaje({ tone: 'success', texto: 'Registro guardado.' });
     } catch (err) {
       setMensaje({ tone: 'error', texto: errorMessage(err) });
@@ -169,51 +160,21 @@ function Saber11({ studentId, actual }: { studentId: string; actual?: string }) 
     <Card>
       <CardHeader title="Saber 11" subtitle="Solo el código de registro y la fecha; nunca los puntajes." />
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-        <Input label="Código de registro" value={codigo} maxLength={40} onChange={(e) => setCodigo(e.target.value)} />
+        <Input
+          label="Número de registro (SNP)"
+          value={codigo}
+          maxLength={40}
+          placeholder="AC23245678"
+          hint="Empieza por AC y lleva de 8 a 12 dígitos. Se aceptan espacios o guiones."
+          error={codigo.trim() !== '' && !valido ? 'El número debe ser AC seguido de 8 a 12 dígitos (por ejemplo AC23245678).' : undefined}
+          onChange={(e) => setCodigo(e.target.value.toUpperCase())}
+        />
         <Input label="Fecha de presentación (opcional)" type="date" value={fecha} onChange={(e) => setFecha(e.target.value)} />
       </div>
       {mensaje && <div className="mt-3"><Alert tone={mensaje.tone}>{mensaje.texto}</Alert></div>}
       <div className="mt-3 flex justify-end">
-        <Button type="button" onClick={() => void enviar()} isLoading={registrar.isPending} disabled={codigo.trim().length < 4}>
+        <Button type="button" onClick={() => void enviar()} isLoading={registrar.isPending} disabled={!valido}>
           Guardar
-        </Button>
-      </div>
-    </Card>
-  );
-}
-
-function CertificadoExterno({ studentId }: { studentId: string }) {
-  const registrar = useRegistrarCertificadoExterno();
-  const [grado, setGrado] = useState('');
-  const [institucion, setInstitucion] = useState('');
-  const [anio, setAnio] = useState('');
-  const [mensaje, setMensaje] = useState<{ tone: 'success' | 'error'; texto: string } | null>(null);
-
-  async function enviar() {
-    setMensaje(null);
-    try {
-      await registrar.mutateAsync({ student_id: studentId, grado_numero: Number(grado), institucion_origen: institucion, anio: anio ? Number(anio) : null });
-      setGrado('');
-      setInstitucion('');
-      setAnio('');
-      setMensaje({ tone: 'success', texto: 'Certificado recibido registrado.' });
-    } catch (err) {
-      setMensaje({ tone: 'error', texto: errorMessage(err) });
-    }
-  }
-
-  return (
-    <Card>
-      <CardHeader title="Certificado de otro colegio" subtitle="Para completar la carpeta académica de un grado cursado fuera." />
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-        <Input label="Grado (número)" type="number" min={-2} max={11} value={grado} onChange={(e) => setGrado(e.target.value)} />
-        <Input label="Institución de origen" value={institucion} maxLength={160} onChange={(e) => setInstitucion(e.target.value)} />
-        <Input label="Año (opcional)" type="number" min={1900} max={2200} value={anio} onChange={(e) => setAnio(e.target.value)} />
-      </div>
-      {mensaje && <div className="mt-3"><Alert tone={mensaje.tone}>{mensaje.texto}</Alert></div>}
-      <div className="mt-3 flex justify-end">
-        <Button type="button" onClick={() => void enviar()} isLoading={registrar.isPending} disabled={grado === '' || !institucion.trim()}>
-          Registrar
         </Button>
       </div>
     </Card>

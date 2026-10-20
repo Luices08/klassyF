@@ -5,6 +5,7 @@ import { ClaveCertificado, ElementoAutenticacion } from '../constants/certificad
 import { env } from '../config/env';
 import * as configuracionService from '../services/certificadoConfiguracion.service';
 import * as certificadoService from '../services/certificado.service';
+import * as loteService from '../services/certificadoLote.service';
 import * as pdfService from '../services/certificadoPdf.service';
 import * as plantillaService from '../services/certificadoPlantilla.service';
 import * as revocacionService from '../services/certificadoRevocacion.service';
@@ -40,6 +41,15 @@ export const matriculasDelEstudiante = catchAsync<{ studentId: string }>(async (
 export const expedir = catchAsync(async (req, res) => {
   const c = await certificadoService.expedirCertificado(req.body, req.user!, req.ip);
   ok(res, await certificadoService.vistaCompleta(c), 201);
+});
+
+export const expedirLote = catchAsync(async (req, res) => ok(res, await loteService.expedirLote(req.body, req.user!, req.ip), 201));
+
+export const zipDeLote = catchAsync(async (req, res) => {
+  const { buffer, nombreArchivo } = await loteService.zipDeCertificados(req.body.ids, urlBase(req), req.user!, req.ip);
+  res.setHeader('Content-Type', 'application/zip');
+  res.setHeader('Content-Disposition', `attachment; filename="${nombreArchivo}"`);
+  res.send(buffer);
 });
 
 export const vistaPrevia = catchAsync(async (req, res) => {

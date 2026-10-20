@@ -13,6 +13,7 @@ export const PAZ_Y_SALVO_DIR = path.join(UPLOADS_ROOT, 'paz-y-salvo');
 export const PLANEACION_DIR = path.join(UPLOADS_ROOT, 'planeacion');
 export const TRASLADOS_DIR = path.join(UPLOADS_ROOT, 'traslados');
 export const SALIDAS_DIR = path.join(UPLOADS_ROOT, 'salidas');
+export const SERVICIO_SOCIAL_DIR = path.join(UPLOADS_ROOT, 'servicio-social');
 
 /** Carpeta de una matricula puntual, para aislar sus documentos del resto. */
 export function carpetaMatricula(enrollmentId: string): string {
@@ -22,6 +23,11 @@ export function carpetaMatricula(enrollmentId: string): string {
 /** Soportes de un traslado (certificado de notas de origen, constancia de retiro...), una carpeta por traslado. */
 export function carpetaTraslado(trasladoId: string): string {
   return path.join(TRASLADOS_DIR, trasladoId);
+}
+
+/** Soportes de las horas de servicio social estudiantil (M19/M26), una carpeta por estudiante. Nunca bajo `public/`: son documentos de menores y se bajan con sesión. */
+export function carpetaServicioSocial(studentId: string): string {
+  return path.join(SERVICIO_SOCIAL_DIR, studentId);
 }
 
 /** Soportes de la salida (retiro o traslado) de una matrícula, una carpeta por matrícula. */

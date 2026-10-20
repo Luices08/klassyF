@@ -1,4 +1,5 @@
 import { ESTADOS_TITULACION } from '../constants/titulacion';
+import { NIVELES_EDUCATIVOS } from '../constants/enums';
 import { HydratedDocument, Model, Schema, Types, model } from 'mongoose';
 import {
   DefinicionCertificado,
@@ -48,6 +49,8 @@ const tipoSchema = new Schema<ITipoCertificado, TipoCertificadoModel>(
     estados_matricula: { type: [{ type: String, enum: ESTADOS_MATRICULA_EXPEDIBLES }], default: [] },
     fuentes: { type: [{ type: String, enum: FUENTES_CERTIFICADO }], default: [] },
     estados_titulacion: { type: [{ type: String, enum: ESTADOS_TITULACION }], default: [] },
+    niveles: { type: [{ type: String, enum: NIVELES_EDUCATIVOS }], default: [] },
+    grados_numeros: { type: [{ type: Number, min: -2, max: 11 }], default: [] },
     variables_obligatorias: { type: [String], default: [] },
     politica: { type: politicaSchema, required: true },
     estado: { type: String, enum: ESTADOS_TIPO_CERTIFICADO, default: 'BORRADOR' },

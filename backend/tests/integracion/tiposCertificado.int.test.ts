@@ -29,6 +29,9 @@ vi.hoisted(() => {
 
 const imagen = (nombre: string) => ({ buffer: Buffer.alloc(0), size: 0, mimetype: 'image/png', originalname: nombre }) as unknown as Express.Multer.File;
 
+/** Los tipos de titulación, culminación de ciclo y retiro se siembran solos, en borrador, la primera vez que se usa M26. */
+const CLAVES_COMPLEMENTARIOS = ['ACTA_GRADO', 'DIPLOMA_BACHILLER', 'CONSTANCIA_CULMINACION', 'DIPLOMA_TRANSICION', 'CERTIFICADO_CULMINACION_PRIMARIA', 'CERTIFICADO_CULMINACION_BASICA', 'CERTIFICADO_RETIRO'];
+
 describe('M26: tipos de documento configurables (con base de datos)', () => {
   let e: Escenario;
   let matriculaId: string;
@@ -70,8 +73,10 @@ describe('M26: tipos de documento configurables (con base de datos)', () => {
   });
 
   it('los tipos de partida se siembran una sola vez: si el colegio elimina uno, no vuelve', async () => {
-    expect((await tipos.todosLosTipos()).map((t) => t.clave)).toEqual(['CONSTANCIA_ESTUDIO', 'CERTIFICADO_MATRICULA', 'PAZ_SALVO', 'CERTIFICADO_ESTUDIOS']);
-    expect((await tipos.todosLosTipos()).every((t) => t.estado === 'ACTIVO')).toBe(true);
+    expect((await tipos.todosLosTipos()).map((t) => t.clave)).toEqual(['CONSTANCIA_ESTUDIO', 'CERTIFICADO_MATRICULA', 'PAZ_SALVO', 'CERTIFICADO_ESTUDIOS', ...CLAVES_COMPLEMENTARIOS]);
+    // Los de partida nacen activos; los complementarios (titulación, culminación y retiro) nacen en borrador.
+    expect((await tipos.todosLosTipos()).filter((t) => !CLAVES_COMPLEMENTARIOS.includes(t.clave)).every((t) => t.estado === 'ACTIVO')).toBe(true);
+    expect((await tipos.todosLosTipos()).filter((t) => CLAVES_COMPLEMENTARIOS.includes(t.clave)).every((t) => t.estado === 'BORRADOR')).toBe(true);
     await tipos.eliminarTipo('PAZ_SALVO', e.secretaria);
     expect((await tipos.todosLosTipos()).map((t) => t.clave)).not.toContain('PAZ_SALVO');
     await expect(expedir({ tipo: 'PAZ_SALVO' })).rejects.toMatchObject({ statusCode: 404 });

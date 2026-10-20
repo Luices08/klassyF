@@ -1,11 +1,11 @@
-import type { EstadoTitulacion } from './titulacion';
+import { ESTADOS_TITULACION_QUE_GRADUAN, type EstadoTitulacion } from './titulacion';
 /**
  * Secretaría académica y certificados (M26). Los TIPOS de documento son datos (`TipoCertificado`): Secretaría y el ADMIN los crean,
  * editan, archivan y eliminan. Lo que hay aquí son los VALORES DE PARTIDA que se siembran una sola vez (como `POLITICA_INICIAL` o la
  * plantilla de planilla de M12) y los catálogos cerrados que el código sí necesita conocer (las fuentes de datos de otros módulos).
  * Los documentos se identifican por una clave estable.
  */
-import { EstadoMatricula } from './enums';
+import { EstadoMatricula, NivelEducativo } from './enums';
 
 /** Clave estable de un tipo de documento (`CONSTANCIA_ESTUDIO`, o la que se genera al crear uno nuevo). */
 export type ClaveCertificado = string;
@@ -18,13 +18,15 @@ export const PATRON_CLAVE_CERTIFICADO = /^[A-Z0-9_]{2,40}$/;
  *   documento solo admite vista previa: lo expedido se congela, así que no se emite oficial con un dato ausente.
  * - DEPENDENCIAS: la confirmación de «sin pendientes» en cada dependencia configurada del paz y salvo.
  */
-export const FUENTES_CERTIFICADO = ['VALORACIONES', 'DEPENDENCIAS', 'PAZ_Y_SALVO_SALIDA', 'TITULACION'] as const;
+export const FUENTES_CERTIFICADO = ['VALORACIONES', 'DEPENDENCIAS', 'PAZ_Y_SALVO_SALIDA', 'TITULACION', 'CULMINACION', 'SERVICIO_SOCIAL'] as const;
 export type FuenteCertificado = (typeof FUENTES_CERTIFICADO)[number];
 export const ETIQUETA_FUENTE: Record<FuenteCertificado, { nombre: string; descripcion: string }> = {
   VALORACIONES: { nombre: 'Valoraciones y promoción', descripcion: 'Incluye la tabla de notas finales y el concepto de promoción. Solo se expide con todas las notas definitivas.' },
   DEPENDENCIAS: { nombre: 'Dependencias (paz y salvo)', descripcion: 'Al expedir se confirma que no hay pendientes en cada dependencia activa.' },
   PAZ_Y_SALVO_SALIDA: { nombre: 'Paz y salvo de salida', descripcion: 'Documento de salida: con la matrícula retirada o trasladada solo se expide cuando el paz y salvo de salida está aprobado.' },
-  TITULACION: { nombre: 'Titulación (grado de bachiller)', descripcion: 'Toma el título y la situación de graduación del estudiante (M19). Solo se expide si esa situación es una de las que el tipo admite; el acta de grado se asienta con número, libro y folio.' },
+  TITULACION: { nombre: 'Libro de grados y titulación (bachiller)', descripcion: 'Toma el título y la situación de graduación del estudiante (M19, solo grado 11). Solo se expide si esa situación es una de las que el tipo admite; el acta de grado se asienta con número, libro y folio.' },
+  CULMINACION: { nombre: 'Culminación de ciclo (promoción del grado)', descripcion: 'Transición, 5° o 9°: solo se expide si el estudiante tiene el cierre de promoción de ese grado con resultado aprobatorio (M19). No pasa por Titulación.' },
+  SERVICIO_SOCIAL: { nombre: 'Servicio social obligatorio', descripcion: 'Toma las horas de servicio social con soporte verificado del estudiante (M19) para ponerlas en el texto.' },
 };
 
 /** Un tipo pasa por estos estados: BORRADOR (se redacta, no se expide) → ACTIVO (se ofrece) → ARCHIVADO (no se ofrece; lo expedido sigue verificándose). */
@@ -74,6 +76,10 @@ export interface DefinicionCertificado {
   descripcion: string;
   /** Estados de matrícula con los que se puede expedir. */
   estados_matricula: EstadoMatricula[];
+  /** Alcance por nivel educativo (vacío = todos): el documento solo se ofrece a matrículas de esos niveles. */
+  niveles?: NivelEducativo[];
+  /** Alcance por número de grado (vacío = todos; -2 Prejardín, -1 Jardín, 0 Transición…): se combina con `niveles`. */
+  grados_numeros?: number[];
   /** Solo con la fuente TITULACION: situaciones de titulación con las que el documento se puede expedir (el candado de M26). */
   estados_titulacion?: EstadoTitulacion[];
   /** Fuentes de datos de otros módulos que este documento usa (las enciende quien configura el tipo). */
@@ -82,6 +88,28 @@ export interface DefinicionCertificado {
   variables_obligatorias: string[];
   /** Qué se estampa por defecto y si se puede cambiar al expedir. */
   politica: PoliticaDeCertificado;
+}
+
+/**
+ * Los grados donde un estudiante culmina un ciclo y se gradúa: Transición (0), 5° (primaria), 9° (básica) y 11° (media). Solo en ellos se expide por grupo.
+ */
+export const GRADOS_DE_GRADUACION: readonly number[] = [0, 5, 9, 11];
+
+/**
+ * ¿Es un documento oficial de culminación o de grado? Los de culminación de ciclo (Transición, 5°, 9°) y los de titulación que exigen estar graduado (acta
+ * y diploma). La constancia de quien aún no se gradúa (`APROBO_NO_GRADUADO`) no lo es: esa se pide uno a uno.
+ */
+export function esDocumentoDeGraduacion(def: Pick<DefinicionCertificado, 'fuentes' | 'estados_titulacion'>): boolean {
+  if (def.fuentes.includes('CULMINACION')) return true;
+  const estados = def.estados_titulacion ?? [];
+  return def.fuentes.includes('TITULACION') && estados.length > 0 && estados.every((e) => ESTADOS_TITULACION_QUE_GRADUAN.includes(e));
+}
+
+/** ¿El documento se ofrece a una matrícula de este nivel y grado? Sin alcance (vacío) se ofrece a todos. */
+export function tipoAplicaAlGrado(def: Pick<DefinicionCertificado, 'niveles' | 'grados_numeros'>, nivel: string | null, gradoNumero: number | null): boolean {
+  const porNivel = !def.niveles || def.niveles.length === 0 || (nivel !== null && (def.niveles as string[]).includes(nivel));
+  const porGrado = !def.grados_numeros || def.grados_numeros.length === 0 || (gradoNumero !== null && def.grados_numeros.includes(gradoNumero));
+  return porNivel && porGrado;
 }
 
 /** Un tipo sembrado al iniciar: además trae las opciones del selector de destinatario/motivo, que son de la plantilla. */

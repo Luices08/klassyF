@@ -49,6 +49,8 @@ const aTipoDefinido = (t: TipoCertificadoDocument): TipoDefinido => ({
   estados_matricula: [...t.estados_matricula],
   fuentes: [...t.fuentes],
   estados_titulacion: [...(t.estados_titulacion ?? [])],
+  niveles: [...(t.niveles ?? [])],
+  grados_numeros: [...(t.grados_numeros ?? [])],
   variables_obligatorias: [...t.variables_obligatorias],
   politica: { rectoria: t.politica.rectoria, secretaria: t.politica.secretaria, sello: t.politica.sello },
   estado: t.estado,
@@ -64,7 +66,14 @@ const aTipoDefinido = (t: TipoCertificadoDocument): TipoDefinido => ({
  */
 export async function asegurarTiposIniciales(): Promise<void> {
   const config = await obtenerConfiguracion();
-  if (config.tipos_sembrados) return;
+  if (!config.tipos_sembrados) await sembrarTiposDePartida(config);
+  if (!config.tipos_complementarios_sembrados) {
+    await crearTiposComplementariosQueFaltan();
+    await ConfiguracionCertificados.updateOne({ _id: config._id }, { $set: { tipos_complementarios_sembrados: true } });
+  }
+}
+
+async function sembrarTiposDePartida(config: Awaited<ReturnType<typeof obtenerConfiguracion>>): Promise<void> {
   const legado = (config.get('politica') ?? {}) as Record<string, Partial<PoliticaDeCertificado> | undefined>;
   await Promise.all(
     TIPOS_INICIALES.map((t, i) =>
@@ -168,6 +177,8 @@ export interface EntradaTipo {
   estados_matricula: string[];
   fuentes: FuenteCertificado[];
   estados_titulacion?: EstadoTitulacion[];
+  niveles?: string[];
+  grados_numeros?: number[];
 }
 
 const normalizarEntrada = (e: Pick<EntradaTipo, 'nombre' | 'descripcion' | 'prefijo'>) => ({ nombre: e.nombre.trim(), descripcion: (e.descripcion ?? '').trim(), prefijo: e.prefijo.trim().toUpperCase() });
@@ -193,6 +204,8 @@ export async function crearTipo(entrada: EntradaTipo, usuario: UserDocument, ip?
     estados_matricula: entrada.estados_matricula,
     fuentes: entrada.fuentes,
     estados_titulacion: entrada.fuentes.includes('TITULACION') ? (entrada.estados_titulacion ?? []) : [],
+    niveles: entrada.niveles ?? [],
+    grados_numeros: entrada.grados_numeros ?? [],
     variables_obligatorias: [],
     autoservicio_acudiente: false,
     politica: structuredClone(POLITICA_PREDETERMINADA),
@@ -211,6 +224,8 @@ export interface CambiosTipo {
   estados_matricula?: string[];
   fuentes?: FuenteCertificado[];
   estados_titulacion?: EstadoTitulacion[];
+  niveles?: string[];
+  grados_numeros?: number[];
   variables_obligatorias?: string[];
   autoservicio_acudiente?: boolean;
 }
@@ -268,6 +283,8 @@ export async function actualizarTipo(clave: string, cambios: CambiosTipo, usuari
   if (cambios.nombre !== undefined) tipo.nombre = cambios.nombre.trim();
   if (cambios.descripcion !== undefined) tipo.descripcion = cambios.descripcion.trim();
   if (cambios.estados_matricula !== undefined) tipo.estados_matricula = cambios.estados_matricula as typeof tipo.estados_matricula;
+  if (cambios.niveles !== undefined) tipo.niveles = cambios.niveles as typeof tipo.niveles;
+  if (cambios.grados_numeros !== undefined) tipo.grados_numeros = cambios.grados_numeros;
   await tipo.save();
   await registrarEvento({ usuario_id: usuario._id, accion: 'CERTIFICADO_TIPO_ACTUALIZADO', entidad: 'TipoCertificado', entidad_id: tipo._id, detalle: `${clave}: ${Object.keys(cambios).join(', ')}`, ip });
   return vistaTipo(aTipoDefinido(tipo), emitidos, usuario);
@@ -283,6 +300,7 @@ export async function activarTipo(clave: string, usuario: UserDocument, ip?: str
   const definido = aTipoDefinido(tipo);
   if (definido.estados_matricula.length === 0) throw new ApiError(409, 'Indica con qué estados de matrícula se puede expedir este documento.');
   if (definido.fuentes.includes('TITULACION') && definido.estados_titulacion?.length === 0) throw new ApiError(409, 'Indica con qué situación de titulación se puede expedir este documento (graduado, graduado extemporáneo o aprobó sin graduar).');
+  if (definido.fuentes.includes('CULMINACION') && (definido.grados_numeros ?? []).length === 0) throw new ApiError(409, 'Indica qué grado culmina este documento (Transición, 5°, 9°…) en el alcance del tipo.');
   const vigente = await PlantillaCertificado.findOne({ tipo: clave, estado: 'VIGENTE' });
   const errores = validarContenido(definido, vigente ? contenidoDe(vigente) : contenidoInicial(definido));
   if (errores.length > 0) throw new ApiError(409, 'El texto del documento todavía no cumple lo mínimo para activarlo.', errores);
@@ -326,13 +344,26 @@ export async function eliminarTipo(clave: string, usuario: UserDocument, ip?: st
  */
 export async function sembrarTiposDeTitulacion(): Promise<string[]> {
   await asegurarTiposIniciales();
+  return crearTiposComplementariosQueFaltan();
+}
+
+/**
+ * Los tipos de titulación (acta, diploma y constancia de culminación), de culminación de ciclo (Transición, 5° y 9°) y el certificado de retiro.
+ * Se crean en borrador la primera vez que se usa M26 (`asegurarTiposIniciales`), sin depender de un script; el script solo sirve para repetirlo.
+ */
+async function crearTiposComplementariosQueFaltan(): Promise<string[]> {
   const creados: string[] = [];
   for (const t of TIPOS_TITULACION) {
     if (await TipoCertificado.exists({ clave: t.clave })) continue;
     if (await TipoCertificado.exists({ prefijo: t.prefijo })) continue;
     const orden = ((await TipoCertificado.findOne().sort({ orden: -1 }).select('orden'))?.orden ?? 0) + 1;
-    await TipoCertificado.create({ ...t, estado: 'BORRADOR', orden, autoservicio_acudiente: false, creado_por: null });
-    creados.push(t.clave);
+    try {
+      await TipoCertificado.create({ ...t, estado: 'BORRADOR', orden, autoservicio_acudiente: false, creado_por: null });
+      creados.push(t.clave);
+    } catch (err) {
+      // Dos peticiones a la vez sembrando lo mismo: la otra ya lo creó.
+      if ((err as { code?: number }).code !== 11000) throw err;
+    }
   }
   return creados;
 }

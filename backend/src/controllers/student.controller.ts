@@ -1,6 +1,7 @@
 import { ParamsDictionary } from 'express-serve-static-core';
 import { EstadoEstudiante } from '../constants/enums';
 import * as studentService from '../services/student.service';
+import { expedienteDelEstudiante } from '../services/expedienteDigital.service';
 import { registrarEvento } from '../services/audit.service';
 import ApiError from '../utils/ApiError';
 import catchAsync from '../utils/catchAsync';
@@ -22,6 +23,11 @@ export const listarEstudiantes = catchAsync<unknown, unknown, unknown, ListarQue
 interface StudentParams extends ParamsDictionary {
   id: string;
 }
+
+/** El expediente digital (M29): una vista indexada por estudiante que junta lo que cada módulo ya guarda; no tiene datos propios. */
+export const expedienteDigital = catchAsync<StudentParams>(async (req, res) => {
+  res.status(200).json({ success: true, data: await expedienteDelEstudiante(req.params.id, req.user!, req.ip) });
+});
 
 export const obtenerFicha360 = catchAsync<StudentParams>(async (req, res) => {
   const ficha = await studentService.obtenerFicha360(req.params.id, req.user!.rol);

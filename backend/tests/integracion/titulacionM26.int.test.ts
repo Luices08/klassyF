@@ -54,9 +54,9 @@ describe('M26: acta de grado, diploma y constancia de culminación', () => {
   /** Cumple los cuatro requisitos: la titulación pasa a GRADUADO_EXTEMPORANEO. */
   async function cumplirRequisitos() {
     const id = String(e.estudiante._id);
-    await titulacion.registrarServicioSocial({ student_id: id, horas: 80, entidad: 'Fundación' }, e.admin);
-    await titulacion.registrarSaber11(id, 'AC20261234567', null, e.admin);
-    await titulacion.registrarCertificadoExterno({ student_id: id, grado_numero: 10, institucion_origen: 'Colegio anterior' }, e.admin);
+    const tanda = await titulacion.registrarServicioSocial({ student_id: id, horas: 80, entidad: 'Fundación' }, { nombre: 'certificado.pdf', archivo_path: 'uploads/servicio-social/prueba.pdf', mimetype: 'application/pdf', tamano: 1024 }, e.admin);
+    await titulacion.verificarServicioSocial(String(tanda._id), 'VERIFICAR', '', e.admin);
+    await titulacion.registrarSaber11(id, 'AC202612345678', null, e.admin);
     await PazYSalvo.create({ student_id: e.estudiante._id, academic_year_id: n.anioId, estado: 'CARGADO' });
     await revisarPazYSalvo({ id: String(e.admin._id), rol: e.admin.rol }, id, n.anioId, { estado: 'CONFIRMADO' });
   }
@@ -96,7 +96,9 @@ describe('M26: acta de grado, diploma y constancia de culminación', () => {
     await cerrarGrupo(n.anioId, n.grupoId, 'CIERRE', CLAVE, e.admin);
     matriculaId = String((await Enrollment.findOne({ student_id: e.estudiante._id }))!._id);
 
-    expect(await tipos.sembrarTiposDeTitulacion()).toEqual(['ACTA_GRADO', 'DIPLOMA_BACHILLER', 'CONSTANCIA_CULMINACION']);
+    // Ya se sembraron solos al usar M26 (en borrador): el script solo repite lo que falte.
+    expect(await tipos.sembrarTiposDeTitulacion()).toEqual([]);
+    expect((await TipoCertificado.findOne({ clave: 'ACTA_GRADO' }))!.estado).toBe('BORRADOR');
     for (const clave of ['ACTA_GRADO', 'DIPLOMA_BACHILLER', 'CONSTANCIA_CULMINACION']) await tipos.activarTipo(clave, e.admin);
   });
 

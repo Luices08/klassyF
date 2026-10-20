@@ -6,7 +6,8 @@ import Institution from '../models/institution.model';
 import PlantillaCertificado, { PlantillaCertificadoDocument } from '../models/plantillaCertificado.model';
 import User, { UserDocument } from '../models/user.model';
 import ApiError from '../utils/ApiError';
-import { snapshotDeMuestra } from '../utils/muestraCertificado';
+import Grade from '../models/grade.model';
+import { gradoDeMuestraPorNumero, numeroDeGradoDeMuestra, snapshotDeMuestra } from '../utils/muestraCertificado';
 import { permisosTipo } from '../utils/permisosCertificados';
 import { contenidoDe, contextoDeVariables, huellaDeContenido, renderizar, validarContenido } from '../utils/plantillaCertificado';
 import { ContenidoResuelto, SnapshotCertificado } from '../utils/certificados';
@@ -131,6 +132,10 @@ export function resolverContenido(snapshot: SnapshotCertificado, plantilla: Pick
 async function snapshotDeMuestraDelColegio(definido: TipoDefinido, conEscudo: boolean): Promise<SnapshotCertificado> {
   const [institucion, sede] = await Promise.all([Institution.findOne(), Campus.findOne({ es_principal: true })]);
   if (!institucion) throw new ApiError(409, 'Configura primero la institución.');
+  // El estudiante inventado cursa el grado del documento (con el nombre real que el colegio le dio), no uno fijo.
+  const numero = numeroDeGradoDeMuestra(definido);
+  const real = await Grade.findOne({ numero }).select('nombre nivel numero').lean();
+  const grado = real ? { nombre: real.nombre, numero: real.numero, nivel: real.nivel } : gradoDeMuestraPorNumero(numero);
   return snapshotDeMuestra(
     definido,
     {
@@ -145,7 +150,8 @@ async function snapshotDeMuestraDelColegio(definido: TipoDefinido, conEscudo: bo
       departamento: institucion.departamento,
       ...(conEscudo ? { escudo: await congelarEscudo(institucion.logo_url) } : {}),
     },
-    new Date().toISOString()
+    new Date().toISOString(),
+    grado
   );
 }
 

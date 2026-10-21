@@ -9,6 +9,8 @@ import {
 } from '../controllers/admissionRequest.controller';
 import { verificarPublico } from '../controllers/certificado.controller';
 import { verImagenPublica } from '../controllers/institution.controller';
+import { verImagenPublica as verImagenSitio, verSitioPublico } from '../controllers/sitioPublico.controller';
+import { conIdDeImagen } from '../validators/sitioPublico.validator';
 import { listarGradosPublicos, obtenerInfoPublica } from '../controllers/public.controller';
 import * as institutionValidator from '../validators/institution.validator';
 import validate from '../middlewares/validate.middleware';
@@ -40,6 +42,8 @@ router.post('/citaciones/:token/respuesta', citacionLimiter, validate(citacionVa
 
 router.get('/institution-info', lecturaLimiter, obtenerInfoPublica);
 router.get('/grades', lecturaLimiter, listarGradosPublicos);
+router.get('/sitio', lecturaLimiter, verSitioPublico);
+router.get('/sitio/imagenes/:id', lecturaLimiter, validate(conIdDeImagen), verImagenSitio);
 router.get('/institution-imagen/:clave', lecturaLimiter, validate(institutionValidator.conClaveDeImagen), verImagenPublica);
 
 router.post(

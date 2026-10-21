@@ -60,6 +60,7 @@ import { GroupsPage } from './pages/admin/GroupsPage';
 import { HorariosPage } from './pages/admin/HorariosPage';
 import { MiHorarioPage } from './pages/MiHorarioPage';
 import { InstitutionSetupPage } from './pages/admin/InstitutionSetupPage';
+import { SitioPublicoPage } from './pages/admin/SitioPublicoPage';
 import { SedesPage } from './pages/admin/SedesPage';
 import { StudentDetailPage } from './pages/admin/StudentDetailPage';
 import { StudentsPage } from './pages/admin/StudentsPage';
@@ -93,6 +94,7 @@ export default function App() {
 
           <Route element={<ProtectedRoute allowedRoles={['ADMIN']} />}>
             <Route path="/admin/setup" element={<InstitutionSetupPage />} />
+            <Route path="/admin/sitio-publico" element={<SitioPublicoPage />} />
             <Route path="/admin/sedes" element={<SedesPage />} />
             <Route path="/admin/grades" element={<GradesPage />} />
             <Route path="/admin/creador-planillas" element={<CreadorPlanillasPage />} />

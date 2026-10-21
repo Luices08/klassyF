@@ -17,6 +17,10 @@ export const PALABRAS_CLAVE_POR_RUTA: Record<string, { descripcion: string; clav
     descripcion: 'Datos de la institución, modalidad, plantilla de franjas y topes de carga y de horas.',
     claves: ['institucion', 'colegio', 'nit', 'dane', 'logo', 'modalidad', 'virtual', 'plantilla de franjas', 'topes', 'aforo', 'limite de horas'],
   },
+  '/admin/sitio-publico': {
+    descripcion: 'Plantilla, tipografía, colores, secciones e imágenes de la página pública del colegio.',
+    claves: ['sitio publico', 'pagina publica', 'pagina de inicio', 'plantilla', 'personalizar', 'colores', 'tipo de letra', 'fuente', 'slider', 'carrusel', 'banner', 'logo'],
+  },
   '/admin/sedes': {
     descripcion: 'Sedes, jornadas, días hábiles y franjas de clase y descanso.',
     claves: ['sede', 'sedes', 'jornada', 'jornadas', 'manana', 'tarde', 'franjas', 'descanso', 'dias habiles', 'hora de inicio'],

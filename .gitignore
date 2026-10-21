@@ -37,3 +37,7 @@ respaldos/
 
 # Guia de despliegue local, no se sube
 DOCKER.md
+
+# Simulación multi-año (scripts/simulacion): archivos y respaldos de la base klassy_sim, datos ficticios regenerables.
+backend/uploads-sim/
+backend/respaldos-sim/

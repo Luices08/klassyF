@@ -99,10 +99,12 @@ export async function quitarImagen(id: string, { usuarioId, ip }: Contexto): Pro
   await registrarEvento({ usuario_id: usuarioId, accion: 'SITIO_PUBLICO_IMAGEN_QUITADA', entidad: 'ImagenSitio', entidad_id: id, ip });
 }
 
-/** Pública. Solo se sirve si la plantilla vigente muestra el carrusel: una imagen cargada y sin uso no queda expuesta. */
+/**
+ * Pública. Se sirve por id aunque la plantilla guardada no tenga carrusel: el administrador las ve en la vista previa antes de guardar,
+ * y la página pública solo conoce los ids que `obtenerVistaPublica` le entrega (ids no adivinables, y solo con carrusel).
+ */
 export async function leerImagenPublica(id: string): Promise<{ mime: string; datos: Buffer }> {
-  const configuracion = await leerConfiguracion();
-  const imagen = plantillaDe(configuracion.plantilla)?.slider ? await ImagenSitio.findById(id) : null;
+  const imagen = await ImagenSitio.findById(id);
   if (!imagen) throw new ApiError(404, 'No hay imagen cargada.');
   return { mime: imagen.mime, datos: imagen.datos };
 }

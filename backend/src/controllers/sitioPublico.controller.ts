@@ -32,5 +32,7 @@ export const verImagenPublica = catchAsync<{ id: string }>(async (req, res) => {
   const { mime, datos } = await sitioService.leerImagenPublica(req.params.id);
   // Reemplazar una imagen es quitarla y agregar otra (id nuevo), así que cachear un día no muestra una vieja.
   res.setHeader('Cache-Control', 'public, max-age=86400');
+  // helmet pone `same-origin` por defecto: con el frontend en otro origen (desarrollo) el navegador bloquearía la imagen.
+  res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
   res.type(mime).send(datos);
 });

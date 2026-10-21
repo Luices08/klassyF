@@ -94,8 +94,7 @@ export function SitioPublicoPage() {
     setArchivo(null);
   }
 
-  // La página pública solo sirve las imágenes si la plantilla ya guardada tiene carrusel.
-  const imagenesVisibles = plantillaGuardada?.slider ? imagenes.map(urlImagenSitio) : [];
+  const imagenesVisibles = imagenes.map(urlImagenSitio);
 
   return (
     <div className="space-y-4">
@@ -198,17 +197,13 @@ export function SitioPublicoPage() {
               <div className="space-y-3">
                 {(agregarImagen.isError || quitarImagen.isError) && <Alert tone="error">{errorMessage(agregarImagen.error ?? quitarImagen.error)}</Alert>}
                 {!plantillaGuardada?.slider && (
-                  <Alert tone="info">Guarda los cambios para que la plantilla con carrusel muestre estas imágenes en la vista previa y en la página.</Alert>
+                  <Alert tone="info">Guarda los cambios para que la página pública muestre el carrusel con estas imágenes.</Alert>
                 )}
                 {imagenes.length > 0 && (
                   <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3">
                     {imagenes.map((imagen, i) => (
                       <li key={imagen.id} className="relative overflow-hidden rounded-lg border border-border bg-soft">
-                        {plantillaGuardada?.slider ? (
-                          <img src={urlImagenSitio(imagen)} alt={`Imagen ${i + 1} del carrusel`} className="aspect-video w-full object-cover" />
-                        ) : (
-                          <div className="flex aspect-video items-center justify-center text-xs text-muted">Imagen {i + 1}</div>
-                        )}
+                        <img src={urlImagenSitio(imagen)} alt={`Imagen ${i + 1} del carrusel`} className="aspect-video w-full object-cover" />
                         <IconButton
                           tone="danger"
                           label={`Quitar imagen ${i + 1}`}

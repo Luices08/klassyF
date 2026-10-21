@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { actaCompleta, alertasDeReprobacionMasiva, CONFIGURACION_INICIAL, contarVotos, firmantesRequeridos, nivelDeRiesgo, validarConfiguracion } from '../src/utils/comision';
+import { actaCompleta, alertasDeReprobacionMasiva, CONFIGURACION_INICIAL, contarVotos, firmantesRequeridos, nivelDeRiesgo, validarConfiguracion, causalDeCierre } from '../src/utils/comision';
 
 const { semaforo, reprobacion_masiva } = CONFIGURACION_INICIAL;
 
@@ -91,5 +91,23 @@ describe('validar configuración', () => {
     expect(validarConfiguracion({ ...CONFIGURACION_INICIAL, semaforo: { ...semaforo, naranja_desde: 1 } })).toMatch(/crecer/);
     expect(validarConfiguracion({ ...CONFIGURACION_INICIAL, reprobacion_masiva: { porcentaje: 0, minimo_estudiantes: 8 } })).toMatch(/entre 1 y 100/);
     expect(validarConfiguracion({ ...CONFIGURACION_INICIAL, quorum_porcentaje: 101 })).toMatch(/quórum/);
+  });
+});
+
+describe('causal del SIEE en el acta', () => {
+  it('lee del cierre las frases, las reglas y lo perdido', () => {
+    expect(
+      causalDeCierre({
+        motivos: ['Perdió 3 asignaturas; el SIEE permite recuperar hasta 2.', ''],
+        reglas_disparadas: [{ clave: 'auto-umbral', nombre: 'Más de 2 asignaturas perdidas', accion: 'NO_PROMUEVE' }],
+        perdidas: [{ nombre: 'Matemáticas' }, { nombre: 'Física' }, { nombre: 'Inglés' }],
+      })
+    ).toEqual({ motivos: ['Perdió 3 asignaturas; el SIEE permite recuperar hasta 2.'], reglas: ['Más de 2 asignaturas perdidas'], perdidas: ['Matemáticas', 'Física', 'Inglés'] });
+  });
+
+  it('un detalle sin esa forma da listas vacías y no falla', () => {
+    for (const raro of [null, undefined, 'texto', 42, {}, { motivos: 'no es lista', perdidas: [null, 3] }]) {
+      expect(causalDeCierre(raro)).toEqual({ motivos: [], reglas: [], perdidas: [] });
+    }
   });
 });

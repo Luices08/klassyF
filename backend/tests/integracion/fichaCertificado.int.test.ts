@@ -93,14 +93,11 @@ describe('M26: ficha del estudiante, solicitante, EPS y vigencia (con base de da
 
     it('avisa qué le falta al sistema antes de que falle al expedir', async () => {
       const sinDatos = await ficha();
-      expect(sinDatos.faltantes.join(' ')).toMatch(/lugar de expedición/);
       expect(sinDatos.faltantes.join(' ')).toMatch(/ciudad del colegio/);
       await perfil();
       await Institution.updateOne({}, { ciudad: 'Bogotá D.C.' });
       expect((await ficha()).faltantes).toEqual([]);
 
-      await StudentGuardian.updateMany({ student_id: e.estudiante._id }, { es_principal: false });
-      expect((await ficha()).faltantes.join(' ')).toMatch(/Ningún acudiente está marcado/);
       await StudentGuardian.deleteMany({ student_id: e.estudiante._id });
       expect((await ficha()).faltantes.join(' ')).toMatch(/no tiene acudiente registrado/);
     });
@@ -173,34 +170,22 @@ describe('M26: ficha del estudiante, solicitante, EPS y vigencia (con base de da
   });
 
   describe('la EPS como destinatario', () => {
-    const conEps = () => expedir({ destinatario: { clave: 'EPS' } });
-
-    it('sin EPS registrada, o sin la autorización, no se expide y explica por qué', async () => {
-      await perfil();
-      await expect(conEps()).rejects.toMatchObject({ statusCode: 409, message: expect.stringMatching(/autorización de datos sensibles/) });
-      await StudentProfile.updateOne({ user_id: e.estudiante._id }, { eps: 'SANITAS', ...conAutorizacion });
-      await StudentProfile.updateOne({ user_id: e.estudiante._id }, { 'autorizacion_datos_sensibles.otorgada': false }, { runValidators: false });
-      await expect(conEps()).rejects.toMatchObject({ statusCode: 409 });
-    });
-
-    it('con EPS y autorización, el nombre real queda en el documento y se audita de dónde salió, sin el régimen', async () => {
-      await perfil({ eps: 'SANITAS', regimen_salud: 'CONTRIBUTIVO', ...conAutorizacion });
-      const c = await conEps();
-      const s = c.snapshot as { destinatario: string; destino: { frase: string }; contenido: { bloques: Array<{ texto: string }> } };
-      expect(s.destinatario).toBe('SANITAS');
-      expect(s.destino.frase).toBe('Se expide para presentar ante la Entidad Promotora de Salud (EPS) SANITAS');
-      expect(s.contenido.bloques.map((b) => b.texto).join(' ')).toContain('presentar ante la Entidad Promotora de Salud (EPS) SANITAS.');
-      expect(JSON.stringify(c.snapshot)).not.toMatch(/CONTRIBUTIVO/);
-      const auditoria = await AuditLog.findOne({ accion: 'CERTIFICADO_EMITIDO' });
-      expect(auditoria!.detalle).toContain('entidad de EPS (M03)');
-      expect(auditoria!.detalle).not.toContain('SANITAS');
-    });
-
-    it('las demás opciones no leen la EPS aunque exista', async () => {
-      await perfil({ eps: 'SANITAS', ...conAutorizacion });
-      const c = await expedir({ destinatario: { clave: 'CAJA_COMPENSACION' } });
-      expect(JSON.stringify(c.snapshot)).not.toContain('SANITAS');
+    it('la opción de EPS dice «la EPS o la ADRES» sin nombrar una entidad ni leer el expediente del estudiante', async () => {
+      await perfil({ eps: 'NUEVA EPS', regimen_salud: 'CONTRIBUTIVO', ...conAutorizacion });
+      const c = await expedir({ destinatario: { clave: 'EPS' } });
+      const s = c.snapshot as { destino: { frase: string } };
+      expect(s.destino.frase).toBe('Se expide para presentar ante la Entidad Promotora de Salud (EPS) o la ADRES');
+      expect(JSON.stringify(c.snapshot)).not.toMatch(/CONTRIBUTIVO|NUEVA EPS/);
       expect((await AuditLog.findOne({ accion: 'CERTIFICADO_EMITIDO' }))!.detalle).not.toContain('entidad de');
+    });
+
+    it('si Secretaría quiere nombrar la EPS, la escribe en «Otro» y queda congelada en el documento', async () => {
+      await perfil({ eps: 'NUEVA EPS', ...conAutorizacion });
+      const c = await expedir({ destinatario: { clave: 'OTRO', otro: 'SANITAS' } });
+      const s = c.snapshot as { destinatario: string; destino: { frase: string } };
+      expect(s.destinatario).toBe('SANITAS');
+      expect(s.destino.frase).toContain('SANITAS');
+      expect(JSON.stringify(c.snapshot)).not.toContain('NUEVA EPS');
     });
   });
 

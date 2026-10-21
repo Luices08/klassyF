@@ -1,10 +1,13 @@
 import PDFDocument from 'pdfkit';
 import { DecisionDeCaso, NOMBRES_INSTANCIA } from '../constants/comision';
+import EvaluacionPromocion from '../models/evaluacionPromocionEstudiante.model';
 import Institution from '../models/institution.model';
 import User, { UserDocument } from '../models/user.model';
 import ConfiguracionCertificados from '../models/configuracionCertificados.model';
 import { leerImagenGuardada } from '../utils/almacenImagenes';
 import { ImagenGuardada } from '../utils/certificados';
+import { causalDeCierre } from '../utils/comision';
+import { ETIQUETA_PROMOCION_SABANA } from '../utils/sabanaCalificaciones';
 import { registrarEvento } from './audit.service';
 import { obtenerSesion } from './sesionComision.service';
 
@@ -63,6 +66,9 @@ export async function generarPdfActaSesion(id: string, usuario: UserDocument): P
   const estudiantes = await User.find({ _id: { $in: sesion.casos.map((c) => c.student_id) } }).select('nombre apellido numero_documento');
   const nombreEstudiante = new Map(estudiantes.map((e) => [String(e._id), `${e.apellido} ${e.nombre} (${e.numero_documento})`]));
   const nombreMiembro = new Map(sesion.miembros.map((m) => [String(m._id), m.nombre]));
+  // La causal del SIEE de cada caso de promoción sale del cierre que se tenía al agregarlo (inmutable): el acta firmada no cambia con el tiempo.
+  const cierres = await EvaluacionPromocion.find({ _id: { $in: sesion.casos.map((c) => c.evaluacion_id).filter(Boolean) } }).select('resultado version detalle').lean();
+  const cierrePor = new Map(cierres.map((c) => [String(c._id), c]));
 
   const doc = new PDFDocument({ size: 'LETTER', margins: { top: MARGEN, left: MARGEN, right: MARGEN, bottom: MARGEN }, bufferPages: true });
   const partes: Buffer[] = [];
@@ -106,6 +112,14 @@ export async function generarPdfActaSesion(id: string, usuario: UserDocument): P
     doc.font('Helvetica-Bold').text(`${nombreEstudiante.get(String(c.student_id)) ?? 'Estudiante'} — ${NOMBRE_TIPO_CASO[c.tipo]}`).font('Helvetica');
     if (c.recusados_ids.length > 0) {
       doc.fillColor(COLOR.tenue).text(`Apartados de la deliberación: ${c.recusados_ids.map((r) => nombreMiembro.get(String(r)) ?? 'integrante').join(', ')}.`).fillColor(COLOR.cuerpo);
+    }
+    const cierre = c.evaluacion_id ? cierrePor.get(String(c.evaluacion_id)) : undefined;
+    if (cierre) {
+      const causal = causalDeCierre(cierre.detalle);
+      doc.fillColor(COLOR.ink).font('Helvetica-Bold').text(`Situación según el SIEE: ${ETIQUETA_PROMOCION_SABANA[cierre.resultado] ?? cierre.resultado}`).font('Helvetica').fillColor(COLOR.cuerpo);
+      if (causal.motivos.length > 0) doc.text(`Causales aplicadas: ${causal.motivos.join(' ')}`);
+      if (causal.reglas.length > 0) doc.text(`Reglas del SIEE aplicadas: ${causal.reglas.join('; ')}.`);
+      if (causal.perdidas.length > 0) doc.text(`Perdidas: ${causal.perdidas.join(', ')}.`);
     }
     doc.text(c.deliberacion.trim() || 'Sin deliberación registrada.');
     if (c.decision) {

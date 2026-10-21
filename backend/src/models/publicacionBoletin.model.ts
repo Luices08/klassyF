@@ -41,7 +41,8 @@ const publicacionBoletinSchema = new Schema<IPublicacionBoletin, PublicacionBole
   {
     academic_year_id: { type: Schema.Types.ObjectId, ref: 'AcademicYear', required: true },
     group_id: { type: Schema.Types.ObjectId, ref: 'Group', required: true },
-    periodo_numero: { type: Number, required: true, min: 1 },
+    // 0 = el informe final del año (M33), que se publica por separado del boletín de los periodos.
+    periodo_numero: { type: Number, required: true, min: 0 },
     publicado: { type: Boolean, default: false },
     publicado_por: { type: Schema.Types.ObjectId, ref: 'User', default: null },
     publicado_at: { type: Date, default: null },

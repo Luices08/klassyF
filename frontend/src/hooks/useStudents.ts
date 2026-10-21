@@ -76,6 +76,10 @@ export function useBulkImportStudents() {
 
 export interface UpsertStudentProfileInput {
   userId: string;
+  primer_nombre?: string;
+  segundo_nombre?: string;
+  primer_apellido?: string;
+  segundo_apellido?: string;
   lugar_expedicion?: string;
   fecha_nacimiento: string;
   genero?: Genero;
@@ -128,6 +132,10 @@ export interface CrearEstudianteCompletoInput {
   email?: string;
   password?: string;
   telefono?: string;
+  primer_nombre?: string;
+  segundo_nombre?: string;
+  primer_apellido?: string;
+  segundo_apellido?: string;
   lugar_expedicion?: string;
   fecha_nacimiento: string;
   genero?: Genero;

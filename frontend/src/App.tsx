@@ -16,6 +16,7 @@ import { ActividadesDocentePage } from './pages/ActividadesDocentePage';
 import { NotasPlanillaPage } from './pages/NotasPlanillaPage';
 import { RecuperacionesPage } from './pages/RecuperacionesPage';
 import { PromocionPage } from './pages/admin/PromocionPage';
+import { ReportesCierrePage } from './pages/admin/ReportesCierrePage';
 import { PromocionAnticipadaPage } from './pages/admin/PromocionAnticipadaPage';
 import { ComisionPage } from './pages/admin/ComisionPage';
 import { TitulacionPage } from './pages/admin/TitulacionPage';
@@ -108,6 +109,11 @@ export default function App() {
           <Route element={<ProtectedRoute allowedRoles={['ADMIN', 'COORDINADOR', 'SECRETARIA', 'DOCENTE']} />}>
             <Route path="/paz-y-salvo" element={<PazYSalvoPage />} />
             <Route path="/secretaria/traslados" element={<TrasladosPage />} />
+          </Route>
+
+          {/* Reportes de cierre: cada pestaña muestra solo lo que el rol puede pedir (orientación solo el balance de inclusión) y el servidor lo vuelve a comprobar. */}
+          <Route element={<ProtectedRoute allowedRoles={['ADMIN', 'COORDINADOR', 'SECRETARIA', 'ORIENTADOR']} />}>
+            <Route path="/admin/reportes-cierre" element={<ReportesCierrePage />} />
           </Route>
 
           {/* Retiros y traslados: el servidor limita a secretaría por sede. */}

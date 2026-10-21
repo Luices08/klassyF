@@ -48,6 +48,10 @@ import {
 
 function formPerfilVacio(perfil: StudentProfile | null) {
   return {
+    primer_nombre: perfil?.primer_nombre ?? '',
+    segundo_nombre: perfil?.segundo_nombre ?? '',
+    primer_apellido: perfil?.primer_apellido ?? '',
+    segundo_apellido: perfil?.segundo_apellido ?? '',
     lugar_expedicion: perfil?.lugar_expedicion ?? '',
     fecha_nacimiento: perfil?.fecha_nacimiento?.slice(0, 10) ?? '',
     genero: (perfil?.genero ?? '') as Genero | '',
@@ -202,6 +206,10 @@ function DatosGeneralesTab({ studentId, perfil }: { studentId: string; perfil: S
     upsertProfile.reset();
     await upsertProfile.mutateAsync({
       userId: studentId,
+      primer_nombre: form.primer_nombre.trim() || undefined,
+      segundo_nombre: form.segundo_nombre.trim() || undefined,
+      primer_apellido: form.primer_apellido.trim() || undefined,
+      segundo_apellido: form.segundo_apellido.trim() || undefined,
       lugar_expedicion: form.lugar_expedicion || undefined,
       fecha_nacimiento: form.fecha_nacimiento,
       genero: form.genero || undefined,
@@ -236,6 +244,10 @@ function DatosGeneralesTab({ studentId, perfil }: { studentId: string; perfil: S
       </p>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <Input label="Primer nombre" value={form.primer_nombre} maxLength={60} onChange={(e) => setForm((f) => ({ ...f, primer_nombre: e.target.value }))} hint="Para los reportes oficiales (SIMAT)." />
+        <Input label="Segundo nombre" value={form.segundo_nombre} maxLength={60} onChange={(e) => setForm((f) => ({ ...f, segundo_nombre: e.target.value }))} />
+        <Input label="Primer apellido" value={form.primer_apellido} maxLength={60} onChange={(e) => setForm((f) => ({ ...f, primer_apellido: e.target.value }))} />
+        <Input label="Segundo apellido" value={form.segundo_apellido} maxLength={60} onChange={(e) => setForm((f) => ({ ...f, segundo_apellido: e.target.value }))} />
         <Input
           label="Lugar de expedición"
           value={form.lugar_expedicion}

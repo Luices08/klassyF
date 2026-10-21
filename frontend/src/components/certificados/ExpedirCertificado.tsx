@@ -83,14 +83,9 @@ export function ExpedirCertificado({ estudianteInicial }: { estudianteInicial?: 
   const destinoClave = destino.clave === tipo && opcionesDestino.some((o) => o.clave === destino.elegido) ? destino.elegido : (opcionesDestino[0]?.clave ?? '');
   const destinoOtro = destino.clave === tipo ? destino.otro : '';
   const restriccion = matricula && tipo ? matricula.restricciones[tipo] : undefined;
-  // La EPS viene de M03 y solo si el responsable legal autorizó su uso: se dice qué se imprimirá o por qué no se puede elegir.
+  // La opción de EPS lleva el nombre de la entidad: lo escribe quien expide en el mismo documento (no se lee del expediente del estudiante).
   const usaEps = opcionesDestino.find((o) => o.clave === destinoClave)?.fuente_entidad === 'EPS';
-  const hayOpcionEps = opcionesDestino.some((o) => o.fuente_entidad === 'EPS');
-  const hintDestino = usaEps
-    ? `Se imprimirá la EPS registrada en M03: ${ficha?.estudiante.eps.valor ?? '—'}.`
-    : hayOpcionEps && ficha && !ficha.estudiante.eps.disponible
-      ? `La opción de EPS no está disponible: ${ficha.estudiante.eps.motivo ?? ''}`
-      : undefined;
+  const pideTextoDestino = destinoClave === CLAVE_DESTINATARIO_OTRO || usaEps;
   // Lo que el documento pide al expedir lo dicen las fuentes del tipo, no su nombre.
   const usaDependencias = Boolean(configuracionDelTipo?.fuentes.includes('DEPENDENCIAS'));
   const dependenciasActivas = configuracion.data?.paz_y_salvo.dependencias.filter((d) => d.activa) ?? [];
@@ -106,7 +101,7 @@ export function ExpedirCertificado({ estudianteInicial }: { estudianteInicial?: 
       ? {
           enrollment_id: matricula._id,
           tipo,
-          destinatario: destinoClave ? { clave: destinoClave, otro: destinoClave === CLAVE_DESTINATARIO_OTRO ? destinoOtro.trim() : null } : null,
+          destinatario: destinoClave ? { clave: destinoClave, otro: pideTextoDestino ? destinoOtro.trim() : null } : null,
           ...(usaDependencias ? { dependencias: dependenciasConfirmadas } : {}),
           firmas,
           solicitante: solicitanteActual,
@@ -229,26 +224,22 @@ export function ExpedirCertificado({ estudianteInicial }: { estudianteInicial?: 
                     label={usaDependencias ? 'Motivo de expedición' : 'Destinatario'}
                     value={destinoClave}
                     onChange={(e) => setDestino({ clave: tipo, elegido: e.target.value, otro: '' })}
-                    hint={hintDestino}
                   >
-                    {opcionesDestino.map((o) => {
-                      const sinEntidad = o.fuente_entidad === 'EPS' && !ficha?.estudiante.eps.disponible;
-                      return (
-                        <option key={o.clave} value={o.clave} disabled={sinEntidad}>
-                          {o.etiqueta}
-                          {sinEntidad ? ' — no disponible' : ''}
-                        </option>
-                      );
-                    })}
+                    {opcionesDestino.map((o) => (
+                      <option key={o.clave} value={o.clave}>
+                        {o.etiqueta}
+                      </option>
+                    ))}
                   </Select>
-                  {destinoClave === CLAVE_DESTINATARIO_OTRO && (
+                  {pideTextoDestino && (
                     <Input
-                      label={usaDependencias ? 'Especifica el motivo' : 'Especifica el destinatario'}
+                      label={usaEps ? 'Nombre de la EPS' : usaDependencias ? 'Especifica el motivo' : 'Especifica el destinatario'}
                       value={destinoOtro}
                       onChange={(e) => setDestino({ clave: tipo, elegido: destinoClave, otro: e.target.value })}
                       maxLength={120}
-                      placeholder={usaDependencias ? 'Ej. cambio de ciudad' : 'Ej. Compensar'}
-                      hint={usaDependencias ? 'Si lo dejas vacío, se usa el motivo predeterminado.' : 'Si lo dejas vacío, el documento dice «a quien interese».'}
+                      required={usaEps}
+                      placeholder={usaEps ? 'Ej. Sanitas' : usaDependencias ? 'Ej. cambio de ciudad' : 'Ej. Compensar'}
+                      hint={usaEps ? 'Escribe la entidad tal como debe aparecer en el documento.' : usaDependencias ? 'Si lo dejas vacío, se usa el motivo predeterminado.' : 'Si lo dejas vacío, el documento dice «a quien interese».'}
                     />
                   )}
                 </div>

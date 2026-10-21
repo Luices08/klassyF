@@ -76,7 +76,7 @@ describe('M26: acta de grado, diploma y constancia de culminación', () => {
     e.secretaria.sedes_ids = [(await Campus.findOne({ es_principal: true }))!._id];
     await e.secretaria.save();
     n = await prepararNotas(e);
-    await Grade.updateMany({}, { numero: 11, nombre: 'Once' });
+    await Grade.updateMany({}, { nivel: 'MEDIA', numero: 11, nombre: 'Once' });
     for (const periodo of [1, 2, 3, 4]) {
       await CalificacionAsignatura.create({
         academic_year_id: n.anioId,

@@ -300,9 +300,8 @@ async function prepararDocumento(
 
   const plantilla = await plantillaVigente(def.clave);
   const perfil = await StudentProfile.findOne({ user_id: matricula.student_id._id }).select('lugar_expedicion fecha_nacimiento eps autorizacion_datos_sensibles');
-  // La entidad de una opción (la EPS de M03) solo se lee si el perfil la tiene y el responsable legal autorizó su uso.
-  const destino = resolverDestinatario({ nombre: def.nombre, destinatarios: plantilla.destinatarios, frase_otro: plantilla.frase_otro }, entrada.destinatario, { EPS: epsDelPerfil(perfil).valor });
-  if ('error' in destino) throw new ApiError(destino.sin_dato ? 409 : 400, destino.error);
+  const destino = resolverDestinatario({ nombre: def.nombre, destinatarios: plantilla.destinatarios, frase_otro: plantilla.frase_otro }, entrada.destinatario);
+  if ('error' in destino) throw new ApiError(400, destino.error);
   const entidadDe = plantilla.destinatarios.find((o) => o.clave === destino.clave)?.fuente_entidad ?? null;
 
   // A quién se entrega el documento: se exige al expedir, no en la vista previa.
@@ -476,7 +475,7 @@ export async function expedirCertificado(entrada: EntradaExpedicion, usuario: Us
     return { certificado: creado, snapshot, solicitante, entidadDe };
   });
   const usadas = ['rectoria', 'secretaria'].filter((e) => snapshot.firmas[e as 'rectoria' | 'secretaria'].aplicada).concat(snapshot.firmas.sello.aplicado ? ['sello'] : []);
-  await registrarEvento({ usuario_id: usuario._id, accion: 'CERTIFICADO_EMITIDO', entidad: 'CertificadoEmitido', entidad_id: certificado._id, detalle: `${certificado.codigo}; estampado: ${usadas.join(', ') || 'ninguno'}; solicitante: ${solicitante?.tipo ?? 'sin registro'}${autoservicio ? '; autoservicio (portal)' : ''}${entidadDe ? `; entidad de ${entidadDe} (M03)` : ''}${snapshot.titulacion?.acta ? `; acta ${snapshot.titulacion.acta.codigo}` : ''}`, ip });
+  await registrarEvento({ usuario_id: usuario._id, accion: 'CERTIFICADO_EMITIDO', entidad: 'CertificadoEmitido', entidad_id: certificado._id, detalle: `${certificado.codigo}; estampado: ${usadas.join(', ') || 'ninguno'}; solicitante: ${solicitante?.tipo ?? 'sin registro'}${autoservicio ? '; autoservicio (portal)' : ''}${entidadDe ? `; entidad de ${entidadDe} (escrita al expedir)` : ''}${snapshot.titulacion?.acta ? `; acta ${snapshot.titulacion.acta.codigo}` : ''}`, ip });
   return certificado;
 }
 

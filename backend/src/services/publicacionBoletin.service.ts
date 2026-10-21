@@ -1,5 +1,6 @@
 import { Types } from 'mongoose';
 import { avisarBoletinPublicado } from './notificacionesEventos.service';
+import { PERIODO_INFORME_FINAL } from '../constants/boletin';
 import { ESTADOS_MATRICULA_ACTIVOS } from '../constants/enums';
 import AcademicYear from '../models/academicYear.model';
 import Enrollment from '../models/enrollment.model';
@@ -49,7 +50,7 @@ async function validarReferencia(ref: ReferenciaPublicacion): Promise<void> {
   if (!anio) throw new ApiError(404, 'Año lectivo no encontrado.');
   if (!grupo) throw new ApiError(404, 'Grupo no encontrado.');
   if (String(grupo.academic_year_id) !== String(anio._id)) throw new ApiError(400, 'El grupo no pertenece a ese año lectivo.');
-  if (!anio.periodos.some((p) => p.numero === ref.periodo_numero)) throw new ApiError(400, `El año ${anio.year} no tiene un periodo ${ref.periodo_numero}.`);
+  if (ref.periodo_numero !== PERIODO_INFORME_FINAL && !anio.periodos.some((p) => p.numero === ref.periodo_numero)) throw new ApiError(400, `El año ${anio.year} no tiene un periodo ${ref.periodo_numero}.`);
 }
 
 async function estudiantesDelGrupo(ref: ReferenciaPublicacion): Promise<UserDocument[]> {
@@ -91,10 +92,10 @@ export async function establecerPublicacionGrupo(
     accion: 'BOLETIN_PUBLICACION_ACTUALIZADA',
     entidad: 'Group',
     entidad_id: ref.group_id,
-    detalle: `periodo ${ref.periodo_numero}: ${publicado ? 'publicado' : 'retirado'}`,
+    detalle: `${ref.periodo_numero === PERIODO_INFORME_FINAL ? 'informe final' : `periodo ${ref.periodo_numero}`}: ${publicado ? 'publicado' : 'retirado'}`,
     ip,
   });
-  if (publicado) await avisarBoletinPublicado({ groupId: ref.group_id, academicYearId: ref.academic_year_id, periodo: ref.periodo_numero });
+  if (publicado && ref.periodo_numero !== PERIODO_INFORME_FINAL) await avisarBoletinPublicado({ groupId: ref.group_id, academicYearId: ref.academic_year_id, periodo: ref.periodo_numero });
   return obtenerPublicacion(ref);
 }
 
@@ -129,7 +130,7 @@ export async function establecerAccesoEstudiante(
     accion: 'BOLETIN_ACCESO_ESTUDIANTE_ACTUALIZADO',
     entidad: 'User',
     entidad_id: studentId,
-    detalle: `periodo ${ref.periodo_numero}: ${permitir === null ? 'excepción retirada' : permitir ? 'permitido' : 'bloqueado'}`,
+    detalle: `${ref.periodo_numero === PERIODO_INFORME_FINAL ? 'informe final' : `periodo ${ref.periodo_numero}`}: ${permitir === null ? 'excepción retirada' : permitir ? 'permitido' : 'bloqueado'}`,
     ip,
   });
   return obtenerPublicacion(ref);
@@ -139,6 +140,6 @@ export async function establecerAccesoEstudiante(
 export async function exigirBoletinDisponible(ref: ReferenciaPublicacion, studentId: string): Promise<void> {
   const publicacion = await PublicacionBoletin.findOne(filtroDe(ref));
   if (!accesoFamilia(aPlana(publicacion), studentId).visible) {
-    throw new ApiError(403, 'El boletín de este periodo aún no está disponible para consulta. Comunícate con el colegio.');
+    throw new ApiError(403, ref.periodo_numero === PERIODO_INFORME_FINAL ? 'El informe final del año aún no está disponible para consulta. Comunícate con el colegio.' : 'El boletín de este periodo aún no está disponible para consulta. Comunícate con el colegio.');
   }
 }

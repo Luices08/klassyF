@@ -19,6 +19,7 @@ import {
   useReportCard,
   type ReportCardQuery,
 } from '../hooks/useReportCard';
+import { descargarInformeFinalDeFamilia } from '../hooks/useReportes';
 import { useUsers } from '../hooks/useUsers';
 import { SelectBuscable } from '../components/ui/SelectBuscable';
 import { opcionesDeGrupos, opcionesDePersonas } from '../lib/opcionesBuscables';
@@ -40,7 +41,8 @@ export function ReportCardPage() {
   const periodo = periodos.some((p) => p.numero === periodoElegido) ? (periodoElegido as number) : (periodos[0]?.numero ?? 1);
   const [query, setQuery] = useState<ReportCardQuery | null>(null);
   const [grupoId, setGrupoId] = useState('');
-  const [descargando, setDescargando] = useState<'boletin' | 'grupo' | null>(null);
+  const [descargando, setDescargando] = useState<'boletin' | 'grupo' | 'informe-final' | null>(null);
+  const esFamilia = user?.rol === 'ESTUDIANTE' || user?.rol === 'ACUDIENTE';
   const [verVistaPrevia, setVerVistaPrevia] = useState(false);
   const [errorPdf, setErrorPdf] = useState<string | null>(null);
 
@@ -63,6 +65,18 @@ export function ReportCardPage() {
       } else if (tipo === 'grupo') {
         await descargarPdfBoletinesGrupo({ group_id: grupoId, academic_year_id: academicYearId, periodo }, `boletines-periodo-${periodo}.pdf`);
       }
+    } catch (error) {
+      setErrorPdf(errorMessage(error));
+    } finally {
+      setDescargando(null);
+    }
+  }
+
+  async function bajarInformeFinal() {
+    setErrorPdf(null);
+    setDescargando('informe-final');
+    try {
+      await descargarInformeFinalDeFamilia(academicYearId, studentId);
     } catch (error) {
       setErrorPdf(errorMessage(error));
     } finally {
@@ -135,6 +149,19 @@ export function ReportCardPage() {
           </Button>
         </form>
       </Card>
+
+      {esFamilia && (
+        <Card>
+          <CardHeader title="Informe final del año" />
+          <div className="flex flex-wrap items-center gap-3">
+            <Button type="button" variant="outline" disabled={!studentId || !academicYearId} isLoading={descargando === 'informe-final'} onClick={() => void bajarInformeFinal()}>
+              <FileTextIcon className="h-4 w-4" />
+              Descargar informe final (PDF)
+            </Button>
+            <p className="text-xs text-muted">Las notas de todos los periodos, el año, las inasistencias y el estado de promoción. Está disponible cuando el colegio lo publica.</p>
+          </div>
+        </Card>
+      )}
 
       {canBrowseStudents && (
         <Card>

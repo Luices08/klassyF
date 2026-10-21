@@ -6,6 +6,7 @@ import Guardian from '../../src/models/guardian.model';
 import SesionComision from '../../src/models/sesionComision.model';
 import StudentGuardian from '../../src/models/studentGuardian.model';
 import { UserDocument } from '../../src/models/user.model';
+import { causalDeCierre } from '../../src/utils/comision';
 import { generarPdfActaSesion } from '../../src/services/actaSesionPdf.service';
 import { actualizarConfiguracion, datosDeConfiguracion, obtenerConfiguracion } from '../../src/services/configuracionComision.service';
 import { cerrarGrupo, reevaluarEstudiante } from '../../src/services/evaluacionPromocion.service';
@@ -191,6 +192,12 @@ describe('M20: comisión de evaluación y promoción', () => {
 
       const { buffer } = await generarPdfActaSesion(sesionId, e.admin);
       expect(buffer.subarray(0, 4).toString()).toBe('%PDF');
+
+      // La causal del SIEE que el acta imprime sale del cierre guardado: debe existir en datos reales, no solo en el cálculo.
+      const caso = (await SesionComision.findById(sesionId))!.casos.find((c) => c.evaluacion_id)!;
+      const cierreDelCaso = (await EvaluacionPromocion.findById(caso.evaluacion_id))!;
+      const causal = causalDeCierre(cierreDelCaso.detalle);
+      expect(causal.motivos.length + causal.reglas.length + causal.perdidas.length).toBeGreaterThan(0);
     });
 
     it('una decisión sin mayoría queda registrada pero no cambia el cierre del estudiante', async () => {

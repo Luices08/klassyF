@@ -39,6 +39,7 @@ import promocionAnticipadaRoutes from './promocionAnticipada.routes';
 import comisionRoutes from './comision.routes';
 import titulacionRoutes from './titulacion.routes';
 import recuperacionRoutes from './recuperacion.routes';
+import reportesRoutes from './reportes.routes';
 import reportCardRoutes from './reportCard.routes';
 import studentRoutes from './student.routes';
 import studyPlanRoutes from './studyPlan.routes';
@@ -137,6 +138,7 @@ router.use('/boletines', boletinRoutes);
 
 // M18: Recuperaciones — política del colegio (por periodo y de fin de año), candidatos y registro de intentos
 router.use('/recuperaciones', recuperacionRoutes);
+router.use('/reportes', reportesRoutes);
 
 // M19: Promoción y cierre del año — política del SIEE (reglas de promoción, arrastre, PIAR)
 router.use('/promocion', promocionRoutes);

@@ -105,8 +105,7 @@ describe('M26: tipos de documento configurables (con base de datos)', () => {
     texto.bloques.find((b) => b.id === 'cuerpo')!.texto += ' Su conducta ha sido ejemplar.';
     await plantillaServicio.publicarPlantilla(nuevo.clave, texto, 'Primer texto', e.secretaria);
 
-    await expect(tipos.activarTipo(nuevo.clave, e.secretaria)).rejects.toMatchObject({ statusCode: 403 });
-    expect((await tipos.activarTipo(nuevo.clave, e.admin)).estado).toBe('ACTIVO');
+    expect((await tipos.activarTipo(nuevo.clave, e.secretaria)).estado).toBe('ACTIVO');
     expect((await matriculasDe()).tipos).toContain(nuevo.clave);
 
     const documento = await expedir({ tipo: nuevo.clave });
@@ -117,11 +116,13 @@ describe('M26: tipos de documento configurables (con base de datos)', () => {
     expect(await AuditLog.countDocuments({ accion: { $in: ['CERTIFICADO_TIPO_CREADO', 'CERTIFICADO_TIPO_ACTIVADO'] } })).toBe(2);
   });
 
-  it('un tipo activo solo lo edita el administrador; Secretaría no puede ni redactar su texto', async () => {
+  it('Secretaría y el administrador editan un tipo activo y redactan su texto; los demás roles no crean tipos', async () => {
     const t = await tipos.crearTipo(entradaTipo(), e.secretaria);
     await tipos.activarTipo(t.clave, e.admin);
-    await expect(tipos.actualizarTipo(t.clave, { nombre: 'Otro nombre' }, e.secretaria)).rejects.toMatchObject({ statusCode: 403 });
-    await expect(plantillaServicio.publicarPlantilla(t.clave, await textoVigente(t.clave), '', e.secretaria)).rejects.toMatchObject({ statusCode: 403 });
+    expect((await tipos.actualizarTipo(t.clave, { nombre: 'Otro nombre' }, e.secretaria)).nombre).toBe('Otro nombre');
+    const texto = await textoVigente(t.clave);
+    texto.bloques.find((b) => b.id === 'cuerpo')!.texto += ' Texto ajustado por Secretaría.';
+    await expect(plantillaServicio.publicarPlantilla(t.clave, texto, 'Ajuste', e.secretaria)).resolves.toBeDefined();
     expect((await tipos.actualizarTipo(t.clave, { nombre: 'Constancia de buen comportamiento' }, e.admin)).nombre).toBe('Constancia de buen comportamiento');
     await expect(tipos.crearTipo(entradaTipo(), e.docenteDeClase)).rejects.toMatchObject({ statusCode: 403 });
   });
@@ -193,17 +194,16 @@ describe('M26: tipos de documento configurables (con base de datos)', () => {
     const historial = await certificados.listarCertificados({ tipo: t.clave, pagina: 1, limite: 10 }, e.secretaria);
     expect(historial.data[0]).toMatchObject({ nombre_tipo: 'Constancia de conducta', codigo: c.codigo });
 
-    // El ADMIN lo puede volver a activar; Secretaría no.
-    await expect(tipos.activarTipo(t.clave, e.secretaria)).rejects.toMatchObject({ statusCode: 403 });
-    expect((await tipos.activarTipo(t.clave, e.admin)).estado).toBe('ACTIVO');
+    // Secretaría o el ADMIN lo pueden volver a activar.
+    expect((await tipos.activarTipo(t.clave, e.secretaria)).estado).toBe('ACTIVO');
   });
 
-  it('la política de firmas y sello vive en cada tipo y solo la cambia el ADMIN', async () => {
+  it('la política de firmas y sello vive en cada tipo y la cambian el ADMIN y Secretaría', async () => {
     await configuracion.actualizarConfiguracion({ politica: { PAZ_SALVO: { sello: 'OBLIGATORIO' } } }, e.admin);
     expect((await tipos.tipoPorClave('PAZ_SALVO')).politica.sello).toBe('OBLIGATORIO');
     const vista = await configuracion.vistaConfiguracion(e.admin);
     expect(vista.tipos.find((t) => t.clave === 'PAZ_SALVO')!.elementos.sello.bloqueado).toBe(true);
-    await expect(configuracion.actualizarConfiguracion({ politica: { PAZ_SALVO: { sello: 'NO_APLICA' } } }, e.secretaria)).rejects.toMatchObject({ statusCode: 403 });
+    await expect(configuracion.actualizarConfiguracion({ politica: { PAZ_SALVO: { sello: 'NO_APLICA' } } }, e.secretaria)).resolves.toBeDefined();
     await expect(configuracion.actualizarConfiguracion({ politica: { NO_EXISTE: { sello: 'NO_APLICA' } } }, e.admin)).rejects.toMatchObject({ statusCode: 400 });
   });
 
@@ -225,10 +225,11 @@ describe('M26: tipos de documento configurables (con base de datos)', () => {
     // No guarda nada: solo existe la versión de partida.
     expect(await PlantillaCertificado.countDocuments({ tipo: t.clave })).toBe(1);
 
-    // Con el tipo activo, Secretaría ya no redacta; el ADMIN sí.
+    // Con el tipo activo, Secretaría y el ADMIN siguen redactando; un docente no.
     await tipos.activarTipo(t.clave, e.admin);
-    await expect(plantillaServicio.renderizarBorrador(t.clave, texto, e.secretaria)).rejects.toMatchObject({ statusCode: 403 });
+    await expect(plantillaServicio.renderizarBorrador(t.clave, texto, e.secretaria)).resolves.toBeDefined();
     await expect(plantillaServicio.renderizarBorrador(t.clave, texto, e.admin)).resolves.toBeDefined();
+    await expect(plantillaServicio.renderizarBorrador(t.clave, texto, e.docenteDeClase)).rejects.toMatchObject({ statusCode: 403 });
   });
 
   it('el responsable legal solo se lee y se congela si el texto del tipo lo usa', async () => {

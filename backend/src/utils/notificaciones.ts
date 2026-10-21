@@ -14,6 +14,9 @@ export interface DatosNotificacion {
   decision?: 'APROBADA' | 'RECHAZADA';
   /** Fecha y hora ya escritas (hora de Colombia) de una citación. */
   cuando?: string;
+  /** Título de una noticia o evento institucional y su categoría. */
+  titulo?: string;
+  categoria?: string;
 }
 
 const plural = (n: number, uno: string, varios: string) => (n === 1 ? uno : varios);
@@ -85,6 +88,11 @@ export function renderizarNotificacion(evento: EventoNotificacion, contador: num
         titulo: 'Próximamente',
         mensaje: `${datos.nombre ?? 'Un evento del calendario'} ${datos.dias === 0 ? 'es hoy' : `empieza en ${datos.dias ?? '?'} ${plural(datos.dias ?? 0, 'día', 'días')}`}.`,
       };
+    case 'NOTICIA_NUEVA':
+      // Las nuevas se acumulan en una sola alerta: con una sola se dice cuál es; con varias, cuántas hay.
+      return n === 1
+        ? { titulo: datos.categoria ? `Nuevo: ${datos.categoria}` : 'Noticia nueva', mensaje: `«${datos.titulo ?? 'Una noticia'}»${datos.cuando ? ` · ${datos.cuando}` : ''}.` }
+        : { titulo: 'Noticias y eventos nuevos', mensaje: `Hay ${n} noticias y eventos nuevos. El último: «${datos.titulo ?? 'sin título'}».` };
     case 'CITACION_NUEVA':
       return {
         titulo: 'Nueva citación',

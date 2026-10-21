@@ -3,6 +3,7 @@ import { connectDB } from './config/db';
 import { env } from './config/env';
 import { iniciarColaCorreo } from './services/colaCorreo.service';
 import { iniciarPlanificadorNotificaciones } from './services/planificadorNotificaciones.service';
+import { iniciarPlanificadorNoticias } from './services/planificadorNoticias.service';
 
 async function start(): Promise<void> {
   await connectDB();
@@ -12,6 +13,7 @@ async function start(): Promise<void> {
   });
 
   iniciarPlanificadorNotificaciones();
+  iniciarPlanificadorNoticias();
   iniciarColaCorreo();
 
   const shutdown = (signal: string): void => {

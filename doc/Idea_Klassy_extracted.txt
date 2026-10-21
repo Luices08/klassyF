@@ -1,0 +1,1078 @@
+Contenido
+1. Visión general del proyecto2
+2. Objetivos2
+3. Actores del sistema2
+3
+M01. Configuración institucional y estructura académica3
+Regla 1: Principio de Datos Centralizados (No Duplicidad)6
+Regla 2: Prohibición Absoluta de Código Quemado (Hardcoding)6
+Regla 3: Frontera Estricta entre Espacio Físico y Unidad Académica7
+Regla 4: Dominio Educativo Colombiano Obligatorio7
+Alcance Delimitado por Solicitud7
+M02. Usuarios, roles y permisos7
+1. Directorio y Gestión de Usuarios (CRUD Maestro de Cuentas)7
+2. Seguridad, Credenciales y Autenticación8
+3. Matriz de Roles y Control de Acceso por Acciones9
+4. Permisos por Contexto y Propiedad de Datos (Reglas de Bloqueo)10
+5. Trazabilidad y Auditoría de Seguridad (Enlace con M31)10
+2. Sección Principal (Hero Section)11
+3. Módulo Central de Admisiones y Preinscripción (M04)11
+4. Accesos a Trámites y Servicios Futuros (Botones Deshabilitados / "Próximamente")11
+5. Resumen de Oferta Institucional (M01)12
+6. Pie de Página Institucional (Footer)12
+M03. Estudiantes, acudientes e historial13
+1. Expediente y Hoja de Vida del Estudiante (Datos Maestros)13
+2. Gestión de Acudientes y Relaciones Familiares (Red de Apoyo)13
+3. Historial Escolar Longitudinal14
+4. Funciones y Operaciones de la Pantalla (Experiencia de Usuario)14
+5. Reglas de Negocio Clave para que Claude Code no se confunda15
+M04. Admisiones, matrículas y cupos15
+2. Aspectos Clave a Considerar para el Futuro (Blindaje Técnico)17
+M05. Calendario académico y periodos18
+1. Gestión del Año Lectivo / Vigencia Académica18
+2. Estructuración y Control de Periodos Académicos18
+3. Semanas de Receso, Vacaciones y Recuperaciones19
+4. Relación Estructural con M01 y M0220
+5. Resumen de Pantallas y Componentes Visuales20
+M06. Plan de estudios, áreas y asignaturas21
+M07. Matriz curricular, DBA y desarrollos curriculares21
+M08. Gestor de docentes y carga académica21
+M09. Motor de horarios21
+M10. Salones, espacios y recursos22
+1. Modelo de Datos del Espacio (Atributos obligatorios)22
+2. Inventario de Recursos y Dotación (recursos)22
+3. Restricciones y Exclusividades por Tipo de Actividad23
+4. Interfaz de Usuario (UI/UX) requerida23
+M11. Actividades y planeación de aula23
+1. La Conexión con Carga Docente (M08) y Plan de Estudios (M06)24
+2. El Núcleo Pedagógico: M07 (Matriz Curricular y DBA)24
+3. Arquitectura Interna del Módulo 1125
+M12. Evaluación y notas25
+1. Motor de Configuración y Reglas (Antes de Iniciar el Año)26
+2. Constructor Dinámico de Planillas (Integración con M21)26
+3. Motor Transaccional y Cálculo (Core de M12)26
+4. Ecosistema de Sincronización y Seguridad (M22 y M31)27
+1. La entrada de datos: M11 (Actividades) hacia M12 (Notas)27
+2. El cierre y consolidación: M12 (Notas) hacia M17 (Boletines)27
+3. Inteligencia de datos: M12 (Notas) hacia M30 (Reportes y Estadísticas)28
+M13. Asistencia y novedades28
+M14. Observaciones y convivencia28
+M15. Comité de Convivencia Escolar28
+M16. PIAR, orientación y apoyo29
+M17. Boletines e informes académicos29
+M18. Recuperaciones, nivelaciones y refuerzos29
+M19. Promoción y cierre del año29
+M20. Comisión de Evaluación y Promoción29
+M21. Planillas y formatos institucionales30
+M22. Planillas docentes + Excel / Google Sheets30
+M23. Proyectos Pedagógicos Transversales30
+M24. Agenda, reuniones y compromisos30
+M25. Calendario ADSO y eventos externos31
+M26. Secretaría académica y certificados31
+Constancia de Estudio32
+Libro de Matrícula y Folio Individual33
+M27. Portal de acudientes y comunicación35
+M28. Comunicaciones y notificaciones internas35
+M29. Documentos y archivo institucional35
+M30. Reportes, estadísticas y tableros35
+M31. Auditoría e historial de cambios35
+M32. Configuración de reglas y parámetros35
+6. Procesos transversales críticos37
+6.1. Flujo de planeación curricular37
+6.2. Flujo de horario37
+6.3. Flujo de evaluación y boletín37
+6.4. Flujo de recuperación y promoción37
+7. Integraciones38
+8. Principio de datos centralizados38
+9. Módulos de mayor complejidad técnica38
+10. Orden recomendado para diseñar el sistema39
+11. Reglas que NO deberían quedar quemadas en código39
+12. Consideraciones normativas40
+1. Visión general del proyecto
+Klassy se plantea como una plataforma integral de gestión escolar. Su propósito no es limitarse al registro de notas, sino centralizar los procesos que una institución educativa necesita durante el año lectivo: configuración institucional, matrícula, planeación curricular, horarios, evaluación, asistencia, convivencia, inclusión, comunicaciones, boletines, recuperaciones, promoción, certificación y seguimiento administrativo.
+El principio central del sistema es que la información debe registrarse una sola vez y reutilizarse en los procesos que dependen de ella. Por ejemplo, la matrícula determina los estudiantes de un grupo; la estructura académica alimenta el horario y la evaluación; el calendario controla los periodos; las notas cerradas alimentan los boletines; y los resultados académicos alimentan recuperación y promoción.
+El sistema debe ser configurable. Una institución puede utilizar diferentes plantillas, escalas, periodos, estructuras de áreas, intensidades horarias, reglas de promoción y procedimientos internos. Por eso estas reglas no deben quedar quemadas directamente en el código.
+2. Objetivos
+Centralizar la gestión académica y administrativa de la institución.
+Reducir la dependencia de documentos, hojas de cálculo y procesos manuales.
+Mantener una transición progresiva para docentes que todavía trabajan con Excel o Google Sheets.
+Automatizar procesos complejos como horarios, boletines, recuperación y promoción.
+Dar trazabilidad a procesos sensibles mediante estados, versiones, aprobaciones y auditoría.
+Facilitar el trabajo de docentes, coordinación, rectoría, secretaría, orientación y familias.
+Permitir configuración por institución sin modificar el núcleo del software.
+3. Actores del sistema
+Actor
+Responsabilidad principal
+ administrador institucional
+Gestión institucional, usuarios, configuración, seguimiento y procesos directivos.
+Coordinador académico
+Horarios, carga docente, desarrollos curriculares, seguimiento académico y coordinación.
+Coordinador de convivencia
+Procesos disciplinarios, comité de convivencia y seguimiento de casos.
+Docente
+Planeación, clases, actividades, notas, asistencia, observaciones, reuniones y desarrollos curriculares.
+Orientación / Psicología
+Seguimiento, inclusión, PIAR y acompañamiento de estudiantes.
+Secretaría académica
+Matrículas, certificados, constancias, libros y documentación académica.
+Estudiante
+Consulta de información académica, actividades, horario, asistencia y recuperación.
+Acudiente
+Seguimiento del estudiante, comunicaciones, citaciones y consulta de información autorizada.
+M01. Configuración institucional y estructura académica
+Definir institución, sedes, jornadas y niveles educativos.
+Configurar básica primaria, básica secundaria y media, con posibilidad de adaptar la estructura institucional.
+Crear grados y grupos, por ejemplo 1°A, 1°B, 10°A, etc.
+Gestionar salones y cupos a los salones, capacidad y estado de los grupos.
+Servir como núcleo para matrícula, horarios, evaluación, asistencia y boletines.
+Estoy desarrollando la plataforma integral de gestión escolar "Klassy" con mi equipo. Te adjunto dos elementos clave:1. El documento maestro del proyecto (con los 32 módulos, actores y reglas) (está en la carpeta docs del git hub).2. El gráfico de dependencias de datos del sistema (en la imagen adjunta). ### REGLAS DE LECTURA DEL GRAFO Y TRAZABILIDAD1. **La imagen adjunta es un grafo de dependencias de datos, no un orden de ejecución lineal:**   - Cada flecha indica consumo estricto de información (A -> B significa que B consume entidades creadas en A).   - Los módulos se dividen en dos dominios paralelos para el backend:     * Backend A (Administración, Personas, Matrículas, Asistencia, Convivencia, Secretaría).     * Backend B (Configuración SIEE, Plan de Estudios, Horarios, Calificaciones, Boletines, Cierres).2. **Prohibición de sobreingeniería y alucinación:**   - No generes endpoints, servicios ni lógica de módulos posteriores a menos que se te pida explícitamente.   - Todo módulo posterior debe respetar el principio de datos centralizados: reutilizar las llaves foráneas (UUID) definidas en los módulos padre, sin reinventar esquemas.3. **Regla de oro institucional:**   - La institución (core_institutions) es el tenant raíz.   - Las reglas del SIEE (M32) cuelgan de la institución y aplican a todas las sedes.   - Los grupos (core_groups) son la intersección física y organizativa de: branch_id + shift_id + grade_id + name.---### TAREA ACTUAL: ENFOQUE EN M01 (Configuración Institucional y Estructura)En este momento estamos programando únicamente el módulo **M01**.Por favor:1. Confirma que comprendes el grafo de la imagen y el documento base.2. Identifica cuáles son las tablas maestras mínimas que requiere M01 (Institución, Sedes, Jornadas, Grados y Grupos) para que los módulos siguientes (M02 Usuarios, M03 Personas, M04 Matrículas y M06 Plan de Estudios) puedan conectarse limpiamente sin rehacer migraciones.3. Espera mis instrucciones antes de generar código completo de lógica de negocio o autenticación.
+bien hecho, ahora bien según la doc/idea klassy, vamos a seguir mejorando el modulo 01, contexto en colombia, existen los 4 periodos no son obligatorios, asi que dejalo que se puedan agregar y eliminar periodos de 2 hasta 4, con la condición de que siempre sume 100%, tambien quiero que los calendario esten enlazados a los meses y periodos  entonces, el periodo inicial del calendario siempre empiezan entre ene y  feb del 2026 y el periodo final termina en siempre entre nov y dic del 2026, y en el calendario b el periodo inicial está entre ago y sept del 2026, y el p final termina entre juny jul del 2027, así que agrga estas validaciones al momento de crear una sede,  las validaciones deben ser solo una advertencia tipo aviso
+Quiero migrar este componente de tabla a TanStack Query (@tanstack/react-query) para que los datos se actualicen automáticamente tras guardar o editar, sin recargar la página.
+Condiciones:
+No toques el diseño visual, clases CSS, ni las etiquetas de mi tabla (<table>, <tr>, etc.).
+Reemplaza únicamente el useEffect/useState por useQuery.
+Agrega la mutación con useMutation e invalida la queryKey correspondiente cuando la acción termine con éxito
+esto para todas las tablas del proyecto, también para  funciones futuras como  
+  las notificaciones o los módulos de actividades y entregas de los docentes y estudiantes, tambien actualiza el claude.md para que esto se siga implementando
+Nivel Institución (Común para todas las sedes)Nivel Sede (Específico y local de cada sede)
+Reglas SIEE (M32): Escala numérica, equivalencias cualitativas, criterios de pérdida. 
+Infraestructura (M10): Salones, laboratorios, canchas y cupos físicos. 
+Calendario Académico (M05): Fechas de inicio/fin de periodo y cierres de notas. 
+Jornadas operativas (core_shifts): La sede A puede tener Jornada Única y la sede B Mañana/Tarde. 
+Plan de Estudios (M06): Áreas, asignaturas y sus ponderaciones porcentuales. 
+Grupos (core_groups): Grado 10°A en Sede Norte, Grado 10°A en Sede Sur. 
+Directivas: Rector/Administrador Institucional y Secretaría general. 
+Horarios (M09): La malla de cruces y disponibilidad física. 
+Educación PreescolarPreescolarPre-jardín, Jardín, Transición (Obligatorio)-2, -1, 0
+Educación Básica
+Básica Primaria
+Primero (1°), Segundo (2°), Tercero (3°), Cuarto (4°), Quinto (5°) 1, 2, 3, 4, 5
+Básica Secundaria
+Sexto (6°), Séptimo (7°), Octavo (8°), Noveno (9°)6, 7, 8, 9
+Educación Media
+Media Académica / Técnica Décimo (10°),  Once (11°) 10, 11
+Regla 1: Principio de Datos Centralizados (No Duplicidad)
+La información se crea una sola vez y se consume mediante llaves foráneas. 
+Flujo de dependencias de datos que debes respetar siempre: 
+$$\text{Institución} \rightarrow \text{Sedes} \rightarrow \text{Jornadas} \rightarrow \text{Grados} \rightarrow \text{Grupos} \rightarrow \text{Matrícula} \rightarrow \text{Estudiante} \rightarrow \text{Calificaciones/Asistencia} \text{[cite: 3]}$$
+Los grupos no son globales: pertenecen estrictamente a una combinación única de branch_id, shift_id y grade_id.
+Regla 2: Prohibición Absoluta de Código Quemado (Hardcoding)
+Está terminantemente prohibido colocar valores fijos en el código para la lógica académica. Todo debe consultarse desde la configuración institucional (M32): 
+No quemar escalas ni rangos de notas: No asumas $1.0$ a $5.0$ ni apruebe con $3.0$ en un if. Debe venir parametrizado por la institución. 
+No quemar periodos: Prohibido hacer bucles fijos de 4 periodos; pueden ser 3 periodos o variar por calendario A/B. 
+No quemar reglas de promoción o recuperación: Las materias reprobadas toleradas, porcentajes de inasistencia para perder y condiciones de promoción anticipada deben leerse desde la base de datos. 
+No quemar ponderaciones de áreas: Un área calcula su nota a partir del peso porcentual de sus asignaturas configurado en M06, no mediante un promedio simple asumido en el código. 
+Regla 3: Frontera Estricta entre Espacio Físico y Unidad Académica
+El Salón (M10) es un aula física con capacidad de pupitres (paredes, computadores, laboratorio). 
+El Grupo (M01) es un colectivo de personas (10°A, 11°B) con un cupo administrativo (max_capacity). 
+No hagas que la existencia de un grupo dependa obligatoriamente de tener un salón físico asignado. Un mismo salón físico puede atender al grupo 10°A en la mañana y al 6°B en la tarde. 
+Regla 4: Dominio Educativo Colombiano Obligatorio
+Los niveles educativos válidos son: PREESCOLAR, PRIMARIA (1° a 5°), SECUNDARIA (6° a 9°) y MEDIA (10° y 11°). 
+Todo grado debe incluir el campo numeric_order: integer (de 1 a 11) para cálculos de promoción y ordenamiento, evitando el orden alfabético. 
+Las jornadas (shifts) pertenecen a la Sede, no a la Institución, y usan los valores: MANANA, TARDE, UNICA, NOCTURNA
+Alcance Delimitado por Solicitud
+Cuando se te pida desarrollar un módulo, no agregues código, tablas ni endpoints de módulos posteriores. 
+Si se está solicitando M01, crea únicamente la jerarquía institucional y los grupos. No implementes la lógica de notas (M12), ni de horarios (M09), ni la gestión de usuarios completa (M02) en ese mismo paso. 
+M02. Usuarios, roles y permisos
+Gestionar usuarios y perfiles.
+Definir permisos por módulo, acción y contexto cuando sea necesario.
+Evitar que un usuario pueda modificar información que solamente debe consultar.
+Registrar acciones críticas para auditoría.
+1. Directorio y Gestión de Usuarios (CRUD Maestro de Cuentas)
+Creación de usuarios individuales:
+Formulario para registrar: tipo de documento (CC, CE, TI, PEP, PPT), número de documento, nombres, apellidos, correo electrónico institucional/personal y contraseña temporal.
+Asignación de Rol base (Administrador, Coordinador, Docente, Orientador, Secretaría, Estudiante, Acudiente).
+Asociación a la Institución (core_institutions).
+Asignación de contexto físico (Sedes autorizadas):
+Poder vincular un usuario a una o varias sedes (core_campuses).
+Permitir que un Administrador tenga acceso global, pero que un Coordinador o Docente solo tenga alcance operativo en sus sedes asignadas.
+Listado general y filtros:
+Tabla completa con paginación, avatar/iniciales, documento, nombres completos, correo, rol, sedes asignadas y estado.
+Buscador en tiempo real por texto (nombre, apellido, documento o correo).
+Filtros rápidos por: Rol, Sede física y Estado de cuenta.
+Edición y actualización:
+Modificar información de contacto o corregir nombres y apellidos.
+Reasignar sedes o cambiar el rol de la cuenta.
+Gestión del ciclo de vida de la cuenta:
+Activar, Suspender o Bloquear cuentas.
+Prohibición de borrado físico: Si el usuario ya tiene acciones registradas (asistencias, notas, matrículas), el sistema no debe permitir borrarlo (DELETE), únicamente inactivarlo para mantener la integridad histórica.
+Carga masiva de usuarios:
+Importación de usuarios mediante archivo (CSV o Excel) para crear docentes o personal administrativo por lotes.
+2. Seguridad, Credenciales y Autenticación
+Restablecimiento de contraseñas:
+Botón para que el Administrador genere una clave temporal autogenerada para el usuario.
+Opción para forzar el cambio de contraseña en el primer inicio de sesión.
+Gestión del propio perfil (Mi Cuenta):
+Pantalla para que cualquier usuario autenticado consulte sus datos básicos, cambie su contraseña actual y actualice su teléfono o foto de perfil.
+Control de sesiones y bloqueos:
+Detección de intentos fallidos consecutivos de contraseña y bloqueo temporal de seguridad.
+Cierre forzado de sesiones activas (útil si se suspende una cuenta de inmediato).
+3. Matriz de Roles y Control de Acceso por Acciones
+El sistema debe permitir parametrizar qué puede y qué no puede hacer cada rol en cada módulo:
+Catálogo de Roles preconfigurados:
+ADMIN: Acceso a configuración macro, reglas SIEE y auditoría.
+COORDINATOR: Gestión académica, currículo, horarios y control de planillas.
+TEACHER: Registro de actividades, notas, asistencia y desarrollos curriculares.
+COUNSELOR (Orientación/Psicología): Acceso prioritario a PIAR y bienestar.
+SECRETARY: Matrículas, expedición de certificados y archivo.
+STUDENT: Consulta de notas, tareas y horarios propios.
+GUARDIAN: Consulta de notas, asistencia y justificaciones de sus acudidos.
+Matriz de Permisos Granulares:
+Configurar por módulo las acciones permitidas: Consultar (Read), Crear (Create), Editar (Update), Eliminar/Anular (Delete) y Aprobar/Cerrar (Approve).
+Ejemplo funcional: El rol Docente puede crear y editar notas en su aula, pero la acción Aprobar / Reabrir notas cerradas solo la tiene habilitada el Coordinador o Admin.
+Ejemplo funcional: El módulo PIAR (M16) solo puede ser consultado por Orientación, Administrador y los docentes directamente involucrados, bloqueándolo para el resto.
+4. Permisos por Contexto y Propiedad de Datos (Reglas de Bloqueo)
+Para cumplir con el requerimiento de "evitar que un usuario pueda modificar información que solamente debe consultar":
+Regla de Contexto Docente:
+Un docente puede ver el listado de todos los cursos si es necesario, pero solo puede registrar calificaciones (M12) o tomar asistencia (M13) en las asignaturas y grupos asignados a su carga académica (M08). Si entra a otra materia, la interfaz se muestra en modo solo lectura y deshabilita los botones de guardado.
+Regla de Contexto Coordinador:
+Un coordinador asignado a la "Sede Primaria" no puede modificar horarios ni aprobar planes curriculares de la "Sede Bachillerato".
+Regla de Contexto Familiar:
+Un estudiante o acudiente solo puede consultar información asociada a su propio ID o al de sus hijos (M03, M27). Cualquier intento de consultar datos de otro estudiante arroja un error de acceso no autorizado.
+5. Trazabilidad y Auditoría de Seguridad (Enlace con M31)
+Cada vez que se interactúe con el módulo de usuarios, el sistema debe registrar en segundo plano para auditoría:
+Fecha, hora y dirección IP del inicio de sesión.
+Quién creó cada nueva cuenta de usuario y cuándo.
+Quién cambió el rol, los permisos o el estado de un usuario.
+Quién solicitó o ejecutó el cambio o restablecimiento de contraseña.
+Registro de intentos fallidos o accesos no autorizados a rutas protegidas.
+MODULO INTERMEDIO 1. Barra de Navegación Superior (Header / Navbar)
+Logo y Nombre de la Institución: Cargado dinámicamente desde los datos de core_institutions (M01) o el logo base de Klassy.
+Enlaces de anclaje rápido: Inicio, Admisiones, Oferta Académica, Trámites y Contacto.
+Botón Principal de Acción (CTA): Botón destacado «Iniciar Sesión» (redirige al login de usuarios de M02).
+2. Sección Principal (Hero Section)
+Titular institucional: Nombre legal del colegio, lema o bienvenida oficial.
+Subtítulo con aval normativo: Cita breve con el Código DANE y la Resolución de Aprobación de la Secretaría de Educación (M01) para dar validez jurídica y credibilidad institucional.
+Dos botones de acción inmediata:
+«Solicitar Cupo / Preinscripción» (Activo): Lleva directo al formulario de admisión de M04.
+«Consultar Estado de Solicitud» (Activo): Campo o modal rápido donde el acudiente ingresa el documento del aspirante para verificar si su cupo fue aprobado en secretaría.
+3. Módulo Central de Admisiones y Preinscripción (M04)
+Información del proceso de matrícula: Explicación sencilla de los requisitos mínimos y las fechas clave del calendario.
+Aviso de inclusión y matrícula condicional: Mensaje institucional recordando que el derecho al estudio es fundamental y que se reciben solicitudes con acta de compromiso documental.
+Formulario o Acceso directo: Botón amplio para diligenciar la preinscripción en línea.
+4. Accesos a Trámites y Servicios Futuros (Botones Deshabilitados / "Próximamente")
+Esta cuadrícula de tarjetas (cards) proyecta el alcance de la plataforma. Los módulos no construidos tendrán un estado visual atenuado con una etiqueta (badge) de «Próximamente»:
+Servicio / Módulo
+Estado en el Home
+Descripción para la comunidad
+Portal de Acudientes (M27)
+Inactivo / Placeholder
+Consulta de calificaciones, citaciones y justificación de inasistencias en línea.
+Validación de Certificados (M26)
+Inactivo / Placeholder
+Verificación de autenticidad de constancias y actas mediante código QR o número de folio.
+Aula Virtual / Tareas (M11)
+Inactivo / Placeholder
+Espacio para que los estudiantes consulten actividades y envíen evidencias.
+Calendario Institucional (M25)
+Inactivo / Placeholder
+Consulta pública de jornadas pedagógicas, recesos y eventos del colegio.
+5. Resumen de Oferta Institucional (M01)
+Sedes Habilitadas: Listado de sedes físicas con dirección y teléfono de atención.
+Niveles Educativos: Bloques informativos indicando si la institución ofrece Preescolar, Básica Primaria, Básica Secundaria o Media Técnica.
+Jornadas disponibles: Indicadores visuales de jornadas (Mañana, Tarde, Única) por cada sede.
+6. Pie de Página Institucional (Footer)
+Datos legales completos: Razón social, NIT, Código DANE central y sedes, teléfonos y correo de secretaría académica.
+Horarios de atención en ventanilla: Horarios físicos de secretaría y coordinación para trámites presenciales.
+Créditos de la plataforma: Indicador de versión de Klassy.
+M03. Estudiantes, acudientes e historial
+Hoja de vida y datos básicos del estudiante.
+Relación con acudientes y contactos autorizados.
+Historial de matrículas, grupos, resultados, recuperaciones, promociones y retiros.
+Consulta longitudinal de la trayectoria escolar.
+1. Expediente y Hoja de Vida del Estudiante (Datos Maestros)
+Es la ficha central del alumno. Debe contener: 
+Identificación Oficial (Estándar Colombia):
+Tipo de documento: Registro Civil (RC), Tarjeta de Identidad (TI), Cédula de Ciudadanía (CC), Permiso por Protección Temporal (PPT), Cédula de Extranjería (CE) o Número Establecido por la Secretaría (NES).
+Número de documento, lugar de expedición y fecha de nacimiento.
+Información Personal y Sociodemográfica:
+Nombres y apellidos completos.
+Género / Sexo, grupo sanguíneo y factor RH.
+Dirección de residencia, barrio/vereda, municipio y estrato socioeconómico.
+Información médica y de salud: EPS, régimen de salud, alergias o condiciones médicas relevantes.
+Campos de Población y Vulnerabilidad:
+Grupo étnico (indígena, afrodescendiente, rom, etc.).
+Víctima del conflicto o desplazamiento forzado.
+Discapacidad o talento excepcional (bandera clave que se conectará con M16 PIAR). 
+Foto de perfil: Para el carné estudiantil, hojas de vida y listas de clase.
+2. Gestión de Acudientes y Relaciones Familiares (Red de Apoyo)
+En Colombia un estudiante puede tener varios contactos, pero solo uno o dos ejercen representación legal: 
+Ficha del Acudiente / Familiar:
+Tipo y número de identificación, nombres, apellidos, teléfono principal, teléfono secundario, correo y ocupación. (Solicitar pdf)
+Dirección de residencia o lugar de trabajo.
+Vínculo Estudiante–Acudiente (Relación $N:M$):
+Parentesco: Padre, Madre, Abuelo/a, Tío/a, Hermano/a, Tutor Legal.
+Acudiente Principal / Responsable Legal (Booleano): Es quien tiene la firma legal de matrícula, recibe citaciones oficiales y tiene cuenta de portal en M27. 
+Contacto de Emergencia / Retiro Autorizado: Personas autorizadas para retirar al estudiante de la sede o recibir llamadas en caso de urgencia médica.
+Soporte familiar: Un padre o madre registrado una sola vez puede estar vinculado a varios hijos en diferentes grados y grupos sin duplicar sus datos. 
+3. Historial Escolar Longitudinal
+El módulo debe actuar como el expediente acumulativo del estudiante a lo largo de los años lectivos: 
+Trazabilidad de Trayectoria Institucional:
+Historial de los grados cursados en la institución. 
+Registro de institución de procedencia (para estudiantes nuevos).
+Vistas de Consulta Histórica (Prepara la conexión con módulos posteriores):
+Pestaña de Matrículas anteriores: histórico de grupos y años cursados en el colegio. 
+Pestaña de Resultados Académicos: consulta de calificaciones pasadas, recuperaciones y boletines históricos. 
+Pestaña de Situación Final: registro de años aprobados, reprobados, promovidos por recuperación o retiros. 
+4. Funciones y Operaciones de la Pantalla (Experiencia de Usuario)
+Buscador y Directorio de Estudiantes:
+Listado general con paginación, avatar, documento, nombres completos, estado (Activo, Inactivo, Retirado, Graduado), acudiente principal y teléfono de contacto.
+Búsqueda predictiva por nombre, apellido o documento de identidad.
+Filtros rápidos: por estado, por EPS, por condición de inclusión/discapacidad.
+Ficha Detallada (Vista 360° del Estudiante):
+Una vista con pestañas:
+Datos Generales y Médicos.
+Núcleo Familiar y Acudientes (con botón para asociar acudiente existente o registrar uno nuevo).
+Historial Académico y Matrículas. 
+Observador y Bienestar (dejará listo el contenedor para M14 Convivencia y M16 PIAR). 
+Formulario de Registro / Edición:
+Formulario por secciones para no abrumar al usuario: 1. Identificación $\rightarrow$ 2. Ubicación y Contacto $\rightarrow$ 3. Salud y Vulnerabilidad $\rightarrow$ 4. Acudiente.
+Importador Masivo:
+Carga inicial de estudiantes y acudientes mediante archivo Excel/CSV con validación de documentos repetidos. 
+5. Reglas de Negocio Clave para que Claude Code no se confunda
+Separar la Persona de la Matrícula:
+El estudiante existe como persona en M03 con su historia clínica y personal. El hecho de cursar un año específico (2026) en un grupo específico (10°A) se gestiona en M04. Si el estudiante se retira a mitad de año, la persona sigue existiendo en M03 en estado inactivo. 
+No vincular obligatoriamente una cuenta de usuario a cada alumno:
+Un niño de primero de primaria tiene expediente en M03, pero no necesariamente tiene una cuenta de login (usr_users). Deja el campo de usuario como opcional (user_id NULL), conectándose con M02 solo si la institución le habilita acceso al portal. 
+Unicidad Documental:
+No pueden existir dos estudiantes con la misma combinación de tipo_documento y numero_documento dentro de la institución.
+M04. Admisiones, matrículas y cupos
+Preinscripción, admisión, matrícula, renovación, traslado y retiro.
+Control de cupos por grado y grupo.
+Documentación asociada a la matrícula.
+Alimentar automáticamente las listas utilizadas por notas, asistencia y demás módulos.
+1. Funcionalidades y Ciclos de Operación (Qué debe hacer M04)
+A. Gestión de Cupos y Preinscripción
+Monitoreo de disponibilidad en tiempo real: Visualización por Sede, Jornada, Grado y Grupo del balance de cupos: $$\text{Cupos Disponibles} = \text{max\_capacity (M01)} - \text{Matriculados Activos} \text{[cite: 5]}$$
+Preinscripción / Solicitud de Admisión: Formulario simplificado para registrar al aspirante como potencial estudiante antes de formalizar la matrícula.
+Alerta de sobrecupo (Hard Constraint): El sistema debe impedir matricular por encima de max_capacity salvo que un ADMIN autorice explícitamente una excepción.
+B. Registro y Formalización de Matrícula
+Vinculación del estudiante: Selección de la persona creada en M03 (o registro exprés).
+Asignación académica: Sede, Jornada, Grado y Grupo para el año lectivo activo (M01 / M05).
+Clasificación del tipo de ingreso:
+Estudiante Antiguo (Renovación): Pasa de grado tras la promoción de M19.
+Nuevo: Ingresa por primera vez a la institución.
+Traslado: Viene de otra institución educativa.
+Reiniciante / Repitente: Repite el grado cursado el año lectivo anterior.
+Generación de folios reglamentarios: Asignación automática o manual del Número de Libro y Número de Folio para dar cumplimiento legal a CU-SEC-03: Generar y Custodiar Libro de Matrícula.
+C. Matrícula Parcial y Checklist Documental (Norma Colombiana)
+Checklist dinámico según el ciclo escolar: Verificación de requisitos documentales según el nivel (Preescolar, Primaria, Secundaria, Media).
+Máquina de estados de la matrícula:
+PREINSCRITO: Cupo reservado pero sin formalizar.
+MATRICULADO_CONDICIONAL: Matriculado con documentos faltantes y acta de compromiso con fecha límite.
+MATRICULADO_DEFINITIVO: 100% de la documentación validada y asentada.
+RETIRADO: El estudiante canceló o fue liberado del sistema.
+ANULADO: Registro cancelado por error administrativo.
+Acta de Compromiso Digital: Generación de un comprobante en PDF con los documentos pendientes y la fecha límite acordada con el acudiente.
+Bandeja de validación de documentos: Interfaz para que secretaría apruebe o rechace con comentarios los archivos cargados por el acudiente.
+D. Novedades de Matrícula
+Reasignación / Cambio de Grupo: Mover a un estudiante de 10°A a 10°B conservando la integridad de sus registros previos.
+Cancelación y Retiro: Registro del motivo de retiro (cambio de ciudad, deserción, traslado) y liberación automática del cupo en el grupo.
+2. Aspectos Clave a Considerar para el Futuro (Blindaje Técnico)
+Para no tener que reescribir código en los módulos posteriores, debes tener en cuenta los siguientes puntos desde este momento:
+La matrícula es la lista viva del aula (M12 y M13):Los módulos de Notas (M12) y Asistencia (M13) no deben consultar directamente la tabla de estudiantes (usr_students); deben consultar a los estudiantes con una matrícula activa en ese grupo y vigencia (core_enrollments con status IN ('MATRICULADO_DEFINITIVO', 'MATRICULADO_CONDICIONAL')). Si un estudiante se retira, no se borra: simplemente su matrícula cambia a RETIRADO y deja de figurar en las planillas activas.
+Historial y no sobreescritura:Un estudiante tendrá múltiples matrículas a lo largo de su vida escolar (una por cada año que curse en Klassy). Por ello, la relación entre el estudiante y el grupo nunca debe guardarse como un campo fijo en la tabla de personas (usr_students), sino en la tabla puente de matrículas.
+Puntos de enganche con otros módulos:
+Con M26 (Secretaría): Todo estudiante matriculado debe poder generar de inmediato su Constancia de Estudio o Certificado de Matrícula.
+Con M27 / M28 (Portal y Notificaciones): Dejar preparado el disparador (trigger/evento) para enviar la alerta de documentos pendientes al acudiente al guardar una matrícula condicional.
+Con M19 (Promoción y Cierre): Al finalizar el año, el proceso de matrícula de alumnos antiguos se automatiza: el sistema leerá los promovidos en M19 y permitirá "promover en lote" al grado siguiente para el nuevo año lectivo.
+Con M31 (Auditoría): Todo cambio de grupo, cambio de estado de matrícula o retiro debe registrar obligatoriamente el usuario responsable y la fecha/hora en la bitácora institucional
+M05. Calendario académico y periodos
+Soporte para calendarios A y B.
+Definir año lectivo, periodos, semanas, vacaciones, recesos, cierres y fechas de recuperación.
+Controlar fechas de apertura y cierre de notas.
+Servir como referencia temporal para boletines, actividades, recuperaciones y promoción.
+1. Gestión del Año Lectivo / Vigencia Académica
+Creación y parametrización del Año Escolar:
+Definición del año civil de la vigencia (por ejemplo, 2026).
+Tipo de régimen/calendario colombiano: Calendario A (año regular de febrero a noviembre) o Calendario B (agosto a junio).
+Fecha formal de inicio y fin del año escolar.
+Vigencia Activa Única por Institución:
+Un colegio solo puede tener un año escolar en estado ACTIVO simultáneamente (evita que los docentes califiquen por error en vigencias pasadas).
+Capacidad de alternar el visor de la plataforma para consultar años en estado CERRADO o HISTÓRICO en modo solo lectura.
+Semana académica de referencia:
+Contador y divisor automático de las 40 semanas mínimas de trabajo académico reglamentadas en Colombia.
+2. Estructuración y Control de Periodos Académicos
+Un colegio puede trabajar a 3 o 4 periodos según su SIEE (M32). M05 debe permitir:
+Configuración de Periodos:
+Nombre o número del periodo (Periodo 1, Periodo 2, Periodo 3, Periodo 4).
+Fecha de inicio y fecha de finalización académica (dictado de clases).
+Ponderación o Peso porcentual: Porcentaje con el que el periodo aporta a la nota final acumulada del año (ej. cuatro periodos de 25% c/u, o 20% - 20% - 30% - 30%). Debe validar que la suma de los periodos dé exactamente 100%.
+Ventanas de Calificación y Cierre de Planillas (CU-CRD-05):
+Fecha de apertura y cierre para que los docentes digiten notas.
+Semáforo de estado del periodo:
+PROGRAMADO: El periodo aún no ha iniciado.
+ABIERTO / EN CURSO: Las clases se dictan, los docentes suben actividades y notas.
+EN DIGITACIÓN / CIERRE: Clases terminadas, ventana final para que los docentes completen planillas.
+CERRADO: Planillas bloqueadas. Ningún docente puede alterar notas. En este estado se calculan puestos y se imprimen boletines oficiales (M17).
+Mecanismo de Desbloqueo / Apertura Excepcional:
+Permiso especial para que el Coordinador o Administrador pueda otorgar una prórroga temporal a un docente específico o a un grupo puntual (ej. habilitar 24 horas extra para cargar una nota rezagada con justificación, dejando trazabilidad en auditoría M31).
+3. Semanas de Receso, Vacaciones y Recuperaciones
+El calendario debe distinguir entre tiempo de clase efectivo y tiempo no lectivo:
+Fechas de Recesos y Vacaciones:
+Registro de la semana de receso escolar (Semana Santa, receso de mitad de año, semana de octubre, receso de fin de año).
+Durante estos rangos, el sistema marca los días como no hábiles para que el motor de asistencia (M13) no exija tomar lista ni compute inasistencias injustificadas.
+Semanas Institucionales / Planeación Docente:
+Días asignados a desarrollo institucional y comisiones de evaluación (M20), donde no hay asistencia de estudiantes pero los docentes sí operan en la plataforma.
+Ventanas de Recuperación y Nivelación (M18):
+Fechas de inicio y fin de actividades de refuerzo y recuperación (tanto de periodo como de final de año).
+Control de plazos para que los docentes registren el resultado de la nivelación.
+4. Relación Estructural con M01 y M02
+Conexión con M01:
+Cada grupo creado en M01 (core_groups) debe estar amarrado a una vigencia (academic_year_id). El grupo 10°A pertenece al año 2026. Al abrir el año 2027, el sistema no sobreescribe 10°A, sino que crea los grupos correspondientes a 2027.
+Si una sede rural o calendario especial opera con fechas distintas a la sede urbana dentro del mismo colegio, el modelo debe permitir asignar periodos por sede o heredar el calendario institucional global.
+Conexión con M02 (Permisos por rol):
+ADMIN: Crea las vigencias, define los periodos y ejecuta el cierre final del año lectivo (CU-REC-05).
+COORDINATOR: Controla las aperturas y prórrogas de planillas de notas (CU-CRD-05).
+TEACHER y STUDENT: Solo consultan el calendario en modo lectura para conocer fechas de entregas, cierres y recesos.
+5. Resumen de Pantallas y Componentes Visuales
+Vista de Configuración del Año Escolar:
+Selector de año activo.
+Configuración general (nombre, régimen Calendario A/B, fechas límite globales).
+Línea de Tiempo de Periodos (Cards o Tabla a ancho completo):
+Tarjetas de cada periodo con su porcentaje, rango de fechas y estado actual (badge: En Curso, Cerrado, etc.).
+Acción directa para abrir/cerrar periodo o conceder prórrogas.
+Selector de Fechas Inhábiles / Recesos:
+Listado de periodos no lectivos (vacaciones, recesos estudiantiles, jornadas pedagógicas).
+Botón de Cierre de Vigencia Académica (Cerrar Año Lectivo):
+Acción crítica con confirmación en dos pasos que verifica que todos los periodos y comisiones estén concluidos antes de congelar el año y habilitar la apertura del siguiente.
+M06. Plan de estudios, áreas y asignaturas
+Separar conceptualmente área, asignatura/materia, grado, grupo e intensidad horaria.
+Permitir áreas compuestas por varias asignaturas: Obligatorias y Optativas 
+Configurar cómo las asignaturas contribuyen al resultado del área.
+Ejemplo: Ciencias Naturales → Biología 50%, Química 30%, Física 20%.
+Permitir promedio ponderado o aritmético según configuración institucional.
+M07. Matriz curricular, DBA y desarrollos curriculares
+Incluir un banco precargado de referentes curriculares, DBA y estándares, sujeto a validación y actualización normativa.
+Permitir seleccionar referentes mediante etiquetas/filtros en lugar de redactar todo desde cero.
+Relacionar DBA con grado, área, asignatura y periodo.
+El docente construye el desarrollo curricular con enseñanzas, competencias, evidencias, actividades, criterios y tiempos.
+Workflow: Borrador → Enviado a Coordinación → Devuelto con observaciones → Aprobado.
+Conservar versiones anteriores para conocer qué cambió, cuándo y quién lo modificó.
+El coordinador puede revisar, observar, devolver y aprobar.
+M08. Gestor de docentes y carga académica
+Registrar asignaciones de docentes a grupos y asignaturas.
+  
+Mostrar carga asignada, disponibilidad y posibles excesos.
+Alimentar directamente al motor de horarios.
+Las reglas concretas de carga deben ser configurables y verificarse contra la normativa vigente.
+M09. Motor de horarios
+Gestionar grupos, docentes, asignaturas, salones, jornadas, franjas y disponibilidad.
+Generar horario por grupo, por docente y vista general institucional.
+Permitir generación automática y edición manual posterior.
+Detectar conflictos antes de publicar el horario.
+Restricciones duras: un docente o salón no puede estar en dos lugares a la vez; respetar bloques obligatorios de prácticas.
+Restricciones blandas: minimizar horas huecas, distribuir carga y optimizar preferencias institucionales.
+Permitir registrar preferencias, restricciones y prioridades.
+Separar claramente restricciones obligatorias de preferencias optimizables.
+M10. Salones, espacios y recursos
+Registrar aulas, laboratorios, salas de informática, canchas y otros espacios.
+Gestionar capacidad, disponibilidad y recursos.
+Definir restricciones por tipo de actividad.
+Integrarse con el motor de horarios.
+1. Modelo de Datos del Espacio (Atributos obligatorios)
+Cada registro en la tabla de salones debe contar con:
+Sede física (sede_id): Vinculada a la sede institucional creada en M01 (ej. Sede Principal o Sede Secundaria). 
+Nombre / Nomenclatura (nombre): Identificador visible (ej. Aula 101, Laboratorio de Química, Sala de Informática 2, Cancha Múltiple). 
+Tipo de espacio (tipo_espacio): Selector fundamental para las restricciones de horarios: 
+Aula Regular
+Laboratorio de Ciencias
+Sala de Informática / Sistemas
+Espacio Deportivo / Cancha
+Auditorio / Aula Máxima
+Taller Técnico
+Capacidad máxima / Aforo (capacidad): Número entero de cupos o puestos de trabajo disponibles. (Este es el valor que previene que abras un grupo con más estudiantes de los que caben en el salón). 
+Estado operativo (estado): Disponible, En mantenimiento o Inactivo (evita que el motor de horarios asigne un espacio en obras o dañado). 
+Piso / Bloque (Opcional): Dato de ubicación física (ej. Bloque A - Piso 2).
+2. Inventario de Recursos y Dotación (recursos)
+En las especificaciones del sistema, M10 incluye gestionar capacidad, disponibilidad y recursos. Debe incluir etiquetas o un listado tipo checklist: 
+Equipamiento disponible: Video beam / TV, Aire acondicionado / ventiladores, Conectividad a internet, Puntos de red cableada, Cantidad de computadores operativos, Lavamanos / gas para laboratorio. 
+Objetivo: Permitir que una materia que requiera proyector o computadores busque automáticamente un espacio compatible.
+3. Restricciones y Exclusividades por Tipo de Actividad
+El documento técnico exige expresamente: «Definir restricciones por tipo de actividad e integrarse con el motor de horarios»: 
+Asignaturas o Áreas exclusivas: Definir qué materias pueden usar el espacio (por ejemplo, el Laboratorio de Química solo puede programarse para Ciencias Naturales / Química, o la Sala 1 para Informática y Tecnología). 
+Aulas fijas o base de grupo: Posibilidad de marcar un aula como el "salón titular" de un grupo (ej. Aula 201 es el salón base de 10°-A). 
+Regla de uso compartido: Definir si el espacio admite solo 1 grupo a la vez (lo usual) o si admite múltiples grupos simultáneos (como la cancha deportiva o el patio). 
+4. Interfaz de Usuario (UI/UX) requerida
+Para el panel del Administrador y Coordinador: 
+Tabla / Directorio de Espacios:
+Filtro por Sede y por Tipo de espacio. 
+Columnas: Sede, Nombre del espacio, Tipo, Capacidad (aforo), Recursos principales y Estado. 
+Acciones: Crear, Editar, Inhabilitar temporalmente por mantenimiento y Eliminar.
+Modal «Nuevo / Editar Espacio»:
+Formulario limpio con sede, nombre, capacidad, tipo, recursos y advertencia de aforo mínimo recomendado.
+Malla de Disponibilidad / Ocupación (Semanal):
+Una vista tipo calendario/rejilla donde se pueda ver qué franjas de la semana está ocupado el salón y por qué grupo/materia (clave para el flujo previo al motor de horarios M09). 
+M11. Actividades y planeación de aula
+Crear tareas, evaluaciones, trabajos y proyectos.
+Relacionar cada actividad con asignatura, grupo, docente y periodo.
+Definir publicación, entrega, evidencias y calificación.
+Consultar el calendario ADSO/institucional antes de asignar actividades.
+Este módulo funciona como el puente de comunicación pedagógica diaria entre el docente y el estudiante, abarcando los casos de uso CU-DOC-02: Programar Actividades y Tareas de Aula y CU-EST-03: Enviar Evidencias de Tareas. 
+Motor de Creación: Formularios para que el docente cree tareas, evaluaciones, trabajos y proyectos. 
+Asignación Estructural: Capacidad de relacionar cada actividad obligatoriamente con una asignatura, un grupo, un docente específico y un periodo académico activo. 
+Parámetros de Recepción: Herramientas para definir las fechas de publicación, los límites de entrega, los tipos de evidencias permitidas y el modelo de calificación de la actividad. 
+Prevención de Sobrecarga: Consulta automática del calendario ADSO e institucional antes de asignar actividades, lo que previene cruces de exámenes o tareas durante recesos. 
+Recepción de Entregables: Interfaz dedicada para que el estudiante suba sus archivos o evidencias directamente a la plataforma. 
+1. La Conexión con Carga Docente (M08) y Plan de Estudios (M06)
+Antes de que se renderice el botón de "Crear Tarea", el Módulo 11 debe filtrar el contexto del usuario.
+Filtro de identidad: El sistema lee la carga académica del docente en M08 para desplegar únicamente los grupos y asignaturas que tiene asignados. Un profesor de Matemáticas no puede crear un proyecto para la clase de Educación Física. 
+Herencia estructural: Al crear la actividad, esta hereda automáticamente su lugar en la jerarquía definida en M06, vinculándose a una asignatura, a un área, a un grado y a un grupo específico. 
+2. El Núcleo Pedagógico: M07 (Matriz Curricular y DBA)
+Esta es la regla de negocio más fuerte. En el modelo educativo colombiano, una tarea no se asigna por capricho, sino para medir una competencia.
+El pre-requisito (Flujo 6.1): Antes de usar M11, el docente tuvo que haber creado su Desarrollo Curricular en M07 seleccionando los Derechos Básicos de Aprendizaje (DBA), competencias y evidencias desde un banco precargado. Este documento debe estar en estado "Aprobado" por el Coordinador. 
+El enlace en M11: Cuando el docente diseña un examen o taller en M11, el formulario debe incluir un selector obligatorio que le pregunte: "¿Qué DBA o competencia de su planeación aprobada evalúa esta actividad?". Esto garantiza la coherencia entre lo que el colegio planea enseñar y lo que el profesor realmente evalúa en el aula. 
+3. Arquitectura Interna del Módulo 11
+Con las dependencias resueltas, el desarrollo técnico de este módulo (CU-DOC-02 y CU-EST-03) se divide en dos grandes interfaces: 
+A. El Gestor del Docente (CU-DOC-02) 
+Configuración de la actividad: Formulario para definir si es una tarea, evaluación, trabajo o proyecto, anclándola a un periodo académico activo. 
+Prevención de choques temporales: Un componente en el selector de fechas que consulta automáticamente el M25 (Calendario ADSO e institucional). Si el docente intenta poner la fecha de entrega de un proyecto en una semana de receso o en un día donde el grupo ya tiene tres exámenes programados, el sistema emite una alerta temprana. 
+Reglas de entrega: El docente define si la actividad requiere un entregable digital (archivo), el tipo de formato permitido y si aceptará entregas tardías.
+B. El Portal del Estudiante (CU-EST-03) 
+Bandeja de actividades: Una vista donde el estudiante filtra sus tareas pendientes por fecha o asignatura.
+Carga de evidencias: Un componente (Dropzone) donde el alumno sube sus archivos (PDF, documentos) para responder a la tarea asignada. 
+Trazabilidad de estados: La tabla de base de datos debe marcar automáticamente la transición: Programada $\rightarrow$ Entregada $\rightarrow$ Entregada con Retraso $\rightarrow$ Calificada.
+M12. Evaluación y notas
+Configurar componentes evaluativos y porcentajes.
+Registrar calificaciones por estudiante, actividad, asignatura y periodo.
+Configurar escala institucional, por ejemplo 1.0 a 5.0.
+Convertir automáticamente a la escala nacional cualitativa cuando corresponda: Superior, Alto, Básico y Bajo.
+Calcular resultados de asignaturas y consolidar áreas.
+Controlar estados de notas: borrador, pendiente, cerrado y definitivo.
+El Módulo 12 (Evaluación y notas) actúa como el núcleo matemático e institucional de la plataforma, fusionando la configuración de reglas, el cálculo de resultados y la estructuración de planillas dinámicas. Su arquitectura exige separar estrictamente la parametrización de las reglas, que ocurre antes del inicio del año lectivo, del registro transaccional diario que realizan los docentes. 
+1. Motor de Configuración y Reglas (Antes de Iniciar el Año)
+Este componente parametriza el sistema de evaluación para evitar que las reglas queden fijas en el código fuente, unificando lineamientos de M12 y M32. 
+Escalas y Equivalencias: Configuración del rango numérico institucional (por ejemplo, 1.0 a 5.0) y su conversión automática a la escala nacional cualitativa (Superior, Alto, Básico y Bajo). 
+Ponderación de Componentes Evaluativos: El administrador define los bloques que conforman el 100% de la nota final del periodo (ej. Heteroevaluación, Autoevaluación) y asigna sus respectivos porcentajes. 
+Consolidación de Áreas: Parametrización de cómo las asignaturas contribuyen al resultado del área mediante un promedio ponderado o aritmético (ej. Ciencias Naturales compuesto por Biología 50% y Química 50%). 
+Bloqueo de Modificación: Una vez que el año inicia y se registra la primera nota, el sistema debe bloquear estas variables estructurales para impedir alteraciones que corrompan los promedios en curso.
+2. Constructor Dinámico de Planillas (Integración con M21)
+El diseño de la planilla que verá el docente se genera leyendo automáticamente las reglas configuradas previamente. 
+Generación de Columnas por Bloque: La interfaz gráfica renderiza separaciones visuales y agrupa las casillas permitidas para cada componente evaluativo (Heteroevaluación, Autoevaluación, etc.).
+Campos Calculados Protegidos: La planilla incorpora columnas de solo lectura que calculan los promedios parciales y definitivos en tiempo real mediante campos calculados. 
+Adaptabilidad Institucional: Permite al administrador configurar encabezados, filtros, tablas y firmas para que la estructura visual de la planilla se adapte a los requerimientos de cada colegio. 
+3. Motor Transaccional y Cálculo (Core de M12)
+Es el responsable de procesar la entrada de datos durante el periodo académico activo. 
+Registro Multidimensional: Almacenamiento preciso de las calificaciones cruzando al estudiante, la actividad específica, la asignatura y el periodo. 
+Control de Estados: Cada calificación transita por un flujo estricto de estados: borrador, pendiente, cerrado y definitivo. 
+Algoritmo de Agrupación: El sistema toma las notas de las actividades, calcula los resultados de cada asignatura individual y finalmente consolida las áreas según la estructura y los porcentajes configurados. 
+4. Ecosistema de Sincronización y Seguridad (M22 y M31)
+Para garantizar que la planilla mantenga su integridad fuera de la plataforma web, el módulo proyecta la configuración a formatos externos.
+Plantillas Controladas Offline: Exportación de la estructura dinámica hacia Excel o Google Sheets, donde únicamente las celdas de calificación son editables, manteniendo protegidas las fórmulas matemáticas. 
+Trazabilidad de Auditoría: Registro estricto en la base de datos de quién creó, modificó o cerró información crítica de las notas, conservando la fecha y el usuario responsable. 
+1. La entrada de datos: M11 (Actividades) hacia M12 (Notas)
+El Módulo 11 se encarga de la creación de las tareas, evaluaciones, trabajos y proyectos, relacionando cada actividad con su respectiva asignatura, grupo, docente y periodo. 
+El Módulo 12 actúa como receptor, permitiendo registrar las calificaciones por cada estudiante y actividad que fue previamente definida en M11. 
+Con base en estas actividades calificadas, M12 aplica la configuración de los componentes evaluativos y sus porcentajes para calcular los resultados de las asignaturas. 
+2. El cierre y consolidación: M12 (Notas) hacia M17 (Boletines)
+M12 es responsable de consolidar las áreas (agrupando asignaturas) y convertir los promedios numéricos a la escala nacional cualitativa (Superior, Alto, Básico y Bajo). 
+Para garantizar la integridad, M12 controla los estados de las notas, transitando desde el estado de borrador hasta el estado cerrado y definitivo. 
+El Módulo 17 depende de forma absoluta de este ciclo, ya que está diseñado para usar únicamente los resultados académicos cerrados como fuente oficial para generar los informes. 
+Siguiendo el flujo centralizado de la plataforma, el resultado calculado del área en evaluación pasa directamente a formar la estructura del boletín final en M17, junto con las inasistencias y observaciones. 
+3. Inteligencia de datos: M12 (Notas) hacia M30 (Reportes y Estadísticas)
+La información transaccional y los promedios calculados en M12 son la base de datos principal para el Módulo 30. 
+M30 consume estos resultados consolidados para generar estadísticas de rendimiento académico filtradas por periodo, materia, área, grupo y grado. 
+Esta conexión permite entregar indicadores precisos y en tiempo real para las decisiones administrativas de los docentes, la coordinación y la rectoría, además de permitir la exportación de reportes. 
+M13. Asistencia y novedades
+Planilla rápida por grupo y fecha.
+Registrar presente, ausencia, retardo, excusa y otros estados configurables.
+Permitir justificaciones y evidencias.
+Generar estadísticas por estudiante, grupo, asignatura y periodo.
+Ofrecer experiencia compatible con planillas tradicionales.
+M14. Observaciones y convivencia
+Registrar observaciones académicas, comportamentales y disciplinarias.
+Permitir compromisos, citaciones y seguimiento.
+Controlar quién puede consultar información sensible.
+Construir historial por estudiante.
+M15. Comité de Convivencia Escolar
+Gestionar casos de convivencia con tipificación Tipo I, II y III, de acuerdo con la normativa aplicable.
+Registrar apertura, hechos, involucrados, medidas, mediación, compromisos y seguimiento.
+Gestionar actas del comité.
+Permitir remisiones a entidades externas cuando corresponda.
+Registrar el debido proceso y conservar trazabilidad documental.
+Los flujos deben configurarse conforme al manual de convivencia y normativa vigente.
+M16. PIAR, orientación y apoyo
+Registrar planes individuales de ajustes razonables (PIAR) y seguimiento de estudiantes que los requieran.
+Relacionar ajustes con áreas, actividades y evaluación.
+Permitir participación de orientación, docentes y responsables autorizados.
+Gestionar evidencias y seguimiento.
+Controlar estrictamente los permisos debido a la sensibilidad de la información.
+M17. Boletines e informes académicos
+Generar boletines por periodo y boletín final.
+Constructor de plantillas por institución.
+Incluir áreas, asignaturas cuando corresponda, resultados, escala, puesto, inasistencias y observaciones.
+Permitir observaciones descriptivas preconfiguradas.
+Usar resultados académicos cerrados como fuente oficial.
+Permitir impresión y generación de PDF.
+M18. Recuperaciones, nivelaciones y refuerzos
+Identificar automáticamente estudiantes que requieren recuperación.
+Crear actividades de refuerzo al final de un periodo o del año.
+Registrar actividades, evidencias y resultados.
+Actualizar la situación académica según reglas configuradas.
+Conservar el resultado original y el resultado de recuperación para mantener trazabilidad.
+M19. Promoción y cierre del año
+Clasificar estudiantes al finalizar el año: promovido, reprobado, pendiente de recuperación, retirado, graduado, etc.
+Registrar promoción por recuperación.
+Gestionar casos de promoción anticipada cuando procedan.
+Registrar promoción de estudiantes reiniciantes cuando la institución la permita.
+Separar claramente resultado académico, decisión de promoción y soporte documental.
+Las reglas automáticas deben poder configurarse y validarse frente a la normativa vigente.
+M20. Comisión de Evaluación y Promoción
+Dashboard para rectoría y coordinación.
+Alertas de estudiantes con riesgo académico.
+Detección de reprobación masiva por asignatura, grupo o grado.
+Análisis de asistencia y desempeño antes del cierre.
+Gestionar reuniones, decisiones y actas de la comisión.
+Conservar evidencia de las decisiones adoptadas.
+M21. Planillas y formatos institucionales
+Constructor de planillas configurables.
+Permitir encabezados, campos, tablas, firmas, filtros y campos calculados.
+Crear formatos para asistencia, seguimiento, reuniones, recuperación, informes y otros procesos.
+Permitir exportación a PDF, Excel u otros formatos.
+M22. Planillas docentes + Excel / Google Sheets
+Servir como puente entre la metodología tradicional y la plataforma.
+Permitir descargar plantillas para trabajar sin conexión.
+Permitir sincronización por lotes cuando vuelva la conectividad.
+Integrar Google Sheets mediante API para determinados formatos.
+Utilizar plantillas controladas: celdas editables para datos permitidos y fórmulas protegidas.
+Definir una fuente oficial de verdad para evitar conflictos entre la hoja y la base de datos.
+Registrar sincronización, usuario, fecha, errores y conflictos.
+El modo offline-first debe contemplar identificación de versión y resolución de conflictos.
+M23. Proyectos Pedagógicos Transversales
+Gestionar proyectos institucionales como PRAE, educación sexual, democracia, seguridad vial y otros que la institución defina.
+Registrar objetivos, responsables, actividades, grupos, evidencias y resultados.
+Relacionar proyectos con docentes y carga de trabajo.
+Permitir que los proyectos sean considerados por el motor de carga y horarios cuando correspondan.
+M24. Agenda, reuniones y compromisos
+Crear reuniones institucionales o académicas.
+Registrar fecha, hora, participantes, agenda, acta, observaciones y compromisos.
+Asignar responsables y fechas límite.
+Dar seguimiento a compromisos pendientes.
+M25. Calendario ADSO y eventos externos
+Mostrar actividades y eventos relevantes para estudiantes y docentes.
+Permitir consultar fechas antes de asignar tareas.
+Integrar eventos institucionales, académicos y externos.
+No debe bloquear automáticamente una actividad salvo que la institución configure esa regla.
+M26. Secretaría académica y certificados
+Generar certificados de estudio: 
+Documento formal que certifica la aprobación o culminación de un grado específico con sus valoraciones finales.
+Datos de identificación: Nombre completo y documento de identidad del estudiante.
+Periodo lectivo: Año lectivo cursado y grado correspondiente.
+Malla curricular y valoraciones:
+Nombre del área y de la asignatura.
+Intensidad horaria semanal y anual.
+Calificación definitiva numérica y escala nacional (Desempeño Superior, Alto, Básico, Bajo).
+Concepto de promoción: Declaración expresa si el estudiante "APROBÓ" o "NO APROBÓ" el grado, sustentada bajo el Decreto 1075 de 2015 y el SIEPE institucional.
+Firmas obligatorias: Rector(a) y Secretario(a) Académico(a).
+Generar constancias de matrícula y otras certificaciones:  (constancia de matrícula). 
+Encabezado institucional:
+Nombre oficial de la institución educativa, escudo y lema.
+Número de Identificación Tributaria (NIT) y código DANE.
+Resoluciones oficiales de reconocimiento o aprobación de estudios emanadas por la Secretaría de Educación territorial.
+Declaración de fe pública:
+Cargo de quien suscribe el documento (generalmente Rector(a) o Secretario(a) Académico(a)).
+Identificación del estudiante:
+Nombres y apellidos completos (tal como aparecen en el documento oficial de identidad).
+Tipo y número de documento de identidad (RC, TI, CC, PPT, etc.) y lugar de expedición.
+Código único estudiantil asignado por el sistema.
+Datos formales del asiento de matrícula:
+Número de Libro de matrícula correspondiente al periodo.
+Número de Folio del acta.
+Código alfanumérico correlativo de matrícula (ej. L1-F000012-2026).
+Fecha exacta de asentamiento/legalización del contrato de matrícula.
+Estado del registro: Matrícula legalizada / definitiva.
+Condición de ingreso: Nuevo, antiguo, reingreso o traslado.
+Información del acudiente/representante:
+Nombre completo y cédula del acudiente registrado que formalizó la firma del acta.
+Cierre y seguridad:
+Ciudad y fecha de expedición del documento.
+Firma digital o manuscrita del Secretario(a) Académico(a) / Rector(a).
+Código QR de verificación pública y hash de integridad para autenticación de terceros.
+El sistema debe detectar dependiendo del tipo de matricula que tenga el estudiante y generar el documento con información correspondiente dependiendo del tipo de matrícula
+Constancia de Estudio
+Este documento acredita la condición académica presente del estudiante, certificando que asiste de forma regular y activa a las actividades pedagógicas programadas.
+Encabezado institucional:
+Nombre del plantel, membrete institucional, NIT, código DANE y resolución de funcionamiento vigente.
+Declaración de fe pública:
+Fórmula formal: "El(La) suscrito(a) Rector(a) / Secretario(a) Académico(a) de la Institución... CERTIFICA QUE:".
+Identificación del estudiante:
+Nombres y apellidos completos en mayúsculas sostenidas.
+Tipo y número de documento de identidad.
+Detalles de la vinculación académica activa:
+Año lectivo en curso (ej. 2026).
+Grado y grupo asignado (ej. Décimo, Grupo 10-A).
+Nivel educativo (Preescolar, Básica Primaria, Básica Secundaria, Educación Media).
+Jornada escolar (Mañana, Tarde, Única, Nocturna).
+Horario regular de clases (relevante para trámites judiciales o permisos laborales del menor, ej. 7:00 a.m. a 1:30 p.m.).
+Estado operativo actual: Cursando activamente / matriculado regular.
+Cláusula de destino o vigencia:
+Texto de salvedad (ej. "Se expide a solicitud de la parte interesada para trámites de subsidio familiar / afiliación a EPS / transporte escolar...").
+Especificación de vigencia habitual (ej. "Válido por treinta (30) días calendario a partir de su expedición").
+Cierre y validación:
+Fecha de expedición con formato textual (ej. "Dado en Bogotá D.C., a los 9 días del mes de octubre de 2026").
+Firma institucional autorizada y sello oficial de la Secretaría.
+Mecanismo de validación web (URL + UUID de trazabilidad) para confirmar autenticidad.
+Importante: El sistema debe emitir constancias de matrículas y de estudios, únicamente a estudiantes matriculados, ya sea Matrícula Condicional o Definitivo
+El sistema debe detectar dependiendo del tipo de matricula que tenga el estudiante y generar el documento con información correspondiente dependiendo del tipo de matrícula. 
+El sistema no debe permitir expedir certificados a personas preinscritas ni Anuladas. 
+Gestionar paz y salvos cuando aplique: Certificación de que el estudiante no adeuda compromisos ante las dependencias del colegio (usualmente requerido para retiros o graduación).
+Datos del alumno y grado/año cursado.
+Validación de áreas:
+Académica: Cierre formal de notas y entrega de recuperaciones.
+Biblioteca: No adeudar libros físicos o materiales pedagógicos.
+Financiera / Administrativa: Sin saldos pendientes (pensiones, derechos de grado, uniformes, si aplica).
+Inventario / Recursos: No adeudar llaves de casilleros, herramientas técnicas o laboratorios.
+Fecha y motivo de expedición: Cierre de año lectivo, retiro voluntario o traslado.
+Gestionar Libro de Matrícula y su trazabilidad: 
+Libro de Matrícula y Folio Individual
+Constituye el registro legal histórico e inalterable del acto de vinculación.
+Numeración y registro: Número de Libro (ej. Libro 1), Número de Folio (ej. Folio 12) y Código único correlativo.
+Ficha del estudiante: Datos biográficos, fecha/lugar de nacimiento, documento, dirección, EPS, grupo sanguíneo.
+Ficha del acudiente: Nombre, identificación, parentesco, teléfono y firma de aceptación de derechos/deberes.
+Condición de ingreso: Nuevo, antiguo, repitente, traslado.
+Trazabilidad de novedades: Registro de cambios de grupo, retiro temporal, deserción o anulación con fecha y motivo.
+Permitir plantillas oficiales configurables: Son formularios estructurados con variables dinámicas  
+la pantalla de Configuración de Plantillas (M26) debe tener los siguientes campos:
+1. Parámetros Generales
+Tipo de Documento: Selector entre Constancia de Estudio, Certificado de Matrícula, Paz y Salvo, Certificado de Calificaciones.
+Cargo de quien certifica: Radio button: [ Rector(a) ] o [ Secretario(a) Académico(a) ].
+Días de Vigencia Oficial: Número de días (por defecto 30 o 60 días, o 0 para sin caducidad).
+2. Fórmula de Fe Pública (Encabezado del Certificado)
+Texto inicial formal.
+Ejemplo de campo: 
+"El suscrito {{cargo_firmante}} de la {{institucion_nombre}}, con aprobación oficial según {{resolución_aprobacion}} ante la Secretaría de Educación, CERTIFICA:"
+3. Cuerpo del Documento (Plantilla con Variables)
+Área de texto enriquecida con etiquetas disponibles para hacer clic e insertar:
+Variables disponibles en pantalla: 
+{{estudiante_nombre}}: Nombres y apellidos completos.
+{{documento_tipo}}: TI, RC, CC, PPT, etc.
+{{documento_numero}}: Número de documento.
+{{grado_nombre}}: Grado que cursa o cursó (ej: Décimo).
+{{grupo_nombre}}: Grupo asignado (ej: 10-01).
+{{jornada}}: Mañana, Tarde, Única.
+{{sede_nombre}}: Nombre de la sede educativa.
+{{año_lectivo}}: Año escolar actual (ej: 2026).
+{{estado_matricula}}: Matriculado Regular / Condicional.
+{{libro_matricula}} y {{folio_matricula}}: Libro y Folio del registro oficial.
+Ejemplo de texto configurado: 
+"Que, {{estudiante_nombre}}, identificado(a) con {{documento_tipo}} No. {{documento_numero}}, se encuentra formalmente matriculado(a) y asistiendo regularmente a clases en el grado {{grado_nombre}} (Grupo {{grupo_nombre}}), durante el año lectivo {{año_lectivo}}, en la sede {{sede_nombre}}, jornada {{jornada}}."
+4. Cláusula de Destino y Vigencia
+Texto de cierre legal antes de la firma.
+Ejemplo de campo: 
+"El presente documento se expide a solicitud de la parte interesada, en {{ciudad_sede}}, a los {{dias_letras}} días del mes de {{mes_letras}} de {{año_expedicion}}, y cuenta con una vigencia de {{vigencia_dias}} días a partir de su emisión."
+5. Notas al Pie y Descargo de Verificación (Seguridad)
+Texto predeterminado donde se advierte la validez jurídica del código QR y firma digital:
+Ejemplo: 
+"La autenticidad e integridad de este documento puede verificarse escaneando el código QR o ingresando el código de verificación {{codigo_verificacion}} en el portal oficial del colegio."
+Registrar quién generó cada documento y cuándo.
+Se plantea el siguiente formulario para la interfaz de generar certificados: 
+Estudiante (Contextual / Selector): (desde Matrículas): el estudiante ya viene precargado y debe mostrar para que se tenga certeza absoluta sobre a quién le está expidiendo un documento público, la ficha del estudiante seleccionado debe proyectar:
+Identificación completa: Nombres y apellidos completos, tipo y número de documento (ej. TI 1.023.456.789) y lugar de expedición del documento.
+Contexto Académico Activo: 
+Grado y Grupo (ej. 10°A).
+Sede y Jornada educativa (ej. Sede Principal · Jornada Mañana).
+Año lectivo vigente (ej. 2026).
+Datos de la Matrícula Legalizada: 
+Estado de la matrícula (Badge visual: Matriculado Definitivo o Matriculado Condicional).
+Asiento del Libro: Número de Libro, Número de Folio y Código único de matrícula (ej. Libro 1, Folio 45 · L1-F000045-2026).
+Condición de ingreso (Nuevo, Antiguo, Traslado, Repitente).
+Acudiente Responsable: Nombre completo, documento y teléfono del acudiente principal que firmó el contrato de matrícula.
+Tipo de certificado (Selector / Dropdown):
+Constancia de estudio
+Constancia de matrícula
+Certificado de estudio (si aplica, un selector del año a certificar: ej. 2025, 2026)
+Paz y salvo
+Destinatario / Motivo):
+El Destinario/Motivo, no será simplemente un input, depende del documento a generar se habilita un selector: 
+1. Si selecciona: Constancia de Estudio
+El select ofrece las entidades o motivos más comunes:
+A quien interese (Opción por defecto)
+Caja de Compensación Familiar (Subsidio)
+Entidad Promotora de Salud (EPS / ADRES)
+Trámite de Visa / Migración
+Proceso Judicial / Juzgado de Familia
+Otro (especificar...) (Al elegir esta opción, se despliega un input de texto para escribir a mano)
+2. Si selecciona: Paz y Salvo
+Aquí el select no es de entidad receptora, sino del motivo administrativo de expedición:
+Retiro definitivo / Traslado de institución (Opción común)
+Graduación / Culminación de bachillerato (11°)
+Cierre regular de año lectivo
+Otro motivo (especificar...)
+3. Si selecciona: Certificado de Estudio (Notas)
+A quien interese (Por defecto)
+Traslado de institución educativa
+Ingreso a educación superior / Universidad
+Convalidación / Homologación de estudios
+Otro (especificar...)
+4. Si selecciona: Constancia de Matrícula
+A quien interese (Por defecto)
+Legalización de cupo / Traslado
+Otro (especificar...)
+Si la persona selecciona otro se habilita un input, y si no digita nada,  el sistema asume "A quien interese" o "la parte interesada". Si el padre le pide "Para Compensar", solo escribe esa palabra y listo.
+¿Incluir firma y sello digital? (Switch / Checkbox):
+Marcado por defecto: Sí (para descargar y enviar por correo o imprimir firmado).
+Si lo desmarca: sale el espacio en blanco para firma con bolígrafo y sello físico.
+Caso de seguridad: Circulación de Documentos Físicos Anulados
+Problema real: Un certificado fue expedido con un error o de manera fraudulenta, la secretaría lo anula en Klassy, pero el acudiente ya lo imprimió y lo radicó físicamente en la Caja de Compensación para cobrar el subsidio familiar.
+Vulnerabilidad: La verificación por QR debe ser contundente. Si el documento está anulado, la página pública (/verificar) no debe decir simplemente "Inválido", sino mostrar un banner rojo destacado: 
+"DOCUMENTO ANULADO el DD/MM/AAAA por motivo: [Motivo registrado]. Este documento carece de validez legal."
+M27. Portal de acudientes y comunicación
+Consultar notas, asistencia, boletines y citaciones según permisos.
+Notificar inasistencias y novedades relevantes.
+Informar faltas disciplinarias y reuniones cuando corresponda.
+Permitir comunicación formal institución-familia.
+Registrar notificaciones enviadas y su estado.
+M28. Comunicaciones y notificaciones internas
+Avisos dirigidos a docentes, estudiantes, acudientes o administrativos.
+Recordatorios de cierres, reuniones, desarrollos curriculares y recuperaciones.
+Notificaciones por rol y contexto.
+Preparar el sistema para integración posterior con correo u otros canales.
+M29. Documentos y archivo institucional
+Repositorio de documentos asociados a estudiantes, docentes, matrículas, actas y procesos.
+Control de versiones.
+Permisos por tipo de documento.
+Conservar evidencias asociadas a decisiones administrativas y académicas.
+M30. Reportes, estadísticas y tableros
+Rendimiento por periodo, materia, área, grupo y grado.
+Indicadores de asistencia.
+Recuperación y promoción.
+Matrículas, cupos y estados.
+Indicadores para docentes, coordinación y rectoría.
+Exportación de reportes para análisis administrativo.
+M31. Auditoría e historial de cambios
+Registrar quién creó, modificó, aprobó o cerró información crítica.
+Especial atención a notas, matrículas, promoción, recuperaciones, PIAR, convivencia y desarrollos curriculares.
+Conservar fecha, usuario, acción y referencia del registro afectado.
+Los registros críticos deben tener trazabilidad suficiente para auditoría.
+M32. Configuración de reglas y parámetros
+Centralizar escalas, criterios, formatos, estados y reglas institucionales.
+Configurar periodos y fechas sin modificar código.
+Configurar reglas de promoción y recuperación.
+Configurar ponderaciones de áreas.
+Configurar restricciones y preferencias del motor de horarios.
+Permitir que el mismo software pueda adaptarse a distintas instituciones.
+6. Procesos transversales críticos
+6.1. Flujo de planeación curricular
+Institución configura estructura académica, áreas, asignaturas, grados y periodos.
+Se dispone del banco curricular y referentes precargados.
+Docente selecciona DBA/estándares aplicables.
+Docente crea el desarrollo curricular.
+Envía a coordinación.
+Coordinador revisa y aprueba o devuelve con observaciones.
+Docente corrige y vuelve a enviar.
+El sistema conserva versiones y deja el documento aprobado como referencia oficial.
+6.2. Flujo de horario
+Configurar jornada y franjas horarias.
+Registrar grupos, intensidad de asignaturas, docentes y carga.
+Registrar salones y disponibilidad.
+Registrar restricciones duras.
+Registrar preferencias blandas.
+Ejecutar generación automática.
+Detectar y mostrar conflictos.
+Permitir ajustes manuales.
+Validar nuevamente.
+Publicar horarios de docentes y grupos.
+6.3. Flujo de evaluación y boletín
+Docente registra actividades y componentes evaluativos.
+Se registran calificaciones.
+El sistema calcula resultado de la asignatura.
+Si existe una estructura de área, consolida las asignaturas según ponderación configurada.
+Convierte a la escala cualitativa configurada.
+Se cierra el periodo.
+Coordinación/administración valida los resultados.
+El sistema genera boletines usando una plantilla institucional.
+6.4. Flujo de recuperación y promoción
+El cierre identifica estudiantes con resultados insuficientes.
+Se genera el listado de recuperación.
+Docente registra actividades de refuerzo y resultados.
+Se determina el resultado de recuperación.
+Comisión de Evaluación y Promoción analiza los casos cuando corresponda.
+Se toma la decisión de promoción/reprobación.
+Se registra el acta y soporte de la decisión.
+El estudiante queda con su estado académico final.
+Se actualiza el historial para el siguiente año.
+7. Integraciones
+Integración
+Propósito
+Google Sheets API
+Sincronización controlada de planillas docentes.
+Excel/CSV
+Importación/exportación masiva y modo offline.
+Generación PDF
+Boletines, certificados, actas, planillas e informes.
+Correo/notificaciones
+Comunicación institucional futura.
+Calendarios externos
+Posibles integraciones futuras para eventos.
+8. Principio de datos centralizados
+El sistema debe evitar duplicar entidades fundamentales. Debe existir una fuente central para estudiantes, docentes, grupos, periodos, materias, áreas, matrículas y demás datos maestros.
+Estudiante → Matrícula → Grupo → Horario.
+Docente → Asignación → Carga → Horario.
+Área → Asignaturas → Evaluación → Resultado del área → Boletín.
+Calendario → Periodo → Actividades/Notas/Asistencia → Cierre.
+DBA → Desarrollo curricular → Actividades → Evidencias.
+Resultado académico → Recuperación → Comisión → Promoción → Historial.
+9. Módulos de mayor complejidad técnica
+Módulo
+Complejidad
+Motivo
+Motor de horarios
+Muy alta
+Problema de optimización con restricciones duras y blandas.
+Planillas / Google Sheets / offline
+Alta
+Sincronización, conflictos, versiones y conectividad intermitente.
+Evaluación + áreas + boletines
+Alta
+Reglas de cálculo, ponderaciones, escalas y plantillas.
+Promoción + recuperación
+Alta
+Reglas variables, estados, actas e historial.
+Matriz curricular / DBA
+Media-Alta
+Banco curricular, workflow y versionado.
+Convivencia
+Alta
+Debido proceso, permisos, evidencias y trazabilidad.
+PIAR / orientación
+Alta
+Información sensible y relación con evaluación.
+Secretaría / certificados
+Media
+Documentos oficiales, folios y trazabilidad.
+10. Orden recomendado para diseñar el sistema
+Definir reglas institucionales y modelo de datos maestro.
+Construir configuración institucional, usuarios y permisos.
+Construir estudiantes, acudientes, grados, grupos y matrículas.
+Construir calendarios, periodos y plan de estudios.
+Construir docentes, asignaciones, salones y carga académica.
+Diseñar y validar el motor de horarios.
+Construir DBA, matriz curricular y workflow de desarrollos.
+Construir actividades, evaluación, notas y asistencia.
+Construir boletines e informes.
+Construir recuperación, comisión y promoción.
+Construir convivencia, orientación y PIAR.
+Construir secretaría, certificados y archivo.
+Construir planillas, Excel, Google Sheets y offline-first.
+Construir proyectos transversales, agenda y calendario ADSO.
+Construir comunicaciones, portal de acudientes y notificaciones.
+Construir reportes, tableros y auditoría.
+Realizar integración, pruebas, revisión normativa y pruebas de aceptación institucional.
+11. Reglas que NO deberían quedar quemadas en código
+Escala de calificación.
+Equivalencias entre escala numérica y escala cualitativa.
+Porcentajes de componentes.
+Ponderación de asignaturas dentro de áreas.
+Número y duración de periodos.
+Fechas de cierre y recuperación.
+Criterios de aprobación.
+Criterios de recuperación.
+Criterios de promoción.
+Intensidad horaria.
+Restricciones y preferencias del horario.
+Plantillas de boletines y certificados.
+Tipos de observaciones.
+Estados de procesos.
+Tipos de convivencia y procedimientos institucionales.
+12. Consideraciones normativas
+Klassy debe diseñarse teniendo en cuenta el marco educativo colombiano y las normas que correspondan a evaluación, promoción, convivencia, inclusión, currículo, jornada, protección de datos y gestión documental. Sin embargo, una referencia normativa no debe convertirse automáticamente en una regla inmutable del software.
+Antes de implementar reglas automáticas, especialmente las relacionadas con carga docente, evaluación, promoción, convivencia, PIAR y conservación documental, se debe validar la versión vigente de la norma y distinguir entre requisitos legales, lineamientos del MEN y reglas particulares de cada institución.
+Diagrama de casos de uso en UML@startuml Diagrama_Casos_de_Uso_Klassy
+left to right direction
+skinparam packageStyle rectangle
+skinparam shadowing false
+skinparam monochrome false
+skinparam actorStyle awesome
+' ==========================================
+' ACTORES DEL SISTEMA
+' ==========================================
+actor "Administrador" as Admin
+actor "Rector" as Rector
+actor "Coordinador" as Coord
+actor "Secretaría Académica" as Sec
+actor "Docente" as Doc
+actor "Docente Orientador" as Ori
+actor "Estudiante" as Est
+actor "Acudiente" as Acu
+' Herencia de roles para simplificar relaciones
+Doc --|> Ori : <<generaliza>>
+Admin --|> Rector : <<soporte a>>
+' ==========================================
+' SUBSISTEMA 1: CONFIGURACIÓN Y GESTIÓN INSTITUCIONAL (M01, M02, M05, M31, M32)
+' ==========================================
+rectangle "Subsistema: Configuración y Núcleo Institucional" {
+  usecase "CU-ADM-01: Parametrizar Estructura\nInstitucional (Sedes/Grupos)" as CU_ADM01
+  usecase "CU-ADM-02: Gestionar Calendario\nAcadémico y Vigencias" as CU_ADM02
+  usecase "CU-ADM-03: Administrar Usuarios,\nRoles y Permisos" as CU_ADM03
+  usecase "CU-ADM-04: Parametrizar Reglas\nInstitucionales del SIEE" as CU_ADM04
+  usecase "CU-ADM-06: Configurar Integración\ncon Google Sheets API" as CU_ADM06
+  usecase "CU-ADM-07: Monitorear Auditoría\ny Trazabilidad Global" as CU_ADM07
+  usecase "CU-REC-05: Cerrar Año Lectivo\ny Vigencia Académica" as CU_REC05
+  CU_REC05 .> CU_ADM02 : <<extend>>
+}
+Admin --> CU_ADM01
+Admin --> CU_ADM02
+Admin --> CU_ADM03
+Admin --> CU_ADM04
+Admin --> CU_ADM06
+Admin --> CU_ADM07
+Rector --> CU_REC05
+' ==========================================
+' SUBSISTEMA 2: ADMISIONES, REGISTRO Y ARCHIVO (M03, M04, M26, M29)
+' ==========================================
+rectangle "Subsistema: Admisiones, Secretaría y Archivo" {
+  usecase "CU-SEC-01: Gestionar Ciclo de\nMatrícula y Cupos" as CU_SEC01
+  usecase "CU-SEC-02: Administrar Expediente\ny Hoja de Vida Estudiante" as CU_SEC02
+  usecase "CU-SEC-03: Generar y Custodiar\nLibro de Matrícula" as CU_SEC03
+  usecase "CU-SEC-04: Expedir Certificados\ny Constancias Oficiales" as CU_SEC04
+  usecase "CU-SEC-06: Generar Libros de Calificaciones\ny Actas Reglamentarias" as CU_SEC06
+  CU_SEC01 .> CU_SEC02 : <<include>>
+  CU_SEC01 .> CU_SEC03 : <<include>>
+}
+Sec --> CU_SEC01
+Sec --> CU_SEC02
+Sec --> CU_SEC03
+Sec --> CU_SEC04
+Sec --> CU_SEC06
+' ==========================================
+' SUBSISTEMA 3: GESTIÓN CURRICULAR, HORARIOS Y CARGA (M06, M07, M08, M09, M10, M23)
+' ==========================================
+rectangle "Subsistema: Currículo, Horarios y Carga Docente" {
+  usecase "CU-CRD-01: Gestionar Plan de Estudios\ny Banco de DBA" as CU_CRD01
+  usecase "CU-DOC-01: Formular Desarrollo Curricular\npor Periodo" as CU_DOC01
+  usecase "CU-CRD-02: Revisar y Aprobar\nDesarrollo Curricular" as CU_CRD02
+  usecase "CU-CRD-03: Asignar Carga Académica\ny Proyectos Transversales" as CU_CRD03
+  usecase "CU-CRD-04: Ejecutar y Ajustar\nMotor de Horarios" as CU_CRD04
+  usecase "CU-REC-04: Aprobar Distribución\nde Carga Docente" as CU_REC04
+  CU_DOC01 .> CU_CRD01 : <<include>>
+  CU_CRD02 .> CU_DOC01 : <<include>>
+  CU_CRD04 .> CU_CRD03 : <<include>>
+  CU_REC04 .> CU_CRD03 : <<extend>>
+}
+Coord --> CU_CRD01
+Coord --> CU_CRD02
+Coord --> CU_CRD03
+Coord --> CU_CRD04
+Doc --> CU_DOC01
+Rector --> CU_REC04
+' ==========================================
+' SUBSISTEMA 4: EVALUACIÓN, SEGUIMIENTO Y SHEETS (M11, M12, M13, M21, M22)
+' ==========================================
+rectangle "Subsistema: Aula, Evaluación y Asistencia" {
+  usecase "CU-DOC-02: Programar Actividades\ny Tareas de Aula" as CU_DOC02
+  usecase "CU-DOC-03: Calificar Actividades\ny Retroalimentar" as CU_DOC03
+  usecase "CU-DOC-04: Registrar Asistencia\nDiaria y Novedades" as CU_DOC04
+  usecase "CU-DOC-05: Sincronizar Calificaciones\ny Asistencia con Sheets/Excel" as CU_DOC05
+  usecase "CU-CRD-05: Controlar Apertura y Cierre\nde Planillas de Notas" as CU_CRD05
+  usecase "CU-EST-03: Enviar Evidencias de Tareas" as CU_EST03
+  usecase "CU-ACU-02: Justificar Inasistencias con Soportes" as CU_ACU02
+  CU_DOC03 .> CU_DOC02 : <<include>>
+  CU_DOC05 .> CU_DOC03 : <<extend>>
+  CU_DOC05 .> CU_DOC04 : <<extend>>
+  CU_ACU02 .> CU_DOC04 : <<extend>>
+}
+Doc --> CU_DOC02
+Doc --> CU_DOC03
+Doc --> CU_DOC04
+Doc --> CU_DOC05
+Coord --> CU_CRD05

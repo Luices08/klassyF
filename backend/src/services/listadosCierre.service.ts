@@ -189,10 +189,61 @@ export async function reporteServicioSocial(filtros: FiltrosListado, usuario: Us
   const todos = await gruposDelAlcance(anio._id, filtros, usuario);
   const grupos = todos.filter((g) => GRADOS_SERVICIO_SOCIAL.includes(g.gradoNumero));
   const institucion = await Institution.findOne().select('nombre').lean();
-  const politica = datosDePolitica(await obtenerPolitica(filtros.academic_year_id)).titulacion.servicio_social;
+  const { filas, exigidas } = await filasDeServicioSocial(filtros.academic_year_id, anio._id, grupos);
+
+  await registrarEvento({ usuario_id: usuario._id, accion: 'REPORTE_CIERRE_GENERADO', entidad: 'AcademicYear', entidad_id: anio._id, detalle: `Servicio social 10° y 11°: ${filas.length} fila(s)`, ip });
+  return {
+    titulo: 'Servicio social estudiantil (décimo y once)',
+    institucion: institucion?.nombre ?? '',
+    anio: anio.year,
+    generado_en: new Date(),
+    alcance: describirAlcance(todos, filtros),
+    leyenda: `Se calcula al descargar. Solo suman las horas con soporte verificado; las que están por verificar se muestran aparte. ${exigidas === null ? 'El colegio no exige un mínimo de horas.' : `El colegio exige ${exigidas} horas.`}`,
+    resumen: [
+      ['Estudiantes', filas.length],
+      ['Aprobado', filas.filter((f) => f.estado === 'Aprobado').length],
+      ['Pendiente', filas.filter((f) => f.estado === 'Pendiente').length],
+      ['Horas por verificar', Math.round(filas.reduce((s, f) => s + f.por_verificar, 0) * 100) / 100],
+    ],
+    columnas: [
+      { clave: 'grupo', titulo: 'Grupo', ancho: 9 },
+      { clave: 'documento', titulo: 'Documento', ancho: 14, texto: true },
+      { clave: 'estudiante', titulo: 'Apellidos y nombres', ancho: 30 },
+      { clave: 'entidad', titulo: 'Entidad receptora', ancho: 42 },
+      { clave: 'verificadas', titulo: 'Horas verificadas', ancho: 11, alinear: 'center' },
+      { clave: 'por_verificar', titulo: 'Por verificar', ancho: 11, alinear: 'center' },
+      { clave: 'exigidas', titulo: 'Exigidas', ancho: 9, alinear: 'center' },
+      { clave: 'faltan', titulo: 'Faltan', ancho: 8, alinear: 'center' },
+      { clave: 'estado', titulo: 'Estado', ancho: 12, alinear: 'center' },
+    ],
+    filas,
+    mensaje_vacio: 'No hay estudiantes de décimo ni de once con matrícula activa en el alcance elegido.',
+    nombre_archivo: nombreDeArchivo('servicio-social', anio.year, filtros.group_id && grupos.length === 1 ? grupos[0]?.etiqueta : 'todos-los-grupos'),
+  };
+}
+
+export type FilaServicioSocial = {
+  orden: number;
+  grupo: string;
+  documento: string;
+  estudiante: string;
+  entidad: string;
+  verificadas: number;
+  por_verificar: number;
+  exigidas: number | null;
+  faltan: number | null;
+  estado: 'Aprobado' | 'Pendiente' | 'No se exige';
+};
+
+/**
+ * Una fila por estudiante con matrícula activa en los grupos dados (décimo y once): horas verificadas, por verificar y si cumple lo que exige el
+ * colegio. Es el cálculo del listado de servicio social y también el que lee el dashboard de coordinación, así que las dos pantallas dicen lo mismo.
+ */
+export async function filasDeServicioSocial(academicYearId: string, anioId: GrupoDelAlcance['_id'], grupos: Array<Pick<GrupoDelAlcance, '_id' | 'gradoNumero' | 'etiqueta'>>): Promise<{ filas: FilaServicioSocial[]; exigidas: number | null }> {
+  const politica = datosDePolitica(await obtenerPolitica(academicYearId)).titulacion.servicio_social;
   const exigidas = politica.activo ? politica.horas_requeridas : null;
 
-  const matriculas = await Enrollment.find({ academic_year_id: anio._id, estado: { $in: ESTADOS_MATRICULA_ACTIVOS }, group_id: { $in: grupos.map((g) => g._id) } }).select('student_id group_id').lean();
+  const matriculas = await Enrollment.find({ academic_year_id: anioId, estado: { $in: ESTADOS_MATRICULA_ACTIVOS }, group_id: { $in: grupos.map((g) => g._id) } }).select('student_id group_id').lean();
   const ids = matriculas.map((m) => m.student_id);
   const [usuarios, registros] = await Promise.all([
     User.find({ _id: { $in: ids } }).select('nombre apellido numero_documento').lean(),
@@ -205,7 +256,7 @@ export async function reporteServicioSocial(filtros: FiltrosListado, usuario: Us
 
   const redondear = (n: number) => Math.round(n * 100) / 100;
   const filas = matriculas
-    .map((m) => {
+    .map((m): FilaServicioSocial => {
       const u = usuarioPor.get(String(m.student_id));
       const grupo = grupoPor.get(String(m.group_id));
       const suyos = registrosPor.get(String(m.student_id)) ?? [];
@@ -230,33 +281,5 @@ export async function reporteServicioSocial(filtros: FiltrosListado, usuario: Us
     })
     .sort((a, b) => a.orden - b.orden || a.grupo.localeCompare(b.grupo, 'es') || a.estudiante.localeCompare(b.estudiante, 'es'));
 
-  await registrarEvento({ usuario_id: usuario._id, accion: 'REPORTE_CIERRE_GENERADO', entidad: 'AcademicYear', entidad_id: anio._id, detalle: `Servicio social 10° y 11°: ${filas.length} fila(s)`, ip });
-  return {
-    titulo: 'Servicio social estudiantil (décimo y once)',
-    institucion: institucion?.nombre ?? '',
-    anio: anio.year,
-    generado_en: new Date(),
-    alcance: describirAlcance(todos, filtros),
-    leyenda: `Se calcula al descargar. Solo suman las horas con soporte verificado; las que están por verificar se muestran aparte. ${exigidas === null ? 'El colegio no exige un mínimo de horas.' : `El colegio exige ${exigidas} horas.`}`,
-    resumen: [
-      ['Estudiantes', filas.length],
-      ['Aprobado', filas.filter((f) => f.estado === 'Aprobado').length],
-      ['Pendiente', filas.filter((f) => f.estado === 'Pendiente').length],
-      ['Horas por verificar', redondear(filas.reduce((s, f) => s + f.por_verificar, 0))],
-    ],
-    columnas: [
-      { clave: 'grupo', titulo: 'Grupo', ancho: 9 },
-      { clave: 'documento', titulo: 'Documento', ancho: 14, texto: true },
-      { clave: 'estudiante', titulo: 'Apellidos y nombres', ancho: 30 },
-      { clave: 'entidad', titulo: 'Entidad receptora', ancho: 42 },
-      { clave: 'verificadas', titulo: 'Horas verificadas', ancho: 11, alinear: 'center' },
-      { clave: 'por_verificar', titulo: 'Por verificar', ancho: 11, alinear: 'center' },
-      { clave: 'exigidas', titulo: 'Exigidas', ancho: 9, alinear: 'center' },
-      { clave: 'faltan', titulo: 'Faltan', ancho: 8, alinear: 'center' },
-      { clave: 'estado', titulo: 'Estado', ancho: 12, alinear: 'center' },
-    ],
-    filas,
-    mensaje_vacio: 'No hay estudiantes de décimo ni de once con matrícula activa en el alcance elegido.',
-    nombre_archivo: nombreDeArchivo('servicio-social', anio.year, filtros.group_id && grupos.length === 1 ? grupos[0]?.etiqueta : 'todos-los-grupos'),
-  };
+  return { filas, exigidas };
 }

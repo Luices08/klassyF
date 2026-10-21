@@ -3,6 +3,10 @@ import * as libros from '../services/libroCalificaciones.service';
 import { reporteBalanceInclusion } from '../services/balanceInclusion.service';
 import * as listados from '../services/listadosCierre.service';
 import { armarSimat, csvSimat, excelSimat } from '../services/simat.service';
+import { auditarDescargaC600, FiltrosC600, generarReporteC600 } from '../services/c600.service';
+import { generarExcelC600 } from '../services/c600Excel.service';
+import { generarPdfC600 } from '../services/c600Pdf.service';
+import { FiltrosConsolidado, reporteConsolidado } from '../services/consolidadoInstitucional.service';
 import { generarExcelTabular } from '../services/reporteTabularExcel.service';
 import { generarPdfTabular } from '../services/reporteTabularPdf.service';
 import { PERIODO_INFORME_FINAL } from '../constants/boletin';
@@ -139,4 +143,48 @@ export const libroIntegridad = catchAsync<{ id: string }>(async (req, res) => {
 
 export const libroAnular = catchAsync<{ id: string }, unknown, { motivo: string }>(async (req, res) => {
   res.status(200).json({ success: true, data: await libros.anularLibro(req.params.id, req.body.motivo, req.user!, req.ip) });
+});
+
+// --- Reporte tipo C-600 (M30): la vista previa y las descargas salen del mismo cálculo ---
+
+type ConsultaC600 = ParsedQs & FiltrosC600;
+
+export const c600Vista = catchAsync<unknown, unknown, unknown, ConsultaC600>(async (req, res) => {
+  res.status(200).json({ success: true, data: await generarReporteC600(req.query, req.user!) });
+});
+
+export const c600Excel = catchAsync<unknown, unknown, unknown, ConsultaC600>(async (req, res) => {
+  const reporte = await generarReporteC600(req.query, req.user!);
+  const { buffer, nombreArchivo } = await generarExcelC600(reporte);
+  await auditarDescargaC600(reporte, 'excel', req.query.academic_year_id, req.user!, req.ip);
+  res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+  res.setHeader('Content-Disposition', `attachment; filename="${nombreArchivo}"`);
+  res.send(buffer);
+});
+
+export const c600Pdf = catchAsync<unknown, unknown, unknown, ConsultaC600>(async (req, res) => {
+  const reporte = await generarReporteC600(req.query, req.user!);
+  const { buffer, nombreArchivo } = await generarPdfC600(reporte);
+  await auditarDescargaC600(reporte, 'pdf', req.query.academic_year_id, req.user!, req.ip);
+  res.setHeader('Content-Type', 'application/pdf');
+  res.setHeader('Content-Disposition', `inline; filename="${nombreArchivo}"`);
+  res.send(buffer);
+});
+
+// --- Consolidado general de la institución ---
+
+type ConsultaConsolidado = ParsedQs & FiltrosConsolidado;
+
+export const consolidadoExcel = catchAsync<unknown, unknown, unknown, ConsultaConsolidado>(async (req, res) => {
+  const { buffer, nombreArchivo } = await generarExcelTabular(await reporteConsolidado(req.query, req.user!, req.ip));
+  res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+  res.setHeader('Content-Disposition', `attachment; filename="${nombreArchivo}"`);
+  res.send(buffer);
+});
+
+export const consolidadoPdf = catchAsync<unknown, unknown, unknown, ConsultaConsolidado>(async (req, res) => {
+  const { buffer, nombreArchivo } = await generarPdfTabular(await reporteConsolidado(req.query, req.user!, req.ip));
+  res.setHeader('Content-Type', 'application/pdf');
+  res.setHeader('Content-Disposition', `inline; filename="${nombreArchivo}"`);
+  res.send(buffer);
 });

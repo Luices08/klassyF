@@ -4,6 +4,7 @@ import { ProtectedRoute } from './components/layout/ProtectedRoute';
 import { DashboardPage } from './pages/DashboardPage';
 import { LoginPage } from './pages/LoginPage';
 import { MyAccountPage } from './pages/MyAccountPage';
+import { NoticiasPage } from './pages/NoticiasPage';
 import { NotFoundPage } from './pages/NotFoundPage';
 import { ReportCardPage } from './pages/ReportCardPage';
 import { HomePage } from './pages/public/HomePage';
@@ -16,6 +17,7 @@ import { ActividadesDocentePage } from './pages/ActividadesDocentePage';
 import { NotasPlanillaPage } from './pages/NotasPlanillaPage';
 import { RecuperacionesPage } from './pages/RecuperacionesPage';
 import { PromocionPage } from './pages/admin/PromocionPage';
+import { ReporteC600Page } from './pages/admin/ReporteC600Page';
 import { ReportesCierrePage } from './pages/admin/ReportesCierrePage';
 import { PromocionAnticipadaPage } from './pages/admin/PromocionAnticipadaPage';
 import { ComisionPage } from './pages/admin/ComisionPage';
@@ -86,6 +88,7 @@ export default function App() {
           <Route path="/report-card" element={<ReportCardPage />} />
           <Route path="/mi-cuenta" element={<MyAccountPage />} />
           <Route path="/anuncios" element={<AnunciosPage />} />
+          <Route path="/noticias" element={<NoticiasPage />} />
           <Route path="/anio-lectivo" element={<AnioLectivoPage />} />
 
           <Route element={<ProtectedRoute allowedRoles={['ADMIN']} />}>
@@ -114,6 +117,11 @@ export default function App() {
           {/* Reportes de cierre: cada pestaña muestra solo lo que el rol puede pedir (orientación solo el balance de inclusión) y el servidor lo vuelve a comprobar. */}
           <Route element={<ProtectedRoute allowedRoles={['ADMIN', 'COORDINADOR', 'SECRETARIA', 'ORIENTADOR']} />}>
             <Route path="/admin/reportes-cierre" element={<ReportesCierrePage />} />
+          </Route>
+
+          {/* Reporte tipo C-600 (M30): lo ven administración, coordinación y secretaría; el servidor limita quién lo descarga. */}
+          <Route element={<ProtectedRoute allowedRoles={['ADMIN', 'COORDINADOR', 'SECRETARIA']} />}>
+            <Route path="/admin/reporte-c600" element={<ReporteC600Page />} />
           </Route>
 
           {/* Retiros y traslados: el servidor limita a secretaría por sede. */}

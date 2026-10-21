@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { InformeFinalPanel } from '../../components/reportes/InformeFinalPanel';
 import { LibroCalificacionesPanel } from '../../components/reportes/LibroCalificacionesPanel';
 import { ListadosPanel } from '../../components/reportes/ListadosPanel';
@@ -23,7 +24,9 @@ export function ReportesCierrePage() {
   const { anio } = useAnioDeTrabajo();
   // Orientación solo entra al balance de inclusión (dentro de «Listados de cierre»); el resto es de administración, coordinación y secretaría.
   const pestanas = user?.rol === 'ORIENTADOR' ? PESTANAS.filter((p) => p.key === 'listados') : PESTANAS;
-  const [elegida, setPestana] = useState('sabana');
+  // `?pestana=` deja que otras pantallas (los dashboards) abran la pestaña que necesitan; sin él abre la sábana, como siempre.
+  const [params] = useSearchParams();
+  const [elegida, setPestana] = useState(params.get('pestana') ?? 'sabana');
   const pestana = pestanas.some((p) => p.key === elegida) ? elegida : (pestanas[0]?.key ?? 'listados');
   return (
     <div className="space-y-4">

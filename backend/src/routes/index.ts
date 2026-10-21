@@ -13,6 +13,7 @@ import certificadoRoutes from './certificado.routes';
 import citacionRoutes from './citacion.routes';
 import casoRoutes from './caso.routes';
 import orientacionRoutes from './orientacion.routes';
+import dashboardRoutes from './dashboard.routes';
 import documentoReferenciaRoutes from './documentoReferencia.routes';
 import enrollmentRoutes from './enrollment.routes';
 import requisitoDocumentalRoutes from './requisitoDocumental.routes';
@@ -27,6 +28,7 @@ import institutionRoutes from './institution.routes';
 import jornadaOperativaRoutes from './jornadaOperativa.routes';
 import liderAreaRoutes from './liderArea.routes';
 import notasRoutes from './notas.routes';
+import noticiaRoutes from './noticia.routes';
 import notificacionRoutes from './notificacion.routes';
 import observacionRoutes from './observacion.routes';
 import periodLockRoutes from './periodLock.routes';
@@ -57,6 +59,8 @@ router.use('/auth', authRoutes);
 
 // M28: campanita, contadores del menú y tablero de anuncios
 router.use('/notificaciones', notificacionRoutes);
+// Noticias y eventos institucionales (módulo propio, aparte de los anuncios): categorías del colegio, alcance por sede, grado o grupo y docentes habilitados
+router.use('/noticias', noticiaRoutes);
 router.use('/users', userRoutes);
 
 // Asistente flotante: orienta al usuario hacia la pantalla que busca
@@ -139,6 +143,9 @@ router.use('/boletines', boletinRoutes);
 // M18: Recuperaciones — política del colegio (por periodo y de fin de año), candidatos y registro de intentos
 router.use('/recuperaciones', recuperacionRoutes);
 router.use('/reportes', reportesRoutes);
+
+// M30: Dashboards de rectoría y coordinación (indicadores, eficiencia, morbilidad, seguimiento pedagógico)
+router.use('/dashboard', dashboardRoutes);
 
 // M19: Promoción y cierre del año — política del SIEE (reglas de promoción, arrastre, PIAR)
 router.use('/promocion', promocionRoutes);

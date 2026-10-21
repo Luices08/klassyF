@@ -785,6 +785,8 @@ export interface SeguimientoQuery {
   academic_year_id: string;
   periodo_numero: number;
   group_id?: string;
+  /** Varios grupos a la vez (p. ej. todos los de una sede); `group_id` manda si llegan los dos. */
+  group_ids?: string[];
 }
 
 export interface FilaSeguimiento {
@@ -805,8 +807,7 @@ export async function seguimiento(query: SeguimientoQuery): Promise<FilaSeguimie
     academic_year_id: query.academic_year_id,
     tipo_asignacion: 'CLASE',
     estado: ESTADO_ACTIVO,
-    group_id: { $ne: null },
-    ...(query.group_id ? { group_id: query.group_id } : {}),
+    group_id: query.group_id ? query.group_id : query.group_ids ? { $in: query.group_ids } : { $ne: null },
   }).lean();
   if (asignaciones.length === 0) return [];
   const ids = asignaciones.map((a) => a._id);

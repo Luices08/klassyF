@@ -41,6 +41,7 @@ export const EVENTOS_NOTIFICACION = [
   'CITACION_CANCELADA',
   'CITACION_RESPONDIDA',
   'SESION_COMISION_CONVOCADA',
+  'NOTICIA_NUEVA',
 ] as const;
 export type EventoNotificacion = (typeof EVENTOS_NOTIFICACION)[number];
 
@@ -70,6 +71,8 @@ export const METADATOS_EVENTO: Record<EventoNotificacion, MetadatoEvento> = {
   CITACION_CANCELADA: { severidad: 'IMPORTANTE', canales: ['CAMPANITA'] },
   CITACION_RESPONDIDA: { severidad: 'INFO', canales: ['CAMPANITA'] },
   SESION_COMISION_CONVOCADA: { severidad: 'IMPORTANTE', canales: ['CAMPANITA'] },
+  // Una noticia o evento nuevo es informativo: no interrumpe como una falta grave.
+  NOTICIA_NUEVA: { severidad: 'INFO', canales: ['CAMPANITA'] },
 };
 
 /**

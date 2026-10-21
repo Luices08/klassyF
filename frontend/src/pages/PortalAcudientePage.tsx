@@ -1,4 +1,5 @@
 import { useSearchParams } from 'react-router-dom';
+import { PanelNoticiasInicio } from '../components/noticias/PanelNoticiasInicio';
 import { PortalCitaciones } from '../components/portal/PortalCitaciones';
 import { PortalCertificados } from '../components/portal/PortalCertificados';
 import { PortalConvivencia } from '../components/portal/PortalConvivencia';
@@ -100,6 +101,9 @@ function PortalDeHijo({
   return (
     <div className="space-y-4">
       <PageHeader title="Portal del acudiente" subtitle="Notas, inasistencias, convivencia, citaciones, documentos y certificados de tus estudiantes a cargo." />
+
+      {/* Las reuniones y eventos del colegio que le tocan a la familia (por los grupos de sus hijos), antes del detalle de cada estudiante. */}
+      <PanelNoticiasInicio />
 
       <SelectorEstudiante hijos={hijos} seleccionado={hijo.student_id} onElegir={(id) => elegir({ hijo: id })} />
       <ResumenEstudiante hijo={hijo} />

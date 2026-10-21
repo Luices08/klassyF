@@ -163,3 +163,75 @@ export function useEstablecerPublicacionInformeFinal() {
     onSuccess: () => void queryClient.invalidateQueries({ queryKey: ['reportes', 'informe-final', 'publicacion'] }),
   });
 }
+
+// --- Reporte tipo C-600 (M30) y consolidado institucional ---
+
+export interface ConteoSexo {
+  H: number;
+  M: number;
+  O: number;
+  total: number;
+}
+
+export interface ReporteC600 {
+  generado_en: string;
+  institucion: { nombre: string; codigo_dane: string };
+  sede: { nombre: string; codigo_dane: string } | null;
+  jornada: string | null;
+  anio: number;
+  fecha_inicio_anio: string;
+  fecha_corte_edad: string;
+  estado_datos: 'PRELIMINAR' | 'DEFINITIVO';
+  leyenda: string;
+  grados: Array<{ grado_id: string; grado: string; grado_numero: number }>;
+  balance: {
+    filas: Array<{ grado_id: string; grado: string; grado_numero: number; matricula_inicial: number; ingresados: number; retirados: number; matricula_final: number }>;
+    total: { matricula_inicial: number; ingresados: number; retirados: number; matricula_final: number };
+  };
+  resultados: {
+    filas: Array<{ grado_id: string; grado: string; grado_numero: number; promovidos: ConteoSexo; no_promovidos: ConteoSexo; desertores: ConteoSexo; sin_resultado: number }>;
+    total: { promovidos: ConteoSexo; no_promovidos: ConteoSexo; desertores: ConteoSexo; sin_resultado: number };
+  };
+  edades: {
+    filas: Array<{ clave: string; etiqueta: string; celdas: Record<string, ConteoSexo>; total: ConteoSexo }>;
+    total_por_grado: Record<string, ConteoSexo>;
+    sin_fecha_nacimiento: number;
+  };
+  hay_otro_sin_dato: boolean;
+  firma: { cargo: string; nombre: string; fecha_expedicion: string };
+  nombre_archivo: string;
+}
+
+export interface FiltrosC600 {
+  academic_year_id: string;
+  sede_id?: string;
+  jornada_id?: string;
+  grade_id?: string;
+  /** `AAAA-MM-DD`; sin él, el inicio del periodo 1. */
+  fecha_corte?: string;
+}
+
+/** La vista previa del reporte: la misma respuesta de la que salen el Excel y el PDF, así que lo que se ve es lo que baja. */
+export function useReporteC600(filtros: FiltrosC600) {
+  return useQuery({
+    queryKey: ['reportes', 'c600', filtros],
+    queryFn: () => api.get<ReporteC600>('/reportes/c600', { ...filtros }),
+    enabled: Boolean(filtros.academic_year_id),
+    staleTime: 30_000,
+    retry: false,
+  });
+}
+
+export function useExportarC600() {
+  return useMutation({
+    mutationFn: ({ formato, filtros, nombreArchivo }: { formato: FormatoListado; filtros: FiltrosC600; nombreArchivo: string }) =>
+      descargarReporte(`c600/${formato}`, { ...filtros }, `${nombreArchivo}.${formato === 'excel' ? 'xlsx' : 'pdf'}`),
+  });
+}
+
+export function useExportarConsolidado() {
+  return useMutation({
+    mutationFn: ({ formato, filtros }: { formato: FormatoListado; filtros: { academic_year_id: string; sede_id?: string } }) =>
+      descargarReporte(`consolidado/${formato}`, { ...filtros }, `consolidado-institucional.${formato === 'excel' ? 'xlsx' : 'pdf'}`),
+  });
+}

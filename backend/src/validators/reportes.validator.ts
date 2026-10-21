@@ -35,6 +35,24 @@ export const listado: ValidationSchema = {
   query: Joi.object({ academic_year_id: objectId.required(), sede_id: objectId, jornada_id: objectId, grade_id: objectId, group_id: objectId }),
 };
 
+// Reporte tipo C-600 (M30): los filtros de siempre más el día en que se cuentan los años cumplidos (sin él, el inicio del periodo 1).
+export const c600: ValidationSchema = {
+  query: Joi.object({
+    academic_year_id: objectId.required(),
+    sede_id: objectId,
+    jornada_id: objectId,
+    grade_id: objectId,
+    fecha_corte: Joi.string()
+      .pattern(/^\d{4}-\d{2}-\d{2}$/)
+      .messages({ 'string.pattern.base': 'La fecha de corte debe tener el formato AAAA-MM-DD.' }),
+  }),
+};
+
+// Consolidado general de la institución: por año y, si se quiere, por sede.
+export const consolidado: ValidationSchema = {
+  query: Joi.object({ academic_year_id: objectId.required(), sede_id: objectId }),
+};
+
 export const emitirLibro: ValidationSchema = {
   body: Joi.object({ academic_year_id: objectId.required(), sede_id: objectId.required(), grade_id: objectId.required() }),
 };

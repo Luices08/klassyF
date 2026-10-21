@@ -8,9 +8,13 @@ import { useInstitution } from '../../hooks/useInstitution';
 import { CambiadorDePerfil } from './CambiadorDePerfil';
 import { ForcedPasswordChangeGate } from './ForcedPasswordChangeGate';
 import { NAV_ITEMS } from './navigation';
+import { BotonNoticias } from '../noticias/BotonNoticias';
 import { Campanita } from '../notificaciones/Campanita';
 import { MenuLateral } from './MenuLateral';
 import { useMarcarVisto, useResumenNotificaciones } from '../../hooks/useNotificaciones';
+import type { Rol } from '../../types/api';
+
+const PERSONAL_CON_NOTICIAS: Rol[] = ['ADMIN', 'COORDINADOR', 'SECRETARIA', 'COORDINADOR_CONVIVENCIA', 'ORIENTADOR'];
 
 export function AppShell() {
   const { user, logout } = useAuth();
@@ -66,6 +70,8 @@ export function AppShell() {
             <header className="flex h-16 shrink-0 items-center justify-between border-b border-border bg-surface px-4 sm:px-6">
               <span className="text-h3 text-primary sm:hidden">Klassy</span>
               <div className="ml-auto flex items-center gap-4">
+                {/* Docentes, estudiantes y acudientes ven las noticias en su inicio; el personal tiene mucho en el suyo y las abre aquí. */}
+                {user && PERSONAL_CON_NOTICIAS.includes(user.rol) && <BotonNoticias />}
                 <Campanita />
                 <NavLink
                   to="/mi-cuenta"

@@ -1,11 +1,16 @@
 import { Link, Navigate } from 'react-router-dom';
-import { ContadorInsignia } from '../components/notificaciones/ContadorInsignia';
+import { CuadriculaDeAccesos } from '../components/dashboard/CuadriculaDeAccesos';
+import { PanelNoticiasInicio } from '../components/noticias/PanelNoticiasInicio';
 import { Card } from '../components/ui/Card';
 import { Chip } from '../components/ui/Badge';
-import { contadorDeRuta, useAnuncios, useResumenNotificaciones } from '../hooks/useNotificaciones';
+import { useAnuncios } from '../hooks/useNotificaciones';
 import { PageHeader } from '../components/ui/PageHeader';
 import { useAuth } from '../context/AuthContext';
 import { NAV_ITEMS } from '../components/layout/navigation';
+import { DashboardConvivenciaPage } from './dashboard/DashboardConvivenciaPage';
+import { DashboardCoordinacionPage } from './dashboard/DashboardCoordinacionPage';
+import { DashboardDirectivoPage } from './dashboard/DashboardDirectivoPage';
+import { DashboardOrientacionPage } from './dashboard/DashboardOrientacionPage';
 
 const ROLE_LABELS: Record<string, string> = {
   ADMIN: 'Administrador',
@@ -20,13 +25,19 @@ const ROLE_LABELS: Record<string, string> = {
 
 export function DashboardPage() {
   const { user } = useAuth();
-  const { data: resumen } = useResumenNotificaciones();
   const { data: anuncios = [] } = useAnuncios();
   if (!user) return null;
   // El acudiente no tiene panel de accesos: su inicio es el portal.
   if (user.rol === 'ACUDIENTE') return <Navigate to="/portal" replace />;
 
   const links = NAV_ITEMS.filter((item) => item.to !== '/panel' && !item.soloEncabezado && (!item.roles || item.roles.includes(user.rol)));
+
+  // Rectoría, coordinación académica, convivencia y orientación tienen su propio panel (M30); conserva debajo la cuadrícula de accesos, que es la navegación en pantallas pequeñas.
+  if (user.rol === 'ADMIN') return <DashboardDirectivoPage links={links} />;
+  if (user.rol === 'COORDINADOR') return <DashboardCoordinacionPage links={links} />;
+  // Convivencia y orientación ven lo suyo (casos, remisiones, expedientes) y solo en conteos: el detalle está en sus pantallas, con la consulta auditada.
+  if (user.rol === 'COORDINADOR_CONVIVENCIA') return <DashboardConvivenciaPage links={links} />;
+  if (user.rol === 'ORIENTADOR') return <DashboardOrientacionPage links={links} />;
 
   return (
     <div className="space-y-4">
@@ -52,21 +63,10 @@ export function DashboardPage() {
         </Card>
       )}
 
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-        {links.map((link) => (
-          <Link
-            key={link.to}
-            to={link.to}
-            className="flex items-center gap-3 rounded-xl border border-border bg-surface p-4 text-sm font-semibold text-ink transition-colors hover:border-primary/40 hover:bg-primary-soft hover:text-primary"
-          >
-            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary-soft text-primary">
-              <link.icon className="h-[18px] w-[18px]" />
-            </span>
-            {link.label}
-            <ContadorInsignia valor={contadorDeRuta(resumen, link.to)} />
-          </Link>
-        ))}
-      </div>
+      {/* Docentes y estudiantes ven aquí las noticias que les tocan; el resto de perfiles las abre desde el encabezado. */}
+      {(user.rol === 'DOCENTE' || user.rol === 'ESTUDIANTE') && <PanelNoticiasInicio />}
+
+      <CuadriculaDeAccesos links={links} />
     </div>
   );
 }

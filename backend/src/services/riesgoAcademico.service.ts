@@ -59,6 +59,16 @@ const ORDEN_NIVEL: Record<NivelRiesgo, number> = { ROJO: 0, NARANJA: 1, AMARILLO
  */
 export async function tableroDeRiesgo(filtros: FiltrosTablero, usuario: UserDocument, ip?: string | null): Promise<TableroDeRiesgo> {
   if (usuario.rol !== ROLES.ADMIN && usuario.rol !== ROLES.COORDINADOR) throw new ApiError(403, 'Solo rectoría y coordinación consultan el tablero de riesgo.');
+  const tablero = await calcularTableroDeRiesgo(filtros);
+  await registrarEvento({ usuario_id: usuario._id, accion: 'COMISION_TABLERO_CONSULTADO', entidad: 'AcademicYear', entidad_id: filtros.academic_year_id, detalle: `Periodo ${filtros.periodo_numero}, ${tablero.estudiantes.length} estudiantes`, ip });
+  return tablero;
+}
+
+/**
+ * El cálculo del tablero sin la comprobación de rol ni la auditoría: quien llama decide quién puede verlo. Lo usan el tablero de la comisión y el
+ * dashboard de coordinación, que lo refresca seguido y no debe llenar la bitácora con una línea por cada carga.
+ */
+export async function calcularTableroDeRiesgo(filtros: FiltrosTablero): Promise<TableroDeRiesgo> {
   const anio = await cargarAnio(filtros.academic_year_id);
   if (!anio.periodos.some((p) => p.numero === filtros.periodo_numero)) throw new ApiError(400, `El año ${anio.year} no tiene periodo ${filtros.periodo_numero}.`);
   const config = datosDeConfiguracion(await obtenerConfiguracion());
@@ -148,7 +158,6 @@ export async function tableroDeRiesgo(filtros: FiltrosTablero, usuario: UserDocu
   const resumen = { VERDE: 0, AMARILLO: 0, NARANJA: 0, ROJO: 0, total: estudiantes.length, con_piar: estudiantes.filter((e) => e.tiene_piar).length };
   for (const e of estudiantes) resumen[e.nivel] += 1;
 
-  await registrarEvento({ usuario_id: usuario._id, accion: 'COMISION_TABLERO_CONSULTADO', entidad: 'AcademicYear', entidad_id: anio._id, detalle: `Periodo ${filtros.periodo_numero}, ${estudiantes.length} estudiantes`, ip });
   return {
     periodo_numero: filtros.periodo_numero,
     hay_notas_provisionales: provisional,

@@ -37,6 +37,15 @@ router.get('/simat/revision', checkRole(...PERSONAL), validate(v.listado), c.sim
 router.get('/simat/excel', checkRole(ROLES.ADMIN, ROLES.SECRETARIA), validate(v.listado), c.simatExcel);
 router.get('/simat/csv', checkRole(ROLES.ADMIN, ROLES.SECRETARIA), validate(v.listado), c.simatCsv);
 
+// Reporte tipo C-600 (M30): verlo en pantalla lo puede hacer también coordinación; bajarlo (Excel o PDF), solo administración y secretaría (esta, de sus sedes).
+router.get('/c600', checkRole(...PERSONAL), validate(v.c600), c.c600Vista);
+router.get('/c600/excel', checkRole(ROLES.ADMIN, ROLES.SECRETARIA), validate(v.c600), c.c600Excel);
+router.get('/c600/pdf', checkRole(ROLES.ADMIN, ROLES.SECRETARIA), validate(v.c600), c.c600Pdf);
+
+// Consolidado general de la institución (los indicadores y la matriz de eficiencia del panel de rectoría, descargables): solo administración y coordinación.
+router.get('/consolidado/excel', checkRole(ROLES.ADMIN, ROLES.COORDINADOR), validate(v.consolidado), c.consolidadoExcel);
+router.get('/consolidado/pdf', checkRole(ROLES.ADMIN, ROLES.COORDINADOR), validate(v.consolidado), c.consolidadoPdf);
+
 // Libro de calificaciones: emiten y anulan administración y secretaría (esta de sus sedes); coordinación consulta y reimprime.
 router.post('/libro-calificaciones', checkRole(ROLES.ADMIN, ROLES.SECRETARIA), validate(v.emitirLibro), c.libroEmitir);
 router.get('/libro-calificaciones', checkRole(ROLES.ADMIN, ROLES.SECRETARIA, ROLES.COORDINADOR), validate(v.listarLibros), c.libroListar);

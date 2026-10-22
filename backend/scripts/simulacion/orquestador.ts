@@ -24,6 +24,7 @@ import { ContextoFase } from './fases/comun';
 import { faseBase } from './fases/base';
 import { fasePrepararAnio } from './fases/prepararAnio';
 import { faseInicioAnio } from './fases/inicioAnio';
+import { fasePeriodo } from './fases/periodo';
 
 interface Fase {
   clave: string;
@@ -32,12 +33,13 @@ interface Fase {
 
 /** Las fases en el orden en que se ejecutan. Las de periodos y cierre de año llegan en los siguientes cambios. */
 function planDeFases(config: ConfigSimulacion): Fase[] {
-  // Mientras no exista el cierre de año, el plan llega solo hasta el inicio del primer año.
+  // Mientras no exista el cierre de año, el plan llega hasta el cierre del último periodo del primer año.
   const anio = config.anios[0] as number;
   return [
     { clave: 'base', correr: faseBase },
     { clave: `${anio}/preparar-anio`, correr: (ctx) => fasePrepararAnio(ctx, anio) },
     { clave: `${anio}/inicio-anio`, correr: (ctx) => faseInicioAnio(ctx, anio) },
+    ...config.calendario.periodos.map((p): Fase => ({ clave: `${anio}/periodo-${p.numero}`, correr: (ctx) => fasePeriodo(ctx, anio, p.numero) })),
   ];
 }
 

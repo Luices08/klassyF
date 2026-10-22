@@ -4,6 +4,16 @@ import { cargarConfiguracion, planDeGrado } from '../scripts/simulacion/configur
 import { asignarCarga } from '../scripts/simulacion/logica/asignadorCarga';
 import { categoriasDelGrado, cholesky, fechaNacimiento, generarEstudiante } from '../scripts/simulacion/logica/perfiles';
 import { azarPara } from '../scripts/simulacion/nucleo/azar';
+import {
+  decidirEntrega,
+  diasLectivos,
+  familiaDeAsignatura,
+  intentoDeRecuperacion,
+  moverLectivos,
+  NOTA_NO_ENTREGADA,
+  notaDeActividad,
+  planearActividades,
+} from '../scripts/simulacion/logica/notas';
 import { festivosColombia, isoDia, pascua, semanaSanta } from '../scripts/simulacion/nucleo/fechas';
 
 const config = cargarConfiguracion(path.join(__dirname, '../scripts/simulacion/config/colegio-pequeno.json'));
@@ -84,5 +94,60 @@ describe('simulación: perfiles de estudiantes', () => {
     const r = (i: number, j: number) => (l[i] as number[]).reduce((s, v, k) => s + v * ((l[j] as number[])[k] ?? 0), 0);
     expect(r(0, 1)).toBeCloseTo(0.5);
     expect(r(1, 1)).toBeCloseTo(1);
+  });
+});
+
+describe('simulación: notas de un periodo', () => {
+  const lectivos = diasLectivos(new Date(Date.UTC(2024, 0, 29)), new Date(Date.UTC(2024, 3, 12)), [{ inicio: new Date(Date.UTC(2024, 2, 25)), fin: new Date(Date.UTC(2024, 2, 29)) }]);
+
+  it('los días lectivos excluyen fines de semana y recesos', () => {
+    expect(lectivos.every((d) => d.getUTCDay() !== 0 && d.getUTCDay() !== 6)).toBe(true);
+    expect(lectivos.some((d) => d.toISOString().startsWith('2024-03-27'))).toBe(false);
+    expect(moverLectivos(lectivos, new Date(Date.UTC(2024, 2, 22)), 1).toISOString().slice(0, 10)).toBe('2024-04-01');
+  });
+
+  it('planea las actividades en orden, con la evaluación al final y la apertura antes del límite', () => {
+    const plan = planearActividades(lectivos.slice(4, -12), 4, 8, azarPara(1, 'plan'));
+    expect(plan).toHaveLength(5);
+    expect(plan.at(-1)?.tipo).toBe('EVALUACION');
+    expect(plan.filter((p) => p.digital)).toHaveLength(2);
+    for (const p of plan) expect(p.apertura.getTime()).toBeLessThan(p.entrega.getTime());
+    expect(planearActividades(lectivos, 4, 1, azarPara(1, 'plan')).some((p) => p.digital)).toBe(false);
+  });
+
+  it('una actividad no entregada vale 1.0 y las notas quedan en la escala con un decimal', () => {
+    const azar = azarPara(5, 'notas');
+    const e = generarEstudiante(config, 7, 'ALTO', azar);
+    expect(notaDeActividad(4.2, e.latentes, 'CRITICA', 'TAREA', { entrega: false, tarde: false }, azar)).toBe(NOTA_NO_ENTREGADA);
+    for (let i = 0; i < 300; i += 1) {
+      const n = notaDeActividad(4.2, e.latentes, 'CRITICA', 'EVALUACION', decidirEntrega(e.latentes, 'EVALUACION', azar), azar);
+      expect(n).toBeGreaterThanOrEqual(1);
+      expect(n).toBeLessThanOrEqual(5);
+      expect(Math.round(n * 10) / 10).toBe(n);
+    }
+  });
+
+  it('un estudiante alto saca en promedio más que uno bajo y la familia de área sale del código de la asignatura', () => {
+    const azar = azarPara(9, 'comparar');
+    const promedio = (categoria: string) => {
+      let s = 0;
+      for (let i = 0; i < 200; i += 1) {
+        const e = generarEstudiante(config, 8, categoria, azar);
+        s += notaDeActividad(e.latentes.habilidad, e.latentes, 'MODERADA', 'TAREA', decidirEntrega(e.latentes, 'TAREA', azar), azar);
+      }
+      return s / 200;
+    };
+    expect(promedio('SUPERIOR') - promedio('BAJO')).toBeGreaterThan(1.5);
+    expect(familiaDeAsignatura('FQ')).toBe('CIENCIAS');
+    expect(familiaDeAsignatura('ETI')).toBe('FORMATIVAS');
+  });
+
+  it('una recuperación superada queda en 3.0 o más y una perdida por debajo', () => {
+    const azar = azarPara(11, 'recu');
+    const e = generarEstudiante(config, 9, 'BASICO', azar);
+    for (let i = 0; i < 200; i += 1) {
+      const n = intentoDeRecuperacion(2.8, e.latentes, azar);
+      if (n !== null) expect(n >= 3 || n <= 2.9).toBe(true);
+    }
   });
 });

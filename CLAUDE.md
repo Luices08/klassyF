@@ -1212,7 +1212,8 @@ Botón flotante en `AppShell` (`components/asistente/AsistenteFlotante.tsx`) que
 - **Todo pasa por la API** (servidor en proceso, un token por persona: ADMIN, coordinación, secretaría, cada docente), así cada paso respeta las reglas y deja auditoría; las únicas escrituras directas son el primer ADMIN y el catálogo de grados (como `npm run seed`).
 - **Reloj simulado** (`nucleo/reloj.ts`, se importa antes que todo): reemplaza `Date` por una subclase con desfase para que ventanas, «no futura» y `createdAt` caigan en la fecha del paso. Mongoose mide su latido con ese reloj: el orquestador corre `_lastHeartbeatAt` en cada salto (si no, las transacciones esperan una reconexión que nunca llega).
 - Lo propio de la simulación va en colecciones `sim_*` (`sim_fases`, `sim_registro` clave→id, `sim_perfiles` = la «verdad oculta» de cada estudiante, para evaluar la IA, nunca para entrenarla). Funciones puras con pruebas en `tests/simulacion.test.ts` (reparto de carga docente, perfiles, festivos).
-- Hoy llega hasta activar el primer año (2024); notas y cierres de periodo, cierre de año y los años siguientes vienen en los próximos cambios.
+- **Un periodo** (`fases/periodo.ts`, `logica/notas.ts`): una cola de eventos con fecha (el reloj salta a cada uno antes de llamar a la API); publicar una actividad agenda las entregas de sus estudiantes en esa misma cola. La nota de cada actividad sale de la habilidad del estudiante en la familia del área (`habilidad_area`), el tipo de nota de la asignatura, la tendencia y la volatilidad; lo no entregado vale 1.0 (regla de este colegio) y la entrega tardía resta décimas. Las recuperaciones usan la política de M18 de la simulación y su ventana del calendario.
+- Hoy llega hasta el cierre del periodo 4 de 2024; el cierre del año, el paso al siguiente y los años 2025 y 2026 vienen en el próximo cambio.
 
 ### Folio del Libro de Matrícula (M04)
 

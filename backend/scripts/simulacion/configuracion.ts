@@ -6,6 +6,7 @@ import fs from 'fs';
 import path from 'path';
 import Joi from 'joi';
 import { NIVELES_DESEMPENO, NIVELES_EDUCATIVOS, TIPOS_ESPACIO } from '../../src/constants/enums';
+import type { Gravedad, ParametrosAsistencia, ParametrosConvivencia } from './logica/asistencia';
 
 export type TipoNota = 'CRITICA' | 'MODERADA' | 'BLANDA';
 export type NombreJornada = 'MANANA' | 'UNICA' | 'TARDE';
@@ -160,6 +161,8 @@ export interface ConfigSimulacion {
     documentos_pendientes: number;
     correlacion_latentes: number;
   };
+  asistencia: ParametrosAsistencia;
+  convivencia: ParametrosConvivencia & { faltas: Array<{ codigo: string; gravedad: Gravedad; descripcion: string }> };
 }
 
 const hora = Joi.string().pattern(/^\d{2}:\d{2}$/);
@@ -322,6 +325,20 @@ const esquema = Joi.object({
     familias_con_hermanos: Joi.number().min(0).max(1).required(),
     documentos_pendientes: Joi.number().min(0).max(1).required(),
     correlacion_latentes: Joi.number().min(-1).max(1).required(),
+  }).required(),
+  asistencia: Joi.object({
+    proporcion_justificadas: Joi.number().min(0).max(1).required(),
+    factor_retardo: Joi.number().min(0).required(),
+    dias_por_registro: Joi.number().integer().min(1).max(31).required(),
+  }).required(),
+  convivencia: Joi.object({
+    tasa: Joi.object({ I: Joi.number().min(0).required(), II: Joi.number().min(0).required(), III: Joi.number().min(0).required() }).required(),
+    factor_secundaria: Joi.number().min(0).required(),
+    factor_primaria_baja: Joi.number().min(0).required(),
+    faltas: Joi.array()
+      .items(Joi.object({ codigo: Joi.string().max(20).required(), gravedad: Joi.string().valid('I', 'II', 'III').required(), descripcion: Joi.string().max(400).required() }))
+      .min(1)
+      .required(),
   }).required(),
 });
 

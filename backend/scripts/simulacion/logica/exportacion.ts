@@ -23,16 +23,28 @@ export interface EntregaDeActividad {
   entregada: boolean;
 }
 
+/** Asistencia de un estudiante en un periodo: cuántos registros de clase tiene y cuántos son falla sin justificar. */
+export interface AsistenciaDePeriodo {
+  periodo: number;
+  registros: number;
+  fallas_injustificadas: number;
+}
+
+/** Una falta de convivencia en la que el estudiante quedó como presunto responsable (la Tipo I no cuenta como alerta). */
+export interface FaltaDeConvivencia {
+  periodo: number;
+  gravedad: 'I' | 'II' | 'III';
+}
+
 export interface EntradasAlCorte {
   promedio_academico: number;
   tareas_no_entregadas: number;
   es_repitente: number;
   periodo_norm: number;
   asignaturas_perdidas_ratio: number;
+  ratio_inasistencias: number;
+  alertas_convivencia: number;
 }
-
-/** Entradas que el modelo del colegio pide y que esta simulación todavía no produce: el exportador no las inventa. */
-export const ENTRADAS_NO_DISPONIBLES = ['ratio_inasistencias', 'alertas_convivencia'] as const;
 
 export const COLUMNAS_ENTRADA: ReadonlyArray<keyof EntradasAlCorte> = [
   'promedio_academico',
@@ -40,7 +52,14 @@ export const COLUMNAS_ENTRADA: ReadonlyArray<keyof EntradasAlCorte> = [
   'es_repitente',
   'periodo_norm',
   'asignaturas_perdidas_ratio',
+  'ratio_inasistencias',
+  'alertas_convivencia',
 ];
+
+/** Puntos de alerta por gravedad. La Tipo I es cotidiana y formativa: no es una alerta. */
+export const PUNTOS_ALERTA: Record<FaltaDeConvivencia['gravedad'], number> = { I: 0, II: 1, III: 2 };
+/** Con estos puntos la entrada llega a 1: dos Tipo III o cuatro Tipo II ya son la señal más alta. */
+export const TOPE_ALERTAS_CONVIVENCIA = 4;
 
 /** Sin al menos estas notas cerradas no hay base para predecir: la fila no se genera (nunca se rellena con ceros). */
 export const MIN_NOTAS_PARA_PREDECIR = 3;
@@ -69,6 +88,8 @@ export interface DatosDeCorte {
   entregas: EntregaDeActividad[];
   esRepitente: boolean;
   escala: EscalaNotas;
+  asistencia: AsistenciaDePeriodo[];
+  faltas: FaltaDeConvivencia[];
 }
 
 /** Las entradas normalizadas a 0–1 con lo registrado hasta el periodo `corte`, o `null` si aún no hay notas suficientes. */
@@ -79,12 +100,19 @@ export function entradasAlCorte(datos: DatosDeCorte): EntradasAlCorte | null {
   const perdidas = notas.filter((n) => n.nota < datos.escala.aprobatoria).length;
   const entregas = datos.entregas.filter((e) => e.periodo <= datos.corte);
   const noEntregadas = entregas.filter((e) => !e.entregada).length;
+  const asistencia = datos.asistencia.filter((a) => a.periodo <= datos.corte);
+  const registros = asistencia.reduce((suma, a) => suma + a.registros, 0);
+  const fallas = asistencia.reduce((suma, a) => suma + a.fallas_injustificadas, 0);
+  const puntos = datos.faltas.filter((f) => f.periodo <= datos.corte).reduce((suma, f) => suma + PUNTOS_ALERTA[f.gravedad], 0);
   return {
     promedio_academico: redondear(normalizarNota(promedio, datos.escala)),
     tareas_no_entregadas: entregas.length === 0 ? 0 : redondear(noEntregadas / entregas.length),
     es_repitente: datos.esRepitente ? 1 : 0,
     periodo_norm: redondear(datos.corte / datos.totalPeriodos),
     asignaturas_perdidas_ratio: redondear(perdidas / notas.length),
+    // Sin planillas de asistencia no se supone que faltó: 0, igual que las tareas.
+    ratio_inasistencias: registros === 0 ? 0 : redondear(fallas / registros),
+    alertas_convivencia: redondear(Math.min(1, puntos / TOPE_ALERTAS_CONVIVENCIA)),
   };
 }
 

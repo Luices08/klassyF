@@ -1,5 +1,6 @@
 import { useSearchParams } from 'react-router-dom';
 import { MosaicoNoticiasInicio } from '../components/noticias/MosaicoNoticiasInicio';
+import { PortalAnalisis } from '../modulos/predictivo/components/PortalAnalisis';
 import { PortalCitaciones } from '../components/portal/PortalCitaciones';
 import { PortalCertificados } from '../components/portal/PortalCertificados';
 import { PortalConvivencia } from '../components/portal/PortalConvivencia';
@@ -16,8 +17,8 @@ import { TabPanel, Tabs } from '../components/ui/Tabs';
 import { useContadoresDePestana } from '../hooks/useNotificaciones';
 import { type HijoDelPortal, useHijos } from '../hooks/usePortal';
 
-type Pestana = 'notas' | 'inasistencias' | 'convivencia' | 'citaciones' | 'documentos' | 'certificados';
-const PESTANAS: Pestana[] = ['notas', 'inasistencias', 'convivencia', 'citaciones', 'documentos', 'certificados'];
+type Pestana = 'notas' | 'analisis' | 'inasistencias' | 'convivencia' | 'citaciones' | 'documentos' | 'certificados';
+const PESTANAS: Pestana[] = ['notas', 'analisis', 'inasistencias', 'convivencia', 'citaciones', 'documentos', 'certificados'];
 
 // Mientras la matrícula no esté formalizada no hay notas, asistencia ni observador: solo documentos.
 const MATRICULA_ACADEMICA = ['MATRICULADO_CONDICIONAL', 'MATRICULADO_DEFINITIVO'];
@@ -111,6 +112,7 @@ function PortalDeHijo({
       <Tabs
         items={[
           { key: 'notas', label: 'Notas', contador: contadorDe('notas') },
+          { key: 'analisis', label: 'Análisis y FODA' },
           { key: 'inasistencias', label: 'Inasistencias', contador: contadorDe('inasistencias') },
           { key: 'convivencia', label: 'Convivencia', contador: contadorDe('convivencia') },
           { key: 'citaciones', label: 'Citaciones', contador: contadorDe('citaciones') },
@@ -124,6 +126,9 @@ function PortalDeHijo({
       {/* `key` con el id del estudiante: al cambiar de hijo cada componente se monta de nuevo y no queda estado de un hijo en la vista de otro. */}
       <TabPanel active={pestana} tabKey="notas">
         {academica ? <PortalNotas key={hijo.student_id} studentId={hijo.student_id} /> : <Alert tone="info">Las notas estarán disponibles cuando la matrícula esté formalizada.</Alert>}
+      </TabPanel>
+      <TabPanel active={pestana} tabKey="analisis">
+        {academica ? <PortalAnalisis key={hijo.student_id} studentId={hijo.student_id} /> : <Alert tone="info">El análisis solo está disponible mientras el estudiante tenga una matrícula activa.</Alert>}
       </TabPanel>
       <TabPanel active={pestana} tabKey="inasistencias">
         {academica ? <PortalInasistencias key={hijo.student_id} studentId={hijo.student_id} /> : <Alert tone="info">La asistencia estará disponible cuando la matrícula esté formalizada.</Alert>}

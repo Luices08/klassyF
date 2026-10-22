@@ -72,6 +72,8 @@ import { DocumentosReferenciaPage } from './pages/admin/DocumentosReferenciaPage
 import { RevisionPlaneacionPage } from './pages/admin/RevisionPlaneacionPage';
 import { PlaneacionDocentePage } from './pages/PlaneacionDocentePage';
 import { PortalAcudientePage } from './pages/PortalAcudientePage';
+import { MiAnalisisPage } from './modulos/predictivo/pages/MiAnalisisPage';
+import { PredictivoPage } from './modulos/predictivo/pages/PredictivoPage';
 
 export default function App() {
   return (
@@ -215,6 +217,10 @@ export default function App() {
             <Route path="/mis-actividades/:id" element={<ActividadEstudiantePage />} />
             <Route path="/mis-notas" element={<MisNotasPage />} />
             <Route path="/mi-observador" element={<MiObservadorPage />} />
+            <Route path="/mi-analisis" element={<MiAnalisisPage />} />
+          </Route>
+          <Route element={<ProtectedRoute allowedRoles={['ADMIN', 'COORDINADOR', 'COORDINADOR_CONVIVENCIA', 'ORIENTADOR', 'DOCENTE']} />}>
+            <Route path="/predictivo" element={<PredictivoPage />} />
           </Route>
         </Route>
       </Route>

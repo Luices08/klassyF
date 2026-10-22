@@ -247,6 +247,11 @@ export const PALABRAS_CLAVE_POR_RUTA: Record<string, { descripcion: string; clav
   '/anuncios': { descripcion: 'Tablero de anuncios de la institución; coordinación y administración los publican.', claves: ['anuncios', 'avisos', 'comunicados', 'circulares', 'publicar anuncio', 'tablero'] },
   '/mis-notas': { descripcion: 'Tus notas por asignatura.', claves: ['mis notas', 'ver mis notas', 'cuanto llevo', 'mis calificaciones'] },
   '/mi-observador': { descripcion: 'Tu observador.', claves: ['mi observador', 'mis observaciones', 'mis faltas'] },
+  '/predictivo': {
+    descripcion: 'Análisis predictivo de un estudiante: riesgo de perder cada asignatura, nota que le falta, FODA y riesgo de no promoción; el administrador entrena la IA.',
+    claves: ['predictivo', 'riesgo academico', 'estudiantes en riesgo', 'foda', 'prediccion', 'entrenar ia', 'inteligencia artificial', 'quien va a perder'],
+  },
+  '/mi-analisis': { descripcion: 'Tu análisis: qué nota te falta en cada asignatura y tu FODA.', claves: ['mi analisis', 'mi foda', 'que me falta', 'cuanto necesito para pasar'] },
 };
 
 const PALABRAS_VACIAS = new Set([

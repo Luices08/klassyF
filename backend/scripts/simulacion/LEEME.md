@@ -15,7 +15,9 @@ tiene usuarios que no creó la simulación, también se detiene.
 | `2024/preparar-anio` | 8-ene | Calendario con festivos y Semana Santa, escala, molde de la planilla, 22 grupos con su salón, plan de estudios, carga docente (18–24 h por docente), líderes y planes de área, horarios generados y publicados, políticas de promoción y recuperación |
 | `2024/inicio-anio` | 9 al 26-ene | Estudiantes con su acudiente (hermanos comparten acudiente), matrículas con documentos, planes de aula del periodo 1 y activación del año |
 
-Siguientes cambios: notas, entregas y cierre de cada periodo; cierre del año, paso al siguiente y 2025 y 2026 hasta hoy.
+| `2024/periodo-1` … `periodo-4` | inicio a fin de cada periodo | Coordinación abre el periodo; cada docente programa 3–5 actividades por asignatura y grado (la última es la evaluación) y las publica en todos sus grupos; los estudiantes entregan las digitales (algunos tarde), el docente califica unos días después (lo no entregado vale 1.0), agrega autoevaluación, coevaluación y comportamiento y cierra su planilla; coordinación declara las definitivas; los docentes registran las recuperaciones del periodo en su ventana; coordinación cierra el periodo y se radican los planes de aula del siguiente. Preescolar lleva valoración descriptiva en vez de notas |
+
+Siguientes cambios: cierre del año, paso al siguiente y 2025 y 2026 hasta hoy.
 
 ## Requisitos
 
@@ -65,7 +67,7 @@ primera vez el sistema pide cambiar la contraseña, como a cualquier usuario nue
 - `config/colegio-pequeno.json`: todo número del colegio (sedes, franjas, plan, docentes, calendario, escala, políticas y la matriz de
   perfiles por grado). Otro colegio es otro JSON (`--config=`); la semilla (`--semilla=`) hace que todo sea reproducible.
 - `nucleo/`: reloj simulado (se importa antes que todo), entorno, API en proceso, registro de ids (`sim_registro`), respaldos.
-- `logica/`: funciones puras con pruebas (`tests/simulacion.test.ts`): reparto de carga docente y perfiles de estudiantes.
+- `logica/`: funciones puras con pruebas (`tests/simulacion.test.ts`): reparto de carga docente, perfiles de estudiantes y notas (`notas.ts`: calendario de actividades, quién entrega, nota esperada por asignatura según el perfil, recuperación).
 - `fases/`: una función por fase. Las únicas escrituras directas a la base son el primer ADMIN y el catálogo de grados (lo mismo que
   `npm run seed`); todo lo demás pasa por la API y queda en la auditoría.
 - `sim_perfiles` guarda la «verdad oculta» de cada estudiante (categoría y variables latentes): sirve para evaluar la IA, nunca para

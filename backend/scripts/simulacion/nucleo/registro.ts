@@ -73,6 +73,9 @@ export const perfiles = {
   async contar(): Promise<number> {
     return coleccion('sim_perfiles').countDocuments();
   },
+  async todos(): Promise<PerfilSimulado[]> {
+    return (await coleccion('sim_perfiles').find({}, { projection: { _id: 0 } }).toArray()) as unknown as PerfilSimulado[];
+  },
 };
 
 /** ¿La base tiene datos que no creó la simulación? (usuarios y ninguna fase registrada). */

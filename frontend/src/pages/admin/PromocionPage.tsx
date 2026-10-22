@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { CierreGrupoPanel } from '../../components/promocion/CierreGrupoPanel';
 import { PoliticaPromocionPanel } from '../../components/promocion/PoliticaPromocionPanel';
-import { RolloverPanel } from '../../components/promocion/RolloverPanel';
+import { RematriculaGrupoPanel } from '../../components/rematricula/RematriculaGrupoPanel';
 import { PageHeader } from '../../components/ui/PageHeader';
 import { Tabs } from '../../components/ui/Tabs';
 import { useAuth } from '../../context/AuthContext';
@@ -33,7 +33,7 @@ export function PromocionPage() {
         onChange={setPestana}
       />
       {pestana === 'cierre' && <CierreGrupoPanel anioId={anio?._id} anioEstado={anio?.estado} puedeCerrar={esAdmin} />}
-      {pestana === 'siguiente' && <RolloverPanel puedeEjecutar={esAdmin} />}
+      {pestana === 'siguiente' && <RematriculaGrupoPanel puedeEjecutar={esAdmin} />}
       {pestana === 'politica' && <PoliticaPromocionPanel academicYearId={anio?._id} puedeEditar={esAdmin && anio?.estado !== 'CERRADO'} notaAprobatoria={anio?.escala_evaluacion?.nota_aprobatoria} periodos={anio?.periodos?.length} />}
     </div>
   );

@@ -18,6 +18,7 @@ import { finDelDia, inicioDelDia } from '../utils/calendarioAcademico';
 import { intentoConsiderado, motivoSinEntrega, requiereElegirIntento } from '../utils/entregasActividad';
 import { sanitizarContenido, textoPlano } from '../utils/contenidoActividad';
 import { detectarEvidencia } from '../utils/evidenciasActividad';
+import { archivoDisponible } from '../utils/purgaAlmacenamiento';
 import { ESTADO_ACTIVO } from '../utils/filtroEstado';
 import { carpetaActividad } from '../utils/uploadPaths';
 import { ActividadPlana, VistaActividad, armarVistas, asignacionDelDocente } from './activity.service';
@@ -88,6 +89,8 @@ export function vistaEntrega(entrega: EntregaPlana | null) {
     con_retraso: entrega.con_retraso ?? false,
     texto_entrega: considerado?.texto_entrega ?? entrega.texto_entrega ?? '',
     tiene_archivo: Boolean(considerado?.archivo_path ?? entrega.archivo_path),
+    // El archivo físico se depuró por política (nota, retroalimentación y fechas siguen intactas): no hay descarga, pero sí se explica.
+    archivo_purgado: considerado ? archivosDe(considerado).some((a) => a.purgado === true) : false,
     archivo_nombre: considerado?.archivo_nombre ?? entrega.archivo_nombre ?? null,
     archivo_formato: considerado?.archivo_formato ?? entrega.archivo_formato ?? null,
     calificacion_numerica: entrega.calificacion_numerica ?? null,
@@ -100,10 +103,11 @@ export function vistaEntrega(entrega: EntregaPlana | null) {
       acceso_especial: i.acceso_especial ?? false,
       texto_entrega: i.texto_entrega ?? '',
       respuesta_html: i.respuesta_html ?? '',
-      tiene_archivo: archivosDe(i).length > 0,
+      tiene_archivo: archivosDe(i).some(archivoDisponible),
+      archivo_purgado: archivosDe(i).some((a) => a.purgado === true),
       archivo_nombre: archivosDe(i)[0]?.nombre ?? null,
       archivo_formato: archivosDe(i)[0]?.formato ?? null,
-      archivos: archivosDe(i).map((a, indice) => ({ indice, nombre: a.nombre, formato: a.formato, bytes: a.bytes })),
+      archivos: archivosDe(i).map((a, indice) => ({ indice, nombre: a.nombre, formato: a.formato, bytes: a.bytes, purgado: a.purgado === true })),
       considerado: considerado?.numero === i.numero,
     })),
     intento_valido: entrega.intento_valido ?? null,
@@ -550,5 +554,6 @@ export async function rutaDeEntrega(entregaId: string, usuario: UserDocument, in
   const elegido = intento != null ? intentos.find((i) => i.numero === intento) : intentoConsiderado(intentos, entrega.intento_valido);
   const elegidoArchivo = elegido ? archivosDe(elegido)[archivo] : undefined;
   if (!elegidoArchivo) throw new ApiError(404, 'Entrega no encontrada.');
-  return { ruta: path.resolve(process.cwd(), elegidoArchivo.path), nombre: elegidoArchivo.nombre };
+  if (!archivoDisponible(elegidoArchivo)) throw new ApiError(410, 'Este archivo fue depurado por política institucional; la nota y la retroalimentación se conservan.');
+  return { ruta: path.resolve(process.cwd(), elegidoArchivo.path as string), nombre: elegidoArchivo.nombre };
 }

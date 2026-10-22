@@ -13,6 +13,7 @@
     "sim": "tsx scripts/simulacion/orquestador.ts",
     "migrate:roles-multiples": "tsx scripts/migrateRolesMultiples.ts",
     "notificar:diario": "tsx scripts/notificarDiario.ts",
+    "storage:purge-periodo": "tsx scripts/purgarAlmacenamientoPeriodo.ts",
     "migrate:superadmin-to-admin": "tsx scripts/migrateSuperadminToAdmin.ts",
     "sembrar:tipos-titulacion": "tsx scripts/sembrarTiposTitulacion.ts",
     "migrate:m05-anio-lectivo": "tsx scripts/migrateM05AnioLectivo.ts",

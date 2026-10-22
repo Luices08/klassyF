@@ -174,13 +174,14 @@ export interface ResumenCierre {
 
 // --- Rollover ---
 
-export type DestinoRollover = 'GRADO_SIGUIENTE' | 'MISMO_GRADO' | 'TERMINA_CICLO' | 'NO_RENUEVA_CUPO' | 'SIN_DECISION';
-export type EstadoFilaRollover = 'POR_CREAR' | 'YA_TIENE_MATRICULA' | 'SIN_CUPO' | 'NO_APLICA';
+export type DestinoRollover = 'GRADO_SIGUIENTE' | 'MISMO_GRADO' | 'TERMINA_CICLO' | 'EGRESADO' | 'NO_RENUEVA_CUPO' | 'SIN_DECISION';
+export type EstadoFilaRollover = 'POR_CREAR' | 'YA_TIENE_MATRICULA' | 'EN_ESPERA' | 'SIN_CUPO' | 'NO_APLICA';
 
 export const NOMBRES_DESTINO: Record<DestinoRollover, string> = {
   GRADO_SIGUIENTE: 'Grado siguiente',
   MISMO_GRADO: 'Repite el grado',
   TERMINA_CICLO: 'Termina el ciclo',
+  EGRESADO: 'Egresado (historial)',
   NO_RENUEVA_CUPO: 'No se renueva el cupo',
   SIN_DECISION: 'Sin decisión',
 };
@@ -188,6 +189,7 @@ export const NOMBRES_DESTINO: Record<DestinoRollover, string> = {
 export const NOMBRES_ESTADO_ROLLOVER: Record<EstadoFilaRollover, string> = {
   POR_CREAR: 'Se pre-matriculará',
   YA_TIENE_MATRICULA: 'Ya tiene matrícula',
+  EN_ESPERA: 'Lista de espera',
   SIN_CUPO: 'Sin cupo',
   NO_APLICA: 'No aplica',
 };
@@ -204,20 +206,33 @@ export interface FilaRollover {
   tipo_ingreso: 'ANTIGUO' | 'REPITENTE' | null;
   grupo_destino_id: string | null;
   grupo_destino: string | null;
+  /** Lugar en la lista de espera de su sede y grado (solo si el estado es EN_ESPERA). */
+  posicion_espera: number | null;
   paz_y_salvo: 'CONFIRMADO' | 'PENDIENTE';
+}
+
+export interface GrupoDestinoPlan {
+  id: string;
+  nombre: string;
+  capacidad: number;
+  ocupados_antes: number;
+  asignados: number;
+  libres_despues: number;
 }
 
 export interface PlanRollover {
   origen: { id: string; year: number };
   destino: { id: string; year: number };
   filas: FilaRollover[];
+  grupos_destino: GrupoDestinoPlan[];
+  alertas: string[];
   retirados: number;
-  resumen: { total: number; por_crear: number; ya_tienen_matricula: number; sin_cupo: number; no_aplica: number; por_destino: Partial<Record<DestinoRollover, number>> };
+  resumen: { total: number; por_crear: number; ya_tienen_matricula: number; en_espera: number; sin_cupo: number; no_aplica: number; por_destino: Partial<Record<DestinoRollover, number>> };
 }
 
 export interface ResultadoRollover {
   creadas: number;
-  fallidas: Array<{ student_id: string; estudiante: string; error: string }>;
+  en_espera: number;
   plan: PlanRollover['resumen'];
 }
 
@@ -260,21 +275,32 @@ export function useCerrarGrupoPromocion() {
   });
 }
 
-export function useSimulacionRollover(origenId: string | undefined, destinoId: string | undefined, sedeId?: string) {
+export interface AlcanceRollover {
+  origen_id?: string;
+  destino_id?: string;
+  sede_id?: string;
+  grade_id?: string;
+  group_id?: string;
+}
+
+/** La simulación solo se pide cuando `activa` (botón «Simular»): así lo que se ve es lo que se acaba de calcular, nunca algo viejo. */
+export function useSimulacionRollover(alcance: AlcanceRollover, activa: boolean) {
   return useQuery({
-    queryKey: ['promocion', 'rollover', origenId, destinoId, sedeId ?? null],
-    queryFn: () => api.get<PlanRollover>('/promocion/rollover', { origen_id: origenId, destino_id: destinoId, sede_id: sedeId }),
-    enabled: Boolean(origenId && destinoId),
+    queryKey: ['promocion', 'rollover', alcance],
+    queryFn: () => api.get<PlanRollover>('/promocion/rollover', { ...alcance }),
+    enabled: activa && Boolean(alcance.origen_id && alcance.destino_id),
     retry: false,
+    staleTime: 0,
   });
 }
 
 export function useEjecutarRollover() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (input: { origen_id: string; destino_id: string; sede_id?: string; confirm_password: string }) => api.post<ResultadoRollover>('/promocion/rollover', input),
+    mutationFn: (input: AlcanceRollover & { origen_id: string; destino_id: string; confirm_password: string }) => api.post<ResultadoRollover>('/promocion/rollover', input),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['promocion', 'rollover'] });
+      void queryClient.invalidateQueries({ queryKey: ['rematricula'] });
       void queryClient.invalidateQueries({ queryKey: ['enrollments'] });
       void queryClient.invalidateQueries({ queryKey: ['groups'] });
     },

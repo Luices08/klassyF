@@ -11,6 +11,7 @@
     "seed:demo": "tsx scripts/seedDemoCompleto.ts",
     "seed:subjects": "tsx scripts/seedSubjects.ts",
     "sim": "tsx scripts/simulacion/orquestador.ts",
+    "sim:exportar": "tsx scripts/simulacion/exportar.ts",
     "migrate:roles-multiples": "tsx scripts/migrateRolesMultiples.ts",
     "notificar:diario": "tsx scripts/notificarDiario.ts",
     "storage:purge-periodo": "tsx scripts/purgarAlmacenamientoPeriodo.ts",

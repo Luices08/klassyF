@@ -38,6 +38,8 @@ router.post('/habilitaciones', checkRole(...ADMINISTRAN), validate(v.otorgarHabi
 router.patch('/habilitaciones/:id', checkRole(...ADMINISTRAN), validate(v.actualizarHabilitacion), c.actualizarHabilitacion);
 router.post('/habilitaciones/:id/revocar', checkRole(...ADMINISTRAN), validate(v.porId), c.revocarHabilitacion);
 
+// Una noticia con su cuerpo: va después de las rutas fijas (`/mias`, `/categorias`…) para que no las tome como un id.
+router.get('/:id', validate(v.porId), c.detalle);
 router.post('/', checkRole(...PUBLICAN), validate(v.crear), c.crear);
 router.patch('/:id', checkRole(...PUBLICAN), validate(v.actualizar), c.actualizar);
 // La imagen: se sube (POST, como todas las subidas del sistema), se quita y se pide con sesión.

@@ -7,9 +7,15 @@ export type AlcanceNoticia = 'GRUPOS' | 'GRADOS' | 'SEDES' | 'INSTITUCION';
 export type RolDestinoNoticia = 'DOCENTE' | 'ESTUDIANTE' | 'ACUDIENTE';
 export type TonoCategoria = 'blue' | 'green' | 'orange' | 'red' | 'neutral';
 
+/** Qué tan grande se ve una noticia en el mosaico (el servidor usa los mismos nombres). */
+export type TamanoMosaico = 'PRINCIPAL' | 'DESTACADA' | 'ESTANDAR' | 'BREVE';
+
 export interface Noticia {
   id: string;
   titulo: string;
+  /** Bajada o entradilla. */
+  subtitulo: string;
+  /** El texto sin formato; el cuerpo con formato solo viaja en el detalle. */
   descripcion: string;
   categoria: { id: string; nombre: string; tono: TonoCategoria };
   fecha_inicio: string | null;
@@ -20,8 +26,20 @@ export interface Noticia {
   fijada: boolean;
   publicar_desde: string;
   alcance: AlcanceNoticia;
-  /** Versión de la imagen (para el caché); `null` = sin imagen. */
+  /** Versión de la portada (para el caché); `null` = sin portada (solo las noticias anteriores a que fuera obligatoria). */
   imagen_version: number | null;
+  tamano_mosaico: TamanoMosaico;
+  /** Hacia dónde mira la portada en cada tarjeta (0 a 100 desde la esquina superior izquierda). */
+  enfoque_x: number;
+  enfoque_y: number;
+  /** Quien la publicó. */
+  autor: string;
+}
+
+/** Una noticia completa, con su cuerpo con formato (ya limpio en el servidor). Vacío en las anteriores: ahí se lee `descripcion`. */
+export interface NoticiaDetalle extends Noticia {
+  estado: 'PUBLICADA' | 'ARCHIVADA';
+  contenido_html: string;
 }
 
 export interface NoticiaGestion extends Noticia {
@@ -68,7 +86,14 @@ export interface Habilitacion {
 
 export interface DatosNoticia {
   titulo: string;
-  descripcion: string;
+  subtitulo?: string;
+  /** El cuerpo con formato: el servidor lo limpia y de él deriva la descripción. */
+  contenido_html: string;
+  tamano_mosaico?: TamanoMosaico;
+  enfoque_x?: number;
+  enfoque_y?: number;
+  /** La portada como data URI. Obligatoria al crear; al editar solo viaja si se cambia. */
+  portada?: string;
   categoria_id: string;
   fecha_inicio?: string | null;
   fecha_fin?: string | null;
@@ -104,6 +129,11 @@ export function useNoticiasParaMi(limite = 50, habilitado = true) {
     enabled: habilitado,
     staleTime: 60_000,
   });
+}
+
+/** Una noticia con su cuerpo: se pide al abrirla (los listados no lo traen) y respeta quién puede verla. */
+export function useNoticiaDetalle(id: string | null) {
+  return useQuery({ queryKey: ['noticias', 'detalle', id], queryFn: () => api.get<NoticiaDetalle>(`/noticias/${id}`), enabled: Boolean(id), staleTime: 30_000 });
 }
 
 export function usePermisosNoticias() {
@@ -188,24 +218,7 @@ export function useRevocarHabilitacion() {
   return useMutation({ mutationFn: (id: string) => api.post<void>(`/noticias/habilitaciones/${id}/revocar`), onSuccess: invalidar });
 }
 
-// --- Imagen: se sube (POST multipart), se quita y se pide con sesión ---
-
-export function useSubirImagenNoticia() {
-  const invalidar = useInvalidarNoticias();
-  return useMutation({
-    mutationFn: ({ id, archivo }: { id: string; archivo: File }) => {
-      const formulario = new FormData();
-      formulario.append('file', archivo);
-      return api.upload<NoticiaGestion>(`/noticias/${id}/imagen`, formulario);
-    },
-    onSuccess: invalidar,
-  });
-}
-
-export function useQuitarImagenNoticia() {
-  const invalidar = useInvalidarNoticias();
-  return useMutation({ mutationFn: (id: string) => api.delete<NoticiaGestion>(`/noticias/${id}/imagen`), onSuccess: invalidar });
-}
+// --- Portada: viaja con la noticia (data URI) y se pide con sesión ---
 
 /**
  * La imagen de una noticia como dirección que el `<img>` puede usar. No hay una URL pública (en un evento puede haber niños en la foto): se pide con la sesión, así que

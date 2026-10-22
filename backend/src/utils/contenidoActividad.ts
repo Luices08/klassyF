@@ -18,6 +18,9 @@ const OPCIONES: sanitizeHtml.IOptions = {
   exclusiveFilter: (marco) => marco.tag === 'img' && !/^data:image\/(png|jpe?g|webp|gif);base64,[A-Za-z0-9+/=]+$/.test(marco.attribs.src ?? ''),
 };
 
+/** Las mismas reglas, para que otros módulos con texto enriquecido (noticias) las amplíen sin copiarlas. */
+export const OPCIONES_CONTENIDO = OPCIONES;
+
 export function sanitizarContenido(html: string): string {
   if (Buffer.byteLength(html, 'utf8') > MAX_BYTES_CONTENIDO_HTML * 2) {
     throw new ApiError(400, 'El contenido de la actividad es demasiado grande: reduce o quita algunas imágenes.');

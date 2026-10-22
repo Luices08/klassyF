@@ -1,5 +1,5 @@
 import Image from '@tiptap/extension-image';
-import { EditorContent, useEditor, useEditorState } from '@tiptap/react';
+import { EditorContent, Extension, useEditor, useEditorState } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import { type ReactNode, useEffect, useMemo, useState } from 'react';
 import { MAX_BYTES_CONTENIDO_HTML } from '../../lib/actividades';
@@ -61,7 +61,31 @@ function Boton({ titulo, activo, disabled, onClick, children }: BotonProps) {
   );
 }
 
+/**
+ * La letra capital: un párrafo puede llevar la clase `letra-capital`, y el CSS agranda su primera letra. Es solo presentación (un atributo del párrafo), no cambia el texto;
+ * el servidor de noticias deja pasar únicamente esa clase.
+ */
+const LetraCapital = Extension.create({
+  name: 'letraCapital',
+  addGlobalAttributes() {
+    return [
+      {
+        types: ['paragraph'],
+        attributes: {
+          letraCapital: {
+            default: false,
+            parseHTML: (elemento) => elemento.classList.contains('letra-capital'),
+            renderHTML: (atributos) => (atributos.letraCapital ? { class: 'letra-capital' } : {}),
+          },
+        },
+      },
+    ];
+  },
+});
+
 interface EditorRicoProps {
+  /** Modo editorial (noticias): suma el botón de cita editorial y el de letra capital, y da a las citas el estilo de periódico. Sin él, el editor es el de siempre. */
+  editorial?: boolean;
   /** HTML del contenido. Se lee al montar y cada vez que cambia desde afuera (p. ej. al abrir otra actividad). */
   value: string;
   onChange: (html: string) => void;
@@ -75,16 +99,16 @@ interface EditorRicoProps {
  * Editor de texto enriquecido (negrita, listas, enlaces, imágenes pegadas o soltadas). El HTML que produce siempre lo vuelve a
  * limpiar el servidor: aquí solo se cuida que quepa (`MAX_BYTES_CONTENIDO_HTML`) y que las imágenes pesen poco.
  */
-export function EditorRico({ value, onChange, placeholder = 'Escribe aquí…', disabled, etiqueta = 'Contenido' }: EditorRicoProps) {
+export function EditorRico({ value, onChange, placeholder = 'Escribe aquí…', disabled, etiqueta = 'Contenido', editorial = false }: EditorRicoProps) {
   const [aviso, setAviso] = useState<string | null>(null);
   const bytes = useMemo(() => new Blob([value]).size, [value]);
 
   const editor = useEditor({
-    extensions: [StarterKit.configure({ heading: { levels: [2, 3] }, link: { openOnClick: false, autolink: true } }), Image.configure({ allowBase64: true })],
+    extensions: [StarterKit.configure({ heading: { levels: [2, 3] }, link: { openOnClick: false, autolink: true } }), Image.configure({ allowBase64: true }), ...(editorial ? [LetraCapital] : [])],
     content: value,
     editable: !disabled,
     editorProps: {
-      attributes: { class: 'ProseMirror contenido-rico', 'aria-label': etiqueta },
+      attributes: { class: `ProseMirror contenido-rico${editorial ? ' contenido-editorial' : ''}`, 'aria-label': etiqueta },
       handlePaste: (_vista, evento) => {
         const imagenes = Array.from(evento.clipboardData?.files ?? []).filter((f) => TIPOS_IMAGEN.includes(f.type));
         if (imagenes.length === 0) return false;
@@ -142,6 +166,8 @@ export function EditorRico({ value, onChange, placeholder = 'Escribe aquí…', 
       viñetas: e?.isActive('bulletList') ?? false,
       numeracion: e?.isActive('orderedList') ?? false,
       enlace: e?.isActive('link') ?? false,
+      cita: e?.isActive('blockquote') ?? false,
+      capital: Boolean(e?.getAttributes('paragraph').letraCapital),
       vacio: e?.isEmpty ?? true,
     }),
   });
@@ -183,6 +209,22 @@ export function EditorRico({ value, onChange, placeholder = 'Escribe aquí…', 
           <Boton titulo="Lista numerada" activo={estado?.numeracion} disabled={disabled} onClick={() => editor?.chain().focus().toggleOrderedList().run()}>
             1. Lista
           </Boton>
+          {editorial && (
+            <>
+              <span className="mx-1 h-5 w-px bg-border" aria-hidden="true" />
+              <Boton titulo="Cita editorial" activo={estado?.cita} disabled={disabled} onClick={() => editor?.chain().focus().toggleBlockquote().run()}>
+                <span className="text-base font-bold leading-none">“</span>
+              </Boton>
+              <Boton
+                titulo="Letra capital al inicio del párrafo"
+                activo={estado?.capital}
+                disabled={disabled}
+                onClick={() => editor?.chain().focus().updateAttributes('paragraph', { letraCapital: !estado?.capital }).run()}
+              >
+                <span className="font-serif text-base font-bold leading-none">Aa</span>
+              </Boton>
+            </>
+          )}
           <span className="mx-1 h-5 w-px bg-border" aria-hidden="true" />
           <Boton titulo={estado?.enlace ? 'Quitar enlace' : 'Agregar enlace'} activo={estado?.enlace} disabled={disabled} onClick={ponerEnlace}>
             <LinkIcon className="h-4 w-4" />

@@ -1,6 +1,18 @@
 import Joi from 'joi';
 import { ESTADOS_USUARIO } from '../constants/enums';
-import { ALCANCES_NOTICIA, MAX_DESCRIPCION_NOTICIA, MAX_LUGAR_NOTICIA, MAX_NOMBRE_CATEGORIA, MAX_TITULO_NOTICIA, ROLES_DESTINO_NOTICIA, TONOS_CATEGORIA } from '../constants/noticias';
+import {
+  ALCANCES_NOTICIA,
+  MAX_CARACTERES_CONTENIDO_NOTICIA,
+  MAX_CARACTERES_PORTADA,
+  MAX_DESCRIPCION_NOTICIA,
+  MAX_LUGAR_NOTICIA,
+  MAX_NOMBRE_CATEGORIA,
+  MAX_SUBTITULO_NOTICIA,
+  MAX_TITULO_NOTICIA,
+  ROLES_DESTINO_NOTICIA,
+  TAMANOS_MOSAICO,
+  TONOS_CATEGORIA,
+} from '../constants/noticias';
 import { ValidationSchema } from '../middlewares/validate.middleware';
 import { objectId } from './common.validator';
 
@@ -9,7 +21,15 @@ const ids = Joi.array().items(objectId).max(100).unique();
 // Lo común de crear y editar: al editar todo es opcional. Las fechas de calendario van `AAAA-MM-DD` o como instante ISO (a medianoche UTC las guarda el modelo).
 const campos = {
   titulo: Joi.string().trim().min(3).max(MAX_TITULO_NOTICIA),
+  subtitulo: Joi.string().trim().allow('').max(MAX_SUBTITULO_NOTICIA),
   descripcion: Joi.string().trim().min(3).max(MAX_DESCRIPCION_NOTICIA),
+  // El cuerpo con formato: el servidor lo limpia y de él deriva la descripción. Las imágenes del cuerpo viajan dentro del texto.
+  contenido_html: Joi.string().allow('').max(MAX_CARACTERES_CONTENIDO_NOTICIA),
+  tamano_mosaico: Joi.string().valid(...TAMANOS_MOSAICO),
+  enfoque_x: Joi.number().min(0).max(100),
+  enfoque_y: Joi.number().min(0).max(100),
+  // La portada como data URI: el servidor confirma por la firma de bytes que sea una imagen de verdad.
+  portada: Joi.string().max(MAX_CARACTERES_PORTADA).pattern(/^data:image\/(png|jpeg|webp);base64,/).messages({ 'string.pattern.base': 'La portada debe ser una imagen PNG, JPG o WEBP.' }),
   categoria_id: objectId,
   fecha_inicio: Joi.date().iso().allow(null),
   fecha_fin: Joi.date().iso().allow(null),
@@ -26,7 +46,8 @@ const campos = {
 };
 
 export const crear: ValidationSchema = {
-  body: Joi.object({ ...campos, titulo: campos.titulo.required(), descripcion: campos.descripcion.required(), categoria_id: objectId.required() }),
+  // El cuerpo llega como texto con formato o, como antes, como descripción; y toda noticia lleva portada.
+  body: Joi.object({ ...campos, titulo: campos.titulo.required(), categoria_id: objectId.required(), portada: campos.portada.required() }).or('descripcion', 'contenido_html'),
 };
 
 export const actualizar: ValidationSchema = {

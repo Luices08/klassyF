@@ -3,6 +3,7 @@ import { BarraFiltrosDashboard } from '../../components/dashboard/BarraFiltrosDa
 import { BarrasHorizontales } from '../../components/dashboard/BarrasHorizontales';
 import { BloqueDashboard } from '../../components/dashboard/BloqueDashboard';
 import { CuadriculaDeAccesos } from '../../components/dashboard/CuadriculaDeAccesos';
+import { MosaicoNoticiasInicio } from '../../components/noticias/MosaicoNoticiasInicio';
 import { SeccionPlegable } from '../../components/dashboard/SeccionPlegable';
 import { TarjetaIndicador } from '../../components/dashboard/TarjetaIndicador';
 import type { NavItem } from '../../components/layout/navigation';
@@ -121,6 +122,8 @@ export function DashboardOrientacionPage({ links }: { links: NavItem[] }) {
           </Card>
         </div>
       </div>
+
+      <MosaicoNoticiasInicio />
 
       <SeccionPlegable titulo="Todas las pantallas" subtitulo="Los accesos del menú, con sus novedades." abiertaPorDefecto={window.innerWidth < 1024}>
         <CuadriculaDeAccesos links={links} />

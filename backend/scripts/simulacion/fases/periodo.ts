@@ -26,8 +26,9 @@ import {
   planearActividades,
   PerfilDeAnio,
 } from '../logica/notas';
-import { ContextoFase, coordinacion, eventosDelAnio, secretaria } from './comun';
+import { ContextoFase, coordinacion, despuesDelCorte, Evento, ejecutarEventos, eventosDelAnio, secretaria } from './comun';
 import { radicarPlanesDeAula } from './planeacion';
+import { eventosSaber11, eventosServicioSocial, registrarSalidas } from './vidaEscolar';
 
 interface AsignacionVista {
   _id: string;
@@ -40,11 +41,6 @@ interface AsignacionVista {
 interface MatriculaVista {
   estado: string;
   student_id: { _id: string } | string;
-}
-
-interface Evento {
-  cuando: Date;
-  correr: () => Promise<void>;
 }
 
 interface Clase {
@@ -87,23 +83,6 @@ function asignaturasPorClave(ctx: ContextoFase): Map<string, string> {
   const tipos = new Map<string, string>();
   for (const area of ctx.config.areas) for (const a of area.asignaturas) tipos.set(a.clave, a.tipo_nota);
   return tipos;
-}
-
-/**
- * Ejecuta los eventos en orden de fecha, moviendo el reloj a cada uno. Un evento puede agendar otros (en `nuevos`): se suman a la
- * fila en cuanto aparecen, así una entrega nunca corre antes que la actividad que la origina ni después de su calificación.
- */
-async function ejecutar(eventos: Evento[], nuevos: Evento[] = []): Promise<void> {
-  const fila = [...eventos];
-  while (fila.length > 0) {
-    // Orden estable: a igual fecha, primero lo que se agendó primero.
-    let i = 0;
-    for (let k = 1; k < fila.length; k += 1) if ((fila[k] as Evento).cuando < (fila[i] as Evento).cuando) i = k;
-    const [e] = fila.splice(i, 1) as [Evento];
-    irA(e.cuando);
-    await e.correr();
-    if (nuevos.length > 0) fila.push(...nuevos.splice(0));
-  }
 }
 
 async function cargarClases(ctx: ContextoFase, anio: number, anioId: string, periodo: number): Promise<Clase[]> {
@@ -167,8 +146,14 @@ export async function fasePeriodo(ctx: ContextoFase, anio: number, periodo: numb
   const coord = como(await coordinacion());
   const semilla = ctx.semilla;
 
+  if (despuesDelCorte(ctx, aLaHora(inicio, '06:30'))) {
+    ctx.log(`El periodo ${periodo} de ${anio} empieza después del corte: no se simula.`);
+    return;
+  }
   irA(aLaHora(inicio, '06:30'));
   await coord.patch(`/academic-years/${anioId}/periodos/${periodo}/estado`, { estado: 'ABIERTO' });
+  const salidas = await registrarSalidas(ctx, anio, periodo, inicio);
+  if (salidas.retiros + salidas.traslados > 0) ctx.log(`Periodo ${periodo} ${anio}: ${salidas.retiros} retiros y ${salidas.traslados} traslados a otro colegio.`);
   const clases = await cargarClases(ctx, anio, anioId, periodo);
   const conNotas = clases.filter((c) => c.grado > 0);
   const preescolar = clases.filter((c) => c.grado === 0);
@@ -242,6 +227,10 @@ export async function fasePeriodo(ctx: ContextoFase, anio: number, periodo: numb
     }
   }
 
+  // Servicio social de 10° y 11° (segundo y tercer periodo) y registro de Saber 11 (tercero).
+  if (periodo === 2 || periodo === 3) eventos.push(...(await eventosServicioSocial(ctx, anio, periodo, lectivos)));
+  if (periodo === 3) eventos.push(...(await eventosSaber11(ctx, anio, lectivos)));
+
   const perfilPorEstudiante = new Map<string, Latentes>();
   for (const p of await perfiles.todos()) {
     const delAnio = p.por_anio.find((x) => x.anio === anio);
@@ -272,7 +261,7 @@ export async function fasePeriodo(ctx: ContextoFase, anio: number, periodo: numb
   };
 
   // Publicar una actividad agenda sus entregas: se suman a la fila en cuanto aparecen, siempre en orden de fecha.
-  await ejecutar(eventos, eventosEntregas);
+  const sinEjecutar = await ejecutarEventos(eventos, eventosEntregas, ctx);
   ctx.log(
     `Periodo ${periodo}: ${contadores.actividades} actividades, ${contadores.entregas} entregas (${contadores.tardias} tarde) y ${contadores.calificaciones} notas de actividades${contadores.omitidas ? `; ${contadores.omitidas} copias omitidas` : ''}.`
   );
@@ -365,14 +354,18 @@ export async function fasePeriodo(ctx: ContextoFase, anio: number, periodo: numb
   }
 
   cierre.push({ cuando: aLaHora(sumarDias(fin, config.calendario.recuperacion_periodo.dias_limite_despues_del_fin + 1), '08:00'), correr: async () => void (await coord.patch(`/academic-years/${anioId}/periodos/${periodo}/estado`, { estado: 'CERRADO' })) });
-  await ejecutar(cierre);
+  const cierreSinEjecutar = await ejecutarEventos(cierre, [], ctx);
+  if (sinEjecutar + cierreSinEjecutar > 0) {
+    ctx.log(`Periodo ${periodo} ${anio} a medias: corte el ${ctx.corte.toISOString().slice(0, 10)} (${sinEjecutar + cierreSinEjecutar} pasos quedan para después).`);
+    return;
+  }
   ctx.log(
     `Periodo ${periodo} cerrado: ${definitivas} planillas definitivas; recuperaciones: ${recuperaciones.candidatos} pendientes, ${recuperaciones.presentadas} presentadas, ${recuperaciones.superadas} superadas.`
   );
 
   // 3. Planes de aula del periodo siguiente, entre el cierre de este y el inicio del otro.
   const siguiente = config.calendario.periodos.find((p) => p.numero === periodo + 1);
-  if (siguiente) {
+  if (siguiente && !despuesDelCorte(ctx, aLaHora(diaDelAnio(anio, siguiente.inicio), '09:00'))) {
     const inicioSiguiente = diaDelAnio(anio, siguiente.inicio);
     const dia = new Date(Math.max(sumarDias(fin, config.calendario.recuperacion_periodo.dias_limite_despues_del_fin + 2).getTime(), sumarDias(inicioSiguiente, -5).getTime()));
     irA(aLaHora(dia, '09:00'));

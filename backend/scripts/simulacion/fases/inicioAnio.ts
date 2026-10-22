@@ -15,7 +15,7 @@ import { admin, ContextoFase, secretaria, siguienteDocumento } from './comun';
 import { grupoClave } from './prepararAnio';
 import { radicarPlanesDeAula } from './planeacion';
 
-interface Familia {
+export interface Familia {
   primer_apellido: string;
   segundo_apellido: string;
   grados: number[];
@@ -33,11 +33,17 @@ interface Familia {
   estrato: number;
 }
 
-interface ChecklistItem {
+export interface ChecklistItem {
   tipo_documento: string;
   obligatorio?: boolean;
   estado: string;
 }
+
+/**
+ * Cada año lectivo abre un libro de matrícula nuevo. El índice único de folio es (libro, folio) sin el año y el consecutivo de folios
+ * reinicia cada año: con el libro 1 por defecto, la primera matrícula del segundo año choca con la del primero.
+ */
+export const libroDelAnio = (ctx: ContextoFase, anio: number): number => anio - (ctx.config.anios[0] as number) + 1;
 
 const MAX_HIJOS_POR_FAMILIA = 3;
 const RH = ['O+', 'O+', 'O+', 'A+', 'A+', 'B+', 'O-', 'AB+'];
@@ -79,20 +85,45 @@ async function familiaPara(ctx: ContextoFase, azar: Azar, familias: Familia[], g
   return familia;
 }
 
-function tipoDeIngreso(grado: number, generado: EstudianteGenerado, azar: Azar): 'NUEVO' | 'ANTIGUO' | 'TRASLADO' | 'REPITENTE' {
+function tipoDeIngreso(grado: number, generado: EstudianteGenerado, azar: Azar, soloNuevos: boolean): 'NUEVO' | 'ANTIGUO' | 'TRASLADO' | 'REPITENTE' {
   if (grado === 0) return 'NUEVO';
+  // Quien llega a un colegio en el que no estudió es nuevo o viene trasladado (aunque ya haya repetido en otro).
+  if (soloNuevos) return azar.prob(0.4) ? 'TRASLADO' : 'NUEVO';
   if (generado.repitente) return 'REPITENTE';
   return azar.prob(0.08) ? (azar.prob(0.5) ? 'TRASLADO' : 'NUEVO') : 'ANTIGUO';
 }
 
-async function matricularGrupo(
+/**
+ * Secretaría escanea y aprueba lo que la familia trae; a unos pocos les queda un documento pendiente (siguen condicionales).
+ * `omitir` son documentos que el sistema aprueba solo (el paz y salvo del año anterior): no se suben a mano.
+ */
+export async function cargarDocumentosDeMatricula(
+  ctx: ContextoFase,
+  matriculaId: string,
+  checklist: ChecklistItem[],
+  quien: { nombre: string; apellido: string; documento: string },
+  azar: Azar,
+  omitir: readonly string[] = []
+): Promise<void> {
+  const secre = como(await secretaria());
+  const porSubir = checklist.filter((i) => i.obligatorio !== false && i.estado === 'PENDIENTE' && !omitir.includes(i.tipo_documento));
+  const pendiente = porSubir.length > 0 && azar.prob(ctx.config.poblacion.documentos_pendientes) ? azar.elegir(porSubir) : null;
+  for (const item of porSubir) {
+    if (item === pendiente) continue;
+    const archivo = await archivoPdf(item.tipo_documento.toLowerCase(), `${item.tipo_documento.replace(/_/g, ' ')}`, [`${quien.nombre} ${quien.apellido}`, `Documento ${quien.documento}`]);
+    await secre.subir(`/enrollments/${matriculaId}/checklist/${item.tipo_documento}/upload`, archivo, { aprobar: 'true' });
+  }
+}
+
+export async function matricularGrupo(
   ctx: ContextoFase,
   anio: number,
   anioId: string,
   grado: number,
   nomenclatura: string,
   total: number,
-  familias: Familia[]
+  familias: Familia[],
+  soloNuevos = false
 ): Promise<PerfilSimulado[]> {
   const { config } = ctx;
   const azar = azarPara(ctx.semilla, 'matricula', anio, nomenclatura);
@@ -148,24 +179,18 @@ async function matricularGrupo(
       acudiente_es_principal: true,
     });
     const studentId = creado.estudiante._id;
-    const tipoIngreso = tipoDeIngreso(grado, generado, azar);
+    const tipoIngreso = tipoDeIngreso(grado, generado, azar, soloNuevos);
 
     const { data: matricula } = await secre.post<{ _id: string; checklist: ChecklistItem[] }>('/enrollments', {
       student_id: studentId,
       group_id: groupId,
       academic_year_id: anioId,
       tipo_ingreso: tipoIngreso,
+      numero_libro: libroDelAnio(ctx, anio),
       fecha_limite_compromiso: sumarDias(diaDelAnio(anio, config.calendario.periodos[0]?.inicio ?? '02-01'), 30).toISOString(),
       ...(tipoIngreso === 'NUEVO' || tipoIngreso === 'TRASLADO' ? { ultimo_grado_aprobado: grado - 1 } : {}),
     });
-    // Secretaría escanea y aprueba lo que la familia trae; a unos pocos les queda un documento pendiente (siguen condicionales).
-    const porSubir = matricula.checklist.filter((i) => i.obligatorio !== false && i.estado === 'PENDIENTE');
-    const pendiente = porSubir.length > 0 && azar.prob(config.poblacion.documentos_pendientes) ? azar.elegir(porSubir) : null;
-    for (const item of porSubir) {
-      if (item === pendiente) continue;
-      const archivo = await archivoPdf(item.tipo_documento.toLowerCase(), `${item.tipo_documento.replace(/_/g, ' ')}`, [`${nombre.nombre} ${nombre.apellido}`, `Documento ${documento}`]);
-      await secre.subir(`/enrollments/${matricula._id}/checklist/${item.tipo_documento}/upload`, archivo, { aprobar: 'true' });
-    }
+    await cargarDocumentosDeMatricula(ctx, matricula._id, matricula.checklist, { nombre: nombre.nombre, apellido: nombre.apellido, documento }, azar);
 
     salida.push({
       student_id: studentId,

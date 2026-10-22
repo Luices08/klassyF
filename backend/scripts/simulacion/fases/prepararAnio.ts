@@ -28,6 +28,8 @@ async function asegurarAnio(ctx: ContextoFase, anio: number): Promise<string> {
   const { data } = await como(await admin()).post<Id>('/academic-years', {
     year: anio,
     calendario: ctx.config.calendario.calendario,
+    fecha_inicio: diaDelAnio(anio, ctx.config.calendario.inicio_anio),
+    fecha_fin: diaDelAnio(anio, ctx.config.calendario.fin_anio),
     periodos: periodosDelAnio(ctx.config, anio),
   });
   await registro.guardar(`anio:${anio}`, data._id);

@@ -1,9 +1,10 @@
 import path from 'path';
-import { describe, expect, it } from 'vitest';
+import { afterAll, describe, expect, it } from 'vitest';
 import { cargarConfiguracion, planDeGrado } from '../scripts/simulacion/configuracion';
 import { asignarCarga } from '../scripts/simulacion/logica/asignadorCarga';
 import { categoriasDelGrado, cholesky, fechaNacimiento, generarEstudiante } from '../scripts/simulacion/logica/perfiles';
 import { azarPara } from '../scripts/simulacion/nucleo/azar';
+import { categoriaDeHabilidad, confirmaPazYSalvo, decidirSalida, evolucionarLatentes, planearServicioSocial, registroSaber11 } from '../scripts/simulacion/logica/trayectoria';
 import {
   decidirEntrega,
   diasLectivos,
@@ -11,9 +12,13 @@ import {
   intentoDeRecuperacion,
   moverLectivos,
   NOTA_NO_ENTREGADA,
+  nivelEsperado,
   notaDeActividad,
+  notasFormativas,
   planearActividades,
 } from '../scripts/simulacion/logica/notas';
+import { despuesDelCorte, ejecutarEventos, Evento } from '../scripts/simulacion/nucleo/eventos';
+import { horaReal } from '../scripts/simulacion/nucleo/reloj';
 import { festivosColombia, isoDia, pascua, semanaSanta } from '../scripts/simulacion/nucleo/fechas';
 
 const config = cargarConfiguracion(path.join(__dirname, '../scripts/simulacion/config/colegio-pequeno.json'));
@@ -149,5 +154,156 @@ describe('simulación: notas de un periodo', () => {
       const n = intentoDeRecuperacion(2.8, e.latentes, azar);
       if (n !== null) expect(n >= 3 || n <= 2.9).toBe(true);
     }
+  });
+});
+
+describe('simulación: el año completo de la matriz de perfiles', () => {
+  const plan = (grado: number) => (config.plan_estudios.find((p) => p.grados.includes(grado))?.asignaturas ?? {}) as Record<string, number>;
+  const tipos = new Map(config.areas.flatMap((a) => a.asignaturas.map((x) => [x.clave, x.tipo_nota] as const)));
+
+  /** Asignaturas perdidas en el año: promedio de cuatro periodos con la recuperación de periodo (tope en la aprobatoria). */
+  function perdidasDelAnio(grado: number, categoria: string, id: string): number {
+    const generado = generarEstudiante(config, grado, categoria, azarPara(config.semilla, 'est', id));
+    let perdidas = 0;
+    for (const [clave, horas] of Object.entries(plan(grado))) {
+      const periodos: number[] = [];
+      for (let periodo = 1; periodo <= 4; periodo += 1) {
+        const azar = azarPara(config.semilla, 'anual', id, clave, periodo);
+        const esperado = nivelEsperado({ latentes: generado.latentes, categoria }, clave, tipos.get(clave) ?? 'MODERADA', periodo);
+        const actividades = planearActividades(Array.from({ length: 60 }, (_, i) => new Date(Date.UTC(2024, 0, 1 + i))), horas, grado, azar);
+        const sueltas = actividades.filter((a) => a.peso === null).length;
+        let suma = 0;
+        for (const a of actividades) {
+          const peso = a.peso ?? 70 / sueltas;
+          suma += peso * notaDeActividad(esperado, generado.latentes, tipos.get(clave) ?? 'MODERADA', a.tipo, decidirEntrega(generado.latentes, a.tipo, azar), azar);
+        }
+        const f = notasFormativas(esperado, generado.latentes, azar);
+        let nota = 0.7 * (suma / 100) + 0.1 * (f.AUTO + f.COEV + f.COMP);
+        if (nota < config.escala.aprobatoria) {
+          const recuperada = intentoDeRecuperacion(esperado, generado.latentes, azar);
+          if (recuperada !== null && recuperada >= config.escala.aprobatoria) nota = config.escala.aprobatoria;
+        }
+        periodos.push(nota);
+      }
+      if (periodos.reduce((x, y) => x + y, 0) / 4 < config.escala.aprobatoria) perdidas += 1;
+    }
+    return perdidas;
+  }
+
+  it('reprueba el año (dos o más asignaturas) una fracción realista y solo quien tiene el perfil bajo o básico', () => {
+    const grados = config.grupos.map((g) => g.grado).filter((g) => g > 0);
+    let total = 0;
+    let reprueban = 0;
+    const porCategoria: Record<string, { n: number; r: number }> = {};
+    for (const grado of grados) {
+      const categorias = categoriasDelGrado(config, grado, 60, azarPara(config.semilla, 'cat', grado));
+      categorias.forEach((categoria, i) => {
+        const r = perdidasDelAnio(grado, categoria, `${grado}-${i}`) >= 2;
+        total += 1;
+        if (r) reprueban += 1;
+        const c = (porCategoria[categoria] ??= { n: 0, r: 0 });
+        c.n += 1;
+        if (r) c.r += 1;
+      });
+    }
+    expect(reprueban / total).toBeGreaterThan(0.07);
+    expect(reprueban / total).toBeLessThan(0.2);
+    expect(porCategoria.SUPERIOR?.r).toBe(0);
+    expect(porCategoria.ALTO?.r ?? 0).toBeLessThanOrEqual(2);
+    expect((porCategoria.BAJO?.r ?? 0) / (porCategoria.BAJO?.n ?? 1)).toBeGreaterThan(0.8);
+  });
+});
+
+describe('simulación: trayectoria de un año al siguiente', () => {
+  const generar = (categoria: string, id: string) => generarEstudiante(config, 7, categoria, azarPara(1, 'tray', id)).latentes;
+
+  it('la categoría sigue la habilidad por los cortes de la matriz', () => {
+    expect(categoriaDeHabilidad(2.3)).toBe('BAJO');
+    expect(categoriaDeHabilidad(3.4)).toBe('BASICO');
+    expect(categoriaDeHabilidad(4.2)).toBe('ALTO');
+    expect(categoriaDeHabilidad(4.8)).toBe('SUPERIOR');
+  });
+
+  it('las latentes evolucionan dentro de sus rangos y quien repite mejora en promedio', () => {
+    let con = 0;
+    let sin = 0;
+    for (let i = 0; i < 300; i += 1) {
+      const l = generar('BASICO', `e${i}`);
+      const siguiente = evolucionarLatentes(l, false, azarPara(1, 'ev', i));
+      const repite = evolucionarLatentes(l, true, azarPara(1, 'ev', i));
+      for (const x of [siguiente, repite]) {
+        expect(x.habilidad).toBeGreaterThanOrEqual(1.2);
+        expect(x.habilidad).toBeLessThanOrEqual(5);
+        expect(x.constancia).toBeLessThanOrEqual(0.99);
+        expect(Math.abs(x.tendencia)).toBeLessThanOrEqual(0.15);
+      }
+      sin += siguiente.habilidad - l.habilidad;
+      con += repite.habilidad - l.habilidad;
+    }
+    expect(con / 300).toBeGreaterThan(sin / 300 + 0.1);
+  });
+
+  it('sale del colegio una minoría, sobre todo quien tiene más riesgo de deserción, y la salida trae tipo y motivo', () => {
+    let salen = 0;
+    let altoRiesgo = 0;
+    let bajoRiesgo = 0;
+    for (let i = 0; i < 2000; i += 1) {
+      const l = generar(i % 2 === 0 ? 'BAJO' : 'ALTO', `s${i}`);
+      const salida = decidirSalida(l, azarPara(1, 'sal', i));
+      if (!salida) continue;
+      salen += 1;
+      expect(['RETIRO', 'TRASLADO']).toContain(salida.tipo);
+      expect(salida.motivo.length).toBeGreaterThan(10);
+      if (l.riesgo_desercion > 0.3) altoRiesgo += 1;
+      else bajoRiesgo += 1;
+    }
+    // Tres periodos de oportunidad: la fracción anual es de pocos puntos, no una deserción masiva.
+    expect(salen / 2000).toBeGreaterThan(0.005);
+    expect(salen / 2000).toBeLessThan(0.1);
+    expect(altoRiesgo).toBeGreaterThan(bajoRiesgo);
+  });
+
+  it('el servicio social pide solo las horas que faltan, en tandas de hasta 40 h', () => {
+    const azar = azarPara(1, 'ss');
+    const tandas = Array.from({ length: 200 }, () => planearServicioSocial(0, 80, 0.9, azar)).filter((t) => t !== null);
+    expect(tandas.length).toBeGreaterThan(150);
+    for (const t of tandas) expect(t?.horas).toBe(40);
+    expect(planearServicioSocial(80, 80, 0.9, azar)).toBeNull();
+    expect(planearServicioSocial(70, 80, 1, azarPara(1, 'ss2'))?.horas ?? 10).toBe(10);
+  });
+
+  it('el registro de Saber 11 tiene la forma que valida el sistema y casi todos confirman el paz y salvo', () => {
+    for (let i = 0; i < 50; i += 1) expect(registroSaber11(2024, azarPara(1, 's11', i))).toMatch(/^AC\d{8,12}$/);
+    const confirman = Array.from({ length: 1000 }, (_, i) => confirmaPazYSalvo(azarPara(1, 'pz', i))).filter(Boolean).length;
+    expect(confirman).toBeGreaterThan(900);
+    expect(confirman).toBeLessThan(1000);
+  });
+});
+
+describe('simulación: eventos con fecha y corte', () => {
+  const dia = (iso: string, hora = '12:00') => new Date(`${iso}T${hora}:00-05:00`);
+  afterAll(() => horaReal());
+
+  it('ejecuta en orden de fecha, suma lo que se agenda al correr y deja para después lo que pasa del corte', async () => {
+    const orden: string[] = [];
+    const nuevos: Evento[] = [];
+    const eventos: Evento[] = [
+      { cuando: dia('2026-10-23'), correr: async () => void orden.push('después del corte') },
+      { cuando: dia('2026-10-20'), correr: async () => void orden.push('segundo') },
+      {
+        cuando: dia('2026-10-10'),
+        correr: async () => {
+          orden.push('primero');
+          nuevos.push({ cuando: dia('2026-10-15'), correr: async () => void orden.push('agendado') });
+        },
+      },
+      { cuando: dia('2026-10-22', '23:30'), correr: async () => void orden.push('último del día de corte') },
+    ];
+    const corte = new Date(Date.UTC(2026, 9, 22));
+    const sinEjecutar = await ejecutarEventos(eventos, nuevos, { corte });
+    expect(orden).toEqual(['primero', 'agendado', 'segundo', 'último del día de corte']);
+    expect(sinEjecutar).toBe(1);
+    expect(despuesDelCorte({ corte }, dia('2026-10-22', '23:59'))).toBe(false);
+    expect(despuesDelCorte({ corte }, dia('2026-10-23', '00:00'))).toBe(true);
   });
 });

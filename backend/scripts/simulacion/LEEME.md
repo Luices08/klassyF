@@ -17,7 +17,19 @@ tiene usuarios que no creó la simulación, también se detiene.
 
 | `2024/periodo-1` … `periodo-4` | inicio a fin de cada periodo | Coordinación abre el periodo; cada docente programa 3–5 actividades por asignatura y grado (la última es la evaluación) y las publica en todos sus grupos; los estudiantes entregan las digitales (algunos tarde), el docente califica unos días después (lo no entregado vale 1.0), agrega autoevaluación, coevaluación y comportamiento y cierra su planilla; coordinación declara las definitivas; los docentes registran las recuperaciones del periodo en su ventana; coordinación cierra el periodo y se radican los planes de aula del siguiente. Preescolar lleva valoración descriptiva en vez de notas |
 
-Siguientes cambios: cierre del año, paso al siguiente y 2025 y 2026 hasta hoy.
+| `2024/cierre-anio` | fin de noviembre a 5-dic | El ADMIN cierra la promoción de cada grupo (quien pierde una asignatura queda pendiente de recuperación; quien pierde dos o más no se promueve), cada docente toma la recuperación final de su asignatura, secretaría confirma el paz y salvo (el de 11° antes del cierre, para graduarse), el ADMIN cierra de nuevo la promoción de quienes recuperaron y, verificado todo, cierra el año con su contraseña |
+| `2025/preparar-anio` … `2025/cierre-anio` | un año más | Lo mismo que 2024, pero en vez de matricular desde cero (`2025/inicio-anio` = `fases/rematricula.ts`): secretaría reserva los cupos con el paso de año de M19 (promovidos al grado siguiente, no promovidos repiten, graduados salen), matricula directamente a quien cambia de sede (5° → 6°), el cupo que no alcanza va a la lista de espera (se descarta: la familia busca otro colegio), llegan estudiantes nuevos hasta llenar cada grupo, se formalizan las pre-matrículas con sus documentos y el ADMIN activa el año |
+| `2026/…` | hasta la fecha de corte | Igual, pero la simulación se detiene en `fecha_corte` (22-oct-2026 en la configuración): el año 2026 queda **abierto**, con el periodo 4 a medias (actividades publicadas, entregas y notas hasta ese día) |
+
+Durante cada año además: **salidas** (al abrir los periodos 2 a 4 algunas familias retiran al estudiante o lo trasladan a otro colegio; `POST /salidas`), **servicio social** de 10° y 11° (secretaría registra cada tanda con su certificado y coordinación la verifica) y **Saber 11** (registro del número). El perfil oculto de cada estudiante que sigue evoluciona de un año al otro (`sim_perfiles.por_anio`).
+
+### La fecha de corte
+
+`fecha_corte` (en el JSON, o `--corte=AAAA-MM-DD`; sin ninguna de las dos, hoy) es el último día simulado. Las fases que empiezan después no se corren y, dentro de la última, lo que cae después del corte no se ejecuta. Para avanzar más tarde: cambia el corte y repite desde el periodo que quedó a medias, p. ej. `npm run sim -- --corte=2026-12-10 --desde=2026/periodo-4 --rehacer`.
+
+### Un hallazgo de la simulación
+
+El índice único de folio de `Enrollment` es `(numero_libro, numero_folio)` sin el año y el consecutivo de folios reinicia cada año: con el libro 1 por defecto, la primera matrícula formalizada del segundo año choca con la del primero (409). La simulación abre un libro por año (`libroDelAnio`), como lo haría secretaría con el campo «libro»; el sistema no lo hace solo.
 
 ## Requisitos
 

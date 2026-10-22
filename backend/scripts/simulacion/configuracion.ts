@@ -104,6 +104,8 @@ export interface ConfigSimulacion {
   anios: number[];
   dominio_correo: string;
   inicio_simulacion: string;
+  /** Hasta qué día se simula (AAAA-MM-DD). Sin él, hasta hoy; un año que no termina antes del corte queda abierto. */
+  fecha_corte?: string;
   admin: { nombre: string; apellido: string; numero_documento: string; email: string };
   institucion: {
     nombre: string;
@@ -171,6 +173,7 @@ const esquema = Joi.object({
   anios: Joi.array().items(Joi.number().integer().min(2000).max(2100)).min(1).required(),
   dominio_correo: Joi.string().required(),
   inicio_simulacion: Joi.string().isoDate().required(),
+  fecha_corte: Joi.string().isoDate(),
   admin: Joi.object({ nombre: Joi.string().required(), apellido: Joi.string().required(), numero_documento: Joi.string().required(), email: Joi.string().email().required() }).required(),
   institucion: Joi.object({
     nombre: Joi.string().required(),

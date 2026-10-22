@@ -8,6 +8,7 @@
  *   npm run sim -- --hasta=2024/inicio-anio
  *   npm run sim -- --desde=2024/preparar-anio --rehacer
  *   npm run sim -- --listar
+ *   npm run sim -- --corte=2026-06-30   → simula solo hasta ese día (por defecto, el de la configuración)
  * Ver scripts/simulacion/LEEME.md.
  */
 // El reloj y el entorno van primero: todo lo que se importe después ya ve la fecha simulada y la base de la simulación.
@@ -16,7 +17,7 @@ import { MONGO_URI_SIM, RESPALDOS_DIR_SIM, UPLOADS_DIR_SIM, nombreDeBase } from 
 import path from 'path';
 import mongoose from 'mongoose';
 import { detenerApi, ErrorApi, iniciarApi } from './nucleo/api';
-import { aLaHora } from './nucleo/fechas';
+import { aLaHora, diaDelAnio, sumarDias } from './nucleo/fechas';
 import { baseAjena, fases, registro } from './nucleo/registro';
 import { existeRespaldo, respaldar, restaurar } from './nucleo/respaldo';
 import { cargarConfiguracion, ConfigSimulacion } from './configuracion';
@@ -25,22 +26,42 @@ import { faseBase } from './fases/base';
 import { fasePrepararAnio } from './fases/prepararAnio';
 import { faseInicioAnio } from './fases/inicioAnio';
 import { fasePeriodo } from './fases/periodo';
+import { faseCierreAnio } from './fases/cierreAnio';
+import { faseRematricula } from './fases/rematricula';
 
 interface Fase {
   clave: string;
   correr: (ctx: ContextoFase) => Promise<void>;
 }
 
-/** Las fases en el orden en que se ejecutan. Las de periodos y cierre de año llegan en los siguientes cambios. */
-function planDeFases(config: ConfigSimulacion): Fase[] {
-  // Mientras no exista el cierre de año, el plan llega hasta el cierre del último periodo del primer año.
-  const anio = config.anios[0] as number;
-  return [
-    { clave: 'base', correr: faseBase },
-    { clave: `${anio}/preparar-anio`, correr: (ctx) => fasePrepararAnio(ctx, anio) },
-    { clave: `${anio}/inicio-anio`, correr: (ctx) => faseInicioAnio(ctx, anio) },
-    ...config.calendario.periodos.map((p): Fase => ({ clave: `${anio}/periodo-${p.numero}`, correr: (ctx) => fasePeriodo(ctx, anio, p.numero) })),
-  ];
+/** Último día simulado: `--corte=AAAA-MM-DD`, o el de la configuración, o hoy. */
+function diaDeCorte(config: ConfigSimulacion): Date {
+  const texto = opcion('corte') ?? config.fecha_corte ?? ahoraReal().toISOString();
+  const dia = new Date(`${texto.slice(0, 10)}T00:00:00.000Z`);
+  if (Number.isNaN(dia.getTime())) throw new Error(`La fecha de corte «${texto}» no es válida (AAAA-MM-DD).`);
+  return dia;
+}
+
+/**
+ * Las fases en el orden en que se ejecutan: la base y, por cada año, preparar el año, matricular (el primero desde cero y los
+ * demás con el paso de año), los periodos y el cierre. Solo entran las que empiezan antes del corte: el año de hoy queda abierto,
+ * con el periodo en curso a medias.
+ */
+function planDeFases(config: ConfigSimulacion, corte: Date): Fase[] {
+  const fases: Fase[] = [{ clave: 'base', correr: faseBase }];
+  const cal = config.calendario;
+  const ultimo = cal.periodos[cal.periodos.length - 1];
+  config.anios.forEach((anio, i) => {
+    if (diaDelAnio(anio, '01-08') > corte) return;
+    fases.push({ clave: `${anio}/preparar-anio`, correr: (ctx) => fasePrepararAnio(ctx, anio) });
+    fases.push(i === 0 ? { clave: `${anio}/inicio-anio`, correr: (ctx) => faseInicioAnio(ctx, anio) } : { clave: `${anio}/inicio-anio`, correr: (ctx) => faseRematricula(ctx, anio) });
+    for (const p of cal.periodos) {
+      if (diaDelAnio(anio, p.inicio) <= corte) fases.push({ clave: `${anio}/periodo-${p.numero}`, correr: (ctx) => fasePeriodo(ctx, anio, p.numero) });
+    }
+    // El cierre ocurre unos días después de la fecha límite de la recuperación final.
+    if (ultimo && sumarDias(diaDelAnio(anio, cal.recuperacion_final.limite_resultados), 3) <= corte) fases.push({ clave: `${anio}/cierre-anio`, correr: (ctx) => faseCierreAnio(ctx, anio) });
+  });
+  return fases;
 }
 
 function opcion(nombre: string): string | undefined {
@@ -66,7 +87,8 @@ async function main(): Promise<void> {
   const rutaConfig = opcion('config') ?? path.join(__dirname, 'config', 'colegio-pequeno.json');
   const config = cargarConfiguracion(rutaConfig);
   const semilla = Number(opcion('semilla') ?? config.semilla);
-  const plan = planDeFases(config);
+  const corte = diaDeCorte(config);
+  const plan = planDeFases(config, corte);
 
   if (bandera('listar')) {
     for (const f of plan) console.log(f.clave);
@@ -130,6 +152,7 @@ async function main(): Promise<void> {
     semilla,
     claveAdmin: process.env.SIM_ADMIN_PASSWORD || 'KlassySim2024*',
     claveUsuarios: process.env.SIM_USUARIOS_PASSWORD || 'Klassy2024*',
+    corte,
     log,
   };
 

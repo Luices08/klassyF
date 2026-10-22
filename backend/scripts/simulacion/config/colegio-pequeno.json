@@ -360,7 +360,7 @@
   "asistencia": { "proporcion_justificadas": 0.4, "factor_retardo": 0.5, "dias_por_registro": 10 },
 
   "convivencia": {
-    "tasa": { "I": 1.5, "II": 0.35, "III": 0.12 },
+    "tasa": { "I": 1.5, "II": 0.35, "III": 0.07 },
     "factor_secundaria": 1.4,
     "factor_primaria_baja": 0.3,
     "faltas": [

@@ -1202,6 +1202,14 @@ Botón flotante en `AppShell` (`components/asistente/AsistenteFlotante.tsx`) que
 
 - `npm run matricular:estudiantes` (`backend/scripts/matricularEstudiantes.ts`) matricula a los estudiantes activos sin matrícula viva en el año de trabajo (EN_CURSO o el más reciente sin cerrar) llamando al mismo `createEnrollment` de secretaría (cupo, folio, checklist): nacen **condicionales** con plazo de compromiso (`--dias-compromiso`, 30 por defecto) y pasan a definitiva al aprobarse sus documentos. El estudiante no guarda su grado, así que los reparte en orden (grado, grupo) llenando cada grupo hasta su cupo; `--grado=` y `--grupo=` acotan, `--tipo=` fija el tipo de ingreso (NUEVO por defecto). **Solo simula** salvo `--aplicar`.
 
+### Simulación multi-año de un colegio (script, base aparte)
+
+- `npm run sim` (`backend/scripts/simulacion/`, guía en su `LEEME.md`) llena la base **`klassy_sim`** (el nombre debe contener `sim`; se niega a correr sobre una base con usuarios que no creó) y `uploads-sim/` con un colegio pequeño ficticio, por fases con respaldo (`respaldos-sim/`). Todo número del colegio vive en `config/colegio-pequeno.json`.
+- **Todo pasa por la API** (servidor en proceso, un token por persona: ADMIN, coordinación, secretaría, cada docente), así cada paso respeta las reglas y deja auditoría; las únicas escrituras directas son el primer ADMIN y el catálogo de grados (como `npm run seed`).
+- **Reloj simulado** (`nucleo/reloj.ts`, se importa antes que todo): reemplaza `Date` por una subclase con desfase para que ventanas, «no futura» y `createdAt` caigan en la fecha del paso. Mongoose mide su latido con ese reloj: el orquestador corre `_lastHeartbeatAt` en cada salto (si no, las transacciones esperan una reconexión que nunca llega).
+- Lo propio de la simulación va en colecciones `sim_*` (`sim_fases`, `sim_registro` clave→id, `sim_perfiles` = la «verdad oculta» de cada estudiante, para evaluar la IA, nunca para entrenarla). Funciones puras con pruebas en `tests/simulacion.test.ts` (reparto de carga docente, perfiles, festivos).
+- Hoy llega hasta activar el primer año (2024); notas y cierres de periodo, cierre de año y los años siguientes vienen en los próximos cambios.
+
 ### Folio del Libro de Matrícula (M04)
 
 - **El folio se asigna al legalizar la matrícula, no al preinscribir**: `Enrollment.folio_matricula`,

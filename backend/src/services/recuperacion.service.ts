@@ -29,10 +29,12 @@ import {
   VentanaRecuperacion,
 } from '../utils/recuperaciones';
 import { integracionDe, IntegracionPeriodo, integrarRecuperacion, ResultadoIntegracion } from '../utils/integracionRecuperacion';
+import { notaEfectivaDePeriodo } from '../utils/notaEfectiva';
 import { periodosParaPromediar } from '../utils/promocionAnticipada';
 import { asignacionDelDocente } from './activity.service';
 import { registrarEvento } from './audit.service';
 import { cargarAnio, obtenerPolitica } from './configuracionRecuperaciones.service';
+import { avisarRecuperacionRegistrada } from './recuperacionAvisos.service';
 import { esGrupoSinReprobacion, idsDeGradosSinReprobacion } from './nivelesSinReprobacion.service';
 import { cargarContextoPlanilla, notaDeCasilla } from './notas.service';
 
@@ -86,8 +88,7 @@ export async function cargarContextoNotas(anio: AcademicYearDocument, asignacion
     entrada.cerradas.set(c.periodo_numero, c.resultado.nota_asignatura);
     const recuperada = recuperacionesPorClave.get(claveRecuperacion(c.teacher_assignment_id, c.student_id, 'PERIODO', c.periodo_numero));
     // Una recuperación que el colegio configuró como «solo anotar» no cambia la nota del periodo ni la definitiva del año.
-    const cuenta = recuperada && integracionDe(recuperada.integracion).cuenta_en_boletin;
-    entrada.efectivas.set(c.periodo_numero, (cuenta ? recuperada?.nota_resultante : null) ?? c.resultado.nota_asignatura);
+    entrada.efectivas.set(c.periodo_numero, notaEfectivaDePeriodo(c.resultado.nota_asignatura, recuperada) ?? c.resultado.nota_asignatura);
     notas.set(k, entrada);
   }
 
@@ -585,5 +586,7 @@ export async function registrarIntento(
       `nota ${input.nota}, resultante ${recuperacion.nota_resultante}, ${recuperacion.estado}`,
     ip,
   });
+  // El estudiante y su acudiente se enteran del resultado; un aviso que falla nunca deshace el registro.
+  await avisarRecuperacionRegistrada(recuperacion, Math.max(0, maxIntentos - recuperacion.intentos.length));
   return recuperacion;
 }

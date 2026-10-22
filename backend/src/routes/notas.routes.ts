@@ -18,6 +18,7 @@ import {
   importacionesExcel,
   importarExcel,
   misNotas,
+  misNotasDelAnio,
   obtenerBloques,
   obtenerPlanilla,
   obtenerPlantilla,
@@ -68,6 +69,8 @@ router.get('/molde/excel', checkRole(...GESTION), validate(notasValidator.consul
 
 // El estudiante ve sus propias notas por asignatura (lo del periodo abierto es provisional; el boletín solo lee lo cerrado).
 router.get('/mias', checkRole(ROLES.ESTUDIANTE), validate(notasValidator.misNotas), misNotas);
+// Cómo va el año de cada asignatura: notas por periodo con su recuperación, la definitiva y la recuperación de fin de año (va antes que cualquier '/:id').
+router.get('/mias/anual', checkRole(ROLES.ESTUDIANTE), validate(notasValidator.misNotasDelAnio), misNotasDelAnio);
 
 // Versión para imprimir y firmar.
 router.get('/planilla/pdf', checkRole(ROLES.DOCENTE, ...GESTION), validate(notasValidator.obtenerPlanilla), descargarPdf);

@@ -7,6 +7,7 @@ import CalificacionAsignatura from '../models/calificacionAsignatura.model';
 import SesionComision from '../models/sesionComision.model';
 import { UserDocument } from '../models/user.model';
 import { memorizar } from '../utils/cacheCorta';
+import { etapasNotaEfectiva } from '../utils/notaEfectiva';
 import { PromedioDeGrupo, agruparDocentesPendientes, compararGruposPorGrado, distribucionDesempeno, resumirAvancePlanillas, resumirServicioSocial } from '../utils/dashboard';
 import { ContextoDashboard, FiltrosDashboard, cargarContextoDashboard, claveDeBloque, resumenDeContexto, clasesDeSeguimiento } from './dashboardContexto.service';
 import { filasDeServicioSocial } from './listadosCierre.service';
@@ -171,7 +172,8 @@ export async function obtenerDesempeno(filtros: FiltrosDashboard) {
     const conteos = gruposIds.length
       ? await CalificacionAsignatura.aggregate<{ _id: number; total: number }>([
           { $match: { academic_year_id: ctx.anio._id, group_id: { $in: gruposIds }, periodo_numero: ctx.periodo_notas, estado: { $in: NOTAS_CERRADAS } } },
-          { $group: { _id: '$resultado.nota_asignatura', total: { $sum: 1 } } },
+          ...etapasNotaEfectiva(),
+          { $group: { _id: '$nota_efectiva', total: { $sum: 1 } } },
         ])
       : [];
     return { contexto: resumenDeContexto(ctx), ...distribucionDesempeno(conteos.map((c) => ({ nota: c._id, total: c.total })), ctx.escala) };
@@ -186,7 +188,8 @@ export async function obtenerComparativoDeGrupos(filtros: FiltrosDashboard) {
     const promedios = gruposIds.length
       ? await CalificacionAsignatura.aggregate<{ _id: Types.ObjectId; promedio: number; notas: number }>([
           { $match: { academic_year_id: ctx.anio._id, group_id: { $in: gruposIds }, periodo_numero: ctx.periodo_notas, estado: { $in: NOTAS_CERRADAS } } },
-          { $group: { _id: '$group_id', promedio: { $avg: '$resultado.nota_asignatura' }, notas: { $sum: 1 } } },
+          ...etapasNotaEfectiva(),
+          { $group: { _id: '$group_id', promedio: { $avg: '$nota_efectiva' }, notas: { $sum: 1 } } },
         ])
       : [];
     const grupoPor = new Map(ctx.grupos.map((g) => [g.id, g]));

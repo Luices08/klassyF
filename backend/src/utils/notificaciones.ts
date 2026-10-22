@@ -17,9 +17,22 @@ export interface DatosNotificacion {
   /** Título de una noticia o evento institucional y su categoría. */
   titulo?: string;
   categoria?: string;
+  /** Recuperaciones (M18): de un periodo o de fin de año, cuántos estudiantes/asignaturas quedan por recuperar y la nota anterior y la nueva. */
+  tipo_recuperacion?: 'PERIODO' | 'ANUAL';
+  cantidad?: number;
+  nota_anterior?: number;
+  nota_nueva?: number;
+  superada?: boolean;
+  intentos_restantes?: number;
 }
 
 const plural = (n: number, uno: string, varios: string) => (n === 1 ? uno : varios);
+
+/** «la recuperación del periodo 2» / «la recuperación de fin de año». */
+const cual = (datos: DatosNotificacion): string =>
+  datos.tipo_recuperacion === 'ANUAL' ? 'la recuperación de fin de año' : `la recuperación del periodo ${datos.periodo ?? '?'}`;
+const mayuscula = (texto: string): string => texto.charAt(0).toUpperCase() + texto.slice(1);
+const nota = (n: number | undefined): string => (typeof n === 'number' ? n.toFixed(2) : '—');
 
 /** Título y texto de una alerta según cuántas se acumularon. Pura: la usa el servidor al leer y las pruebas. */
 export function renderizarNotificacion(evento: EventoNotificacion, contador: number, datos: DatosNotificacion = {}): { titulo: string; mensaje: string } {
@@ -110,6 +123,46 @@ export function renderizarNotificacion(evento: EventoNotificacion, contador: num
         titulo: 'Respuestas a tu citación',
         mensaje: `${n} ${plural(n, 'acudiente respondió', 'acudientes respondieron')} a «${datos.nombre ?? 'tu citación'}».`,
       };
+    case 'RECUPERACION_FECHAS':
+      return {
+        titulo: 'Fechas de recuperación',
+        mensaje: `${mayuscula(cual(datos))} ${datos.cuando ?? 'ya tiene fechas'}.${datos.cantidad ? ` Tienes ${datos.cantidad} ${plural(datos.cantidad, 'estudiante', 'estudiantes')} por recuperar.` : ''}`,
+      };
+    case 'RECUPERACION_INICIA':
+      return {
+        titulo: 'Hoy empieza la recuperación',
+        mensaje: `${mayuscula(cual(datos))} empieza hoy y va ${datos.cuando ?? 'en las fechas del calendario'}. Tienes ${datos.cantidad ?? 0} ${plural(datos.cantidad ?? 0, 'estudiante', 'estudiantes')} por recuperar.`,
+      };
+    case 'RECUPERACION_TERMINA_MANANA':
+      return {
+        titulo: 'La recuperación termina mañana',
+        mensaje: `${mayuscula(cual(datos))} termina mañana. Aún tienes ${datos.cantidad ?? 0} ${plural(datos.cantidad ?? 0, 'estudiante', 'estudiantes')} sin superarla.`,
+      };
+    case 'RECUPERACION_HABILITADA': {
+      const cuantas = `${datos.cantidad ?? 0} ${plural(datos.cantidad ?? 0, 'asignatura', 'asignaturas')}`;
+      return {
+        titulo: 'Recuperación habilitada',
+        mensaje: datos.estudiante
+          ? `${datos.estudiante} tiene ${cuantas} por recuperar: ${cual(datos)} va ${datos.cuando ?? 'en las fechas del calendario'}. Pueden hablar con el docente de cada asignatura.`
+          : `Tienes ${cuantas} por recuperar: ${cual(datos)} va ${datos.cuando ?? 'en las fechas del calendario'}. Habla con tu docente.`,
+      };
+    }
+    case 'RECUPERACION_REGISTRADA': {
+      if (n > 1) {
+        return {
+          titulo: 'Recuperaciones registradas',
+          mensaje: `Se registraron ${n} resultados de recuperación${datos.estudiante ? ` de ${datos.estudiante}` : ''}. Revisa las notas para ver cómo quedaron.`,
+        };
+      }
+      const resultado = datos.superada
+        ? 'la superó'
+        : `no la superó${datos.intentos_restantes ? `, le ${plural(datos.intentos_restantes, 'queda', 'quedan')} ${datos.intentos_restantes} ${plural(datos.intentos_restantes, 'intento', 'intentos')}` : ''}`;
+      const de = datos.estudiante ? `la recuperación de ${datos.estudiante} en ${datos.asignatura ?? 'una asignatura'}` : `tu recuperación de ${datos.asignatura ?? 'una asignatura'}`;
+      return {
+        titulo: datos.superada ? 'Recuperación superada' : 'Recuperación registrada',
+        mensaje: `Se registró ${de}: nota anterior ${nota(datos.nota_anterior)}, recuperación ${nota(datos.nota_nueva)}; ${datos.estudiante ? resultado : resultado.replace('le queda', 'te queda').replace('le quedan', 'te quedan')}.`,
+      };
+    }
     case 'SESION_COMISION_CONVOCADA':
       return {
         titulo: 'Sesión convocada',

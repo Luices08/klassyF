@@ -110,7 +110,7 @@ function PortalDeHijo({
 
       <Tabs
         items={[
-          { key: 'notas', label: 'Notas' },
+          { key: 'notas', label: 'Notas', contador: contadorDe('notas') },
           { key: 'inasistencias', label: 'Inasistencias', contador: contadorDe('inasistencias') },
           { key: 'convivencia', label: 'Convivencia', contador: contadorDe('convivencia') },
           { key: 'citaciones', label: 'Citaciones', contador: contadorDe('citaciones') },

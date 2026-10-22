@@ -7,6 +7,7 @@ import { Chip, DesempenoBadge, EstadoEntregaBadge, TipoActividadChip } from '../
 import { Button } from '../ui/Button';
 import { Card } from '../ui/Card';
 import { Drawer } from '../ui/Drawer';
+import { ChipRecuperacion, FranjaRecuperacion } from './FranjaRecuperacion';
 
 export const formatoNota = (nota: number | null): string => (nota === null ? '—' : nota.toFixed(2));
 
@@ -115,10 +116,12 @@ function EncabezadoNota({ asignatura, aprobatoria, paraFamilia, conAviso = true 
         </div>
         <div className="flex flex-wrap items-center justify-end gap-2">
           {asignatura.desempeno && <DesempenoBadge value={asignatura.desempeno} />}
+          {asignatura.recuperacion && <ChipRecuperacion recuperacion={asignatura.recuperacion} />}
           <Chip tone={definitiva ? 'blue' : 'orange'}>{definitiva ? 'Nota final' : asignatura.nota_asignatura === null ? 'Sin notas aún' : 'Provisional'}</Chip>
           <span className={`text-h2 ${colorDeNota(asignatura.nota_asignatura, aprobatoria)}`}>{formatoNota(asignatura.nota_asignatura)}</span>
         </div>
       </div>
+      {asignatura.recuperacion && <FranjaRecuperacion recuperacion={asignatura.recuperacion} paraFamilia={paraFamilia} />}
       {conAviso && asignatura.parcial && (
         <p className="mt-2 text-xs text-muted">
           Esta nota se calcula con lo calificado hasta ahora; puede cambiar cuando {paraFamilia ? 'el docente' : 'tu docente'} califique el resto.

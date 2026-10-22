@@ -26,7 +26,7 @@ import { areaExenta, calcularNotaArea, calcularPromedioGeneral, porcentajesEnAre
 import { EstadoNotaTraslado } from '../constants/traslados';
 import { escalaEfectiva, type ResultadoDesempeno } from '../utils/escalaEvaluacion';
 import { ESTADO_ACTIVO } from '../utils/filtroEstado';
-import { integracionDe } from '../utils/integracionRecuperacion';
+import { notaEfectivaDePeriodo, recuperacionCuenta } from '../utils/notaEfectiva';
 import { obtenerGradoPlanEfectivo } from '../utils/horasPlanEstudios';
 import { resumenAsistenciaParaBoletin } from './attendanceStats.service';
 import { leerConfiguracionBoletin } from './boletinConfig.service';
@@ -410,8 +410,8 @@ async function cargarContextoGrupo(
         }
         const registro = cerradoPor.get(`${String(subject._id)}|${studentId}`);
         const recuperada = registro?.resultado ? recuperacionDe.get(`${String(subject._id)}|${studentId}`) : undefined;
-        const cuentaRecuperacion = recuperada ? integracionDe(recuperada.integracion).cuenta_en_boletin : false;
-        const nota = (cuentaRecuperacion ? recuperada?.nota_resultante : null) ?? registro?.resultado?.nota_asignatura ?? null;
+        const cuentaRecuperacion = recuperacionCuenta(recuperada);
+        const nota = notaEfectivaDePeriodo(registro?.resultado?.nota_asignatura ?? null, recuperada);
         if (nota === null) pendientes.push(subject.nombre);
         const fallas = fallasPorAsignatura.get(`${String(subject._id)}_${studentId}`) ?? 0;
         const desempeno = nota === null ? null : desempenoCualitativo(nota, escalaEvaluacion);

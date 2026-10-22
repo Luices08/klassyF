@@ -15,6 +15,7 @@ router.use(authenticate, checkRole(ROLES.ACUDIENTE));
 
 router.get('/hijos', ctrl.listarHijos);
 router.get('/hijos/:studentId/notas', validate(v.notas), ctrl.notas);
+router.get('/hijos/:studentId/notas-anuales', validate(v.notasDelAnio), ctrl.notasDelAnio);
 router.get('/hijos/:studentId/inasistencias', validate(v.inasistencias), ctrl.inasistencias);
 router.get('/hijos/:studentId/convivencia', validate(v.conHijo), ctrl.convivencia);
 

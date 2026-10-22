@@ -18,7 +18,7 @@ import { dibujarCertificadoEmitido } from './certificadoPdf.service';
 import { plantillaVigente } from './certificadoPlantilla.service';
 import { guardarArchivoDeDocumento } from './documentoMatriculaArchivo.service';
 import { cargarDocumento } from './enrollment.service';
-import { misNotas } from './notasEstudiante.service';
+import { misNotas, misNotasDelAnio } from './notasEstudiante.service';
 import { observadorDelEstudianteParaAcudiente } from './observacion.service';
 import { ESTADOS_QUE_ADMITEN_DOCUMENTOS, construirDetalle } from './preinscripcionPublica.service';
 import { nombresDeTipos, tipoPorClave, tiposActivos } from './tipoCertificado.service';
@@ -136,6 +136,11 @@ export async function listarHijos(usuario: UserDocument): Promise<HijoDelPortal[
 export async function notasDelHijo(usuario: UserDocument, studentId: string, periodoNumero: number, academicYearId?: string) {
   const { estudiante } = await exigirAcudienteDe(usuario, studentId);
   return misNotas(estudiante, periodoNumero, academicYearId);
+}
+
+export async function notasDelAnioDelHijo(usuario: UserDocument, studentId: string, academicYearId?: string) {
+  const { estudiante } = await exigirAcudienteDe(usuario, studentId);
+  return misNotasDelAnio(estudiante, academicYearId);
 }
 
 /** El año que se muestra si el acudiente no elige otro: la vigencia activa o, si no hay, el más reciente sin cerrar. */

@@ -33,6 +33,21 @@ export interface FilaPlanilla {
   parcial: boolean;
   desempeno: Desempeno | null;
   faltantes: string[];
+  /** Solo de una nota ya cerrada: su recuperación del periodo (M18) y la nota que vale con ella. La nota cerrada no cambia. */
+  recuperacion?: ResumenRecuperacion | null;
+  nota_efectiva?: number | null;
+}
+
+/** La recuperación de una asignatura (de un periodo o de fin de año) con la nota anterior y la nueva. */
+export interface ResumenRecuperacion {
+  nota_original: number;
+  nota_resultante: number;
+  estado: 'SUPERADA' | 'NO_SUPERADA' | 'PENDIENTE';
+  /** Falso cuando el colegio configuró que la recuperación solo se anota: la nota que vale sigue siendo la original. */
+  cuenta: boolean;
+  detalle: string;
+  intentos: number;
+  fecha: string | null;
 }
 
 /** Una casilla: una actividad de M11 o una nota suelta que crea el docente. */
@@ -373,7 +388,10 @@ export interface AsignaturaDeMisNotas {
   teacher_assignment_id: string;
   asignacion: ContextoAsignacion | null;
   estado: EstadoNota;
+  /** La nota que vale hoy: la que cerró el docente o, si recuperó y el colegio la cuenta, la de la recuperación. */
   nota_asignatura: number | null;
+  /** La recuperación del periodo con su nota anterior y la nueva; null si no recuperó. */
+  recuperacion: ResumenRecuperacion | null;
   /** La nota se calculó con lo que hay: todavía faltan notas. */
   parcial: boolean;
   desempeno: Desempeno | null;
@@ -391,6 +409,37 @@ export function useMisNotas(periodoNumero: number | undefined, academicYearId?: 
     queryKey: ['notas', 'mias', academicYearId ?? null, periodoNumero],
     queryFn: () => api.get<MisNotas>('/notas/mias', { periodo_numero: periodoNumero, academic_year_id: academicYearId }),
     enabled: Boolean(periodoNumero),
+    staleTime: 15_000,
+  });
+}
+
+// --- Resumen del año (con la recuperación de fin de año) ---
+
+export interface AsignaturaDelAnio {
+  teacher_assignment_id: string;
+  asignacion: ContextoAsignacion | null;
+  /** Una entrada por periodo del año; `nota` es la efectiva (con la recuperación del periodo) y null = aún sin nota cerrada. */
+  periodos: Array<{ numero: number; nota_original: number | null; nota: number | null; recuperacion: ResumenRecuperacion | null }>;
+  /** La definitiva ponderada de los periodos; null mientras falte alguno por cerrar. */
+  definitiva: number | null;
+  recuperacion_anual: ResumenRecuperacion | null;
+  /** La nota con la que queda el año: la definitiva o, si la perdió y recuperó al final, la de la recuperación. */
+  nota_final: number | null;
+  desempeno: Desempeno | null;
+}
+
+export interface MisNotasDelAnio {
+  anio: { _id: string; year: number; nombre: string };
+  nota_aprobatoria: number;
+  periodos: Array<{ numero: number; nombre: string; porcentaje: number; estado: string }>;
+  asignaturas: AsignaturaDelAnio[];
+}
+
+export function useMisNotasDelAnio(academicYearId: string | undefined, habilitado = true) {
+  return useQuery({
+    queryKey: ['notas', 'mias', 'anual', academicYearId ?? null],
+    queryFn: () => api.get<MisNotasDelAnio>('/notas/mias/anual', { academic_year_id: academicYearId }),
+    enabled: Boolean(academicYearId) && habilitado,
     staleTime: 15_000,
   });
 }

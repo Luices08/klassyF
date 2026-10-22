@@ -1,4 +1,5 @@
 import { Rol } from '../../../src/constants/enums';
+import { despuesDelCorte, ejecutarEventos, Evento } from '../nucleo/eventos';
 import { Actor, como } from '../nucleo/api';
 import { registro } from '../nucleo/registro';
 import { diaDelAnio, festivosColombia, semanaSanta, sumarDias } from '../nucleo/fechas';
@@ -11,8 +12,13 @@ export interface ContextoFase {
   claveAdmin: string;
   /** Contraseña de todos los demás usuarios simulados. */
   claveUsuarios: string;
+  /** Último día simulado (medianoche UTC): lo que ocurriría después no se ejecuta y el año correspondiente queda abierto. */
+  corte: Date;
   log: (mensaje: string) => void;
 }
+
+export { despuesDelCorte, ejecutarEventos };
+export type { Evento };
 
 export async function actor(clave: string, rol: Rol): Promise<Actor> {
   const id = await registro.leer(`usuario:${clave}`);

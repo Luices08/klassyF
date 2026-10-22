@@ -31,9 +31,9 @@ export function familiaDeAsignatura(clave: string): FamiliaArea {
 
 /** En las asignaturas de nota «blanda» los docentes califican más alto (y con menos dispersión) que en las críticas. */
 const AJUSTE_TIPO_NOTA: Record<string, { media: number; dispersion: number }> = {
-  CRITICA: { media: -0.1, dispersion: 1.1 },
-  MODERADA: { media: 0.1, dispersion: 1 },
-  BLANDA: { media: 0.35, dispersion: 0.8 },
+  CRITICA: { media: 0, dispersion: 1.1 },
+  MODERADA: { media: 0.15, dispersion: 1 },
+  BLANDA: { media: 0.4, dispersion: 0.8 },
 };
 
 export const NOTA_NO_ENTREGADA = 1;
@@ -125,7 +125,7 @@ export function nivelEsperado(perfil: PerfilDeAnio, claveAsignatura: string, tip
 /** ¿Entrega la actividad, y a tiempo? La constancia decide si la hace; la puntualidad, si llega tarde. */
 export function decidirEntrega(latentes: Latentes, tipo: TipoActividadSim, azar: Azar): { entrega: boolean; tarde: boolean } {
   // A una evaluación casi nadie falta; una tarea es donde se nota la constancia.
-  const p = tipo === 'EVALUACION' ? 0.97 : Math.min(0.99, Math.max(0.2, latentes.constancia + 0.08));
+  const p = tipo === 'EVALUACION' ? 0.97 : Math.min(0.99, Math.max(0.2, latentes.constancia + 0.16));
   if (!azar.prob(p)) return { entrega: false, tarde: false };
   return { entrega: true, tarde: azar.prob(Math.min(0.5, latentes.puntualidad * 4)) };
 }

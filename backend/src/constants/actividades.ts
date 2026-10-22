@@ -27,6 +27,9 @@ export const MIMETYPES_EVIDENCIA = new Set<string>(Object.values(FORMATOS_EVIDEN
 export const MAX_BYTES_ENTREGA = 10 * 1024 * 1024;
 /** Cuántos archivos admite una entrega cuando el docente permite varios. */
 export const MAX_ARCHIVOS_POR_ENTREGA = 5;
+
+/** Días que se esperan, tras terminar el periodo, antes de depurar los archivos de sus entregas (`npm run storage:purge-periodo`). */
+export const DIAS_PURGA_ARCHIVOS_POR_DEFECTO = 30;
 /** Texto plano del docente para los estudiantes (indicaciones breves aparte de las instrucciones). */
 export const MAX_CARACTERES_COMENTARIOS_DOCENTE = 1000;
 

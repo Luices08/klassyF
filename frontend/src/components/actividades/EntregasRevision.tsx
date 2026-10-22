@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { Alert, errorMessage } from '../ui/Alert';
-import { Chip, EstadoEntregaBadge } from '../ui/Badge';
+import { ArchivoDepuradoChip, Chip, EstadoEntregaBadge } from '../ui/Badge';
 import { Button } from '../ui/Button';
 import { ContenidoRico } from '../ui/ContenidoRico';
 import { Input } from '../ui/Field';
@@ -208,15 +208,18 @@ function FilaEntregaEstudiante({ actividad, fila, escala, puedeGestionar }: Fila
                   {i.acceso_especial && <Chip tone="blue">Plazo personal</Chip>}
                   {variosIntentos && i.considerado && <Chip tone="green">Válida</Chip>}
                 </div>
-                {i.archivos.length > 0 && (
+                {i.archivos.some((a) => !a.purgado) && (
                   <div className="flex flex-wrap gap-2">
-                    {i.archivos.map((a) => (
-                      <Button key={a.indice} type="button" variant="soft-edit" isLoading={descargando === `${i.numero}-${a.indice}`} onClick={() => void bajar(i.numero, a.indice, a.nombre)}>
-                        Descargar {a.nombre}
-                      </Button>
-                    ))}
+                    {i.archivos
+                      .filter((a) => !a.purgado)
+                      .map((a) => (
+                        <Button key={a.indice} type="button" variant="soft-edit" isLoading={descargando === `${i.numero}-${a.indice}`} onClick={() => void bajar(i.numero, a.indice, a.nombre)}>
+                          Descargar {a.nombre}
+                        </Button>
+                      ))}
                   </div>
                 )}
+                {i.archivo_purgado && <ArchivoDepuradoChip />}
               </div>
               {i.respuesta_html && <ContenidoRico html={i.respuesta_html} className="rounded-lg bg-surface p-3" />}
               {i.texto_entrega && <p className="whitespace-pre-wrap rounded-lg bg-surface p-3 text-body">{i.texto_entrega}</p>}

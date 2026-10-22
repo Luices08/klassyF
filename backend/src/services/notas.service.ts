@@ -111,7 +111,7 @@ export async function cargarContextoPlanilla(asignacion: TeacherAssignmentDocume
     actividades.length === 0
       ? []
       : await ActivitySubmission.find({ activity_id: { $in: actividades.map((a) => a._id) } })
-          .select('activity_id student_id calificacion_numerica estado fecha_entrega archivo_path')
+          .select('activity_id student_id calificacion_numerica estado fecha_entrega archivo_path intentos.archivos.purgado')
           .lean();
   const calificadas = entregadas.filter((c) => typeof c.calificacion_numerica === 'number');
 
@@ -147,7 +147,7 @@ export async function cargarContextoPlanilla(asignacion: TeacherAssignmentDocume
     ingresaron_despues: matriculas.filter((m) => despues.has(String(m.student_id._id))).map(estudianteDe),
     notasActividad: new Map(calificadas.map((c) => [`${String(c.activity_id)}|${String(c.student_id)}`, c.calificacion_numerica as number])),
     entregas: new Map(
-      entregadas.map((c) => [`${String(c.activity_id)}|${String(c.student_id)}`, { estado: estadoDeEntrega(c), tiene_archivo: Boolean(c.archivo_path) }])
+      entregadas.map((c) => [`${String(c.activity_id)}|${String(c.student_id)}`, { estado: estadoDeEntrega(c), tiene_archivo: Boolean(c.archivo_path) || (c.intentos ?? []).some((i) => (i.archivos ?? []).some((a) => a.purgado === true)) }])
     ),
     registros: new Map((registros as unknown as RegistroPlano[]).map((r) => [String(r.student_id), r])),
   };

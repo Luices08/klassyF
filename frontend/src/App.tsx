@@ -52,6 +52,7 @@ import { DocumentosPorRevisarPage } from './pages/admin/DocumentosPorRevisarPage
 import { EnrollmentsPage } from './pages/admin/EnrollmentsPage';
 import { PazYSalvoPage } from './pages/admin/PazYSalvoPage';
 import { SalidasPage } from './pages/admin/SalidasPage';
+import { RematriculaPage } from './pages/admin/RematriculaPage';
 import { TrasladosPage } from './pages/admin/TrasladosPage';
 import { EspaciosPage } from './pages/admin/EspaciosPage';
 import { GradesPage } from './pages/admin/GradesPage';
@@ -127,6 +128,7 @@ export default function App() {
           {/* Retiros y traslados: el servidor limita a secretaría por sede. */}
           <Route element={<ProtectedRoute allowedRoles={['ADMIN', 'COORDINADOR', 'SECRETARIA']} />}>
             <Route path="/secretaria/salidas" element={<SalidasPage />} />
+            <Route path="/secretaria/rematricula" element={<RematriculaPage />} />
           </Route>
 
           <Route element={<ProtectedRoute allowedRoles={['ADMIN', 'SECRETARIA']} />}>

@@ -190,6 +190,10 @@ export const PALABRAS_CLAVE_POR_RUTA: Record<string, { descripcion: string; clav
     descripcion: 'Paz y salvo de fin de año de los estudiantes, para su matrícula del año siguiente.',
     claves: ['paz y salvo', 'pazysalvo', 'fin de ano', 'estar a paz y salvo', 'debe libros', 'renovar matricula'],
   },
+  '/secretaria/rematricula': {
+    descripcion: 'Rematrícula de fin de año por sede, grado o grupo: simula y confirma las pre-matrículas del año siguiente, lista de espera por falta de cupos y reglas de prioridad.',
+    claves: ['rematricula', 'rematricular', 'renovar matricula', 'matricula del ano siguiente', 'pasar de ano', 'pre matricula', 'prematricula', 'lista de espera', 'cupos del ano siguiente', 'repitentes', 'proyeccion de matricula'],
+  },
   '/secretaria/traslados': {
     descripcion: 'Traslados extemporáneos de estudiantes y homologación de las notas del colegio de procedencia.',
     claves: ['traslado', 'traslados', 'homologacion', 'homologar', 'notas homologadas', 'exenta', 'exento por traslado', 'colegio de procedencia', 'llego a mitad de ano', 'escala de otro colegio'],

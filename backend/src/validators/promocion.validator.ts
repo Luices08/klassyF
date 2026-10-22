@@ -1,5 +1,6 @@
 import Joi from 'joi';
 import { NIVELES_EDUCATIVOS } from '../constants/enums';
+import { CRITERIOS_DESEMPATE, ESTADOS_ESPERA_REMATRICULA } from '../constants/rematricula';
 import { GRADO_TITULACION } from '../constants/titulacion';
 import {
   ACCIONES_REGLA,
@@ -190,9 +191,33 @@ export const listarEvaluaciones: ValidationSchema = {
 export const idParam: ValidationSchema = { params: Joi.object({ id: objectId.required() }) };
 
 export const simulacionRollover: ValidationSchema = {
-  query: Joi.object({ origen_id: objectId.required(), destino_id: objectId.required(), sede_id: objectId, grade_id: objectId }),
+  query: Joi.object({ origen_id: objectId.required(), destino_id: objectId.required(), sede_id: objectId, grade_id: objectId, group_id: objectId }),
 };
 
 export const ejecutarRollover: ValidationSchema = {
-  body: Joi.object({ origen_id: objectId.required(), destino_id: objectId.required(), sede_id: objectId, grade_id: objectId, confirm_password: Joi.string().required() }),
+  body: Joi.object({ origen_id: objectId.required(), destino_id: objectId.required(), sede_id: objectId, grade_id: objectId, group_id: objectId, confirm_password: Joi.string().required() }),
+};
+
+export const configuracionRematricula: ValidationSchema = {
+  body: Joi.object({
+    criterios_desempate: Joi.array()
+      .items(Joi.object({ criterio: Joi.string().valid(...CRITERIOS_DESEMPATE).required(), activo: Joi.boolean().required() }))
+      .length(CRITERIOS_DESEMPATE.length)
+      .required(),
+    tolerancia_ocupacion_pct: Joi.number().min(0).max(50).required(),
+  }),
+};
+
+export const listaEspera: ValidationSchema = {
+  query: Joi.object({ destino_id: objectId.required(), sede_id: objectId, grade_id: objectId, estado: Joi.string().valid(...ESTADOS_ESPERA_REMATRICULA) }),
+};
+
+export const asignarEspera: ValidationSchema = {
+  params: Joi.object({ id: objectId.required() }),
+  body: Joi.object({ group_id: objectId.required() }),
+};
+
+export const descartarEspera: ValidationSchema = {
+  params: Joi.object({ id: objectId.required() }),
+  body: Joi.object({ motivo: Joi.string().trim().min(10).max(500).required() }),
 };

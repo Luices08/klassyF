@@ -2,6 +2,8 @@ import { ClientSession, Types } from 'mongoose';
 import { CORREOS_EN_PARALELO, CORREOS_POR_TANDA, MINUTOS_RESERVA_CORREO, SEGUNDOS_ENTRE_TANDAS, TipoCorreo } from '../constants/citaciones';
 import CorreoEnCola, { CorreoEnColaDocument } from '../models/correoEnCola.model';
 import { estadoTrasFallo, proximoIntento } from '../utils/citaciones';
+import { TIPOS_AVISO_FAMILIA } from '../constants/avisosCorreo';
+import { armarMensajeDeAviso } from './avisoFamiliaCorreo.service';
 import { armarMensajeDeCitacion } from './citacionCorreo.service';
 import { correoConfigurado, enviarCorreo } from './correo.service';
 
@@ -60,7 +62,8 @@ async function reclamarSiguiente(ahora: Date): Promise<CorreoEnColaDocument | nu
 
 async function enviarUno(correo: CorreoEnColaDocument, ahora: Date): Promise<void> {
   try {
-    const armado = await armarMensajeDeCitacion(correo);
+    const esAviso = (TIPOS_AVISO_FAMILIA as readonly string[]).includes(correo.tipo);
+    const armado = esAviso ? await armarMensajeDeAviso(correo) : await armarMensajeDeCitacion(correo);
     if ('omitir' in armado) {
       await CorreoEnCola.updateOne({ _id: correo._id }, { $set: { estado: 'OMITIDO', reservado_hasta: null, ultimo_error: armado.omitir.slice(0, 300) } });
       return;

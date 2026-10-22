@@ -72,6 +72,8 @@ export interface AjustesInstitucionInput {
   paz_y_salvo_docentes?: boolean;
   titulo_bachiller_defecto?: string;
   politica_cupo_salida?: PoliticaCupoSalida;
+  correo_inasistencias?: boolean;
+  correo_boletines?: boolean;
 }
 
 /** Ajustes de funcionamiento (modalidad, aforo, paz y salvo, cupo de salida, título de bachiller): bloques propios, sin contraseña. */

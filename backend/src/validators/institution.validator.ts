@@ -112,6 +112,8 @@ export const actualizarAjustes: ValidationSchema = {
     paz_y_salvo_docentes: Joi.boolean(),
     titulo_bachiller_defecto: Joi.string().trim().min(3).max(MAX_CARACTERES_TITULO_BACHILLER),
     politica_cupo_salida: Joi.string().valid(...POLITICAS_CUPO_SALIDA),
+    correo_inasistencias: Joi.boolean(),
+    correo_boletines: Joi.boolean(),
   }).min(1),
 };
 

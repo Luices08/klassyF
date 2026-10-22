@@ -20,7 +20,7 @@ export interface DatosCorreoCitacion {
   motivo_cancelacion?: string;
 }
 
-const escapar = (t: string): string => t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+export const escapar = (t: string): string => t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 
 /** Fecha y hora en hora de Colombia, sin depender de la zona del servidor. */
 export function fechaLegible(fecha: Date): { dia: string; hora: string } {

@@ -1,4 +1,5 @@
 import { Types } from 'mongoose';
+import { encolarAvisoBoletin } from './avisoFamiliaCorreo.service';
 import { avisarBoletinPublicado } from './notificacionesEventos.service';
 import { PERIODO_INFORME_FINAL } from '../constants/boletin';
 import { ESTADOS_MATRICULA_ACTIVOS } from '../constants/enums';
@@ -95,7 +96,10 @@ export async function establecerPublicacionGrupo(
     detalle: `${ref.periodo_numero === PERIODO_INFORME_FINAL ? 'informe final' : `periodo ${ref.periodo_numero}`}: ${publicado ? 'publicado' : 'retirado'}`,
     ip,
   });
-  if (publicado && ref.periodo_numero !== PERIODO_INFORME_FINAL) await avisarBoletinPublicado({ groupId: ref.group_id, academicYearId: ref.academic_year_id, periodo: ref.periodo_numero });
+  if (publicado && ref.periodo_numero !== PERIODO_INFORME_FINAL) {
+    await avisarBoletinPublicado({ groupId: ref.group_id, academicYearId: ref.academic_year_id, periodo: ref.periodo_numero });
+    await encolarAvisoBoletin({ groupId: ref.group_id, academicYearId: ref.academic_year_id, periodo: ref.periodo_numero });
+  }
   return obtenerPublicacion(ref);
 }
 

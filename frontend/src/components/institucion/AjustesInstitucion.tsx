@@ -43,12 +43,15 @@ export function AjustesInstitucion({ institution }: { institution: Institution }
   const guardarAforo = useActualizarAjustesInstitucion();
   const guardarPazYSalvo = useActualizarAjustesInstitucion();
   const guardarCupoSalida = useActualizarAjustesInstitucion();
+  const guardarCorreos = useActualizarAjustesInstitucion();
 
   const [modalidad, setModalidad] = useState<ModalidadInstitucion>(institution.modalidad ?? 'PRESENCIAL');
   const [aforo, setAforo] = useState<PoliticaAforoAula>(institution.politica_aforo_aula ?? 'BLOQUEAR');
   const [pazYSalvo, setPazYSalvo] = useState(institution.paz_y_salvo_docentes ?? false);
   const guardarTitulo = useActualizarAjustesInstitucion();
   const [titulo, setTitulo] = useState(institution.titulo_bachiller_defecto ?? 'Bachiller Académico');
+  const [correoInasistencias, setCorreoInasistencias] = useState(institution.correo_inasistencias ?? true);
+  const [correoBoletines, setCorreoBoletines] = useState(institution.correo_boletines ?? true);
   const [cupoSalida, setCupoSalida] = useState<PoliticaCupoSalida>(institution.politica_cupo_salida ?? 'INMEDIATA');
 
   const esVirtual = (institution.modalidad ?? 'PRESENCIAL') === 'VIRTUAL';
@@ -133,6 +136,30 @@ export function AjustesInstitucion({ institution }: { institution: Institution }
             </option>
           ))}
         </Select>
+      </BloqueAjuste>
+
+      <BloqueAjuste
+        titulo="Correos a las familias"
+        subtitulo="Avisos al acudiente principal."
+        modificado={correoInasistencias !== (institution.correo_inasistencias ?? true) || correoBoletines !== (institution.correo_boletines ?? true)}
+        guardando={guardarCorreos.isPending}
+        error={guardarCorreos.error}
+        onGuardar={() => guardarCorreos.mutate({ correo_inasistencias: correoInasistencias, correo_boletines: correoBoletines })}
+      >
+        <div className="space-y-3">
+          <Switch
+            checked={correoInasistencias}
+            onChange={setCorreoInasistencias}
+            label="Avisar las inasistencias sin excusa"
+            description="Un correo por estudiante y día, que junta las clases a las que faltó. Si luego se justifica, no sale."
+          />
+          <Switch
+            checked={correoBoletines}
+            onChange={setCorreoBoletines}
+            label="Avisar cuando se publica el boletín"
+            description="Un correo por periodo al publicar el boletín del grupo. Las citaciones siempre se envían. Todo requiere el correo configurado en el servidor."
+          />
+        </div>
       </BloqueAjuste>
 
       <BloqueAjuste

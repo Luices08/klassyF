@@ -53,6 +53,10 @@ export interface IInstitution {
   titulo_bachiller_defecto: string;
   /** M04: cuándo se libera el cupo del grupo cuando un estudiante se retira o se traslada. */
   politica_cupo_salida: PoliticaCupoSalida;
+  /** Correo a los acudientes cuando un estudiante queda con una inasistencia sin excusa (uno por estudiante y día). */
+  correo_inasistencias: boolean;
+  /** Correo a los acudientes cuando se publica el boletín de un periodo. */
+  correo_boletines: boolean;
   /** M08: Topes maximos de carga horaria semanal por nivel segun Decreto 1850 / PEI institucional */
   limites_carga_docente?: ILimitesCargaDocente;
   /** M06: Tope maximo de horas semanales del Plan de Estudios por nivel (antes quemado en el frontend). */
@@ -101,6 +105,8 @@ const institutionSchema = new Schema<IInstitution, InstitutionModel>(
     paz_y_salvo_docentes: { type: Boolean, default: false },
     titulo_bachiller_defecto: { type: String, trim: true, maxlength: MAX_CARACTERES_TITULO_BACHILLER, default: TITULO_BACHILLER_INICIAL },
     politica_cupo_salida: { type: String, enum: POLITICAS_CUPO_SALIDA, default: 'INMEDIATA' },
+    correo_inasistencias: { type: Boolean, default: true },
+    correo_boletines: { type: Boolean, default: true },
     limites_carga_docente: {
       type: new Schema<ILimitesCargaDocente>(
         {

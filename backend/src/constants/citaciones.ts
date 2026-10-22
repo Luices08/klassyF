@@ -30,7 +30,7 @@ export const MAX_MOTIVO_CANCELACION = 300;
 export const MAX_GRUPOS_POR_CITACION = 30;
 
 // --- Cola de correo ---
-export const TIPOS_CORREO = ['CITACION_NUEVA', 'CITACION_ACTUALIZADA', 'CITACION_CANCELADA'] as const;
+export const TIPOS_CORREO = ['CITACION_NUEVA', 'CITACION_ACTUALIZADA', 'CITACION_CANCELADA', 'AVISO_INASISTENCIA', 'AVISO_BOLETIN'] as const;
 export type TipoCorreo = (typeof TIPOS_CORREO)[number];
 
 /** OMITIDO: ya no tenía sentido enviarlo (la citación se canceló o pasó antes de que le tocara el turno). */

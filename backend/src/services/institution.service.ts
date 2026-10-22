@@ -33,6 +33,8 @@ export interface AjustesInstitucion {
   paz_y_salvo_docentes?: boolean;
   titulo_bachiller_defecto?: string;
   politica_cupo_salida?: PoliticaCupoSalida;
+  correo_inasistencias?: boolean;
+  correo_boletines?: boolean;
 }
 
 export interface SetupInstitutionInput {
@@ -226,6 +228,14 @@ export async function actualizarAjustes(
   if (ajustes.politica_cupo_salida !== undefined && ajustes.politica_cupo_salida !== institucion.politica_cupo_salida) {
     institucion.politica_cupo_salida = ajustes.politica_cupo_salida;
     cambios.push(`cupo de quien sale ${ajustes.politica_cupo_salida}`);
+  }
+  if (ajustes.correo_inasistencias !== undefined && ajustes.correo_inasistencias !== institucion.correo_inasistencias) {
+    institucion.correo_inasistencias = ajustes.correo_inasistencias;
+    cambios.push(`correo de inasistencias ${ajustes.correo_inasistencias ? 'sí' : 'no'}`);
+  }
+  if (ajustes.correo_boletines !== undefined && ajustes.correo_boletines !== institucion.correo_boletines) {
+    institucion.correo_boletines = ajustes.correo_boletines;
+    cambios.push(`correo de boletines ${ajustes.correo_boletines ? 'sí' : 'no'}`);
   }
   if (cambios.length === 0) return institucion;
 

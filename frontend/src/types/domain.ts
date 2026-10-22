@@ -199,6 +199,8 @@ export interface Institution {
   titulo_bachiller_defecto?: string;
   /** M04: cuándo se libera el cupo de quien sale durante el año; por defecto, al registrar la salida. */
   politica_cupo_salida?: PoliticaCupoSalida;
+  correo_inasistencias?: boolean;
+  correo_boletines?: boolean;
   estado: EstadoActivo;
 }
 

@@ -16,6 +16,7 @@ import ApiError from '../utils/ApiError';
 import { hayEventoNoLectivo, periodosEfectivos } from '../utils/calendarioAcademico';
 import { ESTADO_ACTIVO } from '../utils/filtroEstado';
 import { registrarEvento } from './audit.service';
+import { encolarAvisoInasistencias } from './avisoFamiliaCorreo.service';
 import { avisarInasistencias } from './notificacionesEventos.service';
 import { listarEstados, mapaDeEstados } from './attendanceState.service';
 
@@ -350,6 +351,7 @@ async function guardarDia(
     ip,
   });
   await avisarInasistencias(nuevasFallas.get(planilla) ?? []);
+  await encolarAvisoInasistencias(nuevasFallas.get(planilla) ?? [], fecha);
 }
 
 /**

@@ -1,6 +1,7 @@
 import type { ComponentType, SVGProps } from 'react';
 import type { Rol } from '../../types/api';
 import {
+  ActivityIcon,
   BookIcon,
   BuildingIcon,
   CalendarIcon,
@@ -105,6 +106,9 @@ export const NAV_ITEMS: NavItem[] = [
   { to: '/mis-actividades', label: 'Mis actividades', icon: ClipboardListIcon, roles: ['ESTUDIANTE'] },
   { to: '/mis-notas', label: 'Mis notas', icon: FileTextIcon, roles: ['ESTUDIANTE'] },
   { to: '/mi-observador', label: 'Mi observador', icon: EyeIcon, roles: ['ESTUDIANTE'] },
+  // Módulo predictivo: el personal busca a cualquier estudiante; el ADMIN además entrena la IA. El estudiante ve solo el suyo.
+  { to: '/predictivo', label: 'Análisis predictivo', icon: ActivityIcon, roles: ['ADMIN', 'COORDINADOR', 'COORDINADOR_CONVIVENCIA', 'ORIENTADOR', 'DOCENTE'] },
+  { to: '/mi-analisis', label: 'Mi análisis', icon: ActivityIcon, roles: ['ESTUDIANTE'] },
 ];
 
 export interface GrupoNav {
@@ -154,6 +158,7 @@ export const GRUPOS_NAV: GrupoNav[] = [
       '/comision',
       '/asistencia/gestion',
       '/reuniones',
+      '/predictivo',
     ],
   },
   {
@@ -186,7 +191,7 @@ export const GRUPOS_NAV: GrupoNav[] = [
     clave: 'estudio',
     label: 'Mi estudio',
     icon: GraduationCapIcon,
-    rutas: ['/mis-actividades', '/mis-notas', '/mi-observador'],
+    rutas: ['/mis-actividades', '/mis-notas', '/mi-observador', '/mi-analisis'],
   },
 ];
 

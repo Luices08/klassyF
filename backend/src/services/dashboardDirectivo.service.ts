@@ -7,6 +7,7 @@ import Enrollment from '../models/enrollment.model';
 import EvaluacionPromocion from '../models/evaluacionPromocionEstudiante.model';
 import Subject from '../models/subject.model';
 import { memorizar } from '../utils/cacheCorta';
+import { etapasNotaEfectiva } from '../utils/notaEfectiva';
 import {
   ConteoDeReprobacionPorAsignatura,
   EstudianteParaEficiencia,
@@ -48,7 +49,8 @@ async function calcularEficiencia(ctx: ContextoDashboard): Promise<Eficiencia> {
     EvaluacionPromocion.find({ academic_year_id: ctx.anio._id, vigente: true, group_id: { $in: ctx.gruposIds } }).select('student_id resultado').lean(),
     CalificacionAsignatura.aggregate<{ _id: Types.ObjectId; perdidas: number }>([
       { $match: { academic_year_id: ctx.anio._id, group_id: { $in: ctx.gruposIds }, periodo_numero: ctx.periodo_notas, estado: { $in: NOTAS_CERRADAS } } },
-      { $group: { _id: '$student_id', perdidas: { $sum: { $cond: [{ $lt: ['$resultado.nota_asignatura', ctx.nota_aprobatoria] }, 1, 0] } } } },
+      ...etapasNotaEfectiva(),
+      { $group: { _id: '$student_id', perdidas: { $sum: { $cond: [{ $lt: ['$nota_efectiva', ctx.nota_aprobatoria] }, 1, 0] } } } },
     ]),
     // Un retiro o un traslado a otro colegio dejan la matrícula en RETIRADO: el sistema no los distingue de una deserción, así que se cuentan juntos.
     Enrollment.aggregate<{ _id: Types.ObjectId; total: number }>([
@@ -157,7 +159,8 @@ export async function obtenerMorbilidad(filtros: FiltrosDashboard) {
     const conteos = gruposIds.length
       ? await CalificacionAsignatura.aggregate<{ _id: Types.ObjectId; evaluados: number; reprobados: number }>([
           { $match: { academic_year_id: ctx.anio._id, group_id: { $in: gruposIds }, periodo_numero: ctx.periodo_notas, estado: { $in: NOTAS_CERRADAS } } },
-          { $group: { _id: '$subject_id', evaluados: { $sum: 1 }, reprobados: { $sum: { $cond: [{ $lt: ['$resultado.nota_asignatura', ctx.nota_aprobatoria] }, 1, 0] } } } },
+          ...etapasNotaEfectiva(),
+          { $group: { _id: '$subject_id', evaluados: { $sum: 1 }, reprobados: { $sum: { $cond: [{ $lt: ['$nota_efectiva', ctx.nota_aprobatoria] }, 1, 0] } } } },
         ])
       : [];
 

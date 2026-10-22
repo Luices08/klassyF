@@ -5,20 +5,24 @@ import { Card } from '../components/ui/Card';
 import { Select } from '../components/ui/Field';
 import { PageHeader } from '../components/ui/PageHeader';
 import { Spinner } from '../components/ui/Spinner';
+import { ResumenAnualNotas } from '../components/notas/ResumenAnualNotas';
 import { TarjetaNotasAsignatura } from '../components/notas/TarjetaNotasAsignatura';
-import { useMisNotas } from '../hooks/useNotas';
+import { useMisNotas, useMisNotasDelAnio } from '../hooks/useNotas';
 import { useAnioDeTrabajo } from '../hooks/useAniosLectivos';
 
 /**
  * Las notas del estudiante por asignatura y periodo: cada bloque del molde del colegio con las actividades y notas que lo forman.
- * Mientras el periodo está abierto son provisionales; la nota final es la que el docente cierra y la que lleva el boletín.
+ * Mientras el periodo está abierto son provisionales; la nota final es la que el docente cierra y la que lleva el boletín, con la recuperación
+ * del periodo si la hubo. «Resumen del año» (periodo 0) junta los periodos, la definitiva y la recuperación de fin de año.
  */
 export function MisNotasPage() {
   const { anio } = useAnioDeTrabajo();
   const [periodoElegido, setPeriodoElegido] = useState<number | null>(null);
   const periodoAbierto = anio?.periodos.find((p) => p.estado === 'ABIERTO' || p.estado === 'EN_DIGITACION')?.numero ?? 1;
   const periodo = periodoElegido ?? periodoAbierto;
+  const resumenDelAnio = periodo === 0;
   const { data, isLoading, isError, error } = useMisNotas(anio ? periodo : undefined, anio?._id);
+  const anual = useMisNotasDelAnio(anio?._id, resumenDelAnio);
 
   return (
     <div className="space-y-4">
@@ -41,11 +45,19 @@ export function MisNotasPage() {
                   {p.nombre}
                 </option>
               ))}
+              <option value={0}>Resumen del año</option>
             </Select>
           </div>
         </Card>
       )}
 
+      {resumenDelAnio && anual.isError && <Alert tone="error">{errorMessage(anual.error)}</Alert>}
+      {resumenDelAnio && anual.isLoading && (
+        <div className="flex justify-center p-12">
+          <Spinner />
+        </div>
+      )}
+      {resumenDelAnio && anual.data && <ResumenAnualNotas datos={anual.data} />}
       {isError && <Alert tone="error">{errorMessage(error)}</Alert>}
       {isLoading && (
         <div className="flex justify-center p-12">

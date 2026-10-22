@@ -124,3 +124,7 @@ export const descargarExcelDeMuestra = catchAsync<unknown, unknown, unknown, Con
 export const misNotas = catchAsync<unknown, unknown, unknown, ParsedQs & { periodo_numero: number; academic_year_id?: string }>(async (req, res) => {
   res.status(200).json({ success: true, data: await estudianteService.misNotas(req.user!, Number(req.query.periodo_numero), req.query.academic_year_id) });
 });
+
+export const misNotasDelAnio = catchAsync<unknown, unknown, unknown, ParsedQs & { academic_year_id?: string }>(async (req, res) => {
+  res.status(200).json({ success: true, data: await estudianteService.misNotasDelAnio(req.user!, req.query.academic_year_id) });
+});

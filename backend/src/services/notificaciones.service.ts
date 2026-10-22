@@ -89,6 +89,42 @@ export async function sumarInsignia(input: SumarInsigniaInput): Promise<void> {
   }
 }
 
+export interface EstablecerInsigniaInput {
+  destinatarios: IdLike[];
+  rol: Rol;
+  ruta: string;
+  pestana?: string;
+  /** El número exacto que debe mostrar; 0 la quita. */
+  cantidad: number;
+}
+
+/**
+ * Deja el contador del menú de cada destinatario en un número exacto (no suma): sirve para «hay N estudiantes por recuperar», que es un
+ * total calculado y no un conteo de avisos nuevos. Igual que las demás, se apaga cuando el usuario entra a la pantalla.
+ */
+export async function establecerInsignia(input: EstablecerInsigniaInput): Promise<void> {
+  const destinatarios = unicos(input.destinatarios);
+  if (destinatarios.length === 0) return;
+  const pestana = input.pestana ?? '';
+  if (input.cantidad <= 0) {
+    await Insignia.deleteMany({ usuario_id: { $in: destinatarios.map((u) => new Types.ObjectId(u)) }, rol: input.rol, ruta: input.ruta, pestana });
+    return;
+  }
+  const operaciones = destinatarios.map((usuario) => ({
+    updateOne: {
+      filter: { usuario_id: new Types.ObjectId(usuario), rol: input.rol, ruta: input.ruta, pestana },
+      update: { $set: { contador: input.cantidad } },
+      upsert: true,
+    },
+  }));
+  try {
+    await Insignia.bulkWrite(operaciones, { ordered: false });
+  } catch (err) {
+    if ((err as { code?: number }).code !== 11000) throw err;
+    await Insignia.bulkWrite(operaciones, { ordered: false });
+  }
+}
+
 /** El usuario entró a la pantalla (o pestaña): su contador se va. */
 export async function marcarVisto(usuario: UserDocument, ruta: string, pestana = ''): Promise<void> {
   await Insignia.deleteOne({ usuario_id: usuario._id, rol: usuario.rol, ruta, pestana });

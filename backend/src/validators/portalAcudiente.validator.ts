@@ -13,6 +13,11 @@ export const notas: ValidationSchema = {
   query: Joi.object({ periodo_numero: periodo.required(), academic_year_id: objectId }),
 };
 
+export const notasDelAnio: ValidationSchema = {
+  params: delHijo,
+  query: Joi.object({ academic_year_id: objectId }),
+};
+
 export const inasistencias: ValidationSchema = {
   params: delHijo,
   query: Joi.object({ periodo_numero: periodo, academic_year_id: objectId }),

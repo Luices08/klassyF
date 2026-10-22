@@ -2,6 +2,7 @@ import { NivelRiesgo } from '../constants/comision';
 import { ROLES } from '../constants/roles';
 import ExpedienteInclusion from '../models/expedienteInclusion.model';
 import Group from '../models/group.model';
+import Recuperacion from '../models/recuperacion.model';
 import Subject from '../models/subject.model';
 import TeacherAssignment from '../models/teacherAssignment.model';
 import User, { UserDocument } from '../models/user.model';
@@ -9,6 +10,7 @@ import ApiError from '../utils/ApiError';
 import { alertasDeReprobacionMasiva, ConteoDeReprobacion, nivelDeRiesgo } from '../utils/comision';
 import { escalaEfectiva } from '../utils/escalaEvaluacion';
 import { ESTADO_ACTIVO } from '../utils/filtroEstado';
+import { notaEfectivaDePeriodo } from '../utils/notaEfectiva';
 import { registrarEvento } from './audit.service';
 import { cargarAnio } from './configuracionRecuperaciones.service';
 import { datosDeConfiguracion, obtenerConfiguracion } from './configuracionComision.service';
@@ -103,16 +105,21 @@ export async function calcularTableroDeRiesgo(filtros: FiltrosTablero): Promise<
 
   for (const asignacion of asignaciones) {
     const ctx = await cargarContextoPlanilla(asignacion, filtros.periodo_numero);
+    const recuperadas = await Recuperacion.find({ academic_year_id: anio._id, teacher_assignment_id: asignacion._id, tipo: 'PERIODO', periodo_numero: filtros.periodo_numero });
+    const recuperacionDe = new Map(recuperadas.map((r) => [String(r.student_id), r]));
     const asignatura = nombreAsignatura.get(String(asignacion.subject_id)) ?? 'Asignatura';
     const conteo: ConteoDeReprobacion = { clave: String(asignacion._id), nombre: `${asignatura} · ${nombreGrupo.get(String(asignacion.group_id)) ?? ''}`, evaluados: 0, reprobados: 0 };
     for (const est of ctx.estudiantes) {
       const fila = armarFila(ctx, est);
       const acumulado = porEstudiante.get(est._id) ?? { nombre: est.nombre, apellido: est.apellido, documento: est.numero_documento, grupo_id: String(asignacion.group_id), perdidas: [], sin_nota: 0 };
-      if (fila.nota_asignatura === null) acumulado.sin_nota += 1;
+      // Lo cerrado se mide con la recuperación aplicada (si el estudiante recuperó, ya no está en riesgo por esa asignatura).
+      const cerrada = ['CERRADO', 'DEFINITIVO'].includes(fila.estado);
+      const nota = cerrada ? notaEfectivaDePeriodo(fila.nota_asignatura, recuperacionDe.get(est._id)) : fila.nota_asignatura;
+      if (nota === null) acumulado.sin_nota += 1;
       else {
         conteo.evaluados += 1;
-        if (fila.parcial || !['CERRADO', 'DEFINITIVO'].includes(fila.estado)) provisional = true;
-        if (fila.nota_asignatura < aprobatoria) {
+        if (fila.parcial || !cerrada) provisional = true;
+        if (nota < aprobatoria) {
           conteo.reprobados += 1;
           acumulado.perdidas.push(asignatura);
         }

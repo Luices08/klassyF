@@ -642,12 +642,20 @@ async function registrarCambioCalendario(anio: AcademicYearDocument, detalle: st
   });
 }
 
+/** M18/M28: las fechas de una recuperación se avisan a los docentes con estudiantes por recuperar. Carga tardía: evita un ciclo de módulos. */
+async function avisarFechasDeRecuperacion(anioId: Types.ObjectId, eventoId: Types.ObjectId | undefined, tipo: string): Promise<void> {
+  if (!eventoId || (tipo !== 'RECUPERACION_PERIODO' && tipo !== 'RECUPERACION_FINAL')) return;
+  const { avisarFechasDeRecuperacion: avisar } = await import('./recuperacionAvisos.service');
+  await avisar(anioId, eventoId);
+}
+
 export async function crearEvento(id: string, input: EventoInput, ctx: ContextoUsuario): Promise<AnioLectivoDto> {
   const anio = await cargarAnioEditable(id);
   anio.eventos.push(normalizarEvento(input));
   await anio.save();
 
   await registrarCambioCalendario(anio, `evento "${input.nombre}" (${input.tipo}) agregado.`, ctx);
+  await avisarFechasDeRecuperacion(anio._id, anio.eventos[anio.eventos.length - 1]?._id, input.tipo);
   return aDto(anio);
 }
 
@@ -665,6 +673,7 @@ export async function actualizarEvento(
   await anio.save();
 
   await registrarCambioCalendario(anio, `evento "${input.nombre}" (${input.tipo}) modificado.`, ctx);
+  await avisarFechasDeRecuperacion(anio._id, evento._id, input.tipo);
   return aDto(anio);
 }
 

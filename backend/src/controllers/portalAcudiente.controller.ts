@@ -24,6 +24,11 @@ export const notas = catchAsync<HijoParams, unknown, unknown, ParsedQs & { perio
   res.status(200).json({ success: true, data });
 });
 
+export const notasDelAnio = catchAsync<HijoParams, unknown, unknown, ParsedQs & { academic_year_id?: string }>(async (req, res) => {
+  const data = await portal.notasDelAnioDelHijo(req.user!, req.params.studentId, req.query.academic_year_id);
+  res.status(200).json({ success: true, data });
+});
+
 export const inasistencias = catchAsync<HijoParams, unknown, unknown, ParsedQs & { periodo_numero?: string; academic_year_id?: string }>(async (req, res) => {
   const periodo = req.query.periodo_numero ? Number(req.query.periodo_numero) : undefined;
   const data = await portal.inasistenciasDelHijo(req.user!, req.params.studentId, periodo, req.query.academic_year_id);

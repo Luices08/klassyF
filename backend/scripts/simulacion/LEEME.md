@@ -103,3 +103,13 @@ Además, `ratio_inasistencias` (fallas sin justificar ÷ registros de clase de M
 **Lo que no se exporta:** `sim_perfiles` (la verdad oculta) no se exporta: es para evaluar, no para entrenar.
 
 **Cuidado al interpretar:** las notas simuladas salen de habilidades ocultas, así que el promedio solo ya separa casi perfecto a quien pierde el año (AUC ≈ 0.97 desde el periodo 1). Sirve para probar que el código funciona, no para medir la calidad en un colegio real.
+
+## Modelo de demostración del módulo predictivo
+
+El módulo predictivo (`src/modulos/predictivo/`) lo entrena el ADMIN desde su pantalla con los años cerrados del propio colegio. Mientras un colegio no tenga un modelo propio se usa uno **de demostración** entrenado con esta simulación:
+
+```
+npm run predictivo:modelo-demo
+```
+
+Solo lee `klassy_sim` (se niega con una base cuyo nombre no contenga `sim`), arma las filas con el mismo código del entrenamiento del ADMIN (una por estudiante × asignatura × corte, etiqueta = perdió la asignatura antes de la recuperación final), entrena, prueba con el último año cerrado y, si pasa la prueba, reescribe `src/modulos/predictivo/modeloDemostracion.ts`. Se corre de nuevo cuando cambien las entradas del modelo (`VERSION_ENTRADAS`).

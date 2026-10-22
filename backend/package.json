@@ -12,6 +12,7 @@
     "seed:subjects": "tsx scripts/seedSubjects.ts",
     "sim": "tsx scripts/simulacion/orquestador.ts",
     "sim:exportar": "tsx scripts/simulacion/exportar.ts",
+    "predictivo:modelo-demo": "tsx scripts/predictivo/generarModeloDemostracion.ts",
     "migrate:roles-multiples": "tsx scripts/migrateRolesMultiples.ts",
     "notificar:diario": "tsx scripts/notificarDiario.ts",
     "storage:purge-periodo": "tsx scripts/purgarAlmacenamientoPeriodo.ts",
@@ -38,6 +39,7 @@
   "dependencies": {
     "@anthropic-ai/sdk": "^0.133.0",
     "bcryptjs": "^2.4.3",
+    "brain.js": "2.0.0-beta.24",
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
     "exceljs": "^4.4.0",

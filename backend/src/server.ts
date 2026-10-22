@@ -1,6 +1,7 @@
 import app from './app';
 import { connectDB } from './config/db';
 import { env } from './config/env';
+import { iniciarColaEntrenamiento } from './modulos/predictivo/services/modelos.service';
 import { iniciarColaCorreo } from './services/colaCorreo.service';
 import { iniciarPlanificadorNotificaciones } from './services/planificadorNotificaciones.service';
 import { iniciarPlanificadorNoticias } from './services/planificadorNoticias.service';
@@ -15,6 +16,7 @@ async function start(): Promise<void> {
   iniciarPlanificadorNotificaciones();
   iniciarPlanificadorNoticias();
   iniciarColaCorreo();
+  iniciarColaEntrenamiento();
 
   const shutdown = (signal: string): void => {
     console.log(`[server] ${signal} recibido, cerrando servidor...`);

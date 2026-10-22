@@ -33,6 +33,7 @@ import notificacionRoutes from './notificacion.routes';
 import observacionRoutes from './observacion.routes';
 import periodLockRoutes from './periodLock.routes';
 import portalAcudienteRoutes from './portalAcudiente.routes';
+import predictivoRoutes from '../modulos/predictivo/predictivo.routes';
 import planAreaRoutes from './planArea.routes';
 import planAulaRoutes from './planAula.routes';
 import publicRoutes from './public.routes';
@@ -161,5 +162,8 @@ router.use('/comision', comisionRoutes);
 
 // M27: Portal del acudiente — lo de cada hijo (notas, inasistencias, convivencia), sus documentos de matrícula y certificados de autoservicio
 router.use('/portal', portalAcudienteRoutes);
+
+// Módulo predictivo escolar (src/modulos/predictivo): riesgo por asignatura, FODA y entrenamiento de la IA por el ADMIN
+router.use('/predictivo', predictivoRoutes);
 
 export default router;

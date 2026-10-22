@@ -17,18 +17,21 @@ import { NIVELES_SIN_REPROBACION } from '../../src/constants/promocion';
 import {
   aCsv,
   aEjemplosBrain,
+  AsistenciaDePeriodo,
   COLUMNAS_ENTRADA,
   cortesPosibles,
-  ENTRADAS_NO_DISPONIBLES,
   entradasAlCorte,
   EntregaDeActividad,
   EscalaNotas,
   etiquetaDeResultado,
+  FaltaDeConvivencia,
   FilaExportada,
   MIN_NOTAS_PARA_PREDECIR,
   NotaCerrada,
   partirPorAnio,
+  PUNTOS_ALERTA,
   resumirFilas,
+  TOPE_ALERTAS_CONVIVENCIA,
 } from './logica/exportacion';
 
 function opcion(nombre: string): string | undefined {
@@ -58,7 +61,7 @@ interface Exclusiones {
 
 async function filasDelAnio(db: Db, anio: Record<string, any>, excluidos: Exclusiones): Promise<FilaExportada[]> {
   const anioId = anio._id;
-  const periodos: Array<{ numero: number; estado: string }> = anio.periodos ?? [];
+  const periodos: Array<{ numero: number; estado: string; fecha_inicio: Date; fecha_fin: Date }> = anio.periodos ?? [];
   const cerrados = periodos.filter((p) => p.estado === 'CERRADO').map((p) => p.numero);
   const cortes = cortesPosibles(cerrados, periodos.length);
   if (cortes.length === 0) return [];
@@ -96,6 +99,46 @@ async function filasDelAnio(db: Db, anio: Record<string, any>, excluidos: Exclus
     .toArray();
   const entregasPorEstudiante = agrupar(entregas, (s) => id(s.student_id));
 
+  // Asistencia: registros y fallas sin justificar por estudiante y periodo. El estado decide por sus banderas, nunca por el nombre;
+  // una falla con justificación aprobada (M13) tampoco cuenta.
+  const estados = await db.collection('attendancestates').find({}, { projection: { cuenta_como_falla: 1, es_justificada: 1 } }).toArray();
+  const esFallaInjustificada = new Set(estados.filter((e) => e.cuenta_como_falla && !e.es_justificada).map((e) => id(e._id)));
+  const justificados = new Set(
+    (await db.collection('attendancejustifications').find({ estado: 'APROBADA' }, { projection: { registro_id: 1 } }).toArray()).map((j) => id(j.registro_id))
+  );
+  const asistenciaPorEstudiante = new Map<string, Map<number, AsistenciaDePeriodo>>();
+  const cursor = db
+    .collection('attendances')
+    .aggregate([{ $match: { academic_year_id: anioId } }, { $unwind: '$registros' }, { $project: { periodo: '$periodo_numero', r: '$registros' } }]);
+  for await (const fila of cursor) {
+    const estudiante = id(fila.r.student_id);
+    const porPeriodo = asistenciaPorEstudiante.get(estudiante) ?? new Map<number, AsistenciaDePeriodo>();
+    const periodo = Number(fila.periodo);
+    const actual = porPeriodo.get(periodo) ?? { periodo, registros: 0, fallas_injustificadas: 0 };
+    actual.registros += 1;
+    if (esFallaInjustificada.has(id(fila.r.state_id)) && !justificados.has(id(fila.r._id))) actual.fallas_injustificadas += 1;
+    porPeriodo.set(periodo, actual);
+    asistenciaPorEstudiante.set(estudiante, porPeriodo);
+  }
+
+  // Faltas del manual: el antecedente solo queda en el Observador del presunto responsable; las anuladas no cuentan.
+  const periodoDeFecha = (fecha: Date): number | null => {
+    const p = periodos.find((x) => fecha >= new Date(x.fecha_inicio) && fecha <= new Date(x.fecha_fin));
+    return p ? p.numero : null;
+  };
+  const faltas = await db
+    .collection('observacions')
+    .find({ academic_year_id: anioId, clase: 'FALTA', estado: { $ne: 'ANULADA' } }, { projection: { student_id: 1, fecha_hecho: 1, 'falta.gravedad': 1 } })
+    .toArray();
+  const faltasPorEstudiante = new Map<string, FaltaDeConvivencia[]>();
+  for (const f of faltas) {
+    const periodo = periodoDeFecha(new Date(f.fecha_hecho));
+    if (periodo === null) continue;
+    const lista = faltasPorEstudiante.get(id(f.student_id)) ?? [];
+    lista.push({ periodo, gravedad: f.falta.gravedad });
+    faltasPorEstudiante.set(id(f.student_id), lista);
+  }
+
   const abierto = anio.estado !== 'CERRADO';
   const filas: FilaExportada[] = [];
   const vistos = new Set<string>();
@@ -132,7 +175,16 @@ async function filasDelAnio(db: Db, anio: Record<string, any>, excluidos: Exclus
     });
 
     for (const corte of cortes) {
-      const entradas = entradasAlCorte({ corte, totalPeriodos: periodos.length, notas, entregas: entregasDelEstudiante, esRepitente: m.tipo_ingreso === 'REPITENTE', escala });
+      const entradas = entradasAlCorte({
+        corte,
+        totalPeriodos: periodos.length,
+        notas,
+        entregas: entregasDelEstudiante,
+        esRepitente: m.tipo_ingreso === 'REPITENTE',
+        escala,
+        asistencia: [...(asistenciaPorEstudiante.get(estudiante)?.values() ?? [])],
+        faltas: faltasPorEstudiante.get(estudiante) ?? [],
+      });
       if (!entradas) {
         excluidos.sin_notas_suficientes++;
         continue;
@@ -188,8 +240,9 @@ async function main(): Promise<void> {
       advertencia: 'Datos 100% sintéticos: sirven para probar el código del módulo predictivo, no para medir su calidad en un colegio real.',
       etiqueta: 'pierde_anio = 1 si el cierre vigente de M19 quedó NO_PROMOVIDO (después de la recuperación final); 0 si fue promovido.',
       entradas: COLUMNAS_ENTRADA,
-      entradas_no_disponibles: { columnas: ENTRADAS_NO_DISPONIBLES, motivo: 'La simulación aún no genera asistencia (M13) ni faltas de convivencia (M14/M15).' },
-      corte: 'Cada fila usa solo notas cerradas y entregas de los periodos 1..periodo_corte. El último periodo no se usa como corte.',
+      ratio_inasistencias: 'Fallas sin justificar ÷ registros de clase (M13) hasta el corte; sin planillas vale 0.',
+      alertas_convivencia: `Puntos de faltas como presunto responsable hasta el corte (Tipo II = ${PUNTOS_ALERTA.II}, Tipo III = ${PUNTOS_ALERTA.III}; la Tipo I no cuenta) ÷ ${TOPE_ALERTAS_CONVIVENCIA}, con tope 1.`,
+      corte: 'Cada fila usa solo notas cerradas, entregas, asistencia y faltas de los periodos 1..periodo_corte. El último periodo no se usa como corte.',
       minimo_de_notas_por_fila: MIN_NOTAS_PARA_PREDECIR,
       partida_por_anio: { anio_de_prueba: usadoParaPrueba, nota: 'Se parte por año, nunca por fila.' },
       resumen: {

@@ -355,5 +355,25 @@
     "familias_con_hermanos": 0.15,
     "documentos_pendientes": 0.05,
     "correlacion_latentes": 0.5
+  },
+
+  "asistencia": { "proporcion_justificadas": 0.4, "factor_retardo": 0.5, "dias_por_registro": 10 },
+
+  "convivencia": {
+    "tasa": { "I": 1.5, "II": 0.35, "III": 0.12 },
+    "factor_secundaria": 1.4,
+    "factor_primaria_baja": 0.3,
+    "faltas": [
+      { "codigo": "I-01", "gravedad": "I", "descripcion": "Interrumpir reiteradamente el desarrollo de la clase." },
+      { "codigo": "I-02", "gravedad": "I", "descripcion": "Llegar tarde al aula sin justificación después del descanso." },
+      { "codigo": "I-03", "gravedad": "I", "descripcion": "Usar el celular u otros dispositivos en clase sin autorización." },
+      { "codigo": "I-04", "gravedad": "I", "descripcion": "Incumplir el uniforme o la presentación personal acordada." },
+      { "codigo": "I-05", "gravedad": "I", "descripcion": "Dirigirse a un compañero con apodos o palabras ofensivas." },
+      { "codigo": "II-01", "gravedad": "II", "descripcion": "Agresión verbal o intimidación repetida a un compañero (acoso escolar)." },
+      { "codigo": "II-02", "gravedad": "II", "descripcion": "Agresión física sin lesiones que requieran atención médica." },
+      { "codigo": "II-03", "gravedad": "II", "descripcion": "Ciberacoso: publicar o difundir contenido ofensivo sobre un compañero." },
+      { "codigo": "III-01", "gravedad": "III", "descripcion": "Agresión física con lesiones que requieren atención médica." },
+      { "codigo": "III-02", "gravedad": "III", "descripcion": "Porte o consumo de sustancias psicoactivas dentro de la institución." }
+    ]
   }
 }

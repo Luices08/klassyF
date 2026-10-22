@@ -31,6 +31,7 @@ import {
   resumirFilas,
 } from '../scripts/simulacion/logica/exportacion';
 import { festivosColombia, isoDia, pascua, semanaSanta } from '../scripts/simulacion/nucleo/fechas';
+import { ausenciaDelDia, diasDeClase, faltasDelPeriodo, hayRetardo, poisson, tramos } from '../scripts/simulacion/logica/asistencia';
 
 const config = cargarConfiguracion(path.join(__dirname, '../scripts/simulacion/config/colegio-pequeno.json'));
 const grupos = config.grupos.flatMap((g) => g.nomenclaturas.map((clave) => ({ clave, grado: g.grado, sede: g.sede })));
@@ -345,7 +346,7 @@ describe('simulación: exportador de datos', () => {
   });
 
   it('el corte solo usa lo registrado hasta ese periodo (nada del futuro)', () => {
-    const base = { totalPeriodos: 4, notas, entregas, esRepitente: false, escala };
+    const base = { totalPeriodos: 4, notas, entregas, esRepitente: false, escala, asistencia: [], faltas: [] };
     const p1 = entradasAlCorte({ ...base, corte: 1 });
     const p2 = entradasAlCorte({ ...base, corte: 2 });
     expect(p1).toMatchObject({ promedio_academico: 0.5, tareas_no_entregadas: 0.5, asignaturas_perdidas_ratio: 0.3333, periodo_norm: 0.25 });
@@ -356,9 +357,33 @@ describe('simulación: exportador de datos', () => {
   });
 
   it('sin notas suficientes no hay fila, y sin actividades las tareas no entregadas valen 0, no se inventan', () => {
-    const base = { totalPeriodos: 4, entregas: [], esRepitente: true, escala };
+    const base = { totalPeriodos: 4, entregas: [], esRepitente: true, escala, asistencia: [], faltas: [] };
     expect(entradasAlCorte({ ...base, notas: notas.slice(0, 2), corte: 1 })).toBeNull();
     expect(entradasAlCorte({ ...base, notas, corte: 2 })).toMatchObject({ tareas_no_entregadas: 0, es_repitente: 1 });
+  });
+
+  it('la inasistencia y las alertas de convivencia también se cortan, y la Tipo I no es alerta', () => {
+    const base = {
+      totalPeriodos: 4,
+      notas,
+      entregas,
+      esRepitente: false,
+      escala,
+      asistencia: [
+        { periodo: 1, registros: 100, fallas_injustificadas: 5 },
+        { periodo: 2, registros: 100, fallas_injustificadas: 25 },
+      ],
+      faltas: [
+        { periodo: 1, gravedad: 'I' as const },
+        { periodo: 1, gravedad: 'I' as const },
+        { periodo: 1, gravedad: 'II' as const },
+        { periodo: 2, gravedad: 'III' as const },
+        { periodo: 2, gravedad: 'III' as const },
+      ],
+    };
+    expect(entradasAlCorte({ ...base, corte: 1 })).toMatchObject({ ratio_inasistencias: 0.05, alertas_convivencia: 0.25 });
+    expect(entradasAlCorte({ ...base, corte: 2 })).toMatchObject({ ratio_inasistencias: 0.15, alertas_convivencia: 1 });
+    expect(entradasAlCorte({ ...base, asistencia: [], faltas: [], corte: 2 })).toMatchObject({ ratio_inasistencias: 0, alertas_convivencia: 0 });
   });
 
   it('los cortes posibles dejan fuera el último periodo y los que no están cerrados', () => {
@@ -383,7 +408,7 @@ describe('simulación: exportador de datos', () => {
     grado_numero: 6,
     grupo: '6A, "x"',
     periodo_corte: 1,
-    entradas: { promedio_academico: 0.5, tareas_no_entregadas: 0, es_repitente: 0, periodo_norm: 0.25, asignaturas_perdidas_ratio: 0 },
+    entradas: { promedio_academico: 0.5, tareas_no_entregadas: 0, es_repitente: 0, periodo_norm: 0.25, asignaturas_perdidas_ratio: 0, ratio_inasistencias: 0, alertas_convivencia: 0 },
     pierde_anio: pierde,
     resultado_final: pierde === null ? null : pierde === 1 ? 'NO_PROMOVIDO' : 'PROMOVIDO',
   });
@@ -409,5 +434,71 @@ describe('simulación: exportador de datos', () => {
     expect(brain).toHaveLength(1);
     expect(brain[0]).toMatchObject({ output: { pierde_anio: 1 } });
     expect(resumirFilas(filas)).toMatchObject({ filas: 2, estudiantes: 2, positivos: 1, tasa_positivos: 1 });
+  });
+});
+
+describe('simulación: asistencia y convivencia', () => {
+  const parametros = { proporcion_justificadas: 0.4, factor_retardo: 0.5, dias_por_registro: 10 };
+
+  it('la inasistencia sigue a asistencia_base y una parte trae excusa', () => {
+    const conteo = { INJUSTIFICADA: 0, JUSTIFICADA: 0, nada: 0 };
+    for (let i = 0; i < 20000; i += 1) {
+      const r = ausenciaDelDia({ asistencia_base: 0.1 }, parametros, azarPara(3, 'a', i));
+      conteo[r ?? 'nada'] += 1;
+    }
+    const faltas = conteo.INJUSTIFICADA + conteo.JUSTIFICADA;
+    expect(faltas / 20000).toBeGreaterThan(0.09);
+    expect(faltas / 20000).toBeLessThan(0.11);
+    expect(conteo.JUSTIFICADA / faltas).toBeGreaterThan(0.36);
+    expect(conteo.JUSTIFICADA / faltas).toBeLessThan(0.44);
+    expect(ausenciaDelDia({ asistencia_base: 0 }, parametros, azarPara(3, 'b'))).toBeNull();
+  });
+
+  it('el retardo nunca pasa del 30 % aunque la puntualidad sea mala', () => {
+    let tarde = 0;
+    for (let i = 0; i < 10000; i += 1) if (hayRetardo({ puntualidad: 5 }, parametros, azarPara(4, i))) tarde += 1;
+    expect(tarde / 10000).toBeLessThan(0.33);
+    expect(tarde / 10000).toBeGreaterThan(0.27);
+  });
+
+  it('una clase solo toma lista los días que el horario la dicta, y sin horario todos los días', () => {
+    const lunes = new Date(Date.UTC(2026, 1, 2));
+    const semana = [0, 1, 2, 3, 4].map((d) => new Date(lunes.getTime() + d * 86400000));
+    expect(diasDeClase(semana, new Set([1, 3])).map(isoDia)).toEqual(['2026-02-02', '2026-02-04']);
+    expect(diasDeClase(semana, undefined)).toHaveLength(5);
+    expect(diasDeClase(semana, new Set())).toHaveLength(5);
+  });
+
+  it('parte los días en tramos y rechaza un tramo vacío', () => {
+    expect(tramos([1, 2, 3, 4, 5], 2)).toEqual([[1, 2], [3, 4], [5]]);
+    expect(tramos([], 3)).toEqual([]);
+    expect(() => tramos([1], 0)).toThrow();
+  });
+
+  it('poisson da la media pedida y cero con lambda cero', () => {
+    let suma = 0;
+    for (let i = 0; i < 20000; i += 1) suma += poisson(1.5, azarPara(5, i));
+    expect(suma / 20000).toBeGreaterThan(1.45);
+    expect(suma / 20000).toBeLessThan(1.55);
+    expect(poisson(0, azarPara(5, 'x'))).toBe(0);
+  });
+
+  it('las faltas graves crecen más rápido que las leves con el riesgo y casi no existen en primaria baja', () => {
+    const conv = { tasa: { I: 1, II: 0.15, III: 0.06 }, factor_secundaria: 1.4, factor_primaria_baja: 0.3 };
+    const media = (riesgo: number, grado: number) => {
+      const suma = { I: 0, II: 0, III: 0 };
+      for (let i = 0; i < 5000; i += 1) {
+        const f = faltasDelPeriodo({ riesgo_convivencia: riesgo }, grado, conv, azarPara(6, riesgo, grado, i));
+        suma.I += f.I;
+        suma.II += f.II;
+        suma.III += f.III;
+      }
+      return { I: suma.I / 5000, II: suma.II / 5000, III: suma.III / 5000 };
+    };
+    const bajo = media(0.5, 7);
+    const alto = media(2, 7);
+    expect(alto.I / bajo.I).toBeGreaterThan(3); // lineal: ×4
+    expect(alto.II / bajo.II).toBeGreaterThan(10); // cuadrático: ×16
+    expect(media(1, 1).I).toBeLessThan(media(1, 7).I / 3);
   });
 });

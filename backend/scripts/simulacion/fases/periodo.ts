@@ -29,6 +29,7 @@ import {
 import { ContextoFase, coordinacion, despuesDelCorte, Evento, ejecutarEventos, eventosDelAnio, secretaria } from './comun';
 import { radicarPlanesDeAula } from './planeacion';
 import { eventosSaber11, eventosServicioSocial, registrarSalidas } from './vidaEscolar';
+import { ausenciaDe, ClaseConLista, eventosDeAsistencia, eventosDeConvivencia } from './asistenciaConvivencia';
 
 interface AsignacionVista {
   _id: string;
@@ -215,7 +216,9 @@ export async function fasePeriodo(ctx: ContextoFase, anio: number, periodo: numb
               const perfil = latentesDe(clase, s);
               if (!perfil) return [];
               const azar = azarPara(semilla, 'nota', anio, periodo, actividad.id, s);
-              const entrega = decisionDe(clase, actividad.id, p, s, perfil);
+              // Quien falta sin excusa el día de una actividad de clase no la presenta (1.0); con excusa la presenta después.
+              const falto = !p.digital && ausenciaDe(ctx, anio, perfil, s, p.entrega) === 'INJUSTIFICADA';
+              const entrega = falto ? { entrega: false, tarde: false } : decisionDe(clase, actividad.id, p, s, perfil);
               return [{ student_id: s, casilla_id: actividad.id, nota: notaDeActividad(clase.esperado.get(s) ?? 3, perfil, clase.tipoNota, p.tipo, entrega, azar) }];
             });
             if (celdas.length === 0) return;
@@ -237,6 +240,21 @@ export async function fasePeriodo(ctx: ContextoFase, anio: number, periodo: numb
     if (delAnio) perfilPorEstudiante.set(p.student_id, delAnio.latentes as unknown as Latentes);
   }
   const latentesDe = (_clase: Clase, s: string) => perfilPorEstudiante.get(s) ?? null;
+
+  // Asistencia de cada clase y faltas de convivencia del periodo, en la misma fila cronológica que las actividades.
+  const listas: ClaseConLista[] = clases.map((c) => ({
+    asignacionId: c.asignacion._id,
+    groupId: c.asignacion.group_id._id,
+    grupo: c.asignacion.group_id.nomenclatura,
+    subjectId: c.asignacion.subject_id._id,
+    grado: c.grado,
+    docente: c.docente,
+    estudiantes: c.estudiantes,
+  }));
+  const asistencia = { planillas: 0, fallas: 0, justificadas: 0, retardos: 0 };
+  const faltas = { I: 0, II: 0, III: 0, casos: 0 };
+  eventos.push(...(await eventosDeAsistencia(ctx, anio, anioId, listas, lectivos, perfilPorEstudiante, asistencia)));
+  eventos.push(...eventosDeConvivencia(ctx, anio, periodo, listas, lectivos, perfilPorEstudiante, faltas));
   const decisionDe = (_clase: Clase, actividadId: string, p: ActividadPlaneada, s: string, latentes: Latentes) =>
     decidirEntrega(latentes, p.tipo, azarPara(semilla, 'entrega', anio, periodo, actividadId, s));
 
@@ -264,6 +282,9 @@ export async function fasePeriodo(ctx: ContextoFase, anio: number, periodo: numb
   const sinEjecutar = await ejecutarEventos(eventos, eventosEntregas, ctx);
   ctx.log(
     `Periodo ${periodo}: ${contadores.actividades} actividades, ${contadores.entregas} entregas (${contadores.tardias} tarde) y ${contadores.calificaciones} notas de actividades${contadores.omitidas ? `; ${contadores.omitidas} copias omitidas` : ''}.`
+  );
+  ctx.log(
+    `Periodo ${periodo}: asistencia en ${asistencia.planillas} planillas diarias (${asistencia.fallas} fallas, ${asistencia.justificadas} con excusa, ${asistencia.retardos} retardos); faltas I/II/III: ${faltas.I}/${faltas.II}/${faltas.III}, ${faltas.casos} casos abiertos.`
   );
 
   // 2. Cierre: semana de digitación, notas formativas, cierre de planillas, definitivas, recuperaciones y cierre del periodo.

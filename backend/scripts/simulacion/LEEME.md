@@ -84,3 +84,20 @@ primera vez el sistema pide cambiar la contraseña, como a cualquier usuario nue
   `npm run seed`); todo lo demás pasa por la API y queda en la auditoría.
 - `sim_perfiles` guarda la «verdad oculta» de cada estudiante (categoría y variables latentes): sirve para evaluar la IA, nunca para
   entrenarla.
+
+## Exportar los datos para el módulo predictivo
+
+`npm run sim:exportar` (desde `backend/`) lee `klassy_sim` **sin escribir nada** y deja en `exportacion-sim/` (ignorada por git; cambia con `--salida=`) una tabla **estudiante × corte**:
+
+| Archivo | Contenido |
+|---|---|
+| `entrenamiento.csv` / `entrenamiento.brain.json` | Años cerrados con resultado final, salvo el de prueba. El `.brain.json` es `[{ input: {...}, output: { pierde_anio: 0 \| 1 } }]`, el formato de `net.train` de Brain.js |
+| `prueba.csv` / `prueba.brain.json` | El último año con etiquetas (cambia con `--prueba=2025`). **Se parte por año, nunca por fila**: el mismo estudiante en los dos lados haría que el modelo «ya lo conociera» |
+| `anio_abierto.csv` | El año en curso (2026) sin etiqueta: es lo que se predice |
+| `metadatos.json` | Entradas, qué falta, conteos y tasa de positivos por año, y las exclusiones |
+
+**Cada fila es una foto a una fecha.** Con `periodo_corte = k` las entradas usan solo lo cerrado en los periodos 1 a k (notas `CERRADO`/`DEFINITIVO` y entregas de actividades de esos periodos); la etiqueta `pierde_anio` es el cierre vigente de M19 (`NO_PROMOVIDO` = 1; promovido de cualquier forma = 0). El último periodo no se usa como corte. Entradas, todas de 0 a 1: `promedio_academico` (con la escala del año), `tareas_no_entregadas` (sin entrega ÷ actividades con entrega), `es_repitente`, `periodo_norm` y `asignaturas_perdidas_ratio` (notas bajo la aprobatoria ÷ notas). Sin al menos 3 notas cerradas no se genera la fila; Preescolar y retirados quedan fuera.
+
+**Lo que no hay:** `ratio_inasistencias` y `alertas_convivencia` — la simulación aún no genera asistencia (M13) ni faltas (M14/M15) y el exportador no las inventa. `sim_perfiles` (la verdad oculta) no se exporta: es para evaluar, no para entrenar.
+
+**Cuidado al interpretar:** las notas simuladas salen de habilidades ocultas, así que el promedio solo ya separa casi perfecto a quien pierde el año (AUC ≈ 0.97 desde el periodo 1). Sirve para probar que el código funciona, no para medir la calidad en un colegio real.

@@ -19,6 +19,17 @@ import {
 } from '../scripts/simulacion/logica/notas';
 import { despuesDelCorte, ejecutarEventos, Evento } from '../scripts/simulacion/nucleo/eventos';
 import { horaReal } from '../scripts/simulacion/nucleo/reloj';
+import {
+  aCsv,
+  aEjemplosBrain,
+  cortesPosibles,
+  entradasAlCorte,
+  etiquetaDeResultado,
+  FilaExportada,
+  normalizarNota,
+  partirPorAnio,
+  resumirFilas,
+} from '../scripts/simulacion/logica/exportacion';
 import { festivosColombia, isoDia, pascua, semanaSanta } from '../scripts/simulacion/nucleo/fechas';
 
 const config = cargarConfiguracion(path.join(__dirname, '../scripts/simulacion/config/colegio-pequeno.json'));
@@ -305,5 +316,98 @@ describe('simulación: eventos con fecha y corte', () => {
     expect(sinEjecutar).toBe(1);
     expect(despuesDelCorte({ corte }, dia('2026-10-22', '23:59'))).toBe(false);
     expect(despuesDelCorte({ corte }, dia('2026-10-23', '00:00'))).toBe(true);
+  });
+});
+
+describe('simulación: exportador de datos', () => {
+  const escala = { minima: 1, maxima: 5, aprobatoria: 3 };
+  const notas = [
+    { periodo: 1, nota: 4 },
+    { periodo: 1, nota: 2 },
+    { periodo: 1, nota: 3 },
+    { periodo: 2, nota: 1 },
+    { periodo: 2, nota: 1 },
+    { periodo: 2, nota: 1 },
+  ];
+  const entregas = [
+    { periodo: 1, entregada: true },
+    { periodo: 1, entregada: false },
+    { periodo: 2, entregada: false },
+    { periodo: 2, entregada: false },
+  ];
+
+  it('lleva la nota a 0–1 con la escala del año y acota lo que se sale', () => {
+    expect(normalizarNota(1, escala)).toBe(0);
+    expect(normalizarNota(3, escala)).toBe(0.5);
+    expect(normalizarNota(5, escala)).toBe(1);
+    expect(normalizarNota(6, escala)).toBe(1);
+    expect(() => normalizarNota(3, { minima: 3, maxima: 3, aprobatoria: 3 })).toThrow();
+  });
+
+  it('el corte solo usa lo registrado hasta ese periodo (nada del futuro)', () => {
+    const base = { totalPeriodos: 4, notas, entregas, esRepitente: false, escala };
+    const p1 = entradasAlCorte({ ...base, corte: 1 });
+    const p2 = entradasAlCorte({ ...base, corte: 2 });
+    expect(p1).toMatchObject({ promedio_academico: 0.5, tareas_no_entregadas: 0.5, asignaturas_perdidas_ratio: 0.3333, periodo_norm: 0.25 });
+    expect(p2).toMatchObject({ tareas_no_entregadas: 0.75, asignaturas_perdidas_ratio: 0.6667, periodo_norm: 0.5 });
+    // Cambiar una nota del periodo 2 no altera la foto del corte 1.
+    const otras = notas.map((n) => (n.periodo === 2 ? { ...n, nota: 5 } : n));
+    expect(entradasAlCorte({ ...base, notas: otras, corte: 1 })).toEqual(p1);
+  });
+
+  it('sin notas suficientes no hay fila, y sin actividades las tareas no entregadas valen 0, no se inventan', () => {
+    const base = { totalPeriodos: 4, entregas: [], esRepitente: true, escala };
+    expect(entradasAlCorte({ ...base, notas: notas.slice(0, 2), corte: 1 })).toBeNull();
+    expect(entradasAlCorte({ ...base, notas, corte: 2 })).toMatchObject({ tareas_no_entregadas: 0, es_repitente: 1 });
+  });
+
+  it('los cortes posibles dejan fuera el último periodo y los que no están cerrados', () => {
+    expect(cortesPosibles([1, 2, 3, 4], 4)).toEqual([1, 2, 3]);
+    expect(cortesPosibles([1, 2], 4)).toEqual([1, 2]);
+    expect(cortesPosibles([], 4)).toEqual([]);
+  });
+
+  it('la etiqueta solo existe con un resultado final del cierre', () => {
+    expect(etiquetaDeResultado('NO_PROMOVIDO')).toBe(1);
+    expect(etiquetaDeResultado('PROMOVIDO')).toBe(0);
+    expect(etiquetaDeResultado('PROMOVIDO_POR_RECUPERACION')).toBe(0);
+    expect(etiquetaDeResultado('PENDIENTE_RECUPERACION')).toBeNull();
+    expect(etiquetaDeResultado('EN_COMISION')).toBeNull();
+    expect(etiquetaDeResultado(undefined)).toBeNull();
+  });
+
+  const fila = (anio: number, estudiante: string, pierde: 0 | 1 | null): FilaExportada => ({
+    anio,
+    student_id: estudiante,
+    sede_id: 's1',
+    grado_numero: 6,
+    grupo: '6A, "x"',
+    periodo_corte: 1,
+    entradas: { promedio_academico: 0.5, tareas_no_entregadas: 0, es_repitente: 0, periodo_norm: 0.25, asignaturas_perdidas_ratio: 0 },
+    pierde_anio: pierde,
+    resultado_final: pierde === null ? null : pierde === 1 ? 'NO_PROMOVIDO' : 'PROMOVIDO',
+  });
+
+  it('parte por año: el último con etiquetas es la prueba y ningún año cae en los dos lados', () => {
+    const filas = [fila(2024, 'a', 0), fila(2024, 'b', 1), fila(2025, 'a', 0), fila(2026, 'a', null)];
+    const { entrenamiento, prueba, anioPrueba } = partirPorAnio(filas);
+    expect(anioPrueba).toBe(2025);
+    expect(entrenamiento.map((f) => f.anio)).toEqual([2024, 2024]);
+    expect(prueba.map((f) => f.anio)).toEqual([2025]);
+    expect(partirPorAnio(filas, 2024).anioPrueba).toBe(2024);
+    expect(() => partirPorAnio(filas, 2026)).toThrow(/2026/);
+    expect(partirPorAnio([fila(2024, 'a', 0)]).prueba).toEqual([]);
+  });
+
+  it('el CSV escapa comillas y comas, deja vacío lo que no existe, y Brain.js solo recibe filas con etiqueta', () => {
+    const filas = [fila(2024, 'a', 1), fila(2026, 'b', null)];
+    const lineas = aCsv(filas).trim().split('\n');
+    expect(lineas[0]).toContain('periodo_corte');
+    expect(lineas[1]).toContain('"6A, ""x"""');
+    expect(lineas[2]).toMatch(/,,$/);
+    const brain = aEjemplosBrain(filas);
+    expect(brain).toHaveLength(1);
+    expect(brain[0]).toMatchObject({ output: { pierde_anio: 1 } });
+    expect(resumirFilas(filas)).toMatchObject({ filas: 2, estudiantes: 2, positivos: 1, tasa_positivos: 1 });
   });
 });

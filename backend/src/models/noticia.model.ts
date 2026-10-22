@@ -6,14 +6,28 @@ import {
   EstadoNoticia,
   MAX_DESCRIPCION_NOTICIA,
   MAX_LUGAR_NOTICIA,
+  MAX_SUBTITULO_NOTICIA,
   MAX_TITULO_NOTICIA,
   ROLES_DESTINO_NOTICIA,
   RolDestinoNoticia,
+  TAMANO_MOSAICO_POR_DEFECTO,
+  TAMANOS_MOSAICO,
+  TamanoMosaico,
 } from '../constants/noticias';
 
 export interface INoticia {
   titulo: string;
+  /** Bajada o entradilla: resume la noticia antes de entrar al cuerpo. */
+  subtitulo: string;
+  /** El texto sin formato (derivado del cuerpo): es lo que se ve en listados y avisos. */
   descripcion: string;
+  /** El cuerpo con formato (citas, letra capital, imágenes), ya limpio en el servidor. Vacío en las noticias anteriores: ahí manda `descripcion`. */
+  contenido_html: string;
+  /** Qué tan grande se ve en el mosaico. */
+  tamano_mosaico: TamanoMosaico;
+  /** Punto de enfoque de la portada (0 a 100 desde la esquina superior izquierda): cada tarjeta lo usa para no cortar rostros ni lo importante. No recorta el archivo. */
+  enfoque_x: number;
+  enfoque_y: number;
   categoria_id: Types.ObjectId;
   /** Copia del nombre y el tono al publicar: editar o desactivar la categoría después no cambia lo ya publicado. */
   categoria_nombre: string;
@@ -54,7 +68,12 @@ const idsDe = (ref: string) => ({ type: [{ type: Schema.Types.ObjectId, ref }], 
 const noticiaSchema = new Schema<INoticia, Model<INoticia>>(
   {
     titulo: { type: String, required: true, trim: true, maxlength: MAX_TITULO_NOTICIA },
+    subtitulo: { type: String, default: '', trim: true, maxlength: MAX_SUBTITULO_NOTICIA },
     descripcion: { type: String, required: true, trim: true, maxlength: MAX_DESCRIPCION_NOTICIA },
+    contenido_html: { type: String, default: '' },
+    tamano_mosaico: { type: String, enum: TAMANOS_MOSAICO, default: TAMANO_MOSAICO_POR_DEFECTO },
+    enfoque_x: { type: Number, default: 50, min: 0, max: 100 },
+    enfoque_y: { type: Number, default: 50, min: 0, max: 100 },
     categoria_id: { type: Schema.Types.ObjectId, ref: 'CategoriaNoticia', required: true },
     categoria_nombre: { type: String, required: true },
     categoria_tono: { type: String, default: 'blue' },

@@ -42,7 +42,21 @@ export const CATEGORIAS_INICIALES: ReadonlyArray<{ nombre: string; tono: TonoCat
   { nombre: 'Administrativo', tono: 'neutral' },
 ];
 
-/** La imagen de una noticia (afiche, foto del evento): una por noticia, PNG, JPG o WEBP confirmado por la firma de bytes. */
+/**
+ * Tamaño de una noticia en el mosaico (cuadrícula de 4 columnas): Principal 2x2, Destacada 2x1 (horizontal), Estándar 1x2 (vertical) y Breve 1x1. El redactor elige qué tan
+ * importante es la noticia; así las tarjetas del «periódico» no son todas iguales.
+ */
+export const TAMANOS_MOSAICO = ['PRINCIPAL', 'DESTACADA', 'ESTANDAR', 'BREVE'] as const;
+export type TamanoMosaico = (typeof TAMANOS_MOSAICO)[number];
+export const TAMANO_MOSAICO_POR_DEFECTO: TamanoMosaico = 'ESTANDAR';
+
+export const MAX_SUBTITULO_NOTICIA = 200;
+
+/** Cuánto puede pesar el cuerpo con formato (las imágenes del cuerpo viajan dentro del texto, como en las actividades) y la portada como data URI (2 MB de imagen en base64). */
+export const MAX_CARACTERES_CONTENIDO_NOTICIA = 4_500_000;
+export const MAX_CARACTERES_PORTADA = 3_000_000;
+
+/** La imagen de una noticia (afiche, foto del evento): una por noticia, PNG, JPG o WEBP confirmado por la firma de bytes. Toda noticia nueva lleva una. */
 export const MAX_BYTES_IMAGEN_NOTICIA = 2 * 1024 * 1024;
 export const TIPOS_IMAGEN_NOTICIA = ['image/png', 'image/jpeg', 'image/webp'] as const;
 

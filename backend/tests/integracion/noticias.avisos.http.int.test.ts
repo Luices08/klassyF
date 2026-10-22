@@ -13,6 +13,7 @@ import { procesarNoticiasPendientes } from '../../src/services/noticiaAvisos.ser
 import { generateToken } from '../../src/services/token.service';
 import { detenerBaseDeDatos, iniciarBaseDeDatos, limpiarBaseDeDatos } from './baseDeDatos';
 import { armarEscenario, crearUsuario, Escenario } from './escenario';
+import { PORTADA_PNG } from './portadaDePrueba';
 
 type Respuesta = { estado: number; cuerpo: { success?: boolean; data?: any; message?: string } };
 
@@ -64,7 +65,7 @@ describe('Noticias: avisos, programación e imagen (capa HTTP)', () => {
   };
 
   const publicar = (usuario: UserDocument, extra: Record<string, unknown> = {}) =>
-    pedir('POST', '', usuario, { titulo: 'Feria de ciencias', descripcion: 'Proyectos de todos los grados en el coliseo.', categoria_id: categoria, ...extra });
+    pedir('POST', '', usuario, { titulo: 'Feria de ciencias', descripcion: 'Proyectos de todos los grados en el coliseo.', categoria_id: categoria, portada: PORTADA_PNG, ...extra });
 
   const subir = async (id: string, usuario: UserDocument, archivo: Buffer, tipo = 'image/png', nombre = 'afiche.png'): Promise<Respuesta> => {
     const formulario = new FormData();
@@ -233,16 +234,16 @@ describe('Noticias: avisos, programación e imagen (capa HTTP)', () => {
       expect((await subir(id, e.admin, png(), 'application/pdf', 'afiche.pdf')).estado).toBe(400);
       const grande = await subir(id, e.admin, png(3 * 1024 * 1024));
       expect(grande.estado).toBe(400);
-      expect(((await pedir('GET', '/gestion', e.admin)).cuerpo.data as Array<{ imagen_version: number | null }>)[0]?.imagen_version).toBeNull();
+      // La portada con la que se publicó sigue intacta.
+      expect(((await pedir('GET', '/gestion', e.admin)).cuerpo.data as Array<{ imagen_version: number | null }>)[0]?.imagen_version).toEqual(expect.any(Number));
     });
 
-    it('se puede quitar; quitada ya no se sirve', async () => {
+    it('toda noticia lleva portada: no se quita, se reemplaza', async () => {
       const id = (await publicar(e.admin)).cuerpo.data.id as string;
-      await subir(id, e.admin, png());
       const r = await pedir('DELETE', `/${id}/imagen`, e.admin);
-      expect(r.estado).toBe(200);
-      expect(r.cuerpo.data.imagen_version).toBeNull();
-      expect((await imagen(id, e.admin)).status).toBe(404);
+      expect(r.estado).toBe(409);
+      expect(r.cuerpo.message).toMatch(/portada/i);
+      expect((await imagen(id, e.admin)).status).toBe(200);
     });
 
     it('un docente habilitado cambia la imagen de lo suyo; al revocarle el permiso ya no, ni la de otro, ni una archivada', async () => {
@@ -261,12 +262,12 @@ describe('Noticias: avisos, programación e imagen (capa HTTP)', () => {
       expect((await subir(deAdmin, e.admin, png())).estado).toBe(409);
     });
 
-    it('subir, reemplazar y quitar quedan en la auditoría', async () => {
+    it('reemplazar la portada queda en la auditoría; un intento de quitarla no cambia nada', async () => {
       const id = (await publicar(e.admin)).cuerpo.data.id as string;
       await subir(id, e.admin, png());
       await pedir('DELETE', `/${id}/imagen`, e.admin);
       expect(await AuditLog.countDocuments({ accion: 'NOTICIA_IMAGEN_ACTUALIZADA' })).toBe(1);
-      expect(await AuditLog.countDocuments({ accion: 'NOTICIA_IMAGEN_QUITADA' })).toBe(1);
+      expect(await AuditLog.countDocuments({ accion: 'NOTICIA_IMAGEN_QUITADA' })).toBe(0);
     });
   });
 });

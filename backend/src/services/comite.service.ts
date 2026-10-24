@@ -1,5 +1,5 @@
 import { Types } from 'mongoose';
-import { TipoSesionComite } from '../constants/convivencia';
+import { MedioCitacion, TipoSesionComite } from '../constants/convivencia';
 import { EstadoUsuario } from '../constants/enums';
 import { ROLES } from '../constants/roles';
 import AcademicYear from '../models/academicYear.model';
@@ -8,7 +8,7 @@ import Counter from '../models/counter.model';
 import { UserDocument } from '../models/user.model';
 import { User } from '../models/user.model';
 import ApiError from '../utils/ApiError';
-import { calcularQuorum, hashDeActa, quorumDeCaso } from '../utils/comiteConvivencia';
+import { calcularQuorum, hashDeActa, periodicidadDelComite, quorumDeCaso } from '../utils/comiteConvivencia';
 import { ESTADO_ACTIVO } from '../utils/filtroEstado';
 import runTransaction from '../utils/runTransaction';
 import { fechaDeClase, hoyColombia } from './attendance.service';
@@ -36,7 +36,7 @@ async function resolverAnio(anioId?: string) {
 export async function listarMiembros(usuario: UserDocument, anioId?: string, incluirInactivos = false) {
   exigirConvivencia(usuario);
   const anio = await resolverAnio(anioId);
-  const miembros = await MiembroComite.find({ academic_year_id: anio._id, ...(incluirInactivos ? {} : { estado: ESTADO_ACTIVO }) }).sort({ es_presidente: -1, cargo: 1, nombre: 1 });
+  const miembros = await MiembroComite.find({ academic_year_id: anio._id, ...(incluirInactivos ? {} : { estado: ESTADO_ACTIVO }) }).sort({ es_presidente: -1, es_secretario: -1, cargo: 1, nombre: 1 });
   return { anio: { _id: String(anio._id), year: anio.year }, miembros };
 }
 
@@ -46,12 +46,14 @@ export interface DatosMiembro {
   usuario_id?: string | null;
   documento?: string;
   es_presidente?: boolean;
+  es_secretario?: boolean;
 }
 
-async function liberarPresidente(anioId: Types.ObjectId, exceptoId?: Types.ObjectId) {
+/** Solo hay un presidente y un secretario(a) por año: al designar uno nuevo, el anterior queda sin el cargo. */
+async function liberarCargoUnico(campo: 'es_presidente' | 'es_secretario', anioId: Types.ObjectId, exceptoId?: Types.ObjectId) {
   await MiembroComite.updateMany(
-    { academic_year_id: anioId, es_presidente: true, ...(exceptoId ? { _id: { $ne: exceptoId } } : {}) },
-    { $set: { es_presidente: false } }
+    { academic_year_id: anioId, [campo]: true, ...(exceptoId ? { _id: { $ne: exceptoId } } : {}) },
+    { $set: { [campo]: false } }
   );
 }
 
@@ -76,7 +78,8 @@ export async function crearMiembro(input: DatosMiembro, usuario: UserDocument, a
     if ((err as { code?: number }).code === 11000) throw new ApiError(409, 'Ese usuario ya es miembro del comité de este año.');
     throw err;
   }
-  if (miembro.es_presidente) await liberarPresidente(anio._id, miembro._id);
+  if (miembro.es_presidente) await liberarCargoUnico('es_presidente', anio._id, miembro._id);
+  if (miembro.es_secretario) await liberarCargoUnico('es_secretario', anio._id, miembro._id);
   await registrarEvento({ usuario_id: usuario._id, accion: 'MIEMBRO_COMITE_CREADO', entidad: 'MiembroComite', entidad_id: miembro._id, detalle: miembro.cargo, ip });
   return miembro;
 }
@@ -92,7 +95,8 @@ export async function actualizarMiembro(id: string, input: Partial<DatosMiembro>
   const miembro = await cargarMiembro(id);
   miembro.set(await datosDeMiembro({ ...input, usuario_id: input.usuario_id !== undefined ? input.usuario_id : (miembro.usuario_id ? String(miembro.usuario_id) : null) }));
   await miembro.save();
-  if (miembro.es_presidente) await liberarPresidente(miembro.academic_year_id, miembro._id);
+  if (miembro.es_presidente) await liberarCargoUnico('es_presidente', miembro.academic_year_id, miembro._id);
+  if (miembro.es_secretario) await liberarCargoUnico('es_secretario', miembro.academic_year_id, miembro._id);
   await registrarEvento({ usuario_id: usuario._id, accion: 'MIEMBRO_COMITE_ACTUALIZADO', entidad: 'MiembroComite', entidad_id: miembro._id, detalle: Object.keys(input).join(', '), ip });
   return miembro;
 }
@@ -101,7 +105,10 @@ export async function cambiarEstadoMiembro(id: string, estado: EstadoUsuario, us
   exigirConvivencia(usuario);
   const miembro = await cargarMiembro(id);
   miembro.estado = estado;
-  if (estado === 'inactivo') miembro.es_presidente = false;
+  if (estado === 'inactivo') {
+    miembro.es_presidente = false;
+    miembro.es_secretario = false;
+  }
   await miembro.save();
   await registrarEvento({ usuario_id: usuario._id, accion: 'MIEMBRO_COMITE_ACTUALIZADO', entidad: 'MiembroComite', entidad_id: miembro._id, detalle: estado, ip });
   return miembro;
@@ -123,7 +130,14 @@ export async function listarSesiones(usuario: UserDocument, anioId?: string) {
   exigirConvivencia(usuario);
   const anio = await resolverAnio(anioId);
   const sesiones = await SesionComite.find({ academic_year_id: anio._id }).sort({ fecha: -1, createdAt: -1 }).select('-asistentes -casos_tratados -desarrollo -orden_del_dia');
-  return { anio: { _id: String(anio._id), year: anio.year }, sesiones };
+  return { anio: { _id: String(anio._id), year: anio.year }, sesiones, periodicidad: periodicidadDelComite(sesiones, hoyColombia(), anio.fecha_inicio) };
+}
+
+/** La periodicidad del año indicado, para quien necesite solo la alerta (el panel de convivencia). */
+export async function periodicidadDeAnio(anioId: string | Types.ObjectId) {
+  const anio = await AcademicYear.findById(anioId).select('fecha_inicio');
+  const sesiones = await SesionComite.find({ academic_year_id: anioId }).select('tipo fecha estado').lean();
+  return periodicidadDelComite(sesiones, hoyColombia(), anio?.fecha_inicio ?? null);
 }
 
 async function cargarSesion(id: string): Promise<SesionComiteDocument> {
@@ -143,16 +157,22 @@ export interface DatosSesion {
   hora?: string;
   lugar?: string;
   orden_del_dia?: string;
+  convocatoria?: DatosConvocatoria;
+}
+
+export interface DatosConvocatoria {
+  medio: MedioCitacion;
+  nota?: string;
 }
 
 export async function crearSesion(input: DatosSesion, usuario: UserDocument, ip?: string | null) {
   exigirConvivencia(usuario);
   const anio = await AcademicYear.findOne({ estado: 'EN_CURSO' });
   if (!anio) throw new ApiError(409, 'No hay un año lectivo en curso: el comité sesiona en el año vigente.');
+  // La fecha puede ser futura: crear la sesión es la convocatoria. Solo se firma cuando la fecha ya llegó.
   const fecha = fechaDeClase(input.fecha);
-  if (fecha > hoyColombia()) throw new ApiError(400, 'El acta se levanta de una sesión ya realizada: la fecha no puede ser futura.');
 
-  const miembros = await MiembroComite.find({ academic_year_id: anio._id, estado: ESTADO_ACTIVO }).sort({ es_presidente: -1, cargo: 1, nombre: 1 });
+  const miembros = await MiembroComite.find({ academic_year_id: anio._id, estado: ESTADO_ACTIVO }).sort({ es_presidente: -1, es_secretario: -1, cargo: 1, nombre: 1 });
   if (miembros.length === 0) throw new ApiError(409, 'Registra primero los miembros del comité de este año.');
   const configuracion = await obtenerConfiguracion();
 
@@ -164,7 +184,8 @@ export async function crearSesion(input: DatosSesion, usuario: UserDocument, ip?
     hora: input.hora ?? '',
     lugar: input.lugar ?? '',
     orden_del_dia: input.orden_del_dia ?? '',
-    asistentes: miembros.map((m) => ({ miembro_id: m._id, nombre: m.nombre, cargo: m.cargo, es_presidente: m.es_presidente, asistio: false })),
+    convocatoria: input.convocatoria ? { medio: input.convocatoria.medio, fecha: new Date(), nota: input.convocatoria.nota ?? '' } : null,
+    asistentes: miembros.map((m) => ({ miembro_id: m._id, nombre: m.nombre, cargo: m.cargo, es_presidente: m.es_presidente, es_secretario: m.es_secretario, asistio: false })),
     quorum: calcularQuorum(miembros.length, 0, configuracion.quorum_porcentaje),
     creado_por: usuario._id,
   });
@@ -179,7 +200,8 @@ export interface ActualizarSesionInput {
   lugar?: string;
   orden_del_dia?: string;
   desarrollo?: string;
-  asistencia?: { miembro_id: string; asistio: boolean }[];
+  convocatoria?: DatosConvocatoria;
+  asistencia?: { miembro_id: string; asistio: boolean; excusa?: string }[];
   casos_tratados?: { caso_id: string; decisiones?: string; recusados_ids?: string[] }[];
 }
 
@@ -194,23 +216,25 @@ export async function actualizarSesion(id: string, input: ActualizarSesionInput,
   const sesion = await cargarSesion(id);
   exigirBorrador(sesion);
 
-  if (input.fecha) {
-    const fecha = fechaDeClase(input.fecha);
-    if (fecha > hoyColombia()) throw new ApiError(400, 'La fecha de la sesión no puede ser futura.');
-    sesion.fecha = fecha;
+  if (input.fecha) sesion.fecha = fechaDeClase(input.fecha);
+  if (input.convocatoria) {
+    sesion.convocatoria = { medio: input.convocatoria.medio, fecha: sesion.convocatoria?.fecha ?? new Date(), nota: input.convocatoria.nota ?? '' };
   }
   for (const campo of ['tipo', 'hora', 'lugar', 'orden_del_dia', 'desarrollo'] as const) {
     if (input[campo] !== undefined) sesion.set(campo, input[campo]);
   }
 
   if (input.asistencia) {
-    const asistio = new Map(input.asistencia.map((a) => [a.miembro_id, a.asistio]));
-    for (const id of asistio.keys()) {
+    const marcas = new Map(input.asistencia.map((a) => [a.miembro_id, a]));
+    for (const id of marcas.keys()) {
       if (!sesion.asistentes.some((a) => String(a.miembro_id) === id)) throw new ApiError(400, 'Alguien de la asistencia no es miembro del comité en esta sesión.');
     }
     sesion.asistentes.forEach((a) => {
-      const marca = asistio.get(String(a.miembro_id));
-      if (marca !== undefined) a.asistio = marca;
+      const marca = marcas.get(String(a.miembro_id));
+      if (!marca) return;
+      a.asistio = marca.asistio;
+      // La excusa solo tiene sentido en quien no asistió.
+      a.excusa = marca.asistio ? '' : (marca.excusa ?? '').trim();
     });
   }
 
@@ -230,19 +254,34 @@ export async function actualizarSesion(id: string, input: ActualizarSesionInput,
       const miembrosImpedidos = await MiembroComite.find({ _id: { $in: sesion.asistentes.map((a) => a.miembro_id) }, usuario_id: { $in: [...impedidos] } }).select('_id');
       miembrosImpedidos.forEach((m) => recusados.add(String(m._id)));
 
-      tratados.push({ caso_id: caso._id, codigo: caso.codigo, decisiones: (pedido.decisiones ?? '').trim(), recusados_ids: [...recusados].map((r) => new Types.ObjectId(r)) });
+      tratados.push({ caso_id: caso._id, codigo: caso.codigo, decisiones: (pedido.decisiones ?? '').trim(), recusados_ids: [...recusados].map((r) => new Types.ObjectId(r)), quorum: null });
     }
     sesion.set('casos_tratados', tratados);
   }
 
   const configuracion = await obtenerConfiguracion();
   sesion.quorum = calcularQuorum(sesion.asistentes.length, sesion.asistentes.filter((a) => a.asistio).length, configuracion.quorum_porcentaje);
+  recalcularQuorumDeCasos(sesion, configuracion.quorum_porcentaje);
   await sesion.save();
   await registrarEvento({ usuario_id: usuario._id, accion: 'SESION_COMITE_ACTUALIZADA', entidad: 'SesionComite', entidad_id: sesion._id, ip });
   return sesion;
 }
 
-/** El contenido que se sella con la firma: todo lo que el acta dice, sin los campos de control. */
+/**
+ * Quórum para deliberar cada caso sin los recusados. Si no se alcanza no se bloquea la firma: lo que el comité haya decidido queda en el acta con esa advertencia (la
+ * norma no le quita competencia al comité por un apartado, pero el acta debe reflejar quién deliberó).
+ */
+function recalcularQuorumDeCasos(sesion: SesionComiteDocument, porcentaje: number) {
+  const asistentes = sesion.asistentes.map((a) => ({ miembro_id: String(a.miembro_id), asistio: a.asistio }));
+  for (const tratado of sesion.casos_tratados) {
+    tratado.quorum = quorumDeCaso(asistentes, tratado.recusados_ids.map(String), porcentaje);
+  }
+}
+
+/**
+ * El contenido que se sella con la firma: todo lo que el acta dice, sin los campos de control. Lo que se agregó después de las primeras actas (convocatoria, secretario,
+ * excusas, quórum por caso) entra **solo cuando existe**, para que la huella de un acta firmada antes siga coincidiendo al verificarla.
+ */
 function contenidoFirmable(sesion: SesionComiteDocument, codigo: string) {
   return {
     codigo,
@@ -252,9 +291,22 @@ function contenidoFirmable(sesion: SesionComiteDocument, codigo: string) {
     hora: sesion.hora,
     lugar: sesion.lugar,
     orden_del_dia: sesion.orden_del_dia,
+    ...(sesion.convocatoria ? { convocatoria: { medio: sesion.convocatoria.medio, fecha: sesion.convocatoria.fecha, nota: sesion.convocatoria.nota } } : {}),
     desarrollo: sesion.desarrollo,
-    asistentes: sesion.asistentes.map((a) => ({ miembro_id: String(a.miembro_id), nombre: a.nombre, cargo: a.cargo, asistio: a.asistio })),
-    casos_tratados: sesion.casos_tratados.map((c) => ({ codigo: c.codigo, decisiones: c.decisiones, recusados_ids: c.recusados_ids.map(String) })),
+    asistentes: sesion.asistentes.map((a) => ({
+      miembro_id: String(a.miembro_id),
+      nombre: a.nombre,
+      cargo: a.cargo,
+      asistio: a.asistio,
+      ...(a.es_secretario ? { es_secretario: true } : {}),
+      ...(a.excusa ? { excusa: a.excusa } : {}),
+    })),
+    casos_tratados: sesion.casos_tratados.map((c) => ({
+      codigo: c.codigo,
+      decisiones: c.decisiones,
+      recusados_ids: c.recusados_ids.map(String),
+      ...(c.quorum ? { quorum: { total_miembros: c.quorum.total_miembros, presentes: c.quorum.presentes, porcentaje_requerido: c.quorum.porcentaje_requerido, alcanzado: c.quorum.alcanzado } } : {}),
+    })),
   };
 }
 
@@ -263,18 +315,15 @@ export async function firmarSesion(id: string, usuario: UserDocument, ip?: strin
   const sesion = await cargarSesion(id);
   exigirBorrador(sesion);
 
+  if (sesion.fecha > hoyColombia()) throw new ApiError(409, 'La sesión aún no se realiza: el acta se firma desde el día de la sesión.');
+  if (!sesion.convocatoria?.medio) throw new ApiError(409, 'Registra cómo se convocó a los miembros (medio de citación) antes de firmar el acta.');
+
   const configuracion = await obtenerConfiguracion();
   const quorum = calcularQuorum(sesion.asistentes.length, sesion.asistentes.filter((a) => a.asistio).length, configuracion.quorum_porcentaje);
   if (!quorum.alcanzado) throw new ApiError(409, `No hay quórum: asistieron ${quorum.presentes} de ${quorum.total_miembros} miembros.`);
   if (sesion.desarrollo.trim().length < 10) throw new ApiError(409, 'Describe el desarrollo de la sesión antes de firmar el acta.');
 
-  const asistentes = sesion.asistentes.map((a) => ({ miembro_id: String(a.miembro_id), asistio: a.asistio }));
-  for (const tratado of sesion.casos_tratados) {
-    const delCaso = quorumDeCaso(asistentes, tratado.recusados_ids.map(String), configuracion.quorum_porcentaje);
-    if (!delCaso.alcanzado) {
-      throw new ApiError(409, `El caso ${tratado.codigo} no tiene quórum para deliberar una vez apartados los recusados.`);
-    }
-  }
+  recalcularQuorumDeCasos(sesion, configuracion.quorum_porcentaje);
 
   await runTransaction(async (session) => {
     // Consecutivo anual sin huecos: nace al firmar, dentro de la misma transacción.

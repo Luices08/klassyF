@@ -103,6 +103,8 @@ export interface CasoDetalle {
   anulacion: ({ motivo: string; fecha: string } & ConAutor) | null;
   /** Estado de las remisiones a orientación del caso; nunca lo que orientación escribió. */
   remisiones_orientacion: RemisionOrientacionResumen[];
+  /** Las actas (no anuladas) donde el Comité de Convivencia trató el caso. */
+  sesiones_comite: { _id: string; codigo: string | null; estado: 'BORRADOR' | 'FIRMADA'; tipo: 'ORDINARIA' | 'EXTRAORDINARIA'; fecha: string }[];
   alertas: AlertaCaso[];
 }
 

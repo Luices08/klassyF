@@ -6,6 +6,7 @@ import { ROLES } from '../constants/roles';
 import AjusteAsignatura from '../models/ajusteAsignatura.model';
 import CasoConvivencia from '../models/casoConvivencia.model';
 import { SesionComite } from '../models/comiteConvivencia.model';
+import { periodicidadDeAnio } from './comite.service';
 import ExpedienteInclusion from '../models/expedienteInclusion.model';
 import Observacion from '../models/observacion.model';
 import RemisionOrientacion from '../models/remisionOrientacion.model';
@@ -56,7 +57,7 @@ export async function obtenerPanelConvivencia(filtros: FiltrosBienestar, usuario
     // Quien se declaró impedido en un caso deja de verlo (RN-15-11), también en los conteos.
     const delUsuario = { 'impedidos.usuario_id': { $ne: usuario._id } };
 
-    const [solicitudes, casos, configuracion, borradores, proximaSesion, faltas, remisiones] = await Promise.all([
+    const [solicitudes, casos, configuracion, borradores, proximaSesion, faltas, remisiones, periodicidad] = await Promise.all([
       SolicitudCaso.find({ estado: 'PENDIENTE', ...porSede }).select('createdAt').lean(),
       CasoConvivencia.find({ estado: { $nin: ESTADOS_CASO_FINALES }, ...delUsuario, ...porSede }).select('codigo estado tipo_situacion remisiones justificacion_sin_remision seguimientos createdAt').lean(),
       configuracionDeConvivencia(),
@@ -64,6 +65,7 @@ export async function obtenerPanelConvivencia(filtros: FiltrosBienestar, usuario
       SesionComite.findOne({ academic_year_id: filtros.academic_year_id, estado: 'BORRADOR', fecha: { $gte: hoy } }).sort({ fecha: 1 }).select('fecha hora lugar tipo').lean(),
       Observacion.find({ clase: 'FALTA', estado: 'ACTIVA', fecha_hecho: { $gte: desde }, ...porSede }).select('falta.gravedad').lean(),
       RemisionOrientacion.find({ estado: { $in: ['PENDIENTE', 'EN_ATENCION'] }, ...porSede }).select('estado').lean(),
+      periodicidadDeAnio(filtros.academic_year_id),
     ]);
 
     const conAlertas = casos
@@ -88,6 +90,9 @@ export async function obtenerPanelConvivencia(filtros: FiltrosBienestar, usuario
       comite: {
         borradores,
         proxima: proximaSesion ? { fecha: proximaSesion.fecha, hora: proximaSesion.hora, lugar: proximaSesion.lugar, tipo: proximaSesion.tipo } : null,
+        // Decreto 1965, art. 23: una sesión ordinaria como mínimo cada dos meses.
+        periodicidad_vencida: periodicidad.vencida,
+        ultima_ordinaria: periodicidad.ultima_ordinaria,
       },
       faltas: { dias: DIAS_DE_FALTAS, total: faltas.length, por_gravedad: contarPorClave(TIPOS_SITUACION, faltas.flatMap((f) => (f.falta?.gravedad ? [f.falta.gravedad] : []))) },
       remisiones_orientacion: {

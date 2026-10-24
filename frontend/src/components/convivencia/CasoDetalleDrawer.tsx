@@ -317,6 +317,18 @@ function Contenido({ caso }: { caso: CasoDetalle }) {
           </Fila>
           {!finalizado && <Boton onAccion={setAccion} modo="orientacion">Remitir a orientación</Boton>}
 
+          <Fila etiqueta="Comité de convivencia">
+            <ul className="space-y-2">
+              {caso.sesiones_comite.map((s) => (
+                <Registro key={s._id} fecha={s.fecha}>
+                  Sesión {s.tipo === 'ORDINARIA' ? 'ordinaria' : 'extraordinaria'}{' '}
+                  {s.estado === 'FIRMADA' ? <Chip tone="green">Acta {s.codigo}</Chip> : <Chip tone="orange">Acta sin firmar</Chip>}
+                </Registro>
+              ))}
+              {caso.sesiones_comite.length === 0 && <li className="text-muted">El comité aún no lo ha tratado en una sesión.</li>}
+            </ul>
+          </Fila>
+
           <Fila etiqueta="Decisión">
             {caso.decision ? (
               <>

@@ -1,4 +1,5 @@
 import { createHash } from 'crypto';
+import { MESES_MAXIMOS_ENTRE_SESIONES_ORDINARIAS } from '../constants/convivencia';
 
 export interface Quorum {
   total_miembros: number;
@@ -25,6 +26,46 @@ export function quorumDeCaso(asistentes: { miembro_id: string; asistio: boolean 
   const aparta = new Set(recusados);
   const quienesDeliberan = asistentes.filter((a) => !aparta.has(a.miembro_id));
   return calcularQuorum(quienesDeliberan.length, quienesDeliberan.filter((a) => a.asistio).length, porcentaje);
+}
+
+export interface SesionParaPeriodicidad {
+  tipo: string;
+  fecha: Date;
+  estado: string;
+}
+
+export interface PeriodicidadComite {
+  /** Fecha de la última sesión ordinaria ya realizada (o que ya llegó su fecha), sin contar las anuladas. */
+  ultima_ordinaria: Date | null;
+  /** La próxima sesión ordinaria ya convocada, si la hay. */
+  proxima_programada: Date | null;
+  /** Fecha desde la cual se incumple el mínimo de la norma (la última sesión, o el inicio del año si no hubo ninguna, más dos meses). */
+  limite: Date | null;
+  vencida: boolean;
+  meses_maximos: number;
+}
+
+const sumarMeses = (fecha: Date, meses: number) => new Date(Date.UTC(fecha.getUTCFullYear(), fecha.getUTCMonth() + meses, fecha.getUTCDate()));
+
+/**
+ * Si el comité cumple la periodicidad mínima de la norma (una sesión ordinaria cada dos meses, Decreto 1965 art. 23). Cuenta desde la última ordinaria o, si aún no hubo
+ * ninguna, desde el inicio del año lectivo. Una sesión ya convocada para más adelante no «salva» el plazo: se informa como `proxima_programada`.
+ */
+export function periodicidadDelComite(sesiones: readonly SesionParaPeriodicidad[], hoy: Date, inicioAnio: Date | null): PeriodicidadComite {
+  const ordinarias = sesiones.filter((s) => s.tipo === 'ORDINARIA' && s.estado !== 'ANULADA');
+  const realizadas = ordinarias.filter((s) => s.fecha.getTime() <= hoy.getTime()).map((s) => s.fecha.getTime());
+  const futuras = ordinarias.filter((s) => s.fecha.getTime() > hoy.getTime()).map((s) => s.fecha.getTime());
+  const ultima = realizadas.length > 0 ? new Date(Math.max(...realizadas)) : null;
+  const proxima = futuras.length > 0 ? new Date(Math.min(...futuras)) : null;
+  const referencia = ultima ?? inicioAnio;
+  const limite = referencia ? sumarMeses(referencia, MESES_MAXIMOS_ENTRE_SESIONES_ORDINARIAS) : null;
+  return {
+    ultima_ordinaria: ultima,
+    proxima_programada: proxima,
+    limite,
+    vencida: limite !== null && hoy.getTime() > limite.getTime(),
+    meses_maximos: MESES_MAXIMOS_ENTRE_SESIONES_ORDINARIAS,
+  };
 }
 
 /** JSON con las claves ordenadas: el mismo contenido da siempre la misma cadena, sin importar el orden de los campos. */

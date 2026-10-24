@@ -4,6 +4,7 @@ import AuditLog from '../../src/models/auditLog.model';
 import { MiembroComite, SesionComite } from '../../src/models/comiteConvivencia.model';
 import { User } from '../../src/models/user.model';
 import { generarPdfActa } from '../../src/services/actaComitePdf.service';
+import { hashDeActa } from '../../src/utils/comiteConvivencia';
 import * as casos from '../../src/services/caso.service';
 import * as comite from '../../src/services/comite.service';
 import * as catalogo from '../../src/services/convivenciaCatalogo.service';
@@ -43,7 +44,9 @@ describe('M15 comité y actas (con base de datos)', () => {
     casoCodigo = caso.codigo;
   }, 60_000);
 
-  const crear = () => comite.crearSesion({ tipo: 'ORDINARIA', fecha: hoy(), hora: '08:30', lugar: 'Sala de juntas', orden_del_dia: '1. Casos del periodo.' }, e.coordConvivencia);
+  const crear = (fecha = hoy()) =>
+    comite.crearSesion({ tipo: 'ORDINARIA', fecha, hora: '08:30', lugar: 'Sala de juntas', orden_del_dia: '1. Casos del periodo.', convocatoria: { medio: 'CORREO' } }, e.coordConvivencia);
+  const enDias = (dias: number) => new Date(Date.now() + dias * 86_400_000).toISOString().slice(0, 10);
   const asistencia = (quienes: number[]) => miembros.map((m, i) => ({ miembro_id: m, asistio: quienes.includes(i) }));
 
   it('los miembros usan el nombre de su cuenta, hay un solo presidente y un usuario no se repite', async () => {
@@ -127,17 +130,24 @@ describe('M15 comité y actas (con base de datos)', () => {
     expect((await firmar()).codigo).toMatch(/-002$/);
   });
 
-  it('un recusado no cuenta para deliberar el caso aunque asista, y quien se declaró impedido queda recusado solo', async () => {
+  it('un recusado no cuenta para deliberar el caso aunque asista: sin quórum del caso el acta se firma con la advertencia, y quien se declaró impedido queda recusado solo', async () => {
     const sesion = await crear();
     const id = String(sesion._id);
-    // Asisten 3 de 5: hay quórum. Si se recusa a uno de ellos, quedan 2 de 4 deliberantes: no hay quórum para ese caso.
     await comite.actualizarSesion(id, { asistencia: asistencia([0, 2, 3]), desarrollo: 'Se trató el caso.', casos_tratados: [{ caso_id: casoId, decisiones: 'Se cita a los acudientes.' }] }, e.coordConvivencia);
-    await comite.firmarSesion(id, e.admin).then((s) => expect(s.estado).toBe('FIRMADA'));
+    const firmada = await comite.firmarSesion(id, e.admin);
+    expect(firmada.estado).toBe('FIRMADA');
+    expect(firmada.casos_tratados[0]!.quorum).toMatchObject({ alcanzado: true });
 
+    // Asisten 3 de 5: hay quórum de la sesión. Si se recusa a uno de ellos, quedan 2 de 4 deliberantes: el caso no tiene quórum, y eso queda dicho en el acta sin impedir la firma.
     const otra = await crear();
     const otraId = String(otra._id);
-    await comite.actualizarSesion(otraId, { asistencia: asistencia([0, 2, 3]), desarrollo: 'Se trató el caso.', casos_tratados: [{ caso_id: casoId, decisiones: 'Decisión.', recusados_ids: [miembros[2]!] }] }, e.coordConvivencia);
-    await expect(comite.firmarSesion(otraId, e.admin)).rejects.toMatchObject({ statusCode: 409, message: expect.stringContaining(casoCodigo) });
+    const borrador = await comite.actualizarSesion(otraId, { asistencia: asistencia([0, 2, 3]), desarrollo: 'Se trató el caso.', casos_tratados: [{ caso_id: casoId, decisiones: 'Decisión.', recusados_ids: [miembros[2]!] }] }, e.coordConvivencia);
+    expect(borrador.casos_tratados[0]!.quorum).toMatchObject({ alcanzado: false, presentes: 2 });
+    const conAdvertencia = await comite.firmarSesion(otraId, e.admin);
+    expect(conAdvertencia.estado).toBe('FIRMADA');
+    expect(conAdvertencia.casos_tratados[0]!.quorum).toMatchObject({ alcanzado: false });
+    expect(casoCodigo).toBeTruthy();
+    expect(await comite.verificarIntegridad(otraId, e.admin)).toMatchObject({ integra: true });
 
     // El coordinador de convivencia se declara impedido en el caso: queda recusado de la deliberación sin que nadie lo marque.
     await casos.declararImpedimento(casoId, { motivo: 'Es familiar de un involucrado.' }, e.coordConvivencia);
@@ -164,6 +174,110 @@ describe('M15 comité y actas (con base de datos)', () => {
     expect((await generarPdfActa(id, e.admin)).nombreArchivo).toMatch(/^AC-\d{4}-001\.pdf$/);
     await expect(generarPdfActa(id, e.docenteDeClase)).rejects.toMatchObject({ statusCode: 403 });
     expect(await AuditLog.countDocuments({ accion: 'ACTA_COMITE_PDF_GENERADO' })).toBe(2);
+  });
+
+  describe('convocatoria, excusas, secretario y periodicidad (Decreto 1965, arts. 23 a 25)', () => {
+    it('la sesión puede convocarse para una fecha futura, pero no se firma antes de que llegue', async () => {
+      const sesion = await crear(enDias(10));
+      const id = String(sesion._id);
+      expect(sesion.convocatoria).toMatchObject({ medio: 'CORREO' });
+      await comite.actualizarSesion(id, { asistencia: asistencia([0, 1, 2]), desarrollo: 'Se revisaron los casos.' }, e.coordConvivencia);
+      await expect(comite.firmarSesion(id, e.admin)).rejects.toMatchObject({ statusCode: 409, message: expect.stringContaining('aún no se realiza') });
+
+      await comite.actualizarSesion(id, { fecha: hoy() }, e.coordConvivencia);
+      expect((await comite.firmarSesion(id, e.admin)).estado).toBe('FIRMADA');
+    });
+
+    it('el acta no se firma sin registrar el medio de citación', async () => {
+      const sesion = await comite.crearSesion({ tipo: 'ORDINARIA', fecha: hoy(), orden_del_dia: 'Casos.' }, e.coordConvivencia);
+      const id = String(sesion._id);
+      await comite.actualizarSesion(id, { asistencia: asistencia([0, 1, 2]), desarrollo: 'Se revisaron los casos.' }, e.coordConvivencia);
+      await expect(comite.firmarSesion(id, e.admin)).rejects.toMatchObject({ statusCode: 409, message: expect.stringContaining('medio de citación') });
+
+      await comite.actualizarSesion(id, { convocatoria: { medio: 'LLAMADA', nota: 'Llamada a cada miembro.' } }, e.coordConvivencia);
+      expect((await comite.firmarSesion(id, e.admin)).convocatoria).toMatchObject({ medio: 'LLAMADA', nota: 'Llamada a cada miembro.' });
+    });
+
+    it('la excusa solo se guarda de quien no asistió, y el secretario es uno solo por año', async () => {
+      const sesion = await crear();
+      const id = String(sesion._id);
+      const actualizada = await comite.actualizarSesion(
+        id,
+        { asistencia: [{ miembro_id: miembros[0]!, asistio: true, excusa: 'No aplica' }, { miembro_id: miembros[3]!, asistio: false, excusa: 'Cita médica' }] },
+        e.coordConvivencia
+      );
+      const por = (n: number) => actualizada.asistentes.find((a) => String(a.miembro_id) === miembros[n])!;
+      expect(por(0).excusa).toBe('');
+      expect(por(3).excusa).toBe('Cita médica');
+
+      await comite.actualizarMiembro(miembros[2]!, { es_secretario: true }, e.admin);
+      await comite.actualizarMiembro(miembros[3]!, { es_secretario: true }, e.admin);
+      expect(await MiembroComite.countDocuments({ es_secretario: true })).toBe(1);
+      expect((await MiembroComite.findById(miembros[3]))!.es_secretario).toBe(true);
+      const nueva = await crear();
+      expect(nueva.asistentes.filter((a) => a.es_secretario)).toHaveLength(1);
+    });
+
+    it('la convocatoria entra a la huella: quitarla directamente en la base se detecta', async () => {
+      const sesion = await crear();
+      const id = String(sesion._id);
+      await comite.actualizarSesion(id, { asistencia: asistencia([0, 1, 2]), desarrollo: 'Se revisaron los casos.' }, e.coordConvivencia);
+      await comite.firmarSesion(id, e.admin);
+      await SesionComite.collection.updateOne({ _id: new Types.ObjectId(id) }, { $unset: { convocatoria: '' } });
+      expect(await comite.verificarIntegridad(id, e.admin)).toMatchObject({ integra: false });
+    });
+
+    it('un acta firmada con el formato anterior (sin convocatoria, excusas ni quórum por caso) sigue verificándose íntegra', async () => {
+      const sesion = await crear();
+      const id = String(sesion._id);
+      await comite.actualizarSesion(id, { asistencia: asistencia([0, 1, 2]), desarrollo: 'Se revisaron los casos.' }, e.coordConvivencia);
+      await comite.firmarSesion(id, e.admin);
+
+      // Se reconstruye un acta como la dejaba la versión anterior: sin los campos nuevos y sellada con el contenido de entonces.
+      const cruda = (await SesionComite.collection.findOne({ _id: new Types.ObjectId(id) }))!;
+      const formatoAnterior = {
+        codigo: cruda.codigo,
+        anio: cruda.anio,
+        tipo: cruda.tipo,
+        fecha: cruda.fecha,
+        hora: cruda.hora,
+        lugar: cruda.lugar,
+        orden_del_dia: cruda.orden_del_dia,
+        desarrollo: cruda.desarrollo,
+        asistentes: cruda.asistentes.map((a: { miembro_id: Types.ObjectId; nombre: string; cargo: string; asistio: boolean }) => ({ miembro_id: String(a.miembro_id), nombre: a.nombre, cargo: a.cargo, asistio: a.asistio })),
+        casos_tratados: [],
+      };
+      await SesionComite.collection.updateOne(
+        { _id: new Types.ObjectId(id) },
+        { $unset: { convocatoria: '', 'asistentes.$[].es_secretario': '', 'asistentes.$[].excusa': '' }, $set: { 'firma.hash': hashDeActa(formatoAnterior) } }
+      );
+      expect(await comite.verificarIntegridad(id, e.admin)).toMatchObject({ integra: true });
+    });
+
+    it('el caso lista las actas donde el comité lo trató', async () => {
+      const sesion = await crear();
+      const id = String(sesion._id);
+      expect(((await casos.obtenerCaso(casoId, e.coordConvivencia)) as { sesiones_comite: unknown[] }).sesiones_comite).toEqual([]);
+      await comite.actualizarSesion(id, { asistencia: asistencia([0, 1, 2]), desarrollo: 'Se trató el caso.', casos_tratados: [{ caso_id: casoId }] }, e.coordConvivencia);
+      await comite.firmarSesion(id, e.admin);
+      const vista = (await casos.obtenerCaso(casoId, e.coordConvivencia)) as { sesiones_comite: { codigo: string; estado: string }[] };
+      expect(vista.sesiones_comite).toEqual([expect.objectContaining({ estado: 'FIRMADA', codigo: expect.stringMatching(/^AC-\d{4}-001$/) })]);
+    });
+
+    it('la periodicidad se vence a los dos meses de la última sesión ordinaria y una sesión convocada no la salva', async () => {
+      const antigua = await crear();
+      await SesionComite.collection.updateOne({ _id: antigua._id }, { $set: { fecha: new Date(Date.now() - 90 * 86_400_000) } });
+      const vencida = await comite.listarSesiones(e.coordConvivencia);
+      expect(vencida.periodicidad).toMatchObject({ vencida: true, meses_maximos: 2 });
+
+      await crear(enDias(5));
+      const conConvocada = await comite.listarSesiones(e.coordConvivencia);
+      expect(conConvocada.periodicidad.vencida).toBe(true);
+      expect(conConvocada.periodicidad.proxima_programada).not.toBeNull();
+
+      await crear();
+      expect((await comite.listarSesiones(e.coordConvivencia)).periodicidad.vencida).toBe(false);
+    });
   });
 
   it('un miembro que figura en un acta no se elimina, se desactiva; y sin miembros no hay sesión', async () => {

@@ -80,7 +80,7 @@ describe('M30: paneles de convivencia y orientación (capa HTTP)', () => {
       // Un reporte urgente no es una falta registrada: la gravedad la fija el caso que abre coordinación (el conteo de faltas graves por caso es de la Fase 4).
       expect(d.faltas).toMatchObject({ total: 1, por_gravedad: { I: 1, II: 0, III: 0 } });
       expect(d.remisiones_orientacion.pendientes).toBe(1);
-      expect(d.comite).toEqual({ borradores: 0, proxima: null });
+      expect(d.comite).toEqual({ borradores: 0, proxima: null, periodicidad_vencida: expect.any(Boolean), ultima_ordinaria: null });
 
       // La privacidad es parte del contrato: ni un hecho, ni un nombre, ni un documento viajan en este panel.
       const texto = JSON.stringify(cuerpo);

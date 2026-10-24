@@ -210,7 +210,7 @@ export interface PanelConvivencia {
     seguimiento_vencido: number;
     casos: Array<{ _id: string; codigo: string; tipo_situacion: GravedadConvivencia; alertas: string[] }>;
   };
-  comite: { borradores: number; proxima: { fecha: string; hora: string; lugar: string; tipo: string } | null };
+  comite: { borradores: number; proxima: { fecha: string; hora: string; lugar: string; tipo: string } | null; periodicidad_vencida: boolean; ultima_ordinaria: string | null };
   faltas: { dias: number; total: number; por_gravedad: Record<GravedadConvivencia, number> };
   remisiones_orientacion: { pendientes: number; en_atencion: number };
 }

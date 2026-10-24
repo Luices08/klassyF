@@ -137,6 +137,12 @@ export function DashboardConvivenciaPage({ links }: { links: NavItem[] }) {
                   <span className="text-body">Sesiones del comité sin firmar</span>
                   <Chip tone={datos.comite.borradores > 0 ? 'orange' : 'green'}>{datos.comite.borradores}</Chip>
                 </li>
+                {datos.comite.periodicidad_vencida && (
+                  <li className="flex items-center justify-between gap-3">
+                    <span className="text-body">Sin sesión ordinaria en los últimos 2 meses</span>
+                    <Chip tone="red">Vencida</Chip>
+                  </li>
+                )}
                 <li className="flex items-start gap-2 text-body">
                   <CalendarIcon className="mt-0.5 h-4 w-4 shrink-0 text-muted" />
                   {datos.comite.proxima ? (

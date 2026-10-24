@@ -150,7 +150,7 @@ describe('M15 casos de convivencia (con base de datos)', () => {
     await abrir(e.coordConvivencia, 'II', { solicitud_id: pendiente!._id });
     const conCaso = await observaciones.miObservador(e.estudiante);
     expect(conCaso[0]).toMatchObject({ situacion: 'ABIERTO' });
-    expect(JSON.stringify(conCaso)).not.toMatch(/Detalle reservado|3.3|Agrede/);
+    expect(JSON.stringify(conCaso)).not.toMatch(/Detalle reservado|3\.3|Agrede/);
   });
 
   it('una solicitud ajena o ya atendida no se puede convertir otra vez', async () => {

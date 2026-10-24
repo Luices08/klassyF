@@ -3,7 +3,7 @@ import { Alert, errorMessage } from '../ui/Alert';
 import { Chip } from '../ui/Badge';
 import { Button } from '../ui/Button';
 import { Drawer } from '../ui/Drawer';
-import { Input, Textarea } from '../ui/Field';
+import { Input, Select, Textarea } from '../ui/Field';
 import { Spinner } from '../ui/Spinner';
 import { useAuth } from '../../context/AuthContext';
 import { useCasos } from '../../hooks/useCasos';
@@ -17,7 +17,10 @@ import {
   useVerificarIntegridad,
   type SesionDetalle,
 } from '../../hooks/useComite';
+import { MEDIOS_CITACION, NOMBRES_MEDIO, type MedioCitacion } from '../../hooks/useObservaciones';
 import { formatoFechaCalendario, formatoFechaHora } from '../../lib/fechas';
+
+const hoyLocal = () => new Date().toLocaleDateString('en-CA');
 
 interface Props {
   sesionId: string | null;
@@ -62,6 +65,9 @@ function Editor({ sesion, onClose }: { sesion: SesionDetalle; onClose: () => voi
   const [ordenDelDia, setOrdenDelDia] = useState(sesion.orden_del_dia);
   const [asistio, setAsistio] = useState<Record<string, boolean>>(Object.fromEntries(sesion.asistentes.map((a) => [a.miembro_id, a.asistio])));
   const [tratados, setTratados] = useState(sesion.casos_tratados.map((c) => ({ ...c })));
+  const [excusas, setExcusas] = useState<Record<string, string>>(Object.fromEntries(sesion.asistentes.map((a) => [a.miembro_id, a.excusa ?? ''])));
+  const [medio, setMedio] = useState<MedioCitacion>(sesion.convocatoria?.medio ?? 'CORREO');
+  const [notaConvocatoria, setNotaConvocatoria] = useState(sesion.convocatoria?.nota ?? '');
   const [anexo, setAnexo] = useState('');
   const [motivoAnulacion, setMotivoAnulacion] = useState('');
 
@@ -73,12 +79,14 @@ function Editor({ sesion, onClose }: { sesion: SesionDetalle; onClose: () => voi
       id: sesion._id,
       desarrollo,
       orden_del_dia: ordenDelDia,
-      asistencia: sesion.asistentes.map((a) => ({ miembro_id: a.miembro_id, asistio: Boolean(asistio[a.miembro_id]) })),
+      convocatoria: { medio, nota: notaConvocatoria },
+      asistencia: sesion.asistentes.map((a) => ({ miembro_id: a.miembro_id, asistio: Boolean(asistio[a.miembro_id]), excusa: excusas[a.miembro_id] ?? '' })),
       casos_tratados: tratados.map((c) => ({ caso_id: c.caso_id, decisiones: c.decisiones, recusados_ids: c.recusados_ids })),
     });
   };
 
   const presentes = sesion.asistentes.filter((a) => asistio[a.miembro_id]).length;
+  const sesionFutura = sesion.fecha.slice(0, 10) > hoyLocal();
   const alternarRecusado = (casoId: string, miembroId: string) =>
     setTratados((previa) =>
       previa.map((c) =>
@@ -123,14 +131,47 @@ function Editor({ sesion, onClose }: { sesion: SesionDetalle; onClose: () => voi
         </Alert>
       )}
 
+      {editable && sesionFutura && (
+        <Alert tone="info">Sesión convocada para el {formatoFechaCalendario(sesion.fecha)}. La asistencia, el desarrollo y la firma se registran desde ese día.</Alert>
+      )}
+
       <Textarea label="Orden del día" rows={3} maxLength={3000} value={ordenDelDia} onChange={(e) => setOrdenDelDia(e.target.value)} disabled={!editable} />
+
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <Select label="Cómo se citó a los miembros" value={medio} onChange={(e) => setMedio(e.target.value as MedioCitacion)} disabled={!editable}>
+          {MEDIOS_CITACION.map((m) => (
+            <option key={m} value={m}>
+              {NOMBRES_MEDIO[m]}
+            </option>
+          ))}
+        </Select>
+        <Input label="Nota de la citación (opcional)" value={notaConvocatoria} onChange={(e) => setNotaConvocatoria(e.target.value)} maxLength={500} disabled={!editable} />
+      </div>
 
       <fieldset className="space-y-1.5">
         <legend className="mb-1 text-label text-body">Asistencia</legend>
         {sesion.asistentes.map((a) => (
-          <Casilla key={a.miembro_id} marcado={Boolean(asistio[a.miembro_id])} deshabilitado={!editable} onCambio={() => setAsistio((previa) => ({ ...previa, [a.miembro_id]: !previa[a.miembro_id] }))}>
-            {a.nombre} <span className="text-xs text-muted">· {a.cargo}{a.es_presidente ? ' (preside)' : ''}</span>
-          </Casilla>
+          <div key={a.miembro_id} className="space-y-1">
+            <Casilla marcado={Boolean(asistio[a.miembro_id])} deshabilitado={!editable} onCambio={() => setAsistio((previa) => ({ ...previa, [a.miembro_id]: !previa[a.miembro_id] }))}>
+              {a.nombre}{' '}
+              <span className="text-xs text-muted">
+                · {a.cargo}
+                {a.es_presidente ? ' (preside)' : ''}
+                {a.es_secretario ? ' (secretaría técnica)' : ''}
+              </span>
+            </Casilla>
+            {!asistio[a.miembro_id] && (editable || excusas[a.miembro_id]) && (
+              <Input
+                label={`Excusa de ${a.nombre} (opcional)`}
+                hideLabel
+                placeholder="Excusa presentada, si avisó que no asistía"
+                value={excusas[a.miembro_id] ?? ''}
+                onChange={(e) => setExcusas((previa) => ({ ...previa, [a.miembro_id]: e.target.value }))}
+                maxLength={500}
+                disabled={!editable}
+              />
+            )}
+          </div>
         ))}
       </fieldset>
 
@@ -139,7 +180,10 @@ function Editor({ sesion, onClose }: { sesion: SesionDetalle; onClose: () => voi
         {tratados.map((c) => (
           <div key={c.caso_id} className="space-y-2 rounded-xl border border-border p-3">
             <div className="flex items-center justify-between">
-              <p className="text-label text-ink">{c.codigo}</p>
+              <p className="text-label text-ink">
+                {c.codigo}{' '}
+                {c.quorum && !c.quorum.alcanzado && <Chip tone="red">Sin quórum para deliberar este caso ({c.quorum.presentes} de {c.quorum.total_miembros})</Chip>}
+              </p>
               {editable && (
                 <Button type="button" variant="soft-danger" className="px-3 py-1 text-xs" onClick={() => setTratados((previa) => previa.filter((x) => x.caso_id !== c.caso_id))}>
                   Quitar
@@ -171,7 +215,7 @@ function Editor({ sesion, onClose }: { sesion: SesionDetalle; onClose: () => voi
             onChange={(e) => {
               const caso = casos.data?.data.find((c) => c._id === e.target.value);
               if (caso && !tratados.some((t) => t.caso_id === caso._id)) {
-                setTratados((previa) => [...previa, { caso_id: caso._id, codigo: caso.codigo, decisiones: '', recusados_ids: [] }]);
+                setTratados((previa) => [...previa, { caso_id: caso._id, codigo: caso.codigo, decisiones: '', recusados_ids: [], quorum: null }]);
               }
             }}
           >
@@ -194,6 +238,7 @@ function Editor({ sesion, onClose }: { sesion: SesionDetalle; onClose: () => voi
               <p className="mb-1 text-xs text-muted">Se guarda el borrador y se firma. Al firmar el acta recibe su consecutivo y queda inmutable.</p>
               <Button
                 type="button"
+                disabled={sesionFutura}
                 isLoading={firmar.isPending}
                 onClick={async () => {
                   await guardar();

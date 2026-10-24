@@ -1,5 +1,7 @@
 import { HydratedDocument, Model, Schema, Types, model } from 'mongoose';
 import {
+  MEDIOS_CITACION,
+  MedioCitacion,
   ESTADOS_SESION_COMITE,
   EstadoSesionComite,
   TIPOS_SESION_COMITE,
@@ -18,6 +20,8 @@ export interface IMiembroComite {
   usuario_id: Types.ObjectId | null;
   documento: string;
   es_presidente: boolean;
+  /** Quien levanta el acta y la firma junto con el presidente (Decreto 1965, art. 25 → art. 10): solo uno por año. */
+  es_secretario: boolean;
   estado: EstadoUsuario;
   createdAt: Date;
   updatedAt: Date;
@@ -32,6 +36,7 @@ const miembroSchema = new Schema<IMiembroComite, Model<IMiembroComite>>(
     usuario_id: { type: Schema.Types.ObjectId, ref: 'User', default: null },
     documento: { type: String, default: '', trim: true, maxlength: 30 },
     es_presidente: { type: Boolean, default: false },
+    es_secretario: { type: Boolean, default: false },
     estado: { type: String, enum: ESTADOS_USUARIO, default: 'activo' },
   },
   { timestamps: true }
@@ -46,7 +51,10 @@ export interface IAsistenteSesion {
   nombre: string;
   cargo: string;
   es_presidente: boolean;
+  es_secretario: boolean;
   asistio: boolean;
+  /** Por qué no asistió, si avisó (el acta debe registrar las excusas justificadas). */
+  excusa: string;
 }
 
 export interface ICasoTratado {
@@ -56,6 +64,8 @@ export interface ICasoTratado {
   decisiones: string;
   /** Miembros apartados de la deliberación de este caso (implicados o con conflicto de interés). */
   recusados_ids: Types.ObjectId[];
+  /** Quórum para deliberar este caso sin los recusados; se calcula al firmar. Si no se alcanza, el acta lo dice: queda como advertencia, no como bloqueo. */
+  quorum: { total_miembros: number; presentes: number; porcentaje_requerido: number; alcanzado: boolean } | null;
 }
 
 export interface IAnexoActa {
@@ -72,6 +82,8 @@ export interface ISesionComite {
   hora: string;
   lugar: string;
   orden_del_dia: string;
+  /** Cómo se citó a los miembros (el acta lo exige) y cuándo. La fecha de la sesión puede ser futura: es la convocatoria. */
+  convocatoria: { medio: MedioCitacion; fecha: Date | null; nota: string } | null;
   desarrollo: string;
   asistentes: Types.DocumentArray<IAsistenteSesion>;
   casos_tratados: Types.DocumentArray<ICasoTratado>;
@@ -95,7 +107,9 @@ const asistenteSchema = new Schema<IAsistenteSesion>({
   nombre: { type: String, required: true },
   cargo: { type: String, required: true },
   es_presidente: { type: Boolean, default: false },
+  es_secretario: { type: Boolean, default: false },
   asistio: { type: Boolean, default: false },
+  excusa: { type: String, default: '', trim: true, maxlength: 500 },
 });
 
 const casoTratadoSchema = new Schema<ICasoTratado>({
@@ -103,6 +117,18 @@ const casoTratadoSchema = new Schema<ICasoTratado>({
   codigo: { type: String, required: true },
   decisiones: { type: String, default: '', maxlength: 3000 },
   recusados_ids: { type: [{ type: Schema.Types.ObjectId, ref: 'MiembroComite' }], default: [] },
+  quorum: {
+    type: new Schema(
+      {
+        total_miembros: { type: Number, default: 0 },
+        presentes: { type: Number, default: 0 },
+        porcentaje_requerido: { type: Number, default: 0 },
+        alcanzado: { type: Boolean, default: false },
+      },
+      { _id: false }
+    ),
+    default: null,
+  },
 });
 
 const anexoSchema = new Schema<IAnexoActa>({
@@ -120,6 +146,17 @@ const sesionSchema = new Schema<ISesionComite, Model<ISesionComite>>(
     hora: { type: String, default: '', maxlength: 5 },
     lugar: { type: String, default: '', trim: true, maxlength: 200 },
     orden_del_dia: { type: String, default: '', maxlength: 3000 },
+    convocatoria: {
+      type: new Schema(
+        {
+          medio: { type: String, enum: MEDIOS_CITACION, required: true },
+          fecha: { type: Date, default: null },
+          nota: { type: String, default: '', trim: true, maxlength: 500 },
+        },
+        { _id: false }
+      ),
+      default: null,
+    },
     desarrollo: { type: String, default: '', maxlength: 8000 },
     asistentes: { type: [asistenteSchema], default: [] },
     casos_tratados: { type: [casoTratadoSchema], default: [] },

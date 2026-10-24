@@ -393,6 +393,16 @@ las pestañas Faltas / Medidas / Entidades / Protocolos / Plazos de `CatalogoCon
   hechos directo en la base. **Recusación (RN-15-11)**: por cada caso tratado se marca a los miembros apartados; no cuentan ni como miembro ni como
   presente para el quórum de ese caso, y quien (siendo usuario) se declaró impedido en el caso queda recusado solo. El PDF (`pdfkit`) identifica
   el caso solo por su código, marca el borrador como tal, se baja con sesión y queda auditado. Alertas de casos: `GET /convivencia/alertas`.
+- **Convocatoria, periodicidad y contenido del acta** (Decreto 1965 de 2013, arts. 23 a 25; **validar la numeración y el texto con la norma vigente, SUIN-Juriscol**):
+  una sesión **puede crearse con fecha futura**: crearla es convocar a los miembros activos y exige indicar **cómo se citó** (`convocatoria`: medio de `MEDIOS_CITACION` y nota
+  opcional; el envío de la citación no lo hace el sistema). El acta **no se firma** hasta que llegue la fecha de la sesión ni sin ese medio (409). Cada asistente lleva su
+  **excusa** (solo se guarda de quien no asistió) y un miembro puede ser la **secretaría técnica** (`es_secretario`, uno por año como el presidente), que el PDF imprime. El
+  **quórum por caso** (sin los recusados) ya **no bloquea la firma**: se guarda en `casos_tratados[].quorum` y el acta lo imprime como advertencia; el quórum general de la
+  sesión sí sigue siendo requisito. **Periodicidad** (`periodicidadDelComite`, pura; `MESES_MAXIMOS_ENTRE_SESIONES_ORDINARIAS` = 2, mínimo de la norma y por eso constante):
+  `GET /convivencia/comite/sesiones` trae `periodicidad` y el panel de convivencia `comite.periodicidad_vencida`; cuenta desde la última ordinaria realizada (o el inicio del año
+  lectivo) y una ordinaria solo convocada no salva el plazo. `GET /convivencia/casos/:id` trae `sesiones_comite` (las actas no anuladas donde se trató el caso). **La huella
+  sigue siendo compatible hacia atrás**: convocatoria, secretario, excusas y quórum por caso entran a `contenidoFirmable` solo cuando existen, así un acta firmada antes se
+  verifica íntegra (hay prueba que reconstruye ese formato).
 - **Remisión a orientación** (`RemisionOrientacion`, colección aparte; `remisionOrientacion.service.ts`): **siempre la hace convivencia a mano**, desde el caso
   (`POST /convivencia/casos/:id/orientacion`, a los estudiantes del caso que elija; no se repite una remisión manual en curso). Ninguna medida ni paso del protocolo
   remite solos (se retiró la bandera `remite_a_orientacion`); las remisiones automáticas que dejó esa versión anterior (`origen` `MEDIDA`/`PASO`) se conservan y se siguen

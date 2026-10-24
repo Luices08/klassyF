@@ -96,5 +96,11 @@ export type TipoSesionComite = (typeof TIPOS_SESION_COMITE)[number];
 export const ESTADOS_SESION_COMITE = ['BORRADOR', 'FIRMADA', 'ANULADA'] as const;
 export type EstadoSesionComite = (typeof ESTADOS_SESION_COMITE)[number];
 
+/**
+ * El Decreto 1965 de 2013 (art. 23) exige que el comité escolar de convivencia sesione, como mínimo, una vez cada dos meses. Es un mínimo de la norma, no una
+ * política del colegio (puede reunirse más seguido, no menos): por eso es una constante. **Validar con la norma vigente.**
+ */
+export const MESES_MAXIMOS_ENTRE_SESIONES_ORDINARIAS = 2;
+
 /** Valor inicial de la política (porcentaje de miembros presentes para deliberar); cada institución lo ajusta. */
 export const QUORUM_PORCENTAJE_INICIAL = 51;

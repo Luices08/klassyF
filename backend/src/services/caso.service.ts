@@ -13,6 +13,7 @@ import {
 import { ROLES } from '../constants/roles';
 import AcademicYear from '../models/academicYear.model';
 import CasoConvivencia, { CasoConvivenciaDocument } from '../models/casoConvivencia.model';
+import { SesionComite } from '../models/comiteConvivencia.model';
 import { EntidadExterna, MedidaConvivencia, ProtocoloConvivencia } from '../models/catalogosCaso.model';
 import Counter from '../models/counter.model';
 import FaltaConvivencia from '../models/faltaConvivencia.model';
@@ -105,15 +106,18 @@ async function vistaCaso(caso: CasoConvivenciaDocument) {
   const autores = new Set<string>();
   recolectarAutores(plano, autores);
   const estudiantes = plano.involucrados.map((i) => String(i.student_id));
-  const [nombres, configuracion, remisionesOrientacion] = await Promise.all([
+  const [nombres, configuracion, remisionesOrientacion, sesiones] = await Promise.all([
     nombresDeUsuarios([...autores, ...estudiantes]),
     obtenerConfiguracion(),
     resumenDeRemisionesDelCaso(caso._id),
+    // Las actas donde el comité trató el caso: el enlace entre el caso y la constancia que la norma pide dejar en acta.
+    SesionComite.find({ 'casos_tratados.caso_id': caso._id, estado: { $ne: 'ANULADA' } }).sort({ fecha: -1 }).select('codigo estado tipo fecha').lean(),
   ]);
 
   const anotado = anotarAutores(plano, nombres) as Record<string, unknown> & { involucrados: Record<string, unknown>[] };
   anotado.involucrados = anotado.involucrados.map((i) => ({ ...i, estudiante: nombres.get(String(i.student_id)) ?? '' }));
-  return { ...anotado, remisiones_orientacion: remisionesOrientacion, alertas: alertasDeCaso(caso, configuracion, new Date(), hoyColombia()) };
+  const sesionesComite = sesiones.map((s) => ({ _id: String(s._id), codigo: s.codigo ?? null, estado: s.estado, tipo: s.tipo, fecha: s.fecha }));
+  return { ...anotado, remisiones_orientacion: remisionesOrientacion, sesiones_comite: sesionesComite, alertas: alertasDeCaso(caso, configuracion, new Date(), hoyColombia()) };
 }
 
 // --- Apertura ---

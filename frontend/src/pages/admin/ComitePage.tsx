@@ -13,6 +13,7 @@ import { EmptyRow, Table, TableBody, TableHead, Td, Th } from '../../components/
 import { TabPanel, Tabs } from '../../components/ui/Tabs';
 import { BanIcon, PencilIcon, PlusIcon, RefreshIcon, TrashIcon } from '../../components/ui/icons';
 import { useAuth } from '../../context/AuthContext';
+import { MEDIOS_CITACION, NOMBRES_MEDIO, type MedioCitacion } from '../../hooks/useObservaciones';
 import {
   NOMBRES_TIPO_SESION,
   TIPOS_SESION,
@@ -75,6 +76,17 @@ function SesionesTab() {
       />
       {sesiones.isLoading && <Spinner />}
       {sesiones.isError && <Alert tone="error">{errorMessage(sesiones.error)}</Alert>}
+      {sesiones.data?.periodicidad.vencida && (
+        <Alert tone="warning">
+          El comité debe sesionar en ordinaria como mínimo cada {sesiones.data.periodicidad.meses_maximos} meses (Decreto 1965 de 2013, art. 23).{' '}
+          {sesiones.data.periodicidad.ultima_ordinaria
+            ? `La última sesión ordinaria fue el ${formatoFechaCalendario(sesiones.data.periodicidad.ultima_ordinaria)}.`
+            : 'Este año todavía no se ha realizado ninguna.'}{' '}
+          {sesiones.data.periodicidad.proxima_programada
+            ? `Hay una convocada para el ${formatoFechaCalendario(sesiones.data.periodicidad.proxima_programada)}.`
+            : 'No hay otra convocada: crea una sesión ordinaria.'}
+        </Alert>
+      )}
       {sesiones.data && (
         <Table>
           <TableHead>
@@ -92,7 +104,15 @@ function SesionesTab() {
                 <Td>{formatoFechaCalendario(s.fecha)}</Td>
                 <Td>{NOMBRES_TIPO_SESION[s.tipo]}</Td>
                 <Td>
-                  {s.estado === 'FIRMADA' ? <Chip tone="green">{s.codigo}</Chip> : s.estado === 'ANULADA' ? <Chip tone="neutral">Anulada</Chip> : <Chip tone="orange">Borrador</Chip>}
+                  {s.estado === 'FIRMADA' ? (
+                    <Chip tone="green">{s.codigo}</Chip>
+                  ) : s.estado === 'ANULADA' ? (
+                    <Chip tone="neutral">Anulada</Chip>
+                  ) : s.fecha.slice(0, 10) > hoyLocal() ? (
+                    <Chip tone="blue">Convocada</Chip>
+                  ) : (
+                    <Chip tone="orange">Borrador</Chip>
+                  )}
                 </Td>
                 <Td>
                   {s.quorum.presentes} de {s.quorum.total_miembros}
@@ -131,16 +151,18 @@ function FormularioSesion({ onClose, onCreada }: { onClose: () => void; onCreada
   const [hora, setHora] = useState('');
   const [lugar, setLugar] = useState('');
   const [orden, setOrden] = useState('');
+  const [medio, setMedio] = useState<MedioCitacion>('CORREO');
+  const [notaConvocatoria, setNotaConvocatoria] = useState('');
 
   const guardar = async (e: FormEvent) => {
     e.preventDefault();
-    const sesion = await crear.mutateAsync({ tipo, fecha, hora: hora || undefined, lugar, orden_del_dia: orden });
+    const sesion = await crear.mutateAsync({ tipo, fecha, hora: hora || undefined, lugar, orden_del_dia: orden, convocatoria: { medio, nota: notaConvocatoria } });
     onCreada(sesion._id);
     onClose();
   };
 
   return (
-    <Drawer open title="Nueva sesión del comité" subtitle="El acta se levanta de una sesión ya realizada." onClose={onClose} onSubmit={guardar} submitLabel="Crear borrador" isSubmitting={crear.isPending}>
+    <Drawer open title="Nueva sesión del comité" subtitle="Al crearla quedan convocados los miembros activos; el acta se firma desde el día de la sesión." onClose={onClose} onSubmit={guardar} submitLabel="Crear y convocar" isSubmitting={crear.isPending}>
       {crear.isError && <Alert tone="error">{errorMessage(crear.error)}</Alert>}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <Select label="Tipo" value={tipo} onChange={(e) => setTipo(e.target.value as TipoSesion)}>
@@ -150,11 +172,22 @@ function FormularioSesion({ onClose, onCreada }: { onClose: () => void; onCreada
             </option>
           ))}
         </Select>
-        <Input label="Fecha" type="date" max={hoyLocal()} value={fecha} onChange={(e) => setFecha(e.target.value)} required />
+        <Input label="Fecha de la sesión" type="date" value={fecha} onChange={(e) => setFecha(e.target.value)} required />
         <Input label="Hora" type="time" value={hora} onChange={(e) => setHora(e.target.value)} />
         <Input label="Lugar" value={lugar} onChange={(e) => setLugar(e.target.value)} maxLength={200} />
       </div>
       <Textarea label="Orden del día" rows={4} maxLength={3000} value={orden} onChange={(e) => setOrden(e.target.value)} />
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <Select label="Cómo se citó a los miembros" value={medio} onChange={(e) => setMedio(e.target.value as MedioCitacion)}>
+          {MEDIOS_CITACION.map((m) => (
+            <option key={m} value={m}>
+              {NOMBRES_MEDIO[m]}
+            </option>
+          ))}
+        </Select>
+        <Input label="Nota de la citación (opcional)" value={notaConvocatoria} onChange={(e) => setNotaConvocatoria(e.target.value)} maxLength={500} />
+      </div>
+      <p className="text-xs text-muted">El acta debe dejar constancia del medio por el que se convocó (Decreto 1965, art. 25). El envío de la citación no lo hace el sistema.</p>
     </Drawer>
   );
 }
@@ -197,7 +230,7 @@ function MiembrosTab() {
             {miembros.data.miembros.map((m) => (
               <tr key={m._id}>
                 <Td>
-                  {m.nombre} {m.es_presidente && <Chip tone="blue">Preside</Chip>}
+                  {m.nombre} {m.es_presidente && <Chip tone="blue">Preside</Chip>} {m.es_secretario && <Chip tone="neutral">Secretaría técnica</Chip>}
                 </Td>
                 <Td>{m.cargo}</Td>
                 <Td>{m.usuario_id ? 'Usuario del sistema' : 'Designación externa'}</Td>
@@ -275,6 +308,7 @@ function MiembroDrawer({ miembro, onClose }: { miembro: MiembroComite | null; on
   const [nombre, setNombre] = useState(miembro?.nombre ?? '');
   const [documento, setDocumento] = useState(miembro?.documento ?? '');
   const [presidente, setPresidente] = useState(miembro?.es_presidente ?? false);
+  const [secretario, setSecretario] = useState(miembro?.es_secretario ?? false);
   const [usuarioId, setUsuarioId] = useState(miembro?.usuario_id ?? '');
 
   const guardar = async (e: FormEvent) => {
@@ -283,6 +317,7 @@ function MiembroDrawer({ miembro, onClose }: { miembro: MiembroComite | null; on
       id: miembro?._id,
       cargo,
       es_presidente: presidente,
+      es_secretario: secretario,
       ...(usuarioId ? { usuario_id: usuarioId } : { nombre, documento, usuario_id: null }),
     });
     onClose();
@@ -302,6 +337,10 @@ function MiembroDrawer({ miembro, onClose }: { miembro: MiembroComite | null; on
       <label className="flex items-center gap-2 text-sm text-body">
         <input type="checkbox" className="h-4 w-4 rounded border-border text-primary focus:ring-primary" checked={presidente} onChange={(e) => setPresidente(e.target.checked)} />
         Preside el comité (solo uno por año)
+      </label>
+      <label className="flex items-center gap-2 text-sm text-body">
+        <input type="checkbox" className="h-4 w-4 rounded border-border text-primary focus:ring-primary" checked={secretario} onChange={(e) => setSecretario(e.target.checked)} />
+        Secretaría técnica: levanta el acta (solo una persona por año)
       </label>
     </Drawer>
   );

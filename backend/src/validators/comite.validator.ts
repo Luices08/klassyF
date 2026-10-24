@@ -1,5 +1,5 @@
 import Joi from 'joi';
-import { TIPOS_SESION_COMITE } from '../constants/convivencia';
+import { MEDIOS_CITACION, TIPOS_SESION_COMITE } from '../constants/convivencia';
 import { ESTADOS_USUARIO } from '../constants/enums';
 import { ValidationSchema } from '../middlewares/validate.middleware';
 import { objectId } from './common.validator';
@@ -10,6 +10,10 @@ const fechaDeCalendario = Joi.string()
 const hora = Joi.string()
   .pattern(/^([01]\d|2[0-3]):[0-5]\d$/)
   .message('"{{#label}}" debe tener el formato HH:MM.');
+const convocatoria = Joi.object({
+  medio: Joi.string().valid(...MEDIOS_CITACION).required(),
+  nota: Joi.string().trim().max(500).allow(''),
+});
 const idParam = { params: Joi.object({ id: objectId.required() }) };
 const anioQuery = Joi.object({ academic_year_id: objectId, incluir_inactivos: Joi.boolean() });
 
@@ -21,6 +25,7 @@ const camposMiembro = {
   usuario_id: objectId.allow(null),
   documento: Joi.string().trim().max(30).allow(''),
   es_presidente: Joi.boolean(),
+  es_secretario: Joi.boolean(),
 };
 
 export const crearMiembro: ValidationSchema = {
@@ -45,6 +50,7 @@ export const crearSesion: ValidationSchema = {
     hora,
     lugar: Joi.string().trim().max(200).allow(''),
     orden_del_dia: Joi.string().trim().max(3000).allow(''),
+    convocatoria,
   }),
 };
 
@@ -57,7 +63,10 @@ export const actualizarSesion: ValidationSchema = {
     lugar: Joi.string().trim().max(200).allow(''),
     orden_del_dia: Joi.string().trim().max(3000).allow(''),
     desarrollo: Joi.string().trim().max(8000).allow(''),
-    asistencia: Joi.array().items(Joi.object({ miembro_id: objectId.required(), asistio: Joi.boolean().required() })).max(60),
+    convocatoria,
+    asistencia: Joi.array()
+      .items(Joi.object({ miembro_id: objectId.required(), asistio: Joi.boolean().required(), excusa: Joi.string().trim().max(500).allow('') }))
+      .max(60),
     casos_tratados: Joi.array()
       .items(
         Joi.object({

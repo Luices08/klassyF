@@ -18,6 +18,8 @@ import {
 } from '../../hooks/useCasos';
 import { NOMBRES_MEDIO } from '../../hooks/useObservaciones';
 import { formatoFechaCalendario } from '../../lib/fechas';
+import { CitacionDrawer } from '../citaciones/CitacionDrawer';
+import { NOMBRES_ESTADO_CITACION } from '../../hooks/useCitaciones';
 import { AccionesCasoDrawer, type ModoAccionCaso } from './AccionesCasoDrawer';
 
 interface Props {
@@ -74,6 +76,7 @@ function Contenido({ caso }: { caso: CasoDetalle }) {
   const [tab, setTab] = useState('resumen');
   const [accion, setAccion] = useState<ModoAccionCaso | null>(null);
   const [pasoOmitido, setPasoOmitido] = useState<{ id: string; nombre: string } | null>(null);
+  const [citando, setCitando] = useState<{ id: string; nombre: string } | null>(null);
   const actualizarPaso = useActualizarPaso();
 
   const finalizado = caso.estado === 'CERRADO' || caso.estado === 'ANULADO';
@@ -317,6 +320,32 @@ function Contenido({ caso }: { caso: CasoDetalle }) {
           </Fila>
           {!finalizado && <Boton onAccion={setAccion} modo="orientacion">Remitir a orientación</Boton>}
 
+          <Fila etiqueta="Citaciones a acudientes">
+            <ul className="space-y-2">
+              {caso.citaciones.map((c) => (
+                <Registro key={c._id} fecha={c.fecha_hora}>
+                  <strong>{c.titulo}</strong>{' '}
+                  <Chip tone={c.estado === 'CANCELADA' ? 'neutral' : c.estado === 'REALIZADA' ? 'green' : 'blue'}>{NOMBRES_ESTADO_CITACION[c.estado]}</Chip>
+                  <p className="text-xs text-muted">
+                    {caso.involucrados.find((i) => i.student_id === c.student_id)?.estudiante ?? ''}. Las respuestas de los acudientes se ven en «Reuniones y citaciones».
+                  </p>
+                </Registro>
+              ))}
+              {caso.citaciones.length === 0 && <li className="text-muted">Aún no se ha citado a ningún acudiente por este caso.</li>}
+            </ul>
+          </Fila>
+          {!finalizado && (
+            <div className="flex flex-wrap gap-2">
+              {caso.involucrados
+                .filter((i) => i.rol === 'AFECTADO' || i.rol === 'PRESUNTO_RESPONSABLE')
+                .map((i) => (
+                  <Button key={i.student_id} variant="soft-edit" className="px-3 py-1 text-xs" onClick={() => setCitando({ id: i.student_id, nombre: i.estudiante })}>
+                    Citar al acudiente de {i.estudiante}
+                  </Button>
+                ))}
+            </div>
+          )}
+
           <Fila etiqueta="Comité de convivencia">
             <ul className="space-y-2">
               {caso.sesiones_comite.map((s) => (
@@ -362,6 +391,14 @@ function Contenido({ caso }: { caso: CasoDetalle }) {
           {!finalizado && <Boton onAccion={setAccion} modo="medidas-aplicadas">Registrar medida aplicada</Boton>}
         </div>
       </TabPanel>
+
+      <CitacionDrawer
+        open={Boolean(citando)}
+        estudianteFijo={citando ?? undefined}
+        casoId={caso._id}
+        onClose={() => setCitando(null)}
+        onGuardada={() => setCitando(null)}
+      />
 
       <AccionesCasoDrawer
         caso={caso}

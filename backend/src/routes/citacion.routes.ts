@@ -8,9 +8,9 @@ import * as v from '../validators/citacion.validator';
 
 const router = Router();
 
-// Convocan la coordinación y el administrador (a cualquier grupo) y los docentes (a su grupo si lo dirigen, o a un estudiante suyo).
-// El servicio aplica la regla fina por grupo o estudiante y deja a cada docente ver solo lo que convocó.
-const QUIEN_CONVOCA: Rol[] = [ROLES.ADMIN, ROLES.COORDINADOR, ROLES.DOCENTE];
+// Convocan la coordinación y el administrador (a cualquier grupo), los docentes (a su grupo si lo dirigen, o a un estudiante suyo) y orientación y
+// convivencia (a un estudiante de sus sedes). El servicio aplica la regla fina por grupo o estudiante y deja a cada quien ver solo lo que convocó.
+const QUIEN_CONVOCA: Rol[] = [ROLES.ADMIN, ROLES.COORDINADOR, ROLES.DOCENTE, ROLES.ORIENTADOR, ROLES.COORDINADOR_CONVIVENCIA];
 
 router.use(authenticate, checkRole(...QUIEN_CONVOCA));
 

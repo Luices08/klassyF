@@ -104,6 +104,8 @@ export interface CasoDetalle {
   /** Estado de las remisiones a orientación del caso; nunca lo que orientación escribió. */
   remisiones_orientacion: RemisionOrientacionResumen[];
   /** Las actas (no anuladas) donde el Comité de Convivencia trató el caso. */
+  /** Las citaciones a acudientes (M24) enlazadas al caso: solo título, fecha y estado. */
+  citaciones: { _id: string; titulo: string; fecha_hora: string; estado: 'PROGRAMADA' | 'REALIZADA' | 'CANCELADA'; student_id: string | null }[];
   sesiones_comite: { _id: string; codigo: string | null; estado: 'BORRADOR' | 'FIRMADA'; tipo: 'ORDINARIA' | 'EXTRAORDINARIA'; fecha: string }[];
   alertas: AlertaCaso[];
 }

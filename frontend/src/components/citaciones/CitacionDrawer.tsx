@@ -32,18 +32,25 @@ interface Props {
   citacion?: DetalleCitacion | null;
   onClose: () => void;
   onGuardada: (id: string) => void;
+  /** Citar al acudiente de un estudiante ya elegido (p. ej. desde un caso de convivencia): no se piden grupo ni estudiante. */
+  estudianteFijo?: { id: string; nombre: string };
+  /** Con `estudianteFijo`, enlaza la citación a ese caso de convivencia. */
+  casoId?: string;
 }
 
 /**
  * Crear o editar una citación (M24). Los grupos y estudiantes que se ofrecen son los que el servidor deja convocar a quien la hace;
  * el servidor lo vuelve a comprobar. Cambiar la fecha o el lugar de una ya enviada pide a los acudientes confirmar de nuevo.
  */
-export function CitacionDrawer({ open, citacion, onClose, onGuardada }: Props) {
+export function CitacionDrawer({ open, citacion, onClose, onGuardada, estudianteFijo, casoId }: Props) {
   const { user } = useAuth();
   const editando = Boolean(citacion);
   const crear = useCrearCitacion();
   const actualizar = useActualizarCitacion();
-  const grupos = useGruposConvocables(open && !editando);
+  // Orientación y convivencia solo citan a los acudientes de un estudiante (nunca a un grupo completo).
+  const esBienestar = user?.rol === 'ORIENTADOR' || user?.rol === 'COORDINADOR_CONVIVENCIA';
+  const soloParticular = esBienestar || Boolean(estudianteFijo);
+  const grupos = useGruposConvocables(open && !editando && !estudianteFijo);
 
   const [tipo, setTipo] = useState<TipoCitacion>('GENERAL');
   const [motivo, setMotivo] = useState<MotivoCitacion>('ENTREGA_BOLETINES');
@@ -55,15 +62,15 @@ export function CitacionDrawer({ open, citacion, onClose, onGuardada }: Props) {
   const [grupoDelEstudiante, setGrupoDelEstudiante] = useState('');
   const [estudianteId, setEstudianteId] = useState('');
   const [todos, setTodos] = useState(false);
-  const estudiantes = useEstudiantesConvocables(tipo === 'PARTICULAR' ? grupoDelEstudiante || undefined : undefined);
+  const estudiantes = useEstudiantesConvocables(tipo === 'PARTICULAR' && !estudianteFijo ? grupoDelEstudiante || undefined : undefined);
 
   useEffect(() => {
     if (!open) return;
     crear.reset();
     actualizar.reset();
-    setTipo(citacion?.tipo ?? 'GENERAL');
-    setMotivo(citacion?.motivo ?? 'ENTREGA_BOLETINES');
-    setTitulo(citacion?.titulo ?? '');
+    setTipo(citacion?.tipo ?? (soloParticular ? 'PARTICULAR' : 'GENERAL'));
+    setMotivo(citacion?.motivo ?? (soloParticular ? 'ORIENTACION_CONVIVENCIA' : 'ENTREGA_BOLETINES'));
+    setTitulo(citacion?.titulo ?? (estudianteFijo ? 'Citación de convivencia escolar' : ''));
     setDescripcion(citacion?.descripcion ?? '');
     setFechaHora(citacion ? aInputFechaHora(new Date(citacion.fecha_hora)) : '');
     setLugar(citacion?.lugar ?? '');
@@ -79,7 +86,7 @@ export function CitacionDrawer({ open, citacion, onClose, onGuardada }: Props) {
   const etiquetaGrupo = (g: { grado: string; nomenclatura: string }) => `${g.grado} ${g.nomenclatura}`.trim();
 
   const minimo = aInputFechaHora(new Date());
-  const objetivoListo = editando || (tipo === 'GENERAL' ? grupoIds.length > 0 : estudianteId !== '');
+  const objetivoListo = editando || (tipo === 'GENERAL' ? grupoIds.length > 0 : Boolean(estudianteFijo) || estudianteId !== '');
   const listo = titulo.trim().length >= 3 && lugar.trim().length >= 2 && fechaHora !== '' && objetivoListo;
   const guardando = crear.isPending || actualizar.isPending;
   const error = crear.error ?? actualizar.error;
@@ -102,7 +109,7 @@ export function CitacionDrawer({ open, citacion, onClose, onGuardada }: Props) {
       descripcion: descripcion.trim() || undefined,
       fecha_hora: fecha,
       lugar: lugar.trim(),
-      ...(tipo === 'GENERAL' ? { grupo_ids: grupoIds } : { student_id: estudianteId, todos_los_acudientes: todos }),
+      ...(tipo === 'GENERAL' ? { grupo_ids: grupoIds } : { student_id: estudianteFijo?.id ?? estudianteId, todos_los_acudientes: todos, ...(estudianteFijo && casoId ? { caso_id: casoId } : {}) }),
     });
     onGuardada(res._id);
   }
@@ -121,7 +128,7 @@ export function CitacionDrawer({ open, citacion, onClose, onGuardada }: Props) {
       {error && <Alert tone="error">{errorMessage(error)}</Alert>}
       {editando && <Alert tone="info">Si cambias la fecha, la hora o el lugar, los acudientes reciben un correo nuevo y deben confirmar de nuevo. Los grupos y estudiantes no se cambian: cancela y crea otra.</Alert>}
 
-      {!editando && (
+      {!editando && !soloParticular && (
         <Select label="Tipo de citación" value={tipo} onChange={(e) => { setTipo(e.target.value as TipoCitacion); setGrupoIds([]); setEstudianteId(''); }}>
           {TIPOS_CITACION.map((t) => (
             <option key={t} value={t}>
@@ -145,7 +152,14 @@ export function CitacionDrawer({ open, citacion, onClose, onGuardada }: Props) {
         </>
       )}
 
-      {!editando && tipo === 'PARTICULAR' && (
+      {!editando && tipo === 'PARTICULAR' && estudianteFijo && (
+        <>
+          <Input label="Estudiante" value={estudianteFijo.nombre} disabled readOnly />
+          <Switch checked={todos} onChange={setTodos} label="Citar a todos los acudientes" description="Si está apagado, se cita solo al acudiente principal (responsable legal)." />
+        </>
+      )}
+
+      {!editando && tipo === 'PARTICULAR' && !estudianteFijo && (
         <>
           <Select label="Grupo del estudiante" value={grupoDelEstudiante} onChange={(e) => { setGrupoDelEstudiante(e.target.value); setEstudianteId(''); }}>
             <option value="">{grupos.isLoading ? 'Cargando…' : 'Elige un grupo'}</option>
@@ -174,7 +188,15 @@ export function CitacionDrawer({ open, citacion, onClose, onGuardada }: Props) {
           </option>
         ))}
       </Select>
-      <Input label="Título" required maxLength={MAX_TITULO_CITACION} value={titulo} onChange={(e) => setTitulo(e.target.value)} placeholder="Entrega de boletines del segundo periodo" />
+      <Input
+        label="Título"
+        required
+        maxLength={MAX_TITULO_CITACION}
+        value={titulo}
+        onChange={(e) => setTitulo(e.target.value)}
+        placeholder="Entrega de boletines del segundo periodo"
+        hint={tipo === 'PARTICULAR' ? 'El título viaja por correo: no escribas hechos, diagnósticos ni nombres de otros menores.' : undefined}
+      />
       <Input label="Fecha y hora" type="datetime-local" required value={fechaHora} min={minimo} onChange={(e) => setFechaHora(e.target.value)} />
       <Input label="Lugar" required maxLength={MAX_LUGAR_CITACION} value={lugar} onChange={(e) => setLugar(e.target.value)} placeholder="Salón 601 o Coliseo" />
       <Textarea

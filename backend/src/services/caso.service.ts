@@ -15,6 +15,7 @@ import AcademicYear from '../models/academicYear.model';
 import CasoConvivencia, { CasoConvivenciaDocument } from '../models/casoConvivencia.model';
 import { SesionComite } from '../models/comiteConvivencia.model';
 import { EntidadExterna, MedidaConvivencia, ProtocoloConvivencia } from '../models/catalogosCaso.model';
+import Citacion from '../models/citacion.model';
 import Counter from '../models/counter.model';
 import FaltaConvivencia from '../models/faltaConvivencia.model';
 import RemisionOrientacion from '../models/remisionOrientacion.model';
@@ -106,18 +107,21 @@ async function vistaCaso(caso: CasoConvivenciaDocument) {
   const autores = new Set<string>();
   recolectarAutores(plano, autores);
   const estudiantes = plano.involucrados.map((i) => String(i.student_id));
-  const [nombres, configuracion, remisionesOrientacion, sesiones] = await Promise.all([
+  const [nombres, configuracion, remisionesOrientacion, sesiones, citaciones] = await Promise.all([
     nombresDeUsuarios([...autores, ...estudiantes]),
     obtenerConfiguracion(),
     resumenDeRemisionesDelCaso(caso._id),
     // Las actas donde el comité trató el caso: el enlace entre el caso y la constancia que la norma pide dejar en acta.
     SesionComite.find({ 'casos_tratados.caso_id': caso._id, estado: { $ne: 'ANULADA' } }).sort({ fecha: -1 }).select('codigo estado tipo fecha').lean(),
+    // Solo el enlace: título, fecha y estado. Lo que respondió cada acudiente se ve en Reuniones y citaciones, no en el caso.
+    Citacion.find({ caso_id: caso._id }).sort({ fecha_hora: -1 }).select('titulo fecha_hora estado student_id').lean(),
   ]);
 
   const anotado = anotarAutores(plano, nombres) as Record<string, unknown> & { involucrados: Record<string, unknown>[] };
   anotado.involucrados = anotado.involucrados.map((i) => ({ ...i, estudiante: nombres.get(String(i.student_id)) ?? '' }));
   const sesionesComite = sesiones.map((s) => ({ _id: String(s._id), codigo: s.codigo ?? null, estado: s.estado, tipo: s.tipo, fecha: s.fecha }));
-  return { ...anotado, remisiones_orientacion: remisionesOrientacion, sesiones_comite: sesionesComite, alertas: alertasDeCaso(caso, configuracion, new Date(), hoyColombia()) };
+  const citacionesDelCaso = citaciones.map((c) => ({ _id: String(c._id), titulo: c.titulo, fecha_hora: c.fecha_hora, estado: c.estado, student_id: c.student_id ? String(c.student_id) : null }));
+  return { ...anotado, remisiones_orientacion: remisionesOrientacion, sesiones_comite: sesionesComite, citaciones: citacionesDelCaso, alertas: alertasDeCaso(caso, configuracion, new Date(), hoyColombia()) };
 }
 
 // --- Apertura ---

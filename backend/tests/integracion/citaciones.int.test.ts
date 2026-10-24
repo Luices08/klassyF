@@ -9,12 +9,13 @@ import Guardian from '../../src/models/guardian.model';
 import Notificacion from '../../src/models/notificacion.model';
 import StudentGuardian from '../../src/models/studentGuardian.model';
 import { UserDocument } from '../../src/models/user.model';
+import * as casos from '../../src/services/caso.service';
 import { actualizarCitacion, cancelarCitacion, crearCitacion, detalleCitacion, listarCitaciones, reenviarCorreo } from '../../src/services/citacion.service';
 import { citacionesDeHijo, consultarPorToken, responderDesdePortal, responderPorToken } from '../../src/services/citacionRespuesta.service';
 import { procesarCola } from '../../src/services/colaCorreo.service';
 import { fijarEnviadorCorreo, MensajeCorreo } from '../../src/services/correo.service';
 import { detenerBaseDeDatos, iniciarBaseDeDatos, limpiarBaseDeDatos } from './baseDeDatos';
-import { armarEscenario, crearUsuario, Escenario } from './escenario';
+import { armarEscenario, crearUsuario, Escenario, hoy } from './escenario';
 
 const enDias = (n: number) => new Date(Date.now() + n * 86_400_000).toISOString();
 
@@ -223,4 +224,60 @@ describe('Citaciones a acudientes', () => {
     expect(detalle.destinatarios.every((d) => d.correo !== 'EN_COLA')).toBe(true);
     expect(await CorreoEnCola.countDocuments()).toBe(0);
   });
+
+  describe('orientación y coordinación de convivencia citan a los acudientes', () => {
+    const particular = (estudiante: UserDocument, extra: Record<string, unknown> = {}) => ({
+      tipo: 'PARTICULAR' as const,
+      motivo: 'ORIENTACION_CONVIVENCIA' as const,
+      titulo: 'Citación de orientación',
+      descripcion: 'Hechos que solo debe ver el acudiente en el portal.',
+      fecha_hora: enDias(2),
+      lugar: 'Oficina de orientación',
+      student_id: String(estudiante._id),
+      ...extra,
+    });
+    const abrirCaso = async () =>
+      (await casos.abrirCaso(
+        {
+          tipo_situacion: 'II',
+          fecha_hora: undefined,
+          fecha_hecho: hoy(),
+          hechos: 'Discusión en el patio durante el descanso.',
+          involucrados: [{ student_id: String(e.estudiante._id), rol: 'PRESUNTO_RESPONSABLE' as const }],
+        } as unknown as casos.AbrirCasoInput,
+        e.coordConvivencia
+      )) as unknown as { _id: string };
+
+    it('el orientador cita al acudiente de un estudiante de su sede y el correo lo presenta como Orientación', async () => {
+      const detalle = await crearCitacion(particular(e.estudiante), e.orientador);
+      expect(detalle.destinatarios).toHaveLength(1);
+      await procesarCola();
+      const correo = enviados.find((m) => m.para === 'marta@correo.test')!;
+      expect(correo.texto).toContain('(Orientación)');
+      // La descripción de una citación particular no viaja por correo.
+      expect(correo.texto).not.toContain('Hechos que solo');
+      // Cada quien ve solo lo que convocó.
+      await expect(detalleCitacion(detalle._id, e.orientadorColega)).rejects.toMatchObject({ statusCode: 404 });
+    });
+
+    it('no cita a todo un grupo ni a un estudiante de una sede que no tiene asignada', async () => {
+      await expect(crearCitacion(nueva(), e.orientador)).rejects.toMatchObject({ statusCode: 403 });
+      await expect(crearCitacion(nueva(), e.coordConvivencia)).rejects.toMatchObject({ statusCode: 403 });
+      await expect(crearCitacion(particular(e.estudiante), e.orientadorOtraSede)).rejects.toMatchObject({ statusCode: 404 });
+      await expect(crearCitacion(particular(e.estudiante), e.coordConvivenciaOtraSede)).rejects.toMatchObject({ statusCode: 404 });
+    });
+
+    it('convivencia enlaza la citación a un caso: aparece en el caso y el estudiante debe ser parte de él', async () => {
+      const caso = await abrirCaso();
+      const detalle = await crearCitacion(particular(e.estudiante, { caso_id: caso._id }), e.coordConvivencia);
+      const vista = (await casos.obtenerCaso(caso._id, e.coordConvivencia)) as unknown as { citaciones: { _id: string; titulo: string; estado: string }[] };
+      expect(vista.citaciones).toEqual([expect.objectContaining({ _id: detalle._id, titulo: 'Citación de orientación', estado: 'PROGRAMADA' })]);
+
+      // Un estudiante ajeno al caso, una citación general o quien no ve el caso no pueden enlazarlo.
+      await expect(crearCitacion(particular(e.otroEstudiante, { caso_id: caso._id }), e.coordConvivencia)).rejects.toMatchObject({ statusCode: 400 });
+      await expect(crearCitacion(nueva({ caso_id: caso._id }), e.coordConvivencia)).rejects.toMatchObject({ statusCode: 403 });
+      await expect(crearCitacion(particular(e.estudiante, { caso_id: caso._id }), e.orientador)).rejects.toMatchObject({ statusCode: 404 });
+    });
+  });
+
 });

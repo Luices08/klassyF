@@ -159,8 +159,11 @@ export default function App() {
             <Route path="/mi-horario" element={<MiHorarioPage />} />
           </Route>
 
-          <Route element={<ProtectedRoute allowedRoles={['ADMIN', 'COORDINADOR', 'DOCENTE']} />}>
+          <Route element={<ProtectedRoute allowedRoles={['ADMIN', 'COORDINADOR', 'DOCENTE', 'ORIENTADOR', 'COORDINADOR_CONVIVENCIA']} />}>
             <Route path="/reuniones" element={<CitacionesPage />} />
+          </Route>
+
+          <Route element={<ProtectedRoute allowedRoles={['ADMIN', 'COORDINADOR', 'DOCENTE']} />}>
             <Route path="/recuperaciones" element={<RecuperacionesPage />} />
           </Route>
 

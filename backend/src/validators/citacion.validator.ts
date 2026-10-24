@@ -44,6 +44,8 @@ export const crear: ValidationSchema = {
     grupo_ids: Joi.array().items(objectId).max(MAX_GRUPOS_POR_CITACION),
     student_id: objectId,
     todos_los_acudientes: Joi.boolean(),
+    // Solo convivencia enlaza una citación a un caso (el servicio comprueba que el estudiante sea parte del caso).
+    caso_id: objectId,
   }),
 };
 

@@ -27,6 +27,7 @@ import { runTransaction } from '../utils/runTransaction';
 import { registrarEvento } from './audit.service';
 import { despertarCola, encolarCorreos } from './colaCorreo.service';
 import { correoConfigurado, motivoCorreoNoConfigurado } from './correo.service';
+import { cargarCaso } from './caso.service';
 import { avisarCitacion } from './notificacionesEventos.service';
 
 /**
@@ -55,13 +56,19 @@ async function anioEnCurso() {
 }
 
 const esCoordinacion = (usuario: UserDocument) => usuario.rol === ROLES.ADMIN || usuario.rol === ROLES.COORDINADOR;
+const esBienestar = (usuario: UserDocument) => usuario.rol === ROLES.ORIENTADOR || usuario.rol === ROLES.COORDINADOR_CONVIVENCIA;
 
-/** Los grupos del año en curso que este usuario puede convocar: todos para ADMIN y COORDINADOR; para un docente, donde dicta clase o dirige. */
+/**
+ * Los grupos del año en curso que este usuario puede convocar: todos para ADMIN y COORDINADOR; para orientación y convivencia, los de las sedes que tienen asignadas
+ * (sin sedes no convocan a nadie); para un docente, donde dicta clase o dirige.
+ */
 export async function gruposQueConvoca(usuario: UserDocument): Promise<GrupoConvocable[]> {
   const anio = await AcademicYear.findOne({ estado: 'EN_CURSO' });
   if (!anio) return [];
   const base: Record<string, unknown> = { academic_year_id: anio._id, estado: 'ACTIVE' };
-  if (!esCoordinacion(usuario)) {
+  if (esBienestar(usuario)) {
+    base.sede_id = { $in: usuario.sedes_ids };
+  } else if (!esCoordinacion(usuario)) {
     const clases = await TeacherAssignment.distinct('group_id', { docente_id: usuario._id, academic_year_id: anio._id, tipo_asignacion: 'CLASE', estado: ESTADO_ACTIVO });
     base.$or = [{ _id: { $in: clases } }, { director_grupo_id: usuario._id }];
   }
@@ -98,6 +105,7 @@ export interface CitacionInput {
   grupo_ids?: string[];
   student_id?: string;
   todos_los_acudientes?: boolean;
+  caso_id?: string;
 }
 
 interface Objetivo {
@@ -118,6 +126,7 @@ async function resolverObjetivo(input: CitacionInput, usuario: UserDocument, ani
     for (const id of ids) {
       const grupo = convocables.get(id);
       if (!grupo) throw new ApiError(404, 'Uno de los grupos no existe o no está a tu alcance.');
+      if (esBienestar(usuario)) throw new ApiError(403, 'Orientación y convivencia citan a los acudientes de un estudiante, no a un grupo completo.');
       if (!puedeConvocar(usuario.rol!, 'GENERAL', grupo)) throw new ApiError(403, `Solo el director del grupo ${grupo.grado} ${grupo.nomenclatura} (o coordinación) puede citar a todo el grupo.`);
     }
     const sedes = new Set(ids.map((id) => (convocables.get(id) as GrupoConvocable).sede_id));
@@ -172,6 +181,18 @@ const cuando = (fecha: Date): string => {
   return `${dia}, ${hora}`;
 };
 
+/**
+ * Una citación puede enlazarse a un caso de convivencia (M15). Solo convivencia ve el caso (`cargarCaso` responde 404 a quien no), la citación debe ser particular y el estudiante
+ * tiene que ser parte del caso: así no se cita al acudiente de un menor ajeno al hecho.
+ */
+async function casoDeLaCitacion(input: CitacionInput, usuario: UserDocument): Promise<Types.ObjectId | null> {
+  if (!input.caso_id) return null;
+  if (input.tipo !== 'PARTICULAR' || !input.student_id) throw new ApiError(400, 'Solo una citación particular se enlaza a un caso.');
+  const caso = await cargarCaso(input.caso_id, usuario);
+  if (!caso.involucrados.some((i) => String(i.student_id) === input.student_id)) throw new ApiError(400, 'El estudiante no es parte de ese caso.');
+  return caso._id;
+}
+
 export async function crearCitacion(input: CitacionInput, usuario: UserDocument, ip?: string) {
   const fecha = new Date(input.fecha_hora);
   if (!esFechaFutura(fecha, new Date())) throw new ApiError(400, 'La fecha y hora de la citación deben ser posteriores a este momento.');
@@ -179,6 +200,7 @@ export async function crearCitacion(input: CitacionInput, usuario: UserDocument,
   const objetivo = await resolverObjetivo(input, usuario, anio._id);
   if (objetivo.estudiantes.length === 0) throw new ApiError(409, 'Los grupos elegidos no tienen estudiantes con matrícula activa.');
 
+  const casoId = await casoDeLaCitacion(input, usuario);
   const plan = await planDeDestinatarios(objetivo.estudiantes, Boolean(input.todos_los_acudientes));
   if (plan.length === 0) throw new ApiError(409, 'Ninguno de los estudiantes tiene un acudiente registrado: vincúlalos primero en el expediente del estudiante.');
 
@@ -202,6 +224,7 @@ export async function crearCitacion(input: CitacionInput, usuario: UserDocument,
           grupo_ids: objetivo.grupo_ids,
           student_id: objetivo.student_id,
           todos_los_acudientes: Boolean(input.todos_los_acudientes),
+          caso_id: casoId,
         },
       ],
       { session }

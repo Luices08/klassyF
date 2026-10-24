@@ -8,10 +8,12 @@ export const generarTokenCitacion = (): string => crypto.randomBytes(16).toStrin
 
 /**
  * Quién puede convocar a quién. ADMIN y COORDINADOR convocan a cualquier grupo o estudiante del año; un DOCENTE convoca a todo un grupo
- * solo si es su director de grupo, y a un estudiante concreto si dicta clase o dirige el grupo donde está matriculado.
+ * solo si es su director de grupo, y a un estudiante concreto si dicta clase o dirige el grupo donde está matriculado. Orientación y coordinación de convivencia citan
+ * a los acudientes de **un estudiante** (nunca a un grupo entero): los grupos que se les ofrecen ya son solo los de sus sedes.
  */
 export function puedeConvocar(rol: Rol, tipo: TipoCitacion, grupo: { es_director: boolean }): boolean {
   if (rol === ROLES.ADMIN || rol === ROLES.COORDINADOR) return true;
+  if (rol === ROLES.ORIENTADOR || rol === ROLES.COORDINADOR_CONVIVENCIA) return tipo === 'PARTICULAR';
   if (rol !== ROLES.DOCENTE) return false;
   return tipo === 'GENERAL' ? grupo.es_director : true;
 }

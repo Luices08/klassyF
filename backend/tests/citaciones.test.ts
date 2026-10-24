@@ -30,8 +30,15 @@ describe('puedeConvocar', () => {
     expect(puedeConvocar('DOCENTE', 'PARTICULAR', { es_director: false })).toBe(true);
   });
 
+  it('orientación y coordinación de convivencia citan a un estudiante, nunca a un grupo completo', () => {
+    for (const rol of ['ORIENTADOR', 'COORDINADOR_CONVIVENCIA'] as const) {
+      expect(puedeConvocar(rol, 'PARTICULAR', { es_director: false })).toBe(true);
+      expect(puedeConvocar(rol, 'GENERAL', { es_director: true })).toBe(false);
+    }
+  });
+
   it('otros roles no convocan', () => {
-    for (const rol of ['SECRETARIA', 'ESTUDIANTE', 'ACUDIENTE', 'ORIENTADOR', 'COORDINADOR_CONVIVENCIA'] as const) {
+    for (const rol of ['SECRETARIA', 'ESTUDIANTE', 'ACUDIENTE'] as const) {
       expect(puedeConvocar(rol, 'PARTICULAR', { es_director: true })).toBe(false);
     }
   });

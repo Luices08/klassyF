@@ -52,6 +52,8 @@ describe('Seguridad de convivencia (capa HTTP)', () => {
     ['GET', '/observaciones/estudiantes?q=ana'],
     ['POST', '/observaciones'],
     ['POST', '/observaciones/faltas'],
+    ['POST', '/observaciones/reportes-urgentes'],
+    ['GET', '/observaciones/reportes-urgentes/mios'],
     ['GET', '/observaciones/mias'],
     ['GET', '/observaciones/mi-observador'],
     ['GET', `/observaciones/estudiantes/${ID}`],
@@ -106,11 +108,15 @@ describe('Seguridad de convivencia (capa HTTP)', () => {
     expect((await pedir('GET', `/observaciones/estudiantes/${e.estudiante._id}`, e.estudiante)).estado).toBe(403);
     expect((await pedir('POST', '/observaciones', e.estudiante, {})).estado).toBe(403);
     expect((await pedir('GET', '/observaciones/mi-observador', e.docenteDeClase)).estado).toBe(403);
-    // Las faltas las registran el docente y convivencia; ni el coordinador académico, ni orientación, ni el estudiante.
+    // Las faltas y los reportes urgentes los registran el docente y convivencia; ni el coordinador académico, ni orientación, ni el estudiante.
     for (const usuario of [e.coordAcademico, e.orientador, e.estudiante]) {
       expect((await pedir('POST', '/observaciones/faltas', usuario, {})).estado, usuario.rol).toBe(403);
+      expect((await pedir('POST', '/observaciones/reportes-urgentes', usuario, {})).estado, usuario.rol).toBe(403);
+      expect((await pedir('GET', '/observaciones/reportes-urgentes/mios', usuario)).estado, usuario.rol).toBe(403);
     }
     expect((await pedir('POST', '/observaciones/faltas', e.docenteDeClase, {})).estado).toBe(400);
+    expect((await pedir('POST', '/observaciones/reportes-urgentes', e.docenteDeClase, {})).estado).toBe(400);
+    expect((await pedir('GET', '/observaciones/reportes-urgentes/mios', e.docenteDeClase)).estado).toBe(200);
   });
 
   it('el docente no configura el catálogo ni la política', async () => {
@@ -156,24 +162,30 @@ describe('Seguridad de convivencia (capa HTTP)', () => {
     expect(String(guardada!.sede_id)).not.toBe(ID);
   });
 
-  it('la gravedad de una falta la fija el catálogo: el cliente no puede bajarla ni evitar la remisión', async () => {
-    const respuesta = await pedir('POST', '/observaciones/faltas', e.docenteDeClase, {
-      falta_id: e.faltaII,
+  it('la gravedad de una falta la fija el catálogo: lo grave no se registra como falta y el cliente no puede bajarla', async () => {
+    const falta = { falta_id: e.faltaII, fecha_hecho: hoy(), hechos: 'Agresión física durante el descanso.', estudiantes_ids: [String(e.estudiante._id)], gravedad: 'I' };
+    expect((await pedir('POST', '/observaciones/faltas', e.docenteDeClase, falta)).estado).toBe(400);
+    expect(await Observacion.countDocuments()).toBe(0);
+  });
+
+  it('un reporte urgente ignora lo que el cliente intente fijar: la gravedad, los roles, el estado y el solicitante los decide el servidor', async () => {
+    const respuesta = await pedir('POST', '/observaciones/reportes-urgentes', e.docenteDeClase, {
       fecha_hecho: hoy(),
       hechos: 'Agresión física durante el descanso.',
       acciones_contencion: 'Se separó a los estudiantes.',
-      involucrados: [{ student_id: String(e.estudiante._id), rol: 'PRESUNTO_RESPONSABLE' }],
+      estudiantes_ids: [String(e.estudiante._id)],
       gravedad: 'I',
-      remitir_comite: false,
-      solicitud_id: ID,
-      estado: 'ANULADA',
+      falta_id: e.faltaI,
+      estado: 'DESCARTADA',
+      solicitada_por: ID,
+      caso_id: ID,
     });
     expect(respuesta.estado).toBe(201);
-    expect(await SolicitudCaso.countDocuments({ gravedad: 'II', estado: 'PENDIENTE' })).toBe(1);
-    const guardada = await Observacion.findOne({ student_id: e.estudiante._id });
-    expect(guardada).toMatchObject({ clase: 'FALTA', estado: 'ACTIVA' });
-    expect(guardada!.falta).toMatchObject({ codigo: '3.3', gravedad: 'II' });
-    expect(String(guardada!.solicitud_id)).not.toBe(ID);
+    const solicitud = await SolicitudCaso.findOne();
+    expect(solicitud).toMatchObject({ gravedad: null, falta: null, estado: 'PENDIENTE', caso_id: null });
+    expect(String(solicitud!.solicitada_por)).toBe(String(e.docenteDeClase._id));
+    expect(solicitud!.involucrados[0]!.rol).toBeNull();
+    expect(await Observacion.countDocuments()).toBe(0);
   });
 
   it('la validación rechaza identificadores mal formados, paginación desmedida, fechas y roles inválidos', async () => {
@@ -188,10 +200,17 @@ describe('Seguridad de convivencia (capa HTTP)', () => {
     expect((await pedir('POST', '/observaciones', e.docenteDeClase, { ...valido, compromiso: 'x'.repeat(501) })).estado).toBe(400);
     expect((await pedir('POST', '/observaciones', e.docenteDeClase, { ...valido, descripcion: '' })).estado).toBe(400);
 
-    const falta = { falta_id: e.faltaI, fecha_hecho: hoy(), hechos: 'x', involucrados: [{ student_id: estudiante, rol: 'PRESUNTO_RESPONSABLE' }] };
-    expect((await pedir('POST', '/observaciones/faltas', e.docenteDeClase, { ...falta, involucrados: [{ student_id: estudiante, rol: 'INVENTADO' }] })).estado).toBe(400);
-    expect((await pedir('POST', '/observaciones/faltas', e.docenteDeClase, { ...falta, involucrados: [] })).estado).toBe(400);
+    const falta = { falta_id: e.faltaI, fecha_hecho: hoy(), hechos: 'x', estudiantes_ids: [estudiante] };
+    expect((await pedir('POST', '/observaciones/faltas', e.docenteDeClase, { ...falta, estudiantes_ids: ['no-es-un-id'] })).estado).toBe(400);
+    expect((await pedir('POST', '/observaciones/faltas', e.docenteDeClase, { ...falta, estudiantes_ids: [] })).estado).toBe(400);
     expect((await pedir('POST', '/observaciones/faltas', e.docenteDeClase, falta)).estado).toBe(201);
+
+    const reporte = { fecha_hecho: hoy(), hechos: 'x', acciones_contencion: 'Se separó a los estudiantes.', estudiantes_ids: [estudiante] };
+    expect((await pedir('POST', '/observaciones/reportes-urgentes', e.docenteDeClase, { ...reporte, acciones_contencion: 'no' })).estado).toBe(400);
+    expect((await pedir('POST', '/observaciones/reportes-urgentes', e.docenteDeClase, { ...reporte, estudiantes_ids: [] })).estado).toBe(400);
+    expect((await pedir('POST', '/observaciones/reportes-urgentes', e.docenteDeClase, { ...reporte, fecha_hecho: '12-03-2026' })).estado).toBe(400);
+    expect((await pedir('POST', '/observaciones/reportes-urgentes', e.docenteDeClase, { ...reporte, estudiantes_ids: Array.from({ length: 61 }, () => ID) })).estado).toBe(400);
+    expect((await pedir('POST', '/observaciones/reportes-urgentes', e.docenteDeClase, reporte)).estado).toBe(201);
   });
 
   it('la carga de faltas rechaza un formato de plantilla inventado, archivos de otro tipo y demasiado grandes', async () => {

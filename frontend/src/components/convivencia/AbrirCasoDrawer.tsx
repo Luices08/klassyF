@@ -13,7 +13,8 @@ const hoyLocal = () => new Date().toLocaleDateString('en-CA');
 interface Involucrado {
   student_id: string;
   nombre: string;
-  rol: RolInvolucrado;
+  /** '' = sin asignar: un reporte urgente llega sin roles y coordinación los define aquí. */
+  rol: RolInvolucrado | '';
 }
 
 interface Props {
@@ -31,13 +32,14 @@ export function AbrirCasoDrawer(props: Props) {
 
 function Formulario({ onClose, solicitud, onAbierto }: Props) {
   const abrir = useAbrirCaso();
-  const [tipo, setTipo] = useState<TipoSituacion>(solicitud?.gravedad ?? 'I');
+  // Un reporte urgente llega sin tipificar: coordinación elige el tipo (una apertura directa o una falta Tipo I escalada ya traen uno).
+  const [tipo, setTipo] = useState<TipoSituacion | ''>(solicitud ? (solicitud.gravedad ?? '') : 'I');
   const [fecha, setFecha] = useState(solicitud ? solicitud.fecha_hecho.slice(0, 10) : hoyLocal());
   const [lugar, setLugar] = useState('');
   const [hechos, setHechos] = useState(solicitud?.hechos ?? '');
   const [comoSeConocio, setComoSeConocio] = useState('');
   const [involucrados, setInvolucrados] = useState<Involucrado[]>(
-    (solicitud?.involucrados ?? []).map((i) => ({ student_id: i.student_id, nombre: i.estudiante, rol: i.rol }))
+    (solicitud?.involucrados ?? []).map((i) => ({ student_id: i.student_id, nombre: i.estudiante, rol: i.rol ?? '' }))
   );
   const [busqueda, setBusqueda] = useState('');
   const resultados = useEstudiantesObservables({ q: busqueda });
@@ -48,15 +50,18 @@ function Formulario({ onClose, solicitud, onAbierto }: Props) {
     setBusqueda('');
   };
 
+  const sinRol = involucrados.some((i) => !i.rol);
+
   const guardar = async (e: FormEvent) => {
     e.preventDefault();
+    if (!tipo || sinRol) return;
     const caso = await abrir.mutateAsync({
       tipo_situacion: tipo,
       fecha_hecho: fecha,
       lugar,
       hechos,
       como_se_conocio: comoSeConocio,
-      involucrados: involucrados.map(({ student_id, rol }) => ({ student_id, rol })),
+      involucrados: involucrados.map(({ student_id, rol }) => ({ student_id, rol: rol as RolInvolucrado })),
       solicitud_id: solicitud?._id,
     });
     onAbierto?.(caso._id);
@@ -68,12 +73,12 @@ function Formulario({ onClose, solicitud, onAbierto }: Props) {
       open
       size="lg"
       title="Abrir caso de convivencia"
-      subtitle={solicitud ? `A partir de la solicitud con la falta ${solicitud.falta.codigo}` : 'Apertura directa (denuncia, reporte o tercero)'}
+      subtitle={solicitud ? (solicitud.falta ? `A partir de la solicitud con la falta ${solicitud.falta.codigo}` : 'A partir de un reporte urgente del docente') : 'Apertura directa (denuncia, reporte o tercero)'}
       onClose={onClose}
       onSubmit={guardar}
       submitLabel="Abrir caso"
       isSubmitting={abrir.isPending}
-      submitDisabled={hechos.trim().length < 10 || involucrados.length === 0}
+      submitDisabled={hechos.trim().length < 10 || involucrados.length === 0 || !tipo || sinRol}
     >
       {abrir.isError && <Alert tone="error">{errorMessage(abrir.error)}</Alert>}
       <Alert tone="info">
@@ -87,7 +92,8 @@ function Formulario({ onClose, solicitud, onAbierto }: Props) {
       )}
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <Select label="Tipo de situación" value={tipo} onChange={(e) => setTipo(e.target.value as TipoSituacion)}>
+        <Select label="Tipo de situación" value={tipo} onChange={(e) => setTipo(e.target.value as TipoSituacion)} required>
+          {!tipo && <option value="">Elige el tipo</option>}
           {TIPOS_SITUACION.map((t) => (
             <option key={t} value={t}>
               Tipo {t}
@@ -111,7 +117,9 @@ function Formulario({ onClose, solicitud, onAbierto }: Props) {
               hideLabel
               value={i.rol}
               onChange={(e) => setInvolucrados((previa) => previa.map((x) => (x.student_id === i.student_id ? { ...x, rol: e.target.value as RolInvolucrado } : x)))}
+              required
             >
+              {!i.rol && <option value="">Rol en el hecho</option>}
               {ROLES_INVOLUCRADO.map((r) => (
                 <option key={r} value={r}>
                   {NOMBRES_ROL_INVOLUCRADO[r]}

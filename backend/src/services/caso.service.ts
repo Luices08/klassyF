@@ -141,10 +141,12 @@ export async function abrirCaso(input: AbrirCasoInput, usuario: UserDocument, ip
   if (solicitud && usuario.rol !== ROLES.ADMIN && !enAlcanceDeSede(comoUsuarioConvivencia(usuario), String(solicitud.sede_id))) throw solicitudNoDisponible();
 
   // Sin involucrados nuevos, el caso toma los de la solicitud: convivencia puede agregar los que el docente no pudo nombrar.
-  const pedidos = input.involucrados?.length
+  const pedidos: { student_id: string; rol: RolInvolucrado | null }[] = input.involucrados?.length
     ? input.involucrados
     : (solicitud?.involucrados.map((i) => ({ student_id: String(i.student_id), rol: i.rol })) ?? []);
   if (pedidos.length === 0) throw new ApiError(400, 'Indica al menos un estudiante involucrado.');
+  // Un reporte urgente llega sin roles: el docente no los asigna, coordinación los define al abrir el caso.
+  if (pedidos.some((p) => !p.rol)) throw new ApiError(400, 'Asigna el rol de cada estudiante en el hecho (afectado, presunto responsable, testigo o reportante).');
 
   const vistos = new Set<string>();
   const involucrados: { student_id: Types.ObjectId; rol: RolInvolucrado; group_id: Types.ObjectId; enrollment_id: Types.ObjectId; sede_id: Types.ObjectId }[] = [];
@@ -153,7 +155,7 @@ export async function abrirCaso(input: AbrirCasoInput, usuario: UserDocument, ip
     if (vistos.has(clave)) continue;
     vistos.add(clave);
     const contexto = await exigirPermisoSobreEstudiante(usuario, pedido.student_id, 'GESTIONAR_CASO');
-    involucrados.push({ student_id: contexto.student_id, rol: pedido.rol, group_id: contexto.grupo._id, enrollment_id: contexto.enrollment_id, sede_id: contexto.grupo.sede_id });
+    involucrados.push({ student_id: contexto.student_id, rol: pedido.rol as RolInvolucrado, group_id: contexto.grupo._id, enrollment_id: contexto.enrollment_id, sede_id: contexto.grupo.sede_id });
   }
   const sedeDelCaso = (involucrados.find((i) => i.rol === 'PRESUNTO_RESPONSABLE') ?? involucrados[0])!.sede_id;
 

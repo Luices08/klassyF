@@ -71,6 +71,12 @@ export function renderizarNotificacion(evento: EventoNotificacion, contador: num
         titulo: 'Situación de convivencia',
         mensaje: `Se registró una situación de convivencia que requiere atención${datos.estudiante ? ` de ${datos.estudiante}` : ''}. Comunícate con la institución.`,
       };
+    // Sin hechos ni nombres: el detalle se lee en la bandeja de solicitudes, que está acotada a convivencia.
+    case 'REPORTE_URGENTE':
+      return {
+        titulo: 'Reporte urgente de convivencia',
+        mensaje: `Hay ${n} ${plural(n, 'reporte urgente', 'reportes urgentes')} de convivencia por atender. Abre la bandeja de solicitudes.`,
+      };
     case 'CIERRE_PERIODO_PROXIMO':
       return {
         titulo: 'Cierre de periodo',

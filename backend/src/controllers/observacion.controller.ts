@@ -79,6 +79,15 @@ export const registrarFalta = catchAsync<unknown, unknown, observacionService.Re
   res.status(201).json({ success: true, data: await observacionService.registrarFalta(req.body, req.user!, req.ip) });
 });
 
+export const reportarSituacionGrave = catchAsync<unknown, unknown, observacionService.ReporteUrgenteInput>(async (req, res) => {
+  res.status(201).json({ success: true, data: await observacionService.reportarSituacionGrave(req.body, req.user!, req.ip) });
+});
+
+export const listarMisReportesUrgentes = catchAsync<unknown, unknown, unknown, ParsedQs & { pagina?: number; limite?: number }>(async (req, res) => {
+  const paginacion = { pagina: Number(req.query.pagina ?? 1), limite: Number(req.query.limite ?? 20) };
+  res.status(200).json({ success: true, ...(await observacionService.misReportesUrgentes(req.user!, paginacion)) });
+});
+
 export const historialDeEstudiante = catchAsync<EstudianteParams, unknown, unknown, ParsedQs & { pagina?: number; limite?: number }>(
   async (req, res) => {
     const paginacion = { pagina: Number(req.query.pagina ?? 1), limite: Number(req.query.limite ?? 20) };

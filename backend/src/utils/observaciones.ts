@@ -1,4 +1,4 @@
-import { ClaseRegistro, EstadoCompromiso, RolInvolucrado, TipoSituacion } from '../constants/convivencia';
+import { ClaseRegistro, EstadoCompromiso, TipoSituacion } from '../constants/convivencia';
 import { Rol } from '../constants/enums';
 import { ROLES } from '../constants/roles';
 
@@ -68,42 +68,23 @@ export function esVisibleParaEstudiante(obs: ObservacionParaVisibilidad & { visi
 
 // --- Reglas de contenido de una falta (por gravedad) ---
 
-export interface DatosFalta {
-  hechos: string;
-  version_estudiante?: string;
-  compromiso?: string;
-  acciones_contencion?: string;
-  remitir_comite?: boolean;
-  involucrados: { rol: RolInvolucrado }[];
+/** Las faltas Tipo II y III no las tipifica ni las cierra el docente: las reporta como situación urgente y coordinación abre el caso. */
+export const MENSAJE_FALTA_GRAVE = 'Una situación de gravedad II o III no se registra como falta: usa el reporte urgente y coordinación de convivencia abre el caso.';
+
+/** Qué exige el registro de una falta Tipo I (antecedente pedagógico): los hechos y, si se escala, nada más. */
+export function problemasDeFalta(gravedad: TipoSituacion, d: { hechos: string }): string[] {
+  const problemas: string[] = [];
+  if (esSituacionGrave(gravedad)) problemas.push(MENSAJE_FALTA_GRAVE);
+  if (!d.hechos.trim()) problemas.push('Describe los hechos.');
+  return problemas;
 }
 
-/** Una falta Tipo II/III siempre va a convivencia; una Tipo I solo si el docente lo decide. */
-export const debeRemitirse = (gravedad: TipoSituacion, remitirComite: boolean | undefined): boolean =>
-  esSituacionGrave(gravedad) || Boolean(remitirComite);
-
-/**
- * Qué exige y qué no una falta según su gravedad (el docente no cierra lo grave):
- *  - Tipo I: hechos, y opcionalmente la versión del estudiante y el acuerdo formativo; se queda como antecedente pedagógico.
- *  - Tipo II/III: hechos objetivos, involucrados con su rol y acciones de contención; sin versión ni acuerdo (los descargos y
- *    las medidas son del comité).
- */
-export function problemasDeFalta(gravedad: TipoSituacion, d: DatosFalta): string[] {
+/** Lo que exige un reporte urgente: hechos, la contención que se tomó en el momento y al menos un estudiante. */
+export function problemasDeReporteUrgente(d: { hechos: string; acciones_contencion: string; cantidad_estudiantes: number }): string[] {
   const problemas: string[] = [];
-  const hay = (texto?: string) => Boolean(texto?.trim());
-  if (!hay(d.hechos)) problemas.push('Describe los hechos.');
-  if (!d.involucrados.some((i) => i.rol === 'PRESUNTO_RESPONSABLE')) problemas.push('Indica al menos un presunto responsable.');
-
-  if (esSituacionGrave(gravedad)) {
-    if ((d.acciones_contencion?.trim().length ?? 0) < 5) problemas.push('Una falta Tipo II o III exige las acciones inmediatas de contención.');
-    if (hay(d.version_estudiante) || hay(d.compromiso)) {
-      problemas.push('En una falta Tipo II o III la versión del estudiante y el acuerdo los gestiona el comité: no se registran aquí.');
-    }
-  } else {
-    if (hay(d.acciones_contencion)) problemas.push('Las acciones de contención solo se piden en una falta Tipo II o III.');
-    if (d.involucrados.some((i) => i.rol !== 'PRESUNTO_RESPONSABLE')) {
-      problemas.push('En una falta Tipo I solo se indican los estudiantes que la cometieron.');
-    }
-  }
+  if (!d.hechos.trim()) problemas.push('Describe los hechos.');
+  if (d.acciones_contencion.trim().length < 5) problemas.push('Indica la medida de contención inmediata que tomaste.');
+  if (d.cantidad_estudiantes === 0) problemas.push('Indica al menos un estudiante involucrado.');
   return problemas;
 }
 

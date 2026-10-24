@@ -3,7 +3,6 @@ import {
   MAX_COMPROMISO,
   MAX_DESCRIPCION_OBSERVACION,
   MAX_ESTUDIANTES_POR_EVENTO,
-  ROLES_INVOLUCRADO,
 } from '../constants/convivencia';
 import { ESTADOS_USUARIO } from '../constants/enums';
 import { ValidationSchema } from '../middlewares/validate.middleware';
@@ -70,10 +69,10 @@ export const registrarObservacion: ValidationSchema = {
     tipo_id: objectId.required(),
     descripcion: descripcion.min(1).required(),
     compromiso,
+    version_estudiante: descripcion.allow(''),
     requiere_citacion: Joi.boolean(),
     confidencial: Joi.boolean(),
     fecha_hecho: fechaDeCalendario.required(),
-    en_nombre_de_id: objectId,
   }),
 };
 
@@ -84,14 +83,18 @@ export const registrarFalta: ValidationSchema = {
     hechos: descripcion.min(1).required(),
     version_estudiante: descripcion.allow(''),
     compromiso,
-    acciones_contencion: Joi.string().trim().max(1000).allow(''),
-    remitir_comite: Joi.boolean(),
-    involucrados: Joi.array()
-      .items(Joi.object({ student_id: objectId.required(), rol: Joi.string().valid(...ROLES_INVOLUCRADO).required() }))
-      .min(1)
-      .max(MAX_ESTUDIANTES_POR_EVENTO)
-      .required(),
-    en_nombre_de_id: objectId,
+    escalar_a_coordinacion: Joi.boolean(),
+    estudiantes_ids: Joi.array().items(objectId).min(1).max(MAX_ESTUDIANTES_POR_EVENTO).required(),
+  }),
+};
+
+// El docente no tipifica ni asigna roles: solo cuenta qué pasó, a quiénes nombra y qué contención aplicó.
+export const reportarSituacionGrave: ValidationSchema = {
+  body: Joi.object({
+    fecha_hecho: fechaDeCalendario.required(),
+    hechos: descripcion.min(1).required(),
+    acciones_contencion: Joi.string().trim().min(5).max(1000).required(),
+    estudiantes_ids: Joi.array().items(objectId).min(1).max(MAX_ESTUDIANTES_POR_EVENTO).required(),
   }),
 };
 
@@ -105,6 +108,7 @@ export const historialDeEstudiante: ValidationSchema = {
   query: Joi.object(paginacion),
 };
 export const listarMisObservaciones: ValidationSchema = { query: Joi.object(paginacion) };
+export const listarMisReportesUrgentes: ValidationSchema = { query: Joi.object(paginacion) };
 export const obtenerObservacion = idParam;
 
 export const enmendarObservacion: ValidationSchema = {

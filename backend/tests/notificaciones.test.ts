@@ -15,6 +15,13 @@ describe('renderizarNotificacion', () => {
     expect(mensaje).not.toContain('agresión');
   });
 
+  it('los reportes urgentes se agrupan en una alerta y no revelan hechos ni nombres', () => {
+    expect(renderizarNotificacion('REPORTE_URGENTE', 1, { estudiante: 'Ana', motivo: 'agresión' }).mensaje).toContain('1 reporte urgente');
+    const varios = renderizarNotificacion('REPORTE_URGENTE', 3, { estudiante: 'Ana', motivo: 'agresión' }).mensaje;
+    expect(varios).toContain('3 reportes urgentes');
+    expect(varios).not.toMatch(/Ana|agresión/);
+  });
+
   it('el cierre de periodo habla en singular y en el mismo día', () => {
     expect(renderizarNotificacion('CIERRE_PERIODO_PROXIMO', 1, { periodo: 2, dias: 1 }).mensaje).toContain('en 1 día');
     expect(renderizarNotificacion('CIERRE_PERIODO_PROXIMO', 1, { periodo: 2, dias: 0 }).mensaje).toContain('hoy');

@@ -1,11 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import {
-  debeRemitirse,
   dentroDelPlazo,
   esSeguimientoDeOrientacion,
   esSituacionGrave,
   esVisibleParaEstudiante,
+  MENSAJE_FALTA_GRAVE,
   problemasDeFalta,
+  problemasDeReporteUrgente,
   tituloDeRegistro,
   visibilidadDeObservacion,
   vistaObservacion,
@@ -122,53 +123,30 @@ describe('esVisibleParaEstudiante', () => {
 });
 
 describe('problemasDeFalta', () => {
-  const presunto = [{ rol: 'PRESUNTO_RESPONSABLE' as const }];
-
-  it('una falta Tipo I solo pide hechos; versión y acuerdo son opcionales', () => {
-    expect(problemasDeFalta('I', { hechos: 'Llegó tarde.', involucrados: presunto })).toEqual([]);
-    expect(problemasDeFalta('I', { hechos: 'Llegó tarde.', version_estudiante: 'Se me dañó la ruta.', compromiso: 'Llegará a tiempo.', involucrados: presunto })).toEqual([]);
+  it('una falta Tipo I solo pide hechos', () => {
+    expect(problemasDeFalta('I', { hechos: 'Llegó tarde.' })).toEqual([]);
+    expect(problemasDeFalta('I', { hechos: '  ' })).toEqual(['Describe los hechos.']);
   });
 
-  it('una falta Tipo I no acepta contención ni otros roles', () => {
-    const problemas = problemasDeFalta('I', {
-      hechos: 'Discusión.',
-      acciones_contencion: 'Se separó a los estudiantes.',
-      involucrados: [{ rol: 'PRESUNTO_RESPONSABLE' }, { rol: 'AFECTADO' }],
-    });
-    expect(problemas).toHaveLength(2);
-  });
-
-  it('una falta Tipo II/III exige contención y no acepta versión ni acuerdo', () => {
+  it('lo grave (Tipo II y III) no se registra como falta: el docente lo reporta como situación urgente', () => {
     for (const gravedad of ['II', 'III'] as const) {
-      expect(problemasDeFalta(gravedad, { hechos: 'Agresión.', involucrados: presunto })).toEqual(['Una falta Tipo II o III exige las acciones inmediatas de contención.']);
-      expect(
-        problemasDeFalta(gravedad, {
-          hechos: 'Agresión.',
-          acciones_contencion: 'Se llevó a enfermería.',
-          compromiso: 'No lo volverá a hacer.',
-          involucrados: [...presunto, { rol: 'AFECTADO' }, { rol: 'TESTIGO' }],
-        })
-      ).toHaveLength(1);
-      expect(
-        problemasDeFalta(gravedad, { hechos: 'Agresión.', acciones_contencion: 'Se llevó a enfermería.', involucrados: [...presunto, { rol: 'AFECTADO' }] })
-      ).toEqual([]);
+      expect(problemasDeFalta(gravedad, { hechos: 'Agresión.' }), gravedad).toEqual([MENSAJE_FALTA_GRAVE]);
     }
-  });
-
-  it('siempre pide hechos y un presunto responsable', () => {
-    expect(problemasDeFalta('I', { hechos: '  ', involucrados: [] })).toEqual(['Describe los hechos.', 'Indica al menos un presunto responsable.']);
-    expect(problemasDeFalta('II', { hechos: 'x', acciones_contencion: 'Contención inmediata.', involucrados: [{ rol: 'AFECTADO' }] })).toEqual([
-      'Indica al menos un presunto responsable.',
-    ]);
   });
 });
 
-describe('debeRemitirse', () => {
-  it('lo grave siempre va a convivencia; lo leve solo si el docente lo decide', () => {
-    expect(debeRemitirse('II', false)).toBe(true);
-    expect(debeRemitirse('III', undefined)).toBe(true);
-    expect(debeRemitirse('I', undefined)).toBe(false);
-    expect(debeRemitirse('I', true)).toBe(true);
+describe('problemasDeReporteUrgente', () => {
+  const base = { hechos: 'Se agredieron en el patio.', acciones_contencion: 'Se llevó a uno a enfermería.', cantidad_estudiantes: 2 };
+
+  it('un reporte completo no tiene problemas: no pide falta, gravedad ni roles', () => {
+    expect(problemasDeReporteUrgente(base)).toEqual([]);
+  });
+
+  it('exige los hechos, la contención inmediata y al menos un estudiante', () => {
+    expect(problemasDeReporteUrgente({ ...base, hechos: '  ' })).toEqual(['Describe los hechos.']);
+    expect(problemasDeReporteUrgente({ ...base, acciones_contencion: 'ok' })).toEqual(['Indica la medida de contención inmediata que tomaste.']);
+    expect(problemasDeReporteUrgente({ ...base, cantidad_estudiantes: 0 })).toEqual(['Indica al menos un estudiante involucrado.']);
+    expect(problemasDeReporteUrgente({ hechos: '', acciones_contencion: '', cantidad_estudiantes: 0 })).toHaveLength(3);
   });
 });
 

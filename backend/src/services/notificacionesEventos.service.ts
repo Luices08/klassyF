@@ -173,6 +173,20 @@ export function avisarFaltaGrave(falta: { observacionId: Id; estudianteId: Id; s
   });
 }
 
+/**
+ * M14: llegó una solicitud de caso a convivencia (un reporte urgente o una falta Tipo I que el docente escaló): punto rojo en «Solicitudes de caso»
+ * para ADMIN y coordinación de convivencia de esa sede. Un reporte urgente además es alerta crítica en su campanita (agrupada: «Hay 3 reportes…»).
+ */
+export function avisarSolicitudDeCaso(solicitud: { sedeId: Id; urgente: boolean }): Promise<void> {
+  return sinRomper('solicitud de caso', async () => {
+    await insigniaParaRoles([ROLES.ADMIN, ROLES.COORDINADOR_CONVIVENCIA], '/convivencia/solicitudes', solicitud.sedeId);
+    if (!solicitud.urgente) return;
+    for (const rol of [ROLES.ADMIN, ROLES.COORDINADOR_CONVIVENCIA]) {
+      await avisar({ destinatarios: await usuariosConRol([rol], solicitud.sedeId), rol, evento: 'REPORTE_URGENTE', entidad_id: 'reportes-urgentes', ruta: '/convivencia/solicitudes' });
+    }
+  });
+}
+
 /** M11: una actividad ya publicada → los estudiantes del grupo la ven en su campanita (agrupada por asignatura) y en la pestaña «Pendientes». */
 export function avisarActividadNueva(asignacion: { _id: Id; group_id?: Id | null; subject_id?: Id | null; academic_year_id: Id }): Promise<void> {
   return sinRomper('actividad nueva', async () => {

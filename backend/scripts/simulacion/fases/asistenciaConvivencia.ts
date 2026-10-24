@@ -156,10 +156,11 @@ const COMPROMISOS = ['Se compromete a respetar las normas de la clase.', 'Acuerd
 
 interface SolicitudVista {
   _id: string;
-  gravedad: Gravedad;
+  /** null en un reporte urgente: la tipifica la coordinación al abrir el caso. */
+  gravedad: Gravedad | null;
   fecha_hecho: string;
   hechos: string;
-  involucrados: Array<{ student_id: string; rol: string }>;
+  involucrados: Array<{ student_id: string; rol: string | null }>;
 }
 
 export function eventosDeConvivencia(
@@ -205,14 +206,18 @@ export function eventosDeConvivencia(
               const opciones = manual.filter((f) => f.gravedad === gravedad);
               if (opciones.length === 0) return;
               const falta = azarPara(ctx.semilla, 'falta', anio, periodo, s, n, gravedad).elegir(opciones);
-              await docente.post('/observaciones/faltas', {
-                falta_id: falta._id,
-                fecha_hecho: isoDia(dia),
-                hechos: `${falta.descripcion} Lo observó el docente durante la jornada en el grupo ${g.nombre}.`,
-                compromiso,
-                ...(gravedad === 'I' ? {} : { acciones_contencion: azarPara(ctx.semilla, 'contencion', anio, periodo, s, n).elegir(CONTENCION) }),
-                involucrados: [{ student_id: s, rol: 'PRESUNTO_RESPONSABLE' }, ...(afectado ? [{ student_id: afectado, rol: 'AFECTADO' }] : [])],
-              });
+              const hechos = `${falta.descripcion} Lo observó el docente durante la jornada en el grupo ${g.nombre}.`;
+              // Lo leve queda como falta Tipo I; lo grave el docente solo lo reporta (sin falta ni roles) y convivencia abre el caso.
+              if (gravedad === 'I') {
+                await docente.post('/observaciones/faltas', { falta_id: falta._id, fecha_hecho: isoDia(dia), hechos, compromiso, estudiantes_ids: [s] });
+              } else {
+                await docente.post('/observaciones/reportes-urgentes', {
+                  fecha_hecho: isoDia(dia),
+                  hechos,
+                  acciones_contencion: azarPara(ctx.semilla, 'contencion', anio, periodo, s, n).elegir(CONTENCION),
+                  estudiantes_ids: [s, ...(afectado ? [afectado] : [])],
+                });
+              }
               contadores[gravedad] += 1;
             },
           });
@@ -229,12 +234,14 @@ export function eventosDeConvivencia(
         const api = como(await convivencia());
         const { data } = await api.get<SolicitudVista[]>('/convivencia/solicitudes', { limite: 50 });
         for (const sol of data) {
+          // Convivencia tipifica según el manual: la falta que describe el reporte fija el tipo, y el primer nombrado es el presunto responsable.
+          const tipo = sol.gravedad ?? manual.find((f) => sol.hechos.includes(f.descripcion))?.gravedad ?? 'II';
           await api.post('/convivencia/casos', {
-            tipo_situacion: sol.gravedad,
+            tipo_situacion: tipo,
             fecha_hecho: String(sol.fecha_hecho).slice(0, 10),
             hechos: sol.hechos.length >= 10 ? sol.hechos : `${sol.hechos} (sin más detalle)`,
             como_se_conocio: 'Reporte del docente',
-            involucrados: sol.involucrados.map((x) => ({ student_id: x.student_id, rol: x.rol })),
+            involucrados: sol.involucrados.map((x, i) => ({ student_id: x.student_id, rol: x.rol ?? (i === 0 ? 'PRESUNTO_RESPONSABLE' : 'AFECTADO') })),
             solicitud_id: sol._id,
           });
           contadores.casos += 1;

@@ -375,14 +375,16 @@ export async function descargarPlantillaFaltas(formato: 'xlsx' | 'csv'): Promise
 export interface SolicitudCasoVista {
   _id: string;
   estado: 'PENDIENTE' | 'DESCARTADA' | 'CONVERTIDA';
-  gravedad: TipoSituacion;
-  falta: { falta_id: string; codigo: string; descripcion: string };
+  /** null en un reporte urgente: lo tipifica quien abre el caso. */
+  gravedad: TipoSituacion | null;
+  falta: { falta_id: string; codigo: string; descripcion: string } | null;
   fecha_hecho: string;
   hechos: string;
   acciones_contencion: string;
   solicitada_por: string | null;
   createdAt: string;
-  involucrados: { student_id: string; rol: RolInvolucrado; estudiante: string; numero_documento: string; grupo: string }[];
+  /** `rol` es null en un reporte urgente: coordinación lo asigna al abrir el caso. */
+  involucrados: { student_id: string; rol: RolInvolucrado | null; estudiante: string; numero_documento: string; grupo: string }[];
   resolucion: { motivo: string; fecha: string } | null;
   caso_id: string | null;
 }

@@ -244,6 +244,8 @@ export interface RegistrarObservacionInput {
   tipo_id: string;
   descripcion: string;
   compromiso?: string;
+  /** Lo que el estudiante manifestó (descargo verbal). */
+  version_estudiante?: string;
   requiere_citacion: boolean;
   confidencial: boolean;
   fecha_hecho: string;
@@ -257,21 +259,22 @@ export function useRegistrarObservacion() {
   });
 }
 
+/** Una falta Tipo I (leve). Lo grave no se registra como falta: se reporta como situación urgente. */
 export interface RegistrarFaltaInput {
   falta_id: string;
   fecha_hecho: string;
   hechos: string;
   version_estudiante?: string;
   compromiso?: string;
-  acciones_contencion?: string;
-  remitir_comite?: boolean;
-  involucrados: { student_id: string; rol: RolInvolucrado }[];
+  /** Si no se resolvió con la mediación del aula, llega a coordinación de convivencia como solicitud de caso. */
+  escalar_a_coordinacion?: boolean;
+  estudiantes_ids: string[];
 }
 
 export interface ResultadoFalta {
   registros: ObservacionVista[];
-  /** true si se generó una solicitud de caso para convivencia. */
-  remitida: boolean;
+  /** true si se generó una solicitud de caso para coordinación de convivencia. */
+  escalada: boolean;
 }
 
 export function useRegistrarFalta() {
@@ -279,6 +282,44 @@ export function useRegistrarFalta() {
   return useMutation({
     mutationFn: (input: RegistrarFaltaInput) => api.post<ResultadoFalta>('/observaciones/faltas', input),
     onSuccess: invalidar,
+  });
+}
+
+/** El docente no tipifica ni asigna roles: cuenta qué pasó, a quiénes nombra y qué contención aplicó. */
+export interface ReporteUrgenteInput {
+  fecha_hecho: string;
+  hechos: string;
+  acciones_contencion: string;
+  estudiantes_ids: string[];
+}
+
+export function useReportarSituacionGrave() {
+  const invalidar = useInvalidarObservaciones();
+  return useMutation({
+    mutationFn: (input: ReporteUrgenteInput) => api.post<{ _id: string; estado: string; estudiantes: number }>('/observaciones/reportes-urgentes', input),
+    onSuccess: invalidar,
+  });
+}
+
+/** Lo que reportó el docente y qué pasó con ello (el expediente del caso nunca viaja). */
+export interface ReporteUrgentePropio {
+  _id: string;
+  fecha_hecho: string;
+  createdAt: string;
+  hechos: string;
+  acciones_contencion: string;
+  estudiantes: string[];
+  estado: 'PENDIENTE' | 'DESCARTADA' | 'CONVERTIDA';
+  motivo_resolucion: string;
+  caso: { codigo: string; estado: string } | null;
+}
+
+export function useMisReportesUrgentes(pagina: number) {
+  return useQuery({
+    queryKey: ['observaciones', 'reportes-urgentes', pagina],
+    queryFn: () => api.raw<{ success: true; data: ReporteUrgentePropio[]; total: number; pagina: number; limite: number }>('/observaciones/reportes-urgentes/mios', { query: { pagina, limite: 20 } }),
+    select: (res) => ({ data: res.data, total: res.total, pagina: res.pagina, limite: res.limite }),
+    placeholderData: keepPreviousData,
   });
 }
 

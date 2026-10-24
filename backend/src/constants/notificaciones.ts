@@ -30,6 +30,7 @@ export const EVENTOS_NOTIFICACION = [
   'DOCUMENTO_RECHAZADO',
   'BOLETIN_PUBLICADO',
   'FALTA_GRAVE',
+  'REPORTE_URGENTE',
   'CIERRE_PERIODO_PROXIMO',
   'INASISTENCIA_REGISTRADA',
   'OBSERVACION_REGISTRADA',
@@ -64,6 +65,8 @@ export const METADATOS_EVENTO: Record<EventoNotificacion, MetadatoEvento> = {
   BOLETIN_PUBLICADO: { severidad: 'IMPORTANTE', canales: ['CAMPANITA'] },
   // Una citación o falta grave llega también por correo cuando exista el envío: por eso el canal ya queda registrado.
   FALTA_GRAVE: { severidad: 'CRITICA', canales: ['CAMPANITA', 'CORREO'] },
+  // Un docente reportó una situación grave: coordinación de convivencia la atiende de inmediato (abre el caso y tipifica).
+  REPORTE_URGENTE: { severidad: 'CRITICA', canales: ['CAMPANITA'] },
   CIERRE_PERIODO_PROXIMO: { severidad: 'IMPORTANTE', canales: ['CAMPANITA'] },
   INASISTENCIA_REGISTRADA: { severidad: 'IMPORTANTE', canales: ['CAMPANITA'] },
   OBSERVACION_REGISTRADA: { severidad: 'INFO', canales: ['CAMPANITA'] },

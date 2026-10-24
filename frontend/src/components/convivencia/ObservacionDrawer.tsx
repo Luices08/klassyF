@@ -45,7 +45,7 @@ function Formulario({ onClose, catalogo = SIN_CATALOGO, estudiantes = [], observ
   const mutation = enmienda ? enmendar : registrar;
 
   const esFalta = observacion?.clase === 'FALTA';
-  // En una falta Tipo II/III la versión del estudiante y el acuerdo los gestiona el comité.
+  // Registros anteriores de una falta Tipo II/III: la versión del estudiante y el acuerdo los gestiona convivencia, no se enmiendan aquí.
   const faltaLeve = esFalta && observacion?.gravedad === 'I';
   const [tipoId, setTipoId] = useState(catalogo.tipos[0]?._id ?? '');
   const [fecha, setFecha] = useState(hoyLocal());
@@ -53,7 +53,9 @@ function Formulario({ onClose, catalogo = SIN_CATALOGO, estudiantes = [], observ
   const [compromiso, setCompromiso] = useState(observacion?.compromiso ?? '');
   const [versionEstudiante, setVersionEstudiante] = useState(observacion?.version_estudiante ?? '');
   const [requiereCitacion, setRequiereCitacion] = useState(observacion?.requiere_citacion ?? false);
-  const [confidencial, setConfidencial] = useState(esOrientador ? true : (observacion?.confidencial ?? false));
+  // El seguimiento psicosocial de orientación es confidencial siempre, lo escriba quien lo escriba o lo corrija quien lo corrija.
+  const siempreConfidencial = esOrientador || observacion?.contexto === 'ORIENTACION';
+  const [confidencial, setConfidencial] = useState(siempreConfidencial ? true : (observacion?.confidencial ?? false));
 
   const sinDestino = !enmienda && estudiantes.length === 0;
 
@@ -63,7 +65,7 @@ function Formulario({ onClose, catalogo = SIN_CATALOGO, estudiantes = [], observ
       await enmendar.mutateAsync({
         id: observacion._id,
         descripcion,
-        ...(esFalta ? (faltaLeve ? { compromiso, version_estudiante: versionEstudiante } : {}) : { compromiso, requiere_citacion: requiereCitacion, confidencial }),
+        ...(esFalta ? (faltaLeve ? { compromiso, version_estudiante: versionEstudiante } : {}) : { compromiso, version_estudiante: versionEstudiante, requiere_citacion: requiereCitacion, confidencial }),
       });
     } else {
       await registrar.mutateAsync({
@@ -71,6 +73,7 @@ function Formulario({ onClose, catalogo = SIN_CATALOGO, estudiantes = [], observ
         tipo_id: tipoId,
         descripcion,
         compromiso: compromiso || undefined,
+        version_estudiante: versionEstudiante || undefined,
         requiere_citacion: requiereCitacion,
         confidencial,
         fecha_hecho: fecha,
@@ -129,7 +132,7 @@ function Formulario({ onClose, catalogo = SIN_CATALOGO, estudiantes = [], observ
         hint={`${descripcion.length}/${MAX_DESCRIPCION} · relata lo ocurrido de forma objetiva`}
       />
 
-      {faltaLeve && (
+      {(!esFalta || faltaLeve) && (
         <Textarea
           label="Versión del estudiante (opcional)"
           rows={3}
@@ -166,14 +169,14 @@ function Formulario({ onClose, catalogo = SIN_CATALOGO, estudiantes = [], observ
               type="checkbox"
               className="mt-0.5 h-4 w-4 rounded border-border text-primary focus:ring-primary"
               checked={confidencial}
-              disabled={esOrientador}
+              disabled={siempreConfidencial}
               onChange={(e) => setConfidencial(e.target.checked)}
             />
             <span>
               Confidencial
               <span className="block text-xs text-muted">
-                {esOrientador
-                  ? 'El seguimiento de orientación siempre es confidencial.'
+                {siempreConfidencial
+                  ? 'El seguimiento de orientación siempre es confidencial y solo lo lee quien lo escribió.'
                   : 'Solo la leerán tú, orientación y coordinación de convivencia. Úsalo si contiene datos sensibles.'}
               </span>
             </span>

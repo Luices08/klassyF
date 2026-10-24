@@ -2,7 +2,7 @@ import { type FormEvent, useState } from 'react';
 import { AbrirCasoDrawer } from '../../components/convivencia/AbrirCasoDrawer';
 import { CasoDetalleDrawer } from '../../components/convivencia/CasoDetalleDrawer';
 import { Alert, errorMessage } from '../../components/ui/Alert';
-import { TipoSituacionBadge } from '../../components/ui/Badge';
+import { Chip, TipoSituacionBadge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import { Card, CardHeader } from '../../components/ui/Card';
 import { Drawer } from '../../components/ui/Drawer';
@@ -28,7 +28,7 @@ export function SolicitudesCasoPage() {
     <div className="space-y-4">
       <PageHeader
         title="Solicitudes de caso"
-        subtitle="Faltas que los docentes enviaron a convivencia para que se abra el caso. Cada consulta de esta bandeja queda registrada en la auditoría."
+        subtitle="Reportes urgentes y faltas que los docentes escalaron a convivencia para que se abra el caso. Cada consulta de esta bandeja queda registrada en la auditoría."
       />
       {bandeja.isLoading && <Spinner />}
       {bandeja.isError && <Alert tone="error">{errorMessage(bandeja.error)}</Alert>}
@@ -50,9 +50,9 @@ export function SolicitudesCasoPage() {
                 <tr key={s._id}>
                   <Td>{formatoFechaCalendario(s.fecha_hecho)}</Td>
                   <Td className="max-w-xs">
-                    <TipoSituacionBadge value={s.gravedad} />
+                    {s.gravedad ? <TipoSituacionBadge value={s.gravedad} /> : <Chip tone="red">Reporte urgente</Chip>}
                     <span className="mt-1 block text-sm">
-                      {s.falta.codigo} · {s.falta.descripcion}
+                      {s.falta ? `${s.falta.codigo} · ${s.falta.descripcion}` : 'Sin tipificar: lo define coordinación al abrir el caso.'}
                     </span>
                     {s.solicitada_por && <span className="block text-xs text-muted">Reporta: {s.solicitada_por}</span>}
                   </Td>
@@ -61,7 +61,7 @@ export function SolicitudesCasoPage() {
                       <span key={i.student_id} className="block text-sm">
                         {i.estudiante}
                         <span className="block text-xs text-muted">
-                          {NOMBRES_ROL_INVOLUCRADO[i.rol]} · {i.numero_documento} · {i.grupo}
+                          {i.rol ? `${NOMBRES_ROL_INVOLUCRADO[i.rol]} · ` : ''}{i.numero_documento} · {i.grupo}
                         </span>
                       </span>
                     ))}
@@ -130,7 +130,7 @@ function Formulario({ solicitud, onClose }: { solicitud: SolicitudCasoVista; onC
     <Drawer
       open
       title="Descartar solicitud"
-      subtitle={`Falta ${solicitud.falta.codigo}`}
+      subtitle={solicitud.falta ? `Falta ${solicitud.falta.codigo}` : 'Reporte urgente'}
       onClose={onClose}
       onSubmit={guardar}
       submitLabel="Descartar"
@@ -139,8 +139,8 @@ function Formulario({ solicitud, onClose }: { solicitud: SolicitudCasoVista; onC
       submitDisabled={motivo.trim().length < 5}
     >
       {descartar.isError && <Alert tone="error">{errorMessage(descartar.error)}</Alert>}
-      <Alert tone="warning">La falta se conserva en el Observador; solo se cierra la solicitud, con el motivo que escribas.</Alert>
-      <Textarea label="Motivo" rows={3} maxLength={500} value={motivo} onChange={(e) => setMotivo(e.target.value)} />
+      <Alert tone="warning">{solicitud.falta ? 'La falta se conserva en el Observador; solo se cierra la solicitud, con el motivo que escribas.' : 'El reporte no genera antecedente en el Observador; solo se cierra la solicitud, con el motivo que escribas.'}</Alert>
+      <Textarea label="Motivo" rows={3} maxLength={1000} value={motivo} onChange={(e) => setMotivo(e.target.value)} />
     </Drawer>
   );
 }

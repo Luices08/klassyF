@@ -301,12 +301,18 @@ Reglas que no se ven leyendo un solo archivo:
 - **Una observación NO es una falta.** Una sola colección `Observacion` con `clase` = `OBSERVACION` | `FALTA`, pero con contratos distintos
   (se validan en el modelo y en `observacion.validator.ts`):
   - **Observación** (lo cotidiano, Idea_Klassy M14): `tipo` (configurable), `descripcion` de los hechos (texto libre), `compromiso` (texto
-    opcional), `requiere_citacion` (booleano) y `confidencial` (booleano). Se asienta de inmediato en el Observador y en el historial.
-  - **Falta** (`POST /observaciones/faltas`, la registra el docente de clase o el titular de grupo, y convivencia): el docente **elige una falta
-    del manual** (`FaltaConvivencia`, M15) y **no tipifica**: la gravedad I/II/III sale de la falta. **Tipo I** se queda en el Observador (hechos,
-    versión del estudiante y compromiso opcionales; puede marcar "remitir al comité"). **Tipo II/III** (o una Tipo I remitida) crea siempre una
-    `SolicitudCaso` con hechos, involucrados con su rol (afectado, presunto responsable, testigo, reportante) y las acciones de contención; el
-    coordinador de convivencia abre el caso formal (M15). El antecedente en el Observador solo queda en los presuntos responsables.
+    opcional), `version_estudiante` (lo que el estudiante manifestó, opcional), `requiere_citacion` (booleano) y `confidencial` (booleano). Se asienta de
+    inmediato en el Observador y en el historial.
+  - **Falta Tipo I** (`POST /observaciones/faltas`, la registra el docente de clase o el titular de grupo, y convivencia): el docente elige una falta leve
+    del manual (`FaltaConvivencia`, M15) y los estudiantes que la cometieron (`estudiantes_ids`); queda en el Observador como antecedente pedagógico (hechos,
+    versión del estudiante y compromiso opcionales). Si no se resolvió con la mediación del aula marca **«escalar a coordinación»**
+    (`escalar_a_coordinacion`) y además llega una `SolicitudCaso`. **Una falta de gravedad II o III no se registra como falta** (400): el docente no
+    tipifica lo grave.
+  - **Reporte urgente** (`POST /observaciones/reportes-urgentes`, mismos roles que la falta; `GET .../mios` lista los propios): para una situación grave el
+    docente solo cuenta **qué pasó, a quiénes nombra y qué contención aplicó** (sin falta, sin gravedad, sin roles). Crea una `SolicitudCaso` sin
+    tipificar (`gravedad` y `falta` null, `rol` null en cada involucrado) y una **alerta crítica agrupada** (`REPORTE_URGENTE`) más punto rojo para ADMIN y
+    el coordinador de convivencia de la sede. **No deja antecedente en el Observador de nadie** (así una víctima o un estudiante ajeno al hecho no queda
+    marcado y un caso descartado no deja rastro). Quien reportó ve el estado de su reporte y el código del caso, nunca el expediente.
 - **El catálogo es de cada colegio, no del sistema.** Solo se siembran los tipos base "Académica" y "Comportamental" (no hay `familia`: el sistema
   no distingue tipos por nombre). ADMIN y `COORDINADOR_CONVIVENCIA` agregan, editan, desactivan y eliminan (eliminar solo lo no usado; lo
   usado se desactiva). **No existen categorías ni "frases"**: se eliminaron porque eran de otro módulo; las faltas (con gravedad) son de M15.
@@ -340,8 +346,7 @@ Reglas que no se ven leyendo un solo archivo:
 - **Pruebas con base real**: `tests/integracion/` usa `mongodb-memory-server` con réplica (solo dev; la primera ejecución descarga el binario de
   MongoDB). `npm test` las incluye.
 - **Retención**: es política del colegio (`ConfiguracionConvivencia.retencion_anios_*`, vacío = sin plazo); `GET /convivencia/retencion` solo informa lo
-  vencido, nunca borra. **Pendiente, a propósito**: la migración histórica. Registrar "en nombre de" un docente existe en la API
-  (`en_nombre_de_id`) pero aún no tiene pantalla. El descuento de décimas por falta está diferido (solo se guarda).
+  vencido, nunca borra. **Pendiente, a propósito**: la migración histórica. El descuento de décimas por falta está diferido (solo se guarda).
 
 ### M15 (Comité de Convivencia Escolar) — estado: casos, comité y actas completos
 
@@ -360,10 +365,11 @@ las pestañas Faltas / Medidas / Entidades / Protocolos / Plazos de `CatalogoCon
   **única carga masiva de convivencia**: `.xlsx` o `.csv` por el mismo canal (`leerCsv` o `exceljs` → filas normalizadas → un plan de validación), **se
   valida todo el archivo antes de escribir** (una fila con error y no se guarda nada), idempotente por código, fórmulas neutralizadas al generar y
   rechazadas al leer, firma ZIP, 2 MB, 1000 filas. Cada carga queda en un `LoteImportacion` (solo la huella SHA-256, no el archivo).
-- **`SolicitudCaso` es el traspaso M14 → M15**: la crea el registro de una falta Tipo II/III (o una Tipo I que el docente remite) con la falta (copiada),
-  los hechos, los involucrados con su rol y las acciones de contención. La atiende convivencia de la sede desde `/convivencia/solicitudes`
-  (`GET`, auditada): **abrir caso** (`POST /convivencia/casos` con `solicitud_id`, la solicitud pasa a CONVERTIDA y el caso hereda hechos,
-  involucrados y `contencion_reportada`) o **descartar con motivo**. Un caso también puede abrirse directo (`origen`: `SOLICITUD` | `DIRECTO`).
+- **`SolicitudCaso` es el traspaso M14 → M15**: la crea un **reporte urgente** (hechos, estudiantes nombrados y contención; sin tipo ni roles) o una falta Tipo I
+  que el docente escala (con la falta copiada y los estudiantes como presuntos responsables). La atiende convivencia de la sede desde `/convivencia/solicitudes`
+  (`GET`, auditada): **abrir caso** (`POST /convivencia/casos` con `solicitud_id`, la solicitud pasa a CONVERTIDA y el caso hereda hechos y
+  `contencion_reportada`; **de un reporte urgente coordinación elige el tipo y asigna el rol de cada estudiante**: sin roles responde 400) o **descartar con motivo**.
+  Los registros anteriores al reporte urgente (faltas II/III con su solicitud y antecedente) se siguen leyendo igual. Un caso también puede abrirse directo (`origen`: `SOLICITUD` | `DIRECTO`).
 - **Tipos I/II/III fijos (ley); todo lo demás es del colegio.** El tipo lo fija quien abre el caso (no el docente); subir de tipo es de
   convivencia con motivo (y suma los pasos del protocolo nuevo sin perder lo hecho); bajarlo, solo ADMIN. Las faltas del manual son las
   `FaltaConvivencia`: la decisión las referencia (`faltas_ids`, copiadas). `ProtocoloConvivencia` (pasos por tipo) se **copia** al caso al abrirlo:

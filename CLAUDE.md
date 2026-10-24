@@ -422,6 +422,12 @@ las pestañas Faltas / Medidas / Entidades / Protocolos / Plazos de `CatalogoCon
   **afectados y los presuntos responsables** (`ROLES_CUYA_FAMILIA_SE_INFORMA`; no testigos ni quien reportó) reciben una alerta crítica `FALTA_GRAVE` y un punto en la
   pestaña de convivencia de su hijo, **sin hechos, sin nombres de otros menores y sin decir qué papel tuvo cada uno**. No sustituye el registro formal «notificación a
   acudientes» que exige el cierre.
+- **Qué cuenta como falta para otros módulos** (`faltasContadas`, `faltasConvivencia.service.ts`): un solo criterio para la promoción M19 (`FALTAS_CONVIVENCIA_AL_MENOS` y el cierre que lee el
+  rollover), el módulo predictivo, la ficha técnica de la comisión M20 y el panel de convivencia M30. **Tipo I** = las faltas que el docente registró en el Observador; **tipo II y III** = solo
+  los casos con **decisión en firme** (`decision` registrada, caso sin anular), una vez por cada presunto responsable y con el tipo vigente del caso. Un reporte urgente, una solicitud o un caso sin
+  decisión **no es una falta** (presunción de inocencia; un caso descartado no debe dejar rastro). Una falta II/III guardada como observación antes del reporte urgente sigue contando mientras no
+  esté ligada a un caso (`observacion_ids`); si ya tiene caso, cuenta el caso y solo con decisión, para no contarla dos veces. El panel de convivencia excluye los casos de los que el usuario se
+  declaró impedido. Pruebas: `tests/integracion/faltasConvivencia.int.test.ts`.
 - **Pendiente, a propósito**: portal del acudiente/estudiante (M27). El PIAR es M16.
 
 ### M16 (Inclusión — PIAR y plan de apoyo pedagógico) — estado: núcleo completo

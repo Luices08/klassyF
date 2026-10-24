@@ -14,6 +14,7 @@ import User, { UserDocument } from '../models/user.model';
 import ApiError from '../utils/ApiError';
 import { registrarEvento } from './audit.service';
 import { calcularEstadisticas } from './attendanceStats.service';
+import { faltasContadas } from './faltasConvivencia.service';
 
 /** Rectoría y coordinación siempre; un docente o integrante solo si el estudiante está en una sesión de la que forma parte. */
 async function exigirAcceso(usuario: UserDocument, studentId: string, anioId: string): Promise<void> {
@@ -35,14 +36,13 @@ export async function fichaDeEstudiante(studentId: string, anioId: string, usuar
   if (!estudiante || !matricula) throw new ApiError(404, 'Estudiante no encontrado.');
   const grupo = await Group.findById(matricula.group_id).populate<{ grade_id: { nombre: string } }>('grade_id', 'nombre');
 
-  const [calificaciones, recuperaciones, asistencia, observaciones, remisiones, piar, cierre, sesiones] = await Promise.all([
+  const [calificaciones, recuperaciones, asistencia, observaciones, faltas, remisiones, piar, cierre, sesiones] = await Promise.all([
     CalificacionAsignatura.find({ academic_year_id: anioId, student_id: studentId }).select('subject_id periodo_numero estado resultado.nota_asignatura').lean(),
     Recuperacion.find({ academic_year_id: anioId, student_id: studentId }).lean(),
     calcularEstadisticas({ academic_year_id: anioId, agrupar_por: 'periodo', student_id: studentId }, null),
-    Observacion.aggregate<{ _id: { clase: string; gravedad: string | null }; total: number }>([
-      { $match: { academic_year_id: matricula.academic_year_id, student_id: matricula.student_id, estado: 'ACTIVA' } },
-      { $group: { _id: { clase: '$clase', gravedad: '$falta.gravedad' }, total: { $sum: 1 } } },
-    ]),
+    Observacion.countDocuments({ academic_year_id: matricula.academic_year_id, student_id: matricula.student_id, clase: 'OBSERVACION', estado: 'ACTIVA' }),
+    // Tipo I del Observador y tipo II/III solo con decisión en firme del caso.
+    faltasContadas({ academic_year_id: matricula.academic_year_id, estudiantes_ids: [matricula.student_id] }),
     RemisionOrientacion.countDocuments({ student_id: studentId }),
     ExpedienteInclusion.exists({ academic_year_id: anioId, student_id: studentId, tipo: 'PIAR', estado: 'ACTIVO' }),
     EvaluacionPromocion.findOne({ academic_year_id: anioId, student_id: studentId, vigente: true }).select('resultado version momento detalle.motivos').lean(),
@@ -65,7 +65,6 @@ export async function fichaDeEstudiante(studentId: string, anioId: string, usuar
       .filter((k) => String(k.student_id) === studentId)
       .map((k) => ({ sesion: s.codigo ?? `${s.instancia} (${s.estado})`, descripcion: k.descripcion, responsable: k.responsable_nombre, fecha_limite: k.fecha_limite, estado: k.estado }))
   );
-  const subtotal = (clase: string) => observaciones.filter((o) => o._id.clase === clase).reduce((suma, o) => suma + o.total, 0);
 
   await registrarEvento({ usuario_id: usuario._id, accion: 'COMISION_FICHA_CONSULTADA', entidad: 'User', entidad_id: studentId, detalle: `Año ${anioId}` });
   return {
@@ -79,8 +78,8 @@ export async function fichaDeEstudiante(studentId: string, anioId: string, usuar
       total: { total: asistencia.total.total_registros, justificadas: asistencia.total.fallas_justificadas, injustificadas: asistencia.total.fallas_injustificadas },
     },
     convivencia: {
-      observaciones: subtotal('OBSERVACION'),
-      faltas: Object.fromEntries(['I', 'II', 'III'].map((g) => [g, observaciones.filter((o) => o._id.clase === 'FALTA' && o._id.gravedad === g).reduce((suma, o) => suma + o.total, 0)])),
+      observaciones,
+      faltas: Object.fromEntries(['I', 'II', 'III'].map((g) => [g, faltas.filter((f) => f.gravedad === g).length])),
       nota: 'El detalle está en el Observador del estudiante, con sus propios permisos.',
     },
     orientacion: { tiene_remisiones: remisiones > 0 },

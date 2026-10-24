@@ -7,8 +7,8 @@ import AjusteAsignatura from '../models/ajusteAsignatura.model';
 import CasoConvivencia from '../models/casoConvivencia.model';
 import { SesionComite } from '../models/comiteConvivencia.model';
 import { periodicidadDeAnio } from './comite.service';
+import { faltasContadas } from './faltasConvivencia.service';
 import ExpedienteInclusion from '../models/expedienteInclusion.model';
-import Observacion from '../models/observacion.model';
 import RemisionOrientacion from '../models/remisionOrientacion.model';
 import SolicitudApoyo from '../models/solicitudApoyo.model';
 import SolicitudCaso from '../models/solicitudCaso.model';
@@ -63,7 +63,7 @@ export async function obtenerPanelConvivencia(filtros: FiltrosBienestar, usuario
       configuracionDeConvivencia(),
       SesionComite.countDocuments({ academic_year_id: filtros.academic_year_id, estado: 'BORRADOR' }),
       SesionComite.findOne({ academic_year_id: filtros.academic_year_id, estado: 'BORRADOR', fecha: { $gte: hoy } }).sort({ fecha: 1 }).select('fecha hora lugar tipo').lean(),
-      Observacion.find({ clase: 'FALTA', estado: 'ACTIVA', fecha_hecho: { $gte: desde }, ...porSede }).select('falta.gravedad').lean(),
+      faltasContadas({ academic_year_id: filtros.academic_year_id, desde, porSede, excluirImpedido: usuario._id }),
       RemisionOrientacion.find({ estado: { $in: ['PENDIENTE', 'EN_ATENCION'] }, ...porSede }).select('estado').lean(),
       periodicidadDeAnio(filtros.academic_year_id),
     ]);
@@ -94,7 +94,7 @@ export async function obtenerPanelConvivencia(filtros: FiltrosBienestar, usuario
         periodicidad_vencida: periodicidad.vencida,
         ultima_ordinaria: periodicidad.ultima_ordinaria,
       },
-      faltas: { dias: DIAS_DE_FALTAS, total: faltas.length, por_gravedad: contarPorClave(TIPOS_SITUACION, faltas.flatMap((f) => (f.falta?.gravedad ? [f.falta.gravedad] : []))) },
+      faltas: { dias: DIAS_DE_FALTAS, total: faltas.length, por_gravedad: contarPorClave(TIPOS_SITUACION, faltas.map((f) => f.gravedad)) },
       remisiones_orientacion: {
         pendientes: remisiones.filter((r) => r.estado === 'PENDIENTE').length,
         en_atencion: remisiones.filter((r) => r.estado === 'EN_ATENCION').length,

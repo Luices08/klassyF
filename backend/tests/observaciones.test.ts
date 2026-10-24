@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   debeRemitirse,
   dentroDelPlazo,
+  esSeguimientoDeOrientacion,
   esSituacionGrave,
   esVisibleParaEstudiante,
   problemasDeFalta,
@@ -57,6 +58,17 @@ describe('visibilidadDeObservacion', () => {
     expect(visibilidadDeObservacion('DOCENTE', confidencial, true)).toBe('COMPLETA');
     expect(visibilidadDeObservacion('DOCENTE', confidencial, false)).toBeNull();
     expect(visibilidadDeObservacion('COORDINADOR', confidencial, false)).toBeNull();
+  });
+
+  it('el seguimiento psicosocial de orientación solo lo lee su autor y el ADMIN, aunque sea de convivencia u otro orientador', () => {
+    const psicosocial = observacion({ confidencial: true, contexto: 'ORIENTACION' });
+    expect(visibilidadDeObservacion('ORIENTADOR', psicosocial, true)).toBe('COMPLETA');
+    expect(visibilidadDeObservacion('ADMIN', psicosocial, false)).toBe('COMPLETA');
+    for (const rol of ['ORIENTADOR', 'COORDINADOR_CONVIVENCIA', 'COORDINADOR', 'DOCENTE'] as const) {
+      expect(visibilidadDeObservacion(rol, psicosocial, false), rol).toBeNull();
+    }
+    expect(esSeguimientoDeOrientacion(psicosocial)).toBe(true);
+    expect(esSeguimientoDeOrientacion(observacion({ confidencial: true }))).toBe(false);
   });
 
   it('una observación común la ven el director, el coordinador académico y orientación', () => {

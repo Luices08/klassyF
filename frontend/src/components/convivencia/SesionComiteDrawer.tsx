@@ -54,7 +54,9 @@ function Editor({ sesion, onClose }: { sesion: SesionDetalle; onClose: () => voi
   const anular = useAnularSesion();
   const anexar = useAgregarAnexo();
   const verificar = useVerificarIntegridad();
-  const casos = useCasos({ estado: '', tipo_situacion: '', pagina: 1 });
+  const [codigoCaso, setCodigoCaso] = useState('');
+  // Hasta 50 casos por consulta: para uno más antiguo se escribe parte de su código y el servidor filtra.
+  const casos = useCasos({ estado: '', tipo_situacion: '', codigo: codigoCaso, pagina: 1, limite: 50 });
 
   const [desarrollo, setDesarrollo] = useState(sesion.desarrollo);
   const [ordenDelDia, setOrdenDelDia] = useState(sesion.orden_del_dia);
@@ -159,6 +161,9 @@ function Editor({ sesion, onClose }: { sesion: SesionDetalle; onClose: () => voi
         ))}
         {tratados.length === 0 && <p className="text-sm text-muted">No se han agregado casos.</p>}
         {editable && (
+          <Input label="Buscar un caso por código" value={codigoCaso} onChange={(e) => setCodigoCaso(e.target.value)} maxLength={20} placeholder="CC-2026-0007" />
+        )}
+        {editable && (
           <select
             aria-label="Agregar un caso"
             className="block w-full rounded-lg border-0 bg-white px-3 py-2 text-sm text-ink ring-1 ring-inset ring-border focus:ring-2 focus:ring-inset focus:ring-primary"
@@ -170,7 +175,7 @@ function Editor({ sesion, onClose }: { sesion: SesionDetalle; onClose: () => voi
               }
             }}
           >
-            <option value="">Agregar un caso a esta sesión…</option>
+            <option value="">{(casos.data?.total ?? 0) > (casos.data?.data.length ?? 0) ? 'Agregar un caso (hay más: busca por código)…' : 'Agregar un caso a esta sesión…'}</option>
             {(casos.data?.data ?? []).map((c) => (
               <option key={c._id} value={c._id}>
                 {c.codigo} · Tipo {c.tipo_situacion}

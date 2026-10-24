@@ -104,7 +104,8 @@ const enmiendaSchema = new Schema<IEnmiendaObservacion>({
 
 const seguimientoSchema = new Schema<ISeguimientoObservacion>({
   fecha: { type: Date, required: true },
-  nota: { type: String, required: true, trim: true, maxlength: 500 },
+  // 500 de la nota del usuario más el prefijo «Compromiso incumplido: » que agrega el cierre de un compromiso.
+  nota: { type: String, required: true, trim: true, maxlength: 530 },
   por: { type: Schema.Types.ObjectId, ref: 'User', required: true },
 });
 

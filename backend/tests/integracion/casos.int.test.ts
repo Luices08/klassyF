@@ -208,6 +208,45 @@ describe('M15 casos de convivencia (con base de datos)', () => {
     expect(await cerrar()).toMatchObject({ estado: 'CERRADO' });
   });
 
+  it('no se aplica una medida antes de oír los descargos', async () => {
+    const caso = await abrir();
+    await avanzar(caso._id, 'EN_ATENCION');
+    const aplicar = () => casos.agregarRegistroCaso(caso._id, 'medidas-aplicadas', { medida_id: medidaId, fecha: hoy() }, e.coordConvivencia);
+    await expect(aplicar()).rejects.toMatchObject({ statusCode: 409, message: expect.stringContaining('descargos') });
+
+    await casos.agregarRegistroCaso(caso._id, 'descargos', { parte: 'ESTUDIANTE', student_id: String(e.estudiante._id), fecha: hoy(), texto: 'Dice que fue un malentendido.' }, e.coordConvivencia);
+    expect(await aplicar()).toMatchObject({ medidas_aplicadas: [expect.objectContaining({ nombre: 'Taller formativo' })] });
+  });
+
+  it('un paso obligatorio solo se omite con una justificación; uno opcional, sin ella', async () => {
+    const caso = await abrir();
+    const [obligatorio, opcional] = caso.pasos;
+    const omitir = (paso: { _id: string }, nota?: string) => casos.actualizarPaso(caso._id, paso._id, { estado: 'NO_APLICA', nota }, e.coordConvivencia);
+
+    await expect(omitir(obligatorio!)).rejects.toMatchObject({ statusCode: 400 });
+    await expect(omitir(obligatorio!, 'no')).rejects.toMatchObject({ statusCode: 400 });
+    expect(await omitir(obligatorio!, 'Ya se dialogó con el estudiante antes.')).toMatchObject({ pasos: [expect.objectContaining({ estado: 'NO_APLICA' }), expect.anything()] });
+    expect(await omitir(opcional!)).toMatchObject({ pasos: [expect.anything(), expect.objectContaining({ estado: 'NO_APLICA' })] });
+  });
+
+  it('los casos se buscan por parte de su código, sin que los caracteres especiales rompan la consulta', async () => {
+    await abrir();
+    await abrir();
+    const pagina = { pagina: 1, limite: 20 };
+    expect((await casos.listarCasos(e.coordConvivencia, { codigo: 'CC-' }, pagina)).data).toHaveLength(2);
+    expect((await casos.listarCasos(e.coordConvivencia, { codigo: '0002' }, pagina)).data.map((c) => c.codigo)).toEqual([expect.stringMatching(/-0002$/)]);
+    expect((await casos.listarCasos(e.coordConvivencia, { codigo: '.*' }, pagina)).data).toHaveLength(0);
+    expect((await casos.listarCasos(e.coordConvivenciaOtraSede, { codigo: 'CC-' }, pagina)).data).toHaveLength(0);
+  });
+
+  it('los motivos largos (hasta 1000 caracteres) caben en la solicitud descartada y en el impedimento', async () => {
+    await faltaGrave();
+    const [pendiente] = (await solicitudes.bandejaDeSolicitudes(e.coordConvivencia, { pagina: 1, limite: 20 })).data;
+    await expect(solicitudes.descartarSolicitud(pendiente!._id, 'm'.repeat(900), e.coordConvivencia)).resolves.toMatchObject({ estado: 'DESCARTADA' });
+    const caso = await abrir();
+    await expect(casos.declararImpedimento(caso._id, { motivo: 'm'.repeat(900) }, e.coordConvivencia)).resolves.toMatchObject({ apartado: true });
+  });
+
   it('solo un ADMIN reabre (con motivo) o anula; anular devuelve la solicitud a la bandeja', async () => {
     await faltaGrave();
     const [pendiente] = (await solicitudes.bandejaDeSolicitudes(e.coordConvivencia, { pagina: 1, limite: 20 })).data;
@@ -219,7 +258,7 @@ describe('M15 casos de convivencia (con base de datos)', () => {
 
     const otro = await abrir();
     await avanzar(otro._id, 'EN_ATENCION');
-    await casos.actualizarPaso(otro._id, otro.pasos[0]!._id, { estado: 'NO_APLICA' }, e.coordConvivencia);
+    await casos.actualizarPaso(otro._id, otro.pasos[0]!._id, { estado: 'NO_APLICA', nota: 'Ya se dialogó con el estudiante antes.' }, e.coordConvivencia);
     await casos.cerrarCaso(otro._id, { resultado: 'DESESTIMADO', motivo: 'No se probó.' }, e.coordConvivencia);
     await expect(casos.reabrirCaso(otro._id, 'Hay hechos nuevos.', e.coordConvivencia)).rejects.toMatchObject({ statusCode: 403 });
     expect(await casos.reabrirCaso(otro._id, 'Hay hechos nuevos.', e.admin)).toMatchObject({ estado: 'REABIERTO', resultado_cierre: null });

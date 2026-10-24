@@ -57,8 +57,13 @@ describe('M15 → orientación: remisiones de un caso (con base de datos)', () =
       )
     );
 
-  const aplicarMedida = (id: string, medida: string) =>
-    casos.agregarRegistroCaso(id, 'medidas-aplicadas', { fecha: hoy(), medida_id: medida }, e.coordConvivencia);
+  // Una medida solo se aplica después de oír los descargos; aquí se registran una vez y se reutilizan.
+  const aplicarMedida = async (id: string, medida: string) => {
+    if (!(await CasoConvivencia.exists({ _id: id, 'descargos.0': { $exists: true } }))) {
+      await casos.agregarRegistroCaso(id, 'descargos', { parte: 'ESTUDIANTE', student_id: String(e.estudiante._id), fecha: hoy(), texto: 'Dice que fue un malentendido.' }, e.coordConvivencia);
+    }
+    return casos.agregarRegistroCaso(id, 'medidas-aplicadas', { fecha: hoy(), medida_id: medida }, e.coordConvivencia);
+  };
 
   it('el protocolo copia la bandera de cada paso al abrir el caso', async () => {
     const caso = await abrir();

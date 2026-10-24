@@ -332,7 +332,7 @@ const casoSchema = new Schema<ICasoConvivencia, CasoConvivenciaModel>(
         new Schema(
           {
             usuario_id: { type: Schema.Types.ObjectId, ref: 'User', required: true },
-            motivo: { type: String, required: true, maxlength: 500 },
+            motivo: { type: String, required: true, maxlength: 1000 },
             por: { type: Schema.Types.ObjectId, ref: 'User', required: true },
             fecha: { type: Date, required: true },
           },

@@ -73,6 +73,7 @@ function Contenido({ caso }: { caso: CasoDetalle }) {
   const esAdmin = user?.rol === 'ADMIN';
   const [tab, setTab] = useState('resumen');
   const [accion, setAccion] = useState<ModoAccionCaso | null>(null);
+  const [pasoOmitido, setPasoOmitido] = useState<{ id: string; nombre: string } | null>(null);
   const actualizarPaso = useActualizarPaso();
 
   const finalizado = caso.estado === 'CERRADO' || caso.estado === 'ANULADO';
@@ -184,7 +185,20 @@ function Contenido({ caso }: { caso: CasoDetalle }) {
                         <Button variant="soft-success" className="px-3 py-1 text-xs" isLoading={actualizarPaso.isPending} onClick={() => actualizarPaso.mutate({ id: caso._id, pasoId: p._id, estado: 'CUMPLIDO' })}>
                           Cumplido
                         </Button>
-                        <Button variant="soft-edit" className="px-3 py-1 text-xs" isLoading={actualizarPaso.isPending} onClick={() => actualizarPaso.mutate({ id: caso._id, pasoId: p._id, estado: 'NO_APLICA' })}>
+                        <Button
+                          variant="soft-edit"
+                          className="px-3 py-1 text-xs"
+                          isLoading={actualizarPaso.isPending}
+                          onClick={() => {
+                            // Omitir un paso obligatorio exige justificarlo por escrito; uno opcional se omite de una vez.
+                            if (p.obligatorio) {
+                              setPasoOmitido({ id: p._id, nombre: p.nombre });
+                              setAccion('paso-no-aplica');
+                            } else {
+                              actualizarPaso.mutate({ id: caso._id, pasoId: p._id, estado: 'NO_APLICA' });
+                            }
+                          }}
+                        >
                           No aplica
                         </Button>
                       </>
@@ -337,7 +351,16 @@ function Contenido({ caso }: { caso: CasoDetalle }) {
         </div>
       </TabPanel>
 
-      <AccionesCasoDrawer caso={caso} modo={accion} esAdmin={esAdmin} onClose={() => setAccion(null)} />
+      <AccionesCasoDrawer
+        caso={caso}
+        modo={accion}
+        esAdmin={esAdmin}
+        paso={pasoOmitido}
+        onClose={() => {
+          setAccion(null);
+          setPasoOmitido(null);
+        }}
+      />
     </>
   );
 }

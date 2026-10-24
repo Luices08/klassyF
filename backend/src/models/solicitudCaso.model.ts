@@ -81,7 +81,7 @@ const solicitudCasoSchema = new Schema<ISolicitudCaso, SolicitudCasoModel>(
         {
           por: { type: Schema.Types.ObjectId, ref: 'User', required: true },
           fecha: { type: Date, required: true },
-          motivo: { type: String, required: true, maxlength: 500 },
+          motivo: { type: String, required: true, maxlength: 1000 },
         },
         { _id: false }
       ),

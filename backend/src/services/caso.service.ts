@@ -209,7 +209,11 @@ export interface FiltrosCasos {
   estado?: EstadoCaso;
   tipo_situacion?: TipoSituacion;
   sede_id?: string;
+  /** Parte del código del caso (CC-2026-0007): así un caso antiguo se encuentra sin recorrer páginas. */
+  codigo?: string;
 }
+
+const escaparRegex = (texto: string) => texto.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 export async function listarCasos(usuario: UserDocument, filtros: FiltrosCasos, { pagina, limite }: { pagina: number; limite: number }) {
   if (!ROLES_CONVIVENCIA.includes(usuario.rol)) throw new ApiError(403, 'Solo convivencia consulta los casos.');
@@ -217,6 +221,7 @@ export async function listarCasos(usuario: UserDocument, filtros: FiltrosCasos, 
   const filtro: Record<string, unknown> = { 'impedidos.usuario_id': { $ne: usuario._id } };
   if (filtros.estado) filtro.estado = filtros.estado;
   if (filtros.tipo_situacion) filtro.tipo_situacion = filtros.tipo_situacion;
+  if (filtros.codigo?.trim()) filtro.codigo = new RegExp(escaparRegex(filtros.codigo.trim()), 'i');
   if (alcance !== 'TODAS') filtro.sede_id = filtros.sede_id && alcance.includes(filtros.sede_id) ? filtros.sede_id : { $in: alcance };
   else if (filtros.sede_id) filtro.sede_id = filtros.sede_id;
 
@@ -326,8 +331,13 @@ export async function actualizarPaso(id: string, pasoId: string, datos: { estado
   exigirEditable(caso);
   const paso = caso.pasos.id(pasoId);
   if (!paso) throw new ApiError(404, 'Paso no encontrado.');
+  const nota = (datos.nota ?? '').trim();
+  // Saltarse un paso obligatorio del protocolo debe quedar justificado por escrito.
+  if (datos.estado === 'NO_APLICA' && paso.obligatorio && nota.length < 5) {
+    throw new ApiError(400, 'Explica por qué un paso obligatorio no aplica a este caso (mínimo 5 caracteres).');
+  }
   paso.estado = datos.estado;
-  paso.nota = (datos.nota ?? '').trim();
+  paso.nota = nota;
   paso.fecha = datos.estado === 'PENDIENTE' ? null : new Date();
   paso.por = datos.estado === 'PENDIENTE' ? null : usuario._id;
 
@@ -420,6 +430,8 @@ export async function agregarRegistroCaso(id: string, coleccion: ColeccionRegist
       break;
     }
     case 'medidas-aplicadas': {
+      // Presunción de inocencia: una consecuencia solo se aplica después de oír a las partes, igual que la decisión (RN-15-04/05).
+      if (caso.descargos.length === 0) throw new ApiError(409, 'Registra los descargos del estudiante y su acudiente antes de aplicar una medida.');
       const medida = await MedidaConvivencia.findOne({ _id: d.medida_id, estado: { $ne: 'inactivo' } });
       if (!medida) throw new ApiError(400, 'La medida no existe o está inactiva.');
       if (medida.se_aplica_por_dias && !(d.dias && d.dias > 0)) throw new ApiError(400, 'Esta medida se aplica por días: indica cuántos.');

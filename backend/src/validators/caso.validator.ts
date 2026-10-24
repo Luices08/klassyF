@@ -113,6 +113,7 @@ export const listarCasos: ValidationSchema = {
     estado: Joi.string().valid(...ESTADOS_CASO),
     tipo_situacion: tipoSituacion,
     sede_id: objectId,
+    codigo: Joi.string().trim().max(20),
     ...paginacion,
   }),
 };

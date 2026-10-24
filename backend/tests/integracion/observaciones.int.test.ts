@@ -119,6 +119,28 @@ describe('M14 observaciones y faltas (con base de datos)', () => {
       ).rejects.toMatchObject({ statusCode: 400 });
     });
 
+    it('el seguimiento psicosocial de orientación solo lo leen su autor y el ADMIN; ni convivencia ni otro orientador de la sede', async () => {
+      const colega = e.orientadorColega;
+      const [seguimiento] = await registrar(e.orientador, [id(e.estudiante)], { descripcion: 'Entrevista psicosocial reservada.' });
+
+      expect((await historial(e.estudiante, e.orientador)).data).toHaveLength(1);
+      expect((await historial(e.estudiante, e.admin)).data).toHaveLength(1);
+      for (const quien of [colega, e.coordConvivencia]) {
+        expect((await historial(e.estudiante, quien)).data, quien.rol).toHaveLength(0);
+        await expect(observaciones.obtenerObservacion(seguimiento!._id, quien)).rejects.toMatchObject({ statusCode: 404 });
+        await expect(observaciones.agregarSeguimiento(seguimiento!._id, 'Nota ajena.', quien)).rejects.toMatchObject({ statusCode: 404 });
+        await expect(observaciones.enmendarObservacion(seguimiento!._id, { descripcion: 'Cambio ajeno.' }, quien)).rejects.toMatchObject({ statusCode: 404 });
+        await expect(observaciones.anularObservacion(seguimiento!._id, 'No corresponde.', quien)).rejects.toMatchObject({ statusCode: 404 });
+      }
+      // Ni siquiera un ADMIN le quita la confidencialidad: la regla es del contexto, no de quien edita.
+      await expect(observaciones.enmendarObservacion(seguimiento!._id, { confidencial: false }, e.admin)).rejects.toMatchObject({ statusCode: 400 });
+    });
+
+    it('la nota de un compromiso cerrado cabe aunque use los 500 caracteres permitidos', async () => {
+      const [obs] = await registrar(e.docenteDeClase, [id(e.estudiante)], { compromiso: 'Entregará el taller.' });
+      await expect(observaciones.marcarCompromiso(obs!._id, 'INCUMPLIDO', 'n'.repeat(500), e.docenteDeClase)).resolves.toMatchObject({ compromiso_estado: 'INCUMPLIDO' });
+    });
+
     it('orientación solo ve y registra sobre los estudiantes de su sede', async () => {
       const otraSede = await User.findById(e.coordConvivenciaOtraSede._id);
       const orientadorAjeno = new User({ nombre: 'Otra', apellido: 'Sede', tipo_documento: 'CC', numero_documento: '777', email: 'o@x.test', rol: 'ORIENTADOR', sedes_ids: otraSede!.sedes_ids });

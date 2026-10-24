@@ -163,7 +163,11 @@ function useInvalidarCasos() {
 export interface FiltrosCasos {
   estado?: EstadoCaso | '';
   tipo_situacion?: TipoSituacion | '';
+  /** Parte del código del caso (CC-2026-0007). */
+  codigo?: string;
   pagina: number;
+  /** Por defecto 20; el servidor admite hasta 50. */
+  limite?: number;
 }
 
 export function useCasos(filtros: FiltrosCasos) {
@@ -171,7 +175,13 @@ export function useCasos(filtros: FiltrosCasos) {
     queryKey: ['casos', 'lista', filtros],
     queryFn: () =>
       api.raw<{ success: true; data: CasoResumen[]; total: number; pagina: number; limite: number }>('/convivencia/casos', {
-        query: { estado: filtros.estado || undefined, tipo_situacion: filtros.tipo_situacion || undefined, pagina: filtros.pagina, limite: 20 },
+        query: {
+          estado: filtros.estado || undefined,
+          tipo_situacion: filtros.tipo_situacion || undefined,
+          codigo: filtros.codigo?.trim() || undefined,
+          pagina: filtros.pagina,
+          limite: filtros.limite ?? 20,
+        },
       }),
     select: (res) => ({ data: res.data, total: res.total, pagina: res.pagina, limite: res.limite }),
     placeholderData: keepPreviousData,

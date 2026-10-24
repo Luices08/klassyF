@@ -21,11 +21,16 @@ interface ObservacionParaVisibilidad {
   estado: string;
   confidencial: boolean;
   falta: { gravedad: TipoSituacion } | null;
+  contexto?: string;
 }
+
+/** El seguimiento psicosocial de orientación solo lo lee quien lo escribió (y un ADMIN), igual que las atenciones de una remisión. */
+export const esSeguimientoDeOrientacion = (obs: { contexto?: string }): boolean => obs.contexto === 'ORIENTACION';
 
 /**
  * Cómo ve un integrante del personal un registro del Observador; `null` = no lo ve (ni siquiera sabe que existe).
- *  - ADMIN y coordinación de convivencia: todo, incluso anuladas y confidenciales.
+ *  - ADMIN y coordinación de convivencia: todo, incluso anuladas y confidenciales, salvo el seguimiento psicosocial de orientación
+ *    (contexto ORIENTACION): ese solo lo leen su autor y el ADMIN.
  *  - Una observación confidencial solo la leen su autor y orientación.
  *  - Las faltas no las ve el coordinador académico; una Tipo II/III solo la ve completa su autor (el resto, que existe).
  * El acceso al estudiante (sede, grupo que dicta o dirige) lo decide antes `permisoSobreEstudiante`.
@@ -35,7 +40,9 @@ export function visibilidadDeObservacion(
   obs: ObservacionParaVisibilidad,
   esAutor: boolean
 ): 'COMPLETA' | 'RESERVADA' | null {
-  if (rol === ROLES.ADMIN || rol === ROLES.COORDINADOR_CONVIVENCIA) return 'COMPLETA';
+  if (rol === ROLES.ADMIN) return 'COMPLETA';
+  if (esSeguimientoDeOrientacion(obs)) return esAutor ? 'COMPLETA' : null;
+  if (rol === ROLES.COORDINADOR_CONVIVENCIA) return 'COMPLETA';
   const personal: Rol[] = [ROLES.COORDINADOR, ROLES.ORIENTADOR, ROLES.DOCENTE];
   if (!personal.includes(rol) || obs.estado !== 'ACTIVA') return null;
 

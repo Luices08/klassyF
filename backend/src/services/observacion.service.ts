@@ -22,6 +22,7 @@ import { ESTADO_ACTIVO } from '../utils/filtroEstado';
 import {
   debeRemitirse,
   dentroDelPlazo,
+  esSeguimientoDeOrientacion,
   esSituacionGrave,
   esVisibleParaEstudiante,
   ModoVistaObservacion,
@@ -186,7 +187,7 @@ export async function buscarEstudiantes(usuario: UserDocument, { group_id, q }: 
   if (texto) {
     const patron = new RegExp(escaparRegex(texto), 'i');
     const coincidentes = await User.find({
-      rol: ROLES.ESTUDIANTE,
+      roles: ROLES.ESTUDIANTE,
       $or: [{ nombre: patron }, { apellido: patron }, { numero_documento: patron }],
     })
       .select('_id')
@@ -688,8 +689,10 @@ async function cargarParaCorregir(
   if (!obs) throw observacionNoEncontrada();
 
   const conv = comoUsuarioConvivencia(usuario);
+  // El seguimiento psicosocial de orientación solo lo corrige su autor (y un ADMIN): convivencia no lo lee, así que tampoco lo toca.
   const convivencia =
-    usuario.rol === ROLES.ADMIN || (usuario.rol === ROLES.COORDINADOR_CONVIVENCIA && enAlcanceDeSede(conv, String(obs.sede_id)));
+    usuario.rol === ROLES.ADMIN ||
+    (usuario.rol === ROLES.COORDINADOR_CONVIVENCIA && enAlcanceDeSede(conv, String(obs.sede_id)) && !esSeguimientoDeOrientacion(obs));
   const coordinadorAcademico =
     usuario.rol === ROLES.COORDINADOR &&
     enAlcanceDeSede(conv, String(obs.sede_id)) &&
@@ -741,7 +744,7 @@ export async function enmendarObservacion(
   if (esFaltaGrave && (input.compromiso !== undefined || input.version_estudiante !== undefined)) {
     throw new ApiError(400, 'En una falta Tipo II o III la versión del estudiante y el acuerdo los gestiona el comité.');
   }
-  if (obs.confidencial && usuario.rol === ROLES.ORIENTADOR && input.confidencial === false) {
+  if (input.confidencial === false && (esSeguimientoDeOrientacion(obs) || (obs.confidencial && usuario.rol === ROLES.ORIENTADOR))) {
     throw new ApiError(400, 'El seguimiento de orientación es siempre confidencial.');
   }
 
@@ -797,7 +800,7 @@ async function cargarParaSeguimiento(id: string, usuario: UserDocument) {
   const autor = esAutor(obs, usuario);
   let permitido = autor || usuario.rol === ROLES.ADMIN;
   if (!permitido && enSede) {
-    if (usuario.rol === ROLES.COORDINADOR_CONVIVENCIA) permitido = true;
+    if (usuario.rol === ROLES.COORDINADOR_CONVIVENCIA) permitido = !esSeguimientoDeOrientacion(obs);
     else if (usuario.rol === ROLES.ORIENTADOR) permitido = visibilidadDeObservacion(usuario.rol, obs, false) === 'COMPLETA';
     else if (usuario.rol === ROLES.COORDINADOR) permitido = obs.clase === 'OBSERVACION' && !obs.confidencial;
   }

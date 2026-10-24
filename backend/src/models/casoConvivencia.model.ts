@@ -39,7 +39,6 @@ export interface IInvolucradoCaso {
 export interface IPasoCaso {
   nombre: string;
   obligatorio: boolean;
-  remite_a_orientacion: boolean;
   orden: number;
   estado: EstadoPasoProtocolo;
   fecha: Date | null;
@@ -190,7 +189,6 @@ const involucradoSchema = new Schema<IInvolucradoCaso>({
 const pasoSchema = new Schema<IPasoCaso>({
   nombre: { type: String, required: true, trim: true, maxlength: 200 },
   obligatorio: { type: Boolean, default: false },
-  remite_a_orientacion: { type: Boolean, default: false },
   orden: { type: Number, default: 0 },
   estado: { type: String, enum: ESTADOS_PASO_PROTOCOLO, default: 'PENDIENTE' },
   fecha: { type: Date, default: null },

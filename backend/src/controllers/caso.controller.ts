@@ -93,7 +93,7 @@ export const eliminarEntidad = catchAsync<IdParams>(async (req, res) => {
   res.status(200).json({ success: true });
 });
 
-export const guardarProtocolo = catchAsync<{ tipo: TipoSituacion } & ParamsDictionary, unknown, { pasos: { nombre: string; obligatorio: boolean; remite_a_orientacion: boolean }[] }>(
+export const guardarProtocolo = catchAsync<{ tipo: TipoSituacion } & ParamsDictionary, unknown, { pasos: { nombre: string; obligatorio: boolean }[] }>(
   async (req, res) => {
     res.status(200).json({ success: true, data: await catalogoService.guardarProtocolo(req.params.tipo, req.body.pasos, actor(req)) });
   }

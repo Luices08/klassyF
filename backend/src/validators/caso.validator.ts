@@ -33,7 +33,6 @@ const camposMedida = {
   nombre: Joi.string().trim().max(120),
   descripcion: Joi.string().trim().max(1000).allow(''),
   se_aplica_por_dias: Joi.boolean(),
-  remite_a_orientacion: Joi.boolean(),
   orden: Joi.number().integer().min(0),
 };
 export const crearMedida: ValidationSchema = { body: Joi.object({ ...camposMedida, nombre: camposMedida.nombre.required() }) };
@@ -60,7 +59,6 @@ export const guardarProtocolo: ValidationSchema = {
       .items(Joi.object({
           nombre: Joi.string().trim().max(200).required(),
           obligatorio: Joi.boolean().default(false),
-          remite_a_orientacion: Joi.boolean().default(false),
         }))
       .max(40)
       .required(),
@@ -73,7 +71,6 @@ const camposFalta = {
   codigo: Joi.string().trim().max(20),
   descripcion: Joi.string().trim().max(400),
   gravedad: tipoSituacion,
-  descuento_decimas: Joi.number().min(0).max(5).allow(null),
 };
 
 export const crearFalta: ValidationSchema = {

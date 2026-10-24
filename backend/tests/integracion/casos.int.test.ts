@@ -2,14 +2,18 @@ import { Types } from 'mongoose';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import AuditLog from '../../src/models/auditLog.model';
 import CasoConvivencia from '../../src/models/casoConvivencia.model';
+import Guardian from '../../src/models/guardian.model';
+import Notificacion from '../../src/models/notificacion.model';
 import Observacion from '../../src/models/observacion.model';
 import SolicitudCaso from '../../src/models/solicitudCaso.model';
+import StudentGuardian from '../../src/models/studentGuardian.model';
+import { UserDocument } from '../../src/models/user.model';
 import * as casos from '../../src/services/caso.service';
 import * as catalogosCaso from '../../src/services/casoCatalogo.service';
 import * as observaciones from '../../src/services/observacion.service';
 import * as solicitudes from '../../src/services/solicitudCaso.service';
 import { detenerBaseDeDatos, iniciarBaseDeDatos, limpiarBaseDeDatos } from './baseDeDatos';
-import { actor, armarEscenario, Escenario, hoy } from './escenario';
+import { actor, armarEscenario, crearUsuario, Escenario, hoy } from './escenario';
 
 type Caso = Awaited<ReturnType<typeof casos.abrirCaso>>;
 const comoCaso = (c: unknown) => c as Caso & { _id: string; codigo: string; origen: string; contencion_reportada: string; estado: string; tipo_situacion: string; pasos: { _id: string; nombre: string; estado: string }[]; alertas: { codigo: string }[] };
@@ -260,6 +264,48 @@ describe('M15 casos de convivencia (con base de datos)', () => {
     expect((await casos.listarCasos(e.coordConvivencia, { codigo: '0002' }, pagina)).data.map((c) => c.codigo)).toEqual([expect.stringMatching(/-0002$/)]);
     expect((await casos.listarCasos(e.coordConvivencia, { codigo: '.*' }, pagina)).data).toHaveLength(0);
     expect((await casos.listarCasos(e.coordConvivenciaOtraSede, { codigo: 'CC-' }, pagina)).data).toHaveLength(0);
+  });
+
+  describe('aviso a las familias (Decreto 1965, arts. 43 y 44)', () => {
+    const conAcudiente = async (estudiante: UserDocument, documento: string) => {
+      const acudiente = await crearUsuario('ACUDIENTE');
+      const ficha = await Guardian.create({ tipo_documento: 'CC', numero_documento: documento, nombre: 'Marta', apellido: 'Morales', telefono_principal: '3000000000', user_id: acudiente._id });
+      await StudentGuardian.create({ student_id: estudiante._id, guardian_id: ficha._id, parentesco: 'MADRE', es_principal: true });
+      return acudiente;
+    };
+    const alertasDe = (acudiente: UserDocument) => Notificacion.find({ usuario_id: acudiente._id, evento: 'FALTA_GRAVE' });
+    const involucrados = () => [
+      { student_id: String(e.estudiante._id), rol: 'PRESUNTO_RESPONSABLE' as const },
+      { student_id: String(e.otroEstudiante._id), rol: 'AFECTADO' as const },
+      { student_id: String(e.tercerEstudiante._id), rol: 'TESTIGO' as const },
+    ];
+
+    it('al abrir un caso tipo II avisa, sin detalle, a la familia del afectado y a la del presunto responsable, no a la del testigo', async () => {
+      const delPresunto = await conAcudiente(e.estudiante, '5001');
+      const delAfectado = await conAcudiente(e.otroEstudiante, '5002');
+      const delTestigo = await conAcudiente(e.tercerEstudiante, '5003');
+      await abrir(e.coordConvivencia, 'II', { involucrados: involucrados() });
+
+      for (const acudiente of [delPresunto, delAfectado]) {
+        const alertas = await alertasDe(acudiente);
+        expect(alertas).toHaveLength(1);
+        expect(alertas[0]).toMatchObject({ severidad: 'CRITICA', ruta: '/portal', leida: false });
+        expect(JSON.stringify(alertas)).not.toContain('Discusión en el patio');
+      }
+      expect(await alertasDe(delTestigo)).toHaveLength(0);
+    });
+
+    it('un caso tipo I no avisa a las familias; si sube a tipo II, en ese momento sí', async () => {
+      const delPresunto = await conAcudiente(e.estudiante, '5001');
+      const caso = await abrir(e.coordConvivencia, 'I', { involucrados: involucrados() });
+      expect(await alertasDe(delPresunto)).toHaveLength(0);
+
+      await casos.reclasificarCaso(caso._id, 'II', 'Hay daño a la salud de un estudiante.', e.coordConvivencia);
+      expect(await alertasDe(delPresunto)).toHaveLength(1);
+      // Pasar de II a III no vuelve a avisar: la familia ya fue informada.
+      await casos.reclasificarCaso(caso._id, 'III', 'Se configura un posible delito.', e.coordConvivencia);
+      expect((await alertasDe(delPresunto))[0]).toMatchObject({ contador: 1 });
+    });
   });
 
   it('los motivos largos (hasta 1000 caracteres) caben en la solicitud descartada y en el impedimento', async () => {

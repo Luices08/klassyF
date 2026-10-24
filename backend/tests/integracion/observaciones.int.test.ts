@@ -440,7 +440,7 @@ describe('M14 observaciones y faltas (con base de datos)', () => {
     });
 
     it('el código de una falta es único (sin importar mayúsculas)', async () => {
-      await expect(catalogoCaso.crearFalta({ codigo: '1.3', descripcion: 'Otra.', gravedad: 'I', descuento_decimas: null }, actor(e.admin))).rejects.toMatchObject({ statusCode: 409 });
+      await expect(catalogoCaso.crearFalta({ codigo: '1.3', descripcion: 'Otra.', gravedad: 'I' }, actor(e.admin))).rejects.toMatchObject({ statusCode: 409 });
     });
   });
 

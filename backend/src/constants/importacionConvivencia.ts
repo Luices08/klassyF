@@ -18,7 +18,6 @@ export const COLUMNAS_FALTAS: ColumnaImportacion[] = [
   { nombre: 'codigo', obligatoria: true, descripcion: 'Numeral de la falta en el manual. Identifica la fila: si ya existe, se actualiza.', ejemplo: '2.15' },
   { nombre: 'descripcion', obligatoria: true, descripcion: 'Texto de la falta (máximo 400 caracteres).', ejemplo: 'Debe portar los tenis correspondientes al uniforme.' },
   { nombre: 'gravedad', obligatoria: true, descripcion: 'I, II o III, según el manual.', ejemplo: 'I' },
-  { nombre: 'descuento_decimas', obligatoria: false, descripcion: 'Décimas que descuenta el manual (0 a 5, con coma o punto). Solo se guarda; no se aplica a notas.', ejemplo: '0,2' },
   { nombre: 'estado', obligatoria: false, descripcion: 'ACTIVO o INACTIVO (vacío = ACTIVO).', ejemplo: 'ACTIVO' },
 ];
 

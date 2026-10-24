@@ -29,7 +29,6 @@ export interface FaltaConvivencia {
   codigo: string;
   descripcion: string;
   gravedad: TipoSituacion;
-  descuento_decimas: number | null;
   estado: EstadoActivo;
 }
 

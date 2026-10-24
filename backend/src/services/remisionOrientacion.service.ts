@@ -1,5 +1,5 @@
 import { ClientSession, Types } from 'mongoose';
-import { EstadoRemisionOrientacion, OrigenRemisionOrientacion } from '../constants/convivencia';
+import { EstadoRemisionOrientacion } from '../constants/convivencia';
 import { ROLES } from '../constants/roles';
 import { CasoConvivenciaDocument } from '../models/casoConvivencia.model';
 import Group from '../models/group.model';
@@ -7,7 +7,6 @@ import RemisionOrientacion, { RemisionOrientacionDocument } from '../models/remi
 import { User, UserDocument } from '../models/user.model';
 import ApiError from '../utils/ApiError';
 import { alcanceDeSedes, enAlcanceDeSede } from '../utils/permisosConvivencia';
-import { claveDeRemision, involucradosARemitir } from '../utils/remisionOrientacion';
 import { fechaDeClase, hoyColombia } from './attendance.service';
 import { registrarEvento } from './audit.service';
 
@@ -17,43 +16,6 @@ const ROLES_ORIENTACION: string[] = [ROLES.ADMIN, ROLES.ORIENTADOR];
 const comoUsuarioConvivencia = (u: UserDocument) => ({ id: String(u._id), rol: u.rol, sedes_ids: u.sedes_ids.map(String) });
 
 // --- Lo que hace convivencia (M15): crear la remisión ---
-
-type OrigenAutomatico = { tipo: Exclude<OrigenRemisionOrientacion, 'MANUAL'>; id: string; nombre: string };
-
-/**
- * Remite a orientación a los afectados y presuntos responsables del caso porque una medida o un paso del protocolo, marcados
- * por el colegio, se aplicó o se cumplió. Es idempotente (índice por clave): repetirlo no duplica. Devuelve cuántas creó.
- */
-export async function remitirAutomaticamente(caso: CasoConvivenciaDocument, origen: OrigenAutomatico, usuario: UserDocument, session: ClientSession): Promise<number> {
-  let creadas = 0;
-  for (const i of involucradosARemitir(caso.involucrados)) {
-    const clave = claveDeRemision(String(caso._id), String(i.student_id), origen.tipo, origen.id);
-    const resultado = await RemisionOrientacion.updateOne(
-      { clave },
-      {
-        $setOnInsert: {
-          caso_id: caso._id,
-          caso_codigo: caso.codigo,
-          sede_id: caso.sede_id,
-          tipo_situacion: caso.tipo_situacion,
-          hechos: caso.hechos,
-          student_id: i.student_id,
-          group_id: i.group_id,
-          rol: i.rol,
-          origen: origen.tipo,
-          origen_detalle: origen.nombre,
-          estado: 'PENDIENTE',
-          remitida_por: usuario._id,
-          atenciones: [],
-          atendida: null,
-        },
-      },
-      { upsert: true, session }
-    );
-    if (resultado.upsertedCount) creadas++;
-  }
-  return creadas;
-}
 
 /** Convivencia remite a mano a estudiantes del caso. No se repite una remisión manual que todavía está en curso. */
 export async function remitirManualmente(caso: CasoConvivenciaDocument, studentIds: string[], motivo: string, usuario: UserDocument, session: ClientSession): Promise<number> {

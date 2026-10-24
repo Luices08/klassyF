@@ -13,11 +13,6 @@ export interface IFaltaConvivencia {
   codigo: string;
   descripcion: string;
   gravedad: TipoSituacion;
-  /**
-   * Décimas que el manual descuenta a la nota de convivencia por esta falta. Solo se guarda: aplicar descuentos a notas
-   * está diferido y no toca M12/M17.
-   */
-  descuento_decimas: number | null;
   estado: EstadoUsuario;
   createdAt: Date;
   updatedAt: Date;
@@ -32,7 +27,6 @@ const faltaConvivenciaSchema = new Schema<IFaltaConvivencia, FaltaConvivenciaMod
     codigo: { type: String, required: true, trim: true, maxlength: 20 },
     descripcion: { type: String, required: true, trim: true, maxlength: 400 },
     gravedad: { type: String, enum: TIPOS_SITUACION, required: true },
-    descuento_decimas: { type: Number, min: 0, max: 5, default: null },
     estado: { type: String, enum: ESTADOS_USUARIO, default: 'activo' },
   },
   { timestamps: true }

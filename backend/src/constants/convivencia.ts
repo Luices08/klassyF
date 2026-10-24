@@ -71,12 +71,18 @@ export type ParteDescargo = (typeof PARTES_DESCARGO)[number];
 export const ESTADOS_REMISION_ORIENTACION = ['PENDIENTE', 'EN_ATENCION', 'ATENDIDA'] as const;
 export type EstadoRemisionOrientacion = (typeof ESTADOS_REMISION_ORIENTACION)[number];
 
-/** Una remisión nace de una medida o de un paso del protocolo marcados por el colegio, o la hace convivencia a mano. */
+/**
+ * Una remisión la hace convivencia a mano desde el caso (`MANUAL`). `MEDIDA` y `PASO` son remisiones automáticas de una versión anterior (una medida
+ * o un paso marcados por el colegio): ya no se crean, pero las que existen se conservan y se siguen leyendo.
+ */
 export const ORIGENES_REMISION_ORIENTACION = ['MEDIDA', 'PASO', 'MANUAL'] as const;
 export type OrigenRemisionOrientacion = (typeof ORIGENES_REMISION_ORIENTACION)[number];
 
-/** A quiénes de un caso se remite automáticamente: a quien resultó afectado y a quien presuntamente lo causó. */
-export const ROLES_QUE_SE_REMITEN: readonly RolInvolucrado[] = ['AFECTADO', 'PRESUNTO_RESPONSABLE'];
+/**
+ * De quiénes se avisa a la familia al abrir un caso tipo II o III: de quien resultó afectado y de quien presuntamente lo causó. Los testigos y quien reportó
+ * no reciben aviso (su familia no es parte del hecho y el aviso podría revelar quién habló).
+ */
+export const ROLES_CUYA_FAMILIA_SE_INFORMA: readonly RolInvolucrado[] = ['AFECTADO', 'PRESUNTO_RESPONSABLE'];
 
 /** Valor inicial de la política; la institución lo cambia. Pasado este plazo sin remisión, un caso tipo III muestra alerta. */
 export const PLAZO_REMISION_TIPO_III_HORAS_INICIAL = 24;

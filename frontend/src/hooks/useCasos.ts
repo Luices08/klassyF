@@ -88,7 +88,7 @@ export interface CasoDetalle {
   involucrados: { student_id: string; rol: RolInvolucrado; estudiante: string }[];
   atencion_inmediata: ({ descripcion: string; hubo_dano: boolean; fecha: string } & ConAutor) | null;
   medidas_proteccion: ({ _id: string; descripcion: string; fecha: string } & ConAutor)[];
-  pasos: { _id: string; nombre: string; obligatorio: boolean; remite_a_orientacion: boolean; estado: 'PENDIENTE' | 'CUMPLIDO' | 'NO_APLICA'; nota: string; fecha: string | null }[];
+  pasos: { _id: string; nombre: string; obligatorio: boolean; estado: 'PENDIENTE' | 'CUMPLIDO' | 'NO_APLICA'; nota: string; fecha: string | null }[];
   notificaciones: ({ _id: string; tipo: TipoNotificacion; fecha: string; medio: MedioCitacion; dirigida_a: string; resultado: string } & ConAutor)[];
   descargos: ({ _id: string; parte: 'ESTUDIANTE' | 'ACUDIENTE'; student_id: string | null; fecha: string; texto: string } & ConAutor)[];
   seguimientos: ({ _id: string; fecha: string; nota: string; proxima_fecha: string | null } & ConAutor)[];
@@ -124,7 +124,6 @@ export interface MedidaConvivencia {
   nombre: string;
   descripcion: string;
   se_aplica_por_dias: boolean;
-  remite_a_orientacion: boolean;
   orden: number;
   estado: EstadoActivo;
 }
@@ -140,7 +139,7 @@ export interface EntidadExterna {
 export interface ProtocoloConvivencia {
   _id: string;
   tipo_situacion: TipoSituacion;
-  pasos: { nombre: string; obligatorio: boolean; remite_a_orientacion: boolean; orden: number }[];
+  pasos: { nombre: string; obligatorio: boolean; orden: number }[];
 }
 
 export interface CatalogosCaso {
@@ -297,7 +296,7 @@ export function useEliminarCatalogoCaso() {
 export function useGuardarProtocolo() {
   const invalidar = useInvalidarCasos();
   return useMutation({
-    mutationFn: ({ tipo, pasos }: { tipo: TipoSituacion; pasos: { nombre: string; obligatorio: boolean; remite_a_orientacion: boolean }[] }) =>
+    mutationFn: ({ tipo, pasos }: { tipo: TipoSituacion; pasos: { nombre: string; obligatorio: boolean }[] }) =>
       api.put<ProtocoloConvivencia>(`/convivencia/protocolos/${tipo}`, { pasos }),
     onSuccess: invalidar,
   });
@@ -309,7 +308,6 @@ export interface FaltaInput {
   codigo: string;
   descripcion: string;
   gravedad: TipoSituacion;
-  descuento_decimas: number | null;
 }
 
 export function useGuardarFalta() {

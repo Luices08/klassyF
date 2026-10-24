@@ -266,7 +266,6 @@ function FaltasTab({ faltas, onEstado, onEliminar }: { faltas: FaltaConvivencia[
           <tr>
             <Th>Código</Th>
             <Th>Descripción</Th>
-            <Th>Décimas</Th>
             <Th>Estado</Th>
             <Th className="text-right">Acciones</Th>
           </tr>
@@ -295,7 +294,7 @@ function FilasDeGravedad({
   return (
     <>
       <tr className="bg-soft">
-        <Td colSpan={5}>
+        <Td colSpan={4}>
           <span className="flex items-center gap-2">
             <TipoSituacionBadge value={gravedad} />
             <span className="text-xs text-muted">
@@ -308,7 +307,6 @@ function FilasDeGravedad({
         <tr key={f._id}>
           <Td>{f.codigo}</Td>
           <Td className="max-w-md">{f.descripcion}</Td>
-          <Td>{f.descuento_decimas ?? '—'}</Td>
           <Td>
             <EstadoUsuarioBadge value={f.estado} />
           </Td>
@@ -317,7 +315,7 @@ function FilasDeGravedad({
           </Td>
         </tr>
       ))}
-      {filas.length === 0 && <EmptyRow colSpan={5}>Sin faltas de este tipo.</EmptyRow>}
+      {filas.length === 0 && <EmptyRow colSpan={4}>Sin faltas de este tipo.</EmptyRow>}
     </>
   );
 }
@@ -327,7 +325,6 @@ function FaltaCatalogoDrawer({ falta, onClose }: { falta: FaltaConvivencia | nul
   const [codigo, setCodigo] = useState(falta?.codigo ?? '');
   const [descripcion, setDescripcion] = useState(falta?.descripcion ?? '');
   const [gravedad, setGravedad] = useState<TipoSituacion>(falta?.gravedad ?? 'I');
-  const [decimas, setDecimas] = useState(falta?.descuento_decimas?.toString() ?? '');
 
   const guardar = async (e: FormEvent) => {
     e.preventDefault();
@@ -336,7 +333,6 @@ function FaltaCatalogoDrawer({ falta, onClose }: { falta: FaltaConvivencia | nul
       codigo: codigo.trim(),
       descripcion,
       gravedad,
-      descuento_decimas: decimas !== '' ? Number(decimas) : null,
     });
     onClose();
   };
@@ -362,7 +358,6 @@ function FaltaCatalogoDrawer({ falta, onClose }: { falta: FaltaConvivencia | nul
         </Select>
       </div>
       <Textarea label="Descripción" rows={3} value={descripcion} onChange={(e) => setDescripcion(e.target.value)} maxLength={400} required />
-      <Input label="Décimas (opcional)" type="number" step="0.1" min={0} max={5} value={decimas} onChange={(e) => setDecimas(e.target.value)} hint="Solo se guarda; todavía no se descuenta de ninguna nota." />
     </Drawer>
   );
 }

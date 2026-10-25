@@ -226,12 +226,13 @@ export function useGruposObservables() {
   });
 }
 
-export function useEstudiantesObservables(params: { group_id?: string; q?: string }) {
+/** `ambito: 'sede'`: un docente busca por nombre en toda su sede (sin documento) para nombrar a alguien en un reporte a coordinación. */
+export function useEstudiantesObservables(params: { group_id?: string; q?: string; ambito?: 'sede' }) {
   const q = params.q?.trim() ?? '';
   return useQuery({
-    queryKey: ['observaciones', 'estudiantes', params.group_id ?? '', q],
-    queryFn: () => api.get<EstudianteObservable[]>('/observaciones/estudiantes', { group_id: params.group_id, q: q || undefined }),
-    enabled: Boolean(params.group_id) || q.length >= 3,
+    queryKey: ['observaciones', 'estudiantes', params.group_id ?? '', q, params.ambito ?? ''],
+    queryFn: () => api.get<EstudianteObservable[]>('/observaciones/estudiantes', { group_id: params.group_id, q: q || undefined, ambito: params.ambito }),
+    enabled: params.ambito === 'sede' ? q.length >= 3 : Boolean(params.group_id) || q.length >= 3,
     placeholderData: keepPreviousData,
   });
 }

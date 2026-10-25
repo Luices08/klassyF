@@ -106,6 +106,17 @@ describe('permisoSobreEstudiante', () => {
     ]);
   });
 
+  it('reportar a coordinación lo puede cualquier docente de la sede del estudiante, no uno de otra sede', () => {
+    expect(permisoSobreEstudiante(usuario('DOCENTE'), estudiante(), 'REPORTAR_A_COORDINACION')).toBe(true);
+    expect(permisoSobreEstudiante(usuario('DOCENTE', ['s2']), estudiante(), 'REPORTAR_A_COORDINACION')).toBe(false);
+    expect(permisoSobreEstudiante(usuario('COORDINADOR_CONVIVENCIA'), estudiante(), 'REPORTAR_A_COORDINACION')).toBe(true);
+    // Lo que deja antecedente en el Observador sigue siendo solo de quien dicta o dirige el grupo.
+    expect(permisoSobreEstudiante(usuario('DOCENTE'), estudiante(), 'REGISTRAR_FALTA')).toBe(false);
+    for (const rol of ['ORIENTADOR', 'COORDINADOR', 'SECRETARIA'] as const) {
+      expect(permisoSobreEstudiante(usuario(rol), estudiante(), 'REPORTAR_A_COORDINACION'), rol).toBe(false);
+    }
+  });
+
   it('un docente sin relación con el estudiante no registra', () => {
     expect(permisoSobreEstudiante(usuario('DOCENTE'), estudiante(), 'REGISTRAR_OBSERVACION')).toBe(false);
   });

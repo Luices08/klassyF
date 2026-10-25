@@ -339,8 +339,11 @@ Reglas que no se ven leyendo un solo archivo:
 - **Buscador propio** (`GET /observaciones/estudiantes`, `/grupos`): acotado a los grupos del docente (CLASE o dirección) o a las sedes del
   coordinador/orientador. No se abre `/students` a convivencia.
   **Un incidente puede ser entre estudiantes de grupos o grados distintos**: la selección de la pantalla sobrevive al cambio de grupo y de búsqueda (chips «Seleccionados») y cada registro queda en el grupo de su estudiante. El
-  docente solo puede nombrar a quienes están en un grupo que dicta o dirige (otro estudiante es 404 y no se guarda nada a medias): a los demás los describe en los hechos y coordinación los agrega al abrir el caso, que acepta estudiantes de
-  cualquier grupo de su sede (`tests/integracion/incidenteEntreGrupos.int.test.ts`).
+  **Dos alcances distintos para el docente** (`permisoSobreEstudiante`): lo que **deja antecedente en el Observador** (observación, falta Tipo I, Tipo II resuelta) es solo de los grupos que dicta o dirige (otro estudiante es 404 y no se guarda nada a medias);
+  en cambio, **un reporte a coordinación** (Tipo II enviada o Tipo III, acción `REPORTAR_A_COORDINACION`) puede nombrar a **cualquier estudiante de su sede**, porque un incidente se presencia en el recreo y no en la clase. Para encontrarlo, el
+  buscador acepta `?ambito=sede` (solo rol DOCENTE): **solo por nombre (mínimo 3 letras; nunca lista un grupo completo), sin devolver el documento, solo de las sedes del docente**, y nombrar a alguien no da acceso a su Observador ni a su historial. Un reporte no mezcla
+  sedes (400). **La auditoría está en el reporte, no en cada búsqueda**: `REPORTE_URGENTE_REGISTRADO` anota cuántos de los estudiantes nombrados eran de grupos que el docente no dicta ni dirige. Coordinación abre el caso con estudiantes de cualquier grupo de su sede
+  (`tests/integracion/incidenteEntreGrupos.int.test.ts`).
 - **Se audita también la lectura** (`CONVIVENCIA_HISTORIAL_CONSULTADO`, `..._OBSERVACIONES_PROPIAS_CONSULTADAS`). El `detalle` de la auditoría
   nunca lleva contenido (ni el motivo de una anulación, que queda en el registro).
 - **Seguimiento** (embebido en `Observacion`): `seguimientos[]` (notas), `compromiso_estado` (PENDIENTE → CUMPLIDO/INCUMPLIDO; "vencido" no es un

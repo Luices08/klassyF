@@ -13,7 +13,7 @@ import * as catalogo from '../../src/services/convivenciaCatalogo.service';
 import * as observaciones from '../../src/services/observacion.service';
 import * as solicitudes from '../../src/services/solicitudCaso.service';
 import { detenerBaseDeDatos, iniciarBaseDeDatos, limpiarBaseDeDatos } from './baseDeDatos';
-import { actor, armarEscenario, Escenario, hoy } from './escenario';
+import { actor, armarEscenario, crearUsuario, Escenario, hoy } from './escenario';
 
 const PAGINA = { pagina: 1, limite: 20 };
 type Vista = Record<string, unknown> & { _id: string };
@@ -516,14 +516,19 @@ describe('M14 observaciones y faltas (con base de datos)', () => {
       expect(await SolicitudCaso.countDocuments()).toBe(0);
     });
 
-    it('el docente solo nombra estudiantes de sus grupos; el docente ajeno, el coordinador académico y orientación no reportan', async () => {
+    it('cualquier docente de la sede puede nombrar a un estudiante en un reporte a coordinación; uno de otra sede, el coordinador académico y orientación no', async () => {
       await expect(reportar(e.directora)).resolves.toBeDefined();
       await expect(reportar(e.coordConvivencia)).resolves.toBeDefined();
-      for (const quien of [e.docenteAjeno, e.coordAcademico, e.orientador, e.secretaria]) {
+      // Un docente sin clase en el grupo ni dirección también reporta: vio el hecho en el recreo.
+      await expect(reportar(e.docenteAjeno)).resolves.toBeDefined();
+      const deOtraSede = await crearUsuario('DOCENTE', { sedes_ids: e.coordConvivenciaOtraSede.sedes_ids });
+      for (const quien of [deOtraSede, e.coordAcademico, e.orientador, e.secretaria]) {
         await expect(reportar(quien), quien.rol).rejects.toMatchObject({ statusCode: 404 });
       }
-      // Nombrar a alguien fuera de sus grupos no se hace a medias: no queda ninguna solicitud de más.
-      expect(await SolicitudCaso.countDocuments()).toBe(2);
+      // No se guarda nada a medias, y queda dicho cuántos no eran de sus grupos.
+      expect(await SolicitudCaso.countDocuments()).toBe(3);
+      const auditoria = await AuditLog.find({ accion: 'REPORTE_URGENTE_REGISTRADO', usuario_id: e.docenteAjeno._id });
+      expect(auditoria[0]!.detalle).toContain('2 de grupos que no dicta ni dirige');
     });
 
     it('quien reportó ve el estado de su reporte, y solo el suyo', async () => {

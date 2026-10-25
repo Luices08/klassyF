@@ -4,6 +4,7 @@ import AcademicYear from '../../src/models/academicYear.model';
 import CasoConvivencia from '../../src/models/casoConvivencia.model';
 import Enrollment from '../../src/models/enrollment.model';
 import Group from '../../src/models/group.model';
+import JornadaOperativa from '../../src/models/jornadaOperativa.model';
 import Observacion from '../../src/models/observacion.model';
 import SolicitudCaso from '../../src/models/solicitudCaso.model';
 import TeacherAssignment from '../../src/models/teacherAssignment.model';
@@ -92,14 +93,53 @@ describe('incidente entre estudiantes de distintos grupos (con base de datos)', 
     expect(new Set(guardado!.involucrados.map((i) => String(i.group_id))).size).toBe(2);
   });
 
-  it('un estudiante de un grupo que el docente no dicta ni dirige no se puede nombrar, y no se guarda nada a medias', async () => {
+  it('un estudiante de un grupo que el docente no dicta ni dirige se puede nombrar en un reporte a coordinación, pero no en el Observador', async () => {
+    await observaciones.reportarSituacionGrave(
+      { falta_id: e.faltaIII, fecha_hecho: hoy(), hechos: 'Pelea en el patio.', acciones_contencion: 'Se separó a los estudiantes.', estudiantes_ids: [id(e.estudiante), id(deGrupoAjeno)] },
+      e.docenteDeClase
+    );
+    expect(await SolicitudCaso.countDocuments()).toBe(1);
+    expect(await Observacion.countDocuments()).toBe(0);
+
+    // Lo que deja antecedente sigue siendo solo de quien dicta o dirige el grupo: no se escribe sobre un menor que no es suyo.
     await expect(
-      observaciones.reportarSituacionGrave(
-        { fecha_hecho: hoy(), hechos: 'Pelea en el patio.', acciones_contencion: 'Se separó a los estudiantes.', estudiantes_ids: [id(e.estudiante), id(deGrupoAjeno)] },
-        e.docenteDeClase
-      )
+      observaciones.registrarFalta({ falta_id: e.faltaI, fecha_hecho: hoy(), hechos: 'Llegó tarde.', estudiantes_ids: [id(deGrupoAjeno)] }, e.docenteDeClase)
     ).rejects.toMatchObject({ statusCode: 404 });
+    await expect(
+      observaciones.registrarObservacion({ estudiantes_ids: [id(deGrupoAjeno)], tipo_id: e.tipoComportamental, descripcion: 'Respeta.', fecha_hecho: hoy() }, e.docenteDeClase)
+    ).rejects.toMatchObject({ statusCode: 404 });
+    expect(await Observacion.countDocuments()).toBe(0);
+  });
+
+  it('un reporte no mezcla estudiantes de sedes distintas', async () => {
+    const anio = (await AcademicYear.findOne())!;
+    const base = (await Group.findOne())!;
+    const otraSedeId = e.coordConvivenciaOtraSede.sedes_ids[0]!;
+    const jornada = await JornadaOperativa.create({ sede_id: otraSedeId, nombre: 'MANANA', hora_inicio: '06:00', hora_fin: '12:00' });
+    const grupoRural = await Group.create({ sede_id: otraSedeId, academic_year_id: anio._id, grade_id: base.grade_id, jornada_id: jornada._id, nomenclatura: '601', max_capacity: 40 });
+    const rural = await crearUsuario('ESTUDIANTE');
+    await Enrollment.create({ student_id: rural._id, group_id: grupoRural._id, academic_year_id: anio._id, tipo_ingreso: 'NUEVO', estado: 'MATRICULADO_DEFINITIVO', folio_matricula: `F-${rural.numero_documento}` });
+    const docente = await crearUsuario('DOCENTE', { sedes_ids: [base.sede_id, otraSedeId] });
+    await expect(
+      observaciones.reportarSituacionGrave({ fecha_hecho: hoy(), hechos: 'Pelea.', acciones_contencion: 'Se separó a los estudiantes.', estudiantes_ids: [id(e.estudiante), id(rural)] }, docente)
+    ).rejects.toMatchObject({ statusCode: 400, message: expect.stringContaining('misma sede') });
     expect(await SolicitudCaso.countDocuments()).toBe(0);
+  });
+
+  it('el docente busca por nombre en toda su sede para nombrar a alguien, sin ver su documento y sin listar un grupo completo', async () => {
+    const apellido = deGrupoAjeno.apellido.slice(0, 5);
+    // Sin el ámbito de sede, un docente solo encuentra a los de sus grupos.
+    const propios = await observaciones.buscarEstudiantes(e.docenteDeClase, { q: apellido });
+    expect(propios.map((s) => s.student_id)).not.toContain(id(deGrupoAjeno));
+    const encontrados = await observaciones.buscarEstudiantes(e.docenteDeClase, { q: apellido, ambito: 'sede' });
+    expect(encontrados.find((s) => s.student_id === id(deGrupoAjeno))).toMatchObject({ grupo: '603', numero_documento: '' });
+    // Nunca se lista un grupo completo ni se busca con menos de 3 letras.
+    expect(await observaciones.buscarEstudiantes(e.docenteDeClase, { group_id: String(otroGrupoId), ambito: 'sede' })).toEqual([]);
+    expect(await observaciones.buscarEstudiantes(e.docenteDeClase, { q: 'ap', ambito: 'sede' })).toEqual([]);
+    // Un docente de otra sede no encuentra a nadie, y el ámbito no amplía a otros roles.
+    const deOtraSede = await crearUsuario('DOCENTE', { sedes_ids: e.coordConvivenciaOtraSede.sedes_ids });
+    expect(await observaciones.buscarEstudiantes(deOtraSede, { q: apellido, ambito: 'sede' })).toEqual([]);
+    expect(await observaciones.buscarEstudiantes(e.orientador, { q: apellido, ambito: 'sede' })).not.toContainEqual(expect.objectContaining({ numero_documento: '' }));
   });
 
   it('coordinación sí puede sumar al caso a un estudiante de otro grupo de la sede', async () => {

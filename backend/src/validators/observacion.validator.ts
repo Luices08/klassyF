@@ -57,7 +57,8 @@ export const actualizarConfiguracion: ValidationSchema = {
 // --- Observaciones y faltas ---
 
 export const buscarEstudiantes: ValidationSchema = {
-  query: Joi.object({ group_id: objectId, q: Joi.string().trim().max(60) }),
+  // `ambito=sede`: un docente busca por nombre en toda su sede para nombrar a alguien en un reporte a coordinación.
+  query: Joi.object({ group_id: objectId, q: Joi.string().trim().max(60), ambito: Joi.string().valid('sede') }),
 };
 
 const descripcion = Joi.string().trim().max(MAX_DESCRIPCION_OBSERVACION);

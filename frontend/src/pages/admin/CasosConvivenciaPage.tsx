@@ -1,6 +1,6 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { AbrirCasoDrawer } from '../../components/convivencia/AbrirCasoDrawer';
-import { CasoDetalleDrawer } from '../../components/convivencia/CasoDetalleDrawer';
 import { Alert, errorMessage } from '../../components/ui/Alert';
 import { Chip, EstadoCasoBadge, TipoSituacionBadge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
@@ -23,7 +23,8 @@ export function CasosConvivenciaPage() {
   const casos = useCasos({ estado, tipo_situacion: tipo, pagina });
   const alertas = useCasosConAlertas();
   const [abriendo, setAbriendo] = useState(false);
-  const [abierto, setAbierto] = useState<string | null>(null);
+  const navigate = useNavigate();
+  const abrirCaso = (id: string) => navigate(`/convivencia/casos/${id}`);
 
   const { data = [], total = 0, limite = 20 } = casos.data ?? {};
   const paginas = Math.max(1, Math.ceil(total / limite));
@@ -46,7 +47,7 @@ export function CasosConvivenciaPage() {
           <ul className="mt-1 space-y-0.5">
             {alertas.data?.map((c) => (
               <li key={c._id}>
-                <button type="button" className="underline" onClick={() => setAbierto(c._id)}>
+                <button type="button" className="underline" onClick={() => abrirCaso(c._id)}>
                   {c.codigo}
                 </button>{' '}
                 · {c.alertas.map((a) => a.mensaje).join(' ')}
@@ -131,7 +132,7 @@ export function CasosConvivenciaPage() {
                     <EstadoCasoBadge value={c.estado} />
                   </Td>
                   <Td className="text-right">
-                    <Button variant="soft-edit" className="px-3 py-1 text-xs" onClick={() => setAbierto(c._id)}>
+                    <Button variant="soft-edit" className="px-3 py-1 text-xs" onClick={() => abrirCaso(c._id)}>
                       Abrir
                     </Button>
                   </Td>
@@ -158,8 +159,7 @@ export function CasosConvivenciaPage() {
         )}
       </Card>
 
-      <AbrirCasoDrawer open={abriendo} onClose={() => setAbriendo(false)} onAbierto={setAbierto} />
-      <CasoDetalleDrawer casoId={abierto} onClose={() => setAbierto(null)} />
+      <AbrirCasoDrawer open={abriendo} onClose={() => setAbriendo(false)} onAbierto={abrirCaso} />
     </div>
   );
 }

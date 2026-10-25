@@ -43,6 +43,7 @@ import { NotasGestionPage } from './pages/admin/NotasGestionPage';
 import { CreadorPlanillasPage } from './pages/admin/CreadorPlanillasPage';
 import { ConfiguracionBoletinPage } from './pages/admin/ConfiguracionBoletinPage';
 import { AdmissionRequestsPage } from './pages/admin/AdmissionRequestsPage';
+import { CasoConvivenciaPage } from './pages/admin/CasoConvivenciaPage';
 import { CasosConvivenciaPage } from './pages/admin/CasosConvivenciaPage';
 import { ComitePage } from './pages/admin/ComitePage';
 import { CatalogoConvivenciaPage } from './pages/admin/CatalogoConvivenciaPage';
@@ -188,6 +189,7 @@ export default function App() {
           <Route element={<ProtectedRoute allowedRoles={['ADMIN', 'COORDINADOR_CONVIVENCIA']} />}>
             <Route path="/convivencia/catalogo" element={<CatalogoConvivenciaPage />} />
             <Route path="/convivencia/casos" element={<CasosConvivenciaPage />} />
+            <Route path="/convivencia/casos/:id" element={<CasoConvivenciaPage />} />
             <Route path="/convivencia/comite" element={<ComitePage />} />
             <Route path="/convivencia/solicitudes" element={<SolicitudesCasoPage />} />
           </Route>

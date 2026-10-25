@@ -5,11 +5,9 @@ import { Input, Select, Textarea } from '../ui/Field';
 import {
   CERRABLES,
   NOMBRES_ESTADO_CASO,
-  NOMBRES_NOTIFICACION,
   NOMBRES_RESULTADO,
   RESULTADOS_CIERRE,
   SIGUIENTES_ESTADOS,
-  TIPOS_NOTIFICACION,
   useAgregarRegistroCaso,
   useActualizarPaso,
   useAnularCaso,
@@ -27,14 +25,10 @@ import {
   type ColeccionRegistro,
   type EstadoCaso,
   type ResultadoCierre,
-  type TipoNotificacion,
 } from '../../hooks/useCasos';
 import {
-  MEDIOS_CITACION,
-  NOMBRES_MEDIO,
   TIPOS_SITUACION,
   useCatalogoConvivencia,
-  type MedioCitacion,
   type TipoSituacion,
 } from '../../hooks/useObservaciones';
 
@@ -63,7 +57,7 @@ const TITULOS: Record<ModoAccionCaso, string> = {
   orientacion: 'Remitir a orientación',
   'paso-no-aplica': 'Marcar el paso como «No aplica»',
   seguimientos: 'Registrar seguimiento',
-  notificaciones: 'Registrar notificación',
+  notificaciones: 'Anotar el informe a los acudientes',
   descargos: 'Registrar descargos',
   'medidas-proteccion': 'Registrar medida de protección',
   remisiones: 'Registrar remisión',
@@ -108,8 +102,6 @@ function Formulario({ caso, modo, esAdmin, paso, onClose }: Props & { modo: Modo
   const [textoExtra, setTextoExtra] = useState('');
   const [fecha, setFecha] = useState(hoyLocal());
   const [proxima, setProxima] = useState('');
-  const [medio, setMedio] = useState<MedioCitacion>('LLAMADA');
-  const [tipoNotificacion, setTipoNotificacion] = useState<TipoNotificacion>('ACUDIENTES');
   const [parte, setParte] = useState<'ESTUDIANTE' | 'ACUDIENTE'>('ESTUDIANTE');
   const [estudianteId, setEstudianteId] = useState(caso.involucrados[0]?.student_id ?? '');
   const [entidadId, setEntidadId] = useState('');
@@ -164,7 +156,7 @@ function Formulario({ caso, modo, esAdmin, paso, onClose }: Props & { modo: Modo
         await registro.mutateAsync({ id, coleccion: modo, fecha, nota: texto, proxima_fecha: proxima || null });
         break;
       case 'notificaciones':
-        await registro.mutateAsync({ id, coleccion: modo, fecha, tipo: tipoNotificacion, medio, dirigida_a: textoExtra, resultado: texto });
+        await registro.mutateAsync({ id, coleccion: modo, fecha, resultado: texto });
         break;
       case 'descargos':
         await registro.mutateAsync({ id, coleccion: modo, fecha, parte, student_id: parte === 'ESTUDIANTE' ? estudianteId : undefined, texto });
@@ -183,8 +175,8 @@ function Formulario({ caso, modo, esAdmin, paso, onClose }: Props & { modo: Modo
   };
 
   const requiereFecha = ['seguimientos', 'notificaciones', 'descargos', 'medidas-proteccion', 'remisiones', 'medidas-aplicadas'].includes(modo);
-  // El texto es obligatorio salvo en el estado, y en las notificaciones, remisiones y medidas aplicadas, donde es el resultado u observaciones.
-  const TEXTO_OPCIONAL: ModoAccionCaso[] = ['estado', 'notificaciones', 'remisiones', 'medidas-aplicadas'];
+  // El texto es obligatorio salvo en el estado, y en las remisiones y medidas aplicadas, donde es el resultado u observaciones.
+  const TEXTO_OPCIONAL: ModoAccionCaso[] = ['estado', 'remisiones', 'medidas-aplicadas'];
   const textoMinimo = TEXTO_OPCIONAL.includes(modo) ? 0 : modo === 'decision' ? 20 : modo === 'seguimientos' ? 3 : 5;
   const deshabilitar =
     texto.trim().length < textoMinimo ||
@@ -285,26 +277,6 @@ function Formulario({ caso, modo, esAdmin, paso, onClose }: Props & { modo: Modo
       {requiereFecha && <Input label="Fecha" type="date" max={hoyLocal()} value={fecha} onChange={(e) => setFecha(e.target.value)} required />}
 
       {modo === 'seguimientos' && <Input label="Próximo seguimiento (opcional)" type="date" min={fecha} value={proxima} onChange={(e) => setProxima(e.target.value)} />}
-
-      {modo === 'notificaciones' && (
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <Select label="Qué se notificó" value={tipoNotificacion} onChange={(e) => setTipoNotificacion(e.target.value as TipoNotificacion)}>
-            {TIPOS_NOTIFICACION.map((t) => (
-              <option key={t} value={t}>
-                {NOMBRES_NOTIFICACION[t]}
-              </option>
-            ))}
-          </Select>
-          <Select label="Medio" value={medio} onChange={(e) => setMedio(e.target.value as MedioCitacion)}>
-            {MEDIOS_CITACION.map((m) => (
-              <option key={m} value={m}>
-                {NOMBRES_MEDIO[m]}
-              </option>
-            ))}
-          </Select>
-          <Input label="Dirigida a" value={textoExtra} onChange={(e) => setTextoExtra(e.target.value)} maxLength={120} />
-        </div>
-      )}
 
       {modo === 'descargos' && (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -412,7 +384,7 @@ function etiquetaTexto(modo: ModoAccionCaso): string {
     case 'seguimientos':
       return 'Nota de seguimiento';
     case 'notificaciones':
-      return 'Resultado';
+      return 'A quién se informó y cómo';
     case 'descargos':
       return 'Descargos';
     case 'medidas-proteccion':

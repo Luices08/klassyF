@@ -144,9 +144,10 @@ const ESQUEMAS_REGISTRO: Record<string, Joi.ObjectSchema> = {
     proxima_fecha: fechaDeCalendario.allow(null),
   }),
   notificaciones: Joi.object({
-    tipo: Joi.string().valid(...TIPOS_NOTIFICACION_CASO).required(),
+    // La pantalla ya no los pide: sin ellos es el informe a los acudientes, por un medio que el sistema no distingue.
+    tipo: Joi.string().valid(...TIPOS_NOTIFICACION_CASO),
     fecha: fechaDeCalendario.required(),
-    medio: Joi.string().valid(...MEDIOS_CITACION).required(),
+    medio: Joi.string().valid(...MEDIOS_CITACION),
     dirigida_a: Joi.string().trim().max(120).allow(''),
     resultado: Joi.string().trim().max(500).allow(''),
   }),

@@ -89,7 +89,7 @@ export interface CasoDetalle {
   atencion_inmediata: ({ descripcion: string; hubo_dano: boolean; fecha: string } & ConAutor) | null;
   medidas_proteccion: ({ _id: string; descripcion: string; fecha: string } & ConAutor)[];
   pasos: { _id: string; nombre: string; obligatorio: boolean; estado: 'PENDIENTE' | 'CUMPLIDO' | 'NO_APLICA'; nota: string; fecha: string | null }[];
-  notificaciones: ({ _id: string; tipo: TipoNotificacion; fecha: string; medio: MedioCitacion; dirigida_a: string; resultado: string } & ConAutor)[];
+  notificaciones: ({ _id: string; tipo: TipoNotificacion; fecha: string; medio: MedioCitacion; dirigida_a: string; resultado: string; automatica: boolean } & ConAutor)[];
   descargos: ({ _id: string; parte: 'ESTUDIANTE' | 'ACUDIENTE'; student_id: string | null; fecha: string; texto: string } & ConAutor)[];
   seguimientos: ({ _id: string; fecha: string; nota: string; proxima_fecha: string | null } & ConAutor)[];
   remisiones: ({ _id: string; entidad_nombre: string; fecha: string; oficio: string; funcionario: string; respuesta: string } & ConAutor)[];

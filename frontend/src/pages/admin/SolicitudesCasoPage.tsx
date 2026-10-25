@@ -1,6 +1,6 @@
 import { type FormEvent, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { AbrirCasoDrawer } from '../../components/convivencia/AbrirCasoDrawer';
-import { CasoDetalleDrawer } from '../../components/convivencia/CasoDetalleDrawer';
 import { Alert, errorMessage } from '../../components/ui/Alert';
 import { Chip, TipoSituacionBadge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
@@ -19,7 +19,7 @@ export function SolicitudesCasoPage() {
   const bandeja = useBandejaSolicitudes(pagina);
   const [descartando, setDescartando] = useState<SolicitudCasoVista | null>(null);
   const [abriendo, setAbriendo] = useState<SolicitudCasoVista | null>(null);
-  const [casoAbierto, setCasoAbierto] = useState<string | null>(null);
+  const navigate = useNavigate();
 
   const { data = [], total = 0, limite = 20 } = bandeja.data ?? {};
   const paginas = Math.max(1, Math.ceil(total / limite));
@@ -105,8 +105,7 @@ export function SolicitudesCasoPage() {
         </Card>
       )}
       <DescartarDrawer solicitud={descartando} onClose={() => setDescartando(null)} />
-      <AbrirCasoDrawer open={Boolean(abriendo)} solicitud={abriendo} onClose={() => setAbriendo(null)} onAbierto={setCasoAbierto} />
-      <CasoDetalleDrawer casoId={casoAbierto} onClose={() => setCasoAbierto(null)} />
+      <AbrirCasoDrawer open={Boolean(abriendo)} solicitud={abriendo} onClose={() => setAbriendo(null)} onAbierto={(id) => navigate(`/convivencia/casos/${id}`)} />
     </div>
   );
 }

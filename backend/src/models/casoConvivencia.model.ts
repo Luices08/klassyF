@@ -66,6 +66,8 @@ export interface INotificacionCaso {
   medio: MedioCitacion;
   dirigida_a: string;
   resultado: string;
+  /** La dejó el sistema al avisar a las familias con portal (no la escribió una persona). */
+  automatica: boolean;
   por: Types.ObjectId;
 }
 
@@ -214,11 +216,12 @@ const seguimientoSchema = new Schema<ISeguimientoCaso>({
 });
 
 const notificacionSchema = new Schema<INotificacionCaso>({
-  tipo: { type: String, enum: TIPOS_NOTIFICACION_CASO, required: true },
+  tipo: { type: String, enum: TIPOS_NOTIFICACION_CASO, default: 'ACUDIENTES' },
   fecha: { type: Date, required: true },
-  medio: { type: String, enum: MEDIOS_CITACION, required: true },
+  medio: { type: String, enum: MEDIOS_CITACION, default: 'OTRO' },
   dirigida_a: { type: String, default: '', maxlength: 120 },
   resultado: { type: String, default: '', maxlength: 500 },
+  automatica: { type: Boolean, default: false },
   por: { type: Schema.Types.ObjectId, ref: 'User', required: true },
 });
 

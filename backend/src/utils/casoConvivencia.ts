@@ -42,15 +42,16 @@ export interface CasoParaCierre {
 /**
  * Qué falta para cerrar el caso con ese resultado (RN-15-03/04/05): el caso no se cierra con pasos obligatorios pendientes;
  * en tipo II y III hay atención inmediata e informe a los acudientes; en tipo III, remisión inmediata o justificación escrita.
+ * El informe a los acudientes lo cubre una anotación (la del sistema al avisar a las familias o la de una persona) o una citación enlazada al caso que no se canceló.
  */
-export function pendientesParaCerrar(caso: CasoParaCierre, resultado: ResultadoCierreCaso): string[] {
+export function pendientesParaCerrar(caso: CasoParaCierre, resultado: ResultadoCierreCaso, citacionesEnlazadas = 0): string[] {
   const faltan: string[] = [];
   for (const paso of caso.pasos) {
     if (paso.obligatorio && paso.estado === 'PENDIENTE') faltan.push(`Paso obligatorio pendiente: ${paso.nombre}.`);
   }
   if (caso.tipo_situacion !== 'I') {
     if (!caso.atencion_inmediata) faltan.push('Falta registrar la atención inmediata.');
-    if (!caso.notificaciones.some((n) => n.tipo === 'ACUDIENTES')) faltan.push('Falta registrar el informe a los acudientes.');
+    if (citacionesEnlazadas === 0 && !caso.notificaciones.some((n) => n.tipo === 'ACUDIENTES')) faltan.push('Falta registrar el informe a los acudientes.');
   }
   if (caso.tipo_situacion === 'III' && caso.remisiones.length === 0 && !caso.justificacion_sin_remision.trim()) {
     faltan.push('Un caso tipo III exige remisión a la autoridad competente o la justificación de por qué no hubo.');

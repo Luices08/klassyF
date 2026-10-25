@@ -306,6 +306,35 @@ describe('M15 casos de convivencia (con base de datos)', () => {
       await casos.reclasificarCaso(caso._id, 'III', 'Se configura un posible delito.', e.coordConvivencia);
       expect((await alertasDe(delPresunto))[0]).toMatchObject({ contador: 1 });
     });
+
+    it('el aviso del sistema queda como constancia en el caso y con eso se cierra sin anotar el informe a mano', async () => {
+      await conAcudiente(e.estudiante, '5001');
+      const caso = await abrir(e.coordConvivencia, 'II', { involucrados: involucrados() });
+      const guardado = await CasoConvivencia.findById(caso._id);
+      expect(guardado!.notificaciones).toHaveLength(1);
+      expect(guardado!.notificaciones[0]).toMatchObject({ tipo: 'ACUDIENTES', automatica: true });
+      expect(guardado!.notificaciones[0]!.resultado).not.toContain('Discusión');
+
+      await casos.cambiarEstadoCaso(caso._id, 'EN_ATENCION', e.coordConvivencia);
+      await casos.actualizarPaso(caso._id, caso.pasos[0]!._id, { estado: 'CUMPLIDO' }, e.coordConvivencia);
+      await casos.registrarAtencion(caso._id, { descripcion: 'Se separó a los estudiantes.' }, e.coordConvivencia);
+      expect(await casos.cerrarCaso(caso._id, { resultado: 'SOLUCIONADO', motivo: 'Se resolvió con las partes.' }, e.coordConvivencia)).toMatchObject({ estado: 'CERRADO' });
+    });
+
+    it('sin acudientes con portal no hay constancia automática: se anota a mano con solo la fecha y una nota', async () => {
+      const caso = await abrir(e.coordConvivencia, 'II', { involucrados: involucrados() });
+      expect((await CasoConvivencia.findById(caso._id))!.notificaciones).toHaveLength(0);
+
+      await casos.cambiarEstadoCaso(caso._id, 'EN_ATENCION', e.coordConvivencia);
+      await casos.actualizarPaso(caso._id, caso.pasos[0]!._id, { estado: 'CUMPLIDO' }, e.coordConvivencia);
+      await casos.registrarAtencion(caso._id, { descripcion: 'Se separó a los estudiantes.' }, e.coordConvivencia);
+      await expect(casos.cerrarCaso(caso._id, { resultado: 'SOLUCIONADO', motivo: 'Se resolvió.' }, e.coordConvivencia)).rejects.toMatchObject({ statusCode: 409, message: expect.stringContaining('acudientes') });
+
+      await casos.agregarRegistroCaso(caso._id, 'notificaciones', { fecha: hoy(), resultado: 'Se habló con la madre por teléfono.' }, e.coordConvivencia);
+      const anotada = (await CasoConvivencia.findById(caso._id))!.notificaciones[0]!;
+      expect(anotada).toMatchObject({ tipo: 'ACUDIENTES', medio: 'OTRO', automatica: false });
+      expect(await casos.cerrarCaso(caso._id, { resultado: 'SOLUCIONADO', motivo: 'Se resolvió.' }, e.coordConvivencia)).toMatchObject({ estado: 'CERRADO' });
+    });
   });
 
   it('los motivos largos (hasta 1000 caracteres) caben en la solicitud descartada y en el impedimento', async () => {

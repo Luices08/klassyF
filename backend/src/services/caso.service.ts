@@ -37,6 +37,7 @@ import { fechaDeClase, hoyColombia } from './attendance.service';
 import { registrarEvento } from './audit.service';
 import { obtenerConfiguracion } from './convivenciaCatalogo.service';
 import { exigirPermisoSobreEstudiante } from './observacion.service';
+import { acudientesConPortalDe } from './destinatariosNotificacion.service';
 import { avisarRemisionesOrientacion, avisarSituacionDeConvivencia } from './notificacionesEventos.service';
 import { auditarRemisionesCreadas, remitirManualmente, resumenDeRemisionesDelCaso } from './remisionOrientacion.service';
 
@@ -126,12 +127,28 @@ async function vistaCaso(caso: CasoConvivenciaDocument) {
 
 // --- Apertura ---
 
-/** Avisa (sin detalle) a las familias de quienes resultaron afectados o presuntos responsables; ver `avisarSituacionDeConvivencia`. */
-const avisarFamiliasDelCaso = (caso: CasoConvivenciaDocument) =>
-  avisarSituacionDeConvivencia(
-    caso._id,
-    caso.involucrados.filter((i) => ROLES_CUYA_FAMILIA_SE_INFORMA.includes(i.rol)).map((i) => i.student_id)
-  );
+/**
+ * Avisa (sin detalle) a las familias de quienes resultaron afectados o presuntos responsables (`avisarSituacionDeConvivencia`) y deja constancia en el caso de que el sistema
+ * lo hizo: así el coordinador no anota a mano lo que ya pasó. Solo se anota si hay al menos un acudiente con portal; las familias sin portal siguen siendo de quien llama o cita.
+ * Devuelve si quedó la anotación (para que quien llama devuelva la vista actualizada).
+ */
+async function avisarFamiliasDelCaso(caso: CasoConvivenciaDocument, usuario: UserDocument): Promise<boolean> {
+  const estudiantes = caso.involucrados.filter((i) => ROLES_CUYA_FAMILIA_SE_INFORMA.includes(i.rol)).map((i) => i.student_id);
+  await avisarSituacionDeConvivencia(caso._id, estudiantes);
+  const conPortal = new Set((await acudientesConPortalDe(estudiantes)).map(String)).size;
+  if (conPortal === 0) return false;
+  caso.notificaciones.push({
+    tipo: 'ACUDIENTES',
+    fecha: new Date(),
+    medio: 'OTRO',
+    dirigida_a: `${conPortal} acudiente(s) con portal`,
+    resultado: 'Aviso automático del sistema en el portal, sin detalle de los hechos.',
+    automatica: true,
+    por: usuario._id,
+  });
+  await caso.save();
+  return true;
+}
 
 export interface AbrirCasoInput {
   tipo_situacion: TipoSituacion;
@@ -218,7 +235,7 @@ export async function abrirCaso(input: AbrirCasoInput, usuario: UserDocument, ip
   });
 
   await registrarEvento({ usuario_id: usuario._id, accion: 'CASO_CONVIVENCIA_ABIERTO', entidad: 'CasoConvivencia', entidad_id: caso._id, detalle: `${caso.codigo} tipo ${caso.tipo_situacion}`, ip });
-  if (caso.tipo_situacion !== 'I') await avisarFamiliasDelCaso(caso);
+  if (caso.tipo_situacion !== 'I') await avisarFamiliasDelCaso(caso, usuario);
   return vistaCaso(caso);
 }
 
@@ -329,7 +346,7 @@ export async function reclasificarCaso(id: string, tipo: TipoSituacion, motivo: 
   nuevos.forEach((p, i) => caso.pasos.push({ nombre: p.nombre, obligatorio: p.obligatorio, orden: base + i + 1, estado: 'PENDIENTE', fecha: null, por: null, nota: '' }));
   const vista = await guardarYAuditar(caso, usuario, 'CASO_CONVIVENCIA_RECLASIFICADO', `${caso.reclasificaciones.at(-1)?.de} -> ${tipo}`, ip);
   // Un caso leve que sube a II o III es el momento en que la norma exige informar a las familias.
-  if (anterior === 'I' && tipo !== 'I') await avisarFamiliasDelCaso(caso);
+  if (anterior === 'I' && tipo !== 'I' && (await avisarFamiliasDelCaso(caso, usuario))) return vistaCaso(caso);
   return vista;
 }
 
@@ -406,7 +423,7 @@ export async function agregarRegistroCaso(id: string, coleccion: ColeccionRegist
       break;
     }
     case 'notificaciones':
-      caso.notificaciones.push({ tipo: d.tipo!, fecha, medio: d.medio!, dirigida_a: (d.dirigida_a ?? '').trim(), resultado: (d.resultado ?? '').trim(), por });
+      caso.notificaciones.push({ tipo: d.tipo ?? 'ACUDIENTES', fecha, medio: d.medio ?? 'OTRO', dirigida_a: (d.dirigida_a ?? '').trim(), resultado: (d.resultado ?? '').trim(), automatica: false, por });
       break;
     case 'descargos': {
       if (d.parte === 'ESTUDIANTE' && (!d.student_id || !caso.involucrados.some((i) => String(i.student_id) === d.student_id))) {
@@ -490,7 +507,8 @@ export async function cerrarCaso(id: string, input: CerrarCasoInput, usuario: Us
   }
   if (input.justificacion_sin_remision?.trim()) caso.justificacion_sin_remision = input.justificacion_sin_remision.trim();
 
-  const faltan = pendientesParaCerrar(caso, input.resultado);
+  const citacionesEnlazadas = await Citacion.countDocuments({ caso_id: caso._id, estado: { $ne: 'CANCELADA' } });
+  const faltan = pendientesParaCerrar(caso, input.resultado, citacionesEnlazadas);
   if (faltan.length > 0) throw new ApiError(409, `No se puede cerrar el caso. ${faltan.join(' ')}`, faltan);
 
   caso.estado = 'CERRADO';

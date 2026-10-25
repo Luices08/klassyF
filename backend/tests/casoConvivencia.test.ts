@@ -76,6 +76,12 @@ describe('pendientesParaCerrar', () => {
     ).toEqual([]);
   });
 
+  it('una citación enlazada al caso también cubre el informe a los acudientes', () => {
+    const base = casoBase({ tipo_situacion: 'II', atencion_inmediata: {} });
+    expect(pendientesParaCerrar(base, 'SOLUCIONADO')).toHaveLength(1);
+    expect(pendientesParaCerrar(base, 'SOLUCIONADO', 1)).toEqual([]);
+  });
+
   it('el tipo III además exige remisión o su justificación', () => {
     const base = { tipo_situacion: 'III' as const, atencion_inmediata: {}, notificaciones: [{ tipo: 'ACUDIENTES' }] };
     expect(pendientesParaCerrar(casoBase(base), 'SOLUCIONADO')).toHaveLength(1);

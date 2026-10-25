@@ -52,6 +52,7 @@ import { DocumentosPorRevisarPage } from './pages/admin/DocumentosPorRevisarPage
 import { EnrollmentsPage } from './pages/admin/EnrollmentsPage';
 import { PazYSalvoPage } from './pages/admin/PazYSalvoPage';
 import { SalidasPage } from './pages/admin/SalidasPage';
+import { RematriculaPage } from './pages/admin/RematriculaPage';
 import { TrasladosPage } from './pages/admin/TrasladosPage';
 import { EspaciosPage } from './pages/admin/EspaciosPage';
 import { GradesPage } from './pages/admin/GradesPage';
@@ -72,6 +73,8 @@ import { DocumentosReferenciaPage } from './pages/admin/DocumentosReferenciaPage
 import { RevisionPlaneacionPage } from './pages/admin/RevisionPlaneacionPage';
 import { PlaneacionDocentePage } from './pages/PlaneacionDocentePage';
 import { PortalAcudientePage } from './pages/PortalAcudientePage';
+import { MiAnalisisPage } from './modulos/predictivo/pages/MiAnalisisPage';
+import { PredictivoPage } from './modulos/predictivo/pages/PredictivoPage';
 
 export default function App() {
   return (
@@ -129,6 +132,7 @@ export default function App() {
           {/* Retiros y traslados: el servidor limita a secretaría por sede. */}
           <Route element={<ProtectedRoute allowedRoles={['ADMIN', 'COORDINADOR', 'SECRETARIA']} />}>
             <Route path="/secretaria/salidas" element={<SalidasPage />} />
+            <Route path="/secretaria/rematricula" element={<RematriculaPage />} />
           </Route>
 
           <Route element={<ProtectedRoute allowedRoles={['ADMIN', 'SECRETARIA']} />}>
@@ -215,6 +219,10 @@ export default function App() {
             <Route path="/mis-actividades/:id" element={<ActividadEstudiantePage />} />
             <Route path="/mis-notas" element={<MisNotasPage />} />
             <Route path="/mi-observador" element={<MiObservadorPage />} />
+            <Route path="/mi-analisis" element={<MiAnalisisPage />} />
+          </Route>
+          <Route element={<ProtectedRoute allowedRoles={['ADMIN', 'COORDINADOR', 'COORDINADOR_CONVIVENCIA', 'ORIENTADOR', 'DOCENTE']} />}>
+            <Route path="/predictivo" element={<PredictivoPage />} />
           </Route>
         </Route>
       </Route>

@@ -24,6 +24,7 @@ export function TarjetaNoticia({ noticia: n, compacta = false, pie }: TarjetaNot
         {n.afecta_clases && <Chip tone="orange">Afecta las clases</Chip>}
       </div>
       <h3 className="text-h3 text-ink">{n.titulo}</h3>
+      {n.subtitulo && <p className="text-sm font-medium text-ink">{n.subtitulo}</p>}
       <ImagenNoticia id={n.id} version={n.imagen_version} titulo={n.titulo} compacta={compacta} />
       {(cuando || n.lugar) && (
         <p className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-body">

@@ -1,6 +1,8 @@
 import type { AddressInfo } from 'net';
+import { Types } from 'mongoose';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import AuditLog from '../../src/models/auditLog.model';
+import Noticia from '../../src/models/noticia.model';
 import Campus from '../../src/models/campus.model';
 import Group from '../../src/models/group.model';
 import Guardian from '../../src/models/guardian.model';
@@ -9,6 +11,7 @@ import { UserDocument } from '../../src/models/user.model';
 import { generateToken } from '../../src/services/token.service';
 import { detenerBaseDeDatos, iniciarBaseDeDatos, limpiarBaseDeDatos } from './baseDeDatos';
 import { armarEscenario, crearUsuario, Escenario } from './escenario';
+import { PORTADA_PNG } from './portadaDePrueba';
 
 type Respuesta = { estado: number; cuerpo: { success?: boolean; data?: any; message?: string } };
 
@@ -63,7 +66,7 @@ describe('Noticias y eventos (capa HTTP)', () => {
   };
 
   const publicar = (usuario: UserDocument, extra: Record<string, unknown> = {}) =>
-    pedir('POST', '', usuario, { titulo: 'Día de la Virgen', descripcion: 'Eucaristía y acto cultural en el patio.', categoria_id: categoria, ...extra });
+    pedir('POST', '', usuario, { titulo: 'Día de la Virgen', descripcion: 'Eucaristía y acto cultural en el patio.', categoria_id: categoria, portada: PORTADA_PNG, ...extra });
   const mias = async (usuario: UserDocument): Promise<Array<{ id: string; titulo: string }>> => (await pedir('GET', '/mias', usuario)).cuerpo.data;
   const habilitar = (docente: UserDocument, alcance_maximo: string, categorias_ids: string[] = [], quien: UserDocument = e.coordAcademico) =>
     pedir('POST', '/habilitaciones', quien, { docente_id: String(docente._id), alcance_maximo, categorias_ids });
@@ -281,6 +284,140 @@ describe('Noticias y eventos (capa HTTP)', () => {
       expect((await publicar(e.admin, { titulo: 'x' })).estado).toBe(400);
       expect((await pedir('POST', '', null, {})).estado).toBe(401);
     });
+
+  describe('portada obligatoria, cuerpo con formato y mosaico', () => {
+    const detalle = (id: string, usuario: UserDocument | null) => pedir('GET', `/${id}`, usuario);
+
+    it('toda noticia lleva fotografía: sin portada, o con algo que no es una imagen, no se publica', async () => {
+      const sin = await pedir('POST', '', e.admin, { titulo: 'Feria de ciencias', descripcion: 'Proyectos en el coliseo.', categoria_id: categoria });
+      expect(sin.estado).toBe(400);
+      expect(sin.cuerpo.message).toMatch(/portada/i);
+      // Dice ser PNG pero no lo es: el servidor mira la firma de bytes, no lo que declara el navegador.
+      const falsa = await publicar(e.admin, { portada: 'data:image/png;base64,AAAAAAAAAAAAAAAA' });
+      expect(falsa.estado).toBe(400);
+      expect(falsa.cuerpo.message).toMatch(/PNG, JPG o WEBP/);
+      expect((await publicar(e.admin, { portada: 'data:application/pdf;base64,AAAA' })).estado).toBe(400);
+      expect(await Noticia.countDocuments()).toBe(0);
+    });
+
+    it('la portada se guarda junto con la noticia y se sirve con sesión', async () => {
+      const r = await publicar(e.admin, { grupos_ids: [grupoId] });
+      expect(r.estado).toBe(201);
+      expect(r.cuerpo.data.imagen_version).toEqual(expect.any(Number));
+      const id = r.cuerpo.data.id as string;
+      const imagen = await fetch(`${base}/noticias/${id}/imagen`, { headers: { Authorization: `Bearer ${generateToken(e.estudiante)}` } });
+      expect(imagen.status).toBe(200);
+      expect(imagen.headers.get('content-type')).toBe('image/png');
+    });
+
+    it('guarda bajada, tamaño y punto de enfoque, y la descripción se deriva del cuerpo', async () => {
+      const r = await publicar(e.admin, {
+        descripcion: undefined,
+        subtitulo: 'Todos los grados presentan sus proyectos',
+        contenido_html: '<p class="letra-capital">Proyectos de <strong>ciencias</strong> en el coliseo.</p><blockquote>La ciencia es de todos</blockquote>',
+        tamano_mosaico: 'PRINCIPAL',
+        enfoque_x: 20,
+        enfoque_y: 70,
+      });
+      expect(r.estado).toBe(201);
+      expect(r.cuerpo.data).toMatchObject({
+        subtitulo: 'Todos los grados presentan sus proyectos',
+        tamano_mosaico: 'PRINCIPAL',
+        enfoque_x: 20,
+        enfoque_y: 70,
+        descripcion: 'Proyectos de ciencias en el coliseo. La ciencia es de todos',
+        autor: `${e.admin.nombre} ${e.admin.apellido}`,
+      });
+    });
+
+    it('sin tamaño ni enfoque quedan los de partida (Estándar, centro)', async () => {
+      const r = await publicar(e.admin);
+      expect(r.cuerpo.data).toMatchObject({ tamano_mosaico: 'ESTANDAR', enfoque_x: 50, enfoque_y: 50, subtitulo: '' });
+    });
+
+    it('el servidor limpia el cuerpo: deja la letra capital y las citas, y quita scripts, estilos y cualquier otra clase', async () => {
+      const id = (
+        await publicar(e.admin, {
+          grupos_ids: [grupoId],
+          descripcion: undefined,
+          contenido_html:
+            '<p class="letra-capital otra" style="color:red" onclick="robar()">Hola</p><blockquote>cita</blockquote><script>alert(1)</script><img src="https://malo.example/x.png"><a href="javascript:alert(1)">clic</a>',
+        })
+      ).cuerpo.data.id as string;
+      const html = (await detalle(id, e.estudiante)).cuerpo.data.contenido_html as string;
+      expect(html).toContain('<p class="letra-capital">Hola</p>');
+      expect(html).toContain('<blockquote>cita</blockquote>');
+      for (const peligro of ['script', 'onclick', 'style', 'otra', 'malo.example', 'javascript:']) expect(html, peligro).not.toContain(peligro);
+    });
+
+    it('exige cuerpo (con formato o texto) y valida tamaño y enfoque', async () => {
+      expect((await publicar(e.admin, { descripcion: undefined })).estado).toBe(400);
+      expect((await publicar(e.admin, { descripcion: undefined, contenido_html: '<p>   </p>' })).estado).toBe(400);
+      expect((await publicar(e.admin, { tamano_mosaico: 'GIGANTE' })).estado).toBe(400);
+      expect((await publicar(e.admin, { enfoque_x: 101 })).estado).toBe(400);
+      expect((await publicar(e.admin, { enfoque_y: -1 })).estado).toBe(400);
+      expect((await publicar(e.admin, { subtitulo: 'x'.repeat(201) })).estado).toBe(400);
+    });
+
+    it('el detalle trae el cuerpo; los listados no', async () => {
+      const id = (await publicar(e.admin, { grupos_ids: [grupoId], contenido_html: '<p>Cuerpo con <em>formato</em>.</p>', descripcion: undefined })).cuerpo.data.id as string;
+      const d = (await detalle(id, e.estudiante)).cuerpo.data;
+      expect(d.contenido_html).toBe('<p>Cuerpo con <em>formato</em>.</p>');
+      expect(d.autor).toBe(`${e.admin.nombre} ${e.admin.apellido}`);
+      const delListado = (await pedir('GET', '/mias', e.estudiante)).cuerpo.data[0];
+      expect(delListado).not.toHaveProperty('contenido_html');
+      expect(delListado.autor).toBe(`${e.admin.nombre} ${e.admin.apellido}`);
+      expect((await pedir('GET', '/gestion', e.admin)).cuerpo.data[0]).not.toHaveProperty('contenido_html');
+    });
+
+    it('el detalle respeta quién puede ver la noticia: sin sesión 401, a quien no le toca 404, y lo programado solo lo ve quien gestiona', async () => {
+      const deGrupo = (await publicar(e.admin, { grupos_ids: [grupoId] })).cuerpo.data.id as string;
+      expect((await detalle(deGrupo, null)).estado).toBe(401);
+      expect((await detalle(deGrupo, e.docenteAjeno)).estado).toBe(404);
+      expect((await detalle(deGrupo, e.estudiante)).estado).toBe(200);
+      expect((await detalle(deGrupo, acudiente)).estado).toBe(200);
+      expect((await detalle(String(new Types.ObjectId()), e.admin)).estado).toBe(404);
+
+      const programada = (await publicar(e.admin, { publicar_desde: new Date(Date.now() + 2 * 86_400_000).toISOString() })).cuerpo.data.id as string;
+      expect((await detalle(programada, e.estudiante)).estado).toBe(404);
+      expect((await detalle(programada, e.coordAcademico)).estado).toBe(200);
+
+      await pedir('POST', `/${deGrupo}/archivar`, e.admin);
+      expect((await detalle(deGrupo, e.estudiante)).estado).toBe(404);
+      expect((await detalle(deGrupo, e.admin)).estado).toBe(200);
+    });
+
+    it('una noticia anterior sin portada pide una al editarla, pero se puede fijar sin ella', async () => {
+      const anterior = await Noticia.create({
+        titulo: 'Reunión de padres',
+        descripcion: 'Cita general en el coliseo.',
+        categoria_id: categoria,
+        categoria_nombre: 'Pastoral',
+        roles_destino: ['ACUDIENTE'],
+        alcance: 'INSTITUCION',
+        creada_por: e.admin._id,
+      });
+      const id = String(anterior._id);
+
+      const sinPortada = await pedir('PATCH', `/${id}`, e.admin, { titulo: 'Reunión general de padres' });
+      expect(sinPortada.estado).toBe(400);
+      expect(sinPortada.cuerpo.message).toMatch(/portada/i);
+      expect((await pedir('PATCH', `/${id}`, e.admin, { fijada: true })).estado).toBe(200);
+
+      const conPortada = await pedir('PATCH', `/${id}`, e.admin, { titulo: 'Reunión general de padres', portada: PORTADA_PNG });
+      expect(conPortada.estado).toBe(200);
+      expect(conPortada.cuerpo.data.imagen_version).toEqual(expect.any(Number));
+      // Lo anterior sigue leyéndose con su tamaño de partida.
+      expect(conPortada.cuerpo.data.tamano_mosaico).toBe('ESTANDAR');
+    });
+
+    it('al editar se puede cambiar el cuerpo, el tamaño y el enfoque sin volver a subir la portada', async () => {
+      const id = (await publicar(e.admin)).cuerpo.data.id as string;
+      const r = await pedir('PATCH', `/${id}`, e.admin, { contenido_html: '<p>Nuevo cuerpo</p>', tamano_mosaico: 'BREVE', enfoque_x: 10, enfoque_y: 90 });
+      expect(r.estado).toBe(200);
+      expect(r.cuerpo.data).toMatchObject({ descripcion: 'Nuevo cuerpo', tamano_mosaico: 'BREVE', enfoque_x: 10, enfoque_y: 90, imagen_version: expect.any(Number) });
+    });
+  });
 
     it('lo que se publica, archiva y habilita queda en la auditoría', async () => {
       const id = (await publicar(e.admin)).cuerpo.data.id;

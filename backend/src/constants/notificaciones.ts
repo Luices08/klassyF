@@ -42,6 +42,11 @@ export const EVENTOS_NOTIFICACION = [
   'CITACION_RESPONDIDA',
   'SESION_COMISION_CONVOCADA',
   'NOTICIA_NUEVA',
+  'RECUPERACION_FECHAS',
+  'RECUPERACION_INICIA',
+  'RECUPERACION_TERMINA_MANANA',
+  'RECUPERACION_HABILITADA',
+  'RECUPERACION_REGISTRADA',
 ] as const;
 export type EventoNotificacion = (typeof EVENTOS_NOTIFICACION)[number];
 
@@ -73,6 +78,12 @@ export const METADATOS_EVENTO: Record<EventoNotificacion, MetadatoEvento> = {
   SESION_COMISION_CONVOCADA: { severidad: 'IMPORTANTE', canales: ['CAMPANITA'] },
   // Una noticia o evento nuevo es informativo: no interrumpe como una falta grave.
   NOTICIA_NUEVA: { severidad: 'INFO', canales: ['CAMPANITA'] },
+  // M18: lo que se avisa de las recuperaciones. Las fechas son informativas; el inicio, el cierre y el resultado sí piden atención.
+  RECUPERACION_FECHAS: { severidad: 'INFO', canales: ['CAMPANITA'] },
+  RECUPERACION_INICIA: { severidad: 'IMPORTANTE', canales: ['CAMPANITA'] },
+  RECUPERACION_TERMINA_MANANA: { severidad: 'IMPORTANTE', canales: ['CAMPANITA'] },
+  RECUPERACION_HABILITADA: { severidad: 'IMPORTANTE', canales: ['CAMPANITA'] },
+  RECUPERACION_REGISTRADA: { severidad: 'IMPORTANTE', canales: ['CAMPANITA'] },
 };
 
 /**

@@ -87,6 +87,16 @@ body {
 .contenido-rico hr {
   @apply border-border;
 }
+/* Texto editorial (noticias): las citas destacan como en un periódico y un párrafo puede empezar con letra capital. */
+.contenido-editorial blockquote {
+  @apply border-l-4 border-primary pl-4 text-h3 italic text-ink;
+}
+.contenido-rico p.letra-capital::first-letter {
+  @apply float-left pr-2 text-ink;
+  font-size: 3.6rem;
+  line-height: 0.85;
+  font-weight: 700;
+}
 .contenido-rico.ProseMirror {
   @apply min-h-[10rem] px-3 py-2 outline-none;
 }

@@ -1,6 +1,6 @@
 import { Link, Navigate } from 'react-router-dom';
 import { CuadriculaDeAccesos } from '../components/dashboard/CuadriculaDeAccesos';
-import { PanelNoticiasInicio } from '../components/noticias/PanelNoticiasInicio';
+import { MosaicoNoticiasInicio } from '../components/noticias/MosaicoNoticiasInicio';
 import { Card } from '../components/ui/Card';
 import { Chip } from '../components/ui/Badge';
 import { useAnuncios } from '../hooks/useNotificaciones';
@@ -63,8 +63,8 @@ export function DashboardPage() {
         </Card>
       )}
 
-      {/* Docentes y estudiantes ven aquí las noticias que les tocan; el resto de perfiles las abre desde el encabezado. */}
-      {(user.rol === 'DOCENTE' || user.rol === 'ESTUDIANTE') && <PanelNoticiasInicio />}
+      {/* Las noticias que le tocan a cada perfil, como mosaico (docentes, estudiantes y secretaría; el acudiente las ve en su portal). */}
+      <MosaicoNoticiasInicio />
 
       <CuadriculaDeAccesos links={links} />
     </div>

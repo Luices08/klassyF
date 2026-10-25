@@ -8,12 +8,19 @@ import {
   OrigenNota,
 } from '../constants/actividades';
 
-/** Un archivo de una entrega: vive en disco, aquí solo su referencia. */
+/**
+ * Un archivo de una entrega: vive en disco, aquí solo su referencia. La depuración de almacenamiento borra el archivo físico
+ * (`path` pasa a null y `purgado` a true) pero conserva su nombre, formato y tamaño; la nota, la retroalimentación y las fechas de
+ * la entrega nunca se tocan.
+ */
 export interface IArchivoEntrega {
-  path: string;
+  path: string | null;
   nombre: string;
   formato: FormatoEvidencia;
   bytes: number;
+  /** Ausente en las entregas anteriores a la depuración: se lee como false. */
+  purgado?: boolean;
+  fecha_purga?: Date | null;
 }
 
 /** Cada vez que el estudiante entrega queda un intento; los campos de la entrega de abajo reflejan el que cuenta. */
@@ -111,10 +118,12 @@ const activitySubmissionSchema = new Schema<IActivitySubmission, ActivitySubmiss
               type: [
                 new Schema(
                   {
-                    path: { type: String, required: true },
+                    path: { type: String, default: null },
                     nombre: { type: String, required: true },
                     formato: { type: String, enum: CLAVES_FORMATO_EVIDENCIA, required: true },
                     bytes: { type: Number, required: true },
+                    purgado: { type: Boolean, default: false },
+                    fecha_purga: { type: Date, default: null },
                   },
                   { _id: false }
                 ),

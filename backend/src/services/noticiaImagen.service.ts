@@ -7,6 +7,7 @@ import { detectarFirmaArchivo } from '../utils/firmasArchivo';
 import { noticiaAplica, puedeModerar } from '../utils/noticias';
 import { registrarEvento } from './audit.service';
 import { NoticiaGestion, cargarNoticia, exigirPoderPublicar, lectorDe, listarUna, validarPublicacion } from './noticia.service';
+import { almacenarPortada } from './noticiaPortada.service';
 
 const ids = (lista: Array<{ toString(): string }>): string[] => lista.map(String);
 
@@ -29,26 +30,17 @@ export async function guardarImagenDeNoticia(id: string, archivo: Express.Multer
   if (!firma || !(TIPOS_IMAGEN_NOTICIA as readonly string[]).includes(firma.mimetype)) throw new ApiError(400, 'La imagen debe ser un PNG, JPG o WEBP válido.');
 
   const ahora = Date.now();
-  await ImagenNoticia.findOneAndUpdate(
-    { noticia_id: noticia._id },
-    { noticia_id: noticia._id, mime: firma.mimetype, datos: archivo.buffer, tamano: archivo.size, subida_por: usuario._id, actualizada_en: new Date(ahora) },
-    { upsert: true }
-  );
+  await almacenarPortada(noticia._id, { mime: firma.mimetype, datos: archivo.buffer }, usuario._id, ahora);
   noticia.imagen_version = ahora;
   await noticia.save();
   await registrarEvento({ usuario_id: usuario._id, accion: 'NOTICIA_IMAGEN_ACTUALIZADA', entidad: 'Noticia', entidad_id: noticia._id, ip });
   return (await listarUna(noticia._id, usuario)) as NoticiaGestion;
 }
 
-export async function quitarImagenDeNoticia(id: string, usuario: UserDocument, ip?: string | null): Promise<NoticiaGestion> {
-  const noticia = await cargarParaEditar(id, usuario);
-  await ImagenNoticia.deleteOne({ noticia_id: noticia._id });
-  if (noticia.imagen_version !== null) {
-    noticia.imagen_version = null;
-    await noticia.save();
-    await registrarEvento({ usuario_id: usuario._id, accion: 'NOTICIA_IMAGEN_QUITADA', entidad: 'Noticia', entidad_id: noticia._id, ip });
-  }
-  return (await listarUna(noticia._id, usuario)) as NoticiaGestion;
+/** Toda noticia lleva portada: no se quita, se reemplaza. */
+export async function quitarImagenDeNoticia(id: string, usuario: UserDocument, _ip?: string | null): Promise<NoticiaGestion> {
+  await cargarParaEditar(id, usuario);
+  throw new ApiError(409, 'Toda noticia lleva una fotografía de portada: no se puede quitar, súbela de nuevo para reemplazarla.');
 }
 
 /**

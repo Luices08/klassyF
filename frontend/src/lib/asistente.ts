@@ -194,6 +194,10 @@ export const PALABRAS_CLAVE_POR_RUTA: Record<string, { descripcion: string; clav
     descripcion: 'Paz y salvo de fin de año de los estudiantes, para su matrícula del año siguiente.',
     claves: ['paz y salvo', 'pazysalvo', 'fin de ano', 'estar a paz y salvo', 'debe libros', 'renovar matricula'],
   },
+  '/secretaria/rematricula': {
+    descripcion: 'Rematrícula de fin de año por sede, grado o grupo: simula y confirma las pre-matrículas del año siguiente, lista de espera por falta de cupos y reglas de prioridad.',
+    claves: ['rematricula', 'rematricular', 'renovar matricula', 'matricula del ano siguiente', 'pasar de ano', 'pre matricula', 'prematricula', 'lista de espera', 'cupos del ano siguiente', 'repitentes', 'proyeccion de matricula'],
+  },
   '/secretaria/traslados': {
     descripcion: 'Traslados extemporáneos de estudiantes y homologación de las notas del colegio de procedencia.',
     claves: ['traslado', 'traslados', 'homologacion', 'homologar', 'notas homologadas', 'exenta', 'exento por traslado', 'colegio de procedencia', 'llego a mitad de ano', 'escala de otro colegio'],
@@ -247,6 +251,11 @@ export const PALABRAS_CLAVE_POR_RUTA: Record<string, { descripcion: string; clav
   '/anuncios': { descripcion: 'Tablero de anuncios de la institución; coordinación y administración los publican.', claves: ['anuncios', 'avisos', 'comunicados', 'circulares', 'publicar anuncio', 'tablero'] },
   '/mis-notas': { descripcion: 'Tus notas por asignatura.', claves: ['mis notas', 'ver mis notas', 'cuanto llevo', 'mis calificaciones'] },
   '/mi-observador': { descripcion: 'Tu observador.', claves: ['mi observador', 'mis observaciones', 'mis faltas'] },
+  '/predictivo': {
+    descripcion: 'Análisis predictivo de un estudiante: riesgo de perder cada asignatura, nota que le falta, FODA y riesgo de no promoción; el administrador entrena la IA.',
+    claves: ['predictivo', 'riesgo academico', 'estudiantes en riesgo', 'foda', 'prediccion', 'entrenar ia', 'inteligencia artificial', 'quien va a perder'],
+  },
+  '/mi-analisis': { descripcion: 'Tu análisis: qué nota te falta en cada asignatura y tu FODA.', claves: ['mi analisis', 'mi foda', 'que me falta', 'cuanto necesito para pasar'] },
 };
 
 const PALABRAS_VACIAS = new Set([

@@ -15,6 +15,8 @@ export const mias = catchAsync<unknown, unknown, unknown, ParsedQs & { limite?: 
 
 export const permisos = catchAsync(async (req, res) => ok(res, await noticias.permisosDe(req.user!)));
 
+export const detalle = catchAsync<{ id: string }>(async (req, res) => ok(res, await noticias.detalleDeNoticia(req.params.id, req.user!)));
+
 export const gestion = catchAsync(async (req, res) => ok(res, await noticias.listarGestion(req.user!)));
 
 export const crear = catchAsync<unknown, unknown, noticias.DatosNoticia>(async (req, res) => ok(res, await noticias.crearNoticia(req.body, req.user!, req.ip), 201));

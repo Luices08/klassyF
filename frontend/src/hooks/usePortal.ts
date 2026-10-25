@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../lib/apiClient';
 import type { EstadoDocumentoMatricula, EstadoMatricula, InasistenciaEstudiante, TipoDocumentoMatricula } from '../types/domain';
 import type { ObservacionPropia } from './useObservaciones';
-import type { MisNotas } from './useNotas';
+import type { MisNotas, MisNotasDelAnio } from './useNotas';
 
 /**
  * Portal del acudiente (M27). Todo cuelga del estudiante elegido en el selector: el id viaja en la `queryKey` y en la ruta, así al cambiar de
@@ -32,6 +32,15 @@ export function useNotasDelHijo(studentId: string | undefined, periodoNumero: nu
     queryKey: ['portal', studentId, 'notas', academicYearId ?? null, periodoNumero],
     queryFn: () => api.get<MisNotas>(`/portal/hijos/${studentId}/notas`, { periodo_numero: periodoNumero, academic_year_id: academicYearId }),
     enabled: Boolean(studentId && periodoNumero),
+    staleTime: 15_000,
+  });
+}
+
+export function useNotasDelAnioDelHijo(studentId: string | undefined, academicYearId: string | undefined, habilitado = true) {
+  return useQuery({
+    queryKey: ['portal', studentId, 'notas-anuales', academicYearId ?? null],
+    queryFn: () => api.get<MisNotasDelAnio>(`/portal/hijos/${studentId}/notas-anuales`, { academic_year_id: academicYearId }),
+    enabled: Boolean(studentId && academicYearId) && habilitado,
     staleTime: 15_000,
   });
 }

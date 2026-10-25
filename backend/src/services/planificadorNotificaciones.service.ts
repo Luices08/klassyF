@@ -1,5 +1,6 @@
 import TareaDiaria from '../models/tareaDiaria.model';
 import { avisarActividadesPublicadasHoy, recordarCierresDePeriodo, recordarEventosDelCalendario } from './notificacionesEventos.service';
+import { recordarRecuperaciones } from './recuperacionAvisos.service';
 
 const CADA_HORA_MS = 60 * 60 * 1000;
 const ESPERA_INICIAL_MS = 30 * 1000;
@@ -24,6 +25,7 @@ export async function ejecutarAvisosDiarios(ahora: Date = new Date()): Promise<b
   try {
     await recordarCierresDePeriodo(ahora);
     await recordarEventosDelCalendario(ahora);
+    await recordarRecuperaciones(ahora);
     await avisarActividadesPublicadasHoy(ahora);
     return true;
   } catch (err) {

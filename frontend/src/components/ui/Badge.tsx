@@ -355,6 +355,18 @@ export function EstadoEntregaBadge({ value, sinEntrega = false }: { value: Estad
   return <Chip tone={ESTADO_ACTIVIDAD_TONE[value]}>{etiqueta}</Chip>;
 }
 
+/** Aviso discreto de que el archivo de una entrega se borró del servidor por política de almacenamiento (M11); la nota y la retroalimentación siguen visibles. */
+export function ArchivoDepuradoChip() {
+  return (
+    <span
+      className={`inline-flex max-w-full items-center rounded-full px-2.5 py-1 text-xs font-medium ${TONE_CLASSES.neutral}`}
+      title="El archivo se eliminó del servidor para liberar espacio. La nota y la retroalimentación se conservan."
+    >
+      Archivo depurado por política institucional
+    </span>
+  );
+}
+
 const TIPO_ACTIVIDAD_TONE: Record<TipoActividad, Tone> = {
   TAREA: 'blue',
   EVALUACION: 'orange',

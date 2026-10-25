@@ -120,3 +120,7 @@ export const consultaAnio: ValidationSchema = {
 export const misNotas: ValidationSchema = {
   query: Joi.object({ periodo_numero: periodo.required(), academic_year_id: objectId }),
 };
+
+export const misNotasDelAnio: ValidationSchema = {
+  query: Joi.object({ academic_year_id: objectId }),
+};

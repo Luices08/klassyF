@@ -1,5 +1,8 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { CategoriasPanel } from '../components/noticias/CategoriasPanel';
+import { MosaicoDeNoticias } from '../components/noticias/MosaicoDeNoticias';
+import { NoticiaDetalleDrawer } from '../components/noticias/NoticiaDetalleDrawer';
 import { NoticiaDrawer } from '../components/noticias/NoticiaDrawer';
 import { PublicadoresPanel } from '../components/noticias/PublicadoresPanel';
 import { TarjetaNoticia } from '../components/noticias/TarjetaNoticia';
@@ -11,7 +14,9 @@ import { Spinner } from '../components/ui/Spinner';
 import { Tabs } from '../components/ui/Tabs';
 import { PlusIcon } from '../components/ui/icons';
 import { useAuth } from '../context/AuthContext';
-import { ETIQUETA_ALCANCE, ETIQUETA_ROL_DESTINO, useArchivarNoticia, useNoticiasGestion, useNoticiasParaMi, usePermisosNoticias } from '../hooks/useNoticias';
+import { type NoticiaDetalle, type NoticiaGestion, ETIQUETA_ALCANCE, ETIQUETA_ROL_DESTINO, useArchivarNoticia, useNoticiasGestion, useNoticiasParaMi, usePermisosNoticias } from '../hooks/useNoticias';
+import { api } from '../lib/apiClient';
+import { paraMosaico } from '../lib/mosaicoNoticias';
 import { type FormularioNoticia, NOTICIA_VACIA, formularioDeNoticia } from '../lib/noticias';
 import { formatoFechaHora } from '../lib/fechas';
 
@@ -28,6 +33,26 @@ export function NoticiasPage() {
   const archivar = useArchivarNoticia();
   const [pestana, setPestana] = useState('noticias');
   const [form, setForm] = useState<FormularioNoticia | null>(null);
+  const [abierta, setAbierta] = useState<string | null>(null);
+  const [abriendoEdicion, setAbriendoEdicion] = useState<string | null>(null);
+  const [errorEdicion, setErrorEdicion] = useState<string | null>(null);
+  const qc = useQueryClient();
+  // En la página de noticias se ven todas (en el inicio, solo las que caben): el mosaico con todos sus tamaños.
+  const elegidas = useMemo(() => paraMosaico(mias.data ?? [], Number.POSITIVE_INFINITY), [mias.data]);
+
+  /** El cuerpo con formato no viene en los listados: se pide al abrir la edición para que el editor lo muestre completo. */
+  const editar = async (n: NoticiaGestion) => {
+    setErrorEdicion(null);
+    setAbriendoEdicion(n.id);
+    try {
+      const detalle = await qc.fetchQuery({ queryKey: ['noticias', 'detalle', n.id], queryFn: () => api.get<NoticiaDetalle>(`/noticias/${n.id}`), staleTime: 0 });
+      setForm(formularioDeNoticia(n, detalle.contenido_html));
+    } catch (err) {
+      setErrorEdicion(errorMessage(err));
+    } finally {
+      setAbriendoEdicion(null);
+    }
+  };
 
   const moderaTodo = user?.rol === 'ADMIN' || user?.rol === 'COORDINADOR';
   const pestanas = [
@@ -58,13 +83,14 @@ export function NoticiasPage() {
           {mias.isLoading && <Spinner />}
           {mias.isError && <Alert tone="error">{errorMessage(mias.error)}</Alert>}
           {!mias.isLoading && (mias.data?.length ?? 0) === 0 && <Alert tone="info">No hay noticias ni eventos por ahora.</Alert>}
-          {mias.data?.map((n) => <TarjetaNoticia key={n.id} noticia={n} />)}
+          {elegidas.length > 0 && <MosaicoDeNoticias elegidas={elegidas} onAbrir={setAbierta} />}
         </div>
       )}
 
       {activa === 'publicaciones' && (
         <div className="space-y-3">
           {archivar.error && <Alert tone="error">{errorMessage(archivar.error)}</Alert>}
+          {errorEdicion && <Alert tone="error">{errorEdicion}</Alert>}
           {gestion.isLoading && <Spinner />}
           {!gestion.isLoading && (gestion.data?.length ?? 0) === 0 && <Alert tone="info">Aún no has publicado noticias.</Alert>}
           {gestion.data?.map((n) => (
@@ -82,7 +108,7 @@ export function NoticiasPage() {
                   </div>
                   {n.estado === 'PUBLICADA' && (n.es_mia || moderaTodo) && (
                     <div className="flex gap-2">
-                      <Button variant="soft-edit" onClick={() => setForm(formularioDeNoticia(n))}>
+                      <Button variant="soft-edit" onClick={() => void editar(n)} disabled={abriendoEdicion === n.id}>
                         Editar
                       </Button>
                       <Button variant="soft-danger" onClick={() => archivar.mutate(n.id)}>
@@ -101,6 +127,7 @@ export function NoticiasPage() {
       {activa === 'publicadores' && <PublicadoresPanel />}
 
       {p && <NoticiaDrawer form={form} onChange={setForm} permisos={p} />}
+      <NoticiaDetalleDrawer id={abierta} onClose={() => setAbierta(null)} />
     </div>
   );
 }

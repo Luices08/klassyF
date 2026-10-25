@@ -3,7 +3,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import { ComentariosActividad } from '../components/actividades/ComentariosActividad';
 import { ContenidoDeActividad } from '../components/actividades/ContenidoDeActividad';
 import { Alert, errorMessage } from '../components/ui/Alert';
-import { Chip, EstadoEntregaBadge, TipoActividadChip } from '../components/ui/Badge';
+import { ArchivoDepuradoChip, Chip, EstadoEntregaBadge, TipoActividadChip } from '../components/ui/Badge';
 import { Button } from '../components/ui/Button';
 import { Card, CardHeader } from '../components/ui/Card';
 import { ContenidoRico } from '../components/ui/ContenidoRico';
@@ -195,15 +195,18 @@ function PanelDeEntrega({ actividad }: { actividad: ActividadEstudiante }) {
                 {i.acceso_especial && <Chip tone="blue">Plazo personal</Chip>}
                 {intentos.length > 1 && i.considerado && <Chip tone="green">Cuenta para la nota</Chip>}
               </div>
-              {i.archivos.length > 0 && (
+              {i.archivos.some((a) => !a.purgado) && (
                 <div className="flex flex-wrap gap-2">
-                  {i.archivos.map((a) => (
-                    <Button key={a.indice} type="button" variant="soft-edit" isLoading={descargando === `${i.numero}-${a.indice}`} onClick={() => void bajar(i.numero, a.indice, a.nombre)}>
-                      Descargar {a.nombre}
-                    </Button>
-                  ))}
+                  {i.archivos
+                    .filter((a) => !a.purgado)
+                    .map((a) => (
+                      <Button key={a.indice} type="button" variant="soft-edit" isLoading={descargando === `${i.numero}-${a.indice}`} onClick={() => void bajar(i.numero, a.indice, a.nombre)}>
+                        Descargar {a.nombre}
+                      </Button>
+                    ))}
                 </div>
               )}
+              {i.archivo_purgado && <ArchivoDepuradoChip />}
               {i.respuesta_html && <ContenidoRico html={i.respuesta_html} className="rounded-lg bg-surface p-3" />}
               {i.texto_entrega && <p className="whitespace-pre-wrap rounded-lg bg-surface p-3 text-body">{i.texto_entrega}</p>}
             </li>

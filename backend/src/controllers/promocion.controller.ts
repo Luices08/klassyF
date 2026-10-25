@@ -2,6 +2,8 @@ import { ParamsDictionary } from 'express-serve-static-core';
 import { ParsedQs } from 'qs';
 import { MomentoPromocion } from '../constants/promocion';
 import * as evaluacionService from '../services/evaluacionPromocion.service';
+import * as configuracionRematriculaService from '../services/configuracionRematricula.service';
+import * as esperaService from '../services/listaEsperaRematricula.service';
 import * as politicaService from '../services/politicaPromocion.service';
 import * as rolloverService from '../services/rolloverPromocion.service';
 import catchAsync from '../utils/catchAsync';
@@ -56,4 +58,25 @@ export const simularRollover = catchAsync<unknown, unknown, unknown, ParsedQs & 
 export const ejecutarRollover = catchAsync<unknown, unknown, rolloverService.FiltrosRollover & { confirm_password: string }>(async (req, res) => {
   const { confirm_password, ...filtros } = req.body;
   res.status(200).json({ success: true, data: await rolloverService.ejecutarRollover(filtros, confirm_password, req.user!, req.ip) });
+});
+
+export const obtenerConfiguracionRematricula = catchAsync(async (_req, res) => {
+  res.status(200).json({ success: true, data: configuracionRematriculaService.datosDeConfiguracion(await configuracionRematriculaService.obtenerConfiguracion()) });
+});
+
+export const actualizarConfiguracionRematricula = catchAsync<unknown, unknown, configuracionRematriculaService.DatosConfiguracionRematricula>(async (req, res) => {
+  const config = await configuracionRematriculaService.actualizarConfiguracion(req.body, req.user!, req.ip);
+  res.status(200).json({ success: true, data: configuracionRematriculaService.datosDeConfiguracion(config) });
+});
+
+export const listarEspera = catchAsync<unknown, unknown, unknown, ParsedQs & esperaService.FiltrosListaEspera>(async (req, res) => {
+  res.status(200).json({ success: true, data: await esperaService.listarEspera(req.query, req.user!) });
+});
+
+export const asignarDesdeEspera = catchAsync<{ id: string }, unknown, { group_id: string }>(async (req, res) => {
+  res.status(200).json({ success: true, data: await esperaService.asignarDesdeEspera(req.params.id, req.body.group_id, req.user!, req.ip) });
+});
+
+export const descartarDeEspera = catchAsync<{ id: string }, unknown, { motivo: string }>(async (req, res) => {
+  res.status(200).json({ success: true, data: await esperaService.descartarDeEspera(req.params.id, req.body.motivo, req.user!, req.ip) });
 });

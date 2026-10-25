@@ -10,6 +10,7 @@ import ActivitySubmission, { ActivitySubmissionDocument } from '../models/activi
 import CalificacionAsignatura, { ICalificacionAsignatura } from '../models/calificacionAsignatura.model';
 import ColumnaPlanilla from '../models/columnaPlanilla.model';
 import Enrollment from '../models/enrollment.model';
+import Recuperacion from '../models/recuperacion.model';
 import TeacherAssignment, { TeacherAssignmentDocument } from '../models/teacherAssignment.model';
 import { UserDocument } from '../models/user.model';
 import ApiError from '../utils/ApiError';
@@ -18,6 +19,7 @@ import { requiereElegirIntento } from '../utils/entregasActividad';
 import { calcularNotaAsignatura, estadoAbiertoDe, pesosEfectivos, ResultadoAsignatura } from '../utils/calculoNotas';
 import { escalaEfectiva, validarNotaDentroDeEscala } from '../utils/escalaEvaluacion';
 import { ESTADO_ACTIVO } from '../utils/filtroEstado';
+import { notaEfectivaDePeriodo, ResumenRecuperacion, resumenDeRecuperacion } from '../utils/notaEfectiva';
 import { runTransaction } from '../utils/runTransaction';
 import { ComponenteEvaluativo, componentesEfectivos, desempenoCualitativo } from '../utils/siee';
 import { ActividadPlana, asignacionDelDocente } from './activity.service';
@@ -111,7 +113,7 @@ export async function cargarContextoPlanilla(asignacion: TeacherAssignmentDocume
     actividades.length === 0
       ? []
       : await ActivitySubmission.find({ activity_id: { $in: actividades.map((a) => a._id) } })
-          .select('activity_id student_id calificacion_numerica estado fecha_entrega archivo_path')
+          .select('activity_id student_id calificacion_numerica estado fecha_entrega archivo_path intentos.archivos.purgado')
           .lean();
   const calificadas = entregadas.filter((c) => typeof c.calificacion_numerica === 'number');
 
@@ -147,7 +149,7 @@ export async function cargarContextoPlanilla(asignacion: TeacherAssignmentDocume
     ingresaron_despues: matriculas.filter((m) => despues.has(String(m.student_id._id))).map(estudianteDe),
     notasActividad: new Map(calificadas.map((c) => [`${String(c.activity_id)}|${String(c.student_id)}`, c.calificacion_numerica as number])),
     entregas: new Map(
-      entregadas.map((c) => [`${String(c.activity_id)}|${String(c.student_id)}`, { estado: estadoDeEntrega(c), tiene_archivo: Boolean(c.archivo_path) }])
+      entregadas.map((c) => [`${String(c.activity_id)}|${String(c.student_id)}`, { estado: estadoDeEntrega(c), tiene_archivo: Boolean(c.archivo_path) || (c.intentos ?? []).some((i) => (i.archivos ?? []).some((a) => a.purgado === true)) }])
     ),
     registros: new Map((registros as unknown as RegistroPlano[]).map((r) => [String(r.student_id), r])),
   };
@@ -190,6 +192,12 @@ export interface FilaPlanilla {
   parcial: boolean;
   desempeno: ReturnType<typeof desempenoCualitativo> | null;
   faltantes: string[];
+  /**
+   * Solo en la planilla que ve el docente, y solo de una nota ya cerrada: su recuperación del periodo (M18) y la nota que vale con ella.
+   * La nota cerrada (`nota_asignatura`) no cambia: la planilla cerrada nunca se modifica.
+   */
+  recuperacion?: ResumenRecuperacion | null;
+  nota_efectiva?: number | null;
 }
 
 export interface BloquePlanilla {
@@ -314,6 +322,14 @@ export async function obtenerPlanilla(asignacionId: string, periodoNumero: numbe
   const ctx = await cargarContextoPlanilla(asignacion, periodoNumero);
 
   const filas = ctx.estudiantes.map((e) => armarFila(ctx, e));
+  const recuperadas = await Recuperacion.find({ academic_year_id: ctx.anio._id, teacher_assignment_id: asignacion._id, tipo: 'PERIODO', periodo_numero: periodoNumero });
+  const recuperacionDe = new Map(recuperadas.map((r) => [String(r.student_id), r]));
+  for (const fila of filas) {
+    const cerrada = fila.estado === 'CERRADO' || fila.estado === 'DEFINITIVO';
+    const recuperada = cerrada ? recuperacionDe.get(fila.estudiante._id) : undefined;
+    fila.recuperacion = cerrada ? resumenDeRecuperacion(fila.nota_asignatura, recuperada) : null;
+    fila.nota_efectiva = cerrada ? notaEfectivaDePeriodo(fila.nota_asignatura, recuperada) : fila.nota_asignatura;
+  }
   const resumen: Record<EstadoNota, number> = { PENDIENTE: 0, BORRADOR: 0, CERRADO: 0, DEFINITIVO: 0 };
   for (const f of filas) resumen[f.estado] += 1;
 

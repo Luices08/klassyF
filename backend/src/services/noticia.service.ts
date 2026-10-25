@@ -1,5 +1,5 @@
 import { Types } from 'mongoose';
-import { AlcanceNoticia, RolDestinoNoticia, ROLES_DESTINO_NOTICIA } from '../constants/noticias';
+import { AlcanceNoticia, RolDestinoNoticia, ROLES_DESTINO_NOTICIA, TamanoMosaico } from '../constants/noticias';
 import { ROLES } from '../constants/roles';
 import Campus from '../models/campus.model';
 import CategoriaNoticia from '../models/categoriaNoticia.model';
@@ -10,6 +10,9 @@ import Noticia, { NoticiaDocument } from '../models/noticia.model';
 import StudentGuardian from '../models/studentGuardian.model';
 import User, { UserDocument } from '../models/user.model';
 import ApiError from '../utils/ApiError';
+import { resolverContenidoNoticia } from '../utils/contenidoNoticia';
+import { decodificarPortada } from '../utils/portadaNoticia';
+import { runTransaction } from '../utils/runTransaction';
 import {
   LectorDeNoticias,
   PublicadorDeNoticias,
@@ -26,6 +29,7 @@ import { ESTADO_ACTIVO } from '../utils/filtroEstado';
 import { registrarEvento } from './audit.service';
 import { anioDeTrabajo, gruposDelDocente, ubicacionDeEstudiantes, ubicacionDeGrupos } from './noticiaContexto.service';
 import { asegurarCategoriasSembradas } from './noticiaCategoria.service';
+import { almacenarPortada } from './noticiaPortada.service';
 import { avisarSiCorresponde } from './noticiaAvisos.service';
 import { habilitacionActivaDe } from './noticiaHabilitacion.service';
 
@@ -68,6 +72,9 @@ export async function lectorDe(usuario: UserDocument): Promise<LectorDeNoticias>
 export interface NoticiaVista {
   id: string;
   titulo: string;
+  /** Bajada o entradilla. */
+  subtitulo: string;
+  /** El texto sin formato; el cuerpo con formato solo viaja en el detalle (`detalleDeNoticia`). */
   descripcion: string;
   categoria: { id: string; nombre: string; tono: string };
   fecha_inicio: Date | null;
@@ -78,13 +85,20 @@ export interface NoticiaVista {
   fijada: boolean;
   publicar_desde: Date;
   alcance: AlcanceNoticia;
-  /** Versión de la imagen (para el caché del navegador); `null` = sin imagen. */
+  /** Versión de la imagen (para el caché del navegador); `null` = sin imagen (solo noticias anteriores a la portada obligatoria). */
   imagen_version: number | null;
+  /** Cómo se ve en el mosaico y hacia dónde mira la portada en cada tarjeta. */
+  tamano_mosaico: TamanoMosaico;
+  enfoque_x: number;
+  enfoque_y: number;
+  /** Quien la publicó (solo el nombre). */
+  autor: string;
 }
 
-const vistaPublica = (n: NoticiaDocument): NoticiaVista => ({
+const vistaPublica = (n: NoticiaDocument, autor = ''): NoticiaVista => ({
   id: String(n._id),
   titulo: n.titulo,
+  subtitulo: n.subtitulo ?? '',
   descripcion: n.descripcion,
   categoria: { id: String(n.categoria_id), nombre: n.categoria_nombre, tono: n.categoria_tono },
   fecha_inicio: n.fecha_inicio,
@@ -96,7 +110,17 @@ const vistaPublica = (n: NoticiaDocument): NoticiaVista => ({
   publicar_desde: n.publicar_desde,
   alcance: n.alcance,
   imagen_version: n.imagen_version,
+  tamano_mosaico: n.tamano_mosaico ?? 'ESTANDAR',
+  enfoque_x: n.enfoque_x ?? 50,
+  enfoque_y: n.enfoque_y ?? 50,
+  autor,
 });
+
+/** El nombre de quien publicó cada noticia (solo el nombre: nada más de la persona sale en una noticia). */
+async function nombresDeAutores(autores: Array<Types.ObjectId | string>): Promise<Map<string, string>> {
+  const usuarios = await User.find({ _id: { $in: [...new Set(autores.map(String))] } }).select('nombre apellido').lean();
+  return new Map(usuarios.map((u) => [String(u._id), `${u.nombre} ${u.apellido}`]));
+}
 
 /** Lo que ven los lectores: las noticias vigentes que les tocan, fijadas primero y luego los eventos más próximos. */
 export async function noticiasParaMi(usuario: UserDocument, limite = 50): Promise<NoticiaVista[]> {
@@ -108,7 +132,30 @@ export async function noticiasParaMi(usuario: UserDocument, limite = 50): Promis
   const aplicables = vigentes.filter((n) =>
     noticiaAplica({ roles_destino: n.roles_destino, sedes_ids: ids(n.sedes_ids), grados_ids: ids(n.grados_ids), grupos_ids: ids(n.grupos_ids), alcance: n.alcance }, lector)
   );
-  return ordenarNoticias(aplicables, ahora).slice(0, limite).map(vistaPublica);
+  const visibles = ordenarNoticias(aplicables, ahora).slice(0, limite);
+  const autores = await nombresDeAutores(visibles.map((n) => n.creada_por));
+  return visibles.map((n) => vistaPublica(n, autores.get(String(n.creada_por))));
+}
+
+export interface NoticiaDetalle extends NoticiaVista {
+  estado: string;
+  /** El cuerpo con formato, ya limpio. Vacío en las noticias anteriores: ahí se lee `descripcion`. */
+  contenido_html: string;
+}
+
+/**
+ * Una noticia completa con su cuerpo. La ven administración, coordinación y su autor siempre; los demás, solo si está publicada, vigente y les toca (por su perfil, sus
+ * grupos y sus sedes). «No existe» y «no te toca» responden igual.
+ */
+export async function detalleDeNoticia(id: string, usuario: UserDocument): Promise<NoticiaDetalle> {
+  const noticia = await cargarNoticia(id);
+  if (!puedeModerar(usuario.rol, String(noticia.creada_por) === String(usuario._id))) {
+    const lector = noticia.estado === 'PUBLICADA' && estaVigente(noticia, new Date()) ? await lectorDe(usuario) : null;
+    const aplica = lector && noticiaAplica({ roles_destino: noticia.roles_destino, sedes_ids: ids(noticia.sedes_ids), grados_ids: ids(noticia.grados_ids), grupos_ids: ids(noticia.grupos_ids), alcance: noticia.alcance }, lector);
+    if (!aplica) throw new ApiError(404, 'Noticia no encontrada.');
+  }
+  const autor = (await nombresDeAutores([noticia.creada_por])).get(String(noticia.creada_por)) ?? '';
+  return { ...vistaPublica(noticia, autor), estado: noticia.estado, contenido_html: noticia.contenido_html ?? '' };
 }
 
 export interface NoticiaGestion extends NoticiaVista {
@@ -146,7 +193,7 @@ export async function listarGestion(usuario: UserDocument): Promise<NoticiaGesti
   const par = (lista: Types.ObjectId[], mapa: Map<string, string>) => lista.map((i) => ({ id: String(i), nombre: mapa.get(String(i)) ?? '' }));
 
   return noticias.map((n) => ({
-    ...vistaPublica(n),
+    ...vistaPublica(n, autorPor.get(String(n.creada_por))),
     estado: n.estado,
     vigente: estaVigente(n, ahora),
     programada: n.estado === 'PUBLICADA' && n.publicar_desde > ahora,
@@ -204,7 +251,16 @@ export async function permisosDe(usuario: UserDocument): Promise<PermisosDeNotic
 
 export interface DatosNoticia {
   titulo: string;
-  descripcion: string;
+  subtitulo?: string;
+  /** El texto sin formato (la forma anterior de publicar); con `contenido_html`, la descripción se deriva de él. */
+  descripcion?: string;
+  /** El cuerpo con formato: se limpia aquí y de él sale la descripción. */
+  contenido_html?: string;
+  tamano_mosaico?: TamanoMosaico;
+  enfoque_x?: number;
+  enfoque_y?: number;
+  /** La portada como data URI (PNG, JPG o WEBP). Obligatoria al crear; al editar solo viaja si se cambia. */
+  portada?: string;
   categoria_id: string;
   fecha_inicio?: Date | null;
   fecha_fin?: Date | null;
@@ -312,23 +368,44 @@ export async function crearNoticia(input: DatosNoticia, usuario: UserDocument, i
   const vence = input.vence_el !== undefined ? input.vence_el : vencimientoPorDefecto(input.fecha_inicio ?? null, input.fecha_fin ?? null);
   exigirVigenciaCoherente(desde, vence);
 
-  const noticia = await Noticia.create({
-    titulo: input.titulo,
-    descripcion: input.descripcion,
-    categoria_id: input.categoria_id,
-    categoria_nombre: categoria.nombre,
-    categoria_tono: categoria.tono,
-    fecha_inicio: input.fecha_inicio ?? null,
-    fecha_fin: input.fecha_fin ?? null,
-    hora: input.hora ?? '',
-    lugar: input.lugar ?? '',
-    afecta_clases: input.afecta_clases ?? false,
-    roles_destino: input.roles_destino ?? [...ROLES_DESTINO_NOTICIA],
-    ...resuelto,
-    publicar_desde: desde,
-    vence_el: vence,
-    fijada: input.fijada ?? false,
-    creada_por: usuario._id,
+  // Toda noticia lleva una fotografía de portada: sin ella no se publica (y no hay forma de saltarse la pantalla).
+  if (!input.portada) throw new ApiError(400, 'Toda noticia lleva una fotografía de portada.');
+  const portada = decodificarPortada(input.portada);
+  const contenido = resolverContenidoNoticia({ descripcion: input.descripcion, contenido_html: input.contenido_html });
+  const version = Date.now();
+
+  // La noticia y su portada se guardan juntas: o quedan las dos o ninguna.
+  const noticia = await runTransaction(async (session) => {
+    const [creada] = await Noticia.create(
+      [
+        {
+          titulo: input.titulo,
+          subtitulo: input.subtitulo ?? '',
+          ...contenido,
+          tamano_mosaico: input.tamano_mosaico,
+          enfoque_x: input.enfoque_x,
+          enfoque_y: input.enfoque_y,
+          imagen_version: version,
+          categoria_id: input.categoria_id,
+          categoria_nombre: categoria.nombre,
+          categoria_tono: categoria.tono,
+          fecha_inicio: input.fecha_inicio ?? null,
+          fecha_fin: input.fecha_fin ?? null,
+          hora: input.hora ?? '',
+          lugar: input.lugar ?? '',
+          afecta_clases: input.afecta_clases ?? false,
+          roles_destino: input.roles_destino ?? [...ROLES_DESTINO_NOTICIA],
+          ...resuelto,
+          publicar_desde: desde,
+          vence_el: vence,
+          fijada: input.fijada ?? false,
+          creada_por: usuario._id,
+        },
+      ],
+      { session }
+    );
+    await almacenarPortada((creada as NoticiaDocument)._id, portada, usuario._id, version, session);
+    return creada as NoticiaDocument;
   });
   await registrarEvento({ usuario_id: usuario._id, accion: 'NOTICIA_CREADA', entidad: 'Noticia', entidad_id: noticia._id, detalle: `${categoria.nombre} · alcance ${resuelto.alcance}`, ip });
   // Si sale ya, se avisa ya; si está programada, la avisa el planificador cuando le llegue la hora.
@@ -354,6 +431,12 @@ export async function actualizarNoticia(id: string, cambios: Partial<DatosNotici
   exigirPoderFijar(usuario, cambios.fijada);
   exigirFechasCoherentes(cambios.fecha_inicio !== undefined ? cambios.fecha_inicio : noticia.fecha_inicio, cambios.fecha_fin !== undefined ? cambios.fecha_fin : noticia.fecha_fin);
 
+  // Toda noticia lleva portada: una anterior que no la tiene debe recibirla al editarse (fijarla o quitarla de arriba no la exige).
+  const portadaNueva = cambios.portada ? decodificarPortada(cambios.portada) : null;
+  const soloFijar = Object.keys(cambios).every((k) => k === 'fijada');
+  if (!portadaNueva && noticia.imagen_version === null && !soloFijar) throw new ApiError(400, 'Toda noticia lleva una fotografía de portada: sube una para guardar los cambios.');
+  const contenido = cambios.contenido_html !== undefined || cambios.descripcion !== undefined ? resolverContenidoNoticia({ descripcion: cambios.descripcion, contenido_html: cambios.contenido_html }) : null;
+
   const categoriaId = cambios.categoria_id ?? String(noticia.categoria_id);
   const sedes = cambios.sedes_ids ?? ids(noticia.sedes_ids);
   const grados = cambios.grados_ids ?? ids(noticia.grados_ids);
@@ -368,7 +451,19 @@ export async function actualizarNoticia(id: string, cambios: Partial<DatosNotici
     noticia.categoria_tono = categoria.tono;
   }
   if (cambios.titulo !== undefined) noticia.titulo = cambios.titulo;
-  if (cambios.descripcion !== undefined) noticia.descripcion = cambios.descripcion;
+  if (cambios.subtitulo !== undefined) noticia.subtitulo = cambios.subtitulo;
+  if (contenido) {
+    noticia.descripcion = contenido.descripcion;
+    noticia.contenido_html = contenido.contenido_html;
+  }
+  if (cambios.tamano_mosaico !== undefined) noticia.tamano_mosaico = cambios.tamano_mosaico;
+  if (cambios.enfoque_x !== undefined) noticia.enfoque_x = cambios.enfoque_x;
+  if (cambios.enfoque_y !== undefined) noticia.enfoque_y = cambios.enfoque_y;
+  if (portadaNueva) {
+    const version = Date.now();
+    await almacenarPortada(noticia._id, portadaNueva, usuario._id, version);
+    noticia.imagen_version = version;
+  }
   if (cambios.fecha_inicio !== undefined) noticia.fecha_inicio = cambios.fecha_inicio;
   if (cambios.fecha_fin !== undefined) noticia.fecha_fin = cambios.fecha_fin;
   if (cambios.hora !== undefined) noticia.hora = cambios.hora;

@@ -89,10 +89,12 @@ export interface IntentoEntrega {
   /** Lo escrito en el editor de texto (HTML ya limpiado por el servidor). */
   respuesta_html: string;
   tiene_archivo: boolean;
+  /** El servidor borró el archivo por política de almacenamiento; la nota y la retroalimentación se conservan. */
+  archivo_purgado: boolean;
   archivo_nombre: string | null;
   archivo_formato: FormatoEvidencia | null;
-  /** Cada archivo de la entrega; `indice` es lo que se pide al descargar. */
-  archivos: Array<{ indice: number; nombre: string; formato: FormatoEvidencia; bytes: number }>;
+  /** Cada archivo de la entrega; `indice` es lo que se pide al descargar. Un archivo depurado ya no se puede bajar. */
+  archivos: Array<{ indice: number; nombre: string; formato: FormatoEvidencia; bytes: number; purgado: boolean }>;
   /** Es el intento que cuenta para la nota (el elegido por el docente o, si no eligió, el último). */
   considerado: boolean;
 }
@@ -107,6 +109,7 @@ export interface Entrega {
   con_retraso: boolean;
   texto_entrega: string;
   tiene_archivo: boolean;
+  archivo_purgado: boolean;
   archivo_nombre: string | null;
   archivo_formato: FormatoEvidencia | null;
   calificacion_numerica: number | null;

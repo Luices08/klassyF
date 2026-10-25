@@ -484,6 +484,14 @@ export function PlanillaNotas({ planilla, onGuardar, guardando, onRevisarActivid
                   ])}
                   <td className={`${CELDA} border-l border-border bg-soft text-base font-bold ${completa ? 'text-ink' : 'italic text-muted'}`} title={completa ? undefined : 'Parcial: aún faltan notas'}>
                     {formatoNota(nota) || <span className="text-muted">—</span>}
+                    {fila.recuperacion && (
+                      <span
+                        className={`block text-xs font-semibold ${fila.recuperacion.cuenta ? (fila.recuperacion.estado === 'SUPERADA' ? 'text-success' : 'text-warning') : 'text-muted'}`}
+                        title={fila.recuperacion.cuenta ? 'Recuperación registrada: la planilla cerrada no cambia, esta es la nota que vale en el boletín.' : 'La recuperación solo se anota: el boletín conserva la nota cerrada.'}
+                      >
+                        {fila.recuperacion.cuenta ? `Recuperó: ${formatoNota(fila.recuperacion.nota_resultante)}` : `Recup. anotada: ${formatoNota(fila.recuperacion.nota_resultante)}`}
+                      </span>
+                    )}
                   </td>
                   {plantilla.columnas.desempeno && <td className={`${CELDA} bg-soft`}>{desempeno ? <DesempenoBadge value={desempeno} /> : <span className="text-muted">—</span>}</td>}
                   {plantilla.columnas.estado && (

@@ -295,8 +295,11 @@ export async function recordarCierresDePeriodo(ahora = new Date()): Promise<{ av
   return { avisos };
 }
 
-/** Eventos del calendario (M05) que un docente debe tener presentes: las recuperaciones y el desarrollo institucional. */
-const EVENTOS_QUE_SE_RECUERDAN = ['RECUPERACION_PERIODO', 'RECUPERACION_FINAL', 'DESARROLLO_INSTITUCIONAL'] as const;
+/**
+ * Eventos del calendario (M05) que un docente debe tener presentes: el desarrollo institucional. Las recuperaciones ya no pasan por aquí:
+ * tienen sus propios avisos (fechas, inicio y «mañana termina», solo a quien tiene estudiantes por recuperar) en `recuperacionAvisos.service`.
+ */
+const EVENTOS_QUE_SE_RECUERDAN = ['DESARROLLO_INSTITUCIONAL'] as const;
 export const DIAS_RECORDATORIO_EVENTO = 3;
 
 /** Igual que `recordarCierresDePeriodo`: se corre una vez al día (`npm run notificar:cierres`) y es idempotente mientras el aviso siga sin leer. */

@@ -320,7 +320,7 @@ Reglas que no se ven leyendo un solo archivo:
   no distingue tipos por nombre). ADMIN y `COORDINADOR_CONVIVENCIA` agregan, editan, desactivan y eliminan (eliminar solo lo no usado; lo
   usado se desactiva). **No existen categorías ni "frases"**: se eliminaron porque eran de otro módulo; las faltas (con gravedad) son de M15.
 - **La observación copia lo que se eligió** (tipo, `visible_estudiante`, falta) al guardarse: editar o desactivar el catálogo no altera ni revela
-  lo ya registrado. No se borra: se **enmienda** (versión anterior en `enmiendas[]`) o se **anula** con motivo. El autor puede hacerlo dentro de
+  lo ya registrado. No se borra: se **enmienda** (en pantalla el botón dice «Editar»; la versión anterior queda en `enmiendas[]`) o se **anula** con motivo. El autor puede hacerlo dentro de
   `ConfiguracionConvivencia.plazo_*_horas` (48 h por defecto); coordinación de convivencia (de sus sedes) y ADMIN sin plazo; nunca con el año
   CERRADO. Una falta ya remitida a convivencia solo la corrige convivencia.
 - **Quién ve qué** lo decide el servidor con `permisoSobreEstudiante` (`utils/permisosConvivencia.ts`) y la función pura `visibilidadDeObservacion`

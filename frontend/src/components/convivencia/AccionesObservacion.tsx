@@ -31,7 +31,7 @@ export function AccionesObservacion({ observacion }: { observacion: ObservacionV
       {puedeCorregir && (
         <>
           <Button variant="soft-edit" className="px-3 py-1 text-xs" onClick={() => setEnmendando(true)}>
-            Enmendar
+            Editar
           </Button>
           <Button variant="soft-danger" className="px-3 py-1 text-xs" onClick={() => setAnulando(true)}>
             Anular

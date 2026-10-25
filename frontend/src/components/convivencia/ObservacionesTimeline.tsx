@@ -152,7 +152,7 @@ export function ObservacionesTimeline({ observaciones, acciones }: Props) {
               <span>
                 {obs.autor ?? 'Autor no disponible'}
                 {obs.contexto ? ` · ${ETIQUETA_CONTEXTO[obs.contexto]}` : ''}
-                {obs.cantidad_enmiendas ? ` · enmendada ${obs.cantidad_enmiendas} vez(es)` : ''}
+                {obs.cantidad_enmiendas ? ` · editada ${obs.cantidad_enmiendas} vez(es)` : ''}
               </span>
               {acciones?.(obs)}
             </div>

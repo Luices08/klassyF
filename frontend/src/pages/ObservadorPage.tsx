@@ -335,7 +335,7 @@ function MisRegistrosTab() {
 
   return (
     <Card>
-      <CardHeader title="Mis registros" subtitle="Puedes enmendar o anular tus observaciones dentro del plazo que define la institución." />
+      <CardHeader title="Mis registros" subtitle="Puedes editar o anular tus observaciones dentro del plazo que define la institución." />
       <Table>
         <TableHead>
           <tr>

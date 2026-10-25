@@ -89,10 +89,10 @@ function Formulario({ onClose, catalogo = SIN_CATALOGO, estudiantes: inicial = [
     <Drawer
       open
       size="lg"
-      title={enmienda ? (esFalta ? 'Enmendar falta' : 'Enmendar observación') : 'Registrar observación'}
+      title={enmienda ? (esFalta ? 'Editar falta' : 'Editar observación') : 'Registrar observación'}
       subtitle={
         enmienda
-          ? 'La versión anterior queda guardada en el historial.'
+          ? 'La versión anterior queda guardada en el historial del registro.'
           : estudiantes.length === 0
             ? 'Elige a quién se registra'
             : estudiantes.length === 1
@@ -101,7 +101,7 @@ function Formulario({ onClose, catalogo = SIN_CATALOGO, estudiantes: inicial = [
       }
       onClose={onClose}
       onSubmit={guardar}
-      submitLabel={enmienda ? 'Guardar enmienda' : 'Registrar'}
+      submitLabel={enmienda ? 'Guardar cambios' : 'Registrar'}
       isSubmitting={mutation.isPending}
       submitDisabled={!descripcion.trim() || (!enmienda && !tipoId) || sinDestino}
     >

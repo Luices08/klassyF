@@ -404,12 +404,12 @@ function PoliticaTab() {
 
   return (
     <Card>
-      <CardHeader title="Plazos para corregir" subtitle="Pasado el plazo, solo coordinación o administración pueden enmendar o anular un registro." />
+      <CardHeader title="Plazos para corregir" subtitle="Pasado el plazo, solo coordinación o administración pueden editar o anular un registro." />
       <form onSubmit={guardar} className="space-y-4 p-4">
         {actualizar.isError && <Alert tone="error">{errorMessage(actualizar.error)}</Alert>}
         {actualizar.isSuccess && <Alert tone="success">Plazos guardados.</Alert>}
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <Input label="Horas para enmendar" type="number" min={0} max={720} value={enmienda ?? actual?.plazo_enmienda_horas ?? ''} onChange={(e) => setEnmienda(e.target.value)} />
+          <Input label="Horas para editar" type="number" min={0} max={720} value={enmienda ?? actual?.plazo_enmienda_horas ?? ''} onChange={(e) => setEnmienda(e.target.value)} />
           <Input label="Horas para anular" type="number" min={0} max={720} value={anulacion ?? actual?.plazo_anulacion_horas ?? ''} onChange={(e) => setAnulacion(e.target.value)} />
           <Input
             label="Horas para remitir un caso tipo III"

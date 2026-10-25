@@ -13,7 +13,7 @@ import { aLaHora, diaDelAnio, sumarDias } from '../nucleo/fechas';
 import { Latentes } from '../logica/perfiles';
 import { categoriaDeHabilidad, evolucionarLatentes } from '../logica/trayectoria';
 import { admin, coordinacion, ContextoFase, secretaria } from './comun';
-import { cargarDocumentosDeMatricula, ChecklistItem, Familia, libroDelAnio, matricularGrupo } from './inicioAnio';
+import { cargarDocumentosDeMatricula, ChecklistItem, Familia, matricularGrupo } from './inicioAnio';
 import { radicarPlanesDeAula } from './planeacion';
 import { grupoClave } from './prepararAnio';
 
@@ -99,7 +99,6 @@ export async function faseRematricula(ctx: ContextoFase, anio: number): Promise<
       group_id: elegido._id,
       academic_year_id: destinoId,
       tipo_ingreso: fila.tipo_ingreso ?? 'ANTIGUO',
-      numero_libro: libroDelAnio(ctx, anio),
       fecha_limite_compromiso: fechaLimiteCompromiso,
     });
     elegido.cupos_ocupados += 1;
@@ -154,7 +153,7 @@ export async function faseRematricula(ctx: ContextoFase, anio: number): Promise<
   for (const [i, { matricula }] of preinscritos.entries()) {
     if (i % 25 === 0) irA(aLaHora(sumarDias(diaDelAnio(anio, '01-12'), Math.floor(i / 60)), `${String(8 + (Math.floor(i / 25) % 8)).padStart(2, '0')}:00`));
     const azar = azarPara(ctx.semilla, 'formalizar', anio, matricula.student_id._id);
-    await secre.patch(`/enrollments/${matricula._id}/status`, { estado: 'MATRICULADO_CONDICIONAL', fecha_limite_compromiso: fechaLimiteCompromiso, numero_libro: libroDelAnio(ctx, anio) });
+    await secre.patch(`/enrollments/${matricula._id}/status`, { estado: 'MATRICULADO_CONDICIONAL', fecha_limite_compromiso: fechaLimiteCompromiso });
     await cargarDocumentosDeMatricula(ctx, matricula._id, matricula.checklist, { nombre: matricula.student_id.nombre, apellido: matricula.student_id.apellido, documento: matricula.student_id.numero_documento }, azar, [DOCUMENTO_AUTOMATICO]);
     formalizadas += 1;
   }

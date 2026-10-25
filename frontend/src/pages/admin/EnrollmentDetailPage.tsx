@@ -34,6 +34,7 @@ import {
   useSincronizarRequisitosMatricula,
   useUpdateEnrollmentStatus,
 } from '../../hooks/useEnrollments';
+import { useFoliatura } from '../../hooks/useFoliatura';
 import { useGroups } from '../../hooks/useGroups';
 import { useRequisitosDocumentales } from '../../hooks/useRequisitosDocumentales';
 import { api } from '../../lib/apiClient';
@@ -68,13 +69,13 @@ export function EnrollmentDetailPage() {
   const [salidaOpen, setSalidaOpen] = useState(false);
   const [motivo, setMotivo] = useState('');
   const actualizarEstado = useUpdateEnrollmentStatus();
+  const foliatura = useFoliatura();
 
   const [formalizarOpen, setFormalizarOpen] = useState(false);
   const [tipoFormalizacion, setTipoFormalizacion] = useState<'MATRICULADO_DEFINITIVO' | 'MATRICULADO_CONDICIONAL'>(
     'MATRICULADO_DEFINITIVO'
   );
   const [fechaLimite, setFechaLimite] = useState('');
-  const [numeroLibro, setNumeroLibro] = useState(1);
 
   const [cambiarGrupoOpen, setCambiarGrupoOpen] = useState(false);
   const [nuevoGrupo, setNuevoGrupo] = useState('');
@@ -162,7 +163,6 @@ export function EnrollmentDetailPage() {
     await actualizarEstado.mutateAsync({
       id,
       estado: tipoFormalizacion,
-      numero_libro: numeroLibro,
       fecha_limite_compromiso: tipoFormalizacion === 'MATRICULADO_CONDICIONAL' ? fechaLimite : undefined,
     });
     setFormalizarOpen(false);
@@ -657,15 +657,12 @@ export function EnrollmentDetailPage() {
             onChange={(e) => setFechaLimite(e.target.value)}
           />
         )}
-        <Input
-          label="Libro de matrícula"
-          type="number"
-          min={1}
-          required
-          value={numeroLibro}
-          onChange={(e) => setNumeroLibro(Number(e.target.value))}
-          hint="El folio es el siguiente número disponible de este libro."
-        />
+        <p className="rounded-lg bg-soft px-3 py-2 text-sm text-body">
+          El libro y el folio los asigna la configuración del Libro de Matrícula{foliatura.data ? <>: el siguiente será <span className="font-semibold text-ink">{foliatura.data.siguiente.codigo}</span></> : ''}.{' '}
+          <button type="button" className="font-semibold text-primary underline" onClick={() => navigate('/admin/enrollments?pestana=libro')}>
+            Ver la configuración
+          </button>
+        </p>
       </Drawer>
 
       <Drawer

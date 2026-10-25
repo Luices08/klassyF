@@ -28,7 +28,7 @@ import { generarChecklistDesdeCatalogo, listarRequisitos } from './requisitoDocu
 import { nombreDelRequisito } from '../utils/requisitosDocumentales';
 import { runTransaction } from '../utils/runTransaction';
 import { registrarEvento } from './audit.service';
-import { generateFolioMatricula } from './folio.service';
+import { asegurarConfiguracion as asegurarFoliatura, asignarFolio } from './foliatura.service';
 import { aprobarItemConPazYSalvo, pazYSalvoConfirmadoPrevio } from './pazYSalvo.service';
 import { aplicarSalida } from './salidaMatricula.service';
 import { ubicarEstudiantes } from './ubicacionEstudiante.service';
@@ -44,7 +44,6 @@ export interface CreateEnrollmentInput {
   group_id: string | Types.ObjectId;
   academic_year_id: string | Types.ObjectId;
   tipo_ingreso: TipoIngreso;
-  numero_libro?: number;
   estado_inicial?: 'MATRICULADO_CONDICIONAL' | 'MATRICULADO_DEFINITIVO';
   documentacion_completa?: boolean;
   /**
@@ -107,7 +106,6 @@ export async function createEnrollment(
   opciones: OpcionesCreacionMatricula = {}
 ): Promise<EnrollmentDocument> {
   const { student_id, group_id, academic_year_id, tipo_ingreso } = input;
-  const numeroLibro = input.numero_libro ?? 1;
   const marcaPorDocumento = Array.isArray(input.documentos_entregados);
   const esDefinitiva = Boolean(input.documentacion_completa || input.estado_inicial === 'MATRICULADO_DEFINITIVO');
   const estadoInicial: EstadoMatricula = esDefinitiva ? 'MATRICULADO_DEFINITIVO' : 'MATRICULADO_CONDICIONAL';
@@ -119,6 +117,9 @@ export async function createEnrollment(
   }
 
   const puedeForzar = Boolean(input.forzar_sobrecupo) && actor.rol === ROLES.ADMIN;
+
+  // La configuración del Libro de Matrícula se crea antes de abrir la transacción: dentro de ella, dos primeras matrículas a la vez chocarían.
+  await asegurarFoliatura();
 
   return runTransaction(async (session) => {
     const student = await User.findOne({ _id: student_id, roles: ROLES.ESTUDIANTE }).session(session);
@@ -166,7 +167,7 @@ export async function createEnrollment(
       throw new ApiError(409, 'El grupo seleccionado no está activo o no tiene cupos disponibles.');
     }
 
-    const { numero_folio, folio_matricula } = await generateFolioMatricula(academicYear.year, numeroLibro, session);
+    const { numero_libro, numero_folio, folio_matricula } = await asignarFolio(academicYear.year, session);
 
     const profile = await StudentProfile.findOne({ user_id: student_id }).session(session);
     if (profile && requiereReingreso) {
@@ -229,7 +230,7 @@ export async function createEnrollment(
           group_id,
           academic_year_id,
           folio_matricula,
-          numero_libro: numeroLibro,
+          numero_libro,
           numero_folio,
           tipo_ingreso,
           ultimo_grado_aprobado: input.ultimo_grado_aprobado ?? null,
@@ -300,8 +301,6 @@ export async function createEnrollment(
 }
 
 export interface FormalizacionOpciones {
-  /** Libro del Libro de Matricula en el que se asienta el folio (por defecto 1). Solo aplica al formalizar. */
-  numero_libro?: number;
   /** Obligatoria al formalizar como MATRICULADO_CONDICIONAL. */
   fecha_limite_compromiso?: string | Date;
 }
@@ -326,6 +325,7 @@ export async function updateEnrollmentStatus(
   if ((nuevoEstado === 'RETIRADO' || nuevoEstado === 'ANULADO') && !motivo) {
     throw new ApiError(400, `Debes indicar un motivo para pasar la matrícula a ${nuevoEstado}.`);
   }
+  if (ESTADOS_MATRICULA_CON_FOLIO.includes(nuevoEstado)) await asegurarFoliatura();
 
   return runTransaction(async (session) => {
     const enrollment = await Enrollment.findById(enrollmentId).session(session);
@@ -363,10 +363,9 @@ export async function updateEnrollmentStatus(
       const academicYear = await AcademicYear.findById(enrollment.academic_year_id).session(session);
       if (!academicYear) throw new ApiError(404, 'Año lectivo no encontrado.');
 
-      const numeroLibro = opciones.numero_libro ?? 1;
-      const { numero_folio, folio_matricula } = await generateFolioMatricula(academicYear.year, numeroLibro, session);
+      const { numero_libro, numero_folio, folio_matricula } = await asignarFolio(academicYear.year, session);
       enrollment.folio_matricula = folio_matricula;
-      enrollment.numero_libro = numeroLibro;
+      enrollment.numero_libro = numero_libro;
       enrollment.numero_folio = numero_folio;
       // La fecha de matricula es la de la formalizacion, no la de la preinscripcion.
       enrollment.fecha_matricula = new Date();

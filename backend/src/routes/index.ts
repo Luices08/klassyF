@@ -16,6 +16,7 @@ import orientacionRoutes from './orientacion.routes';
 import dashboardRoutes from './dashboard.routes';
 import documentoReferenciaRoutes from './documentoReferencia.routes';
 import enrollmentRoutes from './enrollment.routes';
+import foliaturaRoutes from './foliatura.routes';
 import requisitoDocumentalRoutes from './requisitoDocumental.routes';
 import pazYSalvoRoutes from './pazYSalvo.routes';
 import espacioRoutes from './espacio.routes';
@@ -75,6 +76,7 @@ router.use('/shifts', jornadaOperativaRoutes);
 router.use('/grades', gradeRoutes);
 router.use('/groups', groupRoutes);
 router.use('/enrollments', enrollmentRoutes);
+router.use('/foliatura', foliaturaRoutes);
 router.use('/requisitos-documentales', requisitoDocumentalRoutes);
 router.use('/paz-y-salvo', pazYSalvoRoutes);
 // Traslados extemporáneos y homologación de notas (M04/M26), con las escalas de otras instituciones (M32)

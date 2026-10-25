@@ -7,7 +7,6 @@ export interface CreateEnrollmentInput {
   group_id: string;
   academic_year_id: string;
   tipo_ingreso: TipoIngreso;
-  numero_libro?: number;
   estado_inicial?: 'MATRICULADO_CONDICIONAL' | 'MATRICULADO_DEFINITIVO';
   documentacion_completa?: boolean;
   /** Claves de los documentos que secretaría tuvo en la mano: el estado (definitiva o condicional) lo decide el servidor con esto. */
@@ -95,8 +94,7 @@ export function useUpdateEnrollmentStatus() {
       id: string;
       estado: EstadoMatricula;
       motivo?: string;
-      // Solo al formalizar (PREINSCRITO -> MATRICULADO_*), momento en que se asigna el folio.
-      numero_libro?: number;
+      // Solo al formalizar (PREINSCRITO -> MATRICULADO_*); el libro y el folio los asigna la configuración del Libro de Matrícula.
       fecha_limite_compromiso?: string;
     }) => api.patch<Enrollment>(`/enrollments/${id}/status`, cuerpo),
     onSuccess: (_data, variables) => {

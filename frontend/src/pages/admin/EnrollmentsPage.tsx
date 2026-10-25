@@ -8,6 +8,7 @@ import { Drawer } from '../../components/ui/Drawer';
 import { Input, Select, Textarea } from '../../components/ui/Field';
 import { IconButton } from '../../components/ui/IconButton';
 import { CatalogoDocumentosMatricula } from '../../components/matriculas/CatalogoDocumentosMatricula';
+import { ConfiguracionFoliatura } from '../../components/matriculas/ConfiguracionFoliatura';
 import { PageHeader } from '../../components/ui/PageHeader';
 import { Tabs } from '../../components/ui/Tabs';
 import { Spinner } from '../../components/ui/Spinner';
@@ -17,6 +18,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useAnioDeTrabajo } from '../../hooks/useAniosLectivos';
 import { useCampuses, useGrades, useJornadas } from '../../hooks/useCatalogs';
 import { useCreateEnrollment, useDocumentosPrevistos, useEnrollmentsList, useEstudiantesPorGrado, useCargarDocumentoMatricula, type EnrollmentsFilter } from '../../hooks/useEnrollments';
+import { useFoliatura } from '../../hooks/useFoliatura';
 import { useGroups } from '../../hooks/useGroups';
 import { useInstitution } from '../../hooks/useInstitution';
 import { useCrearEstudianteCompleto } from '../../hooks/useStudents';
@@ -154,10 +156,10 @@ export function EnrollmentsPage() {
   const listQuery = useEnrollmentsList(filter);
 
   // --- Formalizar matricula ---
-  // `?pestana=por-grado`, `?pestana=cupos` o `?pestana=documentos` abren directo esa sección.
+  // `?pestana=por-grado`, `cupos`, `documentos` o `libro` abren directo esa sección.
   const [parametros, setParametros] = useSearchParams();
-  const pestana = ['por-grado', 'cupos', 'documentos'].includes(parametros.get('pestana') ?? '')
-    ? (parametros.get('pestana') as 'por-grado' | 'cupos' | 'documentos')
+  const pestana = ['por-grado', 'cupos', 'documentos', 'libro'].includes(parametros.get('pestana') ?? '')
+    ? (parametros.get('pestana') as 'por-grado' | 'cupos' | 'documentos' | 'libro')
     : 'matriculas';
   const cambiarPestana = (k: string) => setParametros(k === 'matriculas' ? {} : { pestana: k }, { replace: true });
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -327,6 +329,8 @@ export function EnrollmentsPage() {
 
   const esAdmin = user?.rol === 'ADMIN';
   const paginaInfo = listQuery.data;
+  // El libro físico del colegio no empieza en cero: mientras nadie confirme en qué folio va, se avisa antes de matricular.
+  const foliatura = useFoliatura();
 
   const pestanas = (
     <Tabs
@@ -335,18 +339,19 @@ export function EnrollmentsPage() {
         { key: 'por-grado', label: 'Por grado' },
         { key: 'cupos', label: 'Disponibilidad de cupos' },
         { key: 'documentos', label: 'Documentos que se piden' },
+        { key: 'libro', label: 'Libro y folios' },
       ]}
       value={pestana}
       onChange={cambiarPestana}
     />
   );
 
-  if (pestana === 'documentos') {
+  if (pestana === 'documentos' || pestana === 'libro') {
     return (
       <div className="space-y-4">
         <PageHeader title="Matrículas" subtitle="Cupos por sede/jornada/grado, formalización de matrícula y novedades." />
         {pestanas}
-        <CatalogoDocumentosMatricula />
+        {pestana === 'documentos' ? <CatalogoDocumentosMatricula /> : <ConfiguracionFoliatura />}
       </div>
     );
   }
@@ -388,6 +393,15 @@ export function EnrollmentsPage() {
         }
       />
       {pestanas}
+
+      {foliatura.data && !foliatura.data.confirmada && (
+        <Alert tone="warning">
+          Falta confirmar en qué libro y folio va el colegio: el siguiente folio saldría como {foliatura.data.siguiente.codigo}.{' '}
+          <button type="button" className="font-semibold underline" onClick={() => cambiarPestana('libro')}>
+            Configurar el Libro de Matrícula
+          </button>
+        </Alert>
+      )}
 
       {!anio && <Alert tone="warning">Aún no hay un año lectivo. Créalo en "Año lectivo".</Alert>}
 

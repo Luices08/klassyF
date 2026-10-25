@@ -1277,7 +1277,7 @@ Botón flotante en `AppShell` (`components/asistente/AsistenteFlotante.tsx`) que
 - **Encadena 2024, 2025 y 2026** (`orquestador.ts#planDeFases`): por año `preparar-anio`, `inicio-anio` (el primero crea el colegio, `faseInicioAnio`; los siguientes hacen `faseRematricula`), `periodo-1..4` y `cierre-anio`. 2024 y 2025 se cierran; 2026 llega hasta la **fecha de corte** y queda abierto.
 - **Fecha de corte** (`config.fecha_corte` o `--corte=AAAA-MM-DD`; por defecto hoy): último día simulado. Una fase que empieza después no se planea y los eventos posteriores al corte dentro de la última fase se descartan (`nucleo/eventos.ts#ejecutarEventos`), así el periodo en curso queda «a medias» como un colegio real.
 - **Cierre del año** (`fases/cierreAnio.ts`): promoción `CIERRE`, recuperación final anual por asignación, paz y salvo (el de 11° antes del cierre, para que se gradúen y no queden extemporáneos; ~4 % no lo confirma), `TRAS_RECUPERACION` y cierre de la vigencia. **Rematrícula** (`fases/rematricula.ts`): rollover de M19 por sede y grado; 5°→6° cambia de sede y el rollover responde `SIN_CUPO`, por eso secretaría los matricula directo; se descarta la lista de espera, se llenan los grupos con estudiantes nuevos (`soloNuevos`), se formalizan las pre-matrículas y se activa el año. **Vida del año** (`fases/vidaEscolar.ts`): retiros y traslados desde el periodo 2, servicio social (10°: 40 h, 11°: 80 h) y Saber 11. El perfil oculto evoluciona de un año al siguiente (`logica/trayectoria.ts`, pura y con tests).
-- **Defecto real del backend que la simulación destapó:** el índice único de folio es `(numero_libro, numero_folio)` sin el año, pero el contador de folios es anual; en el segundo año el libro 1 repite folios y da 409. La simulación usa un libro por año (`libroDelAnio`); no se corrigió el backend (fuera de alcance).
+- **Defecto real del backend que la simulación destapó (resuelto):** con el libro 1 fijo y el consecutivo reiniciado cada año, la primera matrícula del segundo año repetía el folio y daba 409. Lo resolvió la foliatura configurable (ver «Folio del Libro de Matrícula»): la simulación ya no pasa ningún libro.
 
 - **Exportador para el módulo predictivo** (`npm run sim:exportar`, `scripts/simulacion/exportar.ts`, reglas puras `logica/exportacion.ts` con tests en `tests/simulacion.test.ts`): solo lee `klassy_sim` y escribe en `backend/exportacion-sim/` (git-ignorada) una fila **estudiante × corte** (`periodo_corte` 1..n−1) con entradas 0–1 calculadas solo con lo cerrado hasta ese periodo y la etiqueta `pierde_anio` del cierre de M19; parte entrenamiento/prueba **por año**; `ratio_inasistencias` = fallas sin justificar ÷ registros de M13 y `alertas_convivencia` = faltas II (1 punto) y III (2) como presunto responsable ÷ `TOPE_ALERTAS_CONVIVENCIA` (4), con tope 1; la Tipo I no es alerta. Ver el LEEME de la simulación.
 
@@ -1300,11 +1300,27 @@ Todo vive en **su propia carpeta**: `backend/src/modulos/predictivo/` (rutas `/p
 
 ### Folio del Libro de Matrícula (M04)
 
+- **La foliatura es configuración del colegio, no código** (`ConfiguracionFoliatura`, una por instalación con id fijo `FOLIATURA`; `foliatura.service`, reglas puras `utils/foliatura.ts`, constantes `constants/foliatura.ts`;
+  `GET|PUT /foliatura`; pestaña «Libro y folios» de `/admin/enrollments?pestana=libro`, componente `ConfiguracionFoliatura`). Antes la máscara `L{libro}-F{folio:6}-{año}` y el libro 1 estaban escritos en `folio.service` (se eliminó) y el colegio
+  con historia no tenía dónde decir en qué folio iba. **Esquema ANUAL**: el libro se llama como la vigencia y el folio arranca en 1 cada año. **Esquema CONTINUO**: el libro y el folio siguen el archivo físico del colegio sin reiniciar al cambiar de año.
+  Campos: esquema, **libro actual** (en el anual es la vigencia de la que se fija el último folio), **último folio registrado en físico** (el siguiente es este +1; un libro nuevo empieza en 0), **capacidad por libro** (opcional, solo
+  continuo: al llenarse se abre el libro siguiente con el folio en 1, como las actas de grado con `folios_por_libro_actas`) y **máscara** con `{libro}`, `{folio:N}` y `{año}` (debe llevar `{libro}` y `{folio}`: sin ellos dos libros darían el mismo
+  código, que es único; el código no pasa de 20 caracteres). Edita ADMIN y SECRETARIA; COORDINADOR solo ve (el servicio lo vuelve a comprobar).
+  - **Los folios salen de `contadores` (último folio por libro) con una sola actualización atómica** dentro de la transacción de la matrícula (`asignarFolio`): sin huecos si se deshace, sin repetidos en paralelo, y el libro lleno se abre solo. Un folio
+    ya usado por una matrícula anterior se salta. Como el par (libro, folio) nunca se repite, **el índice único no cambia** (ya no hace falta incluir el año). `numero_libro` desapareció de los cuerpos de `POST /enrollments` y
+    `PATCH /enrollments/:id/status`: la casilla manual de «Libro» ya no existe.
+  - **La configuración se crea antes de abrir la transacción** (`asegurarConfiguracion`): dentro, dos primeras matrículas a la vez chocarían y la lectura de la transacción no vería un documento creado después de abrirla.
+  - **Nace con valores de partida sin confirmar** (`confirmada: false`; la pantalla y Matrículas avisan hasta que alguien la guarda): una instalación sin folios, anual; una con folios ya asentados sigue **exactamente donde iba** (continuo, mismo libro,
+    mismo código). No bloquea matricular a propósito (se rompería lo existente), pero un colegio con historia debe configurarla antes de la primera matrícula: los folios ya asentados no se renumeran.
+  - **Cambios con folios ya asentados**: piden motivo (≥ 10 caracteres, queda en auditoría `FOLIATURA_CONFIGURADA`), el último folio no puede quedar por debajo del mayor emitido en ese libro, y el continuo no vuelve a un libro anterior al último emitido.
+    Cambiar la máscara solo afecta a los folios nuevos; lo asentado no se reescribe.
+  - **Pruebas:** `tests/foliatura.test.ts` (máscara, validación, siguiente folio) y `tests/integracion/foliatura.int.test.ts` (partida, año nuevo, punto de partida 24/187, capacidad, formalizar, datos previos, rollback, paralelo, permisos).
+  - **Pendiente, a propósito:** el importador del SIMAT con «migración histórica» que conserve el folio del archivo; el PDF imprimible del libro.
 - **El folio se asigna al legalizar la matrícula, no al preinscribir**: `Enrollment.folio_matricula`,
   `numero_libro` y `numero_folio` son `null` mientras la matrícula está `PREINSCRITO` (así un aspirante que
   desiste no deja huecos en el consecutivo oficial). Se generan en `updateEnrollmentStatus` en la transición
   `PREINSCRITO` → `MATRICULADO_CONDICIONAL|DEFINITIVO`, dentro de la misma transacción del cambio de estado
-  (rollback si algo falla). `createEnrollment` (matrícula directa, ya matriculada) lo asigna al crearla.
+  (rollback si algo falla). `createEnrollment` (matrícula directa, ya matriculada) lo asigna al crearla. El libro y el folio los decide la configuración de foliatura (arriba), nunca quien matricula.
 - Reglas: la condicional exige `fecha_limite_compromiso`; una matrícula con folio no vuelve a `PREINSCRITO`;
   retirar/anular una ya legalizada conserva su folio (es un asiento del libro). Invariante en el modelo: todo
   `MATRICULADO_*` tiene folio. Los índices únicos de folio son parciales (ignoran `null`).
@@ -1318,7 +1334,7 @@ Todo vive en **su propia carpeta**: `backend/src/modulos/predictivo/` (rutas `/p
   Es informativo: no se anula nada automáticamente al vencer.
 - Nunca asumir que `folio_matricula` es un string: en frontend y PDFs manejar `null`.
 - Bases anteriores a este cambio: `npm run migrate:folio-al-matricular` (libera folios de preinscritos, reemplaza
-  los índices y reajusta el contador; un hueco en medio del libro solo se reporta, no se renumera).
+  los índices y reajusta el contador heredado `MAT-…`, que ya no lee nadie: el siguiente folio sale de la configuración de foliatura, que parte de los folios reales; un hueco en medio del libro solo se reporta, no se renumera).
 
 ### Una matrícula viva por estudiante y año (M04)
 

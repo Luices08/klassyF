@@ -18,7 +18,6 @@ export const createEnrollment: ValidationSchema = {
     tipo_ingreso: Joi.string()
       .valid(...TIPOS_INGRESO)
       .required(),
-    numero_libro: Joi.number().integer().min(1),
     estado_inicial: Joi.string().valid('MATRICULADO_CONDICIONAL', 'MATRICULADO_DEFINITIVO'),
     documentacion_completa: Joi.boolean(),
     // Los documentos que secretaría tuvo en la mano: el estado (definitiva o condicional) sale de aquí.
@@ -64,8 +63,7 @@ export const updateStatus: ValidationSchema = {
       .valid(...ESTADOS_MATRICULA)
       .required(),
     motivo: Joi.string().allow(''),
-    // Solo se usan al formalizar (PREINSCRITO -> MATRICULADO_*), que es cuando se asigna el folio.
-    numero_libro: Joi.number().integer().min(1),
+    // Solo se usa al formalizar (PREINSCRITO -> MATRICULADO_*). El libro y el folio los asigna la configuración del Libro de Matrícula.
     fecha_limite_compromiso: Joi.date(),
   }),
 };

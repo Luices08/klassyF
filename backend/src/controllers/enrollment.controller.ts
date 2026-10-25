@@ -68,13 +68,13 @@ interface UpdateStatusBody extends FormalizacionOpciones {
 }
 
 export const updateStatus = catchAsync<EnrollmentParams, unknown, UpdateStatusBody>(async (req, res) => {
-  const { estado, motivo, numero_libro, fecha_limite_compromiso } = req.body;
+  const { estado, motivo, fecha_limite_compromiso } = req.body;
   const enrollment = await enrollmentService.updateEnrollmentStatus(
     req.params.id,
     estado,
     motivo,
     { id: req.user!._id },
-    { numero_libro, fecha_limite_compromiso }
+    { fecha_limite_compromiso }
   );
   res.status(200).json({ success: true, data: enrollment });
 });

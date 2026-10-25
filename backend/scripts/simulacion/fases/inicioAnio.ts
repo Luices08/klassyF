@@ -39,12 +39,6 @@ export interface ChecklistItem {
   estado: string;
 }
 
-/**
- * Cada año lectivo abre un libro de matrícula nuevo. El índice único de folio es (libro, folio) sin el año y el consecutivo de folios
- * reinicia cada año: con el libro 1 por defecto, la primera matrícula del segundo año choca con la del primero.
- */
-export const libroDelAnio = (ctx: ContextoFase, anio: number): number => anio - (ctx.config.anios[0] as number) + 1;
-
 const MAX_HIJOS_POR_FAMILIA = 3;
 const RH = ['O+', 'O+', 'O+', 'A+', 'A+', 'B+', 'O-', 'AB+'];
 
@@ -186,7 +180,6 @@ export async function matricularGrupo(
       group_id: groupId,
       academic_year_id: anioId,
       tipo_ingreso: tipoIngreso,
-      numero_libro: libroDelAnio(ctx, anio),
       fecha_limite_compromiso: sumarDias(diaDelAnio(anio, config.calendario.periodos[0]?.inicio ?? '02-01'), 30).toISOString(),
       ...(tipoIngreso === 'NUEVO' || tipoIngreso === 'TRASLADO' ? { ultimo_grado_aprobado: grado - 1 } : {}),
     });

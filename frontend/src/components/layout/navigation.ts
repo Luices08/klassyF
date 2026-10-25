@@ -16,6 +16,7 @@ import {
   HomeIcon,
   InboxIcon,
   LayersIcon,
+  PaletteIcon,
   SlidersIcon,
   UserIcon,
   MegaphoneIcon,
@@ -51,6 +52,7 @@ export const NAV_ITEMS: NavItem[] = [
   { to: '/noticias', label: 'Noticias y eventos', icon: CalendarIcon },
   { to: '/mi-cuenta', label: 'Mi cuenta', icon: UserIcon, soloEncabezado: true },
   { to: '/admin/setup', label: 'Configuración institucional', icon: SlidersIcon, roles: STRUCTURAL_ADMINS },
+  { to: '/admin/sitio-publico', label: 'Sitio público', icon: PaletteIcon, roles: STRUCTURAL_ADMINS },
   { to: '/admin/sedes', label: 'Sedes y jornadas', icon: BuildingIcon, roles: STRUCTURAL_ADMINS },
   // Consulta para todos los roles; solo ADMIN/COORDINADOR ven los controles de gestion dentro de la pagina.
   { to: '/anio-lectivo', label: 'Año lectivo', icon: CalendarIcon },
@@ -131,7 +133,7 @@ export const GRUPOS_NAV: GrupoNav[] = [
     clave: 'institucion',
     label: 'Institución',
     icon: BuildingIcon,
-    rutas: ['/admin/setup', '/admin/sedes', '/anio-lectivo', '/admin/grades', '/admin/users'],
+    rutas: ['/admin/setup', '/admin/sitio-publico', '/admin/sedes', '/anio-lectivo', '/admin/grades', '/admin/users'],
   },
   {
     clave: 'academico',

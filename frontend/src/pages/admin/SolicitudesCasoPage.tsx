@@ -50,9 +50,10 @@ export function SolicitudesCasoPage() {
                 <tr key={s._id}>
                   <Td>{formatoFechaCalendario(s.fecha_hecho)}</Td>
                   <Td className="max-w-xs">
-                    {s.gravedad ? <TipoSituacionBadge value={s.gravedad} /> : <Chip tone="red">Reporte urgente</Chip>}
+                    {s.gravedad ? <TipoSituacionBadge value={s.gravedad} /> : <Chip tone="red">Reporte urgente</Chip>}{' '}
+                    {s.gravedad && s.gravedad !== 'I' && <Chip tone="red">Urgente</Chip>}
                     <span className="mt-1 block text-sm">
-                      {s.falta ? `${s.falta.codigo} · ${s.falta.descripcion}` : 'Sin tipificar: lo define coordinación al abrir el caso.'}
+                      {s.falta ? `${s.falta.codigo} · ${s.falta.descripcion}` : 'Sin falta del manual: lo define coordinación al abrir el caso.'}
                     </span>
                     {s.solicitada_por && <span className="block text-xs text-muted">Reporta: {s.solicitada_por}</span>}
                   </Td>

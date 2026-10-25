@@ -68,8 +68,8 @@ export function esVisibleParaEstudiante(obs: ObservacionParaVisibilidad & { visi
 
 // --- Reglas de contenido de una falta (por gravedad) ---
 
-/** Las faltas Tipo II y III no las tipifica ni las cierra el docente: las reporta como situación urgente y coordinación abre el caso. */
-export const MENSAJE_FALTA_GRAVE = 'Una situación de gravedad II o III no se registra como falta: usa el reporte urgente y coordinación de convivencia abre el caso.';
+/** Una falta Tipo II o III no queda en el Observador del estudiante: se envía a coordinación de convivencia (reporte a coordinación) y ella abre el caso. */
+export const MENSAJE_FALTA_GRAVE = 'Una falta de gravedad II o III no se registra como falta leve: se envía a coordinación de convivencia, que abre el caso.';
 
 /** Qué exige el registro de una falta Tipo I (antecedente pedagógico): los hechos y, si se escala, nada más. */
 export function problemasDeFalta(gravedad: TipoSituacion, d: { hechos: string }): string[] {

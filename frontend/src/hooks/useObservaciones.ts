@@ -258,7 +258,7 @@ export function useRegistrarObservacion() {
   });
 }
 
-/** Una falta Tipo I (leve). Lo grave no se registra como falta: se reporta como situación urgente. */
+/** Una falta Tipo I (leve). Lo grave (II o III) se envía a coordinación con `ReporteUrgenteInput`. */
 export interface RegistrarFaltaInput {
   falta_id: string;
   fecha_hecho: string;
@@ -284,8 +284,9 @@ export function useRegistrarFalta() {
   });
 }
 
-/** El docente no tipifica ni asigna roles: cuenta qué pasó, a quiénes nombra y qué contención aplicó. */
+/** Una situación grave (Tipo II o III): la falta del manual que identifica el docente, qué pasó, a quiénes nombra y qué contención aplicó. Los roles los asigna coordinación. */
 export interface ReporteUrgenteInput {
+  falta_id?: string;
   fecha_hecho: string;
   hechos: string;
   acciones_contencion: string;
@@ -308,6 +309,7 @@ export interface ReporteUrgentePropio {
   hechos: string;
   acciones_contencion: string;
   estudiantes: string[];
+  falta: { codigo: string; descripcion: string; gravedad: TipoSituacion } | null;
   estado: 'PENDIENTE' | 'DESCARTADA' | 'CONVERTIDA';
   motivo_resolucion: string;
   caso: { codigo: string; estado: string } | null;

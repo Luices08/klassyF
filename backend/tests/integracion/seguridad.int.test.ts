@@ -168,21 +168,21 @@ describe('Seguridad de convivencia (capa HTTP)', () => {
     expect(await Observacion.countDocuments()).toBe(0);
   });
 
-  it('un reporte urgente ignora lo que el cliente intente fijar: la gravedad, los roles, el estado y el solicitante los decide el servidor', async () => {
+  it('un reporte grave ignora lo que el cliente intente fijar: la gravedad sale de la falta del manual, y los roles, el estado y el solicitante los decide el servidor', async () => {
     const respuesta = await pedir('POST', '/observaciones/reportes-urgentes', e.docenteDeClase, {
       fecha_hecho: hoy(),
       hechos: 'Agresión física durante el descanso.',
       acciones_contencion: 'Se separó a los estudiantes.',
       estudiantes_ids: [String(e.estudiante._id)],
       gravedad: 'I',
-      falta_id: e.faltaI,
+      falta_id: e.faltaIII,
       estado: 'DESCARTADA',
       solicitada_por: ID,
       caso_id: ID,
     });
     expect(respuesta.estado).toBe(201);
     const solicitud = await SolicitudCaso.findOne();
-    expect(solicitud).toMatchObject({ gravedad: null, falta: null, estado: 'PENDIENTE', caso_id: null });
+    expect(solicitud).toMatchObject({ gravedad: 'III', falta: { codigo: '4.3' }, estado: 'PENDIENTE', caso_id: null });
     expect(String(solicitud!.solicitada_por)).toBe(String(e.docenteDeClase._id));
     expect(solicitud!.involucrados[0]!.rol).toBeNull();
     expect(await Observacion.countDocuments()).toBe(0);

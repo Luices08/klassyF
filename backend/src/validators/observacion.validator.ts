@@ -88,9 +88,10 @@ export const registrarFalta: ValidationSchema = {
   }),
 };
 
-// El docente no tipifica ni asigna roles: solo cuenta qué pasó, a quiénes nombra y qué contención aplicó.
+// Una situación grave (Tipo II o III): el docente elige la falta del manual y cuenta qué pasó y qué contención aplicó; los roles de cada estudiante los asigna coordinación.
 export const reportarSituacionGrave: ValidationSchema = {
   body: Joi.object({
+    falta_id: objectId,
     fecha_hecho: fechaDeCalendario.required(),
     hechos: descripcion.min(1).required(),
     acciones_contencion: Joi.string().trim().min(5).max(1000).required(),

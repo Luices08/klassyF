@@ -346,8 +346,8 @@ describe('M14 observaciones y faltas (con base de datos)', () => {
       expect(await SolicitudCaso.countDocuments()).toBe(1);
     });
 
-    it('lo grave no se registra como falta: el docente lo reporta como situación urgente', async () => {
-      await expect(registrarFalta(e.docenteDeClase, { falta_id: e.faltaII })).rejects.toMatchObject({ statusCode: 400, message: expect.stringContaining('reporte urgente') });
+    it('lo grave no se registra como falta leve: se envía a coordinación de convivencia', async () => {
+      await expect(registrarFalta(e.docenteDeClase, { falta_id: e.faltaII })).rejects.toMatchObject({ statusCode: 400, message: expect.stringContaining('coordinación de convivencia') });
       await expect(registrarFalta(e.coordConvivencia, { falta_id: e.faltaIII })).rejects.toMatchObject({ statusCode: 400 });
       expect(await Observacion.countDocuments()).toBe(0);
       expect(await SolicitudCaso.countDocuments()).toBe(0);
@@ -460,6 +460,25 @@ describe('M14 observaciones y faltas (con base de datos)', () => {
       expect((await solicitudes.bandejaDeSolicitudes(e.admin, PAGINA)).total).toBe(1);
       expect(await Observacion.countDocuments()).toBe(0);
       expect(await AuditLog.countDocuments({ accion: 'REPORTE_URGENTE_REGISTRADO' })).toBe(1);
+    });
+
+    it('con la falta del manual que eligió el docente, la solicitud llega con su gravedad y su falta como referencia, y sin roles', async () => {
+      await reportar(e.docenteDeClase, { falta_id: e.faltaIII });
+      const [solicitud] = (await solicitudes.bandejaDeSolicitudes(e.coordConvivencia, PAGINA)).data;
+      expect(solicitud).toMatchObject({ gravedad: 'III', falta: expect.objectContaining({ codigo: '4.3' }) });
+      expect(solicitud!.involucrados.map((i) => i.rol)).toEqual([null, null]);
+      // Sigue sin dejar antecedente en el Observador: lo grave solo cuenta cuando hay una decisión en firme.
+      expect(await Observacion.countDocuments()).toBe(0);
+      expect(await Notificacion.countDocuments({ usuario_id: e.coordConvivencia._id, evento: 'REPORTE_URGENTE' })).toBe(1);
+
+      const [mio] = (await observaciones.misReportesUrgentes(e.docenteDeClase, PAGINA)).data;
+      expect(mio).toMatchObject({ falta: { codigo: '4.3', gravedad: 'III' } });
+    });
+
+    it('la falta de un reporte debe ser Tipo II o III y estar activa', async () => {
+      await expect(reportar(e.docenteDeClase, { falta_id: e.faltaI })).rejects.toMatchObject({ statusCode: 400, message: expect.stringContaining('falta leve') });
+      await expect(reportar(e.docenteDeClase, { falta_id: String(new Types.ObjectId()) })).rejects.toMatchObject({ statusCode: 400 });
+      expect(await SolicitudCaso.countDocuments()).toBe(0);
     });
 
     it('alerta de inmediato a coordinación de convivencia de la sede (agrupada) y no a la de otra sede', async () => {

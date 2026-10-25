@@ -2,7 +2,8 @@ import { type FormEvent, useState } from 'react';
 import { Alert, errorMessage } from '../ui/Alert';
 import { Chip } from '../ui/Badge';
 import { Drawer } from '../ui/Drawer';
-import { Input, Select, Textarea } from '../ui/Field';
+import { Input, Textarea } from '../ui/Field';
+import { SelectBuscable } from '../ui/SelectBuscable';
 import { useAuth } from '../../context/AuthContext';
 import {
   type CatalogoConvivencia,
@@ -107,13 +108,14 @@ function Formulario({ onClose, catalogo = SIN_CATALOGO, estudiantes = [], observ
 
       {!enmienda && (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <Select label="Tipo de observación" value={tipoId} onChange={(e) => setTipoId(e.target.value)}>
-            {catalogo.tipos.map((t) => (
-              <option key={t._id} value={t._id}>
-                {t.nombre}
-              </option>
-            ))}
-          </Select>
+          <SelectBuscable
+            label="Tipo de observación"
+            required
+            value={tipoId}
+            onChange={setTipoId}
+            placeholder="Busca el tipo…"
+            opciones={catalogo.tipos.map((t) => ({ value: t._id, label: t.nombre }))}
+          />
           <Input label="Fecha del hecho" type="date" max={hoyLocal()} value={fecha} onChange={(e) => setFecha(e.target.value)} required />
         </div>
       )}

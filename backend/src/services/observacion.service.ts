@@ -9,7 +9,7 @@ import { ROLES } from '../constants/roles';
 import AcademicYear, { AcademicYearDocument } from '../models/academicYear.model';
 import CasoConvivencia from '../models/casoConvivencia.model';
 import Enrollment from '../models/enrollment.model';
-import FaltaConvivencia from '../models/faltaConvivencia.model';
+import FaltaConvivencia, { FaltaConvivenciaDocument } from '../models/faltaConvivencia.model';
 import Group, { IGroup } from '../models/group.model';
 import Observacion, { IObservacion, ObservacionDocument } from '../models/observacion.model';
 import SolicitudCaso, { ISolicitudCaso } from '../models/solicitudCaso.model';
@@ -473,6 +473,8 @@ export async function registrarFalta(input: RegistrarFaltaInput, usuario: UserDo
 // --- Reporte urgente de una situación grave (Tipo II/III) ---
 
 export interface ReporteUrgenteInput {
+  /** La falta del manual (Tipo II o III) que el docente identifica. Sin ella el reporte llega sin tipificar y coordinación lo define al abrir el caso. */
+  falta_id?: string;
   fecha_hecho: string;
   hechos: string;
   /** Lo que se hizo en el momento para proteger a las personas (llevar a enfermería, separar a los estudiantes…). */
@@ -482,10 +484,10 @@ export interface ReporteUrgenteInput {
 }
 
 /**
- * El docente que atiende una emergencia no tipifica ni asigna roles: cuenta qué pasó, a quiénes involucra y qué contención aplicó. Queda una
- * solicitud de caso (sin falta, gravedad ni roles) y una alerta crítica a coordinación de convivencia de la sede, que abre el caso, lo tipifica
- * y asigna a cada estudiante su rol. **No deja antecedente en el Observador** de nadie: eso evita estigmatizar a una víctima o a un estudiante
- * que luego resulte ajeno al hecho.
+ * Una situación grave (Tipo II o III): el docente identifica la falta del manual (opcional si es una emergencia y no la tiene a mano), cuenta qué pasó, a quiénes
+ * involucra y qué contención aplicó. Queda una solicitud de caso con esa falta y su gravedad **como referencia** (sin roles) y una alerta crítica a coordinación de
+ * convivencia de la sede, que abre el caso, confirma o cambia el tipo y asigna a cada estudiante su rol. **No deja antecedente en el Observador** de nadie: eso evita
+ * estigmatizar a una víctima o a un estudiante que luego resulte ajeno al hecho, y lo grave solo cuenta como falta cuando hay una decisión en firme.
  */
 export async function reportarSituacionGrave(input: ReporteUrgenteInput, usuario: UserDocument, ip?: string | null) {
   const anio = await anioEnCurso();
@@ -496,6 +498,14 @@ export async function reportarSituacionGrave(input: ReporteUrgenteInput, usuario
   const problemas = problemasDeReporteUrgente({ hechos, acciones_contencion: accionesContencion, cantidad_estudiantes: estudiantesIds.length });
   if (problemas.length > 0) throw new ApiError(400, problemas.join(' '));
 
+  let falta: FaltaConvivenciaDocument | null = null;
+  if (input.falta_id) {
+    const institucion = await obtenerInstitucionConvivencia();
+    falta = Types.ObjectId.isValid(input.falta_id) ? await FaltaConvivencia.findOne({ _id: input.falta_id, institucion_id: institucion._id, estado: ESTADO_ACTIVO }) : null;
+    if (!falta) throw new ApiError(400, 'La falta no existe o está inactiva.');
+    if (!esSituacionGrave(falta.gravedad)) throw new ApiError(400, 'Una falta Tipo I se registra como falta leve; el reporte a coordinación es para lo grave (Tipo II o III).');
+  }
+
   // El docente solo nombra estudiantes de sus grupos; si hay otros involucrados, los describe en los hechos y convivencia los agrega al abrir el caso.
   const resueltos = await resolverEstudiantes(usuario, estudiantesIds, 'REGISTRAR_FALTA', fecha, anio);
   const primero = resueltos[0] as EstudianteResuelto;
@@ -504,8 +514,8 @@ export async function reportarSituacionGrave(input: ReporteUrgenteInput, usuario
     sede_id: primero.contexto.grupo.sede_id,
     academic_year_id: anio._id,
     fecha_hecho: fecha,
-    gravedad: null,
-    falta: null,
+    gravedad: falta?.gravedad ?? null,
+    falta: falta ? { falta_id: falta._id, codigo: falta.codigo, descripcion: falta.descripcion } : null,
     hechos,
     acciones_contencion: accionesContencion,
     involucrados: resueltos.map((r) => ({
@@ -525,7 +535,8 @@ export async function reportarSituacionGrave(input: ReporteUrgenteInput, usuario
 
 /** Lo que el docente reportó y qué pasó con ello: el estado de su reporte y, si ya hay caso, su código y estado (nunca el expediente). */
 export async function misReportesUrgentes(usuario: UserDocument, paginacion: Paginacion) {
-  const filtro = { solicitada_por: usuario._id, falta: null };
+  // Lo grave: las faltas Tipo I que el docente escala son suyas también, pero van en «Mis registros».
+  const filtro = { solicitada_por: usuario._id, gravedad: { $ne: 'I' } };
   const [total, solicitudes] = await Promise.all([
     SolicitudCaso.countDocuments(filtro),
     SolicitudCaso.find(filtro)
@@ -551,6 +562,7 @@ export async function misReportesUrgentes(usuario: UserDocument, paginacion: Pag
         hechos: s.hechos,
         acciones_contencion: s.acciones_contencion,
         estudiantes: s.involucrados.map((i) => nombre.get(String(i.student_id)) ?? ''),
+        falta: s.falta ? { codigo: s.falta.codigo, descripcion: s.falta.descripcion, gravedad: s.gravedad } : null,
         estado: s.estado,
         motivo_resolucion: s.resolucion?.motivo ?? '',
         caso: caso ? { codigo: caso.codigo, estado: caso.estado } : null,

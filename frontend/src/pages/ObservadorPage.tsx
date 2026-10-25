@@ -4,7 +4,6 @@ import { FaltaDrawer } from '../components/convivencia/FaltaDrawer';
 import { HistorialObservaciones } from '../components/convivencia/HistorialObservaciones';
 import { ChipsObservacion } from '../components/convivencia/ObservacionesTimeline';
 import { ObservacionDrawer } from '../components/convivencia/ObservacionDrawer';
-import { ReporteUrgenteDrawer } from '../components/convivencia/ReporteUrgenteDrawer';
 import { Alert, errorMessage } from '../components/ui/Alert';
 import { Chip } from '../components/ui/Badge';
 import { Button } from '../components/ui/Button';
@@ -46,7 +45,7 @@ export function ObservadorPage() {
         items={[
           { key: 'registrar', label: 'Registrar' },
           { key: 'mias', label: 'Mis registros' },
-          ...(puedeReportar ? [{ key: 'reportes', label: 'Mis reportes urgentes' }] : []),
+          ...(puedeReportar ? [{ key: 'reportes', label: 'Mis faltas graves' }] : []),
         ]}
         active={tab}
         onChange={setTab}
@@ -78,7 +77,6 @@ function RegistrarTab({ esDocente, puedeRegistrarFalta }: { esDocente: boolean; 
   const [seleccion, setSeleccion] = useState<Set<string>>(new Set());
   const [registrando, setRegistrando] = useState(false);
   const [registrandoFalta, setRegistrandoFalta] = useState(false);
-  const [reportando, setReportando] = useState(false);
   const [aviso, setAviso] = useState<string | null>(null);
   const [historialDe, setHistorialDe] = useState<EstudianteObservable | null>(null);
 
@@ -107,14 +105,9 @@ function RegistrarTab({ esDocente, puedeRegistrarFalta }: { esDocente: boolean; 
         action={
           <div className="flex flex-wrap gap-2">
             {puedeRegistrarFalta && (
-              <>
-                <Button variant="soft-danger" disabled={elegidos.length === 0} onClick={() => setReportando(true)}>
-                  Reporte urgente
-                </Button>
-                <Button variant="outline" disabled={elegidos.length === 0} onClick={() => setRegistrandoFalta(true)}>
-                  Registrar falta leve
-                </Button>
-              </>
+              <Button variant="outline" disabled={elegidos.length === 0} onClick={() => setRegistrandoFalta(true)}>
+                Registrar falta
+              </Button>
             )}
             <Button disabled={elegidos.length === 0} onClick={() => setRegistrando(true)}>
               Registrar observación{elegidos.length > 0 ? ` (${elegidos.length})` : ''}
@@ -207,19 +200,16 @@ function RegistrarTab({ esDocente, puedeRegistrarFalta }: { esDocente: boolean; 
           catalogo={catalogo.data}
           estudiantes={elegidos}
           onRegistrada={(r) =>
-            setAviso(r.escalada ? 'La falta quedó registrada y se escaló a coordinación de convivencia.' : 'La falta quedó registrada en el Observador.')
+            setAviso(
+              r.grave
+                ? 'La falta se envió a coordinación de convivencia, que abre el caso. Puedes seguir su estado en «Mis faltas graves».'
+                : r.escalada
+                  ? 'La falta quedó registrada y se escaló a coordinación de convivencia.'
+                  : 'La falta quedó registrada en el Observador.'
+            )
           }
         />
       )}
-      <ReporteUrgenteDrawer
-        open={reportando}
-        onClose={() => {
-          setReportando(false);
-          setSeleccion(new Set());
-        }}
-        estudiantes={elegidos}
-        onReportado={() => setAviso('El reporte se envió a coordinación de convivencia, que abre el caso. Puedes seguir su estado en «Mis reportes urgentes».')}
-      />
       {catalogo.data && (
         <ObservacionDrawer
           open={registrando}
@@ -258,7 +248,7 @@ function MisReportesTab() {
 
   return (
     <Card>
-      <CardHeader title="Mis reportes urgentes" subtitle="Las situaciones graves que enviaste a coordinación de convivencia y en qué van." />
+      <CardHeader title="Mis faltas graves" subtitle="Las faltas Tipo II y III que enviaste a coordinación de convivencia y en qué van." />
       <Table>
         <TableHead>
           <tr>
@@ -274,6 +264,11 @@ function MisReportesTab() {
               <Td>{formatoFechaCalendario(r.fecha_hecho)}</Td>
               <Td>{r.estudiantes.join(', ')}</Td>
               <Td className="max-w-md">
+                {r.falta && (
+                  <p className="mb-1 text-xs font-semibold text-ink">
+                    Tipo {r.falta.gravedad} · {r.falta.codigo} · {r.falta.descripcion}
+                  </p>
+                )}
                 <p className="whitespace-pre-line">{r.hechos}</p>
                 <p className="mt-1 whitespace-pre-line text-xs text-muted">Contención: {r.acciones_contencion}</p>
               </Td>
@@ -284,7 +279,7 @@ function MisReportesTab() {
               </Td>
             </tr>
           ))}
-          {data.length === 0 && <EmptyRow colSpan={4}>Todavía no has enviado reportes urgentes.</EmptyRow>}
+          {data.length === 0 && <EmptyRow colSpan={4}>Todavía no has enviado faltas graves a coordinación.</EmptyRow>}
         </TableBody>
       </Table>
       {paginas > 1 && (

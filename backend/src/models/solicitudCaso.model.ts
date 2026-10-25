@@ -19,15 +19,15 @@ export interface IInvolucradoSolicitud {
 }
 
 /**
- * Lo que el docente envía a convivencia: un **reporte urgente** (hechos y acciones de contención; sin falta, gravedad ni roles: tipificar
- * es de coordinación) o una falta Tipo I que decide escalar. Es el traspaso de M14 a M15; el expediente formal lo abre coordinación de
+ * Lo que el docente envía a convivencia: una **situación grave** (la falta del manual que identifica, Tipo II o III, hechos y acciones de contención; sin roles:
+ * asignarlos y confirmar el tipo es de coordinación) o una falta Tipo I que decide escalar. Es el traspaso de M14 a M15; el expediente formal lo abre coordinación de
  * convivencia. Solo convivencia la lee (nombres de otros menores, hechos sin tipificar).
  */
 export interface ISolicitudCaso {
   sede_id: Types.ObjectId;
   academic_year_id: Types.ObjectId;
   fecha_hecho: Date;
-  /** null en un reporte urgente: la gravedad la fija quien abre el caso. */
+  /** La del manual que eligió el docente; null solo en un reporte sin falta (emergencia). Quien abre el caso confirma o cambia el tipo. */
   gravedad: TipoSituacion | null;
   falta: { falta_id: Types.ObjectId; codigo: string; descripcion: string } | null;
   hechos: string;

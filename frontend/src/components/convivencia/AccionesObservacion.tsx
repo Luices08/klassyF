@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { Button } from '../ui/Button';
+import { IconButton } from '../ui/IconButton';
+import { BanIcon, CalendarIcon, MessageCircleIcon, PencilIcon, TrashIcon } from '../ui/icons';
 import { useAuth } from '../../context/AuthContext';
 import type { ObservacionVista } from '../../hooks/useObservaciones';
 import { AnularObservacionDrawer } from './AnularObservacionDrawer';
@@ -10,7 +11,7 @@ import { SeguimientoObservacionDrawer, type ModoSeguimiento } from './Seguimient
 /** Acciones sobre un registro del Observador. El servidor valida el permiso, el plazo y el estado de cada una. */
 export function AccionesObservacion({ observacion }: { observacion: ObservacionVista }) {
   const rol = useAuth().user?.rol;
-  const [enmendando, setEnmendando] = useState(false);
+  const [editando, setEditando] = useState(false);
   const [anulando, setAnulando] = useState(false);
   const [eliminando, setEliminando] = useState(false);
   const [seguimiento, setSeguimiento] = useState<ModoSeguimiento | null>(null);
@@ -28,32 +29,18 @@ export function AccionesObservacion({ observacion }: { observacion: ObservacionV
     (!observacion.compromiso_estado || observacion.compromiso_estado === 'PENDIENTE');
 
   return (
-    <span className="flex flex-wrap justify-end gap-2">
-      <Button variant="soft-edit" className="px-3 py-1 text-xs" onClick={() => setSeguimiento('nota')}>
-        Nota de seguimiento
-      </Button>
-      {puedeCitar && (
-        <Button variant="soft-edit" className="px-3 py-1 text-xs" onClick={() => setSeguimiento('citacion')}>
-          Registrar citación
-        </Button>
-      )}
+    <span className="flex justify-end gap-2">
+      <IconButton tone="edit" label="Nota de seguimiento" icon={<MessageCircleIcon />} onClick={() => setSeguimiento('nota')} />
+      {puedeCitar && <IconButton tone="edit" label="Registrar citación" icon={<CalendarIcon />} onClick={() => setSeguimiento('citacion')} />}
       {puedeCorregir && (
         <>
-          <Button variant="soft-edit" className="px-3 py-1 text-xs" onClick={() => setEnmendando(true)}>
-            Editar
-          </Button>
-          {sinUsar && (
-            <Button variant="soft-danger" className="px-3 py-1 text-xs" onClick={() => setEliminando(true)}>
-              Eliminar
-            </Button>
-          )}
-          <Button variant="soft-danger" className="px-3 py-1 text-xs" onClick={() => setAnulando(true)}>
-            Anular
-          </Button>
+          <IconButton tone="edit" label="Editar" icon={<PencilIcon />} onClick={() => setEditando(true)} />
+          {sinUsar && <IconButton tone="danger" label="Eliminar" icon={<TrashIcon />} onClick={() => setEliminando(true)} />}
+          <IconButton tone="neutral" label="Anular" icon={<BanIcon />} onClick={() => setAnulando(true)} />
         </>
       )}
 
-      <ObservacionDrawer open={enmendando} onClose={() => setEnmendando(false)} observacion={observacion} />
+      <ObservacionDrawer open={editando} onClose={() => setEditando(false)} observacion={observacion} />
       <AnularObservacionDrawer observacion={anulando ? observacion : null} onClose={() => setAnulando(false)} />
       <EliminarObservacionDrawer observacion={eliminando ? observacion : null} onClose={() => setEliminando(false)} />
       <SeguimientoObservacionDrawer observacion={seguimiento ? observacion : null} modo={seguimiento ?? 'nota'} onClose={() => setSeguimiento(null)} />

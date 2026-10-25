@@ -74,7 +74,8 @@ function RegistrarTab({ esDocente, puedeRegistrarFalta }: { esDocente: boolean; 
   const [grupoId, setGrupoId] = useState('');
   const [busqueda, setBusqueda] = useState('');
   const estudiantes = useEstudiantesObservables({ group_id: grupoId || undefined, q: busqueda });
-  const [seleccion, setSeleccion] = useState<Set<string>>(new Set());
+  // La selección sobrevive al cambio de grupo y de búsqueda: un incidente puede ser entre estudiantes de grupos o grados distintos.
+  const [seleccion, setSeleccion] = useState<Map<string, EstudianteObservable>>(new Map());
   const [registrando, setRegistrando] = useState(false);
   const [registrandoFalta, setRegistrandoFalta] = useState(false);
   const [aviso, setAviso] = useState<string | null>(null);
@@ -84,13 +85,19 @@ function RegistrarTab({ esDocente, puedeRegistrarFalta }: { esDocente: boolean; 
   const grupoPorId = useMemo(() => new Map((grupos.data ?? []).map((g) => [g._id, g])), [grupos.data]);
   // El docente solo consulta el historial de los grupos que dirige; coordinación, el de sus sedes.
   const puedeVerHistorial = (e: EstudianteObservable) => !esDocente || Boolean(grupoPorId.get(e.group_id)?.es_director);
-  const elegidos = lista.filter((e) => seleccion.has(e.student_id));
+  const elegidos = [...seleccion.values()];
 
-  const alternar = (id: string) =>
+  const alternar = (estudiante: EstudianteObservable) =>
     setSeleccion((previa) => {
-      const siguiente = new Set(previa);
-      if (siguiente.has(id)) siguiente.delete(id);
-      else siguiente.add(id);
+      const siguiente = new Map(previa);
+      if (siguiente.has(estudiante.student_id)) siguiente.delete(estudiante.student_id);
+      else siguiente.set(estudiante.student_id, estudiante);
+      return siguiente;
+    });
+  const quitar = (id: string) =>
+    setSeleccion((previa) => {
+      const siguiente = new Map(previa);
+      siguiente.delete(id);
       return siguiente;
     });
 
@@ -101,7 +108,7 @@ function RegistrarTab({ esDocente, puedeRegistrarFalta }: { esDocente: boolean; 
     <Card>
       <CardHeader
         title="Estudiantes"
-        subtitle="Elige un grupo o busca por nombre o documento (mínimo 3 letras)."
+        subtitle="Elige un grupo o busca por nombre o documento (mínimo 3 letras). Puedes cambiar de grupo o de búsqueda sin perder a quienes ya elegiste."
         action={
           <div className="flex flex-wrap gap-2">
             {puedeRegistrarFalta && (
@@ -121,7 +128,6 @@ function RegistrarTab({ esDocente, puedeRegistrarFalta }: { esDocente: boolean; 
           value={grupoId}
           onChange={(id) => {
             setGrupoId(id);
-            setSeleccion(new Set());
           }}
           placeholder="Buscar grupo…"
           vacioLabel="Todos mis grupos (usa la búsqueda)"
@@ -129,6 +135,23 @@ function RegistrarTab({ esDocente, puedeRegistrarFalta }: { esDocente: boolean; 
         />
         <Input label="Buscar" value={busqueda} onChange={(e) => setBusqueda(e.target.value)} placeholder="Nombre o documento" />
       </div>
+      {elegidos.length > 0 && (
+        <div className="flex flex-wrap items-center gap-2 px-4 pb-4">
+          <span className="text-label text-body">Seleccionados ({elegidos.length}):</span>
+          {elegidos.map((s) => (
+            <span key={s.student_id} className="inline-flex items-center gap-1.5 rounded-full bg-primary-soft px-3 py-1 text-xs text-primary">
+              {s.apellido} {s.nombre} · {s.grupo}
+              <button type="button" className="font-semibold hover:text-ink" aria-label={`Quitar a ${s.nombre} ${s.apellido}`} onClick={() => quitar(s.student_id)}>
+                ×
+              </button>
+            </span>
+          ))}
+          <Button variant="secondary" className="px-3 py-1 text-xs" onClick={() => setSeleccion(new Map())}>
+            Quitar a todos
+          </Button>
+          {new Set(elegidos.map((s) => s.group_id)).size > 1 && <span className="text-xs text-muted">De grupos distintos: cada registro queda en el grupo de su estudiante.</span>}
+        </div>
+      )}
       {(grupos.data ?? []).length === 0 && (
         <div className="px-4 pb-4">
           <Alert tone="info">
@@ -165,7 +188,7 @@ function RegistrarTab({ esDocente, puedeRegistrarFalta }: { esDocente: boolean; 
                   aria-label={`Seleccionar a ${e.nombre} ${e.apellido}`}
                   className="h-4 w-4 rounded border-border text-primary focus:ring-primary"
                   checked={seleccion.has(e.student_id)}
-                  onChange={() => alternar(e.student_id)}
+                  onChange={() => alternar(e)}
                 />
               </Td>
               <Td>
@@ -195,7 +218,7 @@ function RegistrarTab({ esDocente, puedeRegistrarFalta }: { esDocente: boolean; 
           open={registrandoFalta}
           onClose={() => {
             setRegistrandoFalta(false);
-            setSeleccion(new Set());
+            setSeleccion(new Map());
           }}
           catalogo={catalogo.data}
           estudiantes={elegidos}
@@ -215,7 +238,7 @@ function RegistrarTab({ esDocente, puedeRegistrarFalta }: { esDocente: boolean; 
           open={registrando}
           onClose={() => {
             setRegistrando(false);
-            setSeleccion(new Set());
+            setSeleccion(new Map());
           }}
           catalogo={catalogo.data}
           estudiantes={elegidos}

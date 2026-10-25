@@ -91,7 +91,7 @@ function Formulario({ onClose, catalogo, estudiantes, onRegistrada }: Props) {
       open
       size="lg"
       title="Registrar falta"
-      subtitle={estudiantes.length === 1 ? `${estudiantes[0]?.nombre} ${estudiantes[0]?.apellido} · ${estudiantes[0]?.grupo}` : `${estudiantes.length} estudiantes`}
+      subtitle={estudiantes.length === 1 ? `${estudiantes[0]?.nombre} ${estudiantes[0]?.apellido} · ${estudiantes[0]?.grupo}` : `${estudiantes.length} estudiantes · ${[...new Set(estudiantes.map((s) => s.grupo))].join(', ')}`}
       onClose={onClose}
       onSubmit={guardar}
       submitLabel={grave ? 'Enviar a coordinación de convivencia' : tipo === 'I' && escalar ? 'Registrar y escalar a coordinación' : 'Registrar'}

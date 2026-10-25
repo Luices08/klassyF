@@ -338,6 +338,9 @@ Reglas que no se ven leyendo un solo archivo:
   varios estudiantes crea un registro por estudiante (`evento_id` común) en una transacción: todos o ninguno.
 - **Buscador propio** (`GET /observaciones/estudiantes`, `/grupos`): acotado a los grupos del docente (CLASE o dirección) o a las sedes del
   coordinador/orientador. No se abre `/students` a convivencia.
+  **Un incidente puede ser entre estudiantes de grupos o grados distintos**: la selección de la pantalla sobrevive al cambio de grupo y de búsqueda (chips «Seleccionados») y cada registro queda en el grupo de su estudiante. El
+  docente solo puede nombrar a quienes están en un grupo que dicta o dirige (otro estudiante es 404 y no se guarda nada a medias): a los demás los describe en los hechos y coordinación los agrega al abrir el caso, que acepta estudiantes de
+  cualquier grupo de su sede (`tests/integracion/incidenteEntreGrupos.int.test.ts`).
 - **Se audita también la lectura** (`CONVIVENCIA_HISTORIAL_CONSULTADO`, `..._OBSERVACIONES_PROPIAS_CONSULTADAS`). El `detalle` de la auditoría
   nunca lleva contenido (ni el motivo de una anulación, que queda en el registro).
 - **Seguimiento** (embebido en `Observacion`): `seguimientos[]` (notas), `compromiso_estado` (PENDIENTE → CUMPLIDO/INCUMPLIDO; "vencido" no es un

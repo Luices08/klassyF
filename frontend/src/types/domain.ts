@@ -503,7 +503,13 @@ export interface ChecklistItem {
   comentario: string | null;
   fecha_carga: string | null;
   revisado_por: string | { _id: string; nombre: string; apellido: string } | null;
+  /** Cuándo secretaría vio el original y lo dio por bueno sin archivo (quién: `revisado_por`). */
+  fecha_verificacion_fisica?: string | null;
 }
+
+/** Visto en físico, aprobado y todavía sin archivo en el sistema (espejo de `faltaDigitalizar` del backend: si cambia una, cambia la otra). */
+export const faltaDigitalizar = (c: Pick<ChecklistItem, 'estado' | 'archivo_path' | 'fecha_verificacion_fisica'>): boolean =>
+  c.estado === 'APROBADO' && !c.archivo_path && Boolean(c.fecha_verificacion_fisica);
 
 export const SITUACIONES_ESTUDIANTE = ['DISPONIBLE', 'MATRICULADO', 'REINGRESO', 'GRADUADO', 'USUARIO_INACTIVO'] as const;
 export type SituacionEstudiante = (typeof SITUACIONES_ESTUDIANTE)[number];

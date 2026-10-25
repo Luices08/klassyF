@@ -11,9 +11,11 @@ import {
   descargarDocumento,
   eliminarDocumentoChecklist,
   getEnrollment,
+  listarDocumentosPorDigitalizar,
   listarDocumentosPorRevisar,
   listarDocumentosPrevistos,
   listEnrollments,
+  marcarVerificacionFisica,
   situacionEstudiantes,
   estudiantesPorGrado,
   revisarDocumento,
@@ -43,6 +45,12 @@ router.get(
   listarDocumentosPorRevisar
 );
 router.get(
+  '/documentos-por-digitalizar',
+  checkRole(...STAFF_MATRICULAS),
+  validate(enrollmentValidator.listarDocumentosPorDigitalizar),
+  listarDocumentosPorDigitalizar
+);
+router.get(
   '/documentos-previstos',
   checkRole(...STAFF_MATRICULAS),
   validate(enrollmentValidator.listarDocumentosPrevistos),
@@ -59,6 +67,13 @@ router.post(
   validate(enrollmentValidator.cargarDocumento),
   subirDocumentoMatricula.single('file'),
   cargarDocumento
+);
+// Varios documentos a la vez («recibí todo lo obligatorio»); va con una ruta de un solo segmento después de `checklist` para no confundirse con `:tipoDocumento`.
+router.patch(
+  '/:id/checklist/verificacion-fisica',
+  checkRole(...STAFF_MATRICULAS),
+  validate(enrollmentValidator.marcarVerificacionFisica),
+  marcarVerificacionFisica
 );
 router.patch(
   '/:id/checklist/:tipoDocumento/revisar',

@@ -44,7 +44,10 @@ describe('M04: documentos de matrícula y paz y salvo de fin de año', () => {
       fecha_inicio: new Date(Date.UTC(actual.year + 1, 0, 1)),
       fecha_fin: new Date(Date.UTC(actual.year + 1, 11, 31)),
       estado: 'PLANIFICACION',
-      periodos: actual.periodos.map((p) => ({ ...p.toObject() })),
+      // Los periodos del año siguiente caen un año después: copiarlos tal cual los dejaba fuera del año lectivo.
+      periodos: actual.periodos.map((p) =>
+        Object.fromEntries(Object.entries(p.toObject()).map(([clave, valor]) => [clave, valor instanceof Date ? new Date(Date.UTC(valor.getUTCFullYear() + 1, valor.getUTCMonth(), valor.getUTCDate())) : valor]))
+      ),
     });
     anioSiguiente = String(siguiente._id);
     const grupo = await Group.create({
@@ -67,13 +70,19 @@ describe('M04: documentos de matrícula y paz y salvo de fin de año', () => {
     (await Enrollment.findById(id))!.checklist.find((c) => c.tipo_documento === 'PAZ_Y_SALVO_ANIO_ANTERIOR')!;
 
   describe('compuerta de la matrícula definitiva', () => {
-    it('una matrícula nueva no puede crearse como definitiva', async () => {
-      await expect(
-        createEnrollment(
-          { student_id: e.estudiante._id, group_id: grupoSiguiente, academic_year_id: anioSiguiente, tipo_ingreso: 'ANTIGUO', estado_inicial: 'MATRICULADO_DEFINITIVO' },
-          como(e.secretaria)
-        )
-      ).rejects.toMatchObject({ statusCode: 409 });
+    it('una matrícula nueva nace definitiva solo si secretaría marca como entregados todos los obligatorios', async () => {
+      const sinNada = await createEnrollment(
+        { student_id: e.estudiante._id, group_id: grupoSiguiente, academic_year_id: anioSiguiente, tipo_ingreso: 'ANTIGUO', documentos_entregados: [], fecha_limite_compromiso: PLAZO },
+        como(e.secretaria)
+      );
+      expect(sinNada.estado).toBe('MATRICULADO_CONDICIONAL');
+
+      const obligatorios = sinNada.checklist.filter((c) => c.obligatorio !== false).map((c) => c.tipo_documento);
+      const completa = await createEnrollment(
+        { student_id: e.otroEstudiante._id, group_id: grupoSiguiente, academic_year_id: anioSiguiente, tipo_ingreso: 'ANTIGUO', documentos_entregados: obligatorios },
+        como(e.secretaria)
+      );
+      expect(completa.estado).toBe('MATRICULADO_DEFINITIVO');
     });
 
     it('no pasa a definitiva con documentos obligatorios sin aprobar y dice cuáles', async () => {

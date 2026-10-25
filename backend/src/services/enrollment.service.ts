@@ -11,6 +11,7 @@ import {
   TipoIngreso,
   NivelEducativo,
 } from '../constants/enums';
+import { NOMBRES_DOCUMENTO_MATRICULA } from '../constants/matriculaChecklist';
 import { ROLES } from '../constants/roles';
 import AcademicYear from '../models/academicYear.model';
 import Enrollment, { EnrollmentDocument } from '../models/enrollment.model';
@@ -21,7 +22,7 @@ import StudentProfile from '../models/studentProfile.model';
 import User from '../models/user.model';
 import ApiError from '../utils/ApiError';
 import { ESTADOS_QUE_EXIGEN_REINGRESO, SituacionEstudiante, situacionDeEstudiante } from '../utils/situacionEstudiante';
-import { documentosObligatoriosPendientes } from '../utils/documentosMatricula';
+import { checklistCompleto, clavesNoPrevistas, documentosObligatoriosPendientes } from '../utils/documentosMatricula';
 import { resumirLista } from '../utils/horarioCoherencia';
 import { generarChecklistDesdeCatalogo, listarRequisitos } from './requisitoDocumental.service';
 import { nombreDelRequisito } from '../utils/requisitosDocumentales';
@@ -46,6 +47,12 @@ export interface CreateEnrollmentInput {
   numero_libro?: number;
   estado_inicial?: 'MATRICULADO_CONDICIONAL' | 'MATRICULADO_DEFINITIVO';
   documentacion_completa?: boolean;
+  /**
+   * Claves de los documentos que el acudiente entregó en físico y secretaría verificó al formalizar. Con este campo el estado sale solo: definitiva si
+   * quedan aprobados todos los obligatorios, condicional (con acta) si falta alguno. Lo marcado queda APROBADO sin archivo, «por digitalizar».
+   * Sin él rigen `documentacion_completa` y `estado_inicial` de siempre (procesos masivos y scripts).
+   */
+  documentos_entregados?: string[];
   fecha_limite_compromiso?: string | Date | null;
   forzar_sobrecupo?: boolean;
   /** Confirma que quien estaba RETIRADO o INACTIVO en M03 vuelve al colegio: la matrícula lo reactiva. */
@@ -89,8 +96,10 @@ export async function exigirSinMatriculaViva(
  * Crea una matricula ya formalizada (MATRICULADO_*): reserva el cupo
  * (respetando max_capacity salvo override de ADMIN), genera el folio
  * reglamentario (libro/folio) e inicializa el checklist documental segun el
- * nivel del grado del grupo. Si presenta toda la documentación física/digital,
- * nace como MATRICULADO_DEFINITIVO sin exigir fecha límite de acta de compromiso.
+ * nivel del grado del grupo. Los documentos que secretaría marca como entregados
+ * (`documentos_entregados`) quedan aprobados en físico, sin archivo, y esperan
+ * su digitalización. Si quedan todos los obligatorios, nace MATRICULADO_DEFINITIVO
+ * sin acta de compromiso; si falta alguno, MATRICULADO_CONDICIONAL con su fecha límite.
  */
 export async function createEnrollment(
   input: CreateEnrollmentInput,
@@ -99,11 +108,14 @@ export async function createEnrollment(
 ): Promise<EnrollmentDocument> {
   const { student_id, group_id, academic_year_id, tipo_ingreso } = input;
   const numeroLibro = input.numero_libro ?? 1;
+  const marcaPorDocumento = Array.isArray(input.documentos_entregados);
   const esDefinitiva = Boolean(input.documentacion_completa || input.estado_inicial === 'MATRICULADO_DEFINITIVO');
   const estadoInicial: EstadoMatricula = esDefinitiva ? 'MATRICULADO_DEFINITIVO' : 'MATRICULADO_CONDICIONAL';
+  const MENSAJE_SIN_FECHA = 'La fecha límite del acta de compromiso es obligatoria para una matrícula condicional (con documentos pendientes).';
 
-  if (estadoInicial === 'MATRICULADO_CONDICIONAL' && !input.fecha_limite_compromiso) {
-    throw new ApiError(400, 'La fecha límite del acta de compromiso es obligatoria para una matrícula condicional (con documentos pendientes).');
+  // Con la marca por documento el estado se conoce hasta armar el checklist (abajo); sin ella, ya se sabe.
+  if (!marcaPorDocumento && estadoInicial === 'MATRICULADO_CONDICIONAL' && !input.fecha_limite_compromiso) {
+    throw new ApiError(400, MENSAJE_SIN_FECHA);
   }
 
   const puedeForzar = Boolean(input.forzar_sobrecupo) && actor.rol === ROLES.ADMIN;
@@ -171,29 +183,44 @@ export async function createEnrollment(
       parentescoAcudiente: vinculoAcudiente?.parentesco,
     });
 
+    // Lo que secretaría tuvo en la mano: la lista marcada documento por documento o, en los procesos masivos, todo lo obligatorio.
+    // Quedan aprobados sin archivo (verificados en físico) y esperan su digitalización; nada se da por subido.
+    const entregados = new Set(marcaPorDocumento ? input.documentos_entregados : esDefinitiva ? itemsGenerados.filter((i) => i.obligatorio).map((i) => i.tipo_documento) : []);
+    const noPrevistos = clavesNoPrevistas(itemsGenerados.map((i) => i.tipo_documento), [...entregados]);
+    if (noPrevistos.length > 0) {
+      throw new ApiError(400, `Estos documentos no se piden en esta matrícula y no pueden marcarse como entregados: ${noPrevistos.join(', ')}.`);
+    }
+
+    const ahora = new Date();
     const checklist = itemsGenerados.map((item) => {
-      const aprobadoAlCrear = esDefinitiva && item.obligatorio;
+      const verificado = entregados.has(item.tipo_documento);
       return {
         tipo_documento: item.tipo_documento,
         nombre_personalizado: item.nombre_personalizado ?? null,
         indicacion: item.indicacion ?? null,
         categoria: item.categoria ?? null,
         obligatorio: item.obligatorio,
-        estado: (aprobadoAlCrear ? 'APROBADO' : 'PENDIENTE') as EstadoDocumentoMatricula,
+        estado: (verificado ? 'APROBADO' : 'PENDIENTE') as EstadoDocumentoMatricula,
         archivo_path: null,
-        comentario: aprobadoAlCrear ? 'Documentación física completa verificada en secretaría al formalizar' : null,
-        fecha_carga: aprobadoAlCrear ? new Date() : null,
-        revisado_por: aprobadoAlCrear ? new Types.ObjectId(actor.id) : null,
-        fecha_revision: aprobadoAlCrear ? new Date() : null,
+        comentario: null,
+        fecha_carga: null,
+        revisado_por: verificado ? new Types.ObjectId(actor.id) : null,
+        fecha_verificacion_fisica: verificado ? ahora : null,
       };
     });
 
-    // Quien ya estudió aquí no sube de nuevo el paz y salvo si el del año anterior ya está confirmado.
+    // Quien ya estudió aquí no sube de nuevo el paz y salvo si el del año anterior ya está confirmado: lo aprueba el sistema, no se vio en físico.
     const itemPazYSalvo = checklist.find((c) => c.tipo_documento === 'PAZ_Y_SALVO_ANIO_ANTERIOR');
     if (itemPazYSalvo) {
       const previo = await pazYSalvoConfirmadoPrevio(student_id, academicYear.year);
-      if (previo) aprobarItemConPazYSalvo(itemPazYSalvo, previo);
+      if (previo) {
+        aprobarItemConPazYSalvo(itemPazYSalvo, previo);
+        itemPazYSalvo.fecha_verificacion_fisica = null;
+      }
     }
+
+    const estadoFinal: EstadoMatricula = marcaPorDocumento ? (checklistCompleto(checklist) ? 'MATRICULADO_DEFINITIVO' : 'MATRICULADO_CONDICIONAL') : estadoInicial;
+    if (estadoFinal === 'MATRICULADO_CONDICIONAL' && !input.fecha_limite_compromiso) throw new ApiError(400, MENSAJE_SIN_FECHA);
 
     const [enrollment] = await Enrollment.create(
       [
@@ -206,9 +233,9 @@ export async function createEnrollment(
           numero_folio,
           tipo_ingreso,
           ultimo_grado_aprobado: input.ultimo_grado_aprobado ?? null,
-          estado: estadoInicial,
+          estado: estadoFinal,
           fecha_matricula: new Date(),
-          fecha_limite_compromiso: estadoInicial === 'MATRICULADO_CONDICIONAL' && input.fecha_limite_compromiso ? new Date(input.fecha_limite_compromiso) : null,
+          fecha_limite_compromiso: estadoFinal === 'MATRICULADO_CONDICIONAL' && input.fecha_limite_compromiso ? new Date(input.fecha_limite_compromiso) : null,
           checklist,
         },
       ],
@@ -238,7 +265,7 @@ export async function createEnrollment(
       accion: 'MATRICULA_CREADA',
       entidad: 'Enrollment',
       entidad_id: enrollment._id,
-      detalle: `Folio ${folio_matricula}, tipo_ingreso ${tipo_ingreso}, estado ${estadoInicial}`,
+      detalle: `Folio ${folio_matricula}, tipo_ingreso ${tipo_ingreso}, estado ${estadoFinal}, ${checklist.filter((c) => c.fecha_verificacion_fisica).length} documento(s) verificado(s) en físico`,
     });
     if (ajusteDeGrado) {
       await registrarEvento({
@@ -692,6 +719,8 @@ export async function revisarDocumento(
   item.estado = input.estado;
   item.comentario = input.comentario ?? null;
   item.revisado_por = new Types.ObjectId(actor.id);
+  // Un archivo rechazado deja sin efecto lo que se había dado por bueno al ver el original.
+  if (input.estado === 'RECHAZADO') item.fecha_verificacion_fisica = null;
 
   const todoAprobado = enrollment.checklist
     .filter((c) => c.obligatorio !== false)
@@ -713,6 +742,71 @@ export async function revisarDocumento(
     detalle: `${tipoDocumento}: ${input.estado}${transicion}`,
   });
   if (input.estado === 'RECHAZADO') await avisarDocumentoRechazado(enrollment, input.comentario);
+
+  return enrollment;
+}
+
+const nombreDelItemChecklist = (c: { tipo_documento: string; nombre_personalizado?: string | null }): string =>
+  c.nombre_personalizado || NOMBRES_DOCUMENTO_MATRICULA[c.tipo_documento as keyof typeof NOMBRES_DOCUMENTO_MATRICULA] || c.tipo_documento;
+
+/**
+ * Secretaría tiene el original en la mano: da por bueno uno o varios documentos del checklist sin que haya archivo. Quedan APROBADOS y «por
+ * digitalizar» (la bandeja los lista hasta que alguien suba el archivo, que no pasa de nuevo por revisión). Con `verificado: false` se deshace
+ * una marca hecha por error, mientras el documento no tenga archivo. Todo o nada: si uno no se puede marcar, no se toca ninguno.
+ */
+export async function marcarVerificacionFisica(
+  enrollmentId: string,
+  tipos: readonly string[],
+  verificado: boolean,
+  actor: { id: string | Types.ObjectId }
+): Promise<EnrollmentDocument> {
+  const enrollment = await Enrollment.findById(enrollmentId);
+  if (!enrollment) throw new ApiError(404, 'Matrícula no encontrada.');
+  if (ESTADOS_TERMINALES.includes(enrollment.estado)) {
+    throw new ApiError(409, `No se pueden cambiar los documentos de una matrícula en estado ${enrollment.estado}.`);
+  }
+
+  const items = [...new Set(tipos)].map((tipo) => {
+    const item = enrollment.checklist.find((c) => c.tipo_documento === tipo);
+    if (!item) throw new ApiError(400, `El documento ${tipo} no está en el checklist de esta matrícula.`);
+    return item;
+  });
+
+  for (const item of items) {
+    const nombre = nombreDelItemChecklist(item);
+    if (verificado) {
+      if (item.estado === 'APROBADO') throw new ApiError(409, `«${nombre}» ya está aprobado.`);
+      if (item.archivo_path) throw new ApiError(409, `«${nombre}» ya tiene un archivo cargado: apruébalo o recházalo desde su revisión.`);
+    } else {
+      if (!item.fecha_verificacion_fisica) throw new ApiError(409, `«${nombre}» no está marcado como verificado en físico.`);
+      if (item.archivo_path) throw new ApiError(409, `«${nombre}» ya tiene un archivo cargado; si no es válido, recházalo.`);
+    }
+  }
+
+  const ahora = new Date();
+  for (const item of items) {
+    item.estado = verificado ? 'APROBADO' : 'PENDIENTE';
+    item.revisado_por = verificado ? new Types.ObjectId(actor.id) : null;
+    item.fecha_verificacion_fisica = verificado ? ahora : null;
+  }
+
+  let transicion = '';
+  if (verificado) {
+    transicion = promoverSiCompleto(enrollment);
+  } else if (enrollment.estado === 'MATRICULADO_DEFINITIVO' && items.some((i) => i.obligatorio !== false)) {
+    // Igual que al agregar un documento obligatorio a una definitiva: vuelve a condicional (la fecha del acta se fija al generarla).
+    enrollment.estado = 'MATRICULADO_CONDICIONAL';
+    transicion = ' — falta un documento obligatorio: la matrícula vuelve a MATRICULADO_CONDICIONAL';
+  }
+  await enrollment.save();
+
+  await registrarEvento({
+    usuario_id: actor.id,
+    accion: verificado ? 'DOCUMENTO_VERIFICADO_EN_FISICO' : 'DOCUMENTO_VERIFICACION_FISICA_RETIRADA',
+    entidad: 'Enrollment',
+    entidad_id: enrollment._id,
+    detalle: `${items.map((i) => i.tipo_documento).join(', ')}${transicion}`,
+  });
 
   return enrollment;
 }
@@ -939,10 +1033,12 @@ export interface FiltroDocumentosPrevistos {
 export async function listarDocumentosPrevistos(filtro: FiltroDocumentosPrevistos) {
   let nivel: NivelEducativo = 'PRIMARIA';
   let numeroGrado = 1;
+  let anioId: Types.ObjectId | null = null;
 
   if (filtro.group_id) {
     const group = await Group.findById(filtro.group_id);
     if (group) {
+      anioId = group.academic_year_id;
       const grade = await Grade.findById(group.grade_id);
       if (grade) {
         nivel = grade.nivel;
@@ -965,12 +1061,21 @@ export async function listarDocumentosPrevistos(filtro: FiltroDocumentosPrevisto
     tieneDiscapacidad: profile?.tiene_discapacidad,
     parentescoAcudiente: vinculoAcudiente?.parentesco,
   });
+
+  // El paz y salvo del año anterior ya confirmado lo aprueba el sistema al matricular: no hay nada que marcar como entregado.
+  let pazYSalvoCubierto = false;
+  if (filtro.student_id && anioId && items.some((i) => i.tipo_documento === 'PAZ_Y_SALVO_ANIO_ANTERIOR')) {
+    const anio = await AcademicYear.findById(anioId).select('year');
+    pazYSalvoCubierto = Boolean(anio && (await pazYSalvoConfirmadoPrevio(filtro.student_id, anio.year)));
+  }
+
   return items.map((item) => ({
     tipo_documento: item.tipo_documento,
     nombre: item.nombre_personalizado,
     indicacion: item.indicacion,
     categoria: item.categoria,
     obligatorio: item.obligatorio,
+    ya_cubierto: pazYSalvoCubierto && item.tipo_documento === 'PAZ_Y_SALVO_ANIO_ANTERIOR',
   }));
 }
 
@@ -1022,6 +1127,72 @@ export async function listarDocumentosPorRevisar(filtro: FiltroDocumentosPorRevi
               fecha_carga: '$checklist.fecha_carga',
               cargado_por_tipo: '$checklist.cargado_por_tipo',
               cargado_por_nombre: { $concat: [{ $ifNull: [{ $arrayElemAt: ['$cargador.nombre', 0] }, ''] }, ' ', { $ifNull: [{ $arrayElemAt: ['$cargador.apellido', 0] }, ''] }] },
+              nombre: { $arrayElemAt: ['$estudiante.nombre', 0] },
+              apellido: { $arrayElemAt: ['$estudiante.apellido', 0] },
+              numero_documento: { $arrayElemAt: ['$estudiante.numero_documento', 0] },
+              grupo: { $arrayElemAt: ['$grupo.nomenclatura', 0] },
+            },
+          },
+        ],
+      },
+    },
+  ]);
+
+  const total = resultado?.total[0]?.n ?? 0;
+  return { data: resultado?.filas ?? [], total, page, pages: Math.max(1, Math.ceil(total / limit)) };
+}
+
+export interface FiltroDocumentosPorDigitalizar {
+  academic_year_id?: string;
+  group_id?: string;
+  page?: number;
+  limit?: number;
+}
+
+/**
+ * Bandeja de secretaría: los documentos que se vieron en físico al matricular y todavía no tienen archivo en el sistema (`faltaDigitalizar`), del
+ * que lleva más tiempo esperando al más reciente. No esperan revisión: ya están aprobados; solo falta subir el archivo. Una fila por documento.
+ */
+export async function listarDocumentosPorDigitalizar(filtro: FiltroDocumentosPorDigitalizar) {
+  const page = Math.max(1, filtro.page ?? 1);
+  const limit = Math.min(100, Math.max(1, filtro.limit ?? 25));
+
+  // La misma condición de `faltaDigitalizar`, escrita para la base: aprobado, sin archivo y con la marca de verificación en físico.
+  // Antes de desarmar el arreglo hay que usar `$elemMatch`: un `$ne: null` suelto sobre `checklist.x` exige que NINGÚN elemento sea nulo y dejaría
+  // fuera a toda matrícula que tenga un solo documento pendiente.
+  const porDigitalizar = { 'checklist.estado': 'APROBADO', 'checklist.archivo_path': null, 'checklist.fecha_verificacion_fisica': { $ne: null } };
+  const match: Record<string, unknown> = {
+    estado: { $nin: ESTADOS_TERMINALES },
+    checklist: { $elemMatch: { estado: 'APROBADO', archivo_path: null, fecha_verificacion_fisica: { $ne: null } } },
+  };
+  if (filtro.academic_year_id) match.academic_year_id = new Types.ObjectId(filtro.academic_year_id);
+  if (filtro.group_id) match.group_id = new Types.ObjectId(filtro.group_id);
+
+  const [resultado] = await Enrollment.aggregate<{ filas: Array<Record<string, unknown>>; total: Array<{ n: number }> }>([
+    { $match: match },
+    { $unwind: '$checklist' },
+    { $match: porDigitalizar },
+    {
+      $facet: {
+        total: [{ $count: 'n' }],
+        filas: [
+          { $sort: { 'checklist.fecha_verificacion_fisica': 1, _id: 1 } },
+          { $skip: (page - 1) * limit },
+          { $limit: limit },
+          { $lookup: { from: 'users', localField: 'student_id', foreignField: '_id', as: 'estudiante' } },
+          { $lookup: { from: 'groups', localField: 'group_id', foreignField: '_id', as: 'grupo' } },
+          { $lookup: { from: 'users', localField: 'checklist.revisado_por', foreignField: '_id', as: 'verificador' } },
+          {
+            $project: {
+              _id: 0,
+              enrollment_id: '$_id',
+              estado_matricula: '$estado',
+              tipo_ingreso: 1,
+              tipo_documento: '$checklist.tipo_documento',
+              nombre_personalizado: '$checklist.nombre_personalizado',
+              obligatorio: '$checklist.obligatorio',
+              fecha_verificacion_fisica: '$checklist.fecha_verificacion_fisica',
+              verificado_por_nombre: { $concat: [{ $ifNull: [{ $arrayElemAt: ['$verificador.nombre', 0] }, ''] }, ' ', { $ifNull: [{ $arrayElemAt: ['$verificador.apellido', 0] }, ''] }] },
               nombre: { $arrayElemAt: ['$estudiante.nombre', 0] },
               apellido: { $arrayElemAt: ['$estudiante.apellido', 0] },
               numero_documento: { $arrayElemAt: ['$estudiante.numero_documento', 0] },

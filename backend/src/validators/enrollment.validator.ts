@@ -21,6 +21,8 @@ export const createEnrollment: ValidationSchema = {
     numero_libro: Joi.number().integer().min(1),
     estado_inicial: Joi.string().valid('MATRICULADO_CONDICIONAL', 'MATRICULADO_DEFINITIVO'),
     documentacion_completa: Joi.boolean(),
+    // Los documentos que secretaría tuvo en la mano: el estado (definitiva o condicional) sale de aquí.
+    documentos_entregados: Joi.array().items(claveDocumento).unique(),
     fecha_limite_compromiso: Joi.date().allow(null, ''),
     forzar_sobrecupo: Joi.boolean(),
     reingreso: Joi.boolean(),
@@ -93,6 +95,15 @@ export const revisarDocumento: ValidationSchema = {
   }),
 };
 
+export const marcarVerificacionFisica: ValidationSchema = {
+  params: Joi.object({ id: objectId.required() }),
+  body: Joi.object({
+    tipos: Joi.array().items(claveDocumento).min(1).unique().required(),
+    // true = «lo vi en físico»; false = deshacer una marca hecha por error.
+    verificado: Joi.boolean().default(true),
+  }),
+};
+
 export const descargarDocumento: ValidationSchema = {
   params: Joi.object({
     id: objectId.required(),
@@ -143,6 +154,15 @@ export const listarDocumentosPrevistos: ValidationSchema = {
 export const listarDocumentosPorRevisar: ValidationSchema = {
   query: Joi.object({
     subido_por: Joi.string().valid('FAMILIA', 'PERSONAL'),
+    academic_year_id: objectId,
+    group_id: objectId,
+    page: Joi.number().integer().min(1),
+    limit: Joi.number().integer().min(1).max(100),
+  }),
+};
+
+export const listarDocumentosPorDigitalizar: ValidationSchema = {
+  query: Joi.object({
     academic_year_id: objectId,
     group_id: objectId,
     page: Joi.number().integer().min(1),

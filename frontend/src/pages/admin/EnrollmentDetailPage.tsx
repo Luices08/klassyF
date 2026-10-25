@@ -2,7 +2,7 @@ import { type ChangeEvent, type FormEvent, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { RegistrarSalidaDrawer } from '../../components/salidas/RegistrarSalidaDrawer';
 import { Alert, errorMessage } from '../../components/ui/Alert';
-import { EstadoDocumentoBadge, EstadoMatriculaBadge } from '../../components/ui/Badge';
+import { Chip, EstadoDocumentoBadge, EstadoMatriculaBadge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import { Card, CardHeader } from '../../components/ui/Card';
 import { Drawer } from '../../components/ui/Drawer';
@@ -29,6 +29,7 @@ import {
   useCargarDocumentoMatricula,
   useEliminarDocumentoChecklist,
   useEnrollment,
+  useMarcarVerificacionFisica,
   useRevisarDocumentoMatricula,
   useSincronizarRequisitosMatricula,
   useUpdateEnrollmentStatus,
@@ -36,9 +37,10 @@ import {
 import { useGroups } from '../../hooks/useGroups';
 import { useRequisitosDocumentales } from '../../hooks/useRequisitosDocumentales';
 import { api } from '../../lib/apiClient';
-import { formatoFechaCalendario } from '../../lib/fechas';
+import { formatoFechaCalendario, formatoFechaHora } from '../../lib/fechas';
 import {
   categoriaDeItem,
+  faltaDigitalizar,
   indicacionDeItem,
   nombreDeItem,
   type ChecklistItem,
@@ -49,6 +51,12 @@ import { SelectBuscable } from '../../components/ui/SelectBuscable';
 import { opcionesDeGrupos } from '../../lib/opcionesBuscables';
 
 const ESTADOS_TERMINALES: EstadoMatricula[] = ['RETIRADO', 'ANULADO'];
+
+/** Quién y cuándo vio el original: el checklist trae al revisor ya con su nombre. */
+function textoVerificacionFisica(item: ChecklistItem): string {
+  const quien = item.revisado_por && typeof item.revisado_por === 'object' ? `${item.revisado_por.nombre} ${item.revisado_por.apellido}` : null;
+  return `Verificado en físico${quien ? ` por ${quien}` : ''}${item.fecha_verificacion_fisica ? ` el ${formatoFechaHora(item.fecha_verificacion_fisica)}` : ''}`;
+}
 
 export function EnrollmentDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -75,6 +83,7 @@ export function EnrollmentDetailPage() {
   const groupsQuery = useGroups({ academic_year_id: enrollmentQuery.data?.academic_year_id, estado: 'ACTIVE' });
 
   const cargarDocumento = useCargarDocumentoMatricula();
+  const marcarFisico = useMarcarVerificacionFisica();
   const revisarDocumento = useRevisarDocumentoMatricula();
   const [revisando, setRevisando] = useState<TipoDocumentoMatricula | null>(null);
   const [comentario, setComentario] = useState('');
@@ -175,6 +184,13 @@ export function EnrollmentDetailPage() {
     e.target.value = '';
   }
 
+  // «Tengo el original en la mano»: queda aprobado sin archivo y esperando su digitalización.
+  function handleMarcarFisico(tipos: string[], verificado: boolean) {
+    if (!id || tipos.length === 0) return;
+    marcarFisico.reset();
+    marcarFisico.mutate({ id, tipos, verificado });
+  }
+
   async function handleVerArchivo(tipoDocumento: TipoDocumentoMatricula) {
     if (!id) return;
     const { url } = await api.downloadBlob(`/enrollments/${id}/checklist/${tipoDocumento}/archivo`);
@@ -206,6 +222,8 @@ export function EnrollmentDetailPage() {
   const esPreinscrito = enrollment.estado === 'PREINSCRITO';
   const itemsObligatorios = enrollment.checklist.filter((c) => c.obligatorio !== false);
   const documentosCompletos = itemsObligatorios.length > 0 && itemsObligatorios.every((c) => c.estado === 'APROBADO');
+  // Lo obligatorio que aún no llegó ni en físico ni en archivo: es lo que se puede dar por recibido de un solo paso.
+  const obligatoriosPorMarcar = itemsObligatorios.filter((c) => c.estado === 'PENDIENTE' && !c.archivo_path);
 
   const itemsIdentificacionSalud = enrollment.checklist.filter(
     (c) => categoriaDeItem(c) === 'IDENTIFICACION_SALUD'
@@ -249,7 +267,13 @@ export function EnrollmentDetailPage() {
                 </div>
               </Td>
               <Td>
-                <EstadoDocumentoBadge value={item.estado} />
+                <div className="flex flex-col items-start gap-1">
+                  <EstadoDocumentoBadge value={item.estado} />
+                  {faltaDigitalizar(item) && <Chip tone="orange">Verificado en físico · falta digitalizar</Chip>}
+                  {item.estado === 'APROBADO' && item.fecha_verificacion_fisica && (
+                    <span className="text-xs text-muted">{textoVerificacionFisica(item)}</span>
+                  )}
+                </div>
               </Td>
               <Td>
                 {item.comentario ? (
@@ -286,9 +310,27 @@ export function EnrollmentDetailPage() {
               </Td>
               <Td>
                 <div className="flex justify-end gap-2">
+                  {!esTerminal && !item.archivo_path && item.estado === 'PENDIENTE' && (
+                    <IconButton
+                      tone="success"
+                      label="Recibido en físico: aprobar sin archivo"
+                      icon={<CheckCircleIcon />}
+                      disabled={marcarFisico.isPending}
+                      onClick={() => handleMarcarFisico([item.tipo_documento], true)}
+                    />
+                  )}
+                  {!esTerminal && faltaDigitalizar(item) && (
+                    <IconButton
+                      tone="neutral"
+                      label="Quitar la marca de recibido en físico"
+                      icon={<XCircleIcon />}
+                      disabled={marcarFisico.isPending}
+                      onClick={() => handleMarcarFisico([item.tipo_documento], false)}
+                    />
+                  )}
                   <label
                     className="inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-full bg-soft text-body hover:bg-border/60"
-                    title="Cargar archivo"
+                    title={faltaDigitalizar(item) ? 'Subir el archivo (digitalizar)' : 'Cargar archivo'}
                   >
                     <input
                       type="file"
@@ -473,6 +515,21 @@ export function EnrollmentDetailPage() {
             />
             Ya verifiqué el original: aprobar al subir
           </label>
+          {!esTerminal && obligatoriosPorMarcar.length > 0 && (
+            <Button
+              variant="outline"
+              isLoading={marcarFisico.isPending}
+              title="Aprueba sin archivo los obligatorios que el acudiente trajo en físico; quedan en «Por digitalizar»"
+              onClick={() => {
+                if (window.confirm(`¿Tienes en la mano el original de los ${obligatoriosPorMarcar.length} documentos obligatorios que faltan? Quedarán aprobados, sin archivo, hasta que los digitalices.`)) {
+                  handleMarcarFisico(obligatoriosPorMarcar.map((c) => c.tipo_documento), true);
+                }
+              }}
+            >
+              <CheckCircleIcon className="h-4 w-4" />
+              Recibí en físico todo lo obligatorio
+            </Button>
+          )}
           <Button variant="outline" onClick={() => setAgregarDocOpen(true)}>
             <PlusIcon className="h-4 w-4" />
             Añadir documento
@@ -481,6 +538,7 @@ export function EnrollmentDetailPage() {
       </div>
 
       {cargarDocumento.isError && <Alert tone="error">{errorMessage(cargarDocumento.error)}</Alert>}
+      {marcarFisico.isError && <Alert tone="error">{errorMessage(marcarFisico.error)}</Alert>}
       {revisarDocumento.isError && <Alert tone="error">{errorMessage(revisarDocumento.error)}</Alert>}
       {eliminarDocMutation.isError && <Alert tone="error">{errorMessage(eliminarDocMutation.error)}</Alert>}
       {sincronizarRequisitos.isError && <Alert tone="error">{errorMessage(sincronizarRequisitos.error)}</Alert>}

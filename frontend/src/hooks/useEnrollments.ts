@@ -10,6 +10,8 @@ export interface CreateEnrollmentInput {
   numero_libro?: number;
   estado_inicial?: 'MATRICULADO_CONDICIONAL' | 'MATRICULADO_DEFINITIVO';
   documentacion_completa?: boolean;
+  /** Claves de los documentos que secretaría tuvo en la mano: el estado (definitiva o condicional) lo decide el servidor con esto. */
+  documentos_entregados?: string[];
   fecha_limite_compromiso?: string;
   forzar_sobrecupo?: boolean;
   /** Confirma la reincorporación de quien estaba RETIRADO o INACTIVO en su expediente. */
@@ -131,6 +133,20 @@ export function useCargarDocumentoMatricula() {
     onSuccess: (_data, variables) => {
       void queryClient.invalidateQueries({ queryKey: ['enrollments', variables.id] });
       void queryClient.invalidateQueries({ queryKey: ['enrollments', 'documentos-por-revisar'] });
+      void queryClient.invalidateQueries({ queryKey: ['enrollments', 'documentos-por-digitalizar'] });
+    },
+  });
+}
+
+/** «Tengo el original en la mano»: aprueba sin archivo uno o varios documentos (queda por digitalizar); `verificado: false` deshace una marca por error. */
+export function useMarcarVerificacionFisica() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, tipos, verificado = true }: { id: string; tipos: string[]; verificado?: boolean }) =>
+      api.patch<Enrollment>(`/enrollments/${id}/checklist/verificacion-fisica`, { tipos, verificado }),
+    onSuccess: (_data, variables) => {
+      void queryClient.invalidateQueries({ queryKey: ['enrollments'] });
+      void queryClient.invalidateQueries({ queryKey: ['enrollments', variables.id] });
     },
   });
 }
@@ -152,6 +168,7 @@ export function useRevisarDocumentoMatricula() {
     onSuccess: (_data, variables) => {
       void queryClient.invalidateQueries({ queryKey: ['enrollments', variables.id] });
       void queryClient.invalidateQueries({ queryKey: ['enrollments', 'documentos-por-revisar'] });
+      void queryClient.invalidateQueries({ queryKey: ['enrollments', 'documentos-por-digitalizar'] });
     },
   });
 }
@@ -174,6 +191,7 @@ export function useAgregarDocumentoChecklist() {
     onSuccess: (_data, variables) => {
       void queryClient.invalidateQueries({ queryKey: ['enrollments', variables.id] });
       void queryClient.invalidateQueries({ queryKey: ['enrollments', 'documentos-por-revisar'] });
+      void queryClient.invalidateQueries({ queryKey: ['enrollments', 'documentos-por-digitalizar'] });
     },
   });
 }
@@ -186,6 +204,7 @@ export function useEliminarDocumentoChecklist() {
     onSuccess: (_data, variables) => {
       void queryClient.invalidateQueries({ queryKey: ['enrollments', variables.id] });
       void queryClient.invalidateQueries({ queryKey: ['enrollments', 'documentos-por-revisar'] });
+      void queryClient.invalidateQueries({ queryKey: ['enrollments', 'documentos-por-digitalizar'] });
     },
   });
 }
@@ -216,6 +235,7 @@ export function useActualizarComentarioDocumento() {
     onSuccess: (_data, variables) => {
       void queryClient.invalidateQueries({ queryKey: ['enrollments', variables.id] });
       void queryClient.invalidateQueries({ queryKey: ['enrollments', 'documentos-por-revisar'] });
+      void queryClient.invalidateQueries({ queryKey: ['enrollments', 'documentos-por-digitalizar'] });
     },
   });
 }
@@ -248,12 +268,42 @@ export function useDocumentosPorRevisar(filter: { academic_year_id?: string; gro
   });
 }
 
+/** Un documento verificado en físico al matricular que todavía no tiene archivo en el sistema. */
+export interface DocumentoPorDigitalizar {
+  enrollment_id: string;
+  estado_matricula: EstadoMatricula;
+  tipo_ingreso: TipoIngreso;
+  tipo_documento: TipoDocumentoMatricula;
+  nombre_personalizado: string | null;
+  obligatorio?: boolean;
+  fecha_verificacion_fisica: string;
+  verificado_por_nombre?: string | null;
+  nombre: string;
+  apellido: string;
+  numero_documento: string;
+  grupo: string | null;
+}
+
+export function useDocumentosPorDigitalizar(filter: { academic_year_id?: string; group_id?: string; page?: number; limit?: number }) {
+  return useQuery({
+    queryKey: ['enrollments', 'documentos-por-digitalizar', filter],
+    queryFn: () =>
+      api.raw<{ success: true; data: DocumentoPorDigitalizar[]; total: number; page: number; pages: number }>('/enrollments/documentos-por-digitalizar', {
+        query: { ...filter },
+      }),
+    select: (res) => ({ data: res.data, total: res.total, page: res.page, pages: res.pages }),
+    enabled: Boolean(filter.academic_year_id),
+  });
+}
+
 export interface DocumentoPrevisto {
   tipo_documento: TipoDocumentoMatricula;
   nombre: string;
   indicacion: string;
   categoria: string;
   obligatorio: boolean;
+  /** El paz y salvo del año anterior ya confirmado: el sistema lo aprueba al matricular, no hay nada que marcar como entregado. */
+  ya_cubierto?: boolean;
 }
 
 /** Los documentos que se le pedirán al estudiante según el grado del grupo y su tipo de ingreso (mismo cálculo que al crear la matrícula). */

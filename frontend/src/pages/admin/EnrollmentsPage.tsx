@@ -16,7 +16,7 @@ import { EyeIcon, PlusIcon, SearchIcon } from '../../components/ui/icons';
 import { useAuth } from '../../context/AuthContext';
 import { useAnioDeTrabajo } from '../../hooks/useAniosLectivos';
 import { useCampuses, useGrades, useJornadas } from '../../hooks/useCatalogs';
-import { useCreateEnrollment, useEnrollmentsList, useEstudiantesPorGrado, useCargarDocumentoMatricula, type EnrollmentsFilter } from '../../hooks/useEnrollments';
+import { useCreateEnrollment, useDocumentosPrevistos, useEnrollmentsList, useEstudiantesPorGrado, useCargarDocumentoMatricula, type EnrollmentsFilter } from '../../hooks/useEnrollments';
 import { useGroups } from '../../hooks/useGroups';
 import { useInstitution } from '../../hooks/useInstitution';
 import { useCrearEstudianteCompleto } from '../../hooks/useStudents';
@@ -26,6 +26,7 @@ import {
   PARENTESCOS,
   TIPOS_DOCUMENTO,
   TIPOS_INGRESO,
+  faltaDigitalizar,
   type EstadoMatricula,
   type Parentesco,
   type TipoDocumento,
@@ -35,6 +36,7 @@ import {
 import { DocumentosPrevistos } from '../../components/matriculas/DocumentosPrevistos';
 import { InformacionApoyoCampos } from '../../components/inclusion/InformacionApoyoCampos';
 import { APOYO_VACIO, aApoyoDeclarado } from '../../lib/apoyoDeclarado';
+import { entregadosVigentes, obligatoriosSinEntregar } from '../../lib/entregaDocumentos';
 import { SelectBuscable } from '../../components/ui/SelectBuscable';
 import { opcionesDeGrupos } from '../../lib/opcionesBuscables';
 import { SelectorEstudianteMatricula } from '../../components/matriculas/SelectorEstudianteMatricula';
@@ -52,12 +54,14 @@ function ResumenDocumentos({ checklist }: { checklist: ChecklistItem[] }) {
   const obligatorios = checklist.filter((c) => c.obligatorio !== false);
   const aprobados = obligatorios.filter((c) => c.estado === 'APROBADO').length;
   const porRevisar = checklist.filter((c) => c.estado === 'CARGADO').length;
+  const porDigitalizar = checklist.filter(faltaDigitalizar).length;
   const rechazados = checklist.filter((c) => c.estado === 'RECHAZADO').length;
   const completo = obligatorios.length > 0 && aprobados === obligatorios.length;
   return (
     <div className="flex flex-wrap gap-1.5">
       <Chip tone={completo ? 'green' : 'neutral'}>{`${aprobados}/${obligatorios.length} aprobados`}</Chip>
       {porRevisar > 0 && <Chip tone="blue">{`${porRevisar} en revisión`}</Chip>}
+      {porDigitalizar > 0 && <Chip tone="orange">{`${porDigitalizar} por digitalizar`}</Chip>}
       {rechazados > 0 && <Chip tone="red">{`${rechazados} rechazados`}</Chip>}
     </div>
   );
@@ -72,7 +76,8 @@ const FORM_VACIO = {
   student_id: '',
   group_id: '',
   tipo_ingreso: 'NUEVO' as TipoIngreso,
-  documentacion_completa: true,
+  /** Claves de los documentos que el acudiente trajo en físico; de ellos sale si la matrícula es definitiva o condicional. */
+  documentos_entregados: [] as string[],
   fecha_limite_compromiso: '',
   forzar_sobrecupo: false,
   apoyo: APOYO_VACIO,
@@ -202,6 +207,16 @@ export function EnrollmentsPage() {
   const crearEstudiante = useCrearEstudianteCompleto();
   const cargarDoc = useCargarDocumentoMatricula();
   const [archivosDocumentos, setArchivosDocumentos] = useState<Record<string, File>>({});
+  const [resumenCreada, setResumenCreada] = useState<{ definitiva: boolean; porDigitalizar: number } | null>(null);
+
+  // Lo que se pide a este estudiante en este grupo: con ello se sabe antes de guardar si la matrícula nace definitiva o condicional (el servidor decide igual).
+  const previstosQuery = useDocumentosPrevistos({
+    group_id: form.group_id || undefined,
+    tipo_ingreso: form.tipo_ingreso,
+    student_id: modoMatricula === 'existente' ? form.student_id || undefined : undefined,
+  });
+  const documentosEntregados = entregadosVigentes(previstosQuery.data ?? [], form.documentos_entregados);
+  const nacerCondicional = previstosQuery.data ? obligatoriosSinEntregar(previstosQuery.data, documentosEntregados).length > 0 : false;
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -242,14 +257,19 @@ export function EnrollmentsPage() {
         group_id: form.group_id,
         academic_year_id: anioId,
         tipo_ingreso: form.tipo_ingreso,
-        documentacion_completa: form.documentacion_completa,
-        estado_inicial: form.documentacion_completa ? 'MATRICULADO_DEFINITIVO' : 'MATRICULADO_CONDICIONAL',
-        fecha_limite_compromiso: form.documentacion_completa ? undefined : form.fecha_limite_compromiso,
+        documentos_entregados: documentosEntregados,
+        fecha_limite_compromiso: nacerCondicional ? form.fecha_limite_compromiso : undefined,
         forzar_sobrecupo: form.forzar_sobrecupo,
         reingreso: modoMatricula === 'existente' && esReingreso && reingresoConfirmado ? true : undefined,
         apoyo_declarado: aApoyoDeclarado(form.apoyo),
         ultimo_grado_aprobado: gradoAprobado?.numero,
         motivo_grado: necesitaMotivoGrado ? form.motivo_grado.trim() : undefined,
+      });
+
+      // Lo que se vio en físico y no se adjuntó aquí queda esperando su archivo.
+      setResumenCreada({
+        definitiva: matricula.estado === 'MATRICULADO_DEFINITIVO',
+        porDigitalizar: matricula.checklist.filter((c) => faltaDigitalizar(c) && !archivosDocumentos[c.tipo_documento]).length,
       });
 
       // Si se adjuntaron archivos digitales en este drawer, subirlos de inmediato
@@ -282,6 +302,7 @@ export function EnrollmentsPage() {
 
   function handleSeguirMatriculando() {
     setMatriculaCreadaId(null);
+    setResumenCreada(null);
     setErrorEnvio(null);
     setForm(FORM_VACIO);
     setGradoDelGrupo('');
@@ -550,6 +571,7 @@ export function EnrollmentsPage() {
         onClose={() => {
           setDrawerOpen(false);
           setMatriculaCreadaId(null);
+          setResumenCreada(null);
           setErrorEnvio(null);
           setArchivosDocumentos({});
         }}
@@ -560,7 +582,15 @@ export function EnrollmentsPage() {
       >
         {matriculaCreadaId ? (
           <div className="space-y-4">
-            <Alert tone="success">La matrícula quedó registrada. Los documentos se cargan, aprueban o rechazan en su expediente.</Alert>
+            <Alert tone="success">
+              {resumenCreada?.definitiva
+                ? 'La matrícula quedó definitiva: se recibieron todos los documentos obligatorios.'
+                : 'La matrícula quedó condicional: falta algún documento obligatorio. El acta de compromiso se imprime desde el expediente.'}
+              {resumenCreada && resumenCreada.porDigitalizar > 0
+                ? ` ${resumenCreada.porDigitalizar} documento${resumenCreada.porDigitalizar === 1 ? '' : 's'} verificado${resumenCreada.porDigitalizar === 1 ? '' : 's'} en físico ${resumenCreada.porDigitalizar === 1 ? 'espera' : 'esperan'} su archivo en «Por digitalizar».`
+                : ''}{' '}
+              Los documentos se cargan, aprueban o rechazan en su expediente.
+            </Alert>
             <div className="flex flex-wrap gap-2">
               <Button onClick={() => navigate(`/admin/enrollments/${matriculaCreadaId}`)}>Ir al expediente</Button>
               <Button variant="secondary" onClick={handleSeguirMatriculando}>
@@ -859,63 +889,12 @@ export function EnrollmentsPage() {
           ))}
         </Select>
 
-        <div className="space-y-2 rounded-lg border border-border bg-subtle/30 p-3">
-          <label className="text-xs font-bold uppercase tracking-wider text-muted block">
-            Estado de la documentación física
-          </label>
-          <div className="grid grid-cols-2 gap-2">
-            <button
-              type="button"
-              onClick={() => setForm((f) => ({ ...f, documentacion_completa: true }))}
-              className={`rounded-md p-2.5 text-left text-xs font-semibold border transition ${
-                form.documentacion_completa
-                  ? 'bg-emerald-50 border-emerald-500 text-emerald-800 shadow-sm ring-1 ring-emerald-500'
-                  : 'bg-surface border-border text-muted hover:text-ink'
-              }`}
-            >
-              <div className="font-bold">
-                Documentación completa
-              </div>
-              <p className="text-[11px] font-normal opacity-80 mt-1 leading-tight">
-                El estudiante entregó todos los documentos físicos. Matrícula definitiva directa.
-              </p>
-            </button>
-            <button
-              type="button"
-              onClick={() => setForm((f) => ({ ...f, documentacion_completa: false }))}
-              className={`rounded-md p-2.5 text-left text-xs font-semibold border transition ${
-                !form.documentacion_completa
-                  ? 'bg-amber-50 border-amber-500 text-amber-800 shadow-sm ring-1 ring-amber-500'
-                  : 'bg-surface border-border text-muted hover:text-ink'
-              }`}
-            >
-              <div className="font-bold">
-                Documentos pendientes
-              </div>
-              <p className="text-[11px] font-normal opacity-80 mt-1 leading-tight">
-                Tiene documentos faltantes. Matrícula condicional sujeta a acta de compromiso.
-              </p>
-            </button>
-          </div>
-
-          {!form.documentacion_completa && (
-            <div className="pt-2">
-              <Input
-                label="Fecha límite del acta de compromiso"
-                type="date"
-                required={!form.documentacion_completa}
-                value={form.fecha_limite_compromiso}
-                onChange={(e) => setForm((f) => ({ ...f, fecha_limite_compromiso: e.target.value }))}
-                hint="Plazo máximo establecido en el acta para presentar los documentos pendientes."
-              />
-            </div>
-          )}
-        </div>
-
         <DocumentosPrevistos
           groupId={form.group_id}
           tipoIngreso={form.tipo_ingreso}
           studentId={modoMatricula === 'existente' ? form.student_id : undefined}
+          entregados={form.documentos_entregados}
+          onEntregadosChange={(claves) => setForm((f) => ({ ...f, documentos_entregados: claves }))}
           archivos={archivosDocumentos}
           onArchivoChange={(tipoDoc, file) => {
             setArchivosDocumentos((prev) => {
@@ -928,8 +907,18 @@ export function EnrollmentsPage() {
               return copy;
             });
           }}
-          documentacionCompleta={form.documentacion_completa}
         />
+
+        {nacerCondicional && (
+          <Input
+            label="Fecha límite del acta de compromiso"
+            type="date"
+            required
+            value={form.fecha_limite_compromiso}
+            onChange={(e) => setForm((f) => ({ ...f, fecha_limite_compromiso: e.target.value }))}
+            hint="Falta algún documento obligatorio: la matrícula queda condicional. Plazo máximo para entregar lo pendiente, que quedará escrito en el acta."
+          />
+        )}
 
         <InformacionApoyoCampos valor={form.apoyo} onChange={(apoyo) => setForm((f) => ({ ...f, apoyo }))} />
 

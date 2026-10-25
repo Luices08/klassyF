@@ -266,7 +266,7 @@ describe('M15 comité y actas (con base de datos)', () => {
 
     it('la periodicidad se vence a los dos meses de la última sesión ordinaria y una sesión convocada no la salva', async () => {
       const antigua = await crear();
-      await SesionComite.collection.updateOne({ _id: antigua._id }, { $set: { fecha: new Date(Date.now() - 90 * 86_400_000) } });
+      await SesionComite.collection.updateOne({ _id: antigua._id }, { $set: { fecha: new Date(Date.now() - 90 * 86_400_000), estado: 'FIRMADA' } });
       const vencida = await comite.listarSesiones(e.coordConvivencia);
       expect(vencida.periodicidad).toMatchObject({ vencida: true, meses_maximos: 2 });
 
@@ -275,7 +275,10 @@ describe('M15 comité y actas (con base de datos)', () => {
       expect(conConvocada.periodicidad.vencida).toBe(true);
       expect(conConvocada.periodicidad.proxima_programada).not.toBeNull();
 
-      await crear();
+      // Un borrador sin firmar, aunque su fecha ya llegó, tampoco salva el plazo: solo cuenta la que tiene acta firmada.
+      const deHoy = await crear();
+      expect((await comite.listarSesiones(e.coordConvivencia)).periodicidad.vencida).toBe(true);
+      await SesionComite.collection.updateOne({ _id: deHoy._id }, { $set: { estado: 'FIRMADA' } });
       expect((await comite.listarSesiones(e.coordConvivencia)).periodicidad.vencida).toBe(false);
     });
   });

@@ -337,13 +337,11 @@ Reglas que no se ven leyendo un solo archivo:
   historial y recibirá las remisiones a orientación (M15). Su alcance son las sedes asignadas.
 - **Registrar exige matrícula activa en el año EN_CURSO**, fecha no futura y dentro de un periodo (calendario de la sede, M05). Un hecho con
   varios estudiantes crea un registro por estudiante (`evento_id` común) en una transacción: todos o ninguno.
-- **Buscador propio** (`GET /observaciones/estudiantes`, `/grupos`): acotado a los grupos del docente (CLASE o dirección) o a las sedes del
-  coordinador/orientador. No se abre `/students` a convivencia.
-  **Un incidente puede ser entre estudiantes de grupos o grados distintos**: la selección de la pantalla sobrevive al cambio de grupo y de búsqueda (chips «Seleccionados») y cada registro queda en el grupo de su estudiante. El
+- **Buscador propio** (`GET /observaciones/estudiantes`, `/grupos`): acotado a las sedes del usuario (docente incluido). No se abre `/students` a convivencia.
   **Quien ve algo lo registra** (decisión del usuario: p. ej. el docente que anota las llegadas tarde en la puerta, o el que presencia una pelea en el recreo): un DOCENTE registra observaciones y faltas (de cualquier tipo, incluido el reporte grave)
-  sobre **cualquier estudiante de las sedes que tiene asignadas**, dicte o no en su grupo (`permisoSobreEstudiante`; el de otra sede recibe 404 y no se guarda nada a medias). El registro queda con el contexto `SEDE` («Docente de la sede») en vez de `CLASE`/`DIRECCION_GRUPO`.
-  **Lo que no cambia:** consultar el historial del estudiante y el estado de su caso sigue siendo solo del **director de su grupo**, y el docente ve en el buscador el **documento solo de los estudiantes de sus grupos** (de los demás, nombre y grupo; `gruposPropiosDelDocente`).
-  **M16 conserva su alcance anterior:** su buscador reusa `gruposAccesibles`/`buscarEstudiantes` con `soloVinculo = true`, así que allí el docente sigue viendo solo los grupos que dicta o dirige. Un reporte grave no mezcla sedes (400).
+  sobre **cualquier estudiante de las sedes que tiene asignadas**, dicte o no en su grupo (`permisoSobreEstudiante`; el de otra sede recibe 404 y no se guarda nada a medias). Un mismo reporte grave o una falta escalada no mezclan sedes (400). El registro queda con el contexto `SEDE` («Docente de la sede») en vez de `CLASE`/`DIRECCION_GRUPO`.
+  **Lo que no cambia:** consultar el historial del estudiante y el estado de su caso sigue siendo solo del **director de su grupo**, y el docente ve en el buscador el **documento solo de los estudiantes de sus grupos** (de los demás, nombre y grupo; `gruposPropiosDelDocente`, y la búsqueda por documento tampoco los encuentra, para que no se reconstruya).
+  **M16 conserva su alcance anterior:** su buscador reusa `gruposAccesibles`/`buscarEstudiantes` con `soloVinculo = true`, así que allí el docente sigue viendo solo los grupos que dicta o dirige.
   **Un incidente puede ser entre estudiantes de grupos o grados distintos**: la selección sobrevive al cambio de grupo y de búsqueda (chips «Seleccionados») y cada registro queda en el grupo de su estudiante. Coordinación abre el caso con
   estudiantes de cualquier grupo de su sede (`tests/integracion/incidenteEntreGrupos.int.test.ts`).
 - **Se audita también la lectura** (`CONVIVENCIA_HISTORIAL_CONSULTADO`, `..._OBSERVACIONES_PROPIAS_CONSULTADAS`). El `detalle` de la auditoría
@@ -435,7 +433,7 @@ las pestañas Faltas / Medidas / Entidades / Protocolos / Plazos de `CatalogoCon
   cuántos acudientes con portal), así el coordinador no anota a mano lo que el sistema ya hizo; solo se anota si había al menos un acudiente con portal. Las familias sin portal se informan por fuera y se **anota con una
   sola nota** («A quién se informó y cómo»: ya no hay tipo ni medio que elegir, el sistema no llama ni envía mensajes; `tipo` y `medio` son opcionales en la API y quedan `ACUDIENTES`/`OTRO`) o se las cita (M24).
 - **Qué cuenta como falta para otros módulos** (`faltasContadas`, `faltasConvivencia.service.ts`): un solo criterio para la promoción M19 (`FALTAS_CONVIVENCIA_AL_MENOS` y el cierre que lee el
-  rollover), el módulo predictivo, la ficha técnica de la comisión M20 y el panel de convivencia M30. **Tipo I** = las faltas que el docente registró en el Observador; **tipo II y III** = solo
+  rollover), el módulo predictivo, la ficha técnica de la comisión M20 y el panel de convivencia M30. **Tipo I** = las faltas que el docente registró en el Observador (una Tipo I escalada que se vuelve caso II/III con decisión cuenta como el caso, no dos veces; una **Tipo II que el docente resolvió él mismo** también es una observación y cuenta como II); **tipo II y III** = solo
   los casos con **decisión en firme** (`decision` registrada, caso sin anular), una vez por cada presunto responsable y con el tipo vigente del caso. Un reporte urgente, una solicitud o un caso sin
   decisión **no es una falta** (presunción de inocencia; un caso descartado no debe dejar rastro). Una falta II/III guardada como observación antes del reporte urgente sigue contando mientras no
   esté ligada a un caso (`observacion_ids`); si ya tiene caso, cuenta el caso y solo con decisión, para no contarla dos veces. El panel de convivencia excluye los casos de los que el usuario se

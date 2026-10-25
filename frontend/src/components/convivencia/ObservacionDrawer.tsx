@@ -47,8 +47,9 @@ function Formulario({ onClose, catalogo = SIN_CATALOGO, estudiantes: inicial = [
   const mutation = enmienda ? enmendar : registrar;
 
   const esFalta = observacion?.clase === 'FALTA';
-  // Registros anteriores de una falta Tipo II/III: la versión del estudiante y el acuerdo los gestiona convivencia, no se enmiendan aquí.
-  const faltaLeve = esFalta && observacion?.gravedad === 'I';
+  // Una falta Tipo II/III que sigue su curso en convivencia (tiene solicitud o caso): la versión del estudiante y el acuerdo los gestiona convivencia, no se editan aquí.
+  // La Tipo II que el docente resolvió él mismo no tiene solicitud y se edita como una Tipo I.
+  const faltaLeve = esFalta && (observacion?.gravedad === 'I' || !observacion?.solicitud_id);
   const [tipoId, setTipoId] = useState(catalogo.tipos[0]?._id ?? '');
   const [fecha, setFecha] = useState(hoyLocal());
   const [descripcion, setDescripcion] = useState(observacion?.descripcion ?? '');

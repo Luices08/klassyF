@@ -159,8 +159,9 @@ export function avisarBoletinPublicado(grupo: { groupId: Id; academicYearId: Id;
  * sin nombres de otros menores y sin decir qué papel tuvo cada uno (el Decreto 1965 pide informar de inmediato a las familias de las dos partes, art. 43 y 44).
  * Es una alerta en su campanita y un punto en la pestaña de convivencia de ese hijo; el informe formal queda registrado en el caso como «notificación a acudientes».
  */
-export function avisarSituacionDeConvivencia(casoId: Id, estudiantes: Id[]): Promise<void> {
-  return sinRomper('situación de convivencia', async () => {
+export async function avisarSituacionDeConvivencia(casoId: Id, estudiantes: Id[]): Promise<number> {
+  const avisados = new Set<string>();
+  await sinRomper('situación de convivencia', async () => {
     for (const estudianteId of new Set(estudiantes.map(String))) {
       const [estudiante, acudientes] = await Promise.all([User.findById(estudianteId).select('nombre apellido').lean(), acudientesConPortalDe([estudianteId])]);
       await avisar({
@@ -172,8 +173,10 @@ export function avisarSituacionDeConvivencia(casoId: Id, estudiantes: Id[]): Pro
         ruta: '/portal',
       });
       await sumarInsignia({ destinatarios: acudientes, rol: ROLES.ACUDIENTE, ruta: '/portal', pestana: pestanaDeHijo('convivencia', estudianteId) });
+      for (const acudiente of acudientes) avisados.add(String(acudiente));
     }
   });
+  return avisados.size;
 }
 
 /**

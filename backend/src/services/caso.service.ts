@@ -37,7 +37,6 @@ import { fechaDeClase, hoyColombia } from './attendance.service';
 import { registrarEvento } from './audit.service';
 import { obtenerConfiguracion } from './convivenciaCatalogo.service';
 import { exigirPermisoSobreEstudiante } from './observacion.service';
-import { acudientesConPortalDe } from './destinatariosNotificacion.service';
 import { avisarRemisionesOrientacion, avisarSituacionDeConvivencia } from './notificacionesEventos.service';
 import { auditarRemisionesCreadas, remitirManualmente, resumenDeRemisionesDelCaso } from './remisionOrientacion.service';
 
@@ -134,8 +133,8 @@ async function vistaCaso(caso: CasoConvivenciaDocument) {
  */
 async function avisarFamiliasDelCaso(caso: CasoConvivenciaDocument, usuario: UserDocument): Promise<boolean> {
   const estudiantes = caso.involucrados.filter((i) => ROLES_CUYA_FAMILIA_SE_INFORMA.includes(i.rol)).map((i) => i.student_id);
-  await avisarSituacionDeConvivencia(caso._id, estudiantes);
-  const conPortal = new Set((await acudientesConPortalDe(estudiantes)).map(String)).size;
+  // La constancia es solo de lo que se avisó de verdad: si el aviso falló, el informe a los acudientes sigue pendiente.
+  const conPortal = await avisarSituacionDeConvivencia(caso._id, estudiantes);
   if (conPortal === 0) return false;
   caso.notificaciones.push({
     tipo: 'ACUDIENTES',

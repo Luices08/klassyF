@@ -35,7 +35,7 @@ export interface SesionParaPeriodicidad {
 }
 
 export interface PeriodicidadComite {
-  /** Fecha de la última sesión ordinaria ya realizada (o que ya llegó su fecha), sin contar las anuladas. */
+  /** Fecha de la última sesión ordinaria con acta firmada. */
   ultima_ordinaria: Date | null;
   /** La próxima sesión ordinaria ya convocada, si la hay. */
   proxima_programada: Date | null;
@@ -53,8 +53,8 @@ const sumarMeses = (fecha: Date, meses: number) => new Date(Date.UTC(fecha.getUT
  */
 export function periodicidadDelComite(sesiones: readonly SesionParaPeriodicidad[], hoy: Date, inicioAnio: Date | null): PeriodicidadComite {
   const ordinarias = sesiones.filter((s) => s.tipo === 'ORDINARIA' && s.estado !== 'ANULADA');
-  const realizadas = ordinarias.filter((s) => s.fecha.getTime() <= hoy.getTime()).map((s) => s.fecha.getTime());
-  const futuras = ordinarias.filter((s) => s.fecha.getTime() > hoy.getTime()).map((s) => s.fecha.getTime());
+  const realizadas = ordinarias.filter((s) => s.estado === 'FIRMADA' && s.fecha.getTime() <= hoy.getTime()).map((s) => s.fecha.getTime());
+  const futuras = ordinarias.filter((s) => s.estado !== 'FIRMADA' && s.fecha.getTime() > hoy.getTime()).map((s) => s.fecha.getTime());
   const ultima = realizadas.length > 0 ? new Date(Math.max(...realizadas)) : null;
   const proxima = futuras.length > 0 ? new Date(Math.min(...futuras)) : null;
   const referencia = ultima ?? inicioAnio;

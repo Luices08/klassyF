@@ -81,6 +81,22 @@ describe('Faltas de convivencia que cuentan en otros módulos (con base de datos
     expect((await faltasContadas({ academic_year_id: anioId })).map((f) => f.gravedad)).toEqual(['II']);
   });
 
+  it('una falta Tipo II que el docente resolvió él mismo cuenta como II; una Tipo I escalada que se vuelve caso con decisión cuenta como el caso, no dos veces', async () => {
+    await observaciones.registrarFalta({ falta_id: e.faltaII, fecha_hecho: hoy(), hechos: 'Empujó a un compañero; ya lo hablé con ambos.', estudiantes_ids: [String(e.otroEstudiante._id)] }, e.docenteDeClase);
+    expect((await faltasContadas({ academic_year_id: anioId })).map((f) => f.gravedad)).toEqual(['II']);
+
+    const { registros } = await observaciones.registrarFalta({ falta_id: e.faltaI, fecha_hecho: hoy(), hechos: 'Reincidente.', estudiantes_ids: [String(e.estudiante._id)], escalar_a_coordinacion: true }, e.docenteDeClase);
+    const caso = await abrirGrave('II');
+    await CasoConvivencia.updateOne({ _id: caso._id }, { $set: { observacion_ids: [registros[0]!._id] } });
+    // Sin decisión, la I sigue contando.
+    expect(contarPorEstudiante(await faltasContadas({ academic_year_id: anioId })).get(String(e.estudiante._id))).toEqual({ I: 1 });
+
+    await conDecision(caso._id, e.faltaII);
+    expect(contarPorEstudiante(await faltasContadas({ academic_year_id: anioId })).get(String(e.estudiante._id))).toEqual({ II: 1 });
+    // Pedir solo a ese estudiante da lo mismo (el filtro no cambia la cuenta).
+    expect(contarPorEstudiante(await faltasContadas({ academic_year_id: anioId, estudiantes_ids: [e.estudiante._id] })).get(String(e.estudiante._id))).toEqual({ II: 1 });
+  });
+
   it('el filtro por fecha, por estudiante y por declararse impedido acota lo que se cuenta', async () => {
     const caso = await abrirGrave('II');
     await conDecision(caso._id, e.faltaII);

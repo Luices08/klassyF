@@ -29,8 +29,9 @@ const GRAVES: TipoSituacion[] = ['II', 'III'];
  * - **Tipo I:** las que el docente registró como falta en el Observador (antecedente pedagógico).
  * - **Tipo II y III:** solo cuentan los casos con **decisión en firme** (`decision` registrada y el caso sin anular), una vez por cada presunto responsable.
  *   Un reporte urgente o una solicitud aún sin resolver no es una falta: la presunción de inocencia manda y un caso descartado no deja rastro.
- * - **Registros anteriores al reporte urgente:** una falta II/III guardada como observación sigue contando mientras no esté ligada a un caso; si ya tiene caso, cuenta
- *   el caso (y solo con decisión), para no contarla dos veces.
+ * - **Una Tipo II resuelta por el docente** (sin enviarla a coordinación) queda como observación y cuenta como II mientras no esté ligada a un caso; lo mismo una II/III de
+ *   los registros anteriores al reporte urgente. Si ya tiene caso, cuenta el caso (y solo con decisión), para no contarla dos veces.
+ * - **Una Tipo I escalada** que luego se vuelve un caso II/III con decisión cuenta como el caso, no como I y además como II/III.
  */
 export async function faltasContadas(filtro: FiltroFaltas): Promise<FaltaContada[]> {
   const anio = new Types.ObjectId(String(filtro.academic_year_id));
@@ -42,19 +43,25 @@ export async function faltasContadas(filtro: FiltroFaltas): Promise<FaltaContada
     academic_year_id: anio,
     estado: { $ne: 'ANULADO' },
     ...(filtro.excluirImpedido ? { 'impedidos.usuario_id': { $ne: filtro.excluirImpedido } } : {}),
+    ...(estudiantes ? { 'involucrados.student_id': { $in: estudiantes } } : {}),
     ...porSede,
   })
     .select('tipo_situacion decision.fecha involucrados.student_id involucrados.rol observacion_ids')
     .lean();
 
   const ligadas = casos.flatMap((c) => (c.observacion_ids ?? []).map(String));
+  // Lo que ya cuenta por un caso grave con decisión no se cuenta además como la falta leve de la que nació.
+  const ligadasACasoContado = casos.filter((c) => GRAVES.includes(c.tipo_situacion) && c.decision?.fecha).flatMap((c) => (c.observacion_ids ?? []).map(String));
   const observaciones = await Observacion.find({
     academic_year_id: anio,
     clase: 'FALTA',
     estado: 'ACTIVA',
     ...(filtro.desde ? { fecha_hecho: { $gte: filtro.desde } } : {}),
     // Una grave que ya tiene caso se cuenta por el caso.
-    $or: [{ 'falta.gravedad': 'I' }, { 'falta.gravedad': { $in: GRAVES }, _id: { $nin: ligadas.map((id) => new Types.ObjectId(id)) } }],
+    $or: [
+      { 'falta.gravedad': 'I', _id: { $nin: ligadasACasoContado.map((id) => new Types.ObjectId(id)) } },
+      { 'falta.gravedad': { $in: GRAVES }, _id: { $nin: ligadas.map((id) => new Types.ObjectId(id)) } },
+    ],
     ...porEstudiante,
     ...porSede,
   })

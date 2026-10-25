@@ -50,7 +50,7 @@ export const crearSesion: ValidationSchema = {
     hora,
     lugar: Joi.string().trim().max(200).allow(''),
     orden_del_dia: Joi.string().trim().max(3000).allow(''),
-    convocatoria,
+    convocatoria: convocatoria.required(),
   }),
 };
 

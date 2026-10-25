@@ -16,8 +16,9 @@ hipótesis de trabajo para revisar con asesoría jurídica de la institución, n
 > **Actualización 2026-10 — ajuste normativo (rama `feat/m14-m15-ajuste-normativo-convivencia`).** Se revisó lo construido contra la Ley 1620 de 2013, el Decreto 1965 de 2013
 > (compilado en el Decreto 1075 de 2015) y la Sentencia T-076/26, y se quitó lo que la norma no pide. **Las referencias siguen siendo un resumen de trabajo: validar con SUIN-Juriscol.**
 > Lo que cambió respecto de este análisis:
-> 1. **El docente no tipifica lo grave.** Una falta tipo II o III ya no se registra como falta: el docente hace un **reporte urgente** (qué pasó, a quiénes nombra y qué contención aplicó),
->    que crea una solicitud sin tipificar y una alerta crítica; coordinación de convivencia elige el tipo y asigna los roles al abrir el caso. No deja antecedente en el Observador de nadie.
+> 1. **Lo grave no deja antecedente hasta que hay decisión.** Una falta tipo II (enviada a coordinación) o III ya no se registra como falta en el Observador: el docente elige la falta del manual
+>    y hace un **reporte** (qué pasó, a quiénes nombra y qué contención aplicó), que crea una solicitud y una alerta crítica; coordinación de convivencia confirma el tipo y asigna los roles al abrir el caso.
+>    (Versión inicial: el docente no tipificaba; después se decidió que elija el tipo y la falta, y que una Tipo II que resolvió él mismo quede en el Observador como una Tipo I.)
 > 2. **Se retiró el descuento de décimas** (campo y columna de la carga de faltas) y la **remisión automática a orientación** por bandera de medida o paso: la remisión es manual.
 > 3. **Ruta de atención del Decreto 1965** (arts. 42 a 44): protocolo estándar cargable (solo rellena el formulario) y **aviso sin detalle a las familias** de afectados y presuntos responsables al abrir un caso II/III.
 > 4. **Comité** (arts. 23 a 25): convocatoria con fecha futura y medio de citación, excusas, secretaría técnica, periodicidad mínima de una sesión ordinaria cada dos meses (alerta) y quórum por caso
@@ -25,6 +26,8 @@ hipótesis de trabajo para revisar con asesoría jurídica de la institución, n
 > 5. **Qué cuenta como falta para los demás módulos** (promoción M19, predictivo, ficha de la comisión M20 y panel de convivencia M30): Tipo I del Observador y tipo II/III **solo con decisión en firme** del caso
 >    (`faltasConvivencia.service`), nunca un reporte o una solicitud sin resolver (presunción de inocencia).
 > 6. Orientación: el seguimiento psicosocial es visible solo para su autor y el ADMIN. **Pospuesto:** colapsar los estados del caso.
+> 7. **Quien ve algo lo registra** (supera la fila 7 de la sección 8, «grupos que dictan o dirigen»): un docente registra sobre cualquier estudiante de su sede; el historial sigue siendo solo del director de grupo.
+>    Los registros se pueden **editar, eliminar** (error de digitación: dentro del plazo y sin uso) o **anular**; la remisión a entidades externas solo exige entidad y fecha.
 >
 > Los detalles operativos de cada cambio están en las secciones M14/M15 de `CLAUDE.md`.
 

@@ -195,8 +195,8 @@ export async function buscarEstudiantes(usuario: UserDocument, { group_id, q }: 
     group_id: { $in: grupos.map((g) => g._id) },
     estado: { $in: ESTADOS_MATRICULA_ACTIVOS },
   };
-  if (texto) {
-    const patron = new RegExp(escaparRegex(texto), 'i');
+  const patron = texto ? new RegExp(escaparRegex(texto), 'i') : null;
+  if (patron) {
     const coincidentes = await User.find({
       roles: ROLES.ESTUDIANTE,
       $or: [{ nombre: patron }, { apellido: patron }, { numero_documento: patron }],
@@ -206,6 +206,7 @@ export async function buscarEstudiantes(usuario: UserDocument, { group_id, q }: 
     filtroMatricula.student_id = { $in: coincidentes.map((u) => u._id) };
   }
 
+  const coincideNombre = (u: { nombre: string; apellido: string }) => Boolean(patron) && (patron!.test(u.nombre) || patron!.test(u.apellido));
   const matriculas = await Enrollment.find(filtroMatricula)
     .populate<{ student_id: { _id: Types.ObjectId; nombre: string; apellido: string; numero_documento: string } }>(
       'student_id',
@@ -214,7 +215,8 @@ export async function buscarEstudiantes(usuario: UserDocument, { group_id, q }: 
     .limit(group_id ? 200 : LIMITE_BUSQUEDA);
 
   return matriculas
-    .filter((m) => m.student_id)
+    // El documento de un grupo ajeno no se muestra ni sirve para buscar: si no coincide por nombre, ese estudiante no sale.
+    .filter((m) => m.student_id && (!propios || !patron || propios.has(String(m.group_id)) || coincideNombre(m.student_id)))
     .map((m) => ({
       student_id: String(m.student_id._id),
       nombre: m.student_id.nombre,
@@ -421,8 +423,10 @@ export async function registrarFalta(input: RegistrarFaltaInput, usuario: UserDo
   const estudiantesIds = unicos(input.estudiantes_ids);
   if (estudiantesIds.length === 0) throw new ApiError(400, 'Indica al menos un estudiante.');
 
-  // El docente solo puede nombrar estudiantes de sus grupos (los mismos que ve en el buscador).
   const resueltos = await resolverEstudiantes(usuario, estudiantesIds, 'REGISTRAR_FALTA', fecha, anio);
+  if (input.escalar_a_coordinacion && new Set(resueltos.map((r) => String(r.contexto.grupo.sede_id))).size > 1) {
+    throw new ApiError(400, 'Para escalar a coordinación los estudiantes deben ser de la misma sede: registra aparte lo de cada sede.');
+  }
   const eventoId = estudiantesIds.length > 1 ? new Types.ObjectId() : null;
   const escalada = Boolean(input.escalar_a_coordinacion);
   const solicitudId = escalada ? new Types.ObjectId() : null;
@@ -834,7 +838,7 @@ export async function enmendarObservacion(
   const obs = await cargarParaCorregir(id, usuario, (c) => c.plazo_enmienda_horas);
 
   const esFalta = obs.clase === 'FALTA';
-  const esFaltaGrave = esFalta && obs.falta?.gravedad !== 'I';
+  const esFaltaGrave = esFalta && esGraveEnTramite(obs);
   if (esFalta && (input.requiere_citacion !== undefined || input.confidencial !== undefined)) {
     throw new ApiError(400, 'Una falta no usa citación ni confidencialidad.');
   }
@@ -900,7 +904,9 @@ export async function eliminarObservacion(id: string, usuario: UserDocument, ip?
   if (!dentroDelPlazo(obs.createdAt, configuracion.plazo_anulacion_horas)) {
     throw new ApiError(403, 'Venció el plazo para eliminar: anula el registro con su motivo.');
   }
-  await obs.deleteOne();
+  // Condicionado: si entre la comprobación y el borrado alguien le puso seguimiento, citación o solicitud, no se borra.
+  const borrada = await Observacion.deleteOne({ _id: obs._id, solicitud_id: null, citacion_realizada: null, 'seguimientos.0': { $exists: false } });
+  if (borrada.deletedCount !== 1) throw new ApiError(409, 'El registro se acaba de usar: no se elimina, anúlalo con motivo.');
 
   await registrarEvento({ usuario_id: usuario._id, accion: 'OBSERVACION_ELIMINADA', entidad: 'Observacion', entidad_id: obs._id, ip });
   return { _id: String(obs._id) };

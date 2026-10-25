@@ -41,7 +41,7 @@ export const esSeguimientoDeOrientacion = (obs: { contexto?: string }): boolean 
  *    (contexto ORIENTACION): ese solo lo leen su autor y el ADMIN.
  *  - Una observación confidencial solo la leen su autor y orientación.
  *  - Las faltas no las ve el coordinador académico; una Tipo II/III solo la ve completa su autor (el resto, que existe).
- * El acceso al estudiante (sede, grupo que dicta o dirige) lo decide antes `permisoSobreEstudiante`.
+ * El acceso al estudiante (su sede; y para el historial, ser el director de su grupo) lo decide antes `permisoSobreEstudiante`.
  */
 export function visibilidadDeObservacion(
   rol: Rol,

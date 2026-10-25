@@ -125,6 +125,23 @@ describe('incidente entre estudiantes de distintos grupos (con base de datos)', 
     expect(await SolicitudCaso.countDocuments()).toBe(0);
   });
 
+  it('escalar una falta leve tampoco mezcla estudiantes de sedes distintas', async () => {
+    const anio = (await AcademicYear.findOne())!;
+    const base = (await Group.findOne())!;
+    const otraSedeId = e.coordConvivenciaOtraSede.sedes_ids[0]!;
+    const jornada = await JornadaOperativa.create({ sede_id: otraSedeId, nombre: 'MANANA', hora_inicio: '06:00', hora_fin: '12:00' });
+    const grupoRural = await Group.create({ sede_id: otraSedeId, academic_year_id: anio._id, grade_id: base.grade_id, jornada_id: jornada._id, nomenclatura: '601', max_capacity: 40 });
+    const rural = await crearUsuario('ESTUDIANTE');
+    await Enrollment.create({ student_id: rural._id, group_id: grupoRural._id, academic_year_id: anio._id, tipo_ingreso: 'NUEVO', estado: 'MATRICULADO_DEFINITIVO', folio_matricula: `F-${rural.numero_documento}` });
+    const docente = await crearUsuario('DOCENTE', { sedes_ids: [base.sede_id, otraSedeId] });
+    const datos = { falta_id: e.faltaI, fecha_hecho: hoy(), hechos: 'Se empujaron en la fila.', estudiantes_ids: [id(e.estudiante), id(rural)] };
+    await expect(observaciones.registrarFalta({ ...datos, escalar_a_coordinacion: true }, docente)).rejects.toMatchObject({ statusCode: 400, message: expect.stringContaining('misma sede') });
+    expect(await SolicitudCaso.countDocuments()).toBe(0);
+    // Sin escalar, cada registro queda en la sede de su estudiante.
+    const { registros } = await observaciones.registrarFalta(datos, docente);
+    expect(registros).toHaveLength(2);
+  });
+
   it('el docente elige cualquier grupo de su sede y ve sus estudiantes sin documento; los de sus grupos sí lo traen', async () => {
     const grupos = await observaciones.gruposAccesibles(e.docenteDeClase);
     expect(grupos.map((g) => g.nomenclatura)).toEqual(expect.arrayContaining(['601', '602', '603']));

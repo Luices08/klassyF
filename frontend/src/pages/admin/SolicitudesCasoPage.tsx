@@ -139,7 +139,7 @@ function Formulario({ solicitud, onClose }: { solicitud: SolicitudCasoVista; onC
       submitDisabled={motivo.trim().length < 5}
     >
       {descartar.isError && <Alert tone="error">{errorMessage(descartar.error)}</Alert>}
-      <Alert tone="warning">{solicitud.falta ? 'La falta se conserva en el Observador; solo se cierra la solicitud, con el motivo que escribas.' : 'El reporte no genera antecedente en el Observador; solo se cierra la solicitud, con el motivo que escribas.'}</Alert>
+      <Alert tone="warning">{solicitud.falta ? 'La falta se conserva en el Observador; solo se cierra la solicitud. El docente que la envió verá el motivo que escribas: no menciones a otros estudiantes.' : 'El reporte no genera antecedente en el Observador; solo se cierra la solicitud. El docente que lo envió verá el motivo que escribas: no menciones a otros estudiantes.'}</Alert>
       <Textarea label="Motivo" rows={3} maxLength={1000} value={motivo} onChange={(e) => setMotivo(e.target.value)} />
     </Drawer>
   );

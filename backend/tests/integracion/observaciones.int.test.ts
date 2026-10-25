@@ -227,6 +227,12 @@ describe('M14 observaciones y faltas (con base de datos)', () => {
       await expect(observaciones.enmendarObservacion(obs!._id, { descripcion: 'No es suyo.' }, e.docenteAjeno)).rejects.toMatchObject({ statusCode: 404 });
     });
 
+    it('una falta Tipo II que el docente resolvió él mismo se edita como una Tipo I (versión del estudiante y acuerdo)', async () => {
+      const { registros } = await registrarFalta(e.docenteDeClase, { falta_id: e.faltaII, compromiso: 'Pedirá disculpas.' });
+      const editada = await observaciones.enmendarObservacion(registros[0]!._id, { version_estudiante: 'Dice que fue sin querer.', compromiso: 'Pedirá disculpas por escrito.' }, e.docenteDeClase);
+      expect(editada).toMatchObject({ gravedad: 'II', version_estudiante: 'Dice que fue sin querer.', compromiso: 'Pedirá disculpas por escrito.' });
+    });
+
     it('el autor elimina por completo un registro sin usar dentro del plazo y en la auditoría queda quién y cuándo', async () => {
       const [obs] = await registrar(e.docenteDeClase, [id(e.estudiante)]);
       await expect(observaciones.eliminarObservacion(obs!._id, e.docenteDeClase)).resolves.toMatchObject({ _id: obs!._id });
@@ -297,6 +303,9 @@ describe('M14 observaciones y faltas (con base de datos)', () => {
       expect(deLaSede.length).toBe(propios.length);
       expect(deLaSede.every((s) => s.numero_documento === '')).toBe(true);
       expect(await observaciones.buscarEstudiantes(e.docenteAjeno, { q: 'Apellido' }, true)).toHaveLength(0);
+      // Buscar por documento no sirve para reconstruir el de un estudiante de otro grupo; en los grupos propios sí.
+      expect(await observaciones.buscarEstudiantes(e.docenteAjeno, { q: e.estudiante.numero_documento })).toHaveLength(0);
+      expect((await observaciones.buscarEstudiantes(e.docenteDeClase, { q: e.estudiante.numero_documento })).map((s) => s.student_id)).toEqual([id(e.estudiante)]);
       expect(await observaciones.buscarEstudiantes(e.docenteOtraSede, { q: 'Apellido' })).toHaveLength(0);
       expect(await observaciones.buscarEstudiantes(e.coordConvivenciaOtraSede, { q: 'Apellido' })).toHaveLength(0);
       expect(await observaciones.buscarEstudiantes(e.coordConvivencia, { q: 'ap' })).toHaveLength(0);

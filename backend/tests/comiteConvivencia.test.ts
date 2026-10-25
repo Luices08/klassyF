@@ -77,6 +77,11 @@ describe('periodicidadDelComite (Decreto 1965, art. 23)', () => {
     expect(p).toMatchObject({ vencida: true, proxima_programada: dia('2026-04-01') });
   });
 
+  it('una ordinaria con la fecha ya pasada pero sin acta firmada no salva el plazo', () => {
+    const p = periodicidadDelComite([ordinaria('2026-01-10'), ordinaria('2026-03-01', 'BORRADOR')], dia('2026-03-20'), null);
+    expect(p).toMatchObject({ ultima_ordinaria: dia('2026-01-10'), vencida: true });
+  });
+
   it('sin sesiones ni inicio de año no puede decir que está vencida', () => {
     expect(periodicidadDelComite([], dia('2026-03-20'), null)).toMatchObject({ limite: null, vencida: false });
   });

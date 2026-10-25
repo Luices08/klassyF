@@ -37,7 +37,7 @@ export function ObservadorPage() {
         title="Observador del estudiante"
         subtitle={
           user?.rol === 'DOCENTE'
-            ? 'Registra observaciones de tus estudiantes y consulta lo que tú registraste.'
+            ? 'Registra observaciones y faltas de los estudiantes de tu sede y consulta lo que tú registraste.'
             : 'Registra y consulta el seguimiento académico y comportamental de los estudiantes.'
         }
       />
@@ -108,7 +108,7 @@ function RegistrarTab({ esDocente, puedeRegistrarFalta }: { esDocente: boolean; 
     <Card>
       <CardHeader
         title="Estudiantes"
-        subtitle="Consulta el historial de tus estudiantes. Para registrar no hace falta marcar a nadie aquí: el formulario te deja elegir grupo y estudiantes de toda tu sede."
+        subtitle="Para registrar no hace falta marcar a nadie aquí: el formulario te deja elegir grupo y estudiantes de toda tu sede. El historial solo lo ve el director de cada grupo."
         action={
           <div className="flex flex-wrap gap-2">
             {puedeRegistrarFalta && (
@@ -155,7 +155,7 @@ function RegistrarTab({ esDocente, puedeRegistrarFalta }: { esDocente: boolean; 
       {(grupos.data ?? []).length === 0 && (
         <div className="px-4 pb-4">
           <Alert tone="info">
-            No hay grupos disponibles: se necesita un año lectivo en curso y tener grupos asignados (clases o dirección de grupo).
+            No hay grupos disponibles: se necesita un año lectivo en curso y tener una sede asignada con grupos.
           </Alert>
         </div>
       )}

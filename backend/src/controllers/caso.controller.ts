@@ -93,7 +93,7 @@ export const eliminarEntidad = catchAsync<IdParams>(async (req, res) => {
   res.status(200).json({ success: true });
 });
 
-export const guardarProtocolo = catchAsync<{ tipo: TipoSituacion } & ParamsDictionary, unknown, { pasos: { nombre: string; obligatorio: boolean; remite_a_orientacion: boolean }[] }>(
+export const guardarProtocolo = catchAsync<{ tipo: TipoSituacion } & ParamsDictionary, unknown, { pasos: { nombre: string; obligatorio: boolean }[] }>(
   async (req, res) => {
     res.status(200).json({ success: true, data: await catalogoService.guardarProtocolo(req.params.tipo, req.body.pasos, actor(req)) });
   }
@@ -105,7 +105,7 @@ export const abrirCaso = catchAsync<unknown, unknown, casoService.AbrirCasoInput
   res.status(201).json({ success: true, data: await casoService.abrirCaso(req.body, req.user!, req.ip) });
 });
 
-export const listarCasos = catchAsync<unknown, unknown, unknown, ParsedQs & { estado?: EstadoCaso; tipo_situacion?: TipoSituacion; sede_id?: string; pagina?: number; limite?: number }>(
+export const listarCasos = catchAsync<unknown, unknown, unknown, ParsedQs & { estado?: EstadoCaso; tipo_situacion?: TipoSituacion; sede_id?: string; codigo?: string; pagina?: number; limite?: number }>(
   async (req, res) => {
     const { pagina, limite, ...filtros } = req.query;
     const resultado = await casoService.listarCasos(req.user!, filtros, { pagina: Number(pagina ?? 1), limite: Number(limite ?? 20) });

@@ -5,6 +5,7 @@ import { HistorialObservaciones } from '../components/convivencia/HistorialObser
 import { ChipsObservacion } from '../components/convivencia/ObservacionesTimeline';
 import { ObservacionDrawer } from '../components/convivencia/ObservacionDrawer';
 import { Alert, errorMessage } from '../components/ui/Alert';
+import { Chip } from '../components/ui/Badge';
 import { Button } from '../components/ui/Button';
 import { Card, CardHeader } from '../components/ui/Card';
 import { Drawer } from '../components/ui/Drawer';
@@ -20,6 +21,7 @@ import {
   useEstudiantesObservables,
   useGruposObservables,
   useMisObservaciones,
+  useMisReportesUrgentes,
 } from '../hooks/useObservaciones';
 import { formatoFechaCalendario } from '../lib/fechas';
 import { SelectBuscable } from '../components/ui/SelectBuscable';
@@ -27,6 +29,7 @@ import { SelectBuscable } from '../components/ui/SelectBuscable';
 export function ObservadorPage() {
   const { user } = useAuth();
   const [tab, setTab] = useState('registrar');
+  const puedeReportar = user?.rol === 'DOCENTE' || user?.rol === 'COORDINADOR_CONVIVENCIA' || user?.rol === 'ADMIN';
 
   return (
     <div className="space-y-4">
@@ -34,7 +37,7 @@ export function ObservadorPage() {
         title="Observador del estudiante"
         subtitle={
           user?.rol === 'DOCENTE'
-            ? 'Registra observaciones de tus estudiantes y consulta lo que tú registraste.'
+            ? 'Registra observaciones y faltas de los estudiantes de tu sede y consulta lo que tú registraste.'
             : 'Registra y consulta el seguimiento académico y comportamental de los estudiantes.'
         }
       />
@@ -42,6 +45,7 @@ export function ObservadorPage() {
         items={[
           { key: 'registrar', label: 'Registrar' },
           { key: 'mias', label: 'Mis registros' },
+          ...(puedeReportar ? [{ key: 'reportes', label: 'Mis faltas graves' }] : []),
         ]}
         active={tab}
         onChange={setTab}
@@ -49,12 +53,17 @@ export function ObservadorPage() {
       <TabPanel active={tab} tabKey="registrar">
         <RegistrarTab
           esDocente={user?.rol === 'DOCENTE'}
-          puedeRegistrarFalta={user?.rol === 'DOCENTE' || user?.rol === 'COORDINADOR_CONVIVENCIA' || user?.rol === 'ADMIN'}
+          puedeRegistrarFalta={puedeReportar}
         />
       </TabPanel>
       <TabPanel active={tab} tabKey="mias">
         <MisRegistrosTab />
       </TabPanel>
+      {puedeReportar && (
+        <TabPanel active={tab} tabKey="reportes">
+          <MisReportesTab />
+        </TabPanel>
+      )}
     </div>
   );
 }
@@ -65,7 +74,8 @@ function RegistrarTab({ esDocente, puedeRegistrarFalta }: { esDocente: boolean; 
   const [grupoId, setGrupoId] = useState('');
   const [busqueda, setBusqueda] = useState('');
   const estudiantes = useEstudiantesObservables({ group_id: grupoId || undefined, q: busqueda });
-  const [seleccion, setSeleccion] = useState<Set<string>>(new Set());
+  // La selección sobrevive al cambio de grupo y de búsqueda: un incidente puede ser entre estudiantes de grupos o grados distintos.
+  const [seleccion, setSeleccion] = useState<Map<string, EstudianteObservable>>(new Map());
   const [registrando, setRegistrando] = useState(false);
   const [registrandoFalta, setRegistrandoFalta] = useState(false);
   const [aviso, setAviso] = useState<string | null>(null);
@@ -75,13 +85,19 @@ function RegistrarTab({ esDocente, puedeRegistrarFalta }: { esDocente: boolean; 
   const grupoPorId = useMemo(() => new Map((grupos.data ?? []).map((g) => [g._id, g])), [grupos.data]);
   // El docente solo consulta el historial de los grupos que dirige; coordinación, el de sus sedes.
   const puedeVerHistorial = (e: EstudianteObservable) => !esDocente || Boolean(grupoPorId.get(e.group_id)?.es_director);
-  const elegidos = lista.filter((e) => seleccion.has(e.student_id));
+  const elegidos = [...seleccion.values()];
 
-  const alternar = (id: string) =>
+  const alternar = (estudiante: EstudianteObservable) =>
     setSeleccion((previa) => {
-      const siguiente = new Set(previa);
-      if (siguiente.has(id)) siguiente.delete(id);
-      else siguiente.add(id);
+      const siguiente = new Map(previa);
+      if (siguiente.has(estudiante.student_id)) siguiente.delete(estudiante.student_id);
+      else siguiente.set(estudiante.student_id, estudiante);
+      return siguiente;
+    });
+  const quitar = (id: string) =>
+    setSeleccion((previa) => {
+      const siguiente = new Map(previa);
+      siguiente.delete(id);
       return siguiente;
     });
 
@@ -92,15 +108,15 @@ function RegistrarTab({ esDocente, puedeRegistrarFalta }: { esDocente: boolean; 
     <Card>
       <CardHeader
         title="Estudiantes"
-        subtitle="Elige un grupo o busca por nombre o documento (mínimo 3 letras)."
+        subtitle="Para registrar no hace falta marcar a nadie aquí: el formulario te deja elegir grupo y estudiantes de toda tu sede. El historial solo lo ve el director de cada grupo."
         action={
           <div className="flex flex-wrap gap-2">
             {puedeRegistrarFalta && (
-              <Button variant="outline" disabled={elegidos.length === 0} onClick={() => setRegistrandoFalta(true)}>
-                Registrar falta
+              <Button variant="outline" onClick={() => setRegistrandoFalta(true)}>
+                Registrar falta{elegidos.length > 0 ? ` (${elegidos.length})` : ''}
               </Button>
             )}
-            <Button disabled={elegidos.length === 0} onClick={() => setRegistrando(true)}>
+            <Button onClick={() => setRegistrando(true)}>
               Registrar observación{elegidos.length > 0 ? ` (${elegidos.length})` : ''}
             </Button>
           </div>
@@ -112,18 +128,34 @@ function RegistrarTab({ esDocente, puedeRegistrarFalta }: { esDocente: boolean; 
           value={grupoId}
           onChange={(id) => {
             setGrupoId(id);
-            setSeleccion(new Set());
           }}
           placeholder="Buscar grupo…"
-          vacioLabel="Todos mis grupos (usa la búsqueda)"
+          vacioLabel="Toda la sede (usa la búsqueda)"
           opciones={(grupos.data ?? []).map((g) => ({ value: g._id, label: `${g.grado} · ${g.nomenclatura}${g.es_director ? ' (director)' : ''}` }))}
         />
         <Input label="Buscar" value={busqueda} onChange={(e) => setBusqueda(e.target.value)} placeholder="Nombre o documento" />
       </div>
+      {elegidos.length > 0 && (
+        <div className="flex flex-wrap items-center gap-2 px-4 pb-4">
+          <span className="text-label text-body">Seleccionados ({elegidos.length}):</span>
+          {elegidos.map((s) => (
+            <span key={s.student_id} className="inline-flex items-center gap-1.5 rounded-full bg-primary-soft px-3 py-1 text-xs text-primary">
+              {s.apellido} {s.nombre} · {s.grupo}
+              <button type="button" className="font-semibold hover:text-ink" aria-label={`Quitar a ${s.nombre} ${s.apellido}`} onClick={() => quitar(s.student_id)}>
+                ×
+              </button>
+            </span>
+          ))}
+          <Button variant="secondary" className="px-3 py-1 text-xs" onClick={() => setSeleccion(new Map())}>
+            Quitar a todos
+          </Button>
+          {new Set(elegidos.map((s) => s.group_id)).size > 1 && <span className="text-xs text-muted">De grupos distintos: cada registro queda en el grupo de su estudiante.</span>}
+        </div>
+      )}
       {(grupos.data ?? []).length === 0 && (
         <div className="px-4 pb-4">
           <Alert tone="info">
-            No hay grupos disponibles: se necesita un año lectivo en curso y tener grupos asignados (clases o dirección de grupo).
+            No hay grupos disponibles: se necesita un año lectivo en curso y tener una sede asignada con grupos.
           </Alert>
         </div>
       )}
@@ -156,7 +188,7 @@ function RegistrarTab({ esDocente, puedeRegistrarFalta }: { esDocente: boolean; 
                   aria-label={`Seleccionar a ${e.nombre} ${e.apellido}`}
                   className="h-4 w-4 rounded border-border text-primary focus:ring-primary"
                   checked={seleccion.has(e.student_id)}
-                  onChange={() => alternar(e.student_id)}
+                  onChange={() => alternar(e)}
                 />
               </Td>
               <Td>
@@ -186,12 +218,18 @@ function RegistrarTab({ esDocente, puedeRegistrarFalta }: { esDocente: boolean; 
           open={registrandoFalta}
           onClose={() => {
             setRegistrandoFalta(false);
-            setSeleccion(new Set());
+            setSeleccion(new Map());
           }}
           catalogo={catalogo.data}
           estudiantes={elegidos}
           onRegistrada={(r) =>
-            setAviso(r.remitida ? 'La falta quedó registrada y se envió a convivencia para que abra el caso.' : 'La falta quedó registrada en el Observador.')
+            setAviso(
+              r.grave
+                ? 'La falta se envió a coordinación de convivencia, que abre el caso. Puedes seguir su estado en «Mis faltas graves».'
+                : r.escalada
+                  ? 'La falta quedó registrada y se escaló a coordinación de convivencia.'
+                  : 'La falta quedó registrada en el Observador.'
+            )
           }
         />
       )}
@@ -200,7 +238,7 @@ function RegistrarTab({ esDocente, puedeRegistrarFalta }: { esDocente: boolean; 
           open={registrando}
           onClose={() => {
             setRegistrando(false);
-            setSeleccion(new Set());
+            setSeleccion(new Map());
           }}
           catalogo={catalogo.data}
           estudiantes={elegidos}
@@ -219,6 +257,73 @@ function RegistrarTab({ esDocente, puedeRegistrarFalta }: { esDocente: boolean; 
   );
 }
 
+const ESTADO_REPORTE = { PENDIENTE: { tono: 'orange', texto: 'En revisión de coordinación' }, CONVERTIDA: { tono: 'blue', texto: 'Caso abierto' }, DESCARTADA: { tono: 'neutral', texto: 'No ameritó caso' } } as const;
+
+/** Lo que el docente reportó y qué pasó con ello: nunca el expediente del caso, solo su código y estado. */
+function MisReportesTab() {
+  const [pagina, setPagina] = useState(1);
+  const reportes = useMisReportesUrgentes(pagina);
+
+  if (reportes.isLoading) return <Spinner />;
+  if (reportes.isError) return <Alert tone="error">{errorMessage(reportes.error)}</Alert>;
+  const { data = [], total = 0, limite = 20 } = reportes.data ?? {};
+  const paginas = Math.max(1, Math.ceil(total / limite));
+
+  return (
+    <Card>
+      <CardHeader title="Mis faltas graves" subtitle="Las faltas Tipo II y III que enviaste a coordinación de convivencia y en qué van." />
+      <Table>
+        <TableHead>
+          <tr>
+            <Th>Fecha</Th>
+            <Th>Estudiantes</Th>
+            <Th>Lo que reportaste</Th>
+            <Th>Estado</Th>
+          </tr>
+        </TableHead>
+        <TableBody>
+          {data.map((r) => (
+            <tr key={r._id}>
+              <Td>{formatoFechaCalendario(r.fecha_hecho)}</Td>
+              <Td>{r.estudiantes.join(', ')}</Td>
+              <Td className="max-w-md">
+                {r.falta && (
+                  <p className="mb-1 text-xs font-semibold text-ink">
+                    Tipo {r.falta.gravedad} · {r.falta.codigo} · {r.falta.descripcion}
+                  </p>
+                )}
+                <p className="whitespace-pre-line">{r.hechos}</p>
+                <p className="mt-1 whitespace-pre-line text-xs text-muted">Contención: {r.acciones_contencion}</p>
+              </Td>
+              <Td>
+                <Chip tone={ESTADO_REPORTE[r.estado].tono}>{ESTADO_REPORTE[r.estado].texto}</Chip>
+                {r.caso && <span className="mt-1 block text-xs text-muted">{r.caso.codigo}</span>}
+                {r.estado === 'DESCARTADA' && r.motivo_resolucion && <span className="mt-1 block text-xs text-muted">{r.motivo_resolucion}</span>}
+              </Td>
+            </tr>
+          ))}
+          {data.length === 0 && <EmptyRow colSpan={4}>Todavía no has enviado faltas graves a coordinación.</EmptyRow>}
+        </TableBody>
+      </Table>
+      {paginas > 1 && (
+        <div className="flex items-center justify-between p-4 text-sm text-muted">
+          <span>
+            Página {pagina} de {paginas}
+          </span>
+          <span className="flex gap-2">
+            <Button variant="secondary" disabled={pagina <= 1} onClick={() => setPagina((p) => p - 1)}>
+              Anterior
+            </Button>
+            <Button variant="secondary" disabled={pagina >= paginas} onClick={() => setPagina((p) => p + 1)}>
+              Siguiente
+            </Button>
+          </span>
+        </div>
+      )}
+    </Card>
+  );
+}
+
 function MisRegistrosTab() {
   const [pagina, setPagina] = useState(1);
   const mias = useMisObservaciones(pagina);
@@ -230,7 +335,7 @@ function MisRegistrosTab() {
 
   return (
     <Card>
-      <CardHeader title="Mis registros" subtitle="Puedes enmendar o anular tus observaciones dentro del plazo que define la institución." />
+      <CardHeader title="Mis registros" subtitle="Puedes editar o anular tus observaciones dentro del plazo que define la institución." />
       <Table>
         <TableHead>
           <tr>

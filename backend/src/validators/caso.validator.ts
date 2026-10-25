@@ -33,7 +33,6 @@ const camposMedida = {
   nombre: Joi.string().trim().max(120),
   descripcion: Joi.string().trim().max(1000).allow(''),
   se_aplica_por_dias: Joi.boolean(),
-  remite_a_orientacion: Joi.boolean(),
   orden: Joi.number().integer().min(0),
 };
 export const crearMedida: ValidationSchema = { body: Joi.object({ ...camposMedida, nombre: camposMedida.nombre.required() }) };
@@ -60,7 +59,6 @@ export const guardarProtocolo: ValidationSchema = {
       .items(Joi.object({
           nombre: Joi.string().trim().max(200).required(),
           obligatorio: Joi.boolean().default(false),
-          remite_a_orientacion: Joi.boolean().default(false),
         }))
       .max(40)
       .required(),
@@ -73,7 +71,6 @@ const camposFalta = {
   codigo: Joi.string().trim().max(20),
   descripcion: Joi.string().trim().max(400),
   gravedad: tipoSituacion,
-  descuento_decimas: Joi.number().min(0).max(5).allow(null),
 };
 
 export const crearFalta: ValidationSchema = {
@@ -113,6 +110,7 @@ export const listarCasos: ValidationSchema = {
     estado: Joi.string().valid(...ESTADOS_CASO),
     tipo_situacion: tipoSituacion,
     sede_id: objectId,
+    codigo: Joi.string().trim().max(20),
     ...paginacion,
   }),
 };
@@ -146,9 +144,10 @@ const ESQUEMAS_REGISTRO: Record<string, Joi.ObjectSchema> = {
     proxima_fecha: fechaDeCalendario.allow(null),
   }),
   notificaciones: Joi.object({
-    tipo: Joi.string().valid(...TIPOS_NOTIFICACION_CASO).required(),
+    // La pantalla ya no los pide: sin ellos es el informe a los acudientes, por un medio que el sistema no distingue.
+    tipo: Joi.string().valid(...TIPOS_NOTIFICACION_CASO),
     fecha: fechaDeCalendario.required(),
-    medio: Joi.string().valid(...MEDIOS_CITACION).required(),
+    medio: Joi.string().valid(...MEDIOS_CITACION),
     dirigida_a: Joi.string().trim().max(120).allow(''),
     resultado: Joi.string().trim().max(500).allow(''),
   }),

@@ -4,7 +4,7 @@ import { api } from '../lib/apiClient';
 /** Citaciones a acudientes (M24): quien convoca (docente, coordinación), el acudiente desde el portal y el enlace público del correo. */
 
 export type TipoCitacion = 'GENERAL' | 'PARTICULAR';
-export type MotivoCitacion = 'ENTREGA_BOLETINES' | 'ACADEMICO' | 'COMPORTAMENTAL' | 'OTRO';
+export type MotivoCitacion = 'ENTREGA_BOLETINES' | 'ACADEMICO' | 'COMPORTAMENTAL' | 'ORIENTACION_CONVIVENCIA' | 'OTRO';
 export type EstadoCitacion = 'PROGRAMADA' | 'REALIZADA' | 'CANCELADA';
 export type RespuestaAsistencia = 'PENDIENTE' | 'CONFIRMADA' | 'NO_ASISTIRA';
 export type SituacionCorreo = 'SIN_CORREO' | 'NO_ENVIADO' | 'EN_COLA' | 'ENVIADO' | 'FALLIDO' | 'OMITIDO';
@@ -12,11 +12,12 @@ export type SituacionCorreo = 'SIN_CORREO' | 'NO_ENVIADO' | 'EN_COLA' | 'ENVIADO
 export const TIPOS_CITACION: TipoCitacion[] = ['GENERAL', 'PARTICULAR'];
 export const NOMBRES_TIPO_CITACION: Record<TipoCitacion, string> = { GENERAL: 'General (grupos)', PARTICULAR: 'Particular (un estudiante)' };
 
-export const MOTIVOS_CITACION: MotivoCitacion[] = ['ENTREGA_BOLETINES', 'ACADEMICO', 'COMPORTAMENTAL', 'OTRO'];
+export const MOTIVOS_CITACION: MotivoCitacion[] = ['ENTREGA_BOLETINES', 'ACADEMICO', 'COMPORTAMENTAL', 'ORIENTACION_CONVIVENCIA', 'OTRO'];
 export const NOMBRES_MOTIVO_CITACION: Record<MotivoCitacion, string> = {
   ENTREGA_BOLETINES: 'Entrega de boletines',
   ACADEMICO: 'Seguimiento académico',
   COMPORTAMENTAL: 'Seguimiento comportamental',
+  ORIENTACION_CONVIVENCIA: 'Orientación y convivencia',
   OTRO: 'Otro',
 };
 
@@ -114,6 +115,8 @@ export interface CitacionInput {
   grupo_ids?: string[];
   student_id?: string;
   todos_los_acudientes?: boolean;
+  /** Solo convivencia: enlaza la citación a un caso del que el estudiante es parte. */
+  caso_id?: string;
 }
 
 export type CambiosCitacion = Partial<Pick<CitacionInput, 'motivo' | 'titulo' | 'descripcion' | 'fecha_hora' | 'lugar'>>;
@@ -159,6 +162,8 @@ function useInvalidarCitaciones() {
   return () => {
     void queryClient.invalidateQueries({ queryKey: ['citaciones'] });
     void queryClient.invalidateQueries({ queryKey: ['notificaciones'] });
+    // El caso de convivencia lista las citaciones que se le enlazaron.
+    void queryClient.invalidateQueries({ queryKey: ['casos'] });
   };
 }
 

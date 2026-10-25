@@ -27,6 +27,7 @@
     "migrate:retirar-banco-curricular": "tsx scripts/migrateRetirarBancoCurricular.ts",
     "migrate:lideres-de-area": "tsx scripts/migrateLideresDeArea.ts",
     "migrate:anio-repetible": "tsx scripts/migrateAnioRepetible.ts",
+    "migrate:retirar-campos-convivencia": "tsx scripts/migrateRetirarCamposConvivencia.ts",
     "reset-admin-password": "tsx scripts/resetAdminPassword.ts",
     "matricular:estudiantes": "tsx scripts/matricularEstudiantes.ts",
     "reset:planificacion": "tsx scripts/resetYearToPlanificacion.ts",

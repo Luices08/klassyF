@@ -31,6 +31,8 @@ export interface ICitacion {
   student_id: Types.ObjectId | null;
   /** Particular: si se convoca a todos los acudientes del estudiante y no solo al principal. */
   todos_los_acudientes: boolean;
+  /** Si la citación nace de un caso de convivencia (M15): solo es un enlace, el caso no guarda ni lee nada de la citación. */
+  caso_id: Types.ObjectId | null;
   estado: EstadoCitacion;
   /** Sube cuando cambia la fecha o el lugar: las confirmaciones anteriores dejan de valer. */
   version: number;
@@ -56,6 +58,7 @@ const citacionSchema = new Schema<ICitacion, Model<ICitacion>>(
     grupo_ids: { type: [{ type: Schema.Types.ObjectId, ref: 'Group' }], default: [] },
     student_id: { type: Schema.Types.ObjectId, ref: 'User', default: null },
     todos_los_acudientes: { type: Boolean, default: false },
+    caso_id: { type: Schema.Types.ObjectId, ref: 'CasoConvivencia', default: null },
     estado: { type: String, enum: ESTADOS_CITACION, default: 'PROGRAMADA' },
     version: { type: Number, default: 1 },
     cancelacion: {
@@ -86,6 +89,7 @@ citacionSchema.pre('validate', function validarObjetivo(next) {
 
 citacionSchema.index({ academic_year_id: 1, fecha_hora: -1 });
 citacionSchema.index({ convocante_id: 1, fecha_hora: -1 });
+citacionSchema.index({ caso_id: 1 }, { sparse: true });
 
 export const Citacion = model<ICitacion, Model<ICitacion>>('Citacion', citacionSchema);
 export default Citacion;

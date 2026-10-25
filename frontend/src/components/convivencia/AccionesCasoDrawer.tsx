@@ -5,12 +5,11 @@ import { Input, Select, Textarea } from '../ui/Field';
 import {
   CERRABLES,
   NOMBRES_ESTADO_CASO,
-  NOMBRES_NOTIFICACION,
   NOMBRES_RESULTADO,
   RESULTADOS_CIERRE,
   SIGUIENTES_ESTADOS,
-  TIPOS_NOTIFICACION,
   useAgregarRegistroCaso,
+  useActualizarPaso,
   useAnularCaso,
   useCambiarEstadoCaso,
   useCatalogosCaso,
@@ -26,14 +25,10 @@ import {
   type ColeccionRegistro,
   type EstadoCaso,
   type ResultadoCierre,
-  type TipoNotificacion,
 } from '../../hooks/useCasos';
 import {
-  MEDIOS_CITACION,
-  NOMBRES_MEDIO,
   TIPOS_SITUACION,
   useCatalogoConvivencia,
-  type MedioCitacion,
   type TipoSituacion,
 } from '../../hooks/useObservaciones';
 
@@ -47,6 +42,7 @@ export type ModoAccionCaso =
   | 'anulacion'
   | 'impedimento'
   | 'orientacion'
+  | 'paso-no-aplica'
   | ColeccionRegistro;
 
 const TITULOS: Record<ModoAccionCaso, string> = {
@@ -59,8 +55,9 @@ const TITULOS: Record<ModoAccionCaso, string> = {
   anulacion: 'Anular el caso',
   impedimento: 'Declararme impedido',
   orientacion: 'Remitir a orientación',
+  'paso-no-aplica': 'Marcar el paso como «No aplica»',
   seguimientos: 'Registrar seguimiento',
-  notificaciones: 'Registrar notificación',
+  notificaciones: 'Anotar el informe a los acudientes',
   descargos: 'Registrar descargos',
   'medidas-proteccion': 'Registrar medida de protección',
   remisiones: 'Registrar remisión',
@@ -73,6 +70,8 @@ interface Props {
   caso: CasoDetalle;
   modo: ModoAccionCaso | null;
   esAdmin: boolean;
+  /** Solo para el modo «paso-no-aplica»: el paso obligatorio que se va a omitir. */
+  paso?: { id: string; nombre: string } | null;
   onClose: () => void;
 }
 
@@ -81,7 +80,7 @@ export function AccionesCasoDrawer(props: Props) {
   return <Formulario {...props} modo={props.modo} />;
 }
 
-function Formulario({ caso, modo, esAdmin, onClose }: Props & { modo: ModoAccionCaso }) {
+function Formulario({ caso, modo, esAdmin, paso, onClose }: Props & { modo: ModoAccionCaso }) {
   const cambiarEstado = useCambiarEstadoCaso();
   const reclasificar = useReclasificarCaso();
   const atencion = useRegistrarAtencion();
@@ -92,6 +91,7 @@ function Formulario({ caso, modo, esAdmin, onClose }: Props & { modo: ModoAccion
   const impedimento = useDeclararImpedimento();
   const remitirOrientacion = useRemitirAOrientacion();
   const registro = useAgregarRegistroCaso();
+  const actualizarPaso = useActualizarPaso();
   const catalogos = useCatalogosCaso();
   const catalogoFaltas = useCatalogoConvivencia();
 
@@ -102,18 +102,17 @@ function Formulario({ caso, modo, esAdmin, onClose }: Props & { modo: ModoAccion
   const [textoExtra, setTextoExtra] = useState('');
   const [fecha, setFecha] = useState(hoyLocal());
   const [proxima, setProxima] = useState('');
-  const [medio, setMedio] = useState<MedioCitacion>('LLAMADA');
-  const [tipoNotificacion, setTipoNotificacion] = useState<TipoNotificacion>('ACUDIENTES');
   const [parte, setParte] = useState<'ESTUDIANTE' | 'ACUDIENTE'>('ESTUDIANTE');
   const [estudianteId, setEstudianteId] = useState(caso.involucrados[0]?.student_id ?? '');
   const [entidadId, setEntidadId] = useState('');
+  const [funcionario, setFuncionario] = useState('');
   const [medidaId, setMedidaId] = useState('');
   const [dias, setDias] = useState('');
   const [huboDano, setHuboDano] = useState(false);
   const [faltas, setFaltas] = useState<Set<string>>(new Set());
   const [aRemitir, setARemitir] = useState<Set<string>>(new Set());
 
-  const mutation = { estado: cambiarEstado, tipo: reclasificar, atencion, decision, cierre: cerrar, reapertura: reabrir, anulacion: anular, impedimento, orientacion: remitirOrientacion }[modo as string] ?? registro;
+  const mutation = { estado: cambiarEstado, tipo: reclasificar, atencion, decision, cierre: cerrar, reapertura: reabrir, anulacion: anular, impedimento, orientacion: remitirOrientacion, 'paso-no-aplica': actualizarPaso }[modo as string] ?? registro;
   const medida = catalogos.data?.medidas.find((m) => m._id === medidaId);
 
   const tiposDisponibles = TIPOS_SITUACION.filter((t) => t !== caso.tipo_situacion && (esAdmin || TIPOS_SITUACION.indexOf(t) > TIPOS_SITUACION.indexOf(caso.tipo_situacion)));
@@ -151,11 +150,14 @@ function Formulario({ caso, modo, esAdmin, onClose }: Props & { modo: ModoAccion
       case 'orientacion':
         await remitirOrientacion.mutateAsync({ id, student_ids: [...aRemitir], motivo: texto });
         break;
+      case 'paso-no-aplica':
+        if (paso) await actualizarPaso.mutateAsync({ id, pasoId: paso.id, estado: 'NO_APLICA', nota: texto });
+        break;
       case 'seguimientos':
         await registro.mutateAsync({ id, coleccion: modo, fecha, nota: texto, proxima_fecha: proxima || null });
         break;
       case 'notificaciones':
-        await registro.mutateAsync({ id, coleccion: modo, fecha, tipo: tipoNotificacion, medio, dirigida_a: textoExtra, resultado: texto });
+        await registro.mutateAsync({ id, coleccion: modo, fecha, resultado: texto });
         break;
       case 'descargos':
         await registro.mutateAsync({ id, coleccion: modo, fecha, parte, student_id: parte === 'ESTUDIANTE' ? estudianteId : undefined, texto });
@@ -164,7 +166,7 @@ function Formulario({ caso, modo, esAdmin, onClose }: Props & { modo: ModoAccion
         await registro.mutateAsync({ id, coleccion: modo, fecha, descripcion: texto });
         break;
       case 'remisiones':
-        await registro.mutateAsync({ id, coleccion: modo, fecha, entidad_id: entidadId, oficio: textoExtra, respuesta: texto });
+        await registro.mutateAsync({ id, coleccion: modo, fecha, entidad_id: entidadId, oficio: textoExtra, funcionario, respuesta: texto });
         break;
       case 'medidas-aplicadas':
         await registro.mutateAsync({ id, coleccion: modo, fecha, medida_id: medidaId, dias: medida?.se_aplica_por_dias ? Number(dias) : undefined, observaciones: texto });
@@ -174,8 +176,8 @@ function Formulario({ caso, modo, esAdmin, onClose }: Props & { modo: ModoAccion
   };
 
   const requiereFecha = ['seguimientos', 'notificaciones', 'descargos', 'medidas-proteccion', 'remisiones', 'medidas-aplicadas'].includes(modo);
-  // El texto es obligatorio salvo en el estado, y en las notificaciones, remisiones y medidas aplicadas, donde es el resultado u observaciones.
-  const TEXTO_OPCIONAL: ModoAccionCaso[] = ['estado', 'notificaciones', 'remisiones', 'medidas-aplicadas'];
+  // El texto es obligatorio salvo en el estado, y en las remisiones y medidas aplicadas, donde es el resultado u observaciones.
+  const TEXTO_OPCIONAL: ModoAccionCaso[] = ['estado', 'remisiones', 'medidas-aplicadas'];
   const textoMinimo = TEXTO_OPCIONAL.includes(modo) ? 0 : modo === 'decision' ? 20 : modo === 'seguimientos' ? 3 : 5;
   const deshabilitar =
     texto.trim().length < textoMinimo ||
@@ -221,6 +223,10 @@ function Formulario({ caso, modo, esAdmin, onClose }: Props & { modo: ModoAccion
             </label>
           ))}
         </fieldset>
+      )}
+
+      {modo === 'paso-no-aplica' && paso && (
+        <Alert tone="warning">«{paso.nombre}» es un paso obligatorio del protocolo: explica por qué no aplica a este caso.</Alert>
       )}
 
       {modo === 'estado' && (
@@ -273,26 +279,6 @@ function Formulario({ caso, modo, esAdmin, onClose }: Props & { modo: ModoAccion
 
       {modo === 'seguimientos' && <Input label="Próximo seguimiento (opcional)" type="date" min={fecha} value={proxima} onChange={(e) => setProxima(e.target.value)} />}
 
-      {modo === 'notificaciones' && (
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <Select label="Qué se notificó" value={tipoNotificacion} onChange={(e) => setTipoNotificacion(e.target.value as TipoNotificacion)}>
-            {TIPOS_NOTIFICACION.map((t) => (
-              <option key={t} value={t}>
-                {NOMBRES_NOTIFICACION[t]}
-              </option>
-            ))}
-          </Select>
-          <Select label="Medio" value={medio} onChange={(e) => setMedio(e.target.value as MedioCitacion)}>
-            {MEDIOS_CITACION.map((m) => (
-              <option key={m} value={m}>
-                {NOMBRES_MEDIO[m]}
-              </option>
-            ))}
-          </Select>
-          <Input label="Dirigida a" value={textoExtra} onChange={(e) => setTextoExtra(e.target.value)} maxLength={120} />
-        </div>
-      )}
-
       {modo === 'descargos' && (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <Select label="Quién presenta" value={parte} onChange={(e) => setParte(e.target.value as 'ESTUDIANTE' | 'ACUDIENTE')}>
@@ -321,7 +307,8 @@ function Formulario({ caso, modo, esAdmin, onClose }: Props & { modo: ModoAccion
               </option>
             ))}
           </Select>
-          <Input label="Número de oficio" value={textoExtra} onChange={(e) => setTextoExtra(e.target.value)} maxLength={120} />
+          <Input label="Número de oficio (opcional)" value={textoExtra} onChange={(e) => setTextoExtra(e.target.value)} maxLength={120} />
+          <Input label="Funcionario que recibe (opcional)" value={funcionario} onChange={(e) => setFuncionario(e.target.value)} maxLength={120} />
         </div>
       )}
 
@@ -369,7 +356,7 @@ function Formulario({ caso, modo, esAdmin, onClose }: Props & { modo: ModoAccion
         <Textarea
           label={etiquetaTexto(modo)}
           rows={modo === 'decision' ? 6 : 4}
-          maxLength={modo === 'decision' ? 4000 : 2000}
+          maxLength={MAX_TEXTO[modo] ?? 1000}
           value={texto}
           onChange={(e) => setTexto(e.target.value)}
           hint={modo === 'decision' ? 'Mínimo 20 caracteres. Debe estar motivada y salir de lo conocido en los descargos.' : undefined}
@@ -379,8 +366,19 @@ function Formulario({ caso, modo, esAdmin, onClose }: Props & { modo: ModoAccion
   );
 }
 
+/** Mismos topes que el servidor (validador y modelo), para que el error no aparezca después de escribir. El resto admite 1000. */
+const MAX_TEXTO: Partial<Record<ModoAccionCaso, number>> = {
+  decision: 4000,
+  descargos: 3000,
+  atencion: 2000,
+  seguimientos: 2000,
+  notificaciones: 500,
+};
+
 function etiquetaTexto(modo: ModoAccionCaso): string {
   switch (modo) {
+    case 'paso-no-aplica':
+      return 'Justificación';
     case 'atencion':
       return 'Descripción de la atención';
     case 'decision':
@@ -388,7 +386,7 @@ function etiquetaTexto(modo: ModoAccionCaso): string {
     case 'seguimientos':
       return 'Nota de seguimiento';
     case 'notificaciones':
-      return 'Resultado';
+      return 'A quién se informó y cómo';
     case 'descargos':
       return 'Descargos';
     case 'medidas-proteccion':

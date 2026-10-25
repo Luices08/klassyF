@@ -2,13 +2,18 @@ import { Types } from 'mongoose';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import AuditLog from '../../src/models/auditLog.model';
 import CasoConvivencia from '../../src/models/casoConvivencia.model';
+import Guardian from '../../src/models/guardian.model';
+import Notificacion from '../../src/models/notificacion.model';
+import Observacion from '../../src/models/observacion.model';
 import SolicitudCaso from '../../src/models/solicitudCaso.model';
+import StudentGuardian from '../../src/models/studentGuardian.model';
+import { UserDocument } from '../../src/models/user.model';
 import * as casos from '../../src/services/caso.service';
 import * as catalogosCaso from '../../src/services/casoCatalogo.service';
 import * as observaciones from '../../src/services/observacion.service';
 import * as solicitudes from '../../src/services/solicitudCaso.service';
 import { detenerBaseDeDatos, iniciarBaseDeDatos, limpiarBaseDeDatos } from './baseDeDatos';
-import { actor, armarEscenario, Escenario, hoy } from './escenario';
+import { actor, armarEscenario, crearUsuario, Escenario, hoy } from './escenario';
 
 type Caso = Awaited<ReturnType<typeof casos.abrirCaso>>;
 const comoCaso = (c: unknown) => c as Caso & { _id: string; codigo: string; origen: string; contencion_reportada: string; estado: string; tipo_situacion: string; pasos: { _id: string; nombre: string; estado: string }[]; alertas: { codigo: string }[] };
@@ -76,62 +81,84 @@ describe('M15 casos de convivencia (con base de datos)', () => {
     expect((await casos.listarCasos(e.coordConvivencia, {}, { pagina: 1, limite: 20 })).data).toHaveLength(1);
   });
 
+  // El docente solo reporta: nombra a los estudiantes y cuenta qué hizo; no tipifica ni asigna roles.
   const faltaGrave = () =>
-    observaciones.registrarFalta(
+    observaciones.reportarSituacionGrave(
       {
-        falta_id: e.faltaII,
         fecha_hecho: hoy(),
         hechos: 'Detalle reservado de una agresión.',
         acciones_contencion: 'Se separó a los estudiantes.',
-        involucrados: [
-          { student_id: String(e.estudiante._id), rol: 'PRESUNTO_RESPONSABLE' },
-          { student_id: String(e.otroEstudiante._id), rol: 'AFECTADO' },
-        ],
+        estudiantes_ids: [String(e.estudiante._id), String(e.otroEstudiante._id)],
       },
       e.docenteDeClase
     );
+  // Coordinación asigna el rol de cada estudiante al abrir el caso desde el reporte.
+  const rolesDelReporte = () => [
+    { student_id: String(e.estudiante._id), rol: 'PRESUNTO_RESPONSABLE' as const },
+    { student_id: String(e.otroEstudiante._id), rol: 'AFECTADO' as const },
+  ];
+  const bandeja = async () => (await solicitudes.bandejaDeSolicitudes(e.coordConvivencia, { pagina: 1, limite: 20 })).data;
 
-  it('convierte la solicitud de una falta, prellena el caso y el director ve el estado del caso, no su contenido', async () => {
-    const { registros } = await faltaGrave();
-    const [pendiente] = (await solicitudes.bandejaDeSolicitudes(e.coordConvivencia, { pagina: 1, limite: 20 })).data;
-    const caso = await abrir(e.coordConvivencia, 'II', { involucrados: undefined, solicitud_id: pendiente!._id });
+  it('convierte el reporte urgente: coordinación tipifica y asigna roles; el caso hereda hechos y contención, y el docente ve su estado', async () => {
+    await faltaGrave();
+    const [pendiente] = await bandeja();
+    expect(pendiente).toMatchObject({ gravedad: null, falta: null, hechos: 'Detalle reservado de una agresión.' });
+    expect(pendiente!.involucrados.map((i) => i.rol)).toEqual([null, null]);
+
+    // Sin roles no se abre: el docente no los asigna, así que coordinación debe hacerlo.
+    await expect(abrir(e.coordConvivencia, 'II', { involucrados: undefined, solicitud_id: pendiente!._id })).rejects.toMatchObject({ statusCode: 400, message: expect.stringContaining('rol') });
+
+    const caso = await abrir(e.coordConvivencia, 'II', { involucrados: rolesDelReporte(), solicitud_id: pendiente!._id });
     expect(caso).toMatchObject({ origen: 'SOLICITUD', contencion_reportada: 'Se separó a los estudiantes.' });
     expect((caso as { involucrados: { rol: string }[] }).involucrados.map((i) => i.rol).sort()).toEqual(['AFECTADO', 'PRESUNTO_RESPONSABLE']);
-    expect((await solicitudes.bandejaDeSolicitudes(e.coordConvivencia, { pagina: 1, limite: 20 })).data).toHaveLength(0);
+    expect(await bandeja()).toHaveLength(0);
 
     const guardada = await SolicitudCaso.findById(pendiente!._id);
     expect(guardada).toMatchObject({ estado: 'CONVERTIDA' });
     expect(String(guardada!.caso_id)).toBe(String(caso._id));
 
-    const historial = await observaciones.historialDeEstudiante(String(e.estudiante._id), e.directora, { pagina: 1, limite: 20 });
-    const reservada = historial.data[0] as { reservada: boolean; caso: { codigo: string; estado: string } };
-    expect(reservada).toMatchObject({ reservada: true, caso: { codigo: caso.codigo, estado: 'ABIERTO' } });
-    expect(JSON.stringify(historial.data)).not.toContain('Detalle reservado');
-    // Quien registró ve el estado de su solicitud y el código del caso, nunca el contenido del expediente.
-    const propias = (await observaciones.misObservaciones(e.docenteDeClase, { pagina: 1, limite: 20 })).data;
-    expect(propias[0]).toMatchObject({ _id: registros[0]!._id, solicitud: { estado: 'CONVERTIDA' }, caso: { codigo: caso.codigo } });
+    // Quien reportó ve el estado de su reporte y el código del caso, nunca el expediente.
+    const [mio] = (await observaciones.misReportesUrgentes(e.docenteDeClase, { pagina: 1, limite: 20 })).data;
+    expect(mio).toMatchObject({ estado: 'CONVERTIDA', caso: { codigo: caso.codigo, estado: 'ABIERTO' } });
+    expect(JSON.stringify(mio)).not.toContain('involucrados');
+    // Los reportes de otro docente no se mezclan.
+    expect((await observaciones.misReportesUrgentes(e.docenteAjeno, { pagina: 1, limite: 20 })).data).toHaveLength(0);
   });
 
-  it('el estudiante ve de una falta grave solo que hay una situación y el estado del caso, nunca la falta ni los hechos', async () => {
+  it('un reporte urgente no deja antecedente en el Observador de nadie, ni del presunto ni del afectado', async () => {
     await faltaGrave();
+    const [pendiente] = await bandeja();
+    await abrir(e.coordConvivencia, 'II', { involucrados: rolesDelReporte(), solicitud_id: pendiente!._id });
+    expect(await Observacion.countDocuments()).toBe(0);
+    for (const estudiante of [e.estudiante, e.otroEstudiante]) {
+      expect(await observaciones.miObservador(estudiante)).toHaveLength(0);
+      expect((await observaciones.historialDeEstudiante(String(estudiante._id), e.coordConvivencia, { pagina: 1, limite: 20 })).data).toHaveLength(0);
+    }
+  });
+
+  it('un registro anterior de una falta grave solo muestra al estudiante que hay una situación y el estado del caso, nunca la falta ni los hechos', async () => {
+    // Registros creados antes del reporte urgente: una falta II con su solicitud.
+    const { registros } = await observaciones.registrarFalta(
+      { falta_id: e.faltaI, fecha_hecho: hoy(), hechos: 'Detalle reservado de una agresión.', estudiantes_ids: [String(e.estudiante._id)], escalar_a_coordinacion: true },
+      e.docenteDeClase
+    );
+    await Observacion.updateOne({ _id: registros[0]!._id }, { $set: { 'falta.gravedad': 'II', 'falta.codigo': '3.3', 'falta.descripcion': 'Agrede físicamente.' } });
     const enRevision = await observaciones.miObservador(e.estudiante);
     expect(enRevision).toEqual([expect.objectContaining({ clase: 'FALTA', gravedad: 'II', tipo_nombre: 'Situación de convivencia', situacion: 'EN_REVISION' })]);
 
-    const [pendiente] = (await solicitudes.bandejaDeSolicitudes(e.coordConvivencia, { pagina: 1, limite: 20 })).data;
-    await abrir(e.coordConvivencia, 'II', { involucrados: undefined, solicitud_id: pendiente!._id });
+    const [pendiente] = await bandeja();
+    await abrir(e.coordConvivencia, 'II', { solicitud_id: pendiente!._id });
     const conCaso = await observaciones.miObservador(e.estudiante);
     expect(conCaso[0]).toMatchObject({ situacion: 'ABIERTO' });
     expect(JSON.stringify(conCaso)).not.toMatch(/Detalle reservado|3\.3|Agrede/);
-    // Quien fue solo afectado no tiene antecedente en su observador.
-    expect(await observaciones.miObservador(e.otroEstudiante)).toHaveLength(0);
   });
 
   it('una solicitud ajena o ya atendida no se puede convertir otra vez', async () => {
     await faltaGrave();
     const [pendiente] = (await solicitudes.bandejaDeSolicitudes(e.coordConvivencia, { pagina: 1, limite: 20 })).data;
-    await expect(abrir(e.coordConvivenciaOtraSede, 'II', { involucrados: undefined, solicitud_id: pendiente!._id })).rejects.toMatchObject({ statusCode: 404 });
-    await abrir(e.coordConvivencia, 'II', { involucrados: undefined, solicitud_id: pendiente!._id });
-    await expect(abrir(e.coordConvivencia, 'II', { involucrados: undefined, solicitud_id: pendiente!._id })).rejects.toMatchObject({ statusCode: 404 });
+    await expect(abrir(e.coordConvivenciaOtraSede, 'II', { involucrados: rolesDelReporte(), solicitud_id: pendiente!._id })).rejects.toMatchObject({ statusCode: 404 });
+    await abrir(e.coordConvivencia, 'II', { involucrados: rolesDelReporte(), solicitud_id: pendiente!._id });
+    await expect(abrir(e.coordConvivencia, 'II', { involucrados: rolesDelReporte(), solicitud_id: pendiente!._id })).rejects.toMatchObject({ statusCode: 404 });
   });
 
   it('sigue el flujo de estados y rechaza saltos', async () => {
@@ -208,10 +235,120 @@ describe('M15 casos de convivencia (con base de datos)', () => {
     expect(await cerrar()).toMatchObject({ estado: 'CERRADO' });
   });
 
+  it('no se aplica una medida antes de oír los descargos', async () => {
+    const caso = await abrir();
+    await avanzar(caso._id, 'EN_ATENCION');
+    const aplicar = () => casos.agregarRegistroCaso(caso._id, 'medidas-aplicadas', { medida_id: medidaId, fecha: hoy() }, e.coordConvivencia);
+    await expect(aplicar()).rejects.toMatchObject({ statusCode: 409, message: expect.stringContaining('descargos') });
+
+    await casos.agregarRegistroCaso(caso._id, 'descargos', { parte: 'ESTUDIANTE', student_id: String(e.estudiante._id), fecha: hoy(), texto: 'Dice que fue un malentendido.' }, e.coordConvivencia);
+    expect(await aplicar()).toMatchObject({ medidas_aplicadas: [expect.objectContaining({ nombre: 'Taller formativo' })] });
+  });
+
+  it('un paso obligatorio solo se omite con una justificación; uno opcional, sin ella', async () => {
+    const caso = await abrir();
+    const [obligatorio, opcional] = caso.pasos;
+    const omitir = (paso: { _id: string }, nota?: string) => casos.actualizarPaso(caso._id, paso._id, { estado: 'NO_APLICA', nota }, e.coordConvivencia);
+
+    await expect(omitir(obligatorio!)).rejects.toMatchObject({ statusCode: 400 });
+    await expect(omitir(obligatorio!, 'no')).rejects.toMatchObject({ statusCode: 400 });
+    expect(await omitir(obligatorio!, 'Ya se dialogó con el estudiante antes.')).toMatchObject({ pasos: [expect.objectContaining({ estado: 'NO_APLICA' }), expect.anything()] });
+    expect(await omitir(opcional!)).toMatchObject({ pasos: [expect.anything(), expect.objectContaining({ estado: 'NO_APLICA' })] });
+  });
+
+  it('los casos se buscan por parte de su código, sin que los caracteres especiales rompan la consulta', async () => {
+    await abrir();
+    await abrir();
+    const pagina = { pagina: 1, limite: 20 };
+    expect((await casos.listarCasos(e.coordConvivencia, { codigo: 'CC-' }, pagina)).data).toHaveLength(2);
+    expect((await casos.listarCasos(e.coordConvivencia, { codigo: '0002' }, pagina)).data.map((c) => c.codigo)).toEqual([expect.stringMatching(/-0002$/)]);
+    expect((await casos.listarCasos(e.coordConvivencia, { codigo: '.*' }, pagina)).data).toHaveLength(0);
+    expect((await casos.listarCasos(e.coordConvivenciaOtraSede, { codigo: 'CC-' }, pagina)).data).toHaveLength(0);
+  });
+
+  describe('aviso a las familias (Decreto 1965, arts. 43 y 44)', () => {
+    const conAcudiente = async (estudiante: UserDocument, documento: string) => {
+      const acudiente = await crearUsuario('ACUDIENTE');
+      const ficha = await Guardian.create({ tipo_documento: 'CC', numero_documento: documento, nombre: 'Marta', apellido: 'Morales', telefono_principal: '3000000000', user_id: acudiente._id });
+      await StudentGuardian.create({ student_id: estudiante._id, guardian_id: ficha._id, parentesco: 'MADRE', es_principal: true });
+      return acudiente;
+    };
+    const alertasDe = (acudiente: UserDocument) => Notificacion.find({ usuario_id: acudiente._id, evento: 'FALTA_GRAVE' });
+    const involucrados = () => [
+      { student_id: String(e.estudiante._id), rol: 'PRESUNTO_RESPONSABLE' as const },
+      { student_id: String(e.otroEstudiante._id), rol: 'AFECTADO' as const },
+      { student_id: String(e.tercerEstudiante._id), rol: 'TESTIGO' as const },
+    ];
+
+    it('al abrir un caso tipo II avisa, sin detalle, a la familia del afectado y a la del presunto responsable, no a la del testigo', async () => {
+      const delPresunto = await conAcudiente(e.estudiante, '5001');
+      const delAfectado = await conAcudiente(e.otroEstudiante, '5002');
+      const delTestigo = await conAcudiente(e.tercerEstudiante, '5003');
+      await abrir(e.coordConvivencia, 'II', { involucrados: involucrados() });
+
+      for (const acudiente of [delPresunto, delAfectado]) {
+        const alertas = await alertasDe(acudiente);
+        expect(alertas).toHaveLength(1);
+        expect(alertas[0]).toMatchObject({ severidad: 'CRITICA', ruta: '/portal', leida: false });
+        expect(JSON.stringify(alertas)).not.toContain('Discusión en el patio');
+      }
+      expect(await alertasDe(delTestigo)).toHaveLength(0);
+    });
+
+    it('un caso tipo I no avisa a las familias; si sube a tipo II, en ese momento sí', async () => {
+      const delPresunto = await conAcudiente(e.estudiante, '5001');
+      const caso = await abrir(e.coordConvivencia, 'I', { involucrados: involucrados() });
+      expect(await alertasDe(delPresunto)).toHaveLength(0);
+
+      await casos.reclasificarCaso(caso._id, 'II', 'Hay daño a la salud de un estudiante.', e.coordConvivencia);
+      expect(await alertasDe(delPresunto)).toHaveLength(1);
+      // Pasar de II a III no vuelve a avisar: la familia ya fue informada.
+      await casos.reclasificarCaso(caso._id, 'III', 'Se configura un posible delito.', e.coordConvivencia);
+      expect((await alertasDe(delPresunto))[0]).toMatchObject({ contador: 1 });
+    });
+
+    it('el aviso del sistema queda como constancia en el caso y con eso se cierra sin anotar el informe a mano', async () => {
+      await conAcudiente(e.estudiante, '5001');
+      const caso = await abrir(e.coordConvivencia, 'II', { involucrados: involucrados() });
+      const guardado = await CasoConvivencia.findById(caso._id);
+      expect(guardado!.notificaciones).toHaveLength(1);
+      expect(guardado!.notificaciones[0]).toMatchObject({ tipo: 'ACUDIENTES', automatica: true });
+      expect(guardado!.notificaciones[0]!.resultado).not.toContain('Discusión');
+
+      await casos.cambiarEstadoCaso(caso._id, 'EN_ATENCION', e.coordConvivencia);
+      await casos.actualizarPaso(caso._id, caso.pasos[0]!._id, { estado: 'CUMPLIDO' }, e.coordConvivencia);
+      await casos.registrarAtencion(caso._id, { descripcion: 'Se separó a los estudiantes.' }, e.coordConvivencia);
+      expect(await casos.cerrarCaso(caso._id, { resultado: 'SOLUCIONADO', motivo: 'Se resolvió con las partes.' }, e.coordConvivencia)).toMatchObject({ estado: 'CERRADO' });
+    });
+
+    it('sin acudientes con portal no hay constancia automática: se anota a mano con solo la fecha y una nota', async () => {
+      const caso = await abrir(e.coordConvivencia, 'II', { involucrados: involucrados() });
+      expect((await CasoConvivencia.findById(caso._id))!.notificaciones).toHaveLength(0);
+
+      await casos.cambiarEstadoCaso(caso._id, 'EN_ATENCION', e.coordConvivencia);
+      await casos.actualizarPaso(caso._id, caso.pasos[0]!._id, { estado: 'CUMPLIDO' }, e.coordConvivencia);
+      await casos.registrarAtencion(caso._id, { descripcion: 'Se separó a los estudiantes.' }, e.coordConvivencia);
+      await expect(casos.cerrarCaso(caso._id, { resultado: 'SOLUCIONADO', motivo: 'Se resolvió.' }, e.coordConvivencia)).rejects.toMatchObject({ statusCode: 409, message: expect.stringContaining('acudientes') });
+
+      await casos.agregarRegistroCaso(caso._id, 'notificaciones', { fecha: hoy(), resultado: 'Se habló con la madre por teléfono.' }, e.coordConvivencia);
+      const anotada = (await CasoConvivencia.findById(caso._id))!.notificaciones[0]!;
+      expect(anotada).toMatchObject({ tipo: 'ACUDIENTES', medio: 'OTRO', automatica: false });
+      expect(await casos.cerrarCaso(caso._id, { resultado: 'SOLUCIONADO', motivo: 'Se resolvió.' }, e.coordConvivencia)).toMatchObject({ estado: 'CERRADO' });
+    });
+  });
+
+  it('los motivos largos (hasta 1000 caracteres) caben en la solicitud descartada y en el impedimento', async () => {
+    await faltaGrave();
+    const [pendiente] = (await solicitudes.bandejaDeSolicitudes(e.coordConvivencia, { pagina: 1, limite: 20 })).data;
+    await expect(solicitudes.descartarSolicitud(pendiente!._id, 'm'.repeat(900), e.coordConvivencia)).resolves.toMatchObject({ estado: 'DESCARTADA' });
+    const caso = await abrir();
+    await expect(casos.declararImpedimento(caso._id, { motivo: 'm'.repeat(900) }, e.coordConvivencia)).resolves.toMatchObject({ apartado: true });
+  });
+
   it('solo un ADMIN reabre (con motivo) o anula; anular devuelve la solicitud a la bandeja', async () => {
     await faltaGrave();
     const [pendiente] = (await solicitudes.bandejaDeSolicitudes(e.coordConvivencia, { pagina: 1, limite: 20 })).data;
-    const caso = await abrir(e.coordConvivencia, 'II', { involucrados: undefined, solicitud_id: pendiente!._id });
+    const caso = await abrir(e.coordConvivencia, 'II', { involucrados: rolesDelReporte(), solicitud_id: pendiente!._id });
 
     await expect(casos.anularCaso(caso._id, 'Error de apertura.', e.coordConvivencia)).rejects.toMatchObject({ statusCode: 403 });
     expect(await casos.anularCaso(caso._id, 'Error de apertura.', e.admin)).toMatchObject({ estado: 'ANULADO' });
@@ -219,7 +356,7 @@ describe('M15 casos de convivencia (con base de datos)', () => {
 
     const otro = await abrir();
     await avanzar(otro._id, 'EN_ATENCION');
-    await casos.actualizarPaso(otro._id, otro.pasos[0]!._id, { estado: 'NO_APLICA' }, e.coordConvivencia);
+    await casos.actualizarPaso(otro._id, otro.pasos[0]!._id, { estado: 'NO_APLICA', nota: 'Ya se dialogó con el estudiante antes.' }, e.coordConvivencia);
     await casos.cerrarCaso(otro._id, { resultado: 'DESESTIMADO', motivo: 'No se probó.' }, e.coordConvivencia);
     await expect(casos.reabrirCaso(otro._id, 'Hay hechos nuevos.', e.coordConvivencia)).rejects.toMatchObject({ statusCode: 403 });
     expect(await casos.reabrirCaso(otro._id, 'Hay hechos nuevos.', e.admin)).toMatchObject({ estado: 'REABIERTO', resultado_cierre: null });

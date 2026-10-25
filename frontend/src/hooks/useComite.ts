@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../lib/apiClient';
 import type { EstadoActivo } from '../types/domain';
 import type { AlertaCaso, EstadoCaso } from './useCasos';
-import type { TipoSituacion } from './useObservaciones';
+import type { MedioCitacion, TipoSituacion } from './useObservaciones';
 
 export const TIPOS_SESION = ['ORDINARIA', 'EXTRAORDINARIA'] as const;
 export type TipoSesion = (typeof TIPOS_SESION)[number];
@@ -17,6 +17,7 @@ export interface MiembroComite {
   usuario_id: string | null;
   documento: string;
   es_presidente: boolean;
+  es_secretario: boolean;
   estado: EstadoActivo;
 }
 
@@ -25,6 +26,21 @@ export interface Quorum {
   presentes: number;
   porcentaje_requerido: number;
   alcanzado: boolean;
+}
+
+/** El comité sesiona en ordinaria como mínimo cada dos meses (Decreto 1965, art. 23); el servidor calcula si se está incumpliendo. */
+export interface PeriodicidadComite {
+  ultima_ordinaria: string | null;
+  proxima_programada: string | null;
+  limite: string | null;
+  vencida: boolean;
+  meses_maximos: number;
+}
+
+export interface Convocatoria {
+  medio: MedioCitacion;
+  fecha: string | null;
+  nota: string;
 }
 
 export interface SesionResumen {
@@ -41,8 +57,9 @@ export interface SesionDetalle extends SesionResumen {
   lugar: string;
   orden_del_dia: string;
   desarrollo: string;
-  asistentes: { miembro_id: string; nombre: string; cargo: string; es_presidente: boolean; asistio: boolean }[];
-  casos_tratados: { caso_id: string; codigo: string; decisiones: string; recusados_ids: string[] }[];
+  convocatoria: Convocatoria | null;
+  asistentes: { miembro_id: string; nombre: string; cargo: string; es_presidente: boolean; es_secretario: boolean; asistio: boolean; excusa: string }[];
+  casos_tratados: { caso_id: string; codigo: string; decisiones: string; recusados_ids: string[]; quorum: Quorum | null }[];
   firma: { por: string; fecha: string; hash: string } | null;
   anexos: { _id: string; fecha: string; texto: string }[];
   anulacion: { motivo: string; fecha: string } | null;
@@ -80,6 +97,7 @@ export interface MiembroInput {
   usuario_id?: string | null;
   documento?: string;
   es_presidente?: boolean;
+  es_secretario?: boolean;
 }
 
 export function useGuardarMiembro() {
@@ -107,7 +125,7 @@ export function useEliminarMiembro() {
 export function useSesionesComite() {
   return useQuery({
     queryKey: ['comite', 'sesiones'],
-    queryFn: () => api.get<{ anio: { _id: string; year: number }; sesiones: SesionResumen[] }>('/convivencia/comite/sesiones'),
+    queryFn: () => api.get<{ anio: { _id: string; year: number }; sesiones: SesionResumen[]; periodicidad: PeriodicidadComite }>('/convivencia/comite/sesiones'),
   });
 }
 
@@ -122,7 +140,7 @@ export function useSesionComite(id: string | null) {
 export function useCrearSesion() {
   const invalidar = useInvalidarComite();
   return useMutation({
-    mutationFn: (input: { tipo: TipoSesion; fecha: string; hora?: string; lugar?: string; orden_del_dia?: string }) =>
+    mutationFn: (input: { tipo: TipoSesion; fecha: string; hora?: string; lugar?: string; orden_del_dia?: string; convocatoria?: { medio: MedioCitacion; nota?: string } }) =>
       api.post<SesionDetalle>('/convivencia/comite/sesiones', input),
     onSuccess: invalidar,
   });
@@ -133,7 +151,9 @@ export interface ActualizarSesionInput {
   orden_del_dia?: string;
   lugar?: string;
   hora?: string;
-  asistencia?: { miembro_id: string; asistio: boolean }[];
+  fecha?: string;
+  convocatoria?: { medio: MedioCitacion; nota?: string };
+  asistencia?: { miembro_id: string; asistio: boolean; excusa?: string }[];
   casos_tratados?: { caso_id: string; decisiones?: string; recusados_ids?: string[] }[];
 }
 

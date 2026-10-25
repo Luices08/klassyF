@@ -17,9 +17,9 @@ import Enrollment from '../../../models/enrollment.model';
 import EvaluacionPromocionEstudiante from '../../../models/evaluacionPromocionEstudiante.model';
 import Grade from '../../../models/grade.model';
 import Group from '../../../models/group.model';
-import Observacion from '../../../models/observacion.model';
 import Subject from '../../../models/subject.model';
 import TeacherAssignment from '../../../models/teacherAssignment.model';
+import { faltasContadas } from '../../../services/faltasConvivencia.service';
 import { cargarContextoNotas, clave } from '../../../services/recuperacion.service';
 import { escalaEfectiva } from '../../../utils/escalaEvaluacion';
 import { EntradaPromocion } from '../../../utils/promocion';
@@ -89,7 +89,7 @@ export async function cargarDatosDelAnio(anio: AcademicYearDocument, studentIds?
     cargarContextoNotas(anio, asignacionIds),
     Activity.find({ teacher_assignment_id: { $in: asignacionIds }, requiere_entrega: true }).select('teacher_assignment_id periodo_numero').lean(),
     AttendanceState.find({}).select('cuenta_como_falla es_justificada').lean(),
-    Observacion.find({ academic_year_id: anio._id, clase: 'FALTA', estado: { $ne: 'ANULADA' }, ...filtroEstudiante }).select('student_id periodo_numero fecha_hecho falta.gravedad').lean(),
+    faltasContadas({ academic_year_id: anio._id, ...(studentIds ? { estudiantes_ids: studentIds } : {}) }),
   ]);
   const subjectPorId = new Map(subjects.map((s) => [id(s._id), s]));
 
@@ -133,10 +133,9 @@ export async function cargarDatosDelAnio(anio: AcademicYearDocument, studentIds?
   };
   const faltasPorEstudiante = new Map<string, FaltaRegistrada[]>();
   for (const f of faltas) {
-    const periodo = f.periodo_numero ?? periodoDeFecha(new Date(f.fecha_hecho));
-    const gravedad = f.falta?.gravedad;
-    if (periodo === null || !gravedad) continue;
-    faltasPorEstudiante.set(id(f.student_id), [...(faltasPorEstudiante.get(id(f.student_id)) ?? []), { periodo, gravedad }]);
+    const periodo = f.periodo_numero ?? periodoDeFecha(new Date(f.fecha));
+    if (periodo === null) continue;
+    faltasPorEstudiante.set(f.student_id, [...(faltasPorEstudiante.get(f.student_id) ?? []), { periodo, gravedad: f.gravedad }]);
   }
 
   const asignacionesPorGrupo = new Map<string, typeof asignaciones>();

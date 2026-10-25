@@ -7,7 +7,6 @@ import Enrollment from '../models/enrollment.model';
 import ExpedienteInclusion from '../models/expedienteInclusion.model';
 import Grade from '../models/grade.model';
 import { GroupDocument } from '../models/group.model';
-import Observacion from '../models/observacion.model';
 import Recuperacion from '../models/recuperacion.model';
 import StudyPlan from '../models/studyPlan.model';
 import Subject from '../models/subject.model';
@@ -19,6 +18,7 @@ import { obtenerGradoPlanEfectivo } from '../utils/horasPlanEstudios';
 import { AreaEntrada, AsignaturaEntrada, EntradaPromocion, EstadoRecuperacionEntrada } from '../utils/promocion';
 import { calcularEstadisticas, TotalesAsistencia } from './attendanceStats.service';
 import { obtenerPolitica as obtenerPoliticaRecuperaciones } from './configuracionRecuperaciones.service';
+import { contarPorEstudiante, faltasContadas } from './faltasConvivencia.service';
 import { cargarContextoNotas, claveRecuperacion, definitivaAnual } from './recuperacion.service';
 
 export interface EntradaDeEstudiante {
@@ -74,7 +74,8 @@ export async function construirEntradasDelGrupo(anio: AcademicYearDocument, grup
 
   const [asistenciaGlobal, faltas, expedientes] = await Promise.all([
     asistenciaPorEstudiante(String(anio._id), String(grupo._id)),
-    Observacion.find({ academic_year_id: anio._id, student_id: { $in: estudiantesIds }, clase: 'FALTA', estado: 'ACTIVA' }).select('student_id falta.gravedad').lean(),
+    // Tipo I del Observador y tipo II/III solo con decisión en firme del caso (ver `faltasContadas`).
+    faltasContadas({ academic_year_id: anio._id, estudiantes_ids: estudiantesIds }),
     // Solo se pregunta si existe un PIAR vigente: la comisión no necesita (ni debe ver) su categoría ni su modalidad.
     ExpedienteInclusion.find({ academic_year_id: anio._id, student_id: { $in: estudiantesIds }, tipo: 'PIAR', estado: 'ACTIVO' }).select('student_id').lean(),
   ]);
@@ -83,14 +84,7 @@ export async function construirEntradasDelGrupo(anio: AcademicYearDocument, grup
     asistenciaPorAsignatura.set(subjectId, await asistenciaPorEstudiante(String(anio._id), String(grupo._id), subjectId));
   }
   const conPiar = new Set(expedientes.map((e) => String(e.student_id)));
-  const faltasPorEstudiante = new Map<string, Record<string, number>>();
-  for (const f of faltas) {
-    const k = String(f.student_id);
-    const acumulado = faltasPorEstudiante.get(k) ?? {};
-    const gravedad = f.falta?.gravedad;
-    if (gravedad) acumulado[gravedad] = (acumulado[gravedad] ?? 0) + 1;
-    faltasPorEstudiante.set(k, acumulado);
-  }
+  const faltasPorEstudiante = contarPorEstudiante(faltas);
 
   const resultado: EntradaDeEstudiante[] = [];
   for (const matricula of matriculas) {

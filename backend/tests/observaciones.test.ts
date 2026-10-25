@@ -1,10 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import {
-  debeRemitirse,
   dentroDelPlazo,
+  esSeguimientoDeOrientacion,
+  esGraveEnTramite,
   esSituacionGrave,
   esVisibleParaEstudiante,
+  MENSAJE_FALTA_GRAVE,
   problemasDeFalta,
+  problemasDeReporteUrgente,
   tituloDeRegistro,
   visibilidadDeObservacion,
   vistaObservacion,
@@ -22,6 +25,8 @@ const falta = (gravedad: 'I' | 'II' | 'III', extra: Partial<Parameters<typeof vi
   estado: 'ACTIVA',
   confidencial: false,
   falta: { gravedad },
+  // Lo grave que sigue su curso en convivencia tiene una solicitud; la Tipo II que el docente resolvió no.
+  solicitud_id: gravedad === 'I' ? null : 'solicitud',
   ...extra,
 });
 
@@ -43,6 +48,20 @@ describe('esSituacionGrave', () => {
   });
 });
 
+describe('esGraveEnTramite', () => {
+  it('una Tipo II/III con solicitud sigue en convivencia; una Tipo II que el docente resolvió o una Tipo I no', () => {
+    expect(esGraveEnTramite(falta('II'))).toBe(true);
+    expect(esGraveEnTramite(falta('III'))).toBe(true);
+    expect(esGraveEnTramite(falta('II', { solicitud_id: null }))).toBe(false);
+    expect(esGraveEnTramite(falta('I'))).toBe(false);
+  });
+
+  it('la Tipo II resuelta por el docente la ven completa el director y orientación, como una Tipo I', () => {
+    expect(visibilidadDeObservacion('DOCENTE', falta('II', { solicitud_id: null }), false)).toBe('COMPLETA');
+    expect(visibilidadDeObservacion('ORIENTADOR', falta('II', { solicitud_id: null }), false)).toBe('COMPLETA');
+  });
+});
+
 describe('visibilidadDeObservacion', () => {
   it('ADMIN y coordinación de convivencia lo ven todo, incluso confidencial y anulado', () => {
     for (const rol of ['ADMIN', 'COORDINADOR_CONVIVENCIA'] as const) {
@@ -57,6 +76,17 @@ describe('visibilidadDeObservacion', () => {
     expect(visibilidadDeObservacion('DOCENTE', confidencial, true)).toBe('COMPLETA');
     expect(visibilidadDeObservacion('DOCENTE', confidencial, false)).toBeNull();
     expect(visibilidadDeObservacion('COORDINADOR', confidencial, false)).toBeNull();
+  });
+
+  it('el seguimiento psicosocial de orientación solo lo lee su autor y el ADMIN, aunque sea de convivencia u otro orientador', () => {
+    const psicosocial = observacion({ confidencial: true, contexto: 'ORIENTACION' });
+    expect(visibilidadDeObservacion('ORIENTADOR', psicosocial, true)).toBe('COMPLETA');
+    expect(visibilidadDeObservacion('ADMIN', psicosocial, false)).toBe('COMPLETA');
+    for (const rol of ['ORIENTADOR', 'COORDINADOR_CONVIVENCIA', 'COORDINADOR', 'DOCENTE'] as const) {
+      expect(visibilidadDeObservacion(rol, psicosocial, false), rol).toBeNull();
+    }
+    expect(esSeguimientoDeOrientacion(psicosocial)).toBe(true);
+    expect(esSeguimientoDeOrientacion(observacion({ confidencial: true }))).toBe(false);
   });
 
   it('una observación común la ven el director, el coordinador académico y orientación', () => {
@@ -110,53 +140,29 @@ describe('esVisibleParaEstudiante', () => {
 });
 
 describe('problemasDeFalta', () => {
-  const presunto = [{ rol: 'PRESUNTO_RESPONSABLE' as const }];
-
-  it('una falta Tipo I solo pide hechos; versión y acuerdo son opcionales', () => {
-    expect(problemasDeFalta('I', { hechos: 'Llegó tarde.', involucrados: presunto })).toEqual([]);
-    expect(problemasDeFalta('I', { hechos: 'Llegó tarde.', version_estudiante: 'Se me dañó la ruta.', compromiso: 'Llegará a tiempo.', involucrados: presunto })).toEqual([]);
+  it('una falta Tipo I solo pide hechos', () => {
+    expect(problemasDeFalta('I', { hechos: 'Llegó tarde.' })).toEqual([]);
+    expect(problemasDeFalta('I', { hechos: '  ' })).toEqual(['Describe los hechos.']);
   });
 
-  it('una falta Tipo I no acepta contención ni otros roles', () => {
-    const problemas = problemasDeFalta('I', {
-      hechos: 'Discusión.',
-      acciones_contencion: 'Se separó a los estudiantes.',
-      involucrados: [{ rol: 'PRESUNTO_RESPONSABLE' }, { rol: 'AFECTADO' }],
-    });
-    expect(problemas).toHaveLength(2);
-  });
-
-  it('una falta Tipo II/III exige contención y no acepta versión ni acuerdo', () => {
-    for (const gravedad of ['II', 'III'] as const) {
-      expect(problemasDeFalta(gravedad, { hechos: 'Agresión.', involucrados: presunto })).toEqual(['Una falta Tipo II o III exige las acciones inmediatas de contención.']);
-      expect(
-        problemasDeFalta(gravedad, {
-          hechos: 'Agresión.',
-          acciones_contencion: 'Se llevó a enfermería.',
-          compromiso: 'No lo volverá a hacer.',
-          involucrados: [...presunto, { rol: 'AFECTADO' }, { rol: 'TESTIGO' }],
-        })
-      ).toHaveLength(1);
-      expect(
-        problemasDeFalta(gravedad, { hechos: 'Agresión.', acciones_contencion: 'Se llevó a enfermería.', involucrados: [...presunto, { rol: 'AFECTADO' }] })
-      ).toEqual([]);
-    }
-  });
-
-  it('siempre pide hechos y un presunto responsable', () => {
-    expect(problemasDeFalta('I', { hechos: '  ', involucrados: [] })).toEqual(['Describe los hechos.', 'Indica al menos un presunto responsable.']);
-    expect(problemasDeFalta('II', { hechos: 'x', acciones_contencion: 'Contención inmediata.', involucrados: [{ rol: 'AFECTADO' }] })).toEqual([
-      'Indica al menos un presunto responsable.',
-    ]);
+  it('una Tipo II que el docente resolvió se registra como falta; una Tipo III siempre va a coordinación', () => {
+    expect(problemasDeFalta('II', { hechos: 'Empujón en el patio.' })).toEqual([]);
+    expect(problemasDeFalta('III', { hechos: 'Agresión.' })).toEqual([MENSAJE_FALTA_GRAVE]);
   });
 });
 
-describe('debeRemitirse', () => {
-  it('lo grave siempre va a convivencia; lo leve solo si el docente lo decide', () => {
-    expect(debeRemitirse('II', false)).toBe(true);
-    expect(debeRemitirse('III', undefined)).toBe(true);
-    expect(debeRemitirse('I', undefined)).toBe(false);
-    expect(debeRemitirse('I', true)).toBe(true);
+describe('problemasDeReporteUrgente', () => {
+  const base = { hechos: 'Se agredieron en el patio.', acciones_contencion: 'Se llevó a uno a enfermería.', cantidad_estudiantes: 2 };
+
+  it('un reporte completo no tiene problemas: no pide falta, gravedad ni roles', () => {
+    expect(problemasDeReporteUrgente(base)).toEqual([]);
+  });
+
+  it('exige los hechos, la contención inmediata y al menos un estudiante', () => {
+    expect(problemasDeReporteUrgente({ ...base, hechos: '  ' })).toEqual(['Describe los hechos.']);
+    expect(problemasDeReporteUrgente({ ...base, acciones_contencion: 'ok' })).toEqual(['Indica la medida de contención inmediata que tomaste.']);
+    expect(problemasDeReporteUrgente({ ...base, cantidad_estudiantes: 0 })).toEqual(['Indica al menos un estudiante involucrado.']);
+    expect(problemasDeReporteUrgente({ hechos: '', acciones_contencion: '', cantidad_estudiantes: 0 })).toHaveLength(3);
   });
 });
 

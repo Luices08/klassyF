@@ -10,7 +10,8 @@ import {
 
 export interface IInvolucradoSolicitud {
   student_id: Types.ObjectId;
-  rol: RolInvolucrado;
+  /** null en un reporte urgente: el docente solo nombra a los estudiantes y coordinación asigna el rol al abrir el caso. */
+  rol: RolInvolucrado | null;
   group_id: Types.ObjectId;
   enrollment_id: Types.ObjectId;
   /** Antecedente en el Observador: solo los presuntos responsables lo tienen. El resto vive únicamente en la solicitud y el caso. */
@@ -18,16 +19,17 @@ export interface IInvolucradoSolicitud {
 }
 
 /**
- * Lo que el docente envía a convivencia al registrar una falta Tipo II/III (o una Tipo I que decide remitir): hechos,
- * involucrados con su rol y acciones de contención. Es el traspaso de M14 a M15; el expediente formal lo abre
- * coordinación de convivencia. Solo convivencia la lee (nombres de otros menores, hechos sin tipificar).
+ * Lo que el docente envía a convivencia: una **situación grave** (la falta del manual que identifica, Tipo II o III, hechos y acciones de contención; sin roles:
+ * asignarlos y confirmar el tipo es de coordinación) o una falta Tipo I que decide escalar. Es el traspaso de M14 a M15; el expediente formal lo abre coordinación de
+ * convivencia. Solo convivencia la lee (nombres de otros menores, hechos sin tipificar).
  */
 export interface ISolicitudCaso {
   sede_id: Types.ObjectId;
   academic_year_id: Types.ObjectId;
   fecha_hecho: Date;
-  gravedad: TipoSituacion;
-  falta: { falta_id: Types.ObjectId; codigo: string; descripcion: string };
+  /** La del manual que eligió el docente; null solo en un reporte sin falta (emergencia). Quien abre el caso confirma o cambia el tipo. */
+  gravedad: TipoSituacion | null;
+  falta: { falta_id: Types.ObjectId; codigo: string; descripcion: string } | null;
   hechos: string;
   acciones_contencion: string;
   involucrados: Types.DocumentArray<IInvolucradoSolicitud>;
@@ -47,7 +49,7 @@ type SolicitudCasoModel = Model<ISolicitudCaso>;
 
 const involucradoSchema = new Schema<IInvolucradoSolicitud>({
   student_id: { type: Schema.Types.ObjectId, ref: 'User', required: true },
-  rol: { type: String, enum: ROLES_INVOLUCRADO, required: true },
+  rol: { type: String, enum: [...ROLES_INVOLUCRADO, null], default: null },
   group_id: { type: Schema.Types.ObjectId, ref: 'Group', required: true },
   enrollment_id: { type: Schema.Types.ObjectId, ref: 'Enrollment', required: true },
   observacion_id: { type: Schema.Types.ObjectId, ref: 'Observacion', default: null },
@@ -58,7 +60,7 @@ const solicitudCasoSchema = new Schema<ISolicitudCaso, SolicitudCasoModel>(
     sede_id: { type: Schema.Types.ObjectId, ref: 'Campus', required: true },
     academic_year_id: { type: Schema.Types.ObjectId, ref: 'AcademicYear', required: true },
     fecha_hecho: { type: Date, required: true },
-    gravedad: { type: String, enum: TIPOS_SITUACION, required: true },
+    gravedad: { type: String, enum: [...TIPOS_SITUACION, null], default: null },
     falta: {
       type: new Schema(
         {
@@ -68,7 +70,7 @@ const solicitudCasoSchema = new Schema<ISolicitudCaso, SolicitudCasoModel>(
         },
         { _id: false }
       ),
-      required: true,
+      default: null,
     },
     hechos: { type: String, required: true, maxlength: 2000 },
     acciones_contencion: { type: String, default: '', maxlength: 1000 },
@@ -81,7 +83,7 @@ const solicitudCasoSchema = new Schema<ISolicitudCaso, SolicitudCasoModel>(
         {
           por: { type: Schema.Types.ObjectId, ref: 'User', required: true },
           fecha: { type: Date, required: true },
-          motivo: { type: String, required: true, maxlength: 500 },
+          motivo: { type: String, required: true, maxlength: 1000 },
         },
         { _id: false }
       ),

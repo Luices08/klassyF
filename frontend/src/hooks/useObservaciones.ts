@@ -29,7 +29,6 @@ export interface FaltaConvivencia {
   codigo: string;
   descripcion: string;
   gravedad: TipoSituacion;
-  descuento_decimas: number | null;
   estado: EstadoActivo;
 }
 
@@ -78,7 +77,7 @@ export const NOMBRES_MEDIO: Record<MedioCitacion, string> = {
 };
 
 export type ClaseRegistro = 'OBSERVACION' | 'FALTA';
-export type ContextoRegistro = 'CLASE' | 'DIRECCION_GRUPO' | 'COORDINACION' | 'ORIENTACION';
+export type ContextoRegistro = 'CLASE' | 'DIRECCION_GRUPO' | 'SEDE' | 'COORDINACION' | 'ORIENTACION';
 
 /**
  * Lo que el servidor devuelve según quién consulta. `reservada` es una falta Tipo II/III vista por quien solo puede saber que
@@ -244,6 +243,8 @@ export interface RegistrarObservacionInput {
   tipo_id: string;
   descripcion: string;
   compromiso?: string;
+  /** Lo que el estudiante manifestó (descargo verbal). */
+  version_estudiante?: string;
   requiere_citacion: boolean;
   confidencial: boolean;
   fecha_hecho: string;
@@ -257,21 +258,22 @@ export function useRegistrarObservacion() {
   });
 }
 
+/** Una falta Tipo I (leve). Lo grave (II o III) se envía a coordinación con `ReporteUrgenteInput`. */
 export interface RegistrarFaltaInput {
   falta_id: string;
   fecha_hecho: string;
   hechos: string;
   version_estudiante?: string;
   compromiso?: string;
-  acciones_contencion?: string;
-  remitir_comite?: boolean;
-  involucrados: { student_id: string; rol: RolInvolucrado }[];
+  /** Si no se resolvió con la mediación del aula, llega a coordinación de convivencia como solicitud de caso. */
+  escalar_a_coordinacion?: boolean;
+  estudiantes_ids: string[];
 }
 
 export interface ResultadoFalta {
   registros: ObservacionVista[];
-  /** true si se generó una solicitud de caso para convivencia. */
-  remitida: boolean;
+  /** true si se generó una solicitud de caso para coordinación de convivencia. */
+  escalada: boolean;
 }
 
 export function useRegistrarFalta() {
@@ -279,6 +281,46 @@ export function useRegistrarFalta() {
   return useMutation({
     mutationFn: (input: RegistrarFaltaInput) => api.post<ResultadoFalta>('/observaciones/faltas', input),
     onSuccess: invalidar,
+  });
+}
+
+/** Una situación grave (Tipo II o III): la falta del manual que identifica el docente, qué pasó, a quiénes nombra y qué contención aplicó. Los roles los asigna coordinación. */
+export interface ReporteUrgenteInput {
+  falta_id?: string;
+  fecha_hecho: string;
+  hechos: string;
+  acciones_contencion: string;
+  estudiantes_ids: string[];
+}
+
+export function useReportarSituacionGrave() {
+  const invalidar = useInvalidarObservaciones();
+  return useMutation({
+    mutationFn: (input: ReporteUrgenteInput) => api.post<{ _id: string; estado: string; estudiantes: number }>('/observaciones/reportes-urgentes', input),
+    onSuccess: invalidar,
+  });
+}
+
+/** Lo que reportó el docente y qué pasó con ello (el expediente del caso nunca viaja). */
+export interface ReporteUrgentePropio {
+  _id: string;
+  fecha_hecho: string;
+  createdAt: string;
+  hechos: string;
+  acciones_contencion: string;
+  estudiantes: string[];
+  falta: { codigo: string; descripcion: string; gravedad: TipoSituacion } | null;
+  estado: 'PENDIENTE' | 'DESCARTADA' | 'CONVERTIDA';
+  motivo_resolucion: string;
+  caso: { codigo: string; estado: string } | null;
+}
+
+export function useMisReportesUrgentes(pagina: number) {
+  return useQuery({
+    queryKey: ['observaciones', 'reportes-urgentes', pagina],
+    queryFn: () => api.raw<{ success: true; data: ReporteUrgentePropio[]; total: number; pagina: number; limite: number }>('/observaciones/reportes-urgentes/mios', { query: { pagina, limite: 20 } }),
+    select: (res) => ({ data: res.data, total: res.total, pagina: res.pagina, limite: res.limite }),
+    placeholderData: keepPreviousData,
   });
 }
 
@@ -342,6 +384,14 @@ export function useAnularObservacion() {
   return useMutation({
     mutationFn: ({ id, motivo }: { id: string; motivo: string }) =>
       api.patch<ObservacionVista>(`/observaciones/${id}/anular`, { motivo }),
+    onSuccess: invalidar,
+  });
+}
+
+export function useEliminarObservacion() {
+  const invalidar = useInvalidarObservaciones();
+  return useMutation({
+    mutationFn: (id: string) => api.delete<{ _id: string }>(`/observaciones/${id}`),
     onSuccess: invalidar,
   });
 }

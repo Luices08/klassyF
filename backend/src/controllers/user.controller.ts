@@ -7,14 +7,19 @@ import AdmissionRequest from '../models/admissionRequest.model';
 import LiderArea from '../models/liderArea.model';
 import Attendance from '../models/attendance.model';
 import Campus from '../models/campus.model';
+import CasoConvivencia from '../models/casoConvivencia.model';
+import { MiembroComite, SesionComite } from '../models/comiteConvivencia.model';
 import DocumentoReferencia from '../models/documentoReferencia.model';
 import Enrollment from '../models/enrollment.model';
 import Group from '../models/group.model';
 import Guardian from '../models/guardian.model';
 import Institution from '../models/institution.model';
+import Observacion from '../models/observacion.model';
 import PeriodoProrroga from '../models/periodoProrroga.model';
 import PlanArea from '../models/planArea.model';
 import PlanAula from '../models/planAula.model';
+import RemisionOrientacion from '../models/remisionOrientacion.model';
+import SolicitudCaso from '../models/solicitudCaso.model';
 import StudentGuardian from '../models/studentGuardian.model';
 import StudentProfile from '../models/studentProfile.model';
 import TeacherAssignment from '../models/teacherAssignment.model';
@@ -278,7 +283,7 @@ export const actualizarEstadoUsuario = catchAsync<UserParams, unknown, Actualiza
 });
 
 /** Colecciones que representan "acciones registradas" (M02): si alguna referencia al usuario, no se puede borrar fisicamente. */
-async function tieneHistorial(userId: string): Promise<boolean> {
+export async function tieneHistorial(userId: string): Promise<boolean> {
   // El acudiente (M03) es una entidad propia (Guardian): si este User tiene un
   // Guardian vinculado con al menos un estudiante, tambien cuenta como historial.
   const guardian = await Guardian.findOne({ user_id: userId });
@@ -300,6 +305,30 @@ async function tieneHistorial(userId: string): Promise<boolean> {
     Institution.countDocuments({ administrador_id: userId }),
     PeriodoProrroga.countDocuments({ $or: [{ docente_id: userId }, { otorgada_por_id: userId }, { revocada_por_id: userId }] }),
     AdmissionRequest.countDocuments({ revisado_por: userId }),
+    // M14/M15: observaciones y casos son evidencia de convivencia de menores (y las actas, soporte firmado): quien los escribió,
+    // atendió o firmó no se elimina físicamente, o quedarían referencias huérfanas.
+    Observacion.countDocuments({
+      $or: [
+        { autor_id: userId },
+        { registrado_por: userId },
+        { 'enmiendas.por': userId },
+        { 'seguimientos.por': userId },
+        { 'citacion_realizada.por': userId },
+        { 'anulacion.por': userId },
+      ],
+    }),
+    SolicitudCaso.countDocuments({ $or: [{ solicitada_por: userId }, { 'resolucion.por': userId }] }),
+    CasoConvivencia.countDocuments({
+      $or: [
+        { creado_por: userId },
+        { 'impedidos.usuario_id': userId },
+        { 'impedidos.por': userId },
+        ...['atencion_inmediata', 'seguimientos', 'notificaciones', 'descargos', 'medidas_proteccion', 'remisiones', 'medidas_aplicadas', 'pasos', 'decision', 'cierre', 'reaperturas', 'anulacion', 'reclasificaciones'].map((campo) => ({ [`${campo}.por`]: userId })),
+      ],
+    }),
+    RemisionOrientacion.countDocuments({ $or: [{ remitida_por: userId }, { 'atenciones.por': userId }, { 'atendida.por': userId }] }),
+    MiembroComite.countDocuments({ usuario_id: userId }),
+    SesionComite.countDocuments({ $or: [{ creado_por: userId }, { 'firma.por': userId }, { 'anexos.por': userId }, { 'anulacion.por': userId }] }),
   ]);
   return vinculosComoAcudiente > 0 || conteos.some((c) => c > 0);
 }

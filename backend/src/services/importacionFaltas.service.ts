@@ -14,7 +14,7 @@ import LoteImportacion from '../models/loteImportacion.model';
 import { UserDocument } from '../models/user.model';
 import ApiError from '../utils/ApiError';
 import { leerCsv, normalizarEncabezado } from '../utils/csv';
-import { claveDeNombre, leerDecimal, leerEstado, neutralizarFormula } from '../utils/importacion';
+import { claveDeNombre, leerEstado, neutralizarFormula } from '../utils/importacion';
 import runTransaction from '../utils/runTransaction';
 import { registrarEvento } from './audit.service';
 import { obtenerInstitucionConvivencia } from './convivenciaCatalogo.service';
@@ -143,7 +143,6 @@ async function planFaltas(filas: FilaLeida[], institucionId: Types.ObjectId): Pr
     const codigo = (v.codigo ?? '').trim();
     const descripcion = (v.descripcion ?? '').trim();
     const gravedad = (v.gravedad ?? '').trim().toUpperCase();
-    const decimas = leerDecimal(v.descuento_decimas ?? '');
     const estado = leerEstado(v.estado ?? '');
     const problemas: string[] = [];
     if (!codigo) problemas.push('Falta el código.');
@@ -151,7 +150,6 @@ async function planFaltas(filas: FilaLeida[], institucionId: Types.ObjectId): Pr
     if (!descripcion) problemas.push('Falta la descripción.');
     if (descripcion.length > 400) problemas.push('La descripción supera 400 caracteres.');
     if (!(TIPOS_SITUACION as readonly string[]).includes(gravedad)) problemas.push('La gravedad debe ser I, II o III.');
-    if (decimas === undefined || (decimas !== null && decimas > 5)) problemas.push('Las décimas deben ser un número entre 0 y 5.');
     if (estado === null) problemas.push('El estado debe ser ACTIVO o INACTIVO.');
     const clave = claveDeNombre(codigo);
     if (codigo && vistos.has(clave)) problemas.push('Este código está repetido en el archivo.');
@@ -161,7 +159,7 @@ async function planFaltas(filas: FilaLeida[], institucionId: Types.ObjectId): Pr
       continue;
     }
 
-    const datos = { descripcion, gravedad: gravedad as TipoSituacion, descuento_decimas: decimas ?? null, estado: estado ?? 'activo' };
+    const datos = { descripcion, gravedad: gravedad as TipoSituacion, estado: estado ?? 'activo' };
     const existente = porCodigo.get(clave);
     if (!existente) {
       creados += 1;
@@ -171,7 +169,6 @@ async function planFaltas(filas: FilaLeida[], institucionId: Types.ObjectId): Pr
     } else if (
       existente.descripcion === datos.descripcion &&
       existente.gravedad === datos.gravedad &&
-      (existente.descuento_decimas ?? null) === datos.descuento_decimas &&
       existente.estado === datos.estado
     ) {
       omitidos += 1;

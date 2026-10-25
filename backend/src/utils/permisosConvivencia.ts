@@ -57,9 +57,9 @@ export function permisoSobreEstudiante(
   if (usuario.rol === ROLES.DOCENTE) {
     if (accion === 'CONSULTAR_OBSERVACIONES_PROPIAS') return true;
     if (!enAlcanceDeSede(usuario, estudiante.sede_id)) return false;
-    if (accion === 'REGISTRAR_OBSERVACION' || accion === 'REGISTRAR_FALTA') {
-      return Boolean(estudiante.docenteDictaClase || estudiante.esDirectorDeGrupo);
-    }
+    // Quien ve algo lo registra: el docente en la puerta que anota las llegadas tarde, o el que presencia un incidente en el recreo, no dicta clase en ese grupo.
+    // Ver el historial del estudiante sí sigue siendo solo del director de su grupo.
+    if (accion === 'REGISTRAR_OBSERVACION' || accion === 'REGISTRAR_FALTA') return true;
     if (accion === 'CONSULTAR_HISTORIAL' || accion === 'VER_ESTADO_CASO') return Boolean(estudiante.esDirectorDeGrupo);
     return false;
   }

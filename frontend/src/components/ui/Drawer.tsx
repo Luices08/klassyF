@@ -52,7 +52,7 @@ export function Drawer({
         onClick={onClose}
         type="button"
       />
-      <div className={`absolute right-0 top-0 flex h-full w-full ${size === 'xl' ? 'max-w-6xl' : size === 'lg' ? 'max-w-2xl' : 'max-w-md'} flex-col bg-surface shadow-xl`}>
+      <div className={`absolute right-0 top-0 flex h-full w-full ${size === 'xl' ? 'max-w-6xl' : size === 'lg' ? 'max-w-2xl' : 'max-w-md'} flex-col bg-surface text-left shadow-xl`}>
         <div className="flex items-start justify-between gap-3 border-b border-border px-6 py-4">
           <div>
             <h2 className="text-h3 text-ink">{title}</h2>

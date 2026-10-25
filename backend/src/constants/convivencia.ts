@@ -10,7 +10,7 @@ export type TipoSituacion = (typeof TIPOS_SITUACION)[number];
 export const CLASES_REGISTRO = ['OBSERVACION', 'FALTA'] as const;
 export type ClaseRegistro = (typeof CLASES_REGISTRO)[number];
 
-export const CONTEXTOS_OBSERVACION = ['CLASE', 'DIRECCION_GRUPO', 'COORDINACION', 'ORIENTACION'] as const;
+export const CONTEXTOS_OBSERVACION = ['CLASE', 'DIRECCION_GRUPO', 'SEDE', 'COORDINACION', 'ORIENTACION'] as const;
 export type ContextoObservacion = (typeof CONTEXTOS_OBSERVACION)[number];
 
 export const ESTADOS_OBSERVACION = ['ACTIVA', 'ANULADA'] as const;
@@ -71,12 +71,18 @@ export type ParteDescargo = (typeof PARTES_DESCARGO)[number];
 export const ESTADOS_REMISION_ORIENTACION = ['PENDIENTE', 'EN_ATENCION', 'ATENDIDA'] as const;
 export type EstadoRemisionOrientacion = (typeof ESTADOS_REMISION_ORIENTACION)[number];
 
-/** Una remisión nace de una medida o de un paso del protocolo marcados por el colegio, o la hace convivencia a mano. */
+/**
+ * Una remisión la hace convivencia a mano desde el caso (`MANUAL`). `MEDIDA` y `PASO` son remisiones automáticas de una versión anterior (una medida
+ * o un paso marcados por el colegio): ya no se crean, pero las que existen se conservan y se siguen leyendo.
+ */
 export const ORIGENES_REMISION_ORIENTACION = ['MEDIDA', 'PASO', 'MANUAL'] as const;
 export type OrigenRemisionOrientacion = (typeof ORIGENES_REMISION_ORIENTACION)[number];
 
-/** A quiénes de un caso se remite automáticamente: a quien resultó afectado y a quien presuntamente lo causó. */
-export const ROLES_QUE_SE_REMITEN: readonly RolInvolucrado[] = ['AFECTADO', 'PRESUNTO_RESPONSABLE'];
+/**
+ * De quiénes se avisa a la familia al abrir un caso tipo II o III: de quien resultó afectado y de quien presuntamente lo causó. Los testigos y quien reportó
+ * no reciben aviso (su familia no es parte del hecho y el aviso podría revelar quién habló).
+ */
+export const ROLES_CUYA_FAMILIA_SE_INFORMA: readonly RolInvolucrado[] = ['AFECTADO', 'PRESUNTO_RESPONSABLE'];
 
 /** Valor inicial de la política; la institución lo cambia. Pasado este plazo sin remisión, un caso tipo III muestra alerta. */
 export const PLAZO_REMISION_TIPO_III_HORAS_INICIAL = 24;
@@ -89,6 +95,12 @@ export type TipoSesionComite = (typeof TIPOS_SESION_COMITE)[number];
 // Un acta nace en BORRADOR (editable, sin consecutivo) y al firmarse queda inmutable; las correcciones son anexos.
 export const ESTADOS_SESION_COMITE = ['BORRADOR', 'FIRMADA', 'ANULADA'] as const;
 export type EstadoSesionComite = (typeof ESTADOS_SESION_COMITE)[number];
+
+/**
+ * El Decreto 1965 de 2013 (art. 23) exige que el comité escolar de convivencia sesione, como mínimo, una vez cada dos meses. Es un mínimo de la norma, no una
+ * política del colegio (puede reunirse más seguido, no menos): por eso es una constante. **Validar con la norma vigente.**
+ */
+export const MESES_MAXIMOS_ENTRE_SESIONES_ORDINARIAS = 2;
 
 /** Valor inicial de la política (porcentaje de miembros presentes para deliberar); cada institución lo ajusta. */
 export const QUORUM_PORCENTAJE_INICIAL = 51;

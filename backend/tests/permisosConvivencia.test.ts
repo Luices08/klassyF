@@ -106,8 +106,12 @@ describe('permisoSobreEstudiante', () => {
     ]);
   });
 
-  it('un docente sin relación con el estudiante no registra', () => {
-    expect(permisoSobreEstudiante(usuario('DOCENTE'), estudiante(), 'REGISTRAR_OBSERVACION')).toBe(false);
+  it('un docente de la sede registra sobre cualquier estudiante de la sede, aunque no le dicte ni dirija su grupo; el de otra sede no', () => {
+    const sinRelacion = permitidas(usuario('DOCENTE'), estudiante());
+    expect(sinRelacion).toEqual(['REGISTRAR_OBSERVACION', 'REGISTRAR_FALTA', 'CONSULTAR_OBSERVACIONES_PROPIAS']);
+    // Ver el historial del estudiante sigue siendo solo de su director de grupo.
+    expect(sinRelacion).not.toContain('CONSULTAR_HISTORIAL');
+    expect(permitidas(usuario('DOCENTE', ['s2']), estudiante())).toEqual(['CONSULTAR_OBSERVACIONES_PROPIAS']);
   });
 
   it('el director de grupo ve el historial y el estado del caso, pero no gestiona', () => {

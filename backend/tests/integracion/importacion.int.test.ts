@@ -39,14 +39,14 @@ describe('Carga masiva de las faltas del manual (con base de datos)', () => {
 
   it('crea, actualiza y omite sin duplicar al reenviar el mismo archivo (CSV con punto y coma, tildes y coma decimal)', async () => {
     const archivo = csv(
-      'codigo;descripcion;gravedad;descuento_decimas;estado',
-      '1.1;Durante la clase debe estar atenta y participar activamente.;I;0,2;ACTIVO',
-      '3.3;Agrede físicamente a miembros de la comunidad educativa.;II;2,0;',
-      '4.1;Se le comprueba hurto.;III;;'
+      'codigo;descripcion;gravedad;estado',
+      '1.1;Durante la clase debe estar atenta y participar activamente.;I;ACTIVO',
+      '3.3;Agrede físicamente a miembros de la comunidad educativa.;II;',
+      '4.1;Se le comprueba hurto.;III;'
     );
     expect(await importar(archivo)).toMatchObject({ formato: 'csv', filas: 3, creados: 3, actualizados: 0, omitidos: 0 });
-    expect(await FaltaConvivencia.findOne({ codigo: '3.3' })).toMatchObject({ gravedad: 'II', descuento_decimas: 2, estado: 'activo' });
-    expect(await FaltaConvivencia.findOne({ codigo: '4.1' })).toMatchObject({ gravedad: 'III', descuento_decimas: null });
+    expect(await FaltaConvivencia.findOne({ codigo: '3.3' })).toMatchObject({ gravedad: 'II', estado: 'activo' });
+    expect(await FaltaConvivencia.findOne({ codigo: '4.1' })).toMatchObject({ gravedad: 'III' });
 
     expect(await importar(archivo)).toMatchObject({ creados: 0, actualizados: 0, omitidos: 3 });
 
@@ -63,22 +63,27 @@ describe('Carga masiva de las faltas del manual (con base de datos)', () => {
     expect(await FaltaConvivencia.findOne({})).toMatchObject({ codigo: 'A-1', gravedad: 'II' });
   });
 
+  it('un archivo de una versión anterior con la columna descuento_decimas se sigue cargando: la columna se ignora', async () => {
+    const archivo = csv('codigo;descripcion;gravedad;descuento_decimas;estado', '1.1;Una falta del manual.;I;0,2;ACTIVO');
+    expect(await importar(archivo)).toMatchObject({ creados: 1 });
+    expect((await FaltaConvivencia.findOne({ codigo: '1.1' }).lean()) as Record<string, unknown>).not.toHaveProperty('descuento_decimas');
+  });
+
   it('una fila con error impide guardar todo el archivo y se informa cada fila', async () => {
     const err = await errores(
       importar(
         csv(
-          'codigo,descripcion,gravedad,descuento_decimas,estado',
-          '1.1,Falta válida.,I,,',
-          '1.2,Gravedad inventada.,IV,,',
-          ',Sin código.,I,,',
-          '1.3,Décimas inválidas.,I,abc,',
-          '1.4,Estado inválido.,II,,suspendida',
-          '1.1,Código repetido.,III,,'
+          'codigo,descripcion,gravedad,estado',
+          '1.1,Falta válida.,I,',
+          '1.2,Gravedad inventada.,IV,',
+          ',Sin código.,I,',
+          '1.4,Estado inválido.,II,suspendida',
+          '1.1,Código repetido.,III,'
         )
       )
     );
     expect(err).toMatchObject({ statusCode: 400, message: expect.stringContaining('no se guardó nada') });
-    expect(err.details?.map((d) => d.fila)).toEqual([3, 4, 5, 6, 7]);
+    expect(err.details?.map((d) => d.fila)).toEqual([3, 4, 5, 6]);
     expect(await FaltaConvivencia.countDocuments()).toBe(0);
     expect(await LoteImportacion.countDocuments()).toBe(0);
   });
@@ -93,18 +98,18 @@ describe('Carga masiva de las faltas del manual (con base de datos)', () => {
     expect(libro.worksheets.map((h) => h.name)).toEqual(['Carga', 'Instrucciones', 'Listas', 'Contexto']);
     expect(libro.getWorksheet('Listas')!.state).toBe('hidden');
     expect(libro.getWorksheet('Contexto')!.state).toBe('hidden');
-    expect(libro.getWorksheet('Carga')!.getRow(1).values).toEqual([undefined, 'codigo', 'descripcion', 'gravedad', 'descuento_decimas', 'estado']);
+    expect(libro.getWorksheet('Carga')!.getRow(1).values).toEqual([undefined, 'codigo', 'descripcion', 'gravedad', 'estado']);
     expect(libro.getWorksheet('Carga')!.getCell('C2').dataValidation).toMatchObject({ type: 'list' });
     expect(libro.getWorksheet('Instrucciones')!.rowCount).toBeGreaterThan(5);
 
     const carga = libro.getWorksheet('Carga')!;
     // En ExcelJS, un arreglo asignado a `values` empieza en la columna A (al leerlo, el índice 0 queda vacío).
-    carga.getRow(2).values = ['2.10', 'Debe portar el uniforme sin maquillaje.', 'I', 0.3, 'ACTIVO'];
-    carga.getRow(3).values = ['3.2', 'Amenaza a personas utilizando celulares.', 'II', '1,7'];
+    carga.getRow(2).values = ['2.10', 'Debe portar el uniforme sin maquillaje.', 'I', 'ACTIVO'];
+    carga.getRow(3).values = ['3.2', 'Amenaza a personas utilizando celulares.', 'II'];
     const diligenciado = { buffer: Buffer.from(await libro.xlsx.writeBuffer()), originalname: 'plantilla.xlsx' };
     expect(await importar(diligenciado)).toMatchObject({ formato: 'xlsx', creados: 2 });
-    expect(await FaltaConvivencia.findOne({ codigo: '2.10' })).toMatchObject({ gravedad: 'I', descuento_decimas: 0.3 });
-    expect(await FaltaConvivencia.findOne({ codigo: '3.2' })).toMatchObject({ gravedad: 'II', descuento_decimas: 1.7 });
+    expect(await FaltaConvivencia.findOne({ codigo: '2.10' })).toMatchObject({ gravedad: 'I' });
+    expect(await FaltaConvivencia.findOne({ codigo: '3.2' })).toMatchObject({ gravedad: 'II' });
   });
 
   it('la plantilla CSV usa punto y coma con BOM y se puede cargar de vuelta', async () => {
@@ -113,8 +118,8 @@ describe('Carga masiva de las faltas del manual (con base de datos)', () => {
     expect(contentType).toContain('text/csv');
     const texto = buffer.toString('utf8');
     expect(texto.charCodeAt(0)).toBe(0xfeff);
-    expect(texto).toContain('"codigo";"descripcion";"gravedad";"descuento_decimas";"estado"');
-    const relleno = Buffer.from(`${texto}"1.1";"Una falta del manual.";"I";"0,1";"ACTIVO"\r\n`, 'utf8');
+    expect(texto).toContain('"codigo";"descripcion";"gravedad";"estado"');
+    const relleno = Buffer.from(`${texto}"1.1";"Una falta del manual.";"I";"ACTIVO"\r\n`, 'utf8');
     expect(await importar({ buffer: relleno, originalname: 'plantilla-faltas.csv' }, e.admin)).toMatchObject({ creados: 1 });
   });
 

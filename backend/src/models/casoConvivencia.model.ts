@@ -39,7 +39,6 @@ export interface IInvolucradoCaso {
 export interface IPasoCaso {
   nombre: string;
   obligatorio: boolean;
-  remite_a_orientacion: boolean;
   orden: number;
   estado: EstadoPasoProtocolo;
   fecha: Date | null;
@@ -67,6 +66,8 @@ export interface INotificacionCaso {
   medio: MedioCitacion;
   dirigida_a: string;
   resultado: string;
+  /** La dejó el sistema al avisar a las familias con portal (no la escribió una persona). */
+  automatica: boolean;
   por: Types.ObjectId;
 }
 
@@ -190,7 +191,6 @@ const involucradoSchema = new Schema<IInvolucradoCaso>({
 const pasoSchema = new Schema<IPasoCaso>({
   nombre: { type: String, required: true, trim: true, maxlength: 200 },
   obligatorio: { type: Boolean, default: false },
-  remite_a_orientacion: { type: Boolean, default: false },
   orden: { type: Number, default: 0 },
   estado: { type: String, enum: ESTADOS_PASO_PROTOCOLO, default: 'PENDIENTE' },
   fecha: { type: Date, default: null },
@@ -216,11 +216,12 @@ const seguimientoSchema = new Schema<ISeguimientoCaso>({
 });
 
 const notificacionSchema = new Schema<INotificacionCaso>({
-  tipo: { type: String, enum: TIPOS_NOTIFICACION_CASO, required: true },
+  tipo: { type: String, enum: TIPOS_NOTIFICACION_CASO, default: 'ACUDIENTES' },
   fecha: { type: Date, required: true },
-  medio: { type: String, enum: MEDIOS_CITACION, required: true },
+  medio: { type: String, enum: MEDIOS_CITACION, default: 'OTRO' },
   dirigida_a: { type: String, default: '', maxlength: 120 },
   resultado: { type: String, default: '', maxlength: 500 },
+  automatica: { type: Boolean, default: false },
   por: { type: Schema.Types.ObjectId, ref: 'User', required: true },
 });
 
@@ -332,7 +333,7 @@ const casoSchema = new Schema<ICasoConvivencia, CasoConvivenciaModel>(
         new Schema(
           {
             usuario_id: { type: Schema.Types.ObjectId, ref: 'User', required: true },
-            motivo: { type: String, required: true, maxlength: 500 },
+            motivo: { type: String, required: true, maxlength: 1000 },
             por: { type: Schema.Types.ObjectId, ref: 'User', required: true },
             fecha: { type: Date, required: true },
           },

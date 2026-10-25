@@ -10,15 +10,14 @@ import { actor, armarEscenario, Escenario, hoy } from './escenario';
 
 interface CasoVista {
   _id: string;
-  pasos: { _id: string; nombre: string; remite_a_orientacion: boolean }[];
+  pasos: { _id: string; nombre: string }[];
   remisiones_orientacion: { estudiante: string; rol: string; origen: string; estado: string; origen_detalle: string; descripcion?: unknown }[];
 }
 const comoCaso = (c: unknown) => c as CasoVista;
 
 describe('M15 → orientación: remisiones de un caso (con base de datos)', () => {
   let e: Escenario;
-  let medidaRemiteId: string;
-  let medidaSimpleId: string;
+  let medidaId: string;
 
   beforeAll(iniciarBaseDeDatos, 600_000);
   afterAll(detenerBaseDeDatos);
@@ -27,13 +26,12 @@ describe('M15 → orientación: remisiones de un caso (con base de datos)', () =
     await CasoConvivencia.syncIndexes();
     await RemisionOrientacion.syncIndexes();
     e = await armarEscenario();
-    medidaRemiteId = String((await catalogosCaso.crearMedida({ nombre: 'Acompañamiento psicosocial', descripcion: '', se_aplica_por_dias: false, remite_a_orientacion: true, orden: 1 }, actor(e.admin)))._id);
-    medidaSimpleId = String((await catalogosCaso.crearMedida({ nombre: 'Taller formativo', descripcion: '', se_aplica_por_dias: false, orden: 2 }, actor(e.admin)))._id);
+    medidaId = String((await catalogosCaso.crearMedida({ nombre: 'Acompañamiento psicosocial', descripcion: '', se_aplica_por_dias: false, orden: 1 }, actor(e.admin)))._id);
     await catalogosCaso.guardarProtocolo(
       'II',
       [
         { nombre: 'Citar a los acudientes', obligatorio: true },
-        { nombre: 'Valoración por orientación', obligatorio: false, remite_a_orientacion: true },
+        { nombre: 'Valoración por orientación', obligatorio: false },
       ],
       actor(e.admin)
     );
@@ -57,46 +55,30 @@ describe('M15 → orientación: remisiones de un caso (con base de datos)', () =
       )
     );
 
-  const aplicarMedida = (id: string, medida: string) =>
-    casos.agregarRegistroCaso(id, 'medidas-aplicadas', { fecha: hoy(), medida_id: medida }, e.coordConvivencia);
+  // Una medida solo se aplica después de oír los descargos; aquí se registran una vez y se reutilizan.
+  const aplicarMedida = async (id: string, medida: string) => {
+    if (!(await CasoConvivencia.exists({ _id: id, 'descargos.0': { $exists: true } }))) {
+      await casos.agregarRegistroCaso(id, 'descargos', { parte: 'ESTUDIANTE', student_id: String(e.estudiante._id), fecha: hoy(), texto: 'Dice que fue un malentendido.' }, e.coordConvivencia);
+    }
+    return casos.agregarRegistroCaso(id, 'medidas-aplicadas', { fecha: hoy(), medida_id: medida }, e.coordConvivencia);
+  };
 
-  it('el protocolo copia la bandera de cada paso al abrir el caso', async () => {
+  // Remitir a orientación es siempre una decisión de convivencia, desde el caso (ni una medida ni un paso lo hacen solos).
+  const remitirAfectado = (id: string) =>
+    casos.remitirAOrientacion(id, { student_ids: [String(e.otroEstudiante._id)], motivo: 'Acompañamiento psicosocial del afectado.' }, e.coordConvivencia);
+
+  it('aplicar una medida o cumplir un paso del protocolo no remite a nadie a orientación', async () => {
     const caso = await abrir();
-    expect(caso.pasos.map((p) => [p.nombre, p.remite_a_orientacion])).toEqual([
-      ['Citar a los acudientes', false],
-      ['Valoración por orientación', true],
-    ]);
+    expect(comoCaso(await aplicarMedida(caso._id, medidaId)).remisiones_orientacion).toHaveLength(0);
+    for (const paso of caso.pasos) {
+      expect(comoCaso(await casos.actualizarPaso(caso._id, paso._id, { estado: 'CUMPLIDO' }, e.coordConvivencia)).remisiones_orientacion).toHaveLength(0);
+    }
+    expect(await RemisionOrientacion.countDocuments()).toBe(0);
   });
 
-  it('aplicar una medida que remite crea una remisión por afectado y presunto responsable, no por el testigo', async () => {
+  it('los pasos del protocolo ya no traen la bandera de remitir: la remisión es siempre manual', async () => {
     const caso = await abrir();
-    const vista = comoCaso(await aplicarMedida(caso._id, medidaRemiteId));
-
-    expect(vista.remisiones_orientacion).toHaveLength(2);
-    expect(vista.remisiones_orientacion.map((r) => r.rol).sort()).toEqual(['AFECTADO', 'PRESUNTO_RESPONSABLE']);
-    expect(vista.remisiones_orientacion.every((r) => r.estado === 'PENDIENTE' && r.origen === 'MEDIDA')).toBe(true);
-    expect(await AuditLog.countDocuments({ accion: 'ORIENTACION_REMISION_CREADA' })).toBe(1);
-  });
-
-  it('una medida sin la bandera no remite, y aplicar la misma medida otra vez no duplica', async () => {
-    const caso = await abrir();
-    expect(comoCaso(await aplicarMedida(caso._id, medidaSimpleId)).remisiones_orientacion).toHaveLength(0);
-
-    await aplicarMedida(caso._id, medidaRemiteId);
-    const otra = comoCaso(await aplicarMedida(caso._id, medidaRemiteId));
-    expect(otra.remisiones_orientacion).toHaveLength(2);
-  });
-
-  it('cumplir un paso marcado remite; marcarlo pendiente y cumplirlo otra vez no duplica', async () => {
-    const caso = await abrir();
-    const paso = caso.pasos.find((p) => p.remite_a_orientacion)!;
-    const sinBandera = caso.pasos.find((p) => !p.remite_a_orientacion)!;
-
-    expect(comoCaso(await casos.actualizarPaso(caso._id, sinBandera._id, { estado: 'CUMPLIDO' }, e.coordConvivencia)).remisiones_orientacion).toHaveLength(0);
-    expect(comoCaso(await casos.actualizarPaso(caso._id, paso._id, { estado: 'CUMPLIDO' }, e.coordConvivencia)).remisiones_orientacion).toHaveLength(2);
-
-    await casos.actualizarPaso(caso._id, paso._id, { estado: 'PENDIENTE' }, e.coordConvivencia);
-    expect(comoCaso(await casos.actualizarPaso(caso._id, paso._id, { estado: 'CUMPLIDO' }, e.coordConvivencia)).remisiones_orientacion).toHaveLength(2);
+    expect(caso.pasos.map((p) => Object.keys(p))).not.toContainEqual(expect.arrayContaining(['remite_a_orientacion']));
   });
 
   it('convivencia remite a mano a un involucrado y no repite una remisión en curso', async () => {
@@ -111,14 +93,36 @@ describe('M15 → orientación: remisiones de un caso (con base de datos)', () =
 
   it('el caso con remisiones a orientación no se puede anular', async () => {
     const caso = await abrir();
-    await aplicarMedida(caso._id, medidaRemiteId);
+    await remitirAfectado(caso._id);
     await expect(casos.anularCaso(caso._id, 'Error de apertura.', e.admin)).rejects.toMatchObject({ statusCode: 409 });
+  });
+
+  it('una remisión automática de una versión anterior (por una medida) se sigue viendo en el caso y en la bandeja', async () => {
+    const caso = await abrir();
+    const estudiante = e.otroEstudiante;
+    const grupo = (await CasoConvivencia.findById(caso._id))!.involucrados.find((i) => String(i.student_id) === String(estudiante._id))!.group_id;
+    await RemisionOrientacion.create({
+      caso_id: caso._id,
+      caso_codigo: (await CasoConvivencia.findById(caso._id))!.codigo,
+      sede_id: (await CasoConvivencia.findById(caso._id))!.sede_id,
+      tipo_situacion: 'II',
+      hechos: 'Agresión física durante el descanso.',
+      student_id: estudiante._id,
+      group_id: grupo,
+      rol: 'AFECTADO',
+      origen: 'MEDIDA',
+      origen_detalle: 'Acompañamiento psicosocial',
+      clave: `${caso._id}:${estudiante._id}:MEDIDA:antigua`,
+      remitida_por: e.coordConvivencia._id,
+    });
+    expect(comoCaso(await casos.obtenerCaso(caso._id, e.coordConvivencia)).remisiones_orientacion).toMatchObject([{ origen: 'MEDIDA', estado: 'PENDIENTE' }]);
+    expect((await orientacion.bandejaDeRemisiones(e.orientador, {}, { pagina: 1, limite: 20 })).data).toHaveLength(1);
   });
 
   describe('bandeja y atenciones de orientación', () => {
     const preparar = async () => {
       const caso = await abrir();
-      await aplicarMedida(caso._id, medidaRemiteId);
+      await remitirAfectado(caso._id);
       const { data } = await orientacion.bandejaDeRemisiones(e.orientador, {}, { pagina: 1, limite: 20 });
       return { caso, remision: data.find((r) => r.rol === 'AFECTADO')! };
     };

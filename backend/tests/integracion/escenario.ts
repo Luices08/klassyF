@@ -43,6 +43,7 @@ export interface Escenario {
   directora: UserDocument;
   docenteDeClase: UserDocument;
   docenteAjeno: UserDocument;
+  docenteOtraSede: UserDocument;
   secretaria: UserDocument;
   estudiante: UserDocument;
   otroEstudiante: UserDocument;
@@ -96,6 +97,7 @@ export async function armarEscenario(): Promise<Escenario> {
   const directora = await crearUsuario('DOCENTE', { sedes_ids: [sede._id] });
   const docenteDeClase = await crearUsuario('DOCENTE', { sedes_ids: [sede._id] });
   const docenteAjeno = await crearUsuario('DOCENTE', { sedes_ids: [sede._id] });
+  const docenteOtraSede = await crearUsuario('DOCENTE', { sedes_ids: [otraSede._id] });
   const secretaria = await crearUsuario('SECRETARIA');
   const estudiante = await crearUsuario('ESTUDIANTE');
   const otroEstudiante = await crearUsuario('ESTUDIANTE');
@@ -132,9 +134,9 @@ export async function armarEscenario(): Promise<Escenario> {
   const { tipos } = await catalogo.listarCatalogo(true);
   const tipoAcademica = String(tipos.find((t) => t.nombre === 'Académica')!._id);
   const tipoComportamental = String(tipos.find((t) => t.nombre === 'Comportamental')!._id);
-  const faltaI = await catalogoCaso.crearFalta({ codigo: '1.3', descripcion: 'Debe estar puntual en clase.', gravedad: 'I', descuento_decimas: 0.3 }, actor(admin));
-  const faltaII = await catalogoCaso.crearFalta({ codigo: '3.3', descripcion: 'Agrede físicamente a miembros de la comunidad educativa.', gravedad: 'II', descuento_decimas: 2 }, actor(admin));
-  const faltaIII = await catalogoCaso.crearFalta({ codigo: '4.3', descripcion: 'Ocasiona lesiones que ponen en riesgo la vida de otra persona.', gravedad: 'III', descuento_decimas: null }, actor(admin));
+  const faltaI = await catalogoCaso.crearFalta({ codigo: '1.3', descripcion: 'Debe estar puntual en clase.', gravedad: 'I' }, actor(admin));
+  const faltaII = await catalogoCaso.crearFalta({ codigo: '3.3', descripcion: 'Agrede físicamente a miembros de la comunidad educativa.', gravedad: 'II' }, actor(admin));
+  const faltaIII = await catalogoCaso.crearFalta({ codigo: '4.3', descripcion: 'Ocasiona lesiones que ponen en riesgo la vida de otra persona.', gravedad: 'III' }, actor(admin));
 
   return {
     admin,
@@ -147,6 +149,7 @@ export async function armarEscenario(): Promise<Escenario> {
     directora,
     docenteDeClase,
     docenteAjeno,
+    docenteOtraSede,
     secretaria,
     estudiante,
     otroEstudiante,

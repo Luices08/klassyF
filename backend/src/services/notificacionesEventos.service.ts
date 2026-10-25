@@ -154,21 +154,41 @@ export function avisarBoletinPublicado(grupo: { groupId: Id; academicYearId: Id;
   });
 }
 
-/** M14: se registró una falta Tipo II/III → los acudientes del presunto responsable (sin detalle) y coordinación de convivencia de la sede. */
-export function avisarFaltaGrave(falta: { observacionId: Id; estudianteId: Id; sedeId: Id | null; hayCaso: boolean }): Promise<void> {
-  return sinRomper('falta grave', async () => {
-    const [estudiante, acudientes] = await Promise.all([User.findById(falta.estudianteId).select('nombre apellido').lean(), acudientesConPortalDe([falta.estudianteId])]);
-    await avisar({
-      destinatarios: acudientes,
-      rol: ROLES.ACUDIENTE,
-      evento: 'FALTA_GRAVE',
-      entidad_id: String(falta.observacionId),
-      datos: { estudiante: nombreCompleto(estudiante) },
-      ruta: '/portal',
-    });
-    await sumarInsignia({ destinatarios: acudientes, rol: ROLES.ACUDIENTE, ruta: '/portal', pestana: pestanaDeHijo('convivencia', falta.estudianteId) });
-    if (falta.hayCaso) {
-      await insigniaParaRoles([ROLES.ADMIN, ROLES.COORDINADOR_CONVIVENCIA], '/convivencia/solicitudes', falta.sedeId ?? undefined);
+/**
+ * M15: se abrió (o subió a Tipo II o III) un caso de convivencia → los acudientes de **todos** los estudiantes involucrados reciben el aviso, sin hechos,
+ * sin nombres de otros menores y sin decir qué papel tuvo cada uno (el Decreto 1965 pide informar de inmediato a las familias de las dos partes, art. 43 y 44).
+ * Es una alerta en su campanita y un punto en la pestaña de convivencia de ese hijo; el informe formal queda registrado en el caso como «notificación a acudientes».
+ */
+export async function avisarSituacionDeConvivencia(casoId: Id, estudiantes: Id[]): Promise<number> {
+  const avisados = new Set<string>();
+  await sinRomper('situación de convivencia', async () => {
+    for (const estudianteId of new Set(estudiantes.map(String))) {
+      const [estudiante, acudientes] = await Promise.all([User.findById(estudianteId).select('nombre apellido').lean(), acudientesConPortalDe([estudianteId])]);
+      await avisar({
+        destinatarios: acudientes,
+        rol: ROLES.ACUDIENTE,
+        evento: 'FALTA_GRAVE',
+        entidad_id: String(casoId),
+        datos: { estudiante: nombreCompleto(estudiante) },
+        ruta: '/portal',
+      });
+      await sumarInsignia({ destinatarios: acudientes, rol: ROLES.ACUDIENTE, ruta: '/portal', pestana: pestanaDeHijo('convivencia', estudianteId) });
+      for (const acudiente of acudientes) avisados.add(String(acudiente));
+    }
+  });
+  return avisados.size;
+}
+
+/**
+ * M14: llegó una solicitud de caso a convivencia (un reporte urgente o una falta Tipo I que el docente escaló): punto rojo en «Solicitudes de caso»
+ * para ADMIN y coordinación de convivencia de esa sede. Un reporte urgente además es alerta crítica en su campanita (agrupada: «Hay 3 reportes…»).
+ */
+export function avisarSolicitudDeCaso(solicitud: { sedeId: Id; urgente: boolean }): Promise<void> {
+  return sinRomper('solicitud de caso', async () => {
+    await insigniaParaRoles([ROLES.ADMIN, ROLES.COORDINADOR_CONVIVENCIA], '/convivencia/solicitudes', solicitud.sedeId);
+    if (!solicitud.urgente) return;
+    for (const rol of [ROLES.ADMIN, ROLES.COORDINADOR_CONVIVENCIA]) {
+      await avisar({ destinatarios: await usuariosConRol([rol], solicitud.sedeId), rol, evento: 'REPORTE_URGENTE', entidad_id: 'reportes-urgentes', ruta: '/convivencia/solicitudes' });
     }
   });
 }
@@ -200,7 +220,7 @@ export function avisarInasistencias(estudiantes: Id[]): Promise<void> {
 
 /**
  * M14: registros que la familia SÍ puede ver (no confidenciales, de tipos visibles al estudiante, o una falta Tipo I). Los confidenciales y las
- * faltas II/III no pasan por aquí: esas tienen su propia regla (`avisarFaltaGrave`).
+ * faltas II/III no pasan por aquí: esas tienen su propia regla (`avisarSituacionDeConvivencia`, al abrir el caso).
  */
 export function avisarObservacionesVisibles(estudiantes: Id[]): Promise<void> {
   return sinRomper('observaciones', async () => {

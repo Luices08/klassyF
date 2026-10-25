@@ -1,13 +1,14 @@
 export const TIPOS_CITACION = ['GENERAL', 'PARTICULAR'] as const;
 export type TipoCitacion = (typeof TIPOS_CITACION)[number];
 
-export const MOTIVOS_CITACION = ['ENTREGA_BOLETINES', 'ACADEMICO', 'COMPORTAMENTAL', 'OTRO'] as const;
+export const MOTIVOS_CITACION = ['ENTREGA_BOLETINES', 'ACADEMICO', 'COMPORTAMENTAL', 'ORIENTACION_CONVIVENCIA', 'OTRO'] as const;
 export type MotivoCitacion = (typeof MOTIVOS_CITACION)[number];
 
 export const NOMBRES_MOTIVO_CITACION: Record<MotivoCitacion, string> = {
   ENTREGA_BOLETINES: 'Entrega de boletines',
   ACADEMICO: 'Seguimiento académico',
   COMPORTAMENTAL: 'Seguimiento comportamental',
+  ORIENTACION_CONVIVENCIA: 'Orientación y convivencia',
   OTRO: 'Otro',
 };
 

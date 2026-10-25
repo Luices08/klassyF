@@ -1,16 +1,15 @@
 import { HydratedDocument, Types } from 'mongoose';
-import { avisarFaltaGrave, avisarObservacionesVisibles } from './notificacionesEventos.service';
+import { avisarObservacionesVisibles, avisarSolicitudDeCaso } from './notificacionesEventos.service';
 import {
   ContextoObservacion,
   EstadoCompromiso,
-  RolInvolucrado,
 } from '../constants/convivencia';
 import { ESTADOS_MATRICULA_ACTIVOS } from '../constants/enums';
 import { ROLES } from '../constants/roles';
 import AcademicYear, { AcademicYearDocument } from '../models/academicYear.model';
 import CasoConvivencia from '../models/casoConvivencia.model';
 import Enrollment from '../models/enrollment.model';
-import FaltaConvivencia from '../models/faltaConvivencia.model';
+import FaltaConvivencia, { FaltaConvivenciaDocument } from '../models/faltaConvivencia.model';
 import Group, { IGroup } from '../models/group.model';
 import Observacion, { IObservacion, ObservacionDocument } from '../models/observacion.model';
 import SolicitudCaso, { ISolicitudCaso } from '../models/solicitudCaso.model';
@@ -20,12 +19,14 @@ import { User, UserDocument } from '../models/user.model';
 import ApiError from '../utils/ApiError';
 import { ESTADO_ACTIVO } from '../utils/filtroEstado';
 import {
-  debeRemitirse,
   dentroDelPlazo,
+  esSeguimientoDeOrientacion,
+  esGraveEnTramite,
   esSituacionGrave,
   esVisibleParaEstudiante,
   ModoVistaObservacion,
   problemasDeFalta,
+  problemasDeReporteUrgente,
   visibilidadDeObservacion,
   vistaObservacion,
 } from '../utils/observaciones';
@@ -132,26 +133,36 @@ export const exigirPermisoSobreEstudiante = exigirPermiso;
 
 // --- Buscador acotado (no abre /students) ---
 
-/** Los grupos del año en curso a los que el usuario tiene acceso por su sede o por su vínculo docente. */
-async function filtroDeGrupos(usuario: UserDocument, anioId: Types.ObjectId): Promise<Record<string, unknown>> {
+/** Los grupos donde el docente dicta clase o dirige: de los demás ve el nombre del estudiante, no su documento. */
+async function gruposPropiosDelDocente(usuario: UserDocument, anioId: Types.ObjectId): Promise<Set<string>> {
+  const clases = await TeacherAssignment.distinct('group_id', {
+    docente_id: usuario._id,
+    academic_year_id: anioId,
+    tipo_asignacion: 'CLASE',
+    estado: ESTADO_ACTIVO,
+  });
+  const dirigidos = await Group.distinct('_id', { academic_year_id: anioId, director_grupo_id: usuario._id });
+  return new Set([...clases, ...dirigidos].map(String));
+}
+
+/**
+ * Los grupos del año en curso de las sedes del usuario: en el Observador el docente también registra sobre estudiantes de grupos donde no dicta ni dirige
+ * (quien ve algo lo registra). `soloVinculo` lo limita a los suyos, que es lo que usa M16.
+ */
+async function filtroDeGrupos(usuario: UserDocument, anioId: Types.ObjectId, soloVinculo = false): Promise<Record<string, unknown>> {
   const base = { academic_year_id: anioId, estado: 'ACTIVE' };
-  const alcance = alcanceDeSedes(comoUsuarioConvivencia(usuario));
-  if (usuario.rol === ROLES.DOCENTE) {
-    const clases = await TeacherAssignment.distinct('group_id', {
-      docente_id: usuario._id,
-      academic_year_id: anioId,
-      tipo_asignacion: 'CLASE',
-      estado: ESTADO_ACTIVO,
-    });
-    return { ...base, $or: [{ _id: { $in: clases } }, { director_grupo_id: usuario._id }] };
+  if (usuario.rol === ROLES.DOCENTE && soloVinculo) {
+    const propios = [...(await gruposPropiosDelDocente(usuario, anioId))];
+    return { ...base, _id: { $in: propios } };
   }
+  const alcance = alcanceDeSedes(comoUsuarioConvivencia(usuario));
   return alcance === 'TODAS' ? base : { ...base, sede_id: { $in: alcance } };
 }
 
-export async function gruposAccesibles(usuario: UserDocument) {
+export async function gruposAccesibles(usuario: UserDocument, soloVinculo = false) {
   const anio = await AcademicYear.findOne({ estado: 'EN_CURSO' });
   if (!anio) return [];
-  const grupos = await Group.find(await filtroDeGrupos(usuario, anio._id))
+  const grupos = await Group.find(await filtroDeGrupos(usuario, anio._id, soloVinculo))
     .populate<{ grade_id: { nombre: string } }>('grade_id', 'nombre')
     .sort({ nomenclatura: 1 });
   return grupos.map((g) => ({
@@ -168,13 +179,14 @@ export interface ConsultaEstudiantes {
   q?: string;
 }
 
-export async function buscarEstudiantes(usuario: UserDocument, { group_id, q }: ConsultaEstudiantes) {
+export async function buscarEstudiantes(usuario: UserDocument, { group_id, q }: ConsultaEstudiantes, soloVinculo = false) {
   const anio = await AcademicYear.findOne({ estado: 'EN_CURSO' });
   if (!anio) return [];
   const texto = q?.trim() ?? '';
   if (!group_id && texto.length < 3) return [];
 
-  const filtroGrupos = await filtroDeGrupos(usuario, anio._id);
+  const filtroGrupos = await filtroDeGrupos(usuario, anio._id, soloVinculo);
+  const propios = usuario.rol === ROLES.DOCENTE ? await gruposPropiosDelDocente(usuario, anio._id) : null;
   const grupos = await Group.find(group_id ? { $and: [filtroGrupos, { _id: group_id }] } : filtroGrupos).select('nomenclatura');
   if (grupos.length === 0) return [];
   const nomenclatura = new Map(grupos.map((g) => [String(g._id), g.nomenclatura]));
@@ -183,10 +195,10 @@ export async function buscarEstudiantes(usuario: UserDocument, { group_id, q }: 
     group_id: { $in: grupos.map((g) => g._id) },
     estado: { $in: ESTADOS_MATRICULA_ACTIVOS },
   };
-  if (texto) {
-    const patron = new RegExp(escaparRegex(texto), 'i');
+  const patron = texto ? new RegExp(escaparRegex(texto), 'i') : null;
+  if (patron) {
     const coincidentes = await User.find({
-      rol: ROLES.ESTUDIANTE,
+      roles: ROLES.ESTUDIANTE,
       $or: [{ nombre: patron }, { apellido: patron }, { numero_documento: patron }],
     })
       .select('_id')
@@ -194,6 +206,7 @@ export async function buscarEstudiantes(usuario: UserDocument, { group_id, q }: 
     filtroMatricula.student_id = { $in: coincidentes.map((u) => u._id) };
   }
 
+  const coincideNombre = (u: { nombre: string; apellido: string }) => Boolean(patron) && (patron!.test(u.nombre) || patron!.test(u.apellido));
   const matriculas = await Enrollment.find(filtroMatricula)
     .populate<{ student_id: { _id: Types.ObjectId; nombre: string; apellido: string; numero_documento: string } }>(
       'student_id',
@@ -202,12 +215,13 @@ export async function buscarEstudiantes(usuario: UserDocument, { group_id, q }: 
     .limit(group_id ? 200 : LIMITE_BUSQUEDA);
 
   return matriculas
-    .filter((m) => m.student_id)
+    // El documento de un grupo ajeno no se muestra ni sirve para buscar: si no coincide por nombre, ese estudiante no sale.
+    .filter((m) => m.student_id && (!propios || !patron || propios.has(String(m.group_id)) || coincideNombre(m.student_id)))
     .map((m) => ({
       student_id: String(m.student_id._id),
       nombre: m.student_id.nombre,
       apellido: m.student_id.apellido,
-      numero_documento: m.student_id.numero_documento,
+      numero_documento: propios && !propios.has(String(m.group_id)) ? '' : m.student_id.numero_documento,
       group_id: String(m.group_id),
       grupo: nomenclatura.get(String(m.group_id)) ?? '',
     }))
@@ -218,23 +232,11 @@ export async function buscarEstudiantes(usuario: UserDocument, { group_id, q }: 
 
 const vista = (obs: Parameters<typeof vistaObservacion>[0], modo: ModoVistaObservacion) => vistaObservacion(obs, modo);
 
-const ROLES_EN_NOMBRE_DE: string[] = [ROLES.ADMIN, ROLES.COORDINADOR, ROLES.COORDINADOR_CONVIVENCIA];
-
-/** Solo coordinación/ADMIN registran en nombre de un docente (queda quién lo hizo realmente en `registrado_por`). */
-async function resolverAutor(usuario: UserDocument, enNombreDeId?: string): Promise<Types.ObjectId> {
-  if (!enNombreDeId) return usuario._id;
-  if (!ROLES_EN_NOMBRE_DE.includes(usuario.rol)) {
-    throw new ApiError(403, 'Solo coordinación o administración pueden registrar en nombre de un docente.');
-  }
-  const docente = await User.findOne({ _id: enNombreDeId, roles: ROLES.DOCENTE, estado: ESTADO_ACTIVO });
-  if (!docente) throw new ApiError(400, 'El docente indicado no existe o está inactivo.');
-  return docente._id;
-}
-
 function contextoDeRegistro(usuario: UserDocument, datos: EstudianteConvivencia): ContextoObservacion {
   if (usuario.rol === ROLES.ORIENTADOR) return 'ORIENTACION';
   if (usuario.rol !== ROLES.DOCENTE) return 'COORDINACION';
-  return datos.docenteDictaClase ? 'CLASE' : 'DIRECCION_GRUPO';
+  if (datos.docenteDictaClase) return 'CLASE';
+  return datos.esDirectorDeGrupo ? 'DIRECCION_GRUPO' : 'SEDE';
 }
 
 function exigirFechaDelHecho(fechaHecho: string): Date {
@@ -283,7 +285,6 @@ function datosComunes(
   anio: AcademicYearDocument,
   fecha: Date,
   usuario: UserDocument,
-  autorId: Types.ObjectId,
   eventoId: Types.ObjectId | null
 ): Pick<
   IObservacion,
@@ -309,7 +310,7 @@ function datosComunes(
     fecha_hecho: fecha,
     evento_id: eventoId,
     registrado_por: usuario._id,
-    autor_id: autorId,
+    autor_id: usuario._id,
     contexto: contextoDeRegistro(usuario, contexto.datos),
   };
 }
@@ -326,9 +327,9 @@ export interface RegistrarObservacionInput {
   compromiso?: string;
   requiere_citacion?: boolean;
   confidencial?: boolean;
+  /** Lo que el estudiante manifestó (descargo verbal): se guarda tal cual junto a los hechos. */
+  version_estudiante?: string;
   fecha_hecho: string;
-  /** Solo coordinación/ADMIN: el docente al que se atribuye cuando registran por él. */
-  en_nombre_de_id?: string;
 }
 
 export async function registrarObservacion(input: RegistrarObservacionInput, usuario: UserDocument, ip?: string | null) {
@@ -342,7 +343,6 @@ export async function registrarObservacion(input: RegistrarObservacionInput, usu
   if (!tipo || tipo.estado === 'inactivo') throw new ApiError(400, 'El tipo de observación no existe o está inactivo.');
   if (tipo.sistema) throw new ApiError(400, 'Ese tipo lo asienta el sistema; no se registra a mano.');
 
-  const autorId = await resolverAutor(usuario, input.en_nombre_de_id);
   // Lo que escribe orientación es seguimiento psicosocial: siempre confidencial, no queda a elección.
   const confidencial = usuario.rol === ROLES.ORIENTADOR ? true : Boolean(input.confidencial);
 
@@ -351,9 +351,10 @@ export async function registrarObservacion(input: RegistrarObservacionInput, usu
   const resueltos = await resolverEstudiantes(usuario, estudiantesIds, 'REGISTRAR_OBSERVACION', fecha, anio);
 
   const documentos: Partial<IObservacion>[] = resueltos.map((r) => ({
-    ...datosComunes(r, anio, fecha, usuario, autorId, eventoId),
+    ...datosComunes(r, anio, fecha, usuario, eventoId),
     clase: 'OBSERVACION',
     descripcion,
+    version_estudiante: (input.version_estudiante ?? '').trim(),
     compromiso,
     compromiso_estado: compromiso ? 'PENDIENTE' : null,
     tipo_id: tipo._id,
@@ -377,36 +378,32 @@ export async function registrarObservacion(input: RegistrarObservacionInput, usu
   return creadas.map((o) => vista(o, 'COMPLETA'));
 }
 
-// --- Registro de una falta (M15: el manual de convivencia, con su gravedad) ---
+// --- Registro de una falta Tipo I (el manual de convivencia) ---
 
 export interface RegistrarFaltaInput {
   falta_id: string;
   fecha_hecho: string;
   hechos: string;
-  /** Tipo I: lo que el estudiante manifestó. */
+  /** Lo que el estudiante manifestó. */
   version_estudiante?: string;
-  /** Tipo I: el acuerdo formativo. */
+  /** El acuerdo formativo. */
   compromiso?: string;
-  /** Tipo II/III: las acciones inmediatas de contención. */
-  acciones_contencion?: string;
-  /** Tipo I: el docente decide si la manda al comité. Tipo II/III: siempre va. */
-  remitir_comite?: boolean;
-  /** Tipo I: los estudiantes (todos presuntos responsables). Tipo II/III: con su rol en el hecho. */
-  involucrados: { student_id: string; rol: RolInvolucrado }[];
-  en_nombre_de_id?: string;
+  /** Si no se resolvió con la mediación del aula, el docente la escala a coordinación de convivencia (queda una solicitud de caso). */
+  escalar_a_coordinacion?: boolean;
+  /** Los estudiantes que cometieron la falta. */
+  estudiantes_ids: string[];
 }
 
 export interface ResultadoFalta {
   registros: ReturnType<typeof vista>[];
-  /** true si se generó una solicitud de caso para convivencia. */
-  remitida: boolean;
+  /** true si se generó una solicitud de caso para coordinación de convivencia. */
+  escalada: boolean;
 }
 
 /**
- * El docente no tipifica: elige una falta del manual y la gravedad sale de ella. Tipo I se queda en el Observador como
- * antecedente pedagógico; Tipo II/III (o una Tipo I que remite) genera una solicitud para que convivencia abra el caso.
- * El antecedente en el Observador queda solo en los presuntos responsables: el afectado, los testigos y el reportante
- * viven únicamente en la solicitud y el caso (no se estigmatiza a un menor que fue víctima ni se exponen datos de otros).
+ * Una falta Tipo I se queda en el Observador como antecedente pedagógico (se resuelve con mediación de aula) y, si el docente decide
+ * escalarla, además llega a coordinación como solicitud de caso. Una Tipo II que el docente **resolvió él mismo** también queda aquí, con sus hechos y
+ * su compromiso, y se trata como una Tipo I; si decide enviarla a coordinación, o es Tipo III, va por `reportarSituacionGrave` y no deja antecedente.
  */
 export async function registrarFalta(input: RegistrarFaltaInput, usuario: UserDocument, ip?: string | null): Promise<ResultadoFalta> {
   const anio = await anioEnCurso();
@@ -416,28 +413,27 @@ export async function registrarFalta(input: RegistrarFaltaInput, usuario: UserDo
     ? await FaltaConvivencia.findOne({ _id: input.falta_id, institucion_id: institucion._id, estado: ESTADO_ACTIVO })
     : null;
   if (!falta) throw new ApiError(400, 'La falta no existe o está inactiva.');
-
-  const hechos = input.hechos.trim();
-  const problemas = problemasDeFalta(falta.gravedad, { ...input, hechos });
-  if (problemas.length > 0) throw new ApiError(400, problemas.join(' '));
-  const estudiantesIds = input.involucrados.map((i) => i.student_id);
-  if (unicos(estudiantesIds).length !== estudiantesIds.length) {
-    throw new ApiError(400, 'Un estudiante no puede figurar dos veces entre los involucrados.');
+  if (falta.gravedad === 'II' && input.escalar_a_coordinacion) {
+    throw new ApiError(400, 'Una falta Tipo II se envía a coordinación con el reporte a coordinación (no deja antecedente en el Observador); aquí solo se registra la que resolviste tú.');
   }
 
-  const autorId = await resolverAutor(usuario, input.en_nombre_de_id);
-  // El docente solo puede nombrar estudiantes de sus grupos (los mismos que ve en el buscador); convivencia agrega el resto al abrir el caso.
-  const resueltos = await resolverEstudiantes(usuario, estudiantesIds, 'REGISTRAR_FALTA', fecha, anio);
-  const porEstudiante = new Map(input.involucrados.map((i, n) => [i.student_id, { rol: i.rol, resuelto: resueltos[n] as EstudianteResuelto }]));
+  const hechos = input.hechos.trim();
+  const problemas = problemasDeFalta(falta.gravedad, { hechos });
+  if (problemas.length > 0) throw new ApiError(400, problemas.join(' '));
+  const estudiantesIds = unicos(input.estudiantes_ids);
+  if (estudiantesIds.length === 0) throw new ApiError(400, 'Indica al menos un estudiante.');
 
-  const presuntos = input.involucrados.filter((i) => i.rol === 'PRESUNTO_RESPONSABLE');
-  const eventoId = presuntos.length > 1 ? new Types.ObjectId() : null;
-  const remitida = debeRemitirse(falta.gravedad, input.remitir_comite);
-  const solicitudId = remitida ? new Types.ObjectId() : null;
+  const resueltos = await resolverEstudiantes(usuario, estudiantesIds, 'REGISTRAR_FALTA', fecha, anio);
+  if (input.escalar_a_coordinacion && new Set(resueltos.map((r) => String(r.contexto.grupo.sede_id))).size > 1) {
+    throw new ApiError(400, 'Para escalar a coordinación los estudiantes deben ser de la misma sede: registra aparte lo de cada sede.');
+  }
+  const eventoId = estudiantesIds.length > 1 ? new Types.ObjectId() : null;
+  const escalada = Boolean(input.escalar_a_coordinacion);
+  const solicitudId = escalada ? new Types.ObjectId() : null;
   const compromiso = (input.compromiso ?? '').trim();
 
-  const documentos: (Partial<IObservacion> & { _id: Types.ObjectId })[] = presuntos.map((p) => ({
-    ...datosComunes((porEstudiante.get(p.student_id) as { resuelto: EstudianteResuelto }).resuelto, anio, fecha, usuario, autorId, eventoId),
+  const documentos: (Partial<IObservacion> & { _id: Types.ObjectId })[] = resueltos.map((r) => ({
+    ...datosComunes(r, anio, fecha, usuario, eventoId),
     _id: new Types.ObjectId(),
     clase: 'FALTA',
     descripcion: hechos,
@@ -447,11 +443,11 @@ export async function registrarFalta(input: RegistrarFaltaInput, usuario: UserDo
     version_estudiante: (input.version_estudiante ?? '').trim(),
     solicitud_id: solicitudId,
   }));
-  const observacionDe = new Map(documentos.map((d) => [String(d.student_id), d._id as Types.ObjectId]));
+  const observacionDe = new Map(documentos.map((d) => [String(d.student_id), d._id]));
 
-  const primero = (porEstudiante.get((presuntos[0] as { student_id: string }).student_id) as { resuelto: EstudianteResuelto }).resuelto;
+  const primero = resueltos[0] as EstudianteResuelto;
   const solicitud: Partial<ISolicitudCaso> | null = solicitudId
-    ? {
+    ? ({
         _id: solicitudId,
         sede_id: primero.contexto.grupo.sede_id,
         academic_year_id: anio._id,
@@ -459,20 +455,17 @@ export async function registrarFalta(input: RegistrarFaltaInput, usuario: UserDo
         gravedad: falta.gravedad,
         falta: { falta_id: falta._id, codigo: falta.codigo, descripcion: falta.descripcion },
         hechos,
-        acciones_contencion: (input.acciones_contencion ?? '').trim(),
-        involucrados: input.involucrados.map((i) => {
-          const { resuelto } = porEstudiante.get(i.student_id) as { resuelto: EstudianteResuelto };
-          return {
-            student_id: resuelto.contexto.student_id,
-            rol: i.rol,
-            group_id: resuelto.contexto.grupo._id,
-            enrollment_id: resuelto.contexto.enrollment_id,
-            observacion_id: observacionDe.get(String(resuelto.contexto.student_id)) ?? null,
-          };
-        }),
+        acciones_contencion: '',
+        involucrados: resueltos.map((r) => ({
+          student_id: r.contexto.student_id,
+          rol: 'PRESUNTO_RESPONSABLE',
+          group_id: r.contexto.grupo._id,
+          enrollment_id: r.contexto.enrollment_id,
+          observacion_id: observacionDe.get(String(r.contexto.student_id)) ?? null,
+        })),
         evento_id: eventoId,
         solicitada_por: usuario._id,
-      } as unknown as Partial<ISolicitudCaso>
+      } as unknown as Partial<ISolicitudCaso>)
     : null;
 
   const creadas = await runTransaction(async (session) => {
@@ -485,20 +478,120 @@ export async function registrarFalta(input: RegistrarFaltaInput, usuario: UserDo
     accion: 'FALTA_REGISTRADA',
     entidad: 'Observacion',
     entidad_id: creadas[0]?._id,
-    detalle: `gravedad ${falta.gravedad}; ${creadas.length} presunto(s) responsable(s)${remitida ? '; remitida a convivencia' : ''}`,
+    detalle: `gravedad ${falta.gravedad}; ${creadas.length} estudiante(s)${escalada ? '; escalada a coordinación' : ''}`,
     ip,
   });
   if (solicitudId) {
     await registrarEvento({ usuario_id: usuario._id, accion: 'SOLICITUD_CASO_REGISTRADA', entidad: 'SolicitudCaso', entidad_id: solicitudId, ip });
+    await avisarSolicitudDeCaso({ sedeId: primero.contexto.grupo.sede_id, urgente: false });
   }
-  // Una Tipo I (aunque se remita) se queda en el observador y la familia la ve completa; II y III son alerta crítica y sin detalle.
-  if (falta.gravedad === 'I') await avisarObservacionesVisibles(creadas.map((o) => o.student_id));
-  else {
-    for (const o of creadas) {
-      await avisarFaltaGrave({ observacionId: o._id, estudianteId: o.student_id, sedeId: solicitud?.sede_id ?? null, hayCaso: Boolean(solicitud) });
-    }
+  // Una Tipo I (aunque se escale) se queda en el observador y la familia la ve completa.
+  await avisarObservacionesVisibles(creadas.map((o) => o.student_id));
+  return { registros: creadas.map((o) => vista(o, 'COMPLETA')), escalada };
+}
+
+// --- Reporte urgente de una situación grave (Tipo II/III) ---
+
+export interface ReporteUrgenteInput {
+  /** La falta del manual (Tipo II o III) que el docente identifica. Sin ella el reporte llega sin tipificar y coordinación lo define al abrir el caso. */
+  falta_id?: string;
+  fecha_hecho: string;
+  hechos: string;
+  /** Lo que se hizo en el momento para proteger a las personas (llevar a enfermería, separar a los estudiantes…). */
+  acciones_contencion: string;
+  /** Los estudiantes que el docente nombra; su rol en el hecho (afectado, presunto responsable…) lo asigna coordinación al abrir el caso. */
+  estudiantes_ids: string[];
+}
+
+/**
+ * Una situación grave (Tipo II o III): el docente identifica la falta del manual (opcional si es una emergencia y no la tiene a mano), cuenta qué pasó, a quiénes
+ * involucra y qué contención aplicó. Queda una solicitud de caso con esa falta y su gravedad **como referencia** (sin roles) y una alerta crítica a coordinación de
+ * convivencia de la sede, que abre el caso, confirma o cambia el tipo y asigna a cada estudiante su rol. **No deja antecedente en el Observador** de nadie: eso evita
+ * estigmatizar a una víctima o a un estudiante que luego resulte ajeno al hecho, y lo grave solo cuenta como falta cuando hay una decisión en firme.
+ */
+export async function reportarSituacionGrave(input: ReporteUrgenteInput, usuario: UserDocument, ip?: string | null) {
+  const anio = await anioEnCurso();
+  const fecha = exigirFechaDelHecho(input.fecha_hecho);
+  const hechos = input.hechos.trim();
+  const accionesContencion = input.acciones_contencion.trim();
+  const estudiantesIds = unicos(input.estudiantes_ids);
+  const problemas = problemasDeReporteUrgente({ hechos, acciones_contencion: accionesContencion, cantidad_estudiantes: estudiantesIds.length });
+  if (problemas.length > 0) throw new ApiError(400, problemas.join(' '));
+
+  let falta: FaltaConvivenciaDocument | null = null;
+  if (input.falta_id) {
+    const institucion = await obtenerInstitucionConvivencia();
+    falta = Types.ObjectId.isValid(input.falta_id) ? await FaltaConvivencia.findOne({ _id: input.falta_id, institucion_id: institucion._id, estado: ESTADO_ACTIVO }) : null;
+    if (!falta) throw new ApiError(400, 'La falta no existe o está inactiva.');
+    if (!esSituacionGrave(falta.gravedad)) throw new ApiError(400, 'Una falta Tipo I se registra como falta leve; el reporte a coordinación es para lo grave (Tipo II o III).');
   }
-  return { registros: creadas.map((o) => vista(o, 'COMPLETA')), remitida };
+
+  // El docente nombra a quien presenció, sea o no de sus grupos; si hay otros involucrados, los describe en los hechos y convivencia los agrega al abrir el caso.
+  const resueltos = await resolverEstudiantes(usuario, estudiantesIds, 'REGISTRAR_FALTA', fecha, anio);
+  const primero = resueltos[0] as EstudianteResuelto;
+  if (new Set(resueltos.map((r) => String(r.contexto.grupo.sede_id))).size > 1) {
+    throw new ApiError(400, 'Los estudiantes de un mismo reporte deben ser de la misma sede: reporta aparte lo de cada sede.');
+  }
+
+  const solicitud = await SolicitudCaso.create({
+    sede_id: primero.contexto.grupo.sede_id,
+    academic_year_id: anio._id,
+    fecha_hecho: fecha,
+    gravedad: falta?.gravedad ?? null,
+    falta: falta ? { falta_id: falta._id, codigo: falta.codigo, descripcion: falta.descripcion } : null,
+    hechos,
+    acciones_contencion: accionesContencion,
+    involucrados: resueltos.map((r) => ({
+      student_id: r.contexto.student_id,
+      rol: null,
+      group_id: r.contexto.grupo._id,
+      enrollment_id: r.contexto.enrollment_id,
+      observacion_id: null,
+    })),
+    solicitada_por: usuario._id,
+  });
+
+  await registrarEvento({ usuario_id: usuario._id, accion: 'REPORTE_URGENTE_REGISTRADO', entidad: 'SolicitudCaso', entidad_id: solicitud._id, detalle: `${resueltos.length} estudiante(s)`, ip });
+  await avisarSolicitudDeCaso({ sedeId: primero.contexto.grupo.sede_id, urgente: true });
+  return { _id: String(solicitud._id), estado: solicitud.estado, estudiantes: resueltos.length };
+}
+
+/** Lo que el docente reportó y qué pasó con ello: el estado de su reporte y, si ya hay caso, su código y estado (nunca el expediente). */
+export async function misReportesUrgentes(usuario: UserDocument, paginacion: Paginacion) {
+  // Lo grave: las faltas Tipo I que el docente escala son suyas también, pero van en «Mis registros».
+  const filtro = { solicitada_por: usuario._id, gravedad: { $ne: 'I' } };
+  const [total, solicitudes] = await Promise.all([
+    SolicitudCaso.countDocuments(filtro),
+    SolicitudCaso.find(filtro)
+      .sort({ createdAt: -1 })
+      .skip((paginacion.pagina - 1) * paginacion.limite)
+      .limit(paginacion.limite),
+  ]);
+  const [estudiantes, casos] = await Promise.all([
+    User.find({ _id: { $in: solicitudes.flatMap((s) => s.involucrados.map((i) => i.student_id)) } }).select('nombre apellido'),
+    CasoConvivencia.find({ solicitud_id: { $in: solicitudes.map((s) => s._id) } }).select('codigo estado solicitud_id'),
+  ]);
+  const nombre = new Map(estudiantes.map((u) => [String(u._id), `${u.apellido} ${u.nombre}`]));
+  const casoDe = new Map(casos.map((c) => [String(c.solicitud_id), c]));
+  return {
+    total,
+    ...paginacion,
+    data: solicitudes.map((s) => {
+      const caso = casoDe.get(String(s._id));
+      return {
+        _id: String(s._id),
+        fecha_hecho: s.fecha_hecho,
+        createdAt: s.createdAt,
+        hechos: s.hechos,
+        acciones_contencion: s.acciones_contencion,
+        estudiantes: s.involucrados.map((i) => nombre.get(String(i.student_id)) ?? ''),
+        falta: s.falta ? { codigo: s.falta.codigo, descripcion: s.falta.descripcion, gravedad: s.gravedad } : null,
+        estado: s.estado,
+        motivo_resolucion: s.resolucion?.motivo ?? '',
+        caso: caso ? { codigo: caso.codigo, estado: caso.estado } : null,
+      };
+    }),
+  };
 }
 
 // --- Consulta ---
@@ -642,7 +735,7 @@ async function observadorParaLaFamilia(
   const registros = (await Observacion.find({ student_id: estudianteId, estado: 'ACTIVA' }).sort({ fecha_hecho: -1, createdAt: -1 }).limit(LIMITE_HISTORIAL)).sort(porFechaDesc);
 
   // De una falta grave el estudiante solo ve que hay un caso (o que está en revisión) y su estado; sin caso ni solicitud viva, no hay nada que mostrar.
-  const graves = registros.filter((o) => esSituacionGrave(o.falta?.gravedad));
+  const graves = registros.filter(esGraveEnTramite);
   const [casos, solicitudes] = await Promise.all([
     CasoConvivencia.find({ observacion_ids: { $in: graves.map((o) => o._id) }, estado: { $ne: 'ANULADO' } }).select('estado observacion_ids'),
     SolicitudCaso.find({ _id: { $in: graves.flatMap((o) => (o.solicitud_id ? [o.solicitud_id] : [])) }, estado: 'PENDIENTE' }).select('_id'),
@@ -653,7 +746,7 @@ async function observadorParaLaFamilia(
     return o.solicitud_id && solicitudes.some((s) => String(s._id) === String(o.solicitud_id)) ? 'EN_REVISION' : null;
   };
   const visibles = registros
-    .filter((o) => esVisibleParaEstudiante(o) && (!esSituacionGrave(o.falta?.gravedad) || situacionDe(o) !== null))
+    .filter((o) => esVisibleParaEstudiante(o) && (!esGraveEnTramite(o) || situacionDe(o) !== null))
     .slice(0, 200);
 
   await registrarEvento({
@@ -664,7 +757,7 @@ async function observadorParaLaFamilia(
     detalle: `${visibles.length} registro(s)`,
     ip,
   });
-  return visibles.map((o) => ({ ...vista(o, 'ESTUDIANTE'), ...(esSituacionGrave(o.falta?.gravedad) ? { situacion: situacionDe(o) } : {}) }));
+  return visibles.map((o) => ({ ...vista(o, 'ESTUDIANTE'), ...(esGraveEnTramite(o) ? { situacion: situacionDe(o) } : {}) }));
 }
 
 // --- Enmienda y anulación ---
@@ -688,8 +781,10 @@ async function cargarParaCorregir(
   if (!obs) throw observacionNoEncontrada();
 
   const conv = comoUsuarioConvivencia(usuario);
+  // El seguimiento psicosocial de orientación solo lo corrige su autor (y un ADMIN): convivencia no lo lee, así que tampoco lo toca.
   const convivencia =
-    usuario.rol === ROLES.ADMIN || (usuario.rol === ROLES.COORDINADOR_CONVIVENCIA && enAlcanceDeSede(conv, String(obs.sede_id)));
+    usuario.rol === ROLES.ADMIN ||
+    (usuario.rol === ROLES.COORDINADOR_CONVIVENCIA && enAlcanceDeSede(conv, String(obs.sede_id)) && !esSeguimientoDeOrientacion(obs));
   const coordinadorAcademico =
     usuario.rol === ROLES.COORDINADOR &&
     enAlcanceDeSede(conv, String(obs.sede_id)) &&
@@ -714,6 +809,16 @@ async function cargarParaCorregir(
   return obs;
 }
 
+/**
+ * Un registro «sin usar» no tiene nada colgando de él: ni seguimiento, ni citación, ni compromiso resuelto, ni solicitud o caso en convivencia.
+ * Solo así se puede eliminar del todo, y solo así el autor lo edita sin dejar versión anterior.
+ */
+async function estaSinUsar(obs: ObservacionDocument): Promise<boolean> {
+  if (obs.solicitud_id || obs.seguimientos.length > 0 || obs.citacion_realizada) return false;
+  if (obs.compromiso_estado && obs.compromiso_estado !== 'PENDIENTE') return false;
+  return !(await CasoConvivencia.exists({ observacion_ids: obs._id }));
+}
+
 export interface EnmendarObservacionInput {
   descripcion?: string;
   compromiso?: string;
@@ -733,15 +838,14 @@ export async function enmendarObservacion(
   const obs = await cargarParaCorregir(id, usuario, (c) => c.plazo_enmienda_horas);
 
   const esFalta = obs.clase === 'FALTA';
-  const esFaltaGrave = esFalta && obs.falta?.gravedad !== 'I';
+  const esFaltaGrave = esFalta && esGraveEnTramite(obs);
   if (esFalta && (input.requiere_citacion !== undefined || input.confidencial !== undefined)) {
     throw new ApiError(400, 'Una falta no usa citación ni confidencialidad.');
   }
-  if (!esFalta && input.version_estudiante !== undefined) throw new ApiError(400, 'La versión del estudiante solo aplica a una falta Tipo I.');
   if (esFaltaGrave && (input.compromiso !== undefined || input.version_estudiante !== undefined)) {
     throw new ApiError(400, 'En una falta Tipo II o III la versión del estudiante y el acuerdo los gestiona el comité.');
   }
-  if (obs.confidencial && usuario.rol === ROLES.ORIENTADOR && input.confidencial === false) {
+  if (input.confidencial === false && (esSeguimientoDeOrientacion(obs) || (obs.confidencial && usuario.rol === ROLES.ORIENTADOR))) {
     throw new ApiError(400, 'El seguimiento de orientación es siempre confidencial.');
   }
 
@@ -749,13 +853,17 @@ export async function enmendarObservacion(
   if (!descripcion) throw new ApiError(400, 'Describe los hechos.');
   const compromiso = input.compromiso !== undefined ? input.compromiso.trim() : obs.compromiso;
 
-  obs.enmiendas.push({
-    fecha: new Date(),
-    por: usuario._id,
-    descripcion_anterior: obs.descripcion,
-    compromiso_anterior: obs.compromiso,
-    version_estudiante_anterior: obs.version_estudiante,
-  });
+  // Quien se equivocó y se corrige a tiempo, antes de que el registro se use, solo lo actualiza; si lo edita otra persona o ya se usó, queda la versión anterior.
+  const sinVersion = esAutor(obs, usuario) && (await estaSinUsar(obs));
+  if (!sinVersion) {
+    obs.enmiendas.push({
+      fecha: new Date(),
+      por: usuario._id,
+      descripcion_anterior: obs.descripcion,
+      compromiso_anterior: obs.compromiso,
+      version_estudiante_anterior: obs.version_estudiante,
+    });
+  }
   obs.descripcion = descripcion;
   if (compromiso !== obs.compromiso) {
     obs.compromiso = compromiso;
@@ -782,6 +890,28 @@ export async function anularObservacion(id: string, motivo: string, usuario: Use
   return vista(obs, 'COMPLETA');
 }
 
+/**
+ * Eliminar un registro por completo: para el error de digitación. Solo dentro del plazo y mientras no se haya usado; después, solo se anula con motivo
+ * (así lo que ya sirvió de base a un seguimiento o a un caso no desaparece). En la auditoría queda quién y cuándo, nunca el contenido.
+ */
+export async function eliminarObservacion(id: string, usuario: UserDocument, ip?: string | null) {
+  const obs = await cargarParaCorregir(id, usuario, (c) => c.plazo_anulacion_horas);
+  if (!(await estaSinUsar(obs))) {
+    throw new ApiError(409, 'El registro ya se usó (tiene seguimiento, citación, solicitud o caso): no se elimina, anúlalo con motivo.');
+  }
+  // El plazo corre para todos, también para coordinación: pasado el plazo, la salida es anular.
+  const configuracion = await obtenerConfiguracion();
+  if (!dentroDelPlazo(obs.createdAt, configuracion.plazo_anulacion_horas)) {
+    throw new ApiError(403, 'Venció el plazo para eliminar: anula el registro con su motivo.');
+  }
+  // Condicionado: si entre la comprobación y el borrado alguien le puso seguimiento, citación o solicitud, no se borra.
+  const borrada = await Observacion.deleteOne({ _id: obs._id, solicitud_id: null, citacion_realizada: null, 'seguimientos.0': { $exists: false } });
+  if (borrada.deletedCount !== 1) throw new ApiError(409, 'El registro se acaba de usar: no se elimina, anúlalo con motivo.');
+
+  await registrarEvento({ usuario_id: usuario._id, accion: 'OBSERVACION_ELIMINADA', entidad: 'Observacion', entidad_id: obs._id, ip });
+  return { _id: String(obs._id) };
+}
+
 // --- Seguimiento: cumplimiento del compromiso, citación realizada y notas ---
 
 /**
@@ -797,7 +927,7 @@ async function cargarParaSeguimiento(id: string, usuario: UserDocument) {
   const autor = esAutor(obs, usuario);
   let permitido = autor || usuario.rol === ROLES.ADMIN;
   if (!permitido && enSede) {
-    if (usuario.rol === ROLES.COORDINADOR_CONVIVENCIA) permitido = true;
+    if (usuario.rol === ROLES.COORDINADOR_CONVIVENCIA) permitido = !esSeguimientoDeOrientacion(obs);
     else if (usuario.rol === ROLES.ORIENTADOR) permitido = visibilidadDeObservacion(usuario.rol, obs, false) === 'COMPLETA';
     else if (usuario.rol === ROLES.COORDINADOR) permitido = obs.clase === 'OBSERVACION' && !obs.confidencial;
   }

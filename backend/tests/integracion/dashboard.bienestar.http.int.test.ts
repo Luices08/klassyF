@@ -44,23 +44,14 @@ describe('M30: paneles de convivencia y orientación (capa HTTP)', () => {
     return { estado: respuesta.status, cuerpo: (await respuesta.json()) as { data?: any; message?: string } };
   };
 
-  // Tipo II/III exigen contención y admiten afectados; una Tipo I solo indica a quien la cometió y no lleva contención (M14).
+  // Lo grave el docente solo lo reporta (con la contención que aplicó): coordinación abre el caso y lo tipifica (M14).
   const faltaGrave = (hechos: string) =>
-    observaciones.registrarFalta(
-      {
-        falta_id: e.faltaII,
-        fecha_hecho: hoy(),
-        hechos,
-        acciones_contencion: 'Se separó a los estudiantes.',
-        involucrados: [
-          { student_id: String(e.estudiante._id), rol: 'PRESUNTO_RESPONSABLE' },
-          { student_id: String(e.otroEstudiante._id), rol: 'AFECTADO' },
-        ],
-      },
+    observaciones.reportarSituacionGrave(
+      { fecha_hecho: hoy(), hechos, acciones_contencion: 'Se separó a los estudiantes.', estudiantes_ids: [String(e.estudiante._id), String(e.otroEstudiante._id)] },
       e.docenteDeClase
     );
   const faltaLeve = (hechos: string) =>
-    observaciones.registrarFalta({ falta_id: e.faltaI, fecha_hecho: hoy(), hechos, involucrados: [{ student_id: String(e.estudiante._id), rol: 'PRESUNTO_RESPONSABLE' }] }, e.docenteDeClase);
+    observaciones.registrarFalta({ falta_id: e.faltaI, fecha_hecho: hoy(), hechos, estudiantes_ids: [String(e.estudiante._id)] }, e.docenteDeClase);
 
   const abrirTipoIII = async () =>
     (await casos.abrirCaso(
@@ -86,9 +77,10 @@ describe('M30: paneles de convivencia y orientación (capa HTTP)', () => {
       const d = cuerpo.data;
       expect(d.solicitudes.pendientes).toBe(1);
       expect(d.casos).toMatchObject({ activos: 1, por_tipo: { I: 0, II: 0, III: 1 } });
-      expect(d.faltas).toMatchObject({ total: 2, por_gravedad: { I: 1, II: 1, III: 0 } });
+      // Un reporte urgente no es una falta registrada: la gravedad la fija el caso que abre coordinación (el conteo de faltas graves por caso es de la Fase 4).
+      expect(d.faltas).toMatchObject({ total: 1, por_gravedad: { I: 1, II: 0, III: 0 } });
       expect(d.remisiones_orientacion.pendientes).toBe(1);
-      expect(d.comite).toEqual({ borradores: 0, proxima: null });
+      expect(d.comite).toEqual({ borradores: 0, proxima: null, periodicidad_vencida: expect.any(Boolean), ultima_ordinaria: null });
 
       // La privacidad es parte del contrato: ni un hecho, ni un nombre, ni un documento viajan en este panel.
       const texto = JSON.stringify(cuerpo);

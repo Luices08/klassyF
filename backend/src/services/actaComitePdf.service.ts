@@ -10,6 +10,7 @@ import { obtenerSesion } from './comite.service';
 // Los mismos tonos de la guía visual, para que el papel se parezca a la pantalla.
 const COLOR = { ink: '#172235', cuerpo: '#3F4D61', tenue: '#788794', borde: '#DDE4EC', primario: '#2878EA', peligro: '#EF5350' };
 const MARGEN = 50;
+const MEDIO_TEXTO: Record<string, string> = { LLAMADA: 'llamada', MENSAJE: 'mensaje', CORREO: 'correo electrónico', PRESENCIAL: 'aviso presencial', OTRO: 'otro medio' };
 
 const formatoFecha = (fecha: Date) => fecha.toLocaleDateString('es-CO', { timeZone: 'UTC', day: '2-digit', month: 'long', year: 'numeric' });
 const formatoFechaHora = (fecha: Date) => fecha.toLocaleString('es-CO', { timeZone: 'America/Bogota' });
@@ -52,12 +53,20 @@ export async function generarPdfActa(id: string, usuario: UserDocument, ip?: str
   doc.moveDown(0.4).font('Helvetica').fontSize(9.5).fillColor(COLOR.cuerpo);
   doc.text(`Sesión ${sesion.tipo === 'ORDINARIA' ? 'ordinaria' : 'extraordinaria'} · ${formatoFecha(sesion.fecha)}${sesion.hora ? ` · ${sesion.hora}` : ''}${sesion.lugar ? ` · ${sesion.lugar}` : ''}`);
 
+  titulo(doc, 'Convocatoria');
+  doc.text(
+    sesion.convocatoria
+      ? `Se citó a los miembros por ${MEDIO_TEXTO[sesion.convocatoria.medio] ?? sesion.convocatoria.medio}${sesion.convocatoria.fecha ? ` el ${formatoFechaHora(sesion.convocatoria.fecha)}` : ''}.${sesion.convocatoria.nota ? ` ${sesion.convocatoria.nota}` : ''}`
+      : 'No se registró el medio de citación.'
+  );
+
   titulo(doc, 'Orden del día');
   doc.text(sesion.orden_del_dia.trim() || 'No se registró.');
 
   titulo(doc, 'Asistentes y quórum');
   for (const a of sesion.asistentes) {
-    doc.text(`${a.asistio ? '[X]' : '[  ]'}  ${a.nombre} — ${a.cargo}${a.es_presidente ? ' (preside)' : ''}`);
+    doc.text(`${a.asistio ? '[X]' : '[  ]'}  ${a.nombre} — ${a.cargo}${a.es_presidente ? ' (preside)' : ''}${a.es_secretario ? ' (secretaría técnica)' : ''}`);
+    if (!a.asistio && a.excusa) doc.fillColor(COLOR.tenue).text(`      Excusa: ${a.excusa}`).fillColor(COLOR.cuerpo);
   }
   doc.moveDown(0.3).font('Helvetica-Bold').text(
     `Quórum: ${sesion.quorum.presentes} de ${sesion.quorum.total_miembros} miembros (se requiere ${sesion.quorum.porcentaje_requerido}%): ${sesion.quorum.alcanzado ? 'hay quórum para deliberar' : 'sin quórum'}.`
@@ -71,6 +80,9 @@ export async function generarPdfActa(id: string, usuario: UserDocument, ip?: str
   if (sesion.casos_tratados.length === 0) doc.text('No se trataron casos.');
   for (const c of sesion.casos_tratados) {
     doc.font('Helvetica-Bold').text(`Caso ${c.codigo}`).font('Helvetica');
+    if (c.quorum && !c.quorum.alcanzado) {
+      doc.fillColor(COLOR.peligro).text(`Advertencia: sin los apartados, solo ${c.quorum.presentes} de ${c.quorum.total_miembros} miembros podían deliberar este caso (se requiere ${c.quorum.porcentaje_requerido}%).`).fillColor(COLOR.cuerpo);
+    }
     if (c.recusados_ids.length > 0) {
       doc.fillColor(COLOR.tenue).text(`Apartados de la deliberación: ${c.recusados_ids.map((r) => nombreMiembro.get(String(r)) ?? 'miembro').join(', ')}.`).fillColor(COLOR.cuerpo);
     }

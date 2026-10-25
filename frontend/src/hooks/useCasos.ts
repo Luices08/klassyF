@@ -88,8 +88,8 @@ export interface CasoDetalle {
   involucrados: { student_id: string; rol: RolInvolucrado; estudiante: string }[];
   atencion_inmediata: ({ descripcion: string; hubo_dano: boolean; fecha: string } & ConAutor) | null;
   medidas_proteccion: ({ _id: string; descripcion: string; fecha: string } & ConAutor)[];
-  pasos: { _id: string; nombre: string; obligatorio: boolean; remite_a_orientacion: boolean; estado: 'PENDIENTE' | 'CUMPLIDO' | 'NO_APLICA'; nota: string; fecha: string | null }[];
-  notificaciones: ({ _id: string; tipo: TipoNotificacion; fecha: string; medio: MedioCitacion; dirigida_a: string; resultado: string } & ConAutor)[];
+  pasos: { _id: string; nombre: string; obligatorio: boolean; estado: 'PENDIENTE' | 'CUMPLIDO' | 'NO_APLICA'; nota: string; fecha: string | null }[];
+  notificaciones: ({ _id: string; tipo: TipoNotificacion; fecha: string; medio: MedioCitacion; dirigida_a: string; resultado: string; automatica: boolean } & ConAutor)[];
   descargos: ({ _id: string; parte: 'ESTUDIANTE' | 'ACUDIENTE'; student_id: string | null; fecha: string; texto: string } & ConAutor)[];
   seguimientos: ({ _id: string; fecha: string; nota: string; proxima_fecha: string | null } & ConAutor)[];
   remisiones: ({ _id: string; entidad_nombre: string; fecha: string; oficio: string; funcionario: string; respuesta: string } & ConAutor)[];
@@ -103,6 +103,10 @@ export interface CasoDetalle {
   anulacion: ({ motivo: string; fecha: string } & ConAutor) | null;
   /** Estado de las remisiones a orientación del caso; nunca lo que orientación escribió. */
   remisiones_orientacion: RemisionOrientacionResumen[];
+  /** Las actas (no anuladas) donde el Comité de Convivencia trató el caso. */
+  /** Las citaciones a acudientes (M24) enlazadas al caso: solo título, fecha y estado. */
+  citaciones: { _id: string; titulo: string; fecha_hora: string; estado: 'PROGRAMADA' | 'REALIZADA' | 'CANCELADA'; student_id: string | null }[];
+  sesiones_comite: { _id: string; codigo: string | null; estado: 'BORRADOR' | 'FIRMADA'; tipo: 'ORDINARIA' | 'EXTRAORDINARIA'; fecha: string }[];
   alertas: AlertaCaso[];
 }
 
@@ -124,7 +128,6 @@ export interface MedidaConvivencia {
   nombre: string;
   descripcion: string;
   se_aplica_por_dias: boolean;
-  remite_a_orientacion: boolean;
   orden: number;
   estado: EstadoActivo;
 }
@@ -140,7 +143,7 @@ export interface EntidadExterna {
 export interface ProtocoloConvivencia {
   _id: string;
   tipo_situacion: TipoSituacion;
-  pasos: { nombre: string; obligatorio: boolean; remite_a_orientacion: boolean; orden: number }[];
+  pasos: { nombre: string; obligatorio: boolean; orden: number }[];
 }
 
 export interface CatalogosCaso {
@@ -163,7 +166,11 @@ function useInvalidarCasos() {
 export interface FiltrosCasos {
   estado?: EstadoCaso | '';
   tipo_situacion?: TipoSituacion | '';
+  /** Parte del código del caso (CC-2026-0007). */
+  codigo?: string;
   pagina: number;
+  /** Por defecto 20; el servidor admite hasta 50. */
+  limite?: number;
 }
 
 export function useCasos(filtros: FiltrosCasos) {
@@ -171,7 +178,13 @@ export function useCasos(filtros: FiltrosCasos) {
     queryKey: ['casos', 'lista', filtros],
     queryFn: () =>
       api.raw<{ success: true; data: CasoResumen[]; total: number; pagina: number; limite: number }>('/convivencia/casos', {
-        query: { estado: filtros.estado || undefined, tipo_situacion: filtros.tipo_situacion || undefined, pagina: filtros.pagina, limite: 20 },
+        query: {
+          estado: filtros.estado || undefined,
+          tipo_situacion: filtros.tipo_situacion || undefined,
+          codigo: filtros.codigo?.trim() || undefined,
+          pagina: filtros.pagina,
+          limite: filtros.limite ?? 20,
+        },
       }),
     select: (res) => ({ data: res.data, total: res.total, pagina: res.pagina, limite: res.limite }),
     placeholderData: keepPreviousData,
@@ -287,7 +300,7 @@ export function useEliminarCatalogoCaso() {
 export function useGuardarProtocolo() {
   const invalidar = useInvalidarCasos();
   return useMutation({
-    mutationFn: ({ tipo, pasos }: { tipo: TipoSituacion; pasos: { nombre: string; obligatorio: boolean; remite_a_orientacion: boolean }[] }) =>
+    mutationFn: ({ tipo, pasos }: { tipo: TipoSituacion; pasos: { nombre: string; obligatorio: boolean }[] }) =>
       api.put<ProtocoloConvivencia>(`/convivencia/protocolos/${tipo}`, { pasos }),
     onSuccess: invalidar,
   });
@@ -299,7 +312,6 @@ export interface FaltaInput {
   codigo: string;
   descripcion: string;
   gravedad: TipoSituacion;
-  descuento_decimas: number | null;
 }
 
 export function useGuardarFalta() {
@@ -365,14 +377,16 @@ export async function descargarPlantillaFaltas(formato: 'xlsx' | 'csv'): Promise
 export interface SolicitudCasoVista {
   _id: string;
   estado: 'PENDIENTE' | 'DESCARTADA' | 'CONVERTIDA';
-  gravedad: TipoSituacion;
-  falta: { falta_id: string; codigo: string; descripcion: string };
+  /** null en un reporte urgente: lo tipifica quien abre el caso. */
+  gravedad: TipoSituacion | null;
+  falta: { falta_id: string; codigo: string; descripcion: string } | null;
   fecha_hecho: string;
   hechos: string;
   acciones_contencion: string;
   solicitada_por: string | null;
   createdAt: string;
-  involucrados: { student_id: string; rol: RolInvolucrado; estudiante: string; numero_documento: string; grupo: string }[];
+  /** `rol` es null en un reporte urgente: coordinación lo asigna al abrir el caso. */
+  involucrados: { student_id: string; rol: RolInvolucrado | null; estudiante: string; numero_documento: string; grupo: string }[];
   resolucion: { motivo: string; fecha: string } | null;
   caso_id: string | null;
 }

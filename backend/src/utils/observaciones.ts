@@ -1,4 +1,4 @@
-import { ClaseRegistro, EstadoCompromiso, RolInvolucrado, TipoSituacion } from '../constants/convivencia';
+import { ClaseRegistro, EstadoCompromiso, TipoSituacion } from '../constants/convivencia';
 import { Rol } from '../constants/enums';
 import { ROLES } from '../constants/roles';
 
@@ -9,8 +9,15 @@ export function dentroDelPlazo(desde: Date, horas: number, ahora: Date = new Dat
   return ahora.getTime() - desde.getTime() < horas * MS_HORA;
 }
 
-/** Faltas Tipo II y III: solo las gestiona convivencia; el director de grupo y orientación ven que existen, no su contenido. */
+/** Faltas Tipo II y III: las de gravedad que sigue su curso en convivencia solo las gestiona convivencia; el director de grupo y orientación ven que existen, no su contenido. */
 export const esSituacionGrave = (gravedad: TipoSituacion | null | undefined): boolean => gravedad === 'II' || gravedad === 'III';
+
+/**
+ * Una falta II/III que sigue su curso en convivencia (llegó una solicitud o hay un caso). Una Tipo II que el docente resolvió sin enviarla a coordinación **no tiene
+ * solicitud** y se trata como una Tipo I: queda en el Observador, la ve completa quien tiene acceso y la familia también.
+ */
+export const esGraveEnTramite = (obs: { falta?: { gravedad: TipoSituacion } | null; solicitud_id?: unknown }): boolean =>
+  esSituacionGrave(obs.falta?.gravedad) && Boolean(obs.solicitud_id);
 
 // --- Quién ve qué (una sola fuente de verdad para el historial, el detalle y el observador del estudiante) ---
 
@@ -21,21 +28,29 @@ interface ObservacionParaVisibilidad {
   estado: string;
   confidencial: boolean;
   falta: { gravedad: TipoSituacion } | null;
+  solicitud_id?: unknown;
+  contexto?: string;
 }
+
+/** El seguimiento psicosocial de orientación solo lo lee quien lo escribió (y un ADMIN), igual que las atenciones de una remisión. */
+export const esSeguimientoDeOrientacion = (obs: { contexto?: string }): boolean => obs.contexto === 'ORIENTACION';
 
 /**
  * Cómo ve un integrante del personal un registro del Observador; `null` = no lo ve (ni siquiera sabe que existe).
- *  - ADMIN y coordinación de convivencia: todo, incluso anuladas y confidenciales.
+ *  - ADMIN y coordinación de convivencia: todo, incluso anuladas y confidenciales, salvo el seguimiento psicosocial de orientación
+ *    (contexto ORIENTACION): ese solo lo leen su autor y el ADMIN.
  *  - Una observación confidencial solo la leen su autor y orientación.
  *  - Las faltas no las ve el coordinador académico; una Tipo II/III solo la ve completa su autor (el resto, que existe).
- * El acceso al estudiante (sede, grupo que dicta o dirige) lo decide antes `permisoSobreEstudiante`.
+ * El acceso al estudiante (su sede; y para el historial, ser el director de su grupo) lo decide antes `permisoSobreEstudiante`.
  */
 export function visibilidadDeObservacion(
   rol: Rol,
   obs: ObservacionParaVisibilidad,
   esAutor: boolean
 ): 'COMPLETA' | 'RESERVADA' | null {
-  if (rol === ROLES.ADMIN || rol === ROLES.COORDINADOR_CONVIVENCIA) return 'COMPLETA';
+  if (rol === ROLES.ADMIN) return 'COMPLETA';
+  if (esSeguimientoDeOrientacion(obs)) return esAutor ? 'COMPLETA' : null;
+  if (rol === ROLES.COORDINADOR_CONVIVENCIA) return 'COMPLETA';
   const personal: Rol[] = [ROLES.COORDINADOR, ROLES.ORIENTADOR, ROLES.DOCENTE];
   if (!personal.includes(rol) || obs.estado !== 'ACTIVA') return null;
 
@@ -45,7 +60,7 @@ export function visibilidadDeObservacion(
   }
 
   if (rol === ROLES.COORDINADOR || !obs.falta) return null;
-  return esSituacionGrave(obs.falta.gravedad) && !esAutor ? 'RESERVADA' : 'COMPLETA';
+  return esGraveEnTramite(obs) && !esAutor ? 'RESERVADA' : 'COMPLETA';
 }
 
 /**
@@ -61,42 +76,23 @@ export function esVisibleParaEstudiante(obs: ObservacionParaVisibilidad & { visi
 
 // --- Reglas de contenido de una falta (por gravedad) ---
 
-export interface DatosFalta {
-  hechos: string;
-  version_estudiante?: string;
-  compromiso?: string;
-  acciones_contencion?: string;
-  remitir_comite?: boolean;
-  involucrados: { rol: RolInvolucrado }[];
+/** Una falta Tipo III siempre se envía a coordinación de convivencia (no queda en el Observador del estudiante); una Tipo II la puede resolver el docente o enviarla. */
+export const MENSAJE_FALTA_GRAVE = 'Una falta Tipo III siempre se envía a coordinación de convivencia, que abre el caso.';
+
+/** Qué exige el registro de una falta en el Observador (Tipo I o una Tipo II que el docente resolvió): los hechos. */
+export function problemasDeFalta(gravedad: TipoSituacion, d: { hechos: string }): string[] {
+  const problemas: string[] = [];
+  if (gravedad === 'III') problemas.push(MENSAJE_FALTA_GRAVE);
+  if (!d.hechos.trim()) problemas.push('Describe los hechos.');
+  return problemas;
 }
 
-/** Una falta Tipo II/III siempre va a convivencia; una Tipo I solo si el docente lo decide. */
-export const debeRemitirse = (gravedad: TipoSituacion, remitirComite: boolean | undefined): boolean =>
-  esSituacionGrave(gravedad) || Boolean(remitirComite);
-
-/**
- * Qué exige y qué no una falta según su gravedad (el docente no cierra lo grave):
- *  - Tipo I: hechos, y opcionalmente la versión del estudiante y el acuerdo formativo; se queda como antecedente pedagógico.
- *  - Tipo II/III: hechos objetivos, involucrados con su rol y acciones de contención; sin versión ni acuerdo (los descargos y
- *    las medidas son del comité).
- */
-export function problemasDeFalta(gravedad: TipoSituacion, d: DatosFalta): string[] {
+/** Lo que exige un reporte urgente: hechos, la contención que se tomó en el momento y al menos un estudiante. */
+export function problemasDeReporteUrgente(d: { hechos: string; acciones_contencion: string; cantidad_estudiantes: number }): string[] {
   const problemas: string[] = [];
-  const hay = (texto?: string) => Boolean(texto?.trim());
-  if (!hay(d.hechos)) problemas.push('Describe los hechos.');
-  if (!d.involucrados.some((i) => i.rol === 'PRESUNTO_RESPONSABLE')) problemas.push('Indica al menos un presunto responsable.');
-
-  if (esSituacionGrave(gravedad)) {
-    if ((d.acciones_contencion?.trim().length ?? 0) < 5) problemas.push('Una falta Tipo II o III exige las acciones inmediatas de contención.');
-    if (hay(d.version_estudiante) || hay(d.compromiso)) {
-      problemas.push('En una falta Tipo II o III la versión del estudiante y el acuerdo los gestiona el comité: no se registran aquí.');
-    }
-  } else {
-    if (hay(d.acciones_contencion)) problemas.push('Las acciones de contención solo se piden en una falta Tipo II o III.');
-    if (d.involucrados.some((i) => i.rol !== 'PRESUNTO_RESPONSABLE')) {
-      problemas.push('En una falta Tipo I solo se indican los estudiantes que la cometieron.');
-    }
-  }
+  if (!d.hechos.trim()) problemas.push('Describe los hechos.');
+  if (d.acciones_contencion.trim().length < 5) problemas.push('Indica la medida de contención inmediata que tomaste.');
+  if (d.cantidad_estudiantes === 0) problemas.push('Indica al menos un estudiante involucrado.');
   return problemas;
 }
 
@@ -145,7 +141,7 @@ export function vistaObservacion(obs: ObservacionParaVista, modo: ModoVistaObser
     const comun = { _id: obs._id.toString(), clase: obs.clase, fecha_hecho: obs.fecha_hecho, periodo_numero: obs.periodo_numero };
     if (obs.clase === 'OBSERVACION') return { ...comun, tipo_nombre: obs.tipo_nombre, descripcion: obs.descripcion };
     // Una falta grave no revela cuál es ni los hechos: solo que existe una situación de convivencia.
-    if (esSituacionGrave(obs.falta?.gravedad)) return { ...comun, tipo_nombre: 'Situación de convivencia', gravedad: obs.falta?.gravedad ?? null };
+    if (esGraveEnTramite(obs)) return { ...comun, tipo_nombre: 'Situación de convivencia', gravedad: obs.falta?.gravedad ?? null };
     return {
       ...comun,
       tipo_nombre: tituloDeRegistro(obs),

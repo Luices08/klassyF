@@ -182,13 +182,16 @@ function Formulario({ onClose, catalogo, estudiantes, onRegistrada }: Props) {
         <>
           <Textarea label="Versión del estudiante (opcional)" rows={3} maxLength={MAX_TEXTO} value={version} onChange={(e) => setVersion(e.target.value)} />
           <Textarea label="Acuerdo o compromiso formativo (opcional)" rows={2} maxLength={500} value={compromiso} onChange={(e) => setCompromiso(e.target.value)} />
-          <label className="flex items-start gap-2 text-sm text-body">
-            <input type="checkbox" className="mt-0.5 h-4 w-4 rounded border-border text-primary focus:ring-primary" checked={escalar} onChange={(e) => setEscalar(e.target.checked)} />
-            <span>
-              Escalar a coordinación de convivencia
-              <span className="block text-xs text-muted">Solo si es reincidente o no se resolvió con la mediación en el aula.</span>
-            </span>
-          </label>
+          {/* En una Tipo II el envío ya lo decide el interruptor de arriba: aquí solo se escala una Tipo I. */}
+          {tipo === 'I' && (
+            <label className="flex items-start gap-2 text-sm text-body">
+              <input type="checkbox" className="mt-0.5 h-4 w-4 rounded border-border text-primary focus:ring-primary" checked={escalar} onChange={(e) => setEscalar(e.target.checked)} />
+              <span>
+                Escalar a coordinación de convivencia
+                <span className="block text-xs text-muted">Solo si es reincidente o no se resolvió con la mediación en el aula.</span>
+              </span>
+            </label>
+          )}
         </>
       )}
     </Drawer>

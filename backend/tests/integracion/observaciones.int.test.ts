@@ -346,11 +346,28 @@ describe('M14 observaciones y faltas (con base de datos)', () => {
       expect(await SolicitudCaso.countDocuments()).toBe(1);
     });
 
-    it('lo grave no se registra como falta leve: se envía a coordinación de convivencia', async () => {
-      await expect(registrarFalta(e.docenteDeClase, { falta_id: e.faltaII })).rejects.toMatchObject({ statusCode: 400, message: expect.stringContaining('coordinación de convivencia') });
+    it('una falta Tipo III siempre se envía a coordinación; una Tipo II se registra si la resolvió el docente, y para enviarla se usa el reporte', async () => {
+      await expect(registrarFalta(e.docenteDeClase, { falta_id: e.faltaIII })).rejects.toMatchObject({ statusCode: 400, message: expect.stringContaining('coordinación de convivencia') });
       await expect(registrarFalta(e.coordConvivencia, { falta_id: e.faltaIII })).rejects.toMatchObject({ statusCode: 400 });
+      await expect(registrarFalta(e.docenteDeClase, { falta_id: e.faltaII, escalar_a_coordinacion: true })).rejects.toMatchObject({ statusCode: 400, message: expect.stringContaining('reporte') });
       expect(await Observacion.countDocuments()).toBe(0);
       expect(await SolicitudCaso.countDocuments()).toBe(0);
+    });
+
+    it('una falta Tipo II que el docente resolvió queda en el Observador como una Tipo I: sin solicitud, completa para el director y visible para la familia', async () => {
+      const { registros, escalada } = await registrarFalta(e.docenteDeClase, { falta_id: e.faltaII, hechos: 'Empujón en el patio; se habló con los dos.', compromiso: 'No volver a empujar.' });
+      expect(escalada).toBe(false);
+      expect(registros[0]).toMatchObject({ gravedad: 'II', solicitud_id: null });
+      expect(await SolicitudCaso.countDocuments()).toBe(0);
+
+      // El director de grupo la ve completa (una Tipo II en trámite en convivencia solo se le muestra como existente).
+      const [vista] = (await historial(e.estudiante, e.directora)).data;
+      expect(vista).toMatchObject({ reservada: false, descripcion: 'Empujón en el patio; se habló con los dos.' });
+
+      // La familia y el estudiante la ven completa, sin el rótulo de «situación de convivencia».
+      const [propia] = await observaciones.miObservador(e.estudiante);
+      expect(propia).toMatchObject({ descripcion: 'Empujón en el patio; se habló con los dos.' });
+      expect(propia).not.toHaveProperty('situacion');
     });
 
     it('exige hechos y al menos un estudiante, y no acepta uno repetido ni de un grupo ajeno', async () => {

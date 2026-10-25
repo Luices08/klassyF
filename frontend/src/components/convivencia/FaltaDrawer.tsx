@@ -4,6 +4,7 @@ import { TipoSituacionBadge } from '../ui/Badge';
 import { Drawer } from '../ui/Drawer';
 import { Input, Textarea } from '../ui/Field';
 import { SelectBuscable } from '../ui/SelectBuscable';
+import { Switch } from '../ui/Switch';
 import {
   type CatalogoConvivencia,
   type EstudianteObservable,
@@ -34,7 +35,8 @@ interface Props {
 /**
  * Registrar una falta del manual de convivencia. El docente elige el tipo y la falta (los dos selectores se buscan escribiendo):
  * - **Tipo I (leve)**: queda en el Observador como antecedente pedagógico, con la versión del estudiante y el acuerdo formativo; si no se resolvió en el aula, se escala.
- * - **Tipo II o III (grave)**: se envía de inmediato a coordinación de convivencia (alerta crítica) con la falta que el docente identificó y la contención que aplicó.
+ * - **Tipo II**: el docente decide si la envía a coordinación. Si la resolvió él mismo (o no fue tan grave), queda en el Observador como una Tipo I.
+ * - **Tipo II enviada o Tipo III**: se envía de inmediato a coordinación de convivencia (alerta crítica) con la falta que el docente identificó y la contención que aplicó.
  *   No queda en el Observador del estudiante: eso evita marcar a quien luego resulte ajeno al hecho. Coordinación abre el caso, confirma el tipo y asigna los roles.
  */
 export function FaltaDrawer(props: Props) {
@@ -53,8 +55,10 @@ function Formulario({ onClose, catalogo, estudiantes, onRegistrada }: Props) {
   const [compromiso, setCompromiso] = useState('');
   const [contencion, setContencion] = useState('');
   const [escalar, setEscalar] = useState(false);
+  // Una Tipo II se envía por defecto: el docente la deja en el Observador solo si la resolvió él mismo.
+  const [enviar, setEnviar] = useState(true);
 
-  const grave = tipo === 'II' || tipo === 'III';
+  const grave = tipo === 'III' || (tipo === 'II' && enviar);
   const delTipo = useMemo(() => catalogo.faltas.filter((f) => f.gravedad === tipo), [catalogo.faltas, tipo]);
   const falta = delTipo.find((f) => f._id === faltaId);
   const mutacion = grave ? reportar : registrar;
@@ -75,7 +79,7 @@ function Formulario({ onClose, catalogo, estudiantes, onRegistrada }: Props) {
         estudiantes_ids,
         version_estudiante: version || undefined,
         compromiso: compromiso || undefined,
-        escalar_a_coordinacion: escalar,
+        escalar_a_coordinacion: tipo === 'I' && escalar,
       });
       onRegistrada?.({ grave: false, escalada: resultado.escalada });
     }
@@ -90,7 +94,7 @@ function Formulario({ onClose, catalogo, estudiantes, onRegistrada }: Props) {
       subtitle={estudiantes.length === 1 ? `${estudiantes[0]?.nombre} ${estudiantes[0]?.apellido} · ${estudiantes[0]?.grupo}` : `${estudiantes.length} estudiantes`}
       onClose={onClose}
       onSubmit={guardar}
-      submitLabel={grave ? 'Enviar a coordinación de convivencia' : escalar ? 'Registrar y escalar a coordinación' : 'Registrar'}
+      submitLabel={grave ? 'Enviar a coordinación de convivencia' : tipo === 'I' && escalar ? 'Registrar y escalar a coordinación' : 'Registrar'}
       submitVariant={grave ? 'soft-danger' : 'primary'}
       isSubmitting={mutacion.isPending}
       submitDisabled={incompleto}
@@ -106,6 +110,7 @@ function Formulario({ onClose, catalogo, estudiantes, onRegistrada }: Props) {
           onChange={(valor) => {
             setTipo(valor as TipoSituacion | '');
             setFaltaId('');
+            setEnviar(true);
           }}
           placeholder="Elige el tipo"
           opciones={TIPOS_SITUACION.map((t) => ({ value: t, label: `Tipo ${t}`, detalle: DETALLE_TIPO[t] }))}
@@ -136,6 +141,15 @@ function Formulario({ onClose, catalogo, estudiantes, onRegistrada }: Props) {
               : 'Queda en el Observador del estudiante como antecedente pedagógico.'}
           </p>
         </div>
+      )}
+
+      {tipo === 'II' && (
+        <Switch
+          checked={enviar}
+          onChange={setEnviar}
+          label="Enviar a coordinación de convivencia"
+          description="Apágalo si la situación no fue tan grave o ya la resolviste tú: queda en el Observador del estudiante, sin abrir un caso."
+        />
       )}
 
       <Textarea

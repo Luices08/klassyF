@@ -21,6 +21,7 @@ import { ESTADO_ACTIVO } from '../utils/filtroEstado';
 import {
   dentroDelPlazo,
   esSeguimientoDeOrientacion,
+  esGraveEnTramite,
   esSituacionGrave,
   esVisibleParaEstudiante,
   ModoVistaObservacion,
@@ -387,8 +388,8 @@ export interface ResultadoFalta {
 
 /**
  * Una falta Tipo I se queda en el Observador como antecedente pedagógico (se resuelve con mediación de aula) y, si el docente decide
- * escalarla, además llega a coordinación como solicitud de caso. Lo grave (Tipo II y III) no pasa por aquí: el docente no lo tipifica, lo
- * reporta como situación urgente (`reportarSituacionGrave`) y coordinación abre el caso.
+ * escalarla, además llega a coordinación como solicitud de caso. Una Tipo II que el docente **resolvió él mismo** también queda aquí, con sus hechos y
+ * su compromiso, y se trata como una Tipo I; si decide enviarla a coordinación, o es Tipo III, va por `reportarSituacionGrave` y no deja antecedente.
  */
 export async function registrarFalta(input: RegistrarFaltaInput, usuario: UserDocument, ip?: string | null): Promise<ResultadoFalta> {
   const anio = await anioEnCurso();
@@ -398,6 +399,9 @@ export async function registrarFalta(input: RegistrarFaltaInput, usuario: UserDo
     ? await FaltaConvivencia.findOne({ _id: input.falta_id, institucion_id: institucion._id, estado: ESTADO_ACTIVO })
     : null;
   if (!falta) throw new ApiError(400, 'La falta no existe o está inactiva.');
+  if (falta.gravedad === 'II' && input.escalar_a_coordinacion) {
+    throw new ApiError(400, 'Una falta Tipo II se envía a coordinación con el reporte a coordinación (no deja antecedente en el Observador); aquí solo se registra la que resolviste tú.');
+  }
 
   const hechos = input.hechos.trim();
   const problemas = problemasDeFalta(falta.gravedad, { hechos });
@@ -712,7 +716,7 @@ async function observadorParaLaFamilia(
   const registros = (await Observacion.find({ student_id: estudianteId, estado: 'ACTIVA' }).sort({ fecha_hecho: -1, createdAt: -1 }).limit(LIMITE_HISTORIAL)).sort(porFechaDesc);
 
   // De una falta grave el estudiante solo ve que hay un caso (o que está en revisión) y su estado; sin caso ni solicitud viva, no hay nada que mostrar.
-  const graves = registros.filter((o) => esSituacionGrave(o.falta?.gravedad));
+  const graves = registros.filter(esGraveEnTramite);
   const [casos, solicitudes] = await Promise.all([
     CasoConvivencia.find({ observacion_ids: { $in: graves.map((o) => o._id) }, estado: { $ne: 'ANULADO' } }).select('estado observacion_ids'),
     SolicitudCaso.find({ _id: { $in: graves.flatMap((o) => (o.solicitud_id ? [o.solicitud_id] : [])) }, estado: 'PENDIENTE' }).select('_id'),
@@ -723,7 +727,7 @@ async function observadorParaLaFamilia(
     return o.solicitud_id && solicitudes.some((s) => String(s._id) === String(o.solicitud_id)) ? 'EN_REVISION' : null;
   };
   const visibles = registros
-    .filter((o) => esVisibleParaEstudiante(o) && (!esSituacionGrave(o.falta?.gravedad) || situacionDe(o) !== null))
+    .filter((o) => esVisibleParaEstudiante(o) && (!esGraveEnTramite(o) || situacionDe(o) !== null))
     .slice(0, 200);
 
   await registrarEvento({
@@ -734,7 +738,7 @@ async function observadorParaLaFamilia(
     detalle: `${visibles.length} registro(s)`,
     ip,
   });
-  return visibles.map((o) => ({ ...vista(o, 'ESTUDIANTE'), ...(esSituacionGrave(o.falta?.gravedad) ? { situacion: situacionDe(o) } : {}) }));
+  return visibles.map((o) => ({ ...vista(o, 'ESTUDIANTE'), ...(esGraveEnTramite(o) ? { situacion: situacionDe(o) } : {}) }));
 }
 
 // --- Enmienda y anulación ---

@@ -162,10 +162,14 @@ describe('Seguridad de convivencia (capa HTTP)', () => {
     expect(String(guardada!.sede_id)).not.toBe(ID);
   });
 
-  it('la gravedad de una falta la fija el catálogo: lo grave no se registra como falta y el cliente no puede bajarla', async () => {
-    const falta = { falta_id: e.faltaII, fecha_hecho: hoy(), hechos: 'Agresión física durante el descanso.', estudiantes_ids: [String(e.estudiante._id)], gravedad: 'I' };
+  it('la gravedad de una falta la fija el catálogo: una Tipo III no se registra como falta leve y el cliente no puede bajarla', async () => {
+    const falta = { falta_id: e.faltaIII, fecha_hecho: hoy(), hechos: 'Agresión física durante el descanso.', estudiantes_ids: [String(e.estudiante._id)], gravedad: 'I' };
     expect((await pedir('POST', '/observaciones/faltas', e.docenteDeClase, falta)).estado).toBe(400);
     expect(await Observacion.countDocuments()).toBe(0);
+
+    // Una Tipo II sí se registra, pero con la gravedad del manual, no con la que mande el cliente.
+    expect((await pedir('POST', '/observaciones/faltas', e.docenteDeClase, { ...falta, falta_id: e.faltaII })).estado).toBe(201);
+    expect((await Observacion.findOne())!.falta!.gravedad).toBe('II');
   });
 
   it('un reporte grave ignora lo que el cliente intente fijar: la gravedad sale de la falta del manual, y los roles, el estado y el solicitante los decide el servidor', async () => {

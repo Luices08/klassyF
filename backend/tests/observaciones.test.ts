@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   dentroDelPlazo,
   esSeguimientoDeOrientacion,
+  esGraveEnTramite,
   esSituacionGrave,
   esVisibleParaEstudiante,
   MENSAJE_FALTA_GRAVE,
@@ -24,6 +25,8 @@ const falta = (gravedad: 'I' | 'II' | 'III', extra: Partial<Parameters<typeof vi
   estado: 'ACTIVA',
   confidencial: false,
   falta: { gravedad },
+  // Lo grave que sigue su curso en convivencia tiene una solicitud; la Tipo II que el docente resolvió no.
+  solicitud_id: gravedad === 'I' ? null : 'solicitud',
   ...extra,
 });
 
@@ -42,6 +45,20 @@ describe('dentroDelPlazo', () => {
 describe('esSituacionGrave', () => {
   it('II y III son graves; I y sin gravedad no', () => {
     expect(['I', 'II', 'III', null].map((g) => esSituacionGrave(g as 'I' | null))).toEqual([false, true, true, false]);
+  });
+});
+
+describe('esGraveEnTramite', () => {
+  it('una Tipo II/III con solicitud sigue en convivencia; una Tipo II que el docente resolvió o una Tipo I no', () => {
+    expect(esGraveEnTramite(falta('II'))).toBe(true);
+    expect(esGraveEnTramite(falta('III'))).toBe(true);
+    expect(esGraveEnTramite(falta('II', { solicitud_id: null }))).toBe(false);
+    expect(esGraveEnTramite(falta('I'))).toBe(false);
+  });
+
+  it('la Tipo II resuelta por el docente la ven completa el director y orientación, como una Tipo I', () => {
+    expect(visibilidadDeObservacion('DOCENTE', falta('II', { solicitud_id: null }), false)).toBe('COMPLETA');
+    expect(visibilidadDeObservacion('ORIENTADOR', falta('II', { solicitud_id: null }), false)).toBe('COMPLETA');
   });
 });
 
@@ -128,10 +145,9 @@ describe('problemasDeFalta', () => {
     expect(problemasDeFalta('I', { hechos: '  ' })).toEqual(['Describe los hechos.']);
   });
 
-  it('lo grave (Tipo II y III) no se registra como falta: el docente lo reporta como situación urgente', () => {
-    for (const gravedad of ['II', 'III'] as const) {
-      expect(problemasDeFalta(gravedad, { hechos: 'Agresión.' }), gravedad).toEqual([MENSAJE_FALTA_GRAVE]);
-    }
+  it('una Tipo II que el docente resolvió se registra como falta; una Tipo III siempre va a coordinación', () => {
+    expect(problemasDeFalta('II', { hechos: 'Empujón en el patio.' })).toEqual([]);
+    expect(problemasDeFalta('III', { hechos: 'Agresión.' })).toEqual([MENSAJE_FALTA_GRAVE]);
   });
 });
 

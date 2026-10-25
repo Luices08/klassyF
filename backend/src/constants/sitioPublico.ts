@@ -62,6 +62,38 @@ export const PLANTILLAS_SITIO: readonly PlantillaSitio[] = [
     logo: ['lateral'],
     menu: ['lateral'],
   },
+  {
+    id: 'dividida',
+    nombre: 'Dividida',
+    descripcion: 'Titular a la izquierda y carrusel de imágenes a la derecha.',
+    slider: true,
+    logo: ['izquierda', 'centro'],
+    menu: ['superior', 'bajo_logo'],
+  },
+  {
+    id: 'banner',
+    nombre: 'Banner',
+    descripcion: 'Carrusel bajo la barra superior y el titular debajo de las imágenes.',
+    slider: true,
+    logo: ['izquierda', 'centro'],
+    menu: ['superior', 'bajo_logo'],
+  },
+  {
+    id: 'institucional',
+    nombre: 'Institucional',
+    descripcion: 'Franja de color con el escudo grande junto al titular. Sin carrusel.',
+    slider: false,
+    logo: ['izquierda', 'centro'],
+    menu: ['superior', 'bajo_logo'],
+  },
+  {
+    id: 'minimalista',
+    nombre: 'Minimalista',
+    descripcion: 'Escudo centrado, menú debajo y titular alineado a la izquierda con mucho aire. Sin carrusel.',
+    slider: false,
+    logo: ['centro', 'izquierda'],
+    menu: ['bajo_logo', 'superior'],
+  },
 ];
 
 export const MAX_IMAGENES_SLIDER = 6;

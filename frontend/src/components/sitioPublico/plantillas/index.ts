@@ -3,12 +3,20 @@ import type { PropsPlantilla } from '../seccionesSitio';
 import { PlantillaClasica } from './PlantillaClasica';
 import { PlantillaGaleria } from './PlantillaGaleria';
 import { PlantillaLateral } from './PlantillaLateral';
+import { PlantillaDividida } from './PlantillaDividida';
+import { PlantillaBanner } from './PlantillaBanner';
+import { PlantillaInstitucional } from './PlantillaInstitucional';
+import { PlantillaMinimalista } from './PlantillaMinimalista';
 
 /** Una plantilla nueva: su entrada en `PLANTILLAS_SITIO` (backend) y su componente aquí con el mismo id. */
 export const COMPONENTES_PLANTILLA: Record<string, ComponentType<PropsPlantilla>> = {
   clasica: PlantillaClasica,
   galeria: PlantillaGaleria,
   lateral: PlantillaLateral,
+  dividida: PlantillaDividida,
+  banner: PlantillaBanner,
+  institucional: PlantillaInstitucional,
+  minimalista: PlantillaMinimalista,
 };
 
 export const PLANTILLA_POR_DEFECTO = 'clasica';

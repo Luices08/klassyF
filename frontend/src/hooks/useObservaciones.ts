@@ -77,7 +77,7 @@ export const NOMBRES_MEDIO: Record<MedioCitacion, string> = {
 };
 
 export type ClaseRegistro = 'OBSERVACION' | 'FALTA';
-export type ContextoRegistro = 'CLASE' | 'DIRECCION_GRUPO' | 'COORDINACION' | 'ORIENTACION';
+export type ContextoRegistro = 'CLASE' | 'DIRECCION_GRUPO' | 'SEDE' | 'COORDINACION' | 'ORIENTACION';
 
 /**
  * Lo que el servidor devuelve según quién consulta. `reservada` es una falta Tipo II/III vista por quien solo puede saber que
@@ -226,13 +226,12 @@ export function useGruposObservables() {
   });
 }
 
-/** `ambito: 'sede'`: un docente busca por nombre en toda su sede (sin documento) para nombrar a alguien en un reporte a coordinación. */
-export function useEstudiantesObservables(params: { group_id?: string; q?: string; ambito?: 'sede' }) {
+export function useEstudiantesObservables(params: { group_id?: string; q?: string }) {
   const q = params.q?.trim() ?? '';
   return useQuery({
-    queryKey: ['observaciones', 'estudiantes', params.group_id ?? '', q, params.ambito ?? ''],
-    queryFn: () => api.get<EstudianteObservable[]>('/observaciones/estudiantes', { group_id: params.group_id, q: q || undefined, ambito: params.ambito }),
-    enabled: params.ambito === 'sede' ? q.length >= 3 : Boolean(params.group_id) || q.length >= 3,
+    queryKey: ['observaciones', 'estudiantes', params.group_id ?? '', q],
+    queryFn: () => api.get<EstudianteObservable[]>('/observaciones/estudiantes', { group_id: params.group_id, q: q || undefined }),
+    enabled: Boolean(params.group_id) || q.length >= 3,
     placeholderData: keepPreviousData,
   });
 }

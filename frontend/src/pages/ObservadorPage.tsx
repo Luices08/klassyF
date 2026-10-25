@@ -108,15 +108,15 @@ function RegistrarTab({ esDocente, puedeRegistrarFalta }: { esDocente: boolean; 
     <Card>
       <CardHeader
         title="Estudiantes"
-        subtitle="Elige un grupo o busca por nombre o documento (mínimo 3 letras). Puedes cambiar de grupo o de búsqueda sin perder a quienes ya elegiste."
+        subtitle="Consulta el historial de tus estudiantes. Para registrar no hace falta marcar a nadie aquí: el formulario te deja elegir grupo y estudiantes de toda tu sede."
         action={
           <div className="flex flex-wrap gap-2">
             {puedeRegistrarFalta && (
-              <Button variant="outline" disabled={elegidos.length === 0} onClick={() => setRegistrandoFalta(true)}>
-                Registrar falta
+              <Button variant="outline" onClick={() => setRegistrandoFalta(true)}>
+                Registrar falta{elegidos.length > 0 ? ` (${elegidos.length})` : ''}
               </Button>
             )}
-            <Button disabled={elegidos.length === 0} onClick={() => setRegistrando(true)}>
+            <Button onClick={() => setRegistrando(true)}>
               Registrar observación{elegidos.length > 0 ? ` (${elegidos.length})` : ''}
             </Button>
           </div>
@@ -130,7 +130,7 @@ function RegistrarTab({ esDocente, puedeRegistrarFalta }: { esDocente: boolean; 
             setGrupoId(id);
           }}
           placeholder="Buscar grupo…"
-          vacioLabel="Todos mis grupos (usa la búsqueda)"
+          vacioLabel="Toda la sede (usa la búsqueda)"
           opciones={(grupos.data ?? []).map((g) => ({ value: g._id, label: `${g.grado} · ${g.nomenclatura}${g.es_director ? ' (director)' : ''}` }))}
         />
         <Input label="Buscar" value={busqueda} onChange={(e) => setBusqueda(e.target.value)} placeholder="Nombre o documento" />

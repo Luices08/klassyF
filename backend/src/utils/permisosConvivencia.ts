@@ -9,8 +9,6 @@ import { ROLES } from '../constants/roles';
 export type AccionConvivencia =
   | 'REGISTRAR_OBSERVACION'
   | 'REGISTRAR_FALTA'
-  /** Nombrar a un estudiante en una falta que va a coordinación (Tipo II enviada o Tipo III): lo que no deja antecedente en el Observador. */
-  | 'REPORTAR_A_COORDINACION'
   | 'CONSULTAR_OBSERVACIONES_PROPIAS'
   | 'CONSULTAR_HISTORIAL'
   | 'VER_ESTADO_CASO'
@@ -59,11 +57,9 @@ export function permisoSobreEstudiante(
   if (usuario.rol === ROLES.DOCENTE) {
     if (accion === 'CONSULTAR_OBSERVACIONES_PROPIAS') return true;
     if (!enAlcanceDeSede(usuario, estudiante.sede_id)) return false;
-    // Un incidente se presencia en el recreo o el pasillo: cualquier docente de la sede nombra al estudiante, pero solo para que coordinación lo revise.
-    if (accion === 'REPORTAR_A_COORDINACION') return true;
-    if (accion === 'REGISTRAR_OBSERVACION' || accion === 'REGISTRAR_FALTA') {
-      return Boolean(estudiante.docenteDictaClase || estudiante.esDirectorDeGrupo);
-    }
+    // Quien ve algo lo registra: el docente en la puerta que anota las llegadas tarde, o el que presencia un incidente en el recreo, no dicta clase en ese grupo.
+    // Ver el historial del estudiante sí sigue siendo solo del director de su grupo.
+    if (accion === 'REGISTRAR_OBSERVACION' || accion === 'REGISTRAR_FALTA') return true;
     if (accion === 'CONSULTAR_HISTORIAL' || accion === 'VER_ESTADO_CASO') return Boolean(estudiante.esDirectorDeGrupo);
     return false;
   }

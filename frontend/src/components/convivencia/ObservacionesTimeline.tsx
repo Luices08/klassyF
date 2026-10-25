@@ -5,7 +5,7 @@ import { LineaTiempo } from '../ui/LineaTiempo';
 import { formatoFechaCalendario } from '../../lib/fechas';
 import { type ObservacionVista, useMarcarCompromiso } from '../../hooks/useObservaciones';
 
-const ETIQUETA_CONTEXTO = { CLASE: 'Clase', DIRECCION_GRUPO: 'Dirección de grupo', COORDINACION: 'Coordinación', ORIENTACION: 'Orientación' } as const;
+const ETIQUETA_CONTEXTO = { CLASE: 'Clase', DIRECCION_GRUPO: 'Dirección de grupo', SEDE: 'Docente de la sede', COORDINACION: 'Coordinación', ORIENTACION: 'Orientación' } as const;
 
 type CamposDeChips = Pick<ObservacionVista, 'clase' | 'tipo_nombre' | 'gravedad' | 'confidencial' | 'estado' | 'periodo_numero'>;
 

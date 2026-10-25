@@ -13,7 +13,7 @@ import * as catalogo from '../../src/services/convivenciaCatalogo.service';
 import * as observaciones from '../../src/services/observacion.service';
 import * as solicitudes from '../../src/services/solicitudCaso.service';
 import { detenerBaseDeDatos, iniciarBaseDeDatos, limpiarBaseDeDatos } from './baseDeDatos';
-import { actor, armarEscenario, crearUsuario, Escenario, hoy } from './escenario';
+import { actor, armarEscenario, Escenario, hoy } from './escenario';
 
 const PAGINA = { pagina: 1, limite: 20 };
 type Vista = Record<string, unknown> & { _id: string };
@@ -60,13 +60,17 @@ describe('M14 observaciones y faltas (con base de datos)', () => {
   const historial = (estudiante: UserDocument, usuario: UserDocument) => observaciones.historialDeEstudiante(id(estudiante), usuario, PAGINA);
 
   describe('observación (cotidiana)', () => {
-    it('un docente registra en un grupo que dicta y en uno que dirige, y no en uno ajeno', async () => {
+    it('un docente registra en un grupo que dicta, en uno que dirige y en cualquiera de su sede, y no en otra sede', async () => {
       const [deClase] = await registrar(e.docenteDeClase, [id(e.estudiante)]);
       expect(deClase).toMatchObject({ clase: 'OBSERVACION', contexto: 'CLASE', descripcion: 'Participa con respeto.', confidencial: false, compromiso_estado: null });
       const [comoDirectora] = await registrar(e.directora, [id(e.estudiante)]);
       expect(comoDirectora).toMatchObject({ contexto: 'DIRECCION_GRUPO' });
 
-      await expect(registrar(e.docenteAjeno, [id(e.estudiante)])).rejects.toMatchObject({ statusCode: 404 });
+      // Quien ve algo lo registra, aunque no dicte clase en ese grupo (p. ej. el docente que anota las llegadas tarde en la puerta).
+      const [deLaSede] = await registrar(e.docenteAjeno, [id(e.estudiante)]);
+      expect(deLaSede).toMatchObject({ contexto: 'SEDE' });
+
+      await expect(registrar(e.docenteOtraSede, [id(e.estudiante)])).rejects.toMatchObject({ statusCode: 404 });
     });
 
     it('un registro grupal crea uno por estudiante con el mismo evento, o ninguno', async () => {
@@ -75,7 +79,7 @@ describe('M14 observaciones y faltas (con base de datos)', () => {
       expect(new Set(creadas.map((o) => o.evento_id)).size).toBe(1);
 
       const total = await Observacion.countDocuments();
-      await expect(registrar(e.docenteAjeno, [id(e.estudiante)])).rejects.toBeDefined();
+      await expect(registrar(e.docenteOtraSede, [id(e.estudiante)])).rejects.toBeDefined();
       expect(await Observacion.countDocuments()).toBe(total);
     });
 
@@ -242,9 +246,15 @@ describe('M14 observaciones y faltas (con base de datos)', () => {
       expect(await AuditLog.countDocuments({ accion: 'CONVIVENCIA_HISTORIAL_CONSULTADO' })).toBe(2);
     });
 
-    it('el buscador solo trae estudiantes de los grupos del usuario', async () => {
-      expect((await observaciones.buscarEstudiantes(e.docenteDeClase, { q: 'Apellido' })).length).toBeGreaterThan(0);
-      expect(await observaciones.buscarEstudiantes(e.docenteAjeno, { q: 'Apellido' })).toHaveLength(0);
+    it('el buscador trae a los estudiantes de las sedes del usuario; el docente ve el documento solo de los suyos', async () => {
+      const propios = await observaciones.buscarEstudiantes(e.docenteDeClase, { q: 'Apellido' });
+      expect(propios.length).toBeGreaterThan(0);
+      expect(propios[0]!.numero_documento).not.toBe('');
+      const deLaSede = await observaciones.buscarEstudiantes(e.docenteAjeno, { q: 'Apellido' });
+      expect(deLaSede.length).toBe(propios.length);
+      expect(deLaSede.every((s) => s.numero_documento === '')).toBe(true);
+      expect(await observaciones.buscarEstudiantes(e.docenteAjeno, { q: 'Apellido' }, true)).toHaveLength(0);
+      expect(await observaciones.buscarEstudiantes(e.docenteOtraSede, { q: 'Apellido' })).toHaveLength(0);
       expect(await observaciones.buscarEstudiantes(e.coordConvivenciaOtraSede, { q: 'Apellido' })).toHaveLength(0);
       expect(await observaciones.buscarEstudiantes(e.coordConvivencia, { q: 'ap' })).toHaveLength(0);
     });
@@ -376,14 +386,15 @@ describe('M14 observaciones y faltas (con base de datos)', () => {
       // Un estudiante repetido cuenta una sola vez.
       const { registros } = await registrarFalta(e.docenteDeClase, { estudiantes_ids: [id(e.estudiante), id(e.estudiante)] });
       expect(registros).toHaveLength(1);
-      await expect(registrarFalta(e.docenteAjeno)).rejects.toMatchObject({ statusCode: 404 });
+      await expect(registrarFalta(e.docenteOtraSede)).rejects.toMatchObject({ statusCode: 404 });
     });
 
-    it('registran faltas el docente de clase, el titular y convivencia; no el docente ajeno, el coordinador académico ni orientación', async () => {
+    it('registran faltas cualquier docente de la sede y convivencia; no un docente de otra sede, el coordinador académico ni orientación', async () => {
       await expect(registrarFalta(e.docenteDeClase)).resolves.toBeDefined();
       await expect(registrarFalta(e.directora)).resolves.toBeDefined();
+      await expect(registrarFalta(e.docenteAjeno)).resolves.toBeDefined();
       await expect(registrarFalta(e.coordConvivencia)).resolves.toBeDefined();
-      for (const quien of [e.docenteAjeno, e.coordAcademico, e.orientador, e.secretaria]) {
+      for (const quien of [e.docenteOtraSede, e.coordAcademico, e.orientador, e.secretaria]) {
         await expect(registrarFalta(quien), quien.rol).rejects.toMatchObject({ statusCode: 404 });
       }
     });
@@ -516,19 +527,16 @@ describe('M14 observaciones y faltas (con base de datos)', () => {
       expect(await SolicitudCaso.countDocuments()).toBe(0);
     });
 
-    it('cualquier docente de la sede puede nombrar a un estudiante en un reporte a coordinación; uno de otra sede, el coordinador académico y orientación no', async () => {
+    it('cualquier docente de la sede puede reportar a un estudiante de la sede; uno de otra sede, el coordinador académico y orientación no', async () => {
       await expect(reportar(e.directora)).resolves.toBeDefined();
       await expect(reportar(e.coordConvivencia)).resolves.toBeDefined();
       // Un docente sin clase en el grupo ni dirección también reporta: vio el hecho en el recreo.
       await expect(reportar(e.docenteAjeno)).resolves.toBeDefined();
-      const deOtraSede = await crearUsuario('DOCENTE', { sedes_ids: e.coordConvivenciaOtraSede.sedes_ids });
-      for (const quien of [deOtraSede, e.coordAcademico, e.orientador, e.secretaria]) {
+      for (const quien of [e.docenteOtraSede, e.coordAcademico, e.orientador, e.secretaria]) {
         await expect(reportar(quien), quien.rol).rejects.toMatchObject({ statusCode: 404 });
       }
-      // No se guarda nada a medias, y queda dicho cuántos no eran de sus grupos.
+      // Quien no puede, no deja nada a medias.
       expect(await SolicitudCaso.countDocuments()).toBe(3);
-      const auditoria = await AuditLog.find({ accion: 'REPORTE_URGENTE_REGISTRADO', usuario_id: e.docenteAjeno._id });
-      expect(auditoria[0]!.detalle).toContain('2 de grupos que no dicta ni dirige');
     });
 
     it('quien reportó ve el estado de su reporte, y solo el suyo', async () => {

@@ -5,6 +5,7 @@ import { Drawer } from '../ui/Drawer';
 import { Input, Textarea } from '../ui/Field';
 import { SelectBuscable } from '../ui/SelectBuscable';
 import { useAuth } from '../../context/AuthContext';
+import { SelectorEstudiantesRegistro } from './SelectorEstudiantesRegistro';
 import {
   type CatalogoConvivencia,
   type EstudianteObservable,
@@ -24,7 +25,7 @@ interface Props {
   onClose: () => void;
   /** Solo para registrar: al enmendar no hace falta. */
   catalogo?: CatalogoConvivencia;
-  /** Registro nuevo: uno o varios estudiantes (un registro por cada uno). */
+  /** Registro nuevo: los que ya se marcaron en la tabla (opcional); en el formulario se eligen o cambian. Un registro por cada estudiante. */
   estudiantes?: EstudianteObservable[];
   /** Enmienda: el registro que se corrige (la clase, el tipo y la fecha no cambian). */
   observacion?: ObservacionVista;
@@ -38,7 +39,7 @@ export function ObservacionDrawer(props: Props) {
 
 const SIN_CATALOGO: CatalogoConvivencia = { tipos: [], faltas: [] };
 
-function Formulario({ onClose, catalogo = SIN_CATALOGO, estudiantes = [], observacion }: Props) {
+function Formulario({ onClose, catalogo = SIN_CATALOGO, estudiantes: inicial = [], observacion }: Props) {
   const esOrientador = useAuth().user?.rol === 'ORIENTADOR';
   const enmienda = Boolean(observacion);
   const registrar = useRegistrarObservacion();
@@ -58,6 +59,7 @@ function Formulario({ onClose, catalogo = SIN_CATALOGO, estudiantes = [], observ
   const siempreConfidencial = esOrientador || observacion?.contexto === 'ORIENTACION';
   const [confidencial, setConfidencial] = useState(siempreConfidencial ? true : (observacion?.confidencial ?? false));
 
+  const [estudiantes, setEstudiantes] = useState(inicial);
   const sinDestino = !enmienda && estudiantes.length === 0;
 
   const guardar = async (e: FormEvent) => {
@@ -91,9 +93,11 @@ function Formulario({ onClose, catalogo = SIN_CATALOGO, estudiantes = [], observ
       subtitle={
         enmienda
           ? 'La versión anterior queda guardada en el historial.'
-          : estudiantes.length === 1
-            ? `${estudiantes[0]?.nombre} ${estudiantes[0]?.apellido} · ${estudiantes[0]?.grupo}`
-            : `${estudiantes.length} estudiantes: se crea un registro independiente por cada uno`
+          : estudiantes.length === 0
+            ? 'Elige a quién se registra'
+            : estudiantes.length === 1
+              ? `${estudiantes[0]?.nombre} ${estudiantes[0]?.apellido} · ${estudiantes[0]?.grupo}`
+              : `${estudiantes.length} estudiantes: se crea un registro independiente por cada uno`
       }
       onClose={onClose}
       onSubmit={guardar}
@@ -105,6 +109,8 @@ function Formulario({ onClose, catalogo = SIN_CATALOGO, estudiantes = [], observ
       <Alert tone="info">
         Describe solo hechos observables. No escribas diagnósticos ni datos de salud, ni nombres de otros estudiantes.
       </Alert>
+
+      {!enmienda && <SelectorEstudiantesRegistro seleccion={estudiantes} onChange={setEstudiantes} />}
 
       {!enmienda && (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">

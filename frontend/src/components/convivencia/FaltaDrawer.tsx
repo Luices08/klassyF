@@ -5,12 +5,12 @@ import { Drawer } from '../ui/Drawer';
 import { Input, Textarea } from '../ui/Field';
 import { SelectBuscable } from '../ui/SelectBuscable';
 import { Switch } from '../ui/Switch';
+import { SelectorEstudiantesRegistro } from './SelectorEstudiantesRegistro';
 import {
   type CatalogoConvivencia,
   type EstudianteObservable,
   TIPOS_SITUACION,
   type TipoSituacion,
-  useEstudiantesObservables,
   useRegistrarFalta,
   useReportarSituacionGrave,
 } from '../../hooks/useObservaciones';
@@ -28,6 +28,7 @@ interface Props {
   open: boolean;
   onClose: () => void;
   catalogo: CatalogoConvivencia;
+  /** Los que ya se marcaron en la tabla (opcional): en el propio formulario se pueden cambiar. */
   estudiantes: EstudianteObservable[];
   /** `grave`: se envió a coordinación de convivencia sin pasar por el Observador; `escalada`: una falta leve que el docente escaló. */
   onRegistrada?: (resultado: { grave: boolean; escalada: boolean }) => void;
@@ -39,7 +40,7 @@ interface Props {
  * - **Tipo II**: el docente decide si la envía a coordinación. Si la resolvió él mismo (o no fue tan grave), queda en el Observador como una Tipo I.
  * - **Tipo II enviada o Tipo III**: se envía de inmediato a coordinación de convivencia (alerta crítica) con la falta que el docente identificó y la contención que aplicó.
  *   No queda en el Observador del estudiante: eso evita marcar a quien luego resulte ajeno al hecho. Coordinación abre el caso, confirma el tipo y asigna los roles.
- *   Como un incidente se presencia en el recreo y no en la clase, aquí el docente puede sumar a cualquier estudiante de su sede (buscándolo por nombre).
+ * A quién se registra se elige aquí mismo (grupo y estudiantes de toda la sede): quien ve algo lo registra, aunque no dicte clase en ese grupo.
  */
 export function FaltaDrawer(props: Props) {
   if (!props.open) return null;
@@ -59,14 +60,9 @@ function Formulario({ onClose, catalogo, estudiantes, onRegistrada }: Props) {
   const [escalar, setEscalar] = useState(false);
   // Una Tipo II se envía por defecto: el docente la deja en el Observador solo si la resolvió él mismo.
   const [enviar, setEnviar] = useState(true);
-  const [busqueda, setBusqueda] = useState('');
-  const [extras, setExtras] = useState<Map<string, EstudianteObservable>>(new Map());
+  const [todos, setTodos] = useState(estudiantes);
 
   const grave = tipo === 'III' || (tipo === 'II' && enviar);
-  // Solo un reporte a coordinación admite estudiantes fuera de los grupos del docente: lo que queda en el Observador es de quien dicta o dirige.
-  const encontrados = useEstudiantesObservables({ q: grave ? busqueda : '', ambito: 'sede' });
-  const todos = grave ? [...estudiantes, ...extras.values()] : estudiantes;
-  const yaElegidos = new Set(todos.map((s) => s.student_id));
   const delTipo = useMemo(() => catalogo.faltas.filter((f) => f.gravedad === tipo), [catalogo.faltas, tipo]);
   const falta = delTipo.find((f) => f._id === faltaId);
   const mutacion = grave ? reportar : registrar;
@@ -99,7 +95,7 @@ function Formulario({ onClose, catalogo, estudiantes, onRegistrada }: Props) {
       open
       size="lg"
       title="Registrar falta"
-      subtitle={todos.length === 1 ? `${todos[0]?.nombre} ${todos[0]?.apellido} · ${todos[0]?.grupo}` : `${todos.length} estudiantes · ${[...new Set(todos.map((s) => s.grupo))].join(', ')}`}
+      subtitle={todos.length === 0 ? undefined : todos.length === 1 ? `${todos[0]?.nombre} ${todos[0]?.apellido} · ${todos[0]?.grupo}` : `${todos.length} estudiantes · ${[...new Set(todos.map((s) => s.grupo))].join(', ')}`}
       onClose={onClose}
       onSubmit={guardar}
       submitLabel={grave ? 'Enviar a coordinación de convivencia' : tipo === 'I' && escalar ? 'Registrar y escalar a coordinación' : 'Registrar'}
@@ -109,6 +105,8 @@ function Formulario({ onClose, catalogo, estudiantes, onRegistrada }: Props) {
     >
       {mutacion.isError && <Alert tone="error">{errorMessage(mutacion.error)}</Alert>}
       {catalogo.faltas.length === 0 && <Alert tone="warning">Aún no hay faltas del manual. Pídele al coordinador de convivencia que las cargue en el catálogo.</Alert>}
+
+      <SelectorEstudiantesRegistro seleccion={todos} onChange={setTodos} />
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <SelectBuscable
@@ -169,61 +167,6 @@ function Formulario({ onClose, catalogo, estudiantes, onRegistrada }: Props) {
         required
         hint="Relata lo ocurrido de forma objetiva, sin juicios. No incluyas diagnósticos ni datos de salud. Si hay otros estudiantes involucrados que no seleccionaste, descríbelos aquí: coordinación los agrega al caso."
       />
-
-      {grave && (
-        <div className="space-y-2">
-          <Input
-            label="Sumar a otro estudiante de la sede (opcional)"
-            value={busqueda}
-            onChange={(e) => setBusqueda(e.target.value)}
-            placeholder="Escribe al menos 3 letras del nombre o apellido…"
-            hint="Solo para avisar a coordinación: no podrás ver su Observador ni su historial."
-          />
-          {busqueda.trim().length >= 3 && (
-            <ul className="max-h-40 divide-y divide-border overflow-y-auto rounded-xl border border-border text-sm">
-              {(encontrados.data ?? []).filter((s) => !yaElegidos.has(s.student_id)).map((s) => (
-                <li key={s.student_id}>
-                  <button
-                    type="button"
-                    className="flex w-full items-center justify-between px-3 py-2 text-left text-body hover:bg-soft"
-                    onClick={() => {
-                      setExtras(new Map(extras).set(s.student_id, s));
-                      setBusqueda('');
-                    }}
-                  >
-                    <span>
-                      {s.apellido} {s.nombre}
-                    </span>
-                    <span className="text-xs text-muted">{s.grupo}</span>
-                  </button>
-                </li>
-              ))}
-              {!encontrados.isFetching && (encontrados.data ?? []).filter((s) => !yaElegidos.has(s.student_id)).length === 0 && <li className="px-3 py-2 text-muted">Sin resultados en tu sede.</li>}
-            </ul>
-          )}
-          {extras.size > 0 && (
-            <div className="flex flex-wrap gap-2">
-              {[...extras.values()].map((s) => (
-                <span key={s.student_id} className="inline-flex items-center gap-1.5 rounded-full bg-primary-soft px-3 py-1 text-xs text-primary">
-                  {s.apellido} {s.nombre} · {s.grupo}
-                  <button
-                    type="button"
-                    className="font-semibold hover:text-ink"
-                    aria-label={`Quitar a ${s.nombre} ${s.apellido}`}
-                    onClick={() => {
-                      const siguiente = new Map(extras);
-                      siguiente.delete(s.student_id);
-                      setExtras(siguiente);
-                    }}
-                  >
-                    ×
-                  </button>
-                </span>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
 
       {grave ? (
         <Textarea

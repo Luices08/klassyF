@@ -23,12 +23,12 @@ interface AjusteParams extends ParamsDictionary {
 
 const ok = (res: Response, data: unknown, status = 200) => res.status(status).json({ success: true, data });
 
-// --- Buscador (reusa el de convivencia: acotado a las sedes del usuario o a los grupos del docente; no abre /students) ---
+// --- Buscador (reusa el de convivencia: acotado a las sedes del usuario o, para el docente, a sus grupos —aquí no se amplía a la sede—; no abre /students) ---
 
-export const grupos = catchAsync(async (req, res) => ok(res, await observacionService.gruposAccesibles(req.user!)));
+export const grupos = catchAsync(async (req, res) => ok(res, await observacionService.gruposAccesibles(req.user!, true)));
 
 export const estudiantes = catchAsync<unknown, unknown, unknown, ParsedQs & { group_id?: string; q?: string }>(async (req, res) =>
-  ok(res, await observacionService.buscarEstudiantes(req.user!, { group_id: req.query.group_id, q: req.query.q }))
+  ok(res, await observacionService.buscarEstudiantes(req.user!, { group_id: req.query.group_id, q: req.query.q }, true))
 );
 
 // --- Configuración ---

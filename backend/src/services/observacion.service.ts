@@ -133,26 +133,36 @@ export const exigirPermisoSobreEstudiante = exigirPermiso;
 
 // --- Buscador acotado (no abre /students) ---
 
-/** Los grupos del año en curso a los que el usuario tiene acceso por su sede o por su vínculo docente. */
-async function filtroDeGrupos(usuario: UserDocument, anioId: Types.ObjectId): Promise<Record<string, unknown>> {
+/** Los grupos donde el docente dicta clase o dirige: de los demás ve el nombre del estudiante, no su documento. */
+async function gruposPropiosDelDocente(usuario: UserDocument, anioId: Types.ObjectId): Promise<Set<string>> {
+  const clases = await TeacherAssignment.distinct('group_id', {
+    docente_id: usuario._id,
+    academic_year_id: anioId,
+    tipo_asignacion: 'CLASE',
+    estado: ESTADO_ACTIVO,
+  });
+  const dirigidos = await Group.distinct('_id', { academic_year_id: anioId, director_grupo_id: usuario._id });
+  return new Set([...clases, ...dirigidos].map(String));
+}
+
+/**
+ * Los grupos del año en curso de las sedes del usuario: en el Observador el docente también registra sobre estudiantes de grupos donde no dicta ni dirige
+ * (quien ve algo lo registra). `soloVinculo` lo limita a los suyos, que es lo que usa M16.
+ */
+async function filtroDeGrupos(usuario: UserDocument, anioId: Types.ObjectId, soloVinculo = false): Promise<Record<string, unknown>> {
   const base = { academic_year_id: anioId, estado: 'ACTIVE' };
-  const alcance = alcanceDeSedes(comoUsuarioConvivencia(usuario));
-  if (usuario.rol === ROLES.DOCENTE) {
-    const clases = await TeacherAssignment.distinct('group_id', {
-      docente_id: usuario._id,
-      academic_year_id: anioId,
-      tipo_asignacion: 'CLASE',
-      estado: ESTADO_ACTIVO,
-    });
-    return { ...base, $or: [{ _id: { $in: clases } }, { director_grupo_id: usuario._id }] };
+  if (usuario.rol === ROLES.DOCENTE && soloVinculo) {
+    const propios = [...(await gruposPropiosDelDocente(usuario, anioId))];
+    return { ...base, _id: { $in: propios } };
   }
+  const alcance = alcanceDeSedes(comoUsuarioConvivencia(usuario));
   return alcance === 'TODAS' ? base : { ...base, sede_id: { $in: alcance } };
 }
 
-export async function gruposAccesibles(usuario: UserDocument) {
+export async function gruposAccesibles(usuario: UserDocument, soloVinculo = false) {
   const anio = await AcademicYear.findOne({ estado: 'EN_CURSO' });
   if (!anio) return [];
-  const grupos = await Group.find(await filtroDeGrupos(usuario, anio._id))
+  const grupos = await Group.find(await filtroDeGrupos(usuario, anio._id, soloVinculo))
     .populate<{ grade_id: { nombre: string } }>('grade_id', 'nombre')
     .sort({ nomenclatura: 1 });
   return grupos.map((g) => ({
@@ -167,22 +177,16 @@ export async function gruposAccesibles(usuario: UserDocument) {
 export interface ConsultaEstudiantes {
   group_id?: string;
   q?: string;
-  /** `sede`: para un reporte a coordinación, un docente busca por nombre en toda su sede (no solo en sus grupos). Solo cuenta para el rol docente. */
-  ambito?: 'sede';
 }
 
-export async function buscarEstudiantes(usuario: UserDocument, { group_id: grupoPedido, q, ambito }: ConsultaEstudiantes) {
+export async function buscarEstudiantes(usuario: UserDocument, { group_id, q }: ConsultaEstudiantes, soloVinculo = false) {
   const anio = await AcademicYear.findOne({ estado: 'EN_CURSO' });
   if (!anio) return [];
   const texto = q?.trim() ?? '';
-  // Buscar en toda la sede es solo por nombre (nunca se lista un grupo completo) y no muestra el documento: para nombrar a alguien basta con saber quién es.
-  const enSede = ambito === 'sede' && usuario.rol === ROLES.DOCENTE;
-  const group_id = enSede ? undefined : grupoPedido;
   if (!group_id && texto.length < 3) return [];
 
-  const filtroGrupos = enSede
-    ? { academic_year_id: anio._id, estado: 'ACTIVE', sede_id: { $in: usuario.sedes_ids } }
-    : await filtroDeGrupos(usuario, anio._id);
+  const filtroGrupos = await filtroDeGrupos(usuario, anio._id, soloVinculo);
+  const propios = usuario.rol === ROLES.DOCENTE ? await gruposPropiosDelDocente(usuario, anio._id) : null;
   const grupos = await Group.find(group_id ? { $and: [filtroGrupos, { _id: group_id }] } : filtroGrupos).select('nomenclatura');
   if (grupos.length === 0) return [];
   const nomenclatura = new Map(grupos.map((g) => [String(g._id), g.nomenclatura]));
@@ -215,7 +219,7 @@ export async function buscarEstudiantes(usuario: UserDocument, { group_id: grupo
       student_id: String(m.student_id._id),
       nombre: m.student_id.nombre,
       apellido: m.student_id.apellido,
-      numero_documento: enSede ? '' : m.student_id.numero_documento,
+      numero_documento: propios && !propios.has(String(m.group_id)) ? '' : m.student_id.numero_documento,
       group_id: String(m.group_id),
       grupo: nomenclatura.get(String(m.group_id)) ?? '',
     }))
@@ -229,7 +233,8 @@ const vista = (obs: Parameters<typeof vistaObservacion>[0], modo: ModoVistaObser
 function contextoDeRegistro(usuario: UserDocument, datos: EstudianteConvivencia): ContextoObservacion {
   if (usuario.rol === ROLES.ORIENTADOR) return 'ORIENTACION';
   if (usuario.rol !== ROLES.DOCENTE) return 'COORDINACION';
-  return datos.docenteDictaClase ? 'CLASE' : 'DIRECCION_GRUPO';
+  if (datos.docenteDictaClase) return 'CLASE';
+  return datos.esDirectorDeGrupo ? 'DIRECCION_GRUPO' : 'SEDE';
 }
 
 function exigirFechaDelHecho(fechaHecho: string): Date {
@@ -250,7 +255,7 @@ interface EstudianteResuelto {
 async function resolverEstudiantes(
   usuario: UserDocument,
   estudiantesIds: string[],
-  accion: 'REGISTRAR_OBSERVACION' | 'REGISTRAR_FALTA' | 'REPORTAR_A_COORDINACION',
+  accion: 'REGISTRAR_OBSERVACION' | 'REGISTRAR_FALTA',
   fecha: Date,
   anio: AcademicYearDocument
 ): Promise<EstudianteResuelto[]> {
@@ -517,14 +522,12 @@ export async function reportarSituacionGrave(input: ReporteUrgenteInput, usuario
     if (!esSituacionGrave(falta.gravedad)) throw new ApiError(400, 'Una falta Tipo I se registra como falta leve; el reporte a coordinación es para lo grave (Tipo II o III).');
   }
 
-  // Un docente nombra a cualquier estudiante de su sede (un incidente se presencia en el recreo, no en la clase): solo para que coordinación lo revise, sin antecedente.
-  const resueltos = await resolverEstudiantes(usuario, estudiantesIds, 'REPORTAR_A_COORDINACION', fecha, anio);
+  // El docente nombra a quien presenció, sea o no de sus grupos; si hay otros involucrados, los describe en los hechos y convivencia los agrega al abrir el caso.
+  const resueltos = await resolverEstudiantes(usuario, estudiantesIds, 'REGISTRAR_FALTA', fecha, anio);
   const primero = resueltos[0] as EstudianteResuelto;
   if (new Set(resueltos.map((r) => String(r.contexto.grupo.sede_id))).size > 1) {
     throw new ApiError(400, 'Los estudiantes de un mismo reporte deben ser de la misma sede: reporta aparte lo de cada sede.');
   }
-  // Queda dicho cuántos no eran de sus grupos: es lo que amplía este permiso y lo que conviene poder revisar.
-  const ajenos = usuario.rol === ROLES.DOCENTE ? resueltos.filter((r) => !r.contexto.datos.docenteDictaClase && !r.contexto.datos.esDirectorDeGrupo).length : 0;
 
   const solicitud = await SolicitudCaso.create({
     sede_id: primero.contexto.grupo.sede_id,
@@ -544,7 +547,7 @@ export async function reportarSituacionGrave(input: ReporteUrgenteInput, usuario
     solicitada_por: usuario._id,
   });
 
-  await registrarEvento({ usuario_id: usuario._id, accion: 'REPORTE_URGENTE_REGISTRADO', entidad: 'SolicitudCaso', entidad_id: solicitud._id, detalle: `${resueltos.length} estudiante(s)${ajenos > 0 ? `; ${ajenos} de grupos que no dicta ni dirige` : ''}`, ip });
+  await registrarEvento({ usuario_id: usuario._id, accion: 'REPORTE_URGENTE_REGISTRADO', entidad: 'SolicitudCaso', entidad_id: solicitud._id, detalle: `${resueltos.length} estudiante(s)`, ip });
   await avisarSolicitudDeCaso({ sedeId: primero.contexto.grupo.sede_id, urgente: true });
   return { _id: String(solicitud._id), estado: solicitud.estado, estudiantes: resueltos.length };
 }

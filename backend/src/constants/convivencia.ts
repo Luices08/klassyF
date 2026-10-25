@@ -10,7 +10,7 @@ export type TipoSituacion = (typeof TIPOS_SITUACION)[number];
 export const CLASES_REGISTRO = ['OBSERVACION', 'FALTA'] as const;
 export type ClaseRegistro = (typeof CLASES_REGISTRO)[number];
 
-export const CONTEXTOS_OBSERVACION = ['CLASE', 'DIRECCION_GRUPO', 'COORDINACION', 'ORIENTACION'] as const;
+export const CONTEXTOS_OBSERVACION = ['CLASE', 'DIRECCION_GRUPO', 'SEDE', 'COORDINACION', 'ORIENTACION'] as const;
 export type ContextoObservacion = (typeof CONTEXTOS_OBSERVACION)[number];
 
 export const ESTADOS_OBSERVACION = ['ACTIVA', 'ANULADA'] as const;

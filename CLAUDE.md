@@ -303,12 +303,13 @@ Reglas que no se ven leyendo un solo archivo:
   - **Observación** (lo cotidiano, Idea_Klassy M14): `tipo` (configurable), `descripcion` de los hechos (texto libre), `compromiso` (texto
     opcional), `version_estudiante` (lo que el estudiante manifestó, opcional), `requiere_citacion` (booleano) y `confidencial` (booleano). Se asienta de
     inmediato en el Observador y en el historial.
-  - **Falta Tipo I** (`POST /observaciones/faltas`, la registra el docente de clase o el titular de grupo, y convivencia): el docente elige una falta leve
+  - **Falta Tipo I** (`POST /observaciones/faltas`, la registra **cualquier docente de la sede** —no solo el que dicta o dirige ese grupo— y convivencia): el docente elige una falta leve
     del manual (`FaltaConvivencia`, M15) y los estudiantes que la cometieron (`estudiantes_ids`); queda en el Observador como antecedente pedagógico (hechos,
     versión del estudiante y compromiso opcionales). Si no se resolvió con la mediación del aula marca **«escalar a coordinación»**
     (`escalar_a_coordinacion`) y además llega una `SolicitudCaso`. **Una falta Tipo III no se registra por este endpoint** (400): siempre va por el reporte a coordinación (abajo). **Una Tipo II sí**, cuando el docente la resolvió él mismo o no fue tan grave (el interruptor «Enviar a coordinación de convivencia» del formulario, encendido por defecto): queda en el Observador **como una Tipo I** (sin solicitud; la ven completa el director de grupo y orientación y la familia, `esGraveEnTramite` = II/III **con** solicitud o caso) y cuenta como falta II en promoción; pedir `escalar_a_coordinacion` en una Tipo II responde 400 (para enviarla se usa el reporte).
     **En pantalla es un solo formulario, «Registrar falta»** (`FaltaDrawer`): el docente elige el **tipo** (I, II o III) y la **falta del manual** (ambos `SelectBuscable`: se buscan escribiendo; la falta se filtra
     por el tipo) y el formulario llama al endpoint que corresponde: Tipo I (con la casilla de escalar) y Tipo II resuelta → `/faltas`; Tipo II enviada y Tipo III → `/reportes-urgentes`.
+    **A quién se registra se elige en el mismo formulario** (`SelectorEstudiantesRegistro`, también en «Registrar observación»): grupo (de toda la sede) y estudiantes, o búsqueda por nombre; marcar antes a alguien en la tabla es opcional y solo precarga la selección.
   - **Falta grave, Tipo II o III** (`POST /observaciones/reportes-urgentes`, mismos roles que la falta; `GET .../mios` lista los propios, pestaña «Mis faltas graves»): el docente elige la
     falta del manual (`falta_id`, **opcional**: sin ella es una emergencia y llega sin tipificar) y cuenta **qué pasó, a quiénes nombra y qué contención aplicó** (obligatoria). Crea una `SolicitudCaso`
     con esa falta y su `gravedad` **como referencia** (`rol` null en cada involucrado: los asigna coordinación) y una **alerta crítica agrupada** (`REPORTE_URGENTE`) más punto rojo para ADMIN y
@@ -339,11 +340,12 @@ Reglas que no se ven leyendo un solo archivo:
 - **Buscador propio** (`GET /observaciones/estudiantes`, `/grupos`): acotado a los grupos del docente (CLASE o dirección) o a las sedes del
   coordinador/orientador. No se abre `/students` a convivencia.
   **Un incidente puede ser entre estudiantes de grupos o grados distintos**: la selección de la pantalla sobrevive al cambio de grupo y de búsqueda (chips «Seleccionados») y cada registro queda en el grupo de su estudiante. El
-  **Dos alcances distintos para el docente** (`permisoSobreEstudiante`): lo que **deja antecedente en el Observador** (observación, falta Tipo I, Tipo II resuelta) es solo de los grupos que dicta o dirige (otro estudiante es 404 y no se guarda nada a medias);
-  en cambio, **un reporte a coordinación** (Tipo II enviada o Tipo III, acción `REPORTAR_A_COORDINACION`) puede nombrar a **cualquier estudiante de su sede**, porque un incidente se presencia en el recreo y no en la clase. Para encontrarlo, el
-  buscador acepta `?ambito=sede` (solo rol DOCENTE): **solo por nombre (mínimo 3 letras; nunca lista un grupo completo), sin devolver el documento, solo de las sedes del docente**, y nombrar a alguien no da acceso a su Observador ni a su historial. Un reporte no mezcla
-  sedes (400). **La auditoría está en el reporte, no en cada búsqueda**: `REPORTE_URGENTE_REGISTRADO` anota cuántos de los estudiantes nombrados eran de grupos que el docente no dicta ni dirige. Coordinación abre el caso con estudiantes de cualquier grupo de su sede
-  (`tests/integracion/incidenteEntreGrupos.int.test.ts`).
+  **Quien ve algo lo registra** (decisión del usuario: p. ej. el docente que anota las llegadas tarde en la puerta, o el que presencia una pelea en el recreo): un DOCENTE registra observaciones y faltas (de cualquier tipo, incluido el reporte grave)
+  sobre **cualquier estudiante de las sedes que tiene asignadas**, dicte o no en su grupo (`permisoSobreEstudiante`; el de otra sede recibe 404 y no se guarda nada a medias). El registro queda con el contexto `SEDE` («Docente de la sede») en vez de `CLASE`/`DIRECCION_GRUPO`.
+  **Lo que no cambia:** consultar el historial del estudiante y el estado de su caso sigue siendo solo del **director de su grupo**, y el docente ve en el buscador el **documento solo de los estudiantes de sus grupos** (de los demás, nombre y grupo; `gruposPropiosDelDocente`).
+  **M16 conserva su alcance anterior:** su buscador reusa `gruposAccesibles`/`buscarEstudiantes` con `soloVinculo = true`, así que allí el docente sigue viendo solo los grupos que dicta o dirige. Un reporte grave no mezcla sedes (400).
+  **Un incidente puede ser entre estudiantes de grupos o grados distintos**: la selección sobrevive al cambio de grupo y de búsqueda (chips «Seleccionados») y cada registro queda en el grupo de su estudiante. Coordinación abre el caso con
+  estudiantes de cualquier grupo de su sede (`tests/integracion/incidenteEntreGrupos.int.test.ts`).
 - **Se audita también la lectura** (`CONVIVENCIA_HISTORIAL_CONSULTADO`, `..._OBSERVACIONES_PROPIAS_CONSULTADAS`). El `detalle` de la auditoría
   nunca lleva contenido (ni el motivo de una anulación, que queda en el registro).
 - **Seguimiento** (embebido en `Observacion`): `seguimientos[]` (notas), `compromiso_estado` (PENDIENTE → CUMPLIDO/INCUMPLIDO; "vencido" no es un
@@ -461,7 +463,7 @@ Backend `/inclusion` (modelos `SolicitudApoyo`, `ExpedienteInclusion`, `AjusteAs
   recomendaciones, pautas de evaluación, una «alerta de seguridad» opcional escrita por orientación) y edita **solo la asignatura que dicta**; el director
   de grupo ve los ajustes de todas las de su grupo y edita las dimensiones transversales. **Ningún docente ve la modalidad (PIAR/plan) ni la categoría SIMAT**
   (revelarían la condición). SECRETARIA, COORDINADOR_CONVIVENCIA, ACUDIENTE y ESTUDIANTE no tienen acceso (acudiente: M27). «No existe» = «no autorizado» = 404.
-  El buscador reusa el de convivencia (`gruposAccesibles`/`buscarEstudiantes`); no se abre `/students`.
+  El buscador reusa el de convivencia (`gruposAccesibles`/`buscarEstudiantes` con `soloVinculo`: el docente solo ve los grupos que dicta o dirige); no se abre `/students`.
 - **Datos sensibles (Ley 1581/1098).** Sin la **autorización específica del responsable legal** (`consentimiento`, propia de M16, distinta de la de salud de
   M03) no se guarda nada clínico, no se inicia la construcción ni se emite ningún documento; revocarla lo bloquea de nuevo. EPS y régimen **se leen de M03**
   dentro del expediente abierto (nunca se copian al expediente). Los soportes clínicos van a `uploads/inclusion/<expediente>/` (firma de bytes, 5 MB), solo se

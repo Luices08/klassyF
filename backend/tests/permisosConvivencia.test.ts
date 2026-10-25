@@ -106,19 +106,12 @@ describe('permisoSobreEstudiante', () => {
     ]);
   });
 
-  it('reportar a coordinación lo puede cualquier docente de la sede del estudiante, no uno de otra sede', () => {
-    expect(permisoSobreEstudiante(usuario('DOCENTE'), estudiante(), 'REPORTAR_A_COORDINACION')).toBe(true);
-    expect(permisoSobreEstudiante(usuario('DOCENTE', ['s2']), estudiante(), 'REPORTAR_A_COORDINACION')).toBe(false);
-    expect(permisoSobreEstudiante(usuario('COORDINADOR_CONVIVENCIA'), estudiante(), 'REPORTAR_A_COORDINACION')).toBe(true);
-    // Lo que deja antecedente en el Observador sigue siendo solo de quien dicta o dirige el grupo.
-    expect(permisoSobreEstudiante(usuario('DOCENTE'), estudiante(), 'REGISTRAR_FALTA')).toBe(false);
-    for (const rol of ['ORIENTADOR', 'COORDINADOR', 'SECRETARIA'] as const) {
-      expect(permisoSobreEstudiante(usuario(rol), estudiante(), 'REPORTAR_A_COORDINACION'), rol).toBe(false);
-    }
-  });
-
-  it('un docente sin relación con el estudiante no registra', () => {
-    expect(permisoSobreEstudiante(usuario('DOCENTE'), estudiante(), 'REGISTRAR_OBSERVACION')).toBe(false);
+  it('un docente de la sede registra sobre cualquier estudiante de la sede, aunque no le dicte ni dirija su grupo; el de otra sede no', () => {
+    const sinRelacion = permitidas(usuario('DOCENTE'), estudiante());
+    expect(sinRelacion).toEqual(['REGISTRAR_OBSERVACION', 'REGISTRAR_FALTA', 'CONSULTAR_OBSERVACIONES_PROPIAS']);
+    // Ver el historial del estudiante sigue siendo solo de su director de grupo.
+    expect(sinRelacion).not.toContain('CONSULTAR_HISTORIAL');
+    expect(permitidas(usuario('DOCENTE', ['s2']), estudiante())).toEqual(['CONSULTAR_OBSERVACIONES_PROPIAS']);
   });
 
   it('el director de grupo ve el historial y el estado del caso, pero no gestiona', () => {

@@ -14,7 +14,7 @@ import { ROLES } from '../constants/roles';
 import AcademicYear from '../models/academicYear.model';
 import CasoConvivencia, { CasoConvivenciaDocument } from '../models/casoConvivencia.model';
 import { SesionComite } from '../models/comiteConvivencia.model';
-import { MedidaConvivencia, ProtocoloConvivencia } from '../models/catalogosCaso.model';
+import { EntidadExterna, MedidaConvivencia, ProtocoloConvivencia } from '../models/catalogosCaso.model';
 import Citacion from '../models/citacion.model';
 import Counter from '../models/counter.model';
 import FaltaConvivencia from '../models/faltaConvivencia.model';
@@ -397,7 +397,7 @@ export interface DatosRegistroCaso {
   // medidas de protección
   descripcion?: string;
   // remisiones
-  entidad?: string;
+  entidad_id?: string;
   oficio?: string;
   funcionario?: string;
   respuesta?: string;
@@ -436,10 +436,11 @@ export async function agregarRegistroCaso(id: string, coleccion: ColeccionRegist
       caso.medidas_proteccion.push({ descripcion: (d.descripcion ?? '').trim(), fecha, por });
       break;
     case 'remisiones': {
-      const entidad = (d.entidad ?? '').trim();
-      if (entidad.length < 2) throw new ApiError(400, 'Indica la entidad a la que se remitió el caso.');
+      const entidad = await EntidadExterna.findOne({ _id: d.entidad_id, estado: { $ne: 'inactivo' } });
+      if (!entidad) throw new ApiError(400, 'La entidad no existe o está inactiva.');
       caso.remisiones.push({
-        entidad_nombre: entidad,
+        entidad_id: entidad._id,
+        entidad_nombre: entidad.nombre,
         fecha,
         oficio: (d.oficio ?? '').trim(),
         funcionario: (d.funcionario ?? '').trim(),

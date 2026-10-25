@@ -360,9 +360,9 @@ Reglas que no se ven leyendo un solo archivo:
 
 ### M15 (Comité de Convivencia Escolar) — estado: casos, comité y actas completos
 
-Backend `/convivencia` (modelos `CasoConvivencia`, `MedidaConvivencia`, `ProtocoloConvivencia`), frontend
+Backend `/convivencia` (modelos `CasoConvivencia`, `MedidaConvivencia`, `EntidadExterna`, `ProtocoloConvivencia`), frontend
 `CasosConvivenciaPage` (`/convivencia/casos`, la lista) y `CasoConvivenciaPage` (`/convivencia/casos/:id`, **el caso en su propia página**, no en un drawer: historia por pestañas a la izquierda y resumen con las acciones a la derecha; cada acción abre un solo formulario lateral sobre la página, nunca uno sobre otro; la abren «Abrir» y los casos con alerta de la lista, y «Abrir caso» de las solicitudes), `SolicitudesCasoPage` (`/convivencia/solicitudes`, abre caso desde la solicitud que envió el docente) y
-las pestañas Faltas / Medidas / Protocolos / Plazos de `CatalogoConvivenciaPage`. Modelos nuevos: `FaltaConvivencia`, `SolicitudCaso`. Reglas que no se ven leyendo un solo archivo:
+las pestañas Faltas / Medidas / Entidades / Protocolos / Plazos de `CatalogoConvivenciaPage`. Modelos nuevos: `FaltaConvivencia`, `SolicitudCaso`. Reglas que no se ven leyendo un solo archivo:
 
 - **Solo convivencia ve un caso**: ADMIN y el `COORDINADOR_CONVIVENCIA` de la sede del caso (ni coordinador académico, ni secretaría, ni
   docente). "No existe" y "no autorizado" son el mismo 404. Quien se declara impedido (o un ADMIN lo aparta) por conflicto de interés
@@ -390,7 +390,7 @@ las pestañas Faltas / Medidas / Protocolos / Plazos de `CatalogoConvivenciaPage
   resultado, remisión (REMITIDO) o decisión + medida (MEDIDA_APLICADA). **La decisión y cualquier medida aplicada exigen descargos previos** (presunción de inocencia). Un
   paso obligatorio del protocolo solo se marca «No aplica» con una justificación escrita (400 si falta). `GET /convivencia/casos` filtra también por parte del
   `codigo` (el selector de casos del comité lo usa: trae hasta 50 y para uno más antiguo se busca por código). Reabrir y anular son solo ADMIN con motivo (anular solo un caso recién ABIERTO y devuelve su solicitud a PENDIENTE).
-- **La remisión a otra entidad es solo un registro** (`remisiones[]` del caso, `POST /convivencia/casos/:id/registros/remisiones`): la **entidad se escribe** (ICBF, Policía de Infancia y Adolescencia, Comisaría de Familia, EPS…; el formulario sugiere las comunes con un `datalist`, `lib/entidadesRemision.ts`), con fecha, número de oficio, funcionario que recibe y la respuesta. **No hay catálogo de entidades** (se retiró `EntidadExterna`, su CRUD y su pestaña: era sobreingeniería; la colección vieja `entidadexternas` queda sin uso en las bases anteriores). El tipo III sigue exigiendo remisión o justificación escrita para cerrar y da alerta pasado `plazo_remision_tipo_iii_horas`.
+- **Remisión a otra entidad = un registro, sin exigir de más** (`remisiones[]`, `POST /convivencia/casos/:id/registros/remisiones`): solo son obligatorias la **entidad** (de la pestaña «Entidades de remisión», que cada colegio define) y la **fecha**; el número de oficio, el funcionario que recibe y la respuesta son **opcionales** (a un colegio se le puede olvidar preguntar quién recibió, y eso no debe frenar el registro). El tipo III sigue exigiendo remisión o justificación escrita para cerrar.
 - **Consecutivo anual sin huecos** (`CC-<año>-0001`): `Counter` dentro de la misma transacción de la apertura; si falla, no se consume.
   Un caso **no se bloquea** al cerrar el año lectivo (RN-15-09); abrir sí exige el año EN_CURSO. Un mismo hecho con varios estudiantes es un
   caso con varios involucrados (el permiso se comprueba por estudiante).

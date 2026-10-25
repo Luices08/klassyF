@@ -1,6 +1,6 @@
 import { type FormEvent, useState } from 'react';
 import { CargaFaltasDrawer } from '../../components/convivencia/CargaFaltasDrawer';
-import { MedidasTab, ProtocolosTab } from '../../components/convivencia/CatalogosCasoTabs';
+import { EntidadesTab, MedidasTab, ProtocolosTab } from '../../components/convivencia/CatalogosCasoTabs';
 import { useAuth } from '../../context/AuthContext';
 import { useCambiarEstadoFalta, useEliminarFalta, useGuardarFalta } from '../../hooks/useCasos';
 import { useInformeRetencion } from '../../hooks/useComite';
@@ -80,6 +80,7 @@ export function CatalogoConvivenciaPage() {
           { key: 'tipos', label: 'Tipos de observación' },
           { key: 'faltas', label: 'Faltas del manual' },
           { key: 'medidas', label: 'Medidas' },
+          { key: 'entidades', label: 'Entidades de remisión' },
           { key: 'protocolos', label: 'Protocolos' },
           { key: 'politica', label: 'Plazos' },
         ]}
@@ -101,6 +102,9 @@ export function CatalogoConvivenciaPage() {
       )}
       <TabPanel active={tab} tabKey="medidas">
         <MedidasTab />
+      </TabPanel>
+      <TabPanel active={tab} tabKey="entidades">
+        <EntidadesTab />
       </TabPanel>
       <TabPanel active={tab} tabKey="protocolos">
         <ProtocolosTab />

@@ -79,6 +79,20 @@ export const descartarSolicitud = catchAsync<IdParams, unknown, { motivo: string
   res.status(200).json({ success: true, data: await solicitudService.descartarSolicitud(req.params.id, req.body.motivo, req.user!, req.ip) });
 });
 
+export const crearEntidad = catchAsync<unknown, unknown, catalogoService.DatosEntidad>(async (req, res) => {
+  res.status(201).json({ success: true, data: await catalogoService.crearEntidad(req.body, actor(req)) });
+});
+export const actualizarEntidad = catchAsync<IdParams, unknown, Partial<catalogoService.DatosEntidad>>(async (req, res) => {
+  res.status(200).json({ success: true, data: await catalogoService.actualizarEntidad(req.params.id, req.body, actor(req)) });
+});
+export const cambiarEstadoEntidad = catchAsync<IdParams, unknown, { estado: EstadoUsuario }>(async (req, res) => {
+  res.status(200).json({ success: true, data: await catalogoService.cambiarEstadoEntidad(req.params.id, req.body.estado, actor(req)) });
+});
+export const eliminarEntidad = catchAsync<IdParams>(async (req, res) => {
+  await catalogoService.eliminarEntidad(req.params.id, actor(req));
+  res.status(200).json({ success: true });
+});
+
 export const guardarProtocolo = catchAsync<{ tipo: TipoSituacion } & ParamsDictionary, unknown, { pasos: { nombre: string; obligatorio: boolean }[] }>(
   async (req, res) => {
     res.status(200).json({ success: true, data: await catalogoService.guardarProtocolo(req.params.tipo, req.body.pasos, actor(req)) });

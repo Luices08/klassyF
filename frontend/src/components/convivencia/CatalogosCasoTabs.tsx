@@ -15,6 +15,7 @@ import {
   useEliminarCatalogoCaso,
   useGuardarCatalogoCaso,
   useGuardarProtocolo,
+  type EntidadExterna,
   type MedidaConvivencia,
   type ProtocoloConvivencia,
   type RecursoCatalogoCaso,
@@ -22,7 +23,7 @@ import {
 import { TIPOS_SITUACION, type TipoSituacion } from '../../hooks/useObservaciones';
 import { PROTOCOLO_DECRETO_1965 } from '../../lib/protocoloDecreto1965';
 
-type ItemSimple = MedidaConvivencia;
+type ItemSimple = MedidaConvivencia | EntidadExterna;
 
 interface TabSimpleProps {
   recurso: RecursoCatalogoCaso;
@@ -160,6 +161,21 @@ export function MedidasTab() {
       subtitulo="Las de tu manual de convivencia: reparar el daño, trabajo social, taller, desescolarización…"
       nuevo="Nueva medida"
       items={catalogos.data?.medidas ?? []}
+    />
+  );
+}
+
+export function EntidadesTab() {
+  const catalogos = useCatalogosCaso(true);
+  if (catalogos.isLoading) return <Spinner />;
+  if (catalogos.isError) return <Alert tone="error">{errorMessage(catalogos.error)}</Alert>;
+  return (
+    <TabSimple
+      recurso="entidades"
+      titulo="Entidades de remisión"
+      subtitulo="A quién se remite un caso: ICBF, comisaría de familia, policía de infancia y adolescencia, salud…"
+      nuevo="Nueva entidad"
+      items={catalogos.data?.entidades ?? []}
     />
   );
 }

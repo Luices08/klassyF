@@ -2,7 +2,6 @@ import { type FormEvent, useState } from 'react';
 import { Alert, errorMessage } from '../ui/Alert';
 import { Drawer } from '../ui/Drawer';
 import { Input, Select, Textarea } from '../ui/Field';
-import { ENTIDADES_DE_REMISION } from '../../lib/entidadesRemision';
 import {
   CERRABLES,
   NOMBRES_ESTADO_CASO,
@@ -105,7 +104,7 @@ function Formulario({ caso, modo, esAdmin, paso, onClose }: Props & { modo: Modo
   const [proxima, setProxima] = useState('');
   const [parte, setParte] = useState<'ESTUDIANTE' | 'ACUDIENTE'>('ESTUDIANTE');
   const [estudianteId, setEstudianteId] = useState(caso.involucrados[0]?.student_id ?? '');
-  const [entidad, setEntidad] = useState('');
+  const [entidadId, setEntidadId] = useState('');
   const [funcionario, setFuncionario] = useState('');
   const [medidaId, setMedidaId] = useState('');
   const [dias, setDias] = useState('');
@@ -167,7 +166,7 @@ function Formulario({ caso, modo, esAdmin, paso, onClose }: Props & { modo: Modo
         await registro.mutateAsync({ id, coleccion: modo, fecha, descripcion: texto });
         break;
       case 'remisiones':
-        await registro.mutateAsync({ id, coleccion: modo, fecha, entidad, oficio: textoExtra, funcionario, respuesta: texto });
+        await registro.mutateAsync({ id, coleccion: modo, fecha, entidad_id: entidadId, oficio: textoExtra, funcionario, respuesta: texto });
         break;
       case 'medidas-aplicadas':
         await registro.mutateAsync({ id, coleccion: modo, fecha, medida_id: medidaId, dias: medida?.se_aplica_por_dias ? Number(dias) : undefined, observaciones: texto });
@@ -182,7 +181,7 @@ function Formulario({ caso, modo, esAdmin, paso, onClose }: Props & { modo: Modo
   const textoMinimo = TEXTO_OPCIONAL.includes(modo) ? 0 : modo === 'decision' ? 20 : modo === 'seguimientos' ? 3 : 5;
   const deshabilitar =
     texto.trim().length < textoMinimo ||
-    (modo === 'remisiones' && entidad.trim().length < 2) ||
+    (modo === 'remisiones' && !entidadId) ||
     (modo === 'medidas-aplicadas' && (!medidaId || (medida?.se_aplica_por_dias && !(Number(dias) > 0)))) ||
     (modo === 'tipo' && tiposDisponibles.length === 0) ||
     (modo === 'orientacion' && aRemitir.size === 0);
@@ -300,14 +299,16 @@ function Formulario({ caso, modo, esAdmin, paso, onClose }: Props & { modo: Modo
 
       {modo === 'remisiones' && (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <Input label="Entidad a la que se remite" list="entidades-de-remision" value={entidad} onChange={(e) => setEntidad(e.target.value)} maxLength={150} required />
-          <datalist id="entidades-de-remision">
-            {ENTIDADES_DE_REMISION.map((nombre) => (
-              <option key={nombre} value={nombre} />
+          <Select label="Entidad" value={entidadId} onChange={(e) => setEntidadId(e.target.value)} required>
+            <option value="">Elige una entidad</option>
+            {(catalogos.data?.entidades ?? []).map((en) => (
+              <option key={en._id} value={en._id}>
+                {en.nombre}
+              </option>
             ))}
-          </datalist>
-          <Input label="Número de oficio" value={textoExtra} onChange={(e) => setTextoExtra(e.target.value)} maxLength={120} />
-          <Input label="Funcionario que recibe" value={funcionario} onChange={(e) => setFuncionario(e.target.value)} maxLength={120} />
+          </Select>
+          <Input label="Número de oficio (opcional)" value={textoExtra} onChange={(e) => setTextoExtra(e.target.value)} maxLength={120} />
+          <Input label="Funcionario que recibe (opcional)" value={funcionario} onChange={(e) => setFuncionario(e.target.value)} maxLength={120} />
         </div>
       )}
 

@@ -29,7 +29,7 @@ const upload = multer({
 
 router.use(authenticate, checkRole(...CONVIVENCIA));
 
-// Catálogos del manual: medidas y protocolos por tipo de situación.
+// Catálogos del manual: medidas, entidades de remisión y protocolos por tipo de situación.
 router.get('/catalogos', validate(v.listarCatalogosCaso), ctrl.listarCatalogosCaso);
 router.post('/medidas', validate(v.crearMedida), ctrl.crearMedida);
 router.patch('/medidas/:id', validate(v.actualizarMedida), ctrl.actualizarMedida);
@@ -42,6 +42,10 @@ router.post('/faltas', validate(v.crearFalta), ctrl.crearFalta);
 router.patch('/faltas/:id', validate(v.actualizarFalta), ctrl.actualizarFalta);
 router.patch('/faltas/:id/estado', validate(v.cambiarEstadoCatalogoCaso), ctrl.cambiarEstadoFalta);
 router.delete('/faltas/:id', validate(v.eliminarCatalogoCaso), ctrl.eliminarFalta);
+router.post('/entidades', validate(v.crearEntidad), ctrl.crearEntidad);
+router.patch('/entidades/:id', validate(v.actualizarEntidad), ctrl.actualizarEntidad);
+router.patch('/entidades/:id/estado', validate(v.cambiarEstadoCatalogoCaso), ctrl.cambiarEstadoEntidad);
+router.delete('/entidades/:id', validate(v.eliminarCatalogoCaso), ctrl.eliminarEntidad);
 router.put('/protocolos/:tipo', validate(v.guardarProtocolo), ctrl.guardarProtocolo);
 
 // Lo que los docentes envían al registrar una falta Tipo II/III (o una Tipo I que remiten): se abre el caso desde aquí o se descarta.

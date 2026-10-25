@@ -30,6 +30,29 @@ const medidaSchema = new Schema<IMedidaConvivencia, Model<IMedidaConvivencia>>(
 medidaSchema.index({ institucion_id: 1, nombre: 1 }, { unique: true, collation: COLACION });
 export const MedidaConvivencia = model<IMedidaConvivencia>('MedidaConvivencia', medidaSchema);
 
+/** Entidad a la que se remite un caso (ICBF, comisaría de familia, policía de infancia y adolescencia, EPS…). */
+export interface IEntidadExterna {
+  institucion_id: Types.ObjectId;
+  nombre: string;
+  descripcion: string;
+  orden: number;
+  estado: EstadoUsuario;
+}
+export type EntidadExternaDocument = HydratedDocument<IEntidadExterna>;
+
+const entidadSchema = new Schema<IEntidadExterna, Model<IEntidadExterna>>(
+  {
+    institucion_id: { type: Schema.Types.ObjectId, ref: 'Institution', required: true },
+    nombre: { type: String, required: true, trim: true, maxlength: 150 },
+    descripcion: { type: String, default: '', trim: true, maxlength: 500 },
+    orden: { type: Number, default: 0 },
+    estado: { type: String, enum: ESTADOS_USUARIO, default: 'activo' },
+  },
+  { timestamps: true }
+);
+entidadSchema.index({ institucion_id: 1, nombre: 1 }, { unique: true, collation: COLACION });
+export const EntidadExterna = model<IEntidadExterna>('EntidadExterna', entidadSchema);
+
 /** Protocolo de un tipo de situación: lista ordenada de pasos que se copia al abrir (o escalar) un caso. */
 export interface IPasoProtocolo {
   nombre: string;

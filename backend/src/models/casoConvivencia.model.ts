@@ -86,7 +86,7 @@ export interface IMedidaProteccionCaso {
 }
 
 export interface IRemisionCaso {
-  /** ICBF, Policía de Infancia y Adolescencia, Comisaría de Familia, EPS…: se escribe, no se elige de un catálogo. */
+  entidad_id: Types.ObjectId;
   entidad_nombre: string;
   fecha: Date;
   oficio: string;
@@ -240,7 +240,8 @@ const medidaProteccionSchema = new Schema<IMedidaProteccionCaso>({
 });
 
 const remisionSchema = new Schema<IRemisionCaso>({
-  entidad_nombre: { type: String, required: true, trim: true, maxlength: 150 },
+  entidad_id: { type: Schema.Types.ObjectId, ref: 'EntidadExterna', required: true },
+  entidad_nombre: { type: String, required: true },
   fecha: { type: Date, required: true },
   oficio: { type: String, default: '', maxlength: 120 },
   funcionario: { type: String, default: '', maxlength: 120 },

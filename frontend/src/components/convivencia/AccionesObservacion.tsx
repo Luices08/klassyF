@@ -3,6 +3,7 @@ import { Button } from '../ui/Button';
 import { useAuth } from '../../context/AuthContext';
 import type { ObservacionVista } from '../../hooks/useObservaciones';
 import { AnularObservacionDrawer } from './AnularObservacionDrawer';
+import { EliminarObservacionDrawer } from './EliminarObservacionDrawer';
 import { ObservacionDrawer } from './ObservacionDrawer';
 import { SeguimientoObservacionDrawer, type ModoSeguimiento } from './SeguimientoObservacionDrawer';
 
@@ -11,12 +12,20 @@ export function AccionesObservacion({ observacion }: { observacion: ObservacionV
   const rol = useAuth().user?.rol;
   const [enmendando, setEnmendando] = useState(false);
   const [anulando, setAnulando] = useState(false);
+  const [eliminando, setEliminando] = useState(false);
   const [seguimiento, setSeguimiento] = useState<ModoSeguimiento | null>(null);
 
   if (observacion.estado !== 'ACTIVA' || observacion.reservada) return null;
   // Una falta ya remitida solo la corrige convivencia.
   const puedeCorregir = !observacion.solicitud_id || rol === 'ADMIN' || rol === 'COORDINADOR_CONVIVENCIA';
   const puedeCitar = observacion.requiere_citacion && !observacion.citacion_realizada;
+  // Sin usar = nada colgando del registro: solo así se ofrece eliminar (el servidor lo vuelve a comprobar, y también el plazo).
+  const sinUsar =
+    !observacion.solicitud_id &&
+    !observacion.caso &&
+    !observacion.citacion_realizada &&
+    !observacion.seguimientos?.length &&
+    (!observacion.compromiso_estado || observacion.compromiso_estado === 'PENDIENTE');
 
   return (
     <span className="flex flex-wrap justify-end gap-2">
@@ -33,6 +42,11 @@ export function AccionesObservacion({ observacion }: { observacion: ObservacionV
           <Button variant="soft-edit" className="px-3 py-1 text-xs" onClick={() => setEnmendando(true)}>
             Editar
           </Button>
+          {sinUsar && (
+            <Button variant="soft-danger" className="px-3 py-1 text-xs" onClick={() => setEliminando(true)}>
+              Eliminar
+            </Button>
+          )}
           <Button variant="soft-danger" className="px-3 py-1 text-xs" onClick={() => setAnulando(true)}>
             Anular
           </Button>
@@ -41,6 +55,7 @@ export function AccionesObservacion({ observacion }: { observacion: ObservacionV
 
       <ObservacionDrawer open={enmendando} onClose={() => setEnmendando(false)} observacion={observacion} />
       <AnularObservacionDrawer observacion={anulando ? observacion : null} onClose={() => setAnulando(false)} />
+      <EliminarObservacionDrawer observacion={eliminando ? observacion : null} onClose={() => setEliminando(false)} />
       <SeguimientoObservacionDrawer observacion={seguimiento ? observacion : null} modo={seguimiento ?? 'nota'} onClose={() => setSeguimiento(null)} />
     </span>
   );

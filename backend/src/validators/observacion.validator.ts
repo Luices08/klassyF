@@ -128,6 +128,8 @@ export const anularObservacion: ValidationSchema = {
   body: Joi.object({ motivo: Joi.string().trim().min(5).max(500).required() }),
 };
 
+export const eliminarObservacion: ValidationSchema = { params: Joi.object({ id: objectId.required() }) };
+
 // --- Seguimiento ---
 
 export const agregarSeguimiento: ValidationSchema = {

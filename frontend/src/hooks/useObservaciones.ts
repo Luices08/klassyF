@@ -388,6 +388,14 @@ export function useAnularObservacion() {
   });
 }
 
+export function useEliminarObservacion() {
+  const invalidar = useInvalidarObservaciones();
+  return useMutation({
+    mutationFn: (id: string) => api.delete<{ _id: string }>(`/observaciones/${id}`),
+    onSuccess: invalidar,
+  });
+}
+
 export function useAgregarSeguimiento() {
   const invalidar = useInvalidarObservaciones();
   return useMutation({

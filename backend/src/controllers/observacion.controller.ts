@@ -122,6 +122,10 @@ export const anularObservacion = catchAsync<IdParams, unknown, { motivo: string 
   res.status(200).json({ success: true, data: await observacionService.anularObservacion(req.params.id, req.body.motivo, req.user!, req.ip) });
 });
 
+export const eliminarObservacion = catchAsync<IdParams>(async (req, res) => {
+  res.status(200).json({ success: true, data: await observacionService.eliminarObservacion(req.params.id, req.user!, req.ip) });
+});
+
 // --- Seguimiento ---
 
 export const agregarSeguimiento = catchAsync<IdParams, unknown, { nota: string }>(async (req, res) => {

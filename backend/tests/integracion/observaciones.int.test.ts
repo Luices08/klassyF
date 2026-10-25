@@ -98,11 +98,11 @@ describe('M14 observaciones y faltas (con base de datos)', () => {
       expect(completa).toMatchObject({ compromiso: 'Entregará el taller el lunes.', compromiso_estado: 'PENDIENTE', requiere_citacion: true, citacion_realizada: null });
     });
 
-    it('la versión del estudiante se guarda con la observación y se puede enmendar', async () => {
+    it('la versión del estudiante se guarda con la observación y su autor la puede editar', async () => {
       const [obs] = await registrar(e.docenteDeClase, [id(e.estudiante)], { descripcion: 'Discusión en clase.', version_estudiante: 'Dice que le quitaron el cuaderno.' });
       expect(obs).toMatchObject({ clase: 'OBSERVACION', version_estudiante: 'Dice que le quitaron el cuaderno.' });
       const enmendada = await observaciones.enmendarObservacion(obs!._id, { version_estudiante: 'Dice que fue un malentendido.' }, e.docenteDeClase);
-      expect(enmendada).toMatchObject({ version_estudiante: 'Dice que fue un malentendido.', cantidad_enmiendas: 1 });
+      expect(enmendada).toMatchObject({ version_estudiante: 'Dice que fue un malentendido.', cantidad_enmiendas: 0 });
       const [sin] = await registrar(e.docenteDeClase, [id(e.estudiante)]);
       expect(sin).toMatchObject({ version_estudiante: '' });
     });
@@ -203,18 +203,61 @@ describe('M14 observaciones y faltas (con base de datos)', () => {
       await expect(observaciones.miObservador(e.docenteDeClase)).rejects.toMatchObject({ statusCode: 403 });
     });
 
-    it('enmendar conserva la versión anterior y el autor pierde el derecho pasado el plazo', async () => {
+    it('el autor que se corrige a tiempo solo actualiza; si edita otra persona o el registro ya se usó, queda la versión anterior; y pasado el plazo el autor pierde el derecho', async () => {
       const [obs] = await registrar(e.docenteDeClase, [id(e.estudiante)], { compromiso: 'Llevará el carné.' });
       const enmendada = await observaciones.enmendarObservacion(obs!._id, { descripcion: 'Texto corregido.', compromiso: '' }, e.docenteDeClase);
-      expect(enmendada).toMatchObject({ descripcion: 'Texto corregido.', compromiso: '', compromiso_estado: null, cantidad_enmiendas: 1 });
+      expect(enmendada).toMatchObject({ descripcion: 'Texto corregido.', compromiso: '', compromiso_estado: null, cantidad_enmiendas: 0 });
+      expect((await Observacion.findById(obs!._id))!.enmiendas).toHaveLength(0);
+
+      // Si edita coordinación, lo que había antes queda guardado.
+      await observaciones.enmendarObservacion(obs!._id, { descripcion: 'Ajuste de convivencia.' }, e.coordConvivencia);
       const guardada = await Observacion.findById(obs!._id);
-      expect(guardada!.enmiendas[0]).toMatchObject({ descripcion_anterior: 'Participa con respeto.', compromiso_anterior: 'Llevará el carné.' });
+      expect(guardada!.enmiendas).toHaveLength(1);
+      expect(guardada!.enmiendas[0]).toMatchObject({ descripcion_anterior: 'Texto corregido.', compromiso_anterior: '' });
+
+      // Y si el registro ya se usó (tiene seguimiento), tampoco el autor lo cambia sin dejar versión.
+      await observaciones.agregarSeguimiento(obs!._id, 'Se habló con la familia.', e.docenteDeClase);
+      await observaciones.enmendarObservacion(obs!._id, { descripcion: 'Otra precisión.' }, e.docenteDeClase);
+      expect((await Observacion.findById(obs!._id))!.enmiendas).toHaveLength(2);
 
       // `createdAt` es inmutable para Mongoose: se envejece el registro directamente en la colección.
       await Observacion.collection.updateOne({ _id: new Types.ObjectId(obs!._id) }, { $set: { createdAt: new Date(Date.now() - 100 * 3_600_000) } });
       await expect(observaciones.enmendarObservacion(obs!._id, { descripcion: 'Tarde.' }, e.docenteDeClase)).rejects.toMatchObject({ statusCode: 403 });
       await expect(observaciones.enmendarObservacion(obs!._id, { descripcion: 'Convivencia sí puede.' }, e.coordConvivencia)).resolves.toBeDefined();
       await expect(observaciones.enmendarObservacion(obs!._id, { descripcion: 'No es suyo.' }, e.docenteAjeno)).rejects.toMatchObject({ statusCode: 404 });
+    });
+
+    it('el autor elimina por completo un registro sin usar dentro del plazo y en la auditoría queda quién y cuándo', async () => {
+      const [obs] = await registrar(e.docenteDeClase, [id(e.estudiante)]);
+      await expect(observaciones.eliminarObservacion(obs!._id, e.docenteDeClase)).resolves.toMatchObject({ _id: obs!._id });
+      expect(await Observacion.countDocuments()).toBe(0);
+      expect((await historial(e.estudiante, e.coordConvivencia)).data).toHaveLength(0);
+      expect(await AuditLog.countDocuments({ accion: 'OBSERVACION_ELIMINADA', usuario_id: e.docenteDeClase._id })).toBe(1);
+      await expect(observaciones.eliminarObservacion(obs!._id, e.docenteDeClase)).rejects.toMatchObject({ statusCode: 404 });
+    });
+
+    it('no se elimina lo que ya se usó, lo anulado, lo de otro ni lo que pasó el plazo: en esos casos se anula', async () => {
+      // Con seguimiento.
+      const [conSeguimiento] = await registrar(e.docenteDeClase, [id(e.estudiante)]);
+      await observaciones.agregarSeguimiento(conSeguimiento!._id, 'Se habló con la familia.', e.docenteDeClase);
+      await expect(observaciones.eliminarObservacion(conSeguimiento!._id, e.docenteDeClase)).rejects.toMatchObject({ statusCode: 409 });
+      // Una falta escalada a coordinación: ya la recibió convivencia.
+      const { registros } = await registrarFalta(e.docenteDeClase, { escalar_a_coordinacion: true });
+      await expect(observaciones.eliminarObservacion(registros[0]!._id, e.coordConvivencia)).rejects.toMatchObject({ statusCode: 409 });
+      // Anulada.
+      const [anulada] = await registrar(e.docenteDeClase, [id(e.estudiante)]);
+      await observaciones.anularObservacion(anulada!._id, 'Estudiante equivocado.', e.docenteDeClase);
+      await expect(observaciones.eliminarObservacion(anulada!._id, e.docenteDeClase)).rejects.toMatchObject({ statusCode: 409 });
+      // De otro docente o de otra sede.
+      const [ajena] = await registrar(e.docenteDeClase, [id(e.estudiante)]);
+      await expect(observaciones.eliminarObservacion(ajena!._id, e.docenteAjeno)).rejects.toMatchObject({ statusCode: 404 });
+      await expect(observaciones.eliminarObservacion(ajena!._id, e.docenteOtraSede)).rejects.toMatchObject({ statusCode: 404 });
+      // Pasado el plazo: ni el autor ni coordinación; coordinación todavía puede anular.
+      await Observacion.collection.updateOne({ _id: new Types.ObjectId(ajena!._id) }, { $set: { createdAt: new Date(Date.now() - 100 * 3_600_000) } });
+      await expect(observaciones.eliminarObservacion(ajena!._id, e.docenteDeClase)).rejects.toMatchObject({ statusCode: 403 });
+      await expect(observaciones.eliminarObservacion(ajena!._id, e.coordConvivencia)).rejects.toMatchObject({ statusCode: 403, message: expect.stringMatching(/Venció el plazo para eliminar/) });
+      await expect(observaciones.anularObservacion(ajena!._id, 'Registro con error.', e.coordConvivencia)).resolves.toMatchObject({ estado: 'ANULADA' });
+      expect(await AuditLog.countDocuments({ accion: 'OBSERVACION_ELIMINADA' })).toBe(0);
     });
 
     it('una falta no admite campos de una observación (confidencialidad ni citación)', async () => {

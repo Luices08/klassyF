@@ -28,7 +28,7 @@ function Formulario({ observacion, onClose }: { observacion: ObservacionVista; o
     <Drawer
       open
       title="Anular observación"
-      subtitle="Una observación no se borra: queda marcada como anulada, con su motivo."
+      subtitle="Queda marcada como anulada, con su motivo, y deja de contar. Si fue un error reciente y sin usar, mejor elimínala."
       onClose={onClose}
       onSubmit={guardar}
       submitLabel="Anular observación"

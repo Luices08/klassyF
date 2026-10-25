@@ -43,6 +43,7 @@ router.get('/estudiantes/:studentId', checkRole(...REGISTRAN), validate(v.histor
 router.get('/:id', checkRole(...REGISTRAN), validate(v.obtenerObservacion), ctrl.obtenerObservacion);
 router.patch('/:id', checkRole(...REGISTRAN), validate(v.enmendarObservacion), ctrl.enmendarObservacion);
 router.patch('/:id/anular', checkRole(...REGISTRAN), validate(v.anularObservacion), ctrl.anularObservacion);
+router.delete('/:id', checkRole(...REGISTRAN), validate(v.eliminarObservacion), ctrl.eliminarObservacion);
 
 // Seguimiento: notas, cumplimiento del compromiso y citación realizada (solo registro; el envío de avisos es de M28).
 router.post('/:id/seguimientos', checkRole(...REGISTRAN), validate(v.agregarSeguimiento), ctrl.agregarSeguimiento);

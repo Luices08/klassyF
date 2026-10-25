@@ -805,6 +805,16 @@ async function cargarParaCorregir(
   return obs;
 }
 
+/**
+ * Un registro «sin usar» no tiene nada colgando de él: ni seguimiento, ni citación, ni compromiso resuelto, ni solicitud o caso en convivencia.
+ * Solo así se puede eliminar del todo, y solo así el autor lo edita sin dejar versión anterior.
+ */
+async function estaSinUsar(obs: ObservacionDocument): Promise<boolean> {
+  if (obs.solicitud_id || obs.seguimientos.length > 0 || obs.citacion_realizada) return false;
+  if (obs.compromiso_estado && obs.compromiso_estado !== 'PENDIENTE') return false;
+  return !(await CasoConvivencia.exists({ observacion_ids: obs._id }));
+}
+
 export interface EnmendarObservacionInput {
   descripcion?: string;
   compromiso?: string;
@@ -839,13 +849,17 @@ export async function enmendarObservacion(
   if (!descripcion) throw new ApiError(400, 'Describe los hechos.');
   const compromiso = input.compromiso !== undefined ? input.compromiso.trim() : obs.compromiso;
 
-  obs.enmiendas.push({
-    fecha: new Date(),
-    por: usuario._id,
-    descripcion_anterior: obs.descripcion,
-    compromiso_anterior: obs.compromiso,
-    version_estudiante_anterior: obs.version_estudiante,
-  });
+  // Quien se equivocó y se corrige a tiempo, antes de que el registro se use, solo lo actualiza; si lo edita otra persona o ya se usó, queda la versión anterior.
+  const sinVersion = esAutor(obs, usuario) && (await estaSinUsar(obs));
+  if (!sinVersion) {
+    obs.enmiendas.push({
+      fecha: new Date(),
+      por: usuario._id,
+      descripcion_anterior: obs.descripcion,
+      compromiso_anterior: obs.compromiso,
+      version_estudiante_anterior: obs.version_estudiante,
+    });
+  }
   obs.descripcion = descripcion;
   if (compromiso !== obs.compromiso) {
     obs.compromiso = compromiso;
@@ -870,6 +884,26 @@ export async function anularObservacion(id: string, motivo: string, usuario: Use
   // El motivo es texto libre: queda en el registro, no en la auditoría.
   await registrarEvento({ usuario_id: usuario._id, accion: 'OBSERVACION_ANULADA', entidad: 'Observacion', entidad_id: obs._id, ip });
   return vista(obs, 'COMPLETA');
+}
+
+/**
+ * Eliminar un registro por completo: para el error de digitación. Solo dentro del plazo y mientras no se haya usado; después, solo se anula con motivo
+ * (así lo que ya sirvió de base a un seguimiento o a un caso no desaparece). En la auditoría queda quién y cuándo, nunca el contenido.
+ */
+export async function eliminarObservacion(id: string, usuario: UserDocument, ip?: string | null) {
+  const obs = await cargarParaCorregir(id, usuario, (c) => c.plazo_anulacion_horas);
+  if (!(await estaSinUsar(obs))) {
+    throw new ApiError(409, 'El registro ya se usó (tiene seguimiento, citación, solicitud o caso): no se elimina, anúlalo con motivo.');
+  }
+  // El plazo corre para todos, también para coordinación: pasado el plazo, la salida es anular.
+  const configuracion = await obtenerConfiguracion();
+  if (!dentroDelPlazo(obs.createdAt, configuracion.plazo_anulacion_horas)) {
+    throw new ApiError(403, 'Venció el plazo para eliminar: anula el registro con su motivo.');
+  }
+  await obs.deleteOne();
+
+  await registrarEvento({ usuario_id: usuario._id, accion: 'OBSERVACION_ELIMINADA', entidad: 'Observacion', entidad_id: obs._id, ip });
+  return { _id: String(obs._id) };
 }
 
 // --- Seguimiento: cumplimiento del compromiso, citación realizada y notas ---

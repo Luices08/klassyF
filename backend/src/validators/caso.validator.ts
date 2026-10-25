@@ -38,14 +38,6 @@ const camposMedida = {
 export const crearMedida: ValidationSchema = { body: Joi.object({ ...camposMedida, nombre: camposMedida.nombre.required() }) };
 export const actualizarMedida: ValidationSchema = { params: idParam.params, body: Joi.object(camposMedida).min(1) };
 
-const camposEntidad = {
-  nombre: Joi.string().trim().max(150),
-  descripcion: Joi.string().trim().max(500).allow(''),
-  orden: Joi.number().integer().min(0),
-};
-export const crearEntidad: ValidationSchema = { body: Joi.object({ ...camposEntidad, nombre: camposEntidad.nombre.required() }) };
-export const actualizarEntidad: ValidationSchema = { params: idParam.params, body: Joi.object(camposEntidad).min(1) };
-
 export const cambiarEstadoCatalogoCaso: ValidationSchema = {
   params: idParam.params,
   body: Joi.object({ estado: Joi.string().valid(...ESTADOS_USUARIO).required() }),
@@ -162,7 +154,7 @@ const ESQUEMAS_REGISTRO: Record<string, Joi.ObjectSchema> = {
     descripcion: Joi.string().trim().min(5).max(1000).required(),
   }),
   remisiones: Joi.object({
-    entidad_id: objectId.required(),
+    entidad: Joi.string().trim().min(2).max(150).required(),
     fecha: fechaDeCalendario.required(),
     oficio: Joi.string().trim().max(120).allow(''),
     funcionario: Joi.string().trim().max(120).allow(''),

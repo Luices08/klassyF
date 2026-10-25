@@ -20,7 +20,6 @@ const comoCaso = (c: unknown) => c as Caso & { _id: string; codigo: string; orig
 
 describe('M15 casos de convivencia (con base de datos)', () => {
   let e: Escenario;
-  let entidadId: string;
   let medidaId: string;
   let medidaPorDiasId: string;
 
@@ -30,7 +29,6 @@ describe('M15 casos de convivencia (con base de datos)', () => {
     await limpiarBaseDeDatos();
     await CasoConvivencia.syncIndexes();
     e = await armarEscenario();
-    entidadId = String((await catalogosCaso.crearEntidad({ nombre: 'ICBF', descripcion: '', orden: 1 }, actor(e.admin)))._id);
     medidaId = String((await catalogosCaso.crearMedida({ nombre: 'Taller formativo', descripcion: '', se_aplica_por_dias: false, orden: 1 }, actor(e.admin)))._id);
     medidaPorDiasId = String((await catalogosCaso.crearMedida({ nombre: 'Desescolarización', descripcion: '', se_aplica_por_dias: true, orden: 2 }, actor(e.admin)))._id);
     await catalogosCaso.guardarProtocolo('I', [{ nombre: 'Diálogo con el estudiante', obligatorio: true }, { nombre: 'Mediación', obligatorio: false }], actor(e.admin));
@@ -192,7 +190,7 @@ describe('M15 casos de convivencia (con base de datos)', () => {
     await casos.agregarRegistroCaso(caso._id, 'notificaciones', { tipo: 'ACUDIENTES', fecha: hoy(), medio: 'LLAMADA', dirigida_a: 'Madre' }, e.coordConvivencia);
     await expect(cerrar()).rejects.toMatchObject({ statusCode: 409, message: expect.stringContaining('remisión') });
 
-    await casos.agregarRegistroCaso(caso._id, 'remisiones', { entidad_id: entidadId, fecha: hoy(), oficio: 'OF-12' }, e.coordConvivencia);
+    await casos.agregarRegistroCaso(caso._id, 'remisiones', { entidad: 'ICBF', fecha: hoy(), oficio: 'OF-12' }, e.coordConvivencia);
     expect(await cerrar()).toMatchObject({ estado: 'CERRADO' });
   });
 
@@ -200,7 +198,7 @@ describe('M15 casos de convivencia (con base de datos)', () => {
     const caso = await abrir(e.coordConvivencia, 'III');
     await avanzar(caso._id, 'EN_ATENCION');
     await expect(avanzar(caso._id, 'REMITIDO')).rejects.toMatchObject({ statusCode: 409 });
-    await casos.agregarRegistroCaso(caso._id, 'remisiones', { entidad_id: entidadId, fecha: hoy() }, e.coordConvivencia);
+    await casos.agregarRegistroCaso(caso._id, 'remisiones', { entidad: 'Comisaría de Familia', fecha: hoy(), funcionario: 'Dra. Pérez' }, e.coordConvivencia);
     expect(await avanzar(caso._id, 'REMITIDO')).toMatchObject({ estado: 'REMITIDO' });
     expect(await avanzar(caso._id, 'EN_SEGUIMIENTO')).toMatchObject({ estado: 'EN_SEGUIMIENTO' });
   });
@@ -380,11 +378,13 @@ describe('M15 casos de convivencia (con base de datos)', () => {
     expect(await AuditLog.countDocuments({ accion: 'CONVIVENCIA_CASO_CONSULTADO' })).toBe(2);
   });
 
-  it('los catálogos del caso no eliminan lo ya usado', async () => {
+  it('la remisión guarda la entidad que se escribió, con su oficio y el funcionario que recibe; sin entidad no se registra', async () => {
     const caso = await abrir();
     await avanzar(caso._id, 'EN_ATENCION');
-    await casos.agregarRegistroCaso(caso._id, 'remisiones', { entidad_id: entidadId, fecha: hoy() }, e.coordConvivencia);
-    await expect(catalogosCaso.eliminarEntidad(entidadId, actor(e.admin))).rejects.toMatchObject({ statusCode: 409 });
+    await casos.agregarRegistroCaso(caso._id, 'remisiones', { entidad: 'Comisaría de Familia', fecha: hoy(), funcionario: 'Dra. Pérez' }, e.coordConvivencia);
+    await expect(casos.agregarRegistroCaso(caso._id, 'remisiones', { fecha: hoy() }, e.coordConvivencia)).rejects.toMatchObject({ statusCode: 400 });
+    const guardado = await CasoConvivencia.findById(caso._id);
+    expect(guardado!.remisiones[0]).toMatchObject({ entidad_nombre: 'Comisaría de Familia', funcionario: 'Dra. Pérez' });
     await expect(catalogosCaso.eliminarMedida(medidaId, actor(e.admin))).resolves.toBeUndefined();
   });
 });

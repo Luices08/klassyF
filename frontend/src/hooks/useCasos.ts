@@ -132,14 +132,6 @@ export interface MedidaConvivencia {
   estado: EstadoActivo;
 }
 
-export interface EntidadExterna {
-  _id: string;
-  nombre: string;
-  descripcion: string;
-  orden: number;
-  estado: EstadoActivo;
-}
-
 export interface ProtocoloConvivencia {
   _id: string;
   tipo_situacion: TipoSituacion;
@@ -148,7 +140,6 @@ export interface ProtocoloConvivencia {
 
 export interface CatalogosCaso {
   medidas: MedidaConvivencia[];
-  entidades: EntidadExterna[];
   protocolos: ProtocoloConvivencia[];
 }
 
@@ -269,7 +260,7 @@ export function useAgregarRegistroCaso() {
 
 // --- Catálogos del caso ---
 
-export type RecursoCatalogoCaso = 'medidas' | 'entidades';
+export type RecursoCatalogoCaso = 'medidas';
 
 export function useGuardarCatalogoCaso() {
   const invalidar = useInvalidarCasos();

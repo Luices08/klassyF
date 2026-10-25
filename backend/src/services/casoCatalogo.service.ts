@@ -5,8 +5,6 @@ import FaltaConvivencia, { FaltaConvivenciaDocument } from '../models/faltaConvi
 import Observacion from '../models/observacion.model';
 import SolicitudCaso from '../models/solicitudCaso.model';
 import {
-  EntidadExterna,
-  EntidadExternaDocument,
   IPasoProtocolo,
   MedidaConvivencia,
   MedidaConvivenciaDocument,
@@ -26,20 +24,18 @@ import {
 
 export interface CatalogosCaso {
   medidas: MedidaConvivenciaDocument[];
-  entidades: EntidadExternaDocument[];
   protocolos: ProtocoloConvivenciaDocument[];
 }
 
-/** Medidas, entidades de remisión y protocolos de la institución; no hay datos de ejemplo: cada colegio define los suyos. */
+/** Medidas y protocolos de la institución; no hay datos de ejemplo: cada colegio define los suyos. */
 export async function listarCatalogosCaso(incluirInactivos: boolean): Promise<CatalogosCaso> {
   const institucion = await obtenerInstitucionConvivencia();
   const filtro = { institucion_id: institucion._id, ...(incluirInactivos ? {} : { estado: ESTADO_ACTIVO }) };
-  const [medidas, entidades, protocolos] = await Promise.all([
+  const [medidas, protocolos] = await Promise.all([
     MedidaConvivencia.find(filtro).sort({ orden: 1, nombre: 1 }),
-    EntidadExterna.find(filtro).sort({ orden: 1, nombre: 1 }),
     ProtocoloConvivencia.find({ institucion_id: institucion._id }).sort({ tipo_situacion: 1 }),
   ]);
-  return { medidas, entidades, protocolos };
+  return { medidas, protocolos };
 }
 
 // --- Faltas del manual (gravedad Tipo I, II o III) ---
@@ -143,52 +139,6 @@ export async function eliminarMedida(id: string, actor: ContextoActor): Promise<
   }
   await medida.deleteOne();
   await registrarCambio('CATALOGO_CONVIVENCIA_ELIMINADO', 'MedidaConvivencia', medida._id, medida.nombre, actor);
-}
-
-// --- Entidades externas ---
-
-export interface DatosEntidad {
-  nombre: string;
-  descripcion: string;
-  orden: number;
-}
-
-export async function crearEntidad(input: DatosEntidad, actor: ContextoActor): Promise<EntidadExternaDocument> {
-  const institucion = await obtenerInstitucionConvivencia();
-  const entidad = new EntidadExterna({ ...input, institucion_id: institucion._id });
-  try {
-    await entidad.save();
-  } catch (err) {
-    traducirDuplicado(err, mensajeDuplicado);
-  }
-  await registrarCambio('CATALOGO_CONVIVENCIA_CREADO', 'EntidadExterna', entidad._id, entidad.nombre, actor);
-  return entidad;
-}
-
-export async function actualizarEntidad(id: string, input: Partial<DatosEntidad>, actor: ContextoActor): Promise<EntidadExternaDocument> {
-  const entidad = await EntidadExterna.findById(id);
-  if (!entidad) throw new ApiError(404, 'Entidad no encontrada.');
-  entidad.set(input);
-  try {
-    await entidad.save();
-  } catch (err) {
-    traducirDuplicado(err, mensajeDuplicado);
-  }
-  await registrarCambio('CATALOGO_CONVIVENCIA_ACTUALIZADO', 'EntidadExterna', entidad._id, Object.keys(input).join(', '), actor);
-  return entidad;
-}
-
-export const cambiarEstadoEntidad = (id: string, estado: EstadoUsuario, actor: ContextoActor) =>
-  cambiarEstadoDe<EntidadExternaDocument>(EntidadExterna, 'EntidadExterna', id, estado, actor);
-
-export async function eliminarEntidad(id: string, actor: ContextoActor): Promise<void> {
-  const entidad = await EntidadExterna.findById(id);
-  if (!entidad) throw new ApiError(404, 'Entidad no encontrada.');
-  if (await CasoConvivencia.exists({ 'remisiones.entidad_id': entidad._id })) {
-    throw new ApiError(409, 'La entidad ya recibió remisiones: desactívala en lugar de eliminarla.');
-  }
-  await entidad.deleteOne();
-  await registrarCambio('CATALOGO_CONVIVENCIA_ELIMINADO', 'EntidadExterna', entidad._id, entidad.nombre, actor);
 }
 
 // --- Protocolos ---

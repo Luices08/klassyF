@@ -89,7 +89,7 @@ describe('M04: documentos de matrícula y paz y salvo de fin de año', () => {
       const matricula = await matricularAntiguo(e.estudiante);
       await expect(updateEnrollmentStatus(matricula._id, 'MATRICULADO_DEFINITIVO', undefined, { id: e.secretaria._id })).rejects.toMatchObject({
         statusCode: 409,
-        message: expect.stringMatching(/Documento de identidad del estudiante/),
+        message: expect.stringMatching(/Paz y salvo de fin de año/),
       });
     });
 
@@ -107,15 +107,16 @@ describe('M04: documentos de matrícula y paz y salvo de fin de año', () => {
     it('lista lo cargado y sin revisar, del más antiguo al más reciente, y deja de listar lo revisado', async () => {
       const a = await matricularAntiguo(e.estudiante);
       const b = await matricularAntiguo(e.otroEstudiante);
-      await cargarDocumento(String(a._id), 'FOTO', 'ruta/a.pdf', { id: e.secretaria._id, tipo: 'PERSONAL' });
-      await cargarDocumento(String(b._id), 'CARNE_EPS', 'ruta/b.pdf', { id: e.secretaria._id, tipo: 'PERSONAL' });
+      // Un antiguo ya solo trae el paz y salvo del año anterior (lo demás lo tiene el colegio).
+      await cargarDocumento(String(a._id), 'PAZ_Y_SALVO_ANIO_ANTERIOR', 'ruta/a.pdf', { id: e.secretaria._id, tipo: 'PERSONAL' });
+      await cargarDocumento(String(b._id), 'PAZ_Y_SALVO_ANIO_ANTERIOR', 'ruta/b.pdf', { id: e.secretaria._id, tipo: 'PERSONAL' });
 
       const antes = await listarDocumentosPorRevisar({ academic_year_id: anioSiguiente });
       expect(antes.total).toBe(2);
-      expect(antes.data.map((f) => f.tipo_documento)).toEqual(['FOTO', 'CARNE_EPS']);
+      expect(antes.data.map((f) => f.tipo_documento)).toEqual(['PAZ_Y_SALVO_ANIO_ANTERIOR', 'PAZ_Y_SALVO_ANIO_ANTERIOR']);
       expect(antes.data[0]).toMatchObject({ grupo: '701', nombre: e.estudiante.nombre });
 
-      await revisarDocumento(String(a._id), 'FOTO', { estado: 'APROBADO' }, { id: e.secretaria._id });
+      await revisarDocumento(String(a._id), 'PAZ_Y_SALVO_ANIO_ANTERIOR', { estado: 'APROBADO' }, { id: e.secretaria._id });
       expect((await listarDocumentosPorRevisar({ academic_year_id: anioSiguiente })).total).toBe(1);
     });
   });

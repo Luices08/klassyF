@@ -39,7 +39,14 @@ export interface RequisitoInicial {
   orden: number;
 }
 
-const INGRESO_NUEVO: TipoIngreso[] = ['NUEVO', 'TRASLADO'];
+export const INGRESO_NUEVO: TipoIngreso[] = ['NUEVO', 'TRASLADO'];
+
+/**
+ * Lo que el colegio ya tiene de quien estudió con él el año anterior: identidad, foto, EPS, documento del acudiente y el diagnóstico de inclusión se
+ * piden una vez, al ingresar. Un antiguo o repitente no los vuelve a entregar: en enero solo firma el libro de matrículas. Lo que sí se le verifica al
+ * antiguo es el paz y salvo del año anterior (lo aprueba el sistema si ya está confirmado) y, en preescolar, lo de salud, que cambia cada año.
+ */
+export const DOCUMENTOS_QUE_SOLO_PIDE_EL_INGRESO_NUEVO = ['DOCUMENTO_IDENTIDAD', 'FOTO', 'CARNE_EPS', 'DOCUMENTO_ACUDIENTE', 'DIAGNOSTICO_MEDICO_INCLUSION'] as const;
 const TODOS_LOS_NIVELES: NivelEducativo[] = ['PREESCOLAR', 'PRIMARIA', 'SECUNDARIA', 'MEDIA'];
 const BASICA_Y_MEDIA: NivelEducativo[] = ['PRIMARIA', 'SECUNDARIA', 'MEDIA'];
 
@@ -62,10 +69,10 @@ const base = (clave: string, orden: number, extra: Partial<RequisitoInicial> = {
  * `{grado_anterior}`, que se reemplaza por el número del grado anterior al matricular.
  */
 export const REQUISITOS_INICIALES: RequisitoInicial[] = [
-  base('DOCUMENTO_IDENTIDAD', 1),
-  base('FOTO', 2),
-  base('CARNE_EPS', 3),
-  base('DOCUMENTO_ACUDIENTE', 4),
+  base('DOCUMENTO_IDENTIDAD', 1, { tipos_ingreso: INGRESO_NUEVO }),
+  base('FOTO', 2, { tipos_ingreso: INGRESO_NUEVO }),
+  base('CARNE_EPS', 3, { tipos_ingreso: INGRESO_NUEVO }),
+  base('DOCUMENTO_ACUDIENTE', 4, { tipos_ingreso: INGRESO_NUEVO }),
   base('CARNE_VACUNAS', 10, { niveles: ['PREESCOLAR'], grados_numeros: [1, 2] }),
   base('CERTIFICADO_CRECIMIENTO_DESARROLLO', 11, { niveles: ['PREESCOLAR'] }),
   base('CERTIFICADO_AUDIOMETRIA_VISION', 12, { niveles: ['PREESCOLAR'] }),
@@ -75,7 +82,7 @@ export const REQUISITOS_INICIALES: RequisitoInicial[] = [
   base('PAZ_Y_SALVO_SIMAT', 31, { niveles: BASICA_Y_MEDIA, tipos_ingreso: INGRESO_NUEVO }),
   base('SERVICIO_SOCIAL_ESTUDIANTIL', 32, { grados_numeros: [11], tipos_ingreso: INGRESO_NUEVO }),
   base('PAZ_Y_SALVO_ANIO_ANTERIOR', 40, { niveles: TODOS_LOS_NIVELES, tipos_ingreso: ['ANTIGUO', 'REPITENTE'], aprobacion_automatica: 'PAZ_Y_SALVO_ANIO_ANTERIOR' }),
-  base('DIAGNOSTICO_MEDICO_INCLUSION', 50, { condicion_especial: 'CON_DISCAPACIDAD' }),
+  base('DIAGNOSTICO_MEDICO_INCLUSION', 50, { tipos_ingreso: INGRESO_NUEVO, condicion_especial: 'CON_DISCAPACIDAD' }),
   base('CUSTODIA_LEGAL_O_PODER', 60, { obligatorio: false, condicion_especial: 'ACUDIENTE_NO_PADRE_MADRE' }),
 ];
 

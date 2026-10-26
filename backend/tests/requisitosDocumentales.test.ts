@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { NIVELES_EDUCATIVOS, TIPOS_INGRESO } from '../src/constants/enums';
 import { generarChecklistMatricula } from '../src/constants/matriculaChecklist';
-import { REQUISITOS_INICIALES, categoriaInicial, indicacionInicial } from '../src/constants/requisitosDocumentales';
+import { DOCUMENTOS_QUE_SOLO_PIDE_EL_INGRESO_NUEVO, REQUISITOS_INICIALES, categoriaInicial, indicacionInicial } from '../src/constants/requisitosDocumentales';
 import { RequisitoDelCatalogo, seleccionarRequisitos } from '../src/utils/requisitosDocumentales';
 
 const catalogoInicial: RequisitoDelCatalogo[] = REQUISITOS_INICIALES.map((r) => ({ ...r, indicacion: indicacionInicial(r.clave), categoria: categoriaInicial(r.clave) }));
@@ -9,7 +9,11 @@ const catalogoInicial: RequisitoDelCatalogo[] = REQUISITOS_INICIALES.map((r) => 
 // Un nivel por grado, como el catálogo de grados: -2..-1 y 0 preescolar, 1..5 primaria, 6..9 secundaria, 10..11 media.
 const nivelDe = (n: number) => (n <= 0 ? 'PREESCOLAR' : n <= 5 ? 'PRIMARIA' : n <= 9 ? 'SECUNDARIA' : 'MEDIA') as (typeof NIVELES_EDUCATIVOS)[number];
 
-describe('el catálogo sembrado pide exactamente lo mismo que las reglas de siempre', () => {
+// Un antiguo o repitente ya no entrega lo que el colegio tiene (identidad, foto, EPS, documento del acudiente, diagnóstico): se le piden las reglas de
+// siempre menos esos documentos. Para el ingreso nuevo y el traslado nada cambió.
+const yaLoTieneElColegio = (tipo: string) => (DOCUMENTOS_QUE_SOLO_PIDE_EL_INGRESO_NUEVO as readonly string[]).includes(tipo);
+
+describe('el catálogo sembrado pide lo mismo que las reglas de siempre, salvo lo que el colegio ya tiene de sus antiguos', () => {
   const grados = [-2, -1, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11];
   for (const numero of grados) {
     for (const tipoIngreso of TIPOS_INGRESO) {
@@ -17,7 +21,10 @@ describe('el catálogo sembrado pide exactamente lo mismo que las reglas de siem
         for (const parentescoAcudiente of ['MADRE', 'PADRE', 'TUTOR_LEGAL', undefined]) {
           it(`grado ${numero} · ${tipoIngreso} · discapacidad ${tieneDiscapacidad} · ${parentescoAcudiente ?? 'sin acudiente'}`, () => {
             const contexto = { nivel: nivelDe(numero), numeroGrado: numero, tipoIngreso, tieneDiscapacidad, parentescoAcudiente };
-            const antes = generarChecklistMatricula(contexto).map((i) => ({ tipo: i.tipo_documento, obligatorio: i.obligatorio, nombre: i.nombre_personalizado }));
+            const esAntiguo = tipoIngreso === 'ANTIGUO' || tipoIngreso === 'REPITENTE';
+            const antes = generarChecklistMatricula(contexto)
+              .filter((i) => !esAntiguo || !yaLoTieneElColegio(i.tipo_documento))
+              .map((i) => ({ tipo: i.tipo_documento, obligatorio: i.obligatorio, nombre: i.nombre_personalizado }));
             const ahora = seleccionarRequisitos(catalogoInicial, contexto).map((i) => ({ tipo: i.tipo_documento, obligatorio: i.obligatorio, nombre: i.nombre_personalizado }));
             expect(ahora.map((i) => [i.tipo, i.obligatorio])).toEqual(antes.map((i) => [i.tipo, i.obligatorio]));
             // El nombre con el grado anterior es el de siempre, salvo el sufijo «(cierra la básica…)» de 10° (ahora el colegio lo puede escribir)
@@ -32,6 +39,35 @@ describe('el catálogo sembrado pide exactamente lo mismo que las reglas de siem
       }
     }
   }
+});
+
+describe('lo que se le pide a un antiguo', () => {
+  const pide = (numero: number, tipoIngreso: 'NUEVO' | 'ANTIGUO' | 'REPITENTE' | 'TRASLADO', extra: { tieneDiscapacidad?: boolean; parentescoAcudiente?: string } = {}) =>
+    seleccionarRequisitos(catalogoInicial, { nivel: nivelDe(numero), numeroGrado: numero, tipoIngreso, ...extra }).map((i) => i.tipo_documento);
+
+  it('en básica y media solo se le verifica el paz y salvo del año anterior: en enero firma el libro y nada más', () => {
+    for (const grado of [3, 5, 6, 9, 10, 11]) {
+      expect(pide(grado, 'ANTIGUO')).toEqual(['PAZ_Y_SALVO_ANIO_ANTERIOR']);
+      expect(pide(grado, 'REPITENTE')).toEqual(['PAZ_Y_SALVO_ANIO_ANTERIOR']);
+    }
+  });
+
+  it('aunque tenga discapacidad: el diagnóstico ya está en el sistema desde que ingresó', () => {
+    expect(pide(7, 'ANTIGUO', { tieneDiscapacidad: true })).toEqual(['PAZ_Y_SALVO_ANIO_ANTERIOR']);
+  });
+
+  it('lo de salud de preescolar y el carné de vacunas hasta 2° se siguen pidiendo (cambian cada año) y el colegio puede quitarlos del catálogo', () => {
+    expect(pide(1, 'ANTIGUO')).toEqual(['CARNE_VACUNAS', 'PAZ_Y_SALVO_ANIO_ANTERIOR']);
+    expect(pide(0, 'ANTIGUO')).toEqual(expect.arrayContaining(['PAZ_Y_SALVO_ANIO_ANTERIOR', 'CERTIFICADO_CRECIMIENTO_DESARROLLO', 'CERTIFICADO_AUDIOMETRIA_VISION']));
+    expect(pide(0, 'ANTIGUO')).not.toContain('DOCUMENTO_IDENTIDAD');
+  });
+
+  it('quien llega nuevo o por traslado entrega todo, como siempre', () => {
+    for (const tipo of ['NUEVO', 'TRASLADO'] as const) {
+      expect(pide(7, tipo)).toEqual(expect.arrayContaining(['DOCUMENTO_IDENTIDAD', 'FOTO', 'CARNE_EPS', 'DOCUMENTO_ACUDIENTE', 'CERTIFICADO_GRADO_ANTERIOR']));
+    }
+    expect(pide(7, 'NUEVO', { tieneDiscapacidad: true })).toContain('DIAGNOSTICO_MEDICO_INCLUSION');
+  });
 });
 
 describe('seleccionarRequisitos', () => {

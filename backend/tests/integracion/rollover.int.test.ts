@@ -177,7 +177,7 @@ describe('M19: rollover al año siguiente', () => {
     it('se puede procesar un solo grupo de origen; un grupo ajeno al año o a la sede elegida se rechaza', async () => {
       const plan = await simularRollover({ ...filtros(), group_id: n.grupoId }, e.admin);
       expect(plan.resumen.total).toBe(2);
-      const otro = await Group.create({ sede_id: (await Group.findById(n.grupoId))!.sede_id, academic_year_id: n.anioId, grade_id: (await Group.findById(n.grupoId))!.grade_id, nomenclatura: '602', max_capacity: 30 });
+      const otro = await Group.create({ sede_id: (await Group.findById(n.grupoId))!.sede_id, academic_year_id: n.anioId, grade_id: (await Group.findById(n.grupoId))!.grade_id, jornada_id: (await Group.findById(n.grupoId))!.jornada_id, nomenclatura: '602', max_capacity: 30 });
       expect((await simularRollover({ ...filtros(), group_id: String(otro._id) }, e.admin)).resumen.total).toBe(0);
       await expect(simularRollover({ ...filtros(), group_id: septimoId }, e.admin)).rejects.toMatchObject({ statusCode: 404 });
     });

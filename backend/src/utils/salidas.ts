@@ -22,13 +22,22 @@ export function hoyEnColombia(ahora: Date = new Date()): Date {
 }
 
 /**
+ * El día de la matrícula. Una fecha de calendario (medianoche UTC, como se guardan las de este sistema) se deja como está; el instante en que se formalizó
+ * (`new Date()`, UTC) se pasa al día de Colombia: después de las 7 p.m. el día UTC ya es el siguiente.
+ */
+function diaDeLaMatricula(fechaMatricula: Date): Date {
+  const esFechaDeCalendario = fechaMatricula.getTime() % MS_DIA === 0;
+  return esFechaDeCalendario ? aDiaDeCalendario(fechaMatricula) : hoyEnColombia(fechaMatricula);
+}
+
+/**
  * La fecha efectiva de la salida: no puede ser futura (la desvinculación es inmediata, no programada) ni anterior al día en que se
  * formalizó la matrícula. Devuelve el motivo del rechazo o null si es válida.
  */
 export function motivoFechaEfectivaInvalida(fecha: Date, fechaMatricula: Date, hoy: Date = hoyEnColombia()): string | null {
   if (Number.isNaN(fecha.getTime())) return 'La fecha efectiva no es una fecha válida.';
   if (fecha.getTime() > hoy.getTime()) return 'La fecha efectiva de la salida no puede ser futura: el estudiante se desvincula del aula desde que se registra.';
-  if (fecha.getTime() < aDiaDeCalendario(fechaMatricula).getTime()) return 'La fecha efectiva no puede ser anterior a la fecha de la matrícula.';
+  if (fecha.getTime() < diaDeLaMatricula(fechaMatricula).getTime()) return 'La fecha efectiva no puede ser anterior a la fecha de la matrícula.';
   return null;
 }
 

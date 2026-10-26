@@ -34,6 +34,12 @@ describe('fecha efectiva de la salida', () => {
     expect(motivoFechaEfectivaInvalida(dia('2026-01-20'), new Date('2026-01-20T15:30:00.000Z'), hoy)).toBeNull();
   });
 
+  it('una matrícula formalizada pasadas las 7 p.m. en Colombia (ya es el día siguiente en UTC) admite la salida de esa misma noche', () => {
+    const formalizada = new Date('2026-01-21T00:40:00.000Z'); // 19:40 del 20 de enero en Colombia
+    expect(motivoFechaEfectivaInvalida(dia('2026-01-20'), formalizada, hoy)).toBeNull();
+    expect(motivoFechaEfectivaInvalida(dia('2026-01-19'), formalizada, hoy)).toMatch(/anterior a la fecha de la matrícula/);
+  });
+
   it('normaliza a medianoche UTC', () => {
     expect(aDiaDeCalendario('2026-03-02').toISOString()).toBe('2026-03-02T00:00:00.000Z');
     expect(aDiaDeCalendario(new Date('2026-03-02T17:45:00.000Z')).toISOString()).toBe('2026-03-02T00:00:00.000Z');

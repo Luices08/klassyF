@@ -1,5 +1,5 @@
 import { HydratedDocument, Model, Schema, Types, model } from 'mongoose';
-import { Jornada, JORNADAS, TIPOS_DOCUMENTO, TipoDocumento } from '../constants/enums';
+import { Jornada, JORNADAS, PARENTESCOS, Parentesco, TIPOS_DOCUMENTO, TipoDocumento } from '../constants/enums';
 
 // M04 (Admisiones): solicitud publica de cupo, separada de Enrollment a
 // proposito — nadie sin autenticar debe poder crear cuentas de usuario ni
@@ -7,6 +7,18 @@ import { Jornada, JORNADAS, TIPOS_DOCUMENTO, TipoDocumento } from '../constants/
 // aprobarla, recien ahi se crea el User + Enrollment (PREINSCRITO).
 export const ESTADOS_SOLICITUD = ['PENDIENTE', 'EN_REVISION', 'APROBADA', 'RECHAZADA'] as const;
 export type EstadoSolicitud = (typeof ESTADOS_SOLICITUD)[number];
+
+/** Quién radicó la solicitud: la familia desde el sitio público o secretaría en el mostrador. */
+export const ORIGENES_SOLICITUD = ['PUBLICA', 'SECRETARIA'] as const;
+export type OrigenSolicitud = (typeof ORIGENES_SOLICITUD)[number];
+
+/** Un documento recibido con la solicitud (antes de que haya matrícula). El archivo vive en el disco; la API nunca devuelve su ruta. */
+export interface IDocumentoSolicitud {
+  tipo_documento: string;
+  archivo_path: string;
+  cargado_por: Types.ObjectId;
+  fecha_carga: Date;
+}
 
 export interface IAdmissionRequest {
   nombre_aspirante: string;
@@ -21,6 +33,10 @@ export interface IAdmissionRequest {
   acudiente_apellido: string;
   acudiente_telefono: string;
   acudiente_email: string;
+  /** Opcionales: la solicitud pública no los pide; secretaría sí los registra (con ellos se crea la ficha del acudiente y, más adelante, su acceso). */
+  acudiente_tipo_documento: TipoDocumento | null;
+  acudiente_numero_documento: string | null;
+  acudiente_parentesco: Parentesco | null;
   observaciones: string;
   /** Lo que la familia declara sobre apoyos o diagnósticos previos; al aprobar pasa a la bandeja de inclusión (M16). */
   apoyo_declarado: { motivo_declarado: string; aporta_soporte: boolean; observacion: string } | null;
@@ -30,12 +46,33 @@ export interface IAdmissionRequest {
   fecha_revision: Date | null;
   student_user_id: Types.ObjectId | null;
   enrollment_id: Types.ObjectId | null;
+  origen: OrigenSolicitud;
+  registrada_por: Types.ObjectId | null;
+  documentos: IDocumentoSolicitud[];
   createdAt: Date;
   updatedAt: Date;
 }
 
 export type AdmissionRequestDocument = HydratedDocument<IAdmissionRequest>;
 type AdmissionRequestModel = Model<IAdmissionRequest>;
+
+const documentoSolicitudSchema = new Schema<IDocumentoSolicitud>(
+  {
+    tipo_documento: { type: String, required: true, trim: true },
+    archivo_path: { type: String, required: true },
+    cargado_por: { type: Schema.Types.ObjectId, ref: 'User', required: true },
+    fecha_carga: { type: Date, required: true },
+  },
+  {
+    _id: false,
+    toJSON: {
+      transform: (_doc, ret) => {
+        delete (ret as { archivo_path?: string }).archivo_path;
+        return ret;
+      },
+    },
+  }
+);
 
 const admissionRequestSchema = new Schema<IAdmissionRequest, AdmissionRequestModel>(
   {
@@ -51,6 +88,9 @@ const admissionRequestSchema = new Schema<IAdmissionRequest, AdmissionRequestMod
     acudiente_apellido: { type: String, required: true, trim: true },
     acudiente_telefono: { type: String, required: true, trim: true },
     acudiente_email: { type: String, required: true, trim: true, lowercase: true },
+    acudiente_tipo_documento: { type: String, enum: [...TIPOS_DOCUMENTO, null], default: null },
+    acudiente_numero_documento: { type: String, trim: true, default: null },
+    acudiente_parentesco: { type: String, enum: [...PARENTESCOS, null], default: null },
     observaciones: { type: String, default: '', trim: true },
     apoyo_declarado: {
       type: new Schema(
@@ -69,6 +109,9 @@ const admissionRequestSchema = new Schema<IAdmissionRequest, AdmissionRequestMod
     fecha_revision: { type: Date, default: null },
     student_user_id: { type: Schema.Types.ObjectId, ref: 'User', default: null },
     enrollment_id: { type: Schema.Types.ObjectId, ref: 'Enrollment', default: null },
+    origen: { type: String, enum: ORIGENES_SOLICITUD, default: 'PUBLICA' },
+    registrada_por: { type: Schema.Types.ObjectId, ref: 'User', default: null },
+    documentos: { type: [documentoSolicitudSchema], default: [] },
   },
   { timestamps: true }
 );

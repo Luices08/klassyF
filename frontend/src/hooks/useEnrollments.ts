@@ -305,7 +305,7 @@ export interface DocumentoPrevisto {
 }
 
 /** Los documentos que se le pedirán al estudiante según el grado del grupo y su tipo de ingreso (mismo cálculo que al crear la matrícula). */
-export function useDocumentosPrevistos(params: { group_id?: string; tipo_ingreso: TipoIngreso; student_id?: string }) {
+export function useDocumentosPrevistos(params: { group_id?: string; /** Sin grupo (una inscripción): el grado del que se piden. */ grade_id?: string; tipo_ingreso: TipoIngreso; student_id?: string }) {
   return useQuery({
     queryKey: ['enrollments', 'documentos-previstos', params],
     queryFn: () => api.get<DocumentoPrevisto[]>('/enrollments/documentos-previstos', { ...params }),

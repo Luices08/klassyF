@@ -4,6 +4,7 @@ import type {
   AdmissionRequest,
   EstadoSolicitud,
   Jornada,
+  Parentesco,
   PreinscripcionDetalle,
   TipoDocumento,
   TipoDocumentoMatricula,
@@ -115,6 +116,48 @@ export function useAdmissionRequestsList(filter: AdmissionRequestsFilter) {
         { query: { ...filter } }
       ),
     select: (res) => ({ data: res.data, total: res.total, page: res.page, pages: res.pages }),
+  });
+}
+
+/** Inscripción en el mostrador: la misma solicitud, con el documento y el parentesco del acudiente. */
+export interface InscripcionInput extends SolicitarCupoInput {
+  acudiente_tipo_documento: TipoDocumento;
+  acudiente_numero_documento: string;
+  acudiente_parentesco?: Parentesco;
+}
+
+export function useRegistrarInscripcion() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: InscripcionInput) => api.post<AdmissionRequest>('/admission-requests', input),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['admission-requests'] });
+    },
+  });
+}
+
+/** Recibe (o reemplaza) un documento de la solicitud mientras esté en trámite. */
+export function useSubirDocumentoSolicitud() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, tipoDocumento, file }: { id: string; tipoDocumento: string; file: File }) => {
+      const formData = new FormData();
+      formData.append('file', file);
+      return api.upload<AdmissionRequest>(`/admission-requests/${id}/documentos/${tipoDocumento}`, formData);
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['admission-requests'] });
+    },
+  });
+}
+
+export function useQuitarDocumentoSolicitud() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, tipoDocumento }: { id: string; tipoDocumento: string }) => api.delete<AdmissionRequest>(`/admission-requests/${id}/documentos/${tipoDocumento}`),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['admission-requests'] });
+    },
   });
 }
 

@@ -9,7 +9,9 @@ import { IconButton } from '../../components/ui/IconButton';
 import { PageHeader } from '../../components/ui/PageHeader';
 import { Spinner } from '../../components/ui/Spinner';
 import { EmptyRow, Table, TableBody, TableHead, Td, Th } from '../../components/ui/Table';
-import { CheckCircleIcon, XCircleIcon } from '../../components/ui/icons';
+import { CheckCircleIcon, FileTextIcon, PlusIcon, XCircleIcon } from '../../components/ui/icons';
+import { InscripcionDrawer } from '../../components/admisiones/InscripcionDrawer';
+import { SolicitudDocumentosDrawer } from '../../components/admisiones/SolicitudDocumentosDrawer';
 import { useAnioDeTrabajo } from '../../hooks/useAniosLectivos';
 import {
   useAdmissionRequestsList,
@@ -41,6 +43,9 @@ export function AdmissionRequestsPage() {
   const listQuery = useAdmissionRequestsList(filter);
 
   const [aprobando, setAprobando] = useState<AdmissionRequest | null>(null);
+  const [inscribiendo, setInscribiendo] = useState(false);
+  // Se guarda el id y no la solicitud: al subir o quitar un documento la lista se refresca y el drawer muestra lo nuevo.
+  const [documentosDe, setDocumentosDe] = useState<string | null>(null);
   const [groupId, setGroupId] = useState('');
   const [fechaLimite, setFechaLimite] = useState('');
   const groupsQuery = useGroups({
@@ -84,7 +89,13 @@ export function AdmissionRequestsPage() {
     <div className="space-y-4">
       <PageHeader
         title="Admisiones"
-        subtitle="Solicitudes de cupo recibidas desde el sitio público (M04). Apruébalas para crear la matrícula, o recházalas con un motivo."
+        subtitle="Solicitudes de cupo que llegan por el sitio público o que se inscriben en el mostrador (M04). Apruébalas para crear la matrícula, o recházalas con un motivo."
+        action={
+          <Button onClick={() => setInscribiendo(true)}>
+            <PlusIcon className="h-4 w-4" />
+            Registrar inscripción
+          </Button>
+        }
       />
 
       <Card>
@@ -121,6 +132,7 @@ export function AdmissionRequestsPage() {
                 <Th>Documento</Th>
                 <Th>Grado deseado</Th>
                 <Th>Acudiente</Th>
+                <Th>Documentos</Th>
                 <Th>Fecha</Th>
                 <Th>Estado</Th>
                 <Th />
@@ -138,13 +150,19 @@ export function AdmissionRequestsPage() {
                     <Td>
                       {s.acudiente_nombre} {s.acudiente_apellido} · {s.acudiente_telefono}
                     </Td>
+                    <Td>{s.documentos?.length ? `${s.documentos.length} recibido${s.documentos.length === 1 ? '' : 's'}` : '—'}</Td>
                     <Td>{new Date(s.createdAt).toLocaleDateString()}</Td>
                     <Td>
-                      <Chip tone={ESTADO_TONE[s.estado]}>{s.estado}</Chip>
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        <Chip tone={ESTADO_TONE[s.estado]}>{s.estado}</Chip>
+                        {s.origen === 'SECRETARIA' && <Chip tone="neutral">Mostrador</Chip>}
+                      </div>
                     </Td>
                     <Td>
-                      {(s.estado === 'PENDIENTE' || s.estado === 'EN_REVISION') && (
-                        <div className="flex justify-end gap-2">
+                      <div className="flex justify-end gap-2">
+                        <IconButton tone="neutral" label="Documentos de la solicitud" icon={<FileTextIcon />} onClick={() => setDocumentosDe(s._id)} />
+                        {(s.estado === 'PENDIENTE' || s.estado === 'EN_REVISION') && (
+                          <>
                           <IconButton
                             tone="success"
                             label="Aprobar solicitud"
@@ -161,12 +179,13 @@ export function AdmissionRequestsPage() {
                             icon={<XCircleIcon />}
                             onClick={() => setRechazando(s)}
                           />
-                        </div>
-                      )}
+                          </>
+                        )}
+                      </div>
                     </Td>
                   </tr>
                 ))}
-                {paginaInfo.data.length === 0 && <EmptyRow colSpan={7}>Sin solicitudes.</EmptyRow>}
+                {paginaInfo.data.length === 0 && <EmptyRow colSpan={8}>Sin solicitudes.</EmptyRow>}
               </TableBody>
             </Table>
 
@@ -188,6 +207,9 @@ export function AdmissionRequestsPage() {
           </>
         )}
       </Card>
+
+      <InscripcionDrawer open={inscribiendo} onClose={() => setInscribiendo(false)} />
+      <SolicitudDocumentosDrawer solicitud={paginaInfo?.data.find((s) => s._id === documentosDe) ?? null} onClose={() => setDocumentosDe(null)} />
 
       <Drawer
         open={aprobando !== null}

@@ -1019,6 +1019,8 @@ export async function actualizarComentarioDocumento(
 
 export interface FiltroDocumentosPrevistos {
   group_id?: string;
+  /** Sin grupo (una inscripción todavía no lo tiene): el grado del que se piden los documentos. */
+  grade_id?: string;
   tipo_ingreso: TipoIngreso;
   student_id?: string;
 }
@@ -1043,6 +1045,12 @@ export async function listarDocumentosPrevistos(filtro: FiltroDocumentosPrevisto
         nivel = grade.nivel;
         numeroGrado = grade.numero;
       }
+    }
+  } else if (filtro.grade_id) {
+    const grade = await Grade.findById(filtro.grade_id);
+    if (grade) {
+      nivel = grade.nivel;
+      numeroGrado = grade.numero;
     }
   }
 

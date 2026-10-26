@@ -841,11 +841,18 @@ export interface AdmissionRequest {
   acudiente_apellido: string;
   acudiente_telefono: string;
   acudiente_email: string;
+  /** Los registra secretaría en la inscripción del mostrador; la solicitud pública no los trae. */
+  acudiente_tipo_documento?: TipoDocumento | null;
+  acudiente_numero_documento?: string | null;
+  acudiente_parentesco?: Parentesco | null;
   observaciones: string;
   estado: EstadoSolicitud;
   motivo_rechazo: string | null;
   student_user_id: string | null;
   enrollment_id: string | null;
+  origen?: 'PUBLICA' | 'SECRETARIA';
+  /** Documentos recibidos con la solicitud (la API nunca trae la ruta del archivo). */
+  documentos?: Array<{ tipo_documento: string; fecha_carga: string }>;
   createdAt: string;
 }
 

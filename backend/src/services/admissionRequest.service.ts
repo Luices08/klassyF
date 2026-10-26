@@ -1,5 +1,5 @@
 import { ClientSession, Types } from 'mongoose';
-import { Jornada, TipoDocumento } from '../constants/enums';
+import { EstadoDocumentoMatricula, Jornada, Parentesco, TipoDocumento } from '../constants/enums';
 import { DIAS_PLAZO_LEGALIZACION } from '../constants/matriculaChecklist';
 import { generarChecklistDesdeCatalogo } from './requisitoDocumental.service';
 import { ROLES } from '../constants/roles';
@@ -18,6 +18,7 @@ import { runTransaction } from '../utils/runTransaction';
 import { buscarMatriculaDePreinscripcion, construirDetalle, PreinscripcionDetalle } from './preinscripcionPublica.service';
 import { avisarSolicitudAdmision } from './notificacionesEventos.service';
 import { crearDesdeMatricula } from './solicitudApoyo.service';
+import { registrarEvento } from './audit.service';
 
 // Incluye APROBADA para que un aspirante ya admitido no pueda radicar una segunda solicitud
 // paralela (terminaria chocando con el numero_documento unico del User al aprobarla de nuevo).
@@ -40,8 +41,14 @@ export interface CrearSolicitudInput {
   apoyo_declarado?: { motivo_declarado: string; aporta_soporte?: boolean; observacion?: string };
 }
 
+/** Quién radica la solicitud: la familia (sitio público, el valor por defecto) o secretaría en el mostrador. */
+export interface OrigenDeSolicitud {
+  origen?: 'PUBLICA' | 'SECRETARIA';
+  registrada_por?: Types.ObjectId | string | null;
+}
+
 /** Solicitud publica (M04): sin autenticar, no crea cuentas ni consume cupos todavia. */
-export async function crearSolicitud(input: CrearSolicitudInput): Promise<AdmissionRequestDocument> {
+export async function crearSolicitud(input: CrearSolicitudInput, origen: OrigenDeSolicitud = {}): Promise<AdmissionRequestDocument> {
   const grado = await Grade.findOne({ _id: input.grado_deseado_id, estado: ESTADO_ACTIVO });
   if (!grado) throw new ApiError(400, 'El grado seleccionado no existe o no esta activo.');
 
@@ -58,8 +65,30 @@ export async function crearSolicitud(input: CrearSolicitudInput): Promise<Admiss
     );
   }
 
-  const solicitud = await AdmissionRequest.create({ ...input, estado: 'PENDIENTE' });
-  await avisarSolicitudAdmision();
+  const solicitud = await AdmissionRequest.create({ ...input, estado: 'PENDIENTE', origen: origen.origen ?? 'PUBLICA', registrada_por: origen.registrada_por ?? null });
+  // Quien la radica en el mostrador ya sabe que existe: el aviso a la bandeja es para las que llegan por el sitio público.
+  if ((origen.origen ?? 'PUBLICA') === 'PUBLICA') await avisarSolicitudAdmision();
+  return solicitud;
+}
+
+export interface RegistrarInscripcionInput extends CrearSolicitudInput {
+  /** Secretaría sí registra el documento del acudiente: con él se crea su ficha real (la solicitud pública solo trae su teléfono). */
+  acudiente_tipo_documento: TipoDocumento;
+  acudiente_numero_documento: string;
+  acudiente_parentesco?: Parentesco;
+}
+
+/**
+ * Inscripción en el mostrador (M04): secretaría o administración radican la misma solicitud que la familia radica por el sitio público, con el documento
+ * y el parentesco del acudiente. No crea cuenta, matrícula ni consume cupo: eso lo decide quien la revisa. Quien ya figura en el sistema (por su documento)
+ * no se inscribe de nuevo: se matricula desde «Matricular existente».
+ */
+export async function registrarInscripcion(input: RegistrarInscripcionInput, usuario: { id: Types.ObjectId | string }): Promise<AdmissionRequestDocument> {
+  if (await User.exists({ numero_documento: input.numero_documento })) {
+    throw new ApiError(409, 'Ya hay una persona registrada con ese documento. Si es un estudiante del colegio, matricúlalo desde «Matricular existente»; no se inscribe de nuevo.');
+  }
+  const solicitud = await crearSolicitud(input, { origen: 'SECRETARIA', registrada_por: usuario.id });
+  await registrarEvento({ usuario_id: usuario.id, accion: 'INSCRIPCION_REGISTRADA', entidad: 'AdmissionRequest', entidad_id: solicitud._id, detalle: `Inscripción en el mostrador: ${solicitud.nombre_aspirante} ${solicitud.apellido_aspirante}` });
   return solicitud;
 }
 
@@ -214,18 +243,22 @@ export async function aprobarSolicitud(
       { session }
     );
 
-    // Guardar o vincular datos del acudiente suministrados en la preinscripción (M03)
-    const docAcudiente = `TEL-${solicitud.acudiente_telefono.trim()}`;
+    // Guardar o vincular datos del acudiente suministrados en la preinscripción (M03). Si secretaría registró su documento se usa ese; si no (la solicitud
+    // pública no lo pide) la ficha lleva el teléfono como identificador provisional.
+    const documentoReal = solicitud.acudiente_numero_documento?.trim() || null;
+    const docAcudiente = documentoReal ?? `TEL-${solicitud.acudiente_telefono.trim()}`;
+    const parentescoAcudiente: Parentesco = solicitud.acudiente_parentesco ?? 'TUTOR_LEGAL';
     let guardian = await Guardian.findOne({
       $or: [
-        { numero_documento: docAcudiente },
+        ...(documentoReal ? [{ numero_documento: documentoReal }] : []),
+        { numero_documento: `TEL-${solicitud.acudiente_telefono.trim()}` },
         { email: solicitud.acudiente_email.trim().toLowerCase() },
       ],
     }).session(session);
 
     if (!guardian) {
       guardian = new Guardian({
-        tipo_documento: 'CC',
+        tipo_documento: solicitud.acudiente_tipo_documento ?? 'CC',
         numero_documento: docAcudiente,
         nombre: solicitud.acudiente_nombre.trim(),
         apellido: solicitud.acudiente_apellido.trim(),
@@ -247,7 +280,7 @@ export async function aprobarSolicitud(
           {
             student_id: student._id,
             guardian_id: guardian._id,
-            parentesco: 'TUTOR_LEGAL',
+            parentesco: parentescoAcudiente,
             es_principal: true,
             autorizado_retiro: true,
           },
@@ -260,21 +293,28 @@ export async function aprobarSolicitud(
       nivel: grade.nivel,
       numeroGrado: grade.numero,
       tipoIngreso: 'NUEVO',
-      parentescoAcudiente: 'TUTOR_LEGAL',
+      parentescoAcudiente,
     });
 
-    const checklist = itemsGenerados.map((item) => ({
-      tipo_documento: item.tipo_documento,
-      nombre_personalizado: item.nombre_personalizado ?? null,
-      indicacion: item.indicacion ?? null,
-      categoria: item.categoria ?? null,
-      obligatorio: item.obligatorio,
-      estado: 'PENDIENTE' as const,
-      archivo_path: null,
-      comentario: null,
-      fecha_carga: null,
-      revisado_por: null,
-    }));
+    // Lo que ya se recibió con la solicitud (la inscripción en el mostrador) pasa al checklist como CARGADO: queda por revisar, no se vuelve a pedir.
+    const recibidos = new Map(solicitud.documentos.map((d) => [d.tipo_documento, d]));
+    const checklist = itemsGenerados.map((item) => {
+      const recibido = recibidos.get(item.tipo_documento);
+      return {
+        tipo_documento: item.tipo_documento,
+        nombre_personalizado: item.nombre_personalizado ?? null,
+        indicacion: item.indicacion ?? null,
+        categoria: item.categoria ?? null,
+        obligatorio: item.obligatorio,
+        estado: (recibido ? 'CARGADO' : 'PENDIENTE') as EstadoDocumentoMatricula,
+        archivo_path: recibido?.archivo_path ?? null,
+        comentario: null,
+        fecha_carga: recibido?.fecha_carga ?? null,
+        revisado_por: null,
+        cargado_por_tipo: recibido ? ('PERSONAL' as const) : null,
+        cargado_por: recibido?.cargado_por ?? null,
+      };
+    });
 
     const [enrollment] = await Enrollment.create(
       [

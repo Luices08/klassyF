@@ -1,6 +1,6 @@
 import Joi from 'joi';
 import { ESTADOS_SOLICITUD } from '../models/admissionRequest.model';
-import { JORNADAS, TIPOS_DOCUMENTO } from '../constants/enums';
+import { JORNADAS, PARENTESCOS, TIPOS_DOCUMENTO } from '../constants/enums';
 import { ValidationSchema } from '../middlewares/validate.middleware';
 import { claveDocumento, objectId } from './common.validator';
 
@@ -27,6 +27,21 @@ export const crearSolicitud: ValidationSchema = {
       observacion: Joi.string().trim().allow('').max(2000),
     }),
   }),
+};
+
+// La inscripción en el mostrador es la misma solicitud, con lo que secretaría sí registra: el documento y el parentesco del acudiente.
+export const registrarInscripcion: ValidationSchema = {
+  body: (crearSolicitud.body as Joi.ObjectSchema).keys({
+    acudiente_tipo_documento: Joi.string()
+      .valid(...TIPOS_DOCUMENTO)
+      .required(),
+    acudiente_numero_documento: Joi.string().trim().min(3).max(20).required(),
+    acudiente_parentesco: Joi.string().valid(...PARENTESCOS),
+  }),
+};
+
+export const documentoDeSolicitud: ValidationSchema = {
+  params: Joi.object({ id: objectId.required(), tipoDocumento: claveDocumento.required() }),
 };
 
 export const consultarEstado: ValidationSchema = {

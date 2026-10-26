@@ -142,6 +142,8 @@ export const actualizarComentario: ValidationSchema = {
 export const listarDocumentosPrevistos: ValidationSchema = {
   query: Joi.object({
     group_id: objectId.allow('', null),
+    // Para quien aún no tiene grupo (una inscripción): los documentos de ese grado.
+    grade_id: objectId.allow('', null),
     tipo_ingreso: Joi.string()
       .valid(...TIPOS_INGRESO)
       .required(),

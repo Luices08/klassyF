@@ -23,6 +23,37 @@ export interface CreateEnrollmentInput {
   motivo_grado?: string;
 }
 
+/** Formaliza una matrícula preinscrita con la pregunta de «Nueva matrícula»: ¿el acudiente trae todos los documentos obligatorios? */
+export function useFormalizarMatricula() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, ...datos }: { id: string; trae_todos: boolean; fecha_limite_compromiso?: string }) => api.post<Enrollment>(`/enrollments/${id}/formalizar`, datos),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['enrollments'] });
+      void queryClient.invalidateQueries({ queryKey: ['groups'] });
+    },
+  });
+}
+
+export interface GrupoSugerido {
+  id: string;
+  nombre: string;
+  capacidad: number;
+  ocupados: number;
+  libres: number;
+  /** false si no quedó cupo en la sede y jornada de su renovación y se sugiere un grupo de otra. */
+  en_preferencia: boolean;
+}
+
+/** El grupo menos lleno del grado para matricular a alguien (sugerencia; secretaría elige). */
+export function useGrupoSugerido(anioId: string | undefined, gradeId: string | undefined, studentId?: string) {
+  return useQuery({
+    queryKey: ['enrollments', 'grupo-sugerido', anioId, gradeId, studentId ?? null],
+    queryFn: () => api.get<{ sugerido: GrupoSugerido | null; grupos_con_cupo: number }>('/enrollments/grupo-sugerido', { academic_year_id: anioId, grade_id: gradeId, student_id: studentId }),
+    enabled: Boolean(anioId && gradeId),
+  });
+}
+
 export function useCreateEnrollment() {
   const queryClient = useQueryClient();
   return useMutation({

@@ -68,6 +68,18 @@ export const updateStatus: ValidationSchema = {
   }),
 };
 
+export const formalizar: ValidationSchema = {
+  params: Joi.object({ id: objectId.required() }),
+  body: Joi.object({
+    trae_todos: Joi.boolean().required(),
+    fecha_limite_compromiso: Joi.date().allow(null),
+  }),
+};
+
+export const grupoSugerido: ValidationSchema = {
+  query: Joi.object({ academic_year_id: objectId.required(), grade_id: objectId.required(), student_id: objectId }),
+};
+
 export const cambiarGrupo: ValidationSchema = {
   params: Joi.object({ id: objectId.required() }),
   body: Joi.object({ group_id: objectId.required() }),

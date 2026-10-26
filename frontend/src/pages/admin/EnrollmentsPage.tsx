@@ -17,7 +17,8 @@ import { EyeIcon, PlusIcon, SearchIcon } from '../../components/ui/icons';
 import { useAuth } from '../../context/AuthContext';
 import { useAnioDeTrabajo } from '../../hooks/useAniosLectivos';
 import { useCampuses, useGrades, useJornadas } from '../../hooks/useCatalogs';
-import { useCreateEnrollment, useDocumentosPrevistos, useEnrollmentsList, useEstudiantesPorGrado, type EnrollmentsFilter } from '../../hooks/useEnrollments';
+import { useCreateEnrollment, useDocumentosPrevistos, useEnrollment, useEnrollmentsList, useEstudiantesPorGrado, useFormalizarMatricula, useGrupoSugerido, type EnrollmentsFilter } from '../../hooks/useEnrollments';
+import { useHojaDeVida } from '../../hooks/useStudents';
 import { useFoliatura } from '../../hooks/useFoliatura';
 import { useGroups } from '../../hooks/useGroups';
 import { useInstitution } from '../../hooks/useInstitution';
@@ -31,12 +32,14 @@ import {
   type TipoIngreso,
 } from '../../types/domain';
 import { DocumentosPrevistos, type TraeTodos } from '../../components/matriculas/DocumentosPrevistos';
+import { DocumentosDeLaPreinscrita } from '../../components/matriculas/DocumentosDeLaPreinscrita';
+import { hayObligatoriosPorAprobar } from '../../lib/documentosMatricula';
 import { InformacionApoyoCampos } from '../../components/inclusion/InformacionApoyoCampos';
 import { APOYO_VACIO, aApoyoDeclarado } from '../../lib/apoyoDeclarado';
 import { SelectBuscable } from '../../components/ui/SelectBuscable';
 import { opcionesDeGrupos } from '../../lib/opcionesBuscables';
 import { SelectorEstudianteMatricula } from '../../components/matriculas/SelectorEstudianteMatricula';
-import { admiteMatricula, type FiltroEstudiante } from '../../lib/situacionEstudiante';
+import { admiteMatricula, estaPorFormalizar, type FiltroEstudiante } from '../../lib/situacionEstudiante';
 import { MatriculaPorGrado } from '../../components/matriculas/MatriculaPorGrado';
 import { gradosOrdenados, tipoDeIngresoSugerido, veredictoDeGrado } from '../../lib/matriculaPorGrado';
 
@@ -146,7 +149,9 @@ export function EnrollmentsPage() {
   const estudianteElegido = studentsQuery.data?.find((e) => e._id === form.student_id);
   const esReingreso = estudianteElegido?.situacion === 'REINGRESO';
   // Matricular a quien ya está matriculado (o graduado / sin usuario activo) no se permite; el servidor lo rechaza igual.
-  const matriculaBloqueada = Boolean(estudianteElegido) && (!admiteMatricula(estudianteElegido!.situacion) || (esReingreso && !reingresoConfirmado));
+  // Quien ya tiene su matrícula preinscrita (cupo y grupo, sin folio) no se matricula de nuevo: aquí se formaliza.
+  const preinscrita = estudianteElegido && estaPorFormalizar(estudianteElegido) ? estudianteElegido.matricula : null;
+  const matriculaBloqueada = Boolean(estudianteElegido) && !preinscrita && (!admiteMatricula(estudianteElegido!.situacion) || (esReingreso && !reingresoConfirmado));
   // Solo grupos activos: uno CLOSED ya no admite nuevas matriculas (ver group.controller).
   const groupsQuery = useGroups({ academic_year_id: anioId, estado: 'ACTIVE' });
   const [gradoDelGrupo, setGradoDelGrupo] = useState('');
@@ -176,16 +181,25 @@ export function EnrollmentsPage() {
   const gradoEsperado = gradoAprobado
     ? grados.find((g) => g.numero === gradoAprobado.numero + 1)
     : grados.find((g) => g._id === ubicacionDelElegido?.esperado_grado_id);
+  // El grupo menos lleno del grado (el que se eligió o el que le toca por su historial); con su renovación, en su sede y jornada.
+  const gradoParaSugerir = gradoDelGrupo || ubicacionDelElegido?.esperado_grado_id || '';
+  const sugerencia = useGrupoSugerido(anioId, preinscrita ? undefined : gradoParaSugerir || undefined, form.student_id || undefined);
   const createEnrollment = useCreateEnrollment();
+  const formalizar = useFormalizarMatricula();
+  // Lo que ya dice la hoja de vida de una discapacidad: se muestra (no se vuelve a escribir) y orientación la recibe al matricular.
+  const hojaDeVida = useHojaDeVida(form.student_id, Boolean(estudianteElegido?.tiene_discapacidad));
+  const detalleDeLaPreinscrita = useEnrollment(preinscrita?._id);
   const [resumenCreada, setResumenCreada] = useState<{ definitiva: boolean } | null>(null);
 
   // Lo que se pide a este estudiante en este grupo: con ello se sabe antes de guardar si la matrícula nace definitiva o condicional (el servidor decide igual).
   const previstosQuery = useDocumentosPrevistos({ group_id: form.group_id || undefined, tipo_ingreso: form.tipo_ingreso, student_id: form.student_id || undefined });
   const obligatoriosPorTraer = (previstosQuery.data ?? []).filter((d) => d.obligatorio && !d.ya_cubierto);
-  // Sin obligatorios por recibir no hay nada que preguntar: nace definitiva.
-  const sinPreguntaDeDocumentos = Boolean(previstosQuery.data) && obligatoriosPorTraer.length === 0;
+  // Sin obligatorios por recibir no hay nada que preguntar: nace definitiva. En una preinscrita se mira lo que le falta de su propio checklist.
+  const checklistDeLaPreinscrita = detalleDeLaPreinscrita.data?.checklist;
+  const hayPorRecibir = preinscrita ? Boolean(checklistDeLaPreinscrita) && hayObligatoriosPorAprobar(checklistDeLaPreinscrita!) : obligatoriosPorTraer.length > 0;
+  const sinPreguntaDeDocumentos = preinscrita ? Boolean(checklistDeLaPreinscrita) && !hayPorRecibir : Boolean(previstosQuery.data) && !hayPorRecibir;
   const traeTodos = sinPreguntaDeDocumentos || form.trae_todos === 'SI';
-  const nacerCondicional = form.trae_todos === 'NO' && obligatoriosPorTraer.length > 0;
+  const nacerCondicional = form.trae_todos === 'NO' && hayPorRecibir;
   const faltaRespuestaDeDocumentos = !sinPreguntaDeDocumentos && form.trae_todos === '';
 
   async function handleSubmit(e: FormEvent) {
@@ -195,6 +209,20 @@ export function EnrollmentsPage() {
     createEnrollment.reset();
 
     try {
+      if (preinscrita) {
+        const formal = await formalizar.mutateAsync({ id: preinscrita._id, trae_todos: traeTodos, fecha_limite_compromiso: nacerCondicional ? form.fecha_limite_compromiso : undefined });
+        void studentsQuery.refetch();
+        // Con los originales en la mano, lo que sigue es subir los archivos: se abre el expediente.
+        if (traeTodos && hayPorRecibir) {
+          setDrawerOpen(false);
+          navigate(`/admin/enrollments/${formal._id}`);
+          reiniciarFormulario();
+          return;
+        }
+        setResumenCreada({ definitiva: formal.estado === 'MATRICULADO_DEFINITIVO' });
+        setMatriculaCreadaId(formal._id);
+        return;
+      }
       const matricula = await createEnrollment.mutateAsync({
         student_id: form.student_id,
         group_id: form.group_id,
@@ -235,13 +263,14 @@ export function EnrollmentsPage() {
     setFiltroEstudiante('DISPONIBLES');
     setReingresoConfirmado(false);
     createEnrollment.reset();
+    formalizar.reset();
   }
 
   /** Abre «Nueva matrícula» con un estudiante ya elegido (y, si se sabe, el grado del grupo): así no hay que buscarlo. */
   function abrirNuevaMatricula(estudiante: EstudiantePorGrado | null, gradoId: string | null = null) {
     reiniciarFormulario();
     if (estudiante) {
-      setFiltroEstudiante(estudiante.situacion === 'REINGRESO' ? 'REINGRESO' : estudiante.situacion === 'DISPONIBLE' ? 'DISPONIBLES' : 'TODOS');
+      setFiltroEstudiante(estaPorFormalizar(estudiante) ? 'POR_FORMALIZAR' : estudiante.situacion === 'REINGRESO' ? 'REINGRESO' : estudiante.situacion === 'DISPONIBLE' ? 'DISPONIBLES' : 'TODOS');
       setForm({ ...FORM_VACIO, student_id: estudiante._id, tipo_ingreso: estudiante.situacion === 'REINGRESO' ? 'ANTIGUO' : tipoDeIngresoSugerido(estudiante, gradoId) });
       setGradoDelGrupo(gradoId ?? '');
     }
@@ -261,6 +290,17 @@ export function EnrollmentsPage() {
   }, [estudiantePedido, anioId, studentsQuery.data]);
 
   const esAdmin = user?.rol === 'ADMIN';
+  const sugerida = sugerencia.data?.sugerido ?? null;
+  const grupoSugeridoCompleto = sugerida ? groupsQuery.data?.find((g) => g._id === sugerida.id) : undefined;
+  const nombreDelGrupoSugerido = sugerida ? `${grupoSugeridoCompleto && typeof grupoSugeridoCompleto.grade_id === 'object' ? grupoSugeridoCompleto.grade_id.nombre : ''} ${sugerida.nombre}`.trim() : '';
+  const avisoDiscapacidad = estudianteElegido?.tiene_discapacidad ? (
+    <Alert tone="info">
+      <div className="space-y-1">
+        <p>En su hoja de vida está registrada una discapacidad: al matricularlo llega sola a orientación de la sede, con lo ya escrito. No hay que declararla otra vez.</p>
+        {hojaDeVida.data?.descripcion_inclusion && <p className="text-xs">Lo registrado: «{hojaDeVida.data.descripcion_inclusion}»</p>}
+      </div>
+    </Alert>
+  ) : null;
   const paginaInfo = listQuery.data;
   // El libro físico del colegio no empieza en cero: mientras nadie confirme en qué folio va, se avisa antes de matricular.
   const foliatura = useFoliatura();
@@ -501,9 +541,9 @@ export function EnrollmentsPage() {
           reiniciarFormulario();
         }}
         onSubmit={matriculaCreadaId ? undefined : handleSubmit}
-        submitLabel="Matricular"
-        isSubmitting={createEnrollment.isPending}
-        submitDisabled={!form.student_id || matriculaBloqueada || (necesitaMotivoGrado && !motivoGradoCompleto) || faltaRespuestaDeDocumentos}
+        submitLabel={preinscrita ? 'Formalizar matrícula' : 'Matricular'}
+        isSubmitting={createEnrollment.isPending || formalizar.isPending}
+        submitDisabled={!form.student_id || matriculaBloqueada || (!preinscrita && necesitaMotivoGrado && !motivoGradoCompleto) || faltaRespuestaDeDocumentos || (preinscrita !== null && !checklistDeLaPreinscrita)}
       >
         {matriculaCreadaId ? (
           <div className="space-y-4">
@@ -549,6 +589,23 @@ export function EnrollmentsPage() {
               onReingresoChange={setReingresoConfirmado}
             />
 
+            {preinscrita ? (
+              <>
+                <DocumentosDeLaPreinscrita matriculaId={preinscrita._id} traeTodos={form.trae_todos} onChange={(valor) => setForm((f) => ({ ...f, trae_todos: valor }))} />
+                {nacerCondicional && (
+                  <Input
+                    label="Fecha límite del acta de compromiso"
+                    type="date"
+                    required
+                    value={form.fecha_limite_compromiso}
+                    onChange={(e) => setForm((f) => ({ ...f, fecha_limite_compromiso: e.target.value }))}
+                    hint="Falta algún documento obligatorio: la matrícula queda condicional. Plazo máximo para entregar lo pendiente, que quedará escrito en el acta."
+                  />
+                )}
+                {avisoDiscapacidad}
+              </>
+            ) : (
+              <>
             <Select
               label="Grado del grupo"
               value={gradoDelGrupo}
@@ -576,6 +633,18 @@ export function EnrollmentsPage() {
               vacioLabel="Selecciona..."
               opciones={opcionesDeGrupos(gruposDelGrado, { conCupos: true })}
             />
+
+            {sugerida && sugerida.id !== form.group_id && (
+              <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-soft px-3 py-2 text-sm text-body">
+                <span>
+                  Sugerido para repartir parejo: <strong className="text-ink">{nombreDelGrupoSugerido}</strong> · {sugerida.ocupados} de {sugerida.capacidad} cupos usados
+                  {sugerida.en_preferencia ? '' : ' (en su sede y jornada de renovación ya no queda cupo)'}.
+                </span>
+                <Button type="button" variant="outline" onClick={() => setForm((f) => ({ ...f, group_id: sugerida.id }))}>
+                  Usar este grupo
+                </Button>
+              </div>
+            )}
 
             {pideGradoAprobado && (
               <Select
@@ -638,13 +707,7 @@ export function EnrollmentsPage() {
               />
             )}
 
-            {estudianteElegido?.tiene_discapacidad ? (
-              <Alert tone="info">
-                En su hoja de vida está registrada una discapacidad: al matricularlo se envía sola a orientación de la sede, con lo ya escrito. No hay que declararla otra vez.
-              </Alert>
-            ) : (
-              <InformacionApoyoCampos valor={form.apoyo} onChange={(apoyo) => setForm((f) => ({ ...f, apoyo }))} />
-            )}
+            {estudianteElegido?.tiene_discapacidad ? avisoDiscapacidad : <InformacionApoyoCampos valor={form.apoyo} onChange={(apoyo) => setForm((f) => ({ ...f, apoyo }))} />}
 
             {esAdmin && (
               <label className="flex items-center gap-2 text-sm text-body">
@@ -656,6 +719,8 @@ export function EnrollmentsPage() {
                 />
                 Autorizar matrícula aunque el grupo esté en su capacidad máxima (sobrecupo)
               </label>
+            )}
+              </>
             )}
           </>
         )}

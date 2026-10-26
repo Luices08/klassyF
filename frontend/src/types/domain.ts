@@ -524,6 +524,8 @@ export interface SituacionEstudianteMatricula {
   estado_expediente: EstadoEstudiante | null;
   /** Lo registrado en su hoja de vida (M03): al matricularlo, orientación recibe la solicitud sin que se escriba de nuevo. */
   tiene_discapacidad?: boolean;
+  /** Lo que respondió la familia sobre si continúa el año (renovación); null si no ha respondido. */
+  continuidad?: 'CONTINUA' | 'NO_CONTINUA' | null;
   situacion: SituacionEstudiante;
   matricula: { _id: string; estado: EstadoMatricula; grupo: string; folio: string | null } | null;
 }

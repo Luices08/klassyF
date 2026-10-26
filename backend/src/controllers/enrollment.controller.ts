@@ -1,5 +1,6 @@
 import { ParamsDictionary } from 'express-serve-static-core';
 import path from 'path';
+import { ParsedQs } from 'qs';
 import { EstadoMatricula, TipoDocumentoMatricula } from '../constants/enums';
 import * as actaCompromisoService from '../services/actaCompromiso.service';
 import { guardarArchivoDeDocumento } from '../services/documentoMatriculaArchivo.service';
@@ -30,6 +31,15 @@ export const listEnrollments = catchAsync<unknown, unknown, unknown, ListQuery>(
 export const situacionEstudiantes = catchAsync<unknown, unknown, unknown, { academic_year_id: string }>(async (req, res) => {
   const data = await enrollmentService.listarSituacionEstudiantes(req.query.academic_year_id);
   res.status(200).json({ success: true, data });
+});
+
+export const formalizar = catchAsync<EnrollmentParams, unknown, enrollmentService.DatosFormalizacion>(async (req, res) => {
+  const data = await enrollmentService.formalizarMatriculaPreinscrita(req.params.id, req.body, { id: req.user!._id });
+  res.status(200).json({ success: true, data });
+});
+
+export const grupoSugerido = catchAsync<unknown, unknown, unknown, ParsedQs & enrollmentService.ConsultaGrupoSugerido>(async (req, res) => {
+  res.status(200).json({ success: true, data: await enrollmentService.grupoSugerido(req.query) });
 });
 
 export const estudiantesPorGrado = catchAsync<unknown, unknown, unknown, { academic_year_id: string }>(async (req, res) => {

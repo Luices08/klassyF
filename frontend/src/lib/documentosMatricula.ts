@@ -10,3 +10,6 @@ export function validarArchivoDocumento(file: File): string | null {
   if (file.size > MAX_BYTES) return 'El archivo supera el máximo de 5 MB.';
   return null;
 }
+
+/** ¿Hay documentos obligatorios sin aprobar en el checklist? Sin ellos no hay nada que preguntar al formalizar. */
+export const hayObligatoriosPorAprobar = (checklist: readonly { obligatorio?: boolean; estado: string }[]): boolean => checklist.some((c) => c.obligatorio !== false && c.estado !== 'APROBADO');

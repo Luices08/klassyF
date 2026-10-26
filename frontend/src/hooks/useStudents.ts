@@ -177,6 +177,16 @@ export interface CrearEstudianteCompletoResult {
   vinculo: unknown | null;
 }
 
+/** La hoja de vida de un estudiante (la ven quienes matriculan). Se pide solo cuando hace falta: `habilitado` evita leer la de todos. */
+export function useHojaDeVida(userId: string | undefined, habilitado = true) {
+  return useQuery({
+    queryKey: ['students', 'hoja-de-vida', userId],
+    queryFn: () => api.get<StudentProfile>(`/users/${userId}/student-profile`),
+    enabled: Boolean(userId) && habilitado,
+    retry: false,
+  });
+}
+
 export function useCrearEstudianteCompleto() {
   const queryClient = useQueryClient();
   return useMutation({

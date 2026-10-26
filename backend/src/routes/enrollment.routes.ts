@@ -10,6 +10,8 @@ import {
   descargarActa,
   descargarDocumento,
   eliminarDocumentoChecklist,
+  formalizar,
+  grupoSugerido,
   getEnrollment,
   listarDocumentosPorDigitalizar,
   listarDocumentosPorRevisar,
@@ -37,6 +39,7 @@ router.post('/', checkRole(...STAFF_MATRICULAS), validate(enrollmentValidator.cr
 router.get('/', checkRole(...STAFF_MATRICULAS), validate(enrollmentValidator.listEnrollments), listEnrollments);
 // Antes de '/:id' para que no la tome como un id.
 router.get('/estudiantes-situacion', checkRole(...STAFF_MATRICULAS), validate(enrollmentValidator.situacionEstudiantes), situacionEstudiantes);
+router.get('/grupo-sugerido', checkRole(...STAFF_MATRICULAS), validate(enrollmentValidator.grupoSugerido), grupoSugerido);
 router.get('/estudiantes-por-grado', checkRole(...STAFF_MATRICULAS), validate(enrollmentValidator.estudiantesPorGrado), estudiantesPorGrado);
 router.get(
   '/documentos-por-revisar',
@@ -59,6 +62,7 @@ router.get(
 router.get('/:id', checkRole(...STAFF_MATRICULAS), validate(enrollmentValidator.getEnrollment), getEnrollment);
 
 router.patch('/:id/status', checkRole(...STAFF_MATRICULAS), validate(enrollmentValidator.updateStatus), updateStatus);
+router.post('/:id/formalizar', checkRole(...STAFF_MATRICULAS), validate(enrollmentValidator.formalizar), formalizar);
 router.patch('/:id/grupo', checkRole(...STAFF_MATRICULAS), validate(enrollmentValidator.cambiarGrupo), cambiarGrupo);
 
 router.post(

@@ -14,6 +14,7 @@ import {
 import { NOMBRES_DOCUMENTO_MATRICULA } from '../constants/matriculaChecklist';
 import { ROLES } from '../constants/roles';
 import AcademicYear from '../models/academicYear.model';
+import ConfirmacionContinuidad, { DecisionContinuidad } from '../models/confirmacionContinuidad.model';
 import Enrollment, { EnrollmentDocument } from '../models/enrollment.model';
 import Grade from '../models/grade.model';
 import Group from '../models/group.model';
@@ -33,6 +34,7 @@ import { aprobarItemConPazYSalvo, pazYSalvoConfirmadoPrevio } from './pazYSalvo.
 import { aplicarSalida } from './salidaMatricula.service';
 import { ubicarEstudiantes } from './ubicacionEstudiante.service';
 import { compararGradoElegido, Ubicacion } from '../utils/ubicacionEstudiante';
+import { GrupoSugerido, sugerirGrupo } from '../utils/sugerenciaDeGrupo';
 import { apoyoRegistradoEnPerfil, crearDesdeMatricula } from './solicitudApoyo.service';
 
 // Un RETIRADO que venía matriculado libera su cupo en `aplicarSalida` (según la política de la institución); aquí llega solo quien se retira siendo PREINSCRITO.
@@ -524,13 +526,15 @@ export interface SituacionDeEstudianteMatricula {
   tipo_documento: string;
   estado_expediente: EstadoEstudiante | null;
   tiene_discapacidad: boolean;
+  /** Lo que respondió la familia sobre si continúa el año (M04, continuidad); null si no ha respondido. */
+  continuidad: DecisionContinuidad | null;
   situacion: SituacionEstudiante;
   matricula: { _id: string; estado: EstadoMatricula; grupo: string; folio: string | null } | null;
 }
 
 /** Todos los estudiantes con su situación frente a la matrícula del año: alimenta los filtros del formulario de matrícula (sin duplicar datos). */
 export async function listarSituacionEstudiantes(academicYearId: string): Promise<SituacionDeEstudianteMatricula[]> {
-  const [usuarios, perfiles, vivas, retiradas] = await Promise.all([
+  const [usuarios, perfiles, vivas, retiradas, continuidades] = await Promise.all([
     User.find({ roles: ROLES.ESTUDIANTE }).select('nombre apellido numero_documento tipo_documento estado').sort({ apellido: 1, nombre: 1 }).lean(),
     StudentProfile.find().select('user_id estado tiene_discapacidad').lean(),
     Enrollment.find({ academic_year_id: academicYearId, estado: { $in: ESTADOS_MATRICULA_VIVOS } })
@@ -538,7 +542,9 @@ export async function listarSituacionEstudiantes(academicYearId: string): Promis
       .populate({ path: 'group_id', select: 'nomenclatura grade_id', populate: { path: 'grade_id', select: 'nombre' } })
       .lean(),
     Enrollment.find({ academic_year_id: academicYearId, estado: 'RETIRADO' }).distinct('student_id'),
+    ConfirmacionContinuidad.find({ academic_year_id: academicYearId }).select('student_id decision').lean(),
   ]);
+  const continuidadPorUsuario = new Map(continuidades.map((c) => [String(c.student_id), c.decision]));
   const retiradosEnElAnio = new Set(retiradas.map(String));
   const estadoPorUsuario = new Map(perfiles.map((p) => [String(p.user_id), p.estado]));
   const conDiscapacidad = new Set(perfiles.filter((p) => p.tiene_discapacidad).map((p) => String(p.user_id)));
@@ -556,6 +562,7 @@ export async function listarSituacionEstudiantes(academicYearId: string): Promis
       tipo_documento: u.tipo_documento,
       estado_expediente: estadoPerfil ?? null,
       tiene_discapacidad: conDiscapacidad.has(String(u._id)),
+      continuidad: continuidadPorUsuario.get(String(u._id)) ?? null,
       situacion: situacionDeEstudiante({ tieneMatriculaViva: Boolean(viva), estadoPerfil, usuarioActivo: u.estado === 'activo', retiradoEnElAnio: retiradosEnElAnio.has(String(u._id)) }),
       matricula: viva
         ? {
@@ -567,6 +574,77 @@ export async function listarSituacionEstudiantes(academicYearId: string): Promis
         : null,
     };
   });
+}
+
+export interface DatosFormalizacion {
+  /** El acudiente trae todos los documentos obligatorios (secretaría tuvo los originales en la mano). */
+  trae_todos: boolean;
+  /** Obligatoria si no los trae: la matrícula queda condicional con acta de compromiso. */
+  fecha_limite_compromiso?: string | Date | null;
+}
+
+/**
+ * Formaliza una matrícula PREINSCRITA (la de quien se aprobó desde una solicitud o la que dejó la rematrícula) con la misma pregunta de «Nueva matrícula»:
+ * con `trae_todos` cada obligatorio que no está aprobado queda aprobado —el que ya tiene archivo, tras ver el original; el que no, verificado en físico y
+ * por digitalizar— y la matrícula pasa a definitiva; sin él queda condicional con su fecha. Asigna el folio como cualquier formalización. Si la hoja de vida
+ * dice que tiene una discapacidad y ese año no hay solicitud, llega a orientación. Cada paso es idempotente: si algo falla a la mitad se puede repetir.
+ */
+export async function formalizarMatriculaPreinscrita(enrollmentId: string, datos: DatosFormalizacion, actor: { id: string | Types.ObjectId }): Promise<EnrollmentDocument> {
+  const matricula = await Enrollment.findById(enrollmentId);
+  if (!matricula) throw new ApiError(404, 'Matrícula no encontrada.');
+  if (matricula.estado !== 'PREINSCRITO') throw new ApiError(409, `Solo se formaliza una matrícula preinscrita; esta está ${matricula.estado}.`);
+  if (!datos.trae_todos && !datos.fecha_limite_compromiso) {
+    throw new ApiError(400, 'La fecha límite del acta de compromiso es obligatoria para una matrícula condicional (con documentos pendientes).');
+  }
+
+  if (datos.trae_todos) {
+    const porAprobar = matricula.checklist.filter((c) => c.obligatorio !== false && c.estado !== 'APROBADO');
+    const sinArchivo = porAprobar.filter((c) => !c.archivo_path).map((c) => c.tipo_documento);
+    if (sinArchivo.length > 0) await marcarVerificacionFisica(enrollmentId, sinArchivo, true, actor);
+    for (const c of porAprobar.filter((x) => x.archivo_path)) {
+      await revisarDocumento(enrollmentId, c.tipo_documento as TipoDocumentoMatricula, { estado: 'APROBADO' }, actor);
+    }
+  }
+
+  await runTransaction(async (session) => {
+    const apoyo = await apoyoRegistradoEnPerfil(matricula.student_id, matricula.academic_year_id, session);
+    if (!apoyo) return;
+    await crearDesdeMatricula(
+      { student_id: matricula.student_id, academic_year_id: matricula.academic_year_id, group_id: matricula.group_id, origen: 'MATRICULA', ...apoyo, solicitada_por: actor.id },
+      session
+    );
+  });
+
+  return updateEnrollmentStatus(enrollmentId, datos.trae_todos ? 'MATRICULADO_DEFINITIVO' : 'MATRICULADO_CONDICIONAL', undefined, actor, {
+    fecha_limite_compromiso: datos.trae_todos ? undefined : (datos.fecha_limite_compromiso ?? undefined),
+  });
+}
+
+export interface ConsultaGrupoSugerido {
+  academic_year_id: string;
+  grade_id: string;
+  /** Si se conoce, se prefiere la sede y la jornada de su renovación (continuidad). */
+  student_id?: string;
+}
+
+/** El grupo menos lleno de un grado para matricular a alguien (sugerencia; secretaría elige). */
+export async function grupoSugerido(consulta: ConsultaGrupoSugerido): Promise<{ sugerido: GrupoSugerido | null; grupos_con_cupo: number }> {
+  const [grupos, renovacion] = await Promise.all([
+    Group.find({ academic_year_id: consulta.academic_year_id, grade_id: consulta.grade_id, estado: 'ACTIVE' }).select('nomenclatura sede_id jornada_id max_capacity cupos_ocupados').lean(),
+    consulta.student_id ? ConfirmacionContinuidad.findOne({ student_id: consulta.student_id, academic_year_id: consulta.academic_year_id, decision: 'CONTINUA' }).select('sede_id jornada_id').lean() : null,
+  ]);
+  const candidatos = grupos.map((g) => ({
+    id: String(g._id),
+    nombre: g.nomenclatura,
+    sede_id: String(g.sede_id),
+    jornada_id: g.jornada_id ? String(g.jornada_id) : null,
+    max_capacity: g.max_capacity,
+    cupos_ocupados: g.cupos_ocupados,
+  }));
+  return {
+    sugerido: sugerirGrupo(candidatos, { sede_id: renovacion ? String(renovacion.sede_id) : null, jornada_id: renovacion?.jornada_id ? String(renovacion.jornada_id) : null }),
+    grupos_con_cupo: candidatos.filter((g) => g.cupos_ocupados < g.max_capacity).length,
+  };
 }
 
 /**

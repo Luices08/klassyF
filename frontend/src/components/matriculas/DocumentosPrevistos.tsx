@@ -7,6 +7,21 @@ import type { TipoIngreso } from '../../types/domain';
 
 export type TraeTodos = '' | 'SI' | 'NO';
 
+/** La pregunta que decide si la matrícula nace definitiva o condicional; la comparten «Nueva matrícula» y la formalización de una preinscrita. */
+export function PreguntaTraeTodos({ value, onChange }: { value: TraeTodos; onChange: (valor: TraeTodos) => void }) {
+  return (
+    <OpcionesTarjeta<TraeTodos>
+      label="¿El acudiente trae todos los documentos obligatorios?"
+      value={value}
+      onChange={onChange}
+      options={[
+        { value: 'SI', titulo: 'Sí, los trae todos', ejemplo: 'Matrícula definitiva. Verificas los originales y luego subes los archivos.' },
+        { value: 'NO', titulo: 'No, falta alguno', ejemplo: 'Matrícula condicional con acta de compromiso y fecha límite.' },
+      ]}
+    />
+  );
+}
+
 interface Props {
   groupId: string;
   tipoIngreso: TipoIngreso;
@@ -45,15 +60,7 @@ export function DocumentosPrevistos({ groupId, tipoIngreso, studentId, traeTodos
         (obligatorios.length === 0 ? (
           <Alert tone="success">No hay documentos obligatorios por recibir: la matrícula queda definitiva.</Alert>
         ) : (
-          <OpcionesTarjeta<TraeTodos>
-            label="¿El acudiente trae todos los documentos obligatorios?"
-            value={traeTodos}
-            onChange={onChange}
-            options={[
-              { value: 'SI', titulo: 'Sí, los trae todos', ejemplo: 'Matrícula definitiva. Verificas los originales y luego subes los archivos.' },
-              { value: 'NO', titulo: 'No, falta alguno', ejemplo: 'Matrícula condicional con acta de compromiso y fecha límite.' },
-            ]}
-          />
+          <PreguntaTraeTodos value={traeTodos} onChange={onChange} />
         ))}
     </div>
   );

@@ -52,11 +52,6 @@ export const listarDocumentosPorRevisar = catchAsync<unknown, unknown, unknown, 
   res.status(200).json({ success: true, ...resultado });
 });
 
-export const listarDocumentosPorDigitalizar = catchAsync<unknown, unknown, unknown, enrollmentService.FiltroDocumentosPorDigitalizar>(async (req, res) => {
-  const resultado = await enrollmentService.listarDocumentosPorDigitalizar(req.query);
-  res.status(200).json({ success: true, ...resultado });
-});
-
 export const listarDocumentosPrevistos = catchAsync(async (req, res) => {
   // El validador ya exige group_id y tipo_ingreso.
   const data = await enrollmentService.listarDocumentosPrevistos(req.query as unknown as enrollmentService.FiltroDocumentosPrevistos);

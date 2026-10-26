@@ -507,8 +507,8 @@ export interface ChecklistItem {
   fecha_verificacion_fisica?: string | null;
 }
 
-/** Visto en físico, aprobado y todavía sin archivo en el sistema (espejo de `faltaDigitalizar` del backend: si cambia una, cambia la otra). */
-export const faltaDigitalizar = (c: Pick<ChecklistItem, 'estado' | 'archivo_path' | 'fecha_verificacion_fisica'>): boolean =>
+/** Secretaría lo vio en físico y lo aprobó, pero todavía no tiene archivo en el sistema. */
+export const soloVerificadoEnFisico = (c: Pick<ChecklistItem, 'estado' | 'archivo_path' | 'fecha_verificacion_fisica'>): boolean =>
   c.estado === 'APROBADO' && !c.archivo_path && Boolean(c.fecha_verificacion_fisica);
 
 export const SITUACIONES_ESTUDIANTE = ['DISPONIBLE', 'MATRICULADO', 'REINGRESO', 'GRADUADO', 'USUARIO_INACTIVO'] as const;

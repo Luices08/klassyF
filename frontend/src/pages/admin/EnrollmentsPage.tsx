@@ -26,7 +26,6 @@ import type { EstudiantePorGrado } from '../../types/domain';
 import {
   ESTADOS_MATRICULA,
   TIPOS_INGRESO,
-  faltaDigitalizar,
   type EstadoMatricula,
   type ChecklistItem,
   type TipoIngreso,
@@ -53,14 +52,12 @@ function ResumenDocumentos({ checklist }: { checklist: ChecklistItem[] }) {
   const obligatorios = checklist.filter((c) => c.obligatorio !== false);
   const aprobados = obligatorios.filter((c) => c.estado === 'APROBADO').length;
   const porRevisar = checklist.filter((c) => c.estado === 'CARGADO').length;
-  const porDigitalizar = checklist.filter(faltaDigitalizar).length;
   const rechazados = checklist.filter((c) => c.estado === 'RECHAZADO').length;
   const completo = obligatorios.length > 0 && aprobados === obligatorios.length;
   return (
     <div className="flex flex-wrap gap-1.5">
       <Chip tone={completo ? 'green' : 'neutral'}>{`${aprobados}/${obligatorios.length} aprobados`}</Chip>
       {porRevisar > 0 && <Chip tone="blue">{`${porRevisar} en revisión`}</Chip>}
-      {porDigitalizar > 0 && <Chip tone="orange">{`${porDigitalizar} por digitalizar`}</Chip>}
       {rechazados > 0 && <Chip tone="red">{`${rechazados} rechazados`}</Chip>}
     </div>
   );

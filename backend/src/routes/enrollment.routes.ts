@@ -13,7 +13,6 @@ import {
   formalizar,
   grupoSugerido,
   getEnrollment,
-  listarDocumentosPorDigitalizar,
   listarDocumentosPorRevisar,
   listarDocumentosPrevistos,
   listEnrollments,
@@ -46,12 +45,6 @@ router.get(
   checkRole(...STAFF_MATRICULAS),
   validate(enrollmentValidator.listarDocumentosPorRevisar),
   listarDocumentosPorRevisar
-);
-router.get(
-  '/documentos-por-digitalizar',
-  checkRole(...STAFF_MATRICULAS),
-  validate(enrollmentValidator.listarDocumentosPorDigitalizar),
-  listarDocumentosPorDigitalizar
 );
 router.get(
   '/documentos-previstos',

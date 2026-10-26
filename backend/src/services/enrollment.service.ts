@@ -51,7 +51,7 @@ export interface CreateEnrollmentInput {
   documentacion_completa?: boolean;
   /**
    * Claves de los documentos que el acudiente entregó en físico y secretaría verificó al formalizar. Con este campo el estado sale solo: definitiva si
-   * quedan aprobados todos los obligatorios, condicional (con acta) si falta alguno. Lo marcado queda APROBADO sin archivo, «por digitalizar».
+   * quedan aprobados todos los obligatorios, condicional (con acta) si falta alguno. Lo marcado queda APROBADO sin archivo (el archivo se sube después en el expediente).
    * Sin él rigen `documentacion_completa` y `estado_inicial` de siempre (procesos masivos y scripts).
    */
   documentos_entregados?: string[];
@@ -99,8 +99,8 @@ export async function exigirSinMatriculaViva(
  * (respetando max_capacity salvo override de ADMIN), genera el folio
  * reglamentario (libro/folio) e inicializa el checklist documental segun el
  * nivel del grado del grupo. Los documentos que secretaría marca como entregados
- * (`documentos_entregados`) quedan aprobados en físico, sin archivo, y esperan
- * su digitalización. Si quedan todos los obligatorios, nace MATRICULADO_DEFINITIVO
+ * (`documentos_entregados`) quedan aprobados en físico, sin archivo (el archivo se
+ * sube después, en el expediente). Si quedan todos los obligatorios, nace MATRICULADO_DEFINITIVO
  * sin acta de compromiso; si falta alguno, MATRICULADO_CONDICIONAL con su fecha límite.
  */
 export async function createEnrollment(
@@ -188,7 +188,7 @@ export async function createEnrollment(
     });
 
     // Lo que secretaría tuvo en la mano: la lista marcada documento por documento o, en los procesos masivos, todo lo obligatorio.
-    // Quedan aprobados sin archivo (verificados en físico) y esperan su digitalización; nada se da por subido.
+    // Quedan aprobados sin archivo (verificados en físico); nada se da por subido.
     const entregados = new Set(marcaPorDocumento ? input.documentos_entregados : esDefinitiva ? itemsGenerados.filter((i) => i.obligatorio).map((i) => i.tipo_documento) : []);
     const noPrevistos = clavesNoPrevistas(itemsGenerados.map((i) => i.tipo_documento), [...entregados]);
     if (noPrevistos.length > 0) {
@@ -601,8 +601,8 @@ export interface DatosFormalizacion {
 
 /**
  * Formaliza una matrícula PREINSCRITA (la de quien se aprobó desde una solicitud o la que dejó la rematrícula) con la misma pregunta de «Nueva matrícula»:
- * con `trae_todos` cada obligatorio que no está aprobado queda aprobado —el que ya tiene archivo, tras ver el original; el que no, verificado en físico y
- * por digitalizar— y la matrícula pasa a definitiva; sin él queda condicional con su fecha. Asigna el folio como cualquier formalización. Si la hoja de vida
+ * con `trae_todos` cada obligatorio que no está aprobado queda aprobado —el que ya tiene archivo, tras ver el original; el que no, verificado en físico
+ * sin archivo— y la matrícula pasa a definitiva; sin él queda condicional con su fecha. Asigna el folio como cualquier formalización. Si la hoja de vida
  * dice que tiene una discapacidad y ese año no hay solicitud, llega a orientación. Cada paso es idempotente: si algo falla a la mitad se puede repetir.
  */
 export async function formalizarMatriculaPreinscrita(enrollmentId: string, datos: DatosFormalizacion, actor: { id: string | Types.ObjectId }): Promise<EnrollmentDocument> {
@@ -848,8 +848,8 @@ const nombreDelItemChecklist = (c: { tipo_documento: string; nombre_personalizad
   c.nombre_personalizado || NOMBRES_DOCUMENTO_MATRICULA[c.tipo_documento as keyof typeof NOMBRES_DOCUMENTO_MATRICULA] || c.tipo_documento;
 
 /**
- * Secretaría tiene el original en la mano: da por bueno uno o varios documentos del checklist sin que haya archivo. Quedan APROBADOS y «por
- * digitalizar» (la bandeja los lista hasta que alguien suba el archivo, que no pasa de nuevo por revisión). Con `verificado: false` se deshace
+ * Secretaría tiene el original en la mano: da por bueno uno o varios documentos del checklist sin que haya archivo. Quedan APROBADOS sin
+ * archivo; el archivo que se suba después no pasa de nuevo por revisión. Con `verificado: false` se deshace
  * una marca hecha por error, mientras el documento no tenga archivo. Todo o nada: si uno no se puede marcar, no se toca ninguno.
  */
 export async function marcarVerificacionFisica(
@@ -1233,72 +1233,6 @@ export async function listarDocumentosPorRevisar(filtro: FiltroDocumentosPorRevi
               fecha_carga: '$checklist.fecha_carga',
               cargado_por_tipo: '$checklist.cargado_por_tipo',
               cargado_por_nombre: { $concat: [{ $ifNull: [{ $arrayElemAt: ['$cargador.nombre', 0] }, ''] }, ' ', { $ifNull: [{ $arrayElemAt: ['$cargador.apellido', 0] }, ''] }] },
-              nombre: { $arrayElemAt: ['$estudiante.nombre', 0] },
-              apellido: { $arrayElemAt: ['$estudiante.apellido', 0] },
-              numero_documento: { $arrayElemAt: ['$estudiante.numero_documento', 0] },
-              grupo: { $arrayElemAt: ['$grupo.nomenclatura', 0] },
-            },
-          },
-        ],
-      },
-    },
-  ]);
-
-  const total = resultado?.total[0]?.n ?? 0;
-  return { data: resultado?.filas ?? [], total, page, pages: Math.max(1, Math.ceil(total / limit)) };
-}
-
-export interface FiltroDocumentosPorDigitalizar {
-  academic_year_id?: string;
-  group_id?: string;
-  page?: number;
-  limit?: number;
-}
-
-/**
- * Bandeja de secretaría: los documentos que se vieron en físico al matricular y todavía no tienen archivo en el sistema (`faltaDigitalizar`), del
- * que lleva más tiempo esperando al más reciente. No esperan revisión: ya están aprobados; solo falta subir el archivo. Una fila por documento.
- */
-export async function listarDocumentosPorDigitalizar(filtro: FiltroDocumentosPorDigitalizar) {
-  const page = Math.max(1, filtro.page ?? 1);
-  const limit = Math.min(100, Math.max(1, filtro.limit ?? 25));
-
-  // La misma condición de `faltaDigitalizar`, escrita para la base: aprobado, sin archivo y con la marca de verificación en físico.
-  // Antes de desarmar el arreglo hay que usar `$elemMatch`: un `$ne: null` suelto sobre `checklist.x` exige que NINGÚN elemento sea nulo y dejaría
-  // fuera a toda matrícula que tenga un solo documento pendiente.
-  const porDigitalizar = { 'checklist.estado': 'APROBADO', 'checklist.archivo_path': null, 'checklist.fecha_verificacion_fisica': { $ne: null } };
-  const match: Record<string, unknown> = {
-    estado: { $nin: ESTADOS_TERMINALES },
-    checklist: { $elemMatch: { estado: 'APROBADO', archivo_path: null, fecha_verificacion_fisica: { $ne: null } } },
-  };
-  if (filtro.academic_year_id) match.academic_year_id = new Types.ObjectId(filtro.academic_year_id);
-  if (filtro.group_id) match.group_id = new Types.ObjectId(filtro.group_id);
-
-  const [resultado] = await Enrollment.aggregate<{ filas: Array<Record<string, unknown>>; total: Array<{ n: number }> }>([
-    { $match: match },
-    { $unwind: '$checklist' },
-    { $match: porDigitalizar },
-    {
-      $facet: {
-        total: [{ $count: 'n' }],
-        filas: [
-          { $sort: { 'checklist.fecha_verificacion_fisica': 1, _id: 1 } },
-          { $skip: (page - 1) * limit },
-          { $limit: limit },
-          { $lookup: { from: 'users', localField: 'student_id', foreignField: '_id', as: 'estudiante' } },
-          { $lookup: { from: 'groups', localField: 'group_id', foreignField: '_id', as: 'grupo' } },
-          { $lookup: { from: 'users', localField: 'checklist.revisado_por', foreignField: '_id', as: 'verificador' } },
-          {
-            $project: {
-              _id: 0,
-              enrollment_id: '$_id',
-              estado_matricula: '$estado',
-              tipo_ingreso: 1,
-              tipo_documento: '$checklist.tipo_documento',
-              nombre_personalizado: '$checklist.nombre_personalizado',
-              obligatorio: '$checklist.obligatorio',
-              fecha_verificacion_fisica: '$checklist.fecha_verificacion_fisica',
-              verificado_por_nombre: { $concat: [{ $ifNull: [{ $arrayElemAt: ['$verificador.nombre', 0] }, ''] }, ' ', { $ifNull: [{ $arrayElemAt: ['$verificador.apellido', 0] }, ''] }] },
               nombre: { $arrayElemAt: ['$estudiante.nombre', 0] },
               apellido: { $arrayElemAt: ['$estudiante.apellido', 0] },
               numero_documento: { $arrayElemAt: ['$estudiante.numero_documento', 0] },

@@ -173,11 +173,3 @@ export const listarDocumentosPorRevisar: ValidationSchema = {
   }),
 };
 
-export const listarDocumentosPorDigitalizar: ValidationSchema = {
-  query: Joi.object({
-    academic_year_id: objectId,
-    group_id: objectId,
-    page: Joi.number().integer().min(1),
-    limit: Joi.number().integer().min(1).max(100),
-  }),
-};

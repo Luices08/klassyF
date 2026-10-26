@@ -162,12 +162,11 @@ export function useCargarDocumentoMatricula() {
     onSuccess: (_data, variables) => {
       void queryClient.invalidateQueries({ queryKey: ['enrollments', variables.id] });
       void queryClient.invalidateQueries({ queryKey: ['enrollments', 'documentos-por-revisar'] });
-      void queryClient.invalidateQueries({ queryKey: ['enrollments', 'documentos-por-digitalizar'] });
     },
   });
 }
 
-/** «Tengo el original en la mano»: aprueba sin archivo uno o varios documentos (queda por digitalizar); `verificado: false` deshace una marca por error. */
+/** «Tengo el original en la mano»: aprueba sin archivo uno o varios documentos (queda aprobado sin archivo); `verificado: false` deshace una marca por error. */
 export function useMarcarVerificacionFisica() {
   const queryClient = useQueryClient();
   return useMutation({
@@ -197,7 +196,6 @@ export function useRevisarDocumentoMatricula() {
     onSuccess: (_data, variables) => {
       void queryClient.invalidateQueries({ queryKey: ['enrollments', variables.id] });
       void queryClient.invalidateQueries({ queryKey: ['enrollments', 'documentos-por-revisar'] });
-      void queryClient.invalidateQueries({ queryKey: ['enrollments', 'documentos-por-digitalizar'] });
     },
   });
 }
@@ -220,7 +218,6 @@ export function useAgregarDocumentoChecklist() {
     onSuccess: (_data, variables) => {
       void queryClient.invalidateQueries({ queryKey: ['enrollments', variables.id] });
       void queryClient.invalidateQueries({ queryKey: ['enrollments', 'documentos-por-revisar'] });
-      void queryClient.invalidateQueries({ queryKey: ['enrollments', 'documentos-por-digitalizar'] });
     },
   });
 }
@@ -233,7 +230,6 @@ export function useEliminarDocumentoChecklist() {
     onSuccess: (_data, variables) => {
       void queryClient.invalidateQueries({ queryKey: ['enrollments', variables.id] });
       void queryClient.invalidateQueries({ queryKey: ['enrollments', 'documentos-por-revisar'] });
-      void queryClient.invalidateQueries({ queryKey: ['enrollments', 'documentos-por-digitalizar'] });
     },
   });
 }
@@ -264,7 +260,6 @@ export function useActualizarComentarioDocumento() {
     onSuccess: (_data, variables) => {
       void queryClient.invalidateQueries({ queryKey: ['enrollments', variables.id] });
       void queryClient.invalidateQueries({ queryKey: ['enrollments', 'documentos-por-revisar'] });
-      void queryClient.invalidateQueries({ queryKey: ['enrollments', 'documentos-por-digitalizar'] });
     },
   });
 }
@@ -290,34 +285,6 @@ export function useDocumentosPorRevisar(filter: { academic_year_id?: string; gro
     queryKey: ['enrollments', 'documentos-por-revisar', filter],
     queryFn: () =>
       api.raw<{ success: true; data: DocumentoPorRevisar[]; total: number; page: number; pages: number }>('/enrollments/documentos-por-revisar', {
-        query: { ...filter },
-      }),
-    select: (res) => ({ data: res.data, total: res.total, page: res.page, pages: res.pages }),
-    enabled: Boolean(filter.academic_year_id),
-  });
-}
-
-/** Un documento verificado en físico al matricular que todavía no tiene archivo en el sistema. */
-export interface DocumentoPorDigitalizar {
-  enrollment_id: string;
-  estado_matricula: EstadoMatricula;
-  tipo_ingreso: TipoIngreso;
-  tipo_documento: TipoDocumentoMatricula;
-  nombre_personalizado: string | null;
-  obligatorio?: boolean;
-  fecha_verificacion_fisica: string;
-  verificado_por_nombre?: string | null;
-  nombre: string;
-  apellido: string;
-  numero_documento: string;
-  grupo: string | null;
-}
-
-export function useDocumentosPorDigitalizar(filter: { academic_year_id?: string; group_id?: string; page?: number; limit?: number }) {
-  return useQuery({
-    queryKey: ['enrollments', 'documentos-por-digitalizar', filter],
-    queryFn: () =>
-      api.raw<{ success: true; data: DocumentoPorDigitalizar[]; total: number; page: number; pages: number }>('/enrollments/documentos-por-digitalizar', {
         query: { ...filter },
       }),
     select: (res) => ({ data: res.data, total: res.total, page: res.page, pages: res.pages }),

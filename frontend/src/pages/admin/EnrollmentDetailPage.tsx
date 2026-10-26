@@ -41,7 +41,7 @@ import { api } from '../../lib/apiClient';
 import { formatoFechaCalendario, formatoFechaHora } from '../../lib/fechas';
 import {
   categoriaDeItem,
-  faltaDigitalizar,
+  soloVerificadoEnFisico,
   indicacionDeItem,
   nombreDeItem,
   type ChecklistItem,
@@ -184,7 +184,7 @@ export function EnrollmentDetailPage() {
     e.target.value = '';
   }
 
-  // «Tengo el original en la mano»: queda aprobado sin archivo y esperando su digitalización.
+  // «Tengo el original en la mano»: queda aprobado sin archivo sin archivo; el archivo se sube después.
   function handleMarcarFisico(tipos: string[], verificado: boolean) {
     if (!id || tipos.length === 0) return;
     marcarFisico.reset();
@@ -269,7 +269,7 @@ export function EnrollmentDetailPage() {
               <Td>
                 <div className="flex flex-col items-start gap-1">
                   <EstadoDocumentoBadge value={item.estado} />
-                  {faltaDigitalizar(item) && <Chip tone="orange">Verificado en físico · falta digitalizar</Chip>}
+                  {soloVerificadoEnFisico(item) && <Chip tone="orange">Verificado en físico · sin archivo</Chip>}
                   {item.estado === 'APROBADO' && item.fecha_verificacion_fisica && (
                     <span className="text-xs text-muted">{textoVerificacionFisica(item)}</span>
                   )}
@@ -319,7 +319,7 @@ export function EnrollmentDetailPage() {
                       onClick={() => handleMarcarFisico([item.tipo_documento], true)}
                     />
                   )}
-                  {!esTerminal && faltaDigitalizar(item) && (
+                  {!esTerminal && soloVerificadoEnFisico(item) && (
                     <IconButton
                       tone="neutral"
                       label="Quitar la marca de recibido en físico"
@@ -330,7 +330,7 @@ export function EnrollmentDetailPage() {
                   )}
                   <label
                     className="inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-full bg-soft text-body hover:bg-border/60"
-                    title={faltaDigitalizar(item) ? 'Subir el archivo (digitalizar)' : 'Cargar archivo'}
+                    title={soloVerificadoEnFisico(item) ? 'Subir el archivo' : 'Cargar archivo'}
                   >
                     <input
                       type="file"
@@ -519,9 +519,9 @@ export function EnrollmentDetailPage() {
             <Button
               variant="outline"
               isLoading={marcarFisico.isPending}
-              title="Aprueba sin archivo los obligatorios que el acudiente trajo en físico; quedan en «Por digitalizar»"
+              title="Aprueba sin archivo los obligatorios que el acudiente trajo en físico; el archivo se sube después"
               onClick={() => {
-                if (window.confirm(`¿Tienes en la mano el original de los ${obligatoriosPorMarcar.length} documentos obligatorios que faltan? Quedarán aprobados, sin archivo, hasta que los digitalices.`)) {
+                if (window.confirm(`¿Tienes en la mano el original de los ${obligatoriosPorMarcar.length} documentos obligatorios que faltan? Quedarán aprobados, sin archivo, hasta que subas cada archivo.`)) {
                   handleMarcarFisico(obligatoriosPorMarcar.map((c) => c.tipo_documento), true);
                 }
               }}

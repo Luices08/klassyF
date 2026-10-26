@@ -2,12 +2,12 @@ import { Alert, errorMessage } from '../ui/Alert';
 import { Chip, type Tone } from '../ui/Badge';
 import { Spinner } from '../ui/Spinner';
 import { useEnrollment } from '../../hooks/useEnrollments';
-import { faltaDigitalizar, nombreDeItem, type ChecklistItem } from '../../types/domain';
+import { nombreDeItem, soloVerificadoEnFisico, type ChecklistItem } from '../../types/domain';
 import { PreguntaTraeTodos, type TraeTodos } from './DocumentosPrevistos';
 
 /** Cómo está cada documento de una matrícula preinscrita, en palabras de quien matricula. */
 function estadoDelDocumento(c: ChecklistItem): { texto: string; tone: Tone } {
-  if (c.estado === 'APROBADO') return faltaDigitalizar(c) ? { texto: 'Verificado en físico · falta digitalizar', tone: 'orange' } : { texto: 'Aprobado', tone: 'green' };
+  if (c.estado === 'APROBADO') return soloVerificadoEnFisico(c) ? { texto: 'Verificado en físico · sin archivo', tone: 'orange' } : { texto: 'Aprobado', tone: 'green' };
   if (c.estado === 'CARGADO') return { texto: c.cargado_por_tipo === 'FAMILIA' ? 'Subido por la familia · por revisar' : 'Ya subido · por revisar', tone: 'blue' };
   if (c.estado === 'RECHAZADO') return { texto: 'Rechazado', tone: 'red' };
   return { texto: 'Sin subir', tone: 'neutral' };

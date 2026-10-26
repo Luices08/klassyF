@@ -20,15 +20,6 @@ export function checklistCompleto(checklist: readonly ItemDeChecklist[]): boolea
   return documentosObligatoriosPendientes(checklist).length === 0;
 }
 
-/**
- * Un documento que secretaría verificó en físico pero aún no tiene archivo en el sistema. Es la única definición de «falta digitalizar»: la bandeja,
- * el expediente y la lista de matrículas preguntan lo mismo. Un documento aprobado por el paz y salvo del año anterior tampoco tiene archivo, pero
- * no se verificó en físico, así que no entra.
- */
-export function faltaDigitalizar(item: { estado: EstadoDocumentoMatricula; archivo_path?: string | null; fecha_verificacion_fisica?: Date | string | null }): boolean {
-  return item.estado === 'APROBADO' && !item.archivo_path && Boolean(item.fecha_verificacion_fisica);
-}
-
 /** Las claves marcadas como entregadas que no están entre los documentos que esa matrícula pide (una clave de otro grado o ya desactivada). */
 export function clavesNoPrevistas(previstas: readonly string[], entregadas: readonly string[]): string[] {
   const conocidas = new Set(previstas);

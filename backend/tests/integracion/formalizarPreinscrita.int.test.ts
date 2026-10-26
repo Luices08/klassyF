@@ -67,7 +67,7 @@ describe('M04: formalizar preinscritas y sugerir grupo', () => {
     expect(formal.folio_matricula).toBeTruthy();
     expect(formal.fecha_limite_compromiso).toBeNull();
     for (const c of obligatorios(formal.checklist)) expect(c.estado).toBe('APROBADO');
-    // El que ya tenía archivo conserva su archivo y no queda «por digitalizar»; los demás sí.
+    // El que ya tenía archivo conserva su archivo y no queda marcado como visto en físico; los demás sí.
     const item = formal.checklist.find((c) => c.tipo_documento === conArchivo!.tipo_documento)!;
     expect(item.archivo_path).toBe('/ruta/falsa.pdf');
     expect(item.fecha_verificacion_fisica).toBeNull();

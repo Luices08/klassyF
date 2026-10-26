@@ -29,7 +29,7 @@ export interface IChecklistItem {
   cargado_por?: Types.ObjectId | null;
   /**
    * Cuándo secretaría tuvo el original en la mano y lo dio por bueno, sin que haya archivo todavía (quién: `revisado_por`). El documento queda APROBADO
-   * y sin archivo: mientras `archivo_path` siga null, falta digitalizarlo (`faltaDigitalizar`). null = nunca se verificó así.
+   * y sin archivo; el archivo se sube después y no pasa de nuevo por revisión. null = nunca se verificó así.
    */
   fecha_verificacion_fisica?: Date | null;
 }

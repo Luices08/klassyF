@@ -33,6 +33,12 @@ router.get('/configuracion', checkRole(...BANDEJA), ctrl.obtenerConfiguracionInc
 router.put('/configuracion', checkRole(ROLES.ADMIN), validate(v.actualizarConfiguracion), ctrl.actualizarConfiguracion);
 
 // Solicitudes de apoyo (entrada única: matrícula, preinscripción, docente, convivencia, directo)
+// Catálogo de condiciones (categorías del PIAR y necesidades del plan de apoyo): lo gestionan el ADMIN y la orientación.
+router.get('/condiciones', checkRole(...ORIENTACION), validate(v.listarCondiciones), ctrl.listarCondiciones);
+router.post('/condiciones', checkRole(...ORIENTACION), validate(v.crearCondicion), ctrl.crearCondicion);
+router.patch('/condiciones/:id', checkRole(...ORIENTACION), validate(v.actualizarCondicion), ctrl.actualizarCondicion);
+router.delete('/condiciones/:id', checkRole(...ORIENTACION), validate(v.eliminarCondicion), ctrl.eliminarCondicion);
+
 router.post('/solicitudes', checkRole(...CON_DOCENTE), validate(v.crearSolicitud), ctrl.crearSolicitud);
 router.get('/solicitudes', checkRole(...BANDEJA), validate(v.listarSolicitudes), ctrl.bandejaDeSolicitudes);
 router.get('/solicitudes/mias', checkRole(ROLES.DOCENTE), ctrl.misSolicitudes);

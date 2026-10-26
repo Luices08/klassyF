@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AbrirExpedienteDrawer } from '../components/inclusion/AbrirExpedienteDrawer';
+import { CatalogoCondicionesPanel } from '../components/inclusion/CatalogoCondicionesPanel';
 import { ConfiguracionInclusionPanel } from '../components/inclusion/ConfiguracionInclusionPanel';
 import { ReportarEstudianteDrawer } from '../components/inclusion/ReportarEstudianteDrawer';
 import { ResolverSolicitudDrawer } from '../components/inclusion/ResolverSolicitudDrawer';
@@ -82,6 +83,7 @@ export function InclusionPage() {
           items={[
             { key: 'solicitudes', label: 'Solicitudes de apoyo', contador: contadorDe('solicitudes') },
             { key: 'expedientes', label: 'Expedientes' },
+            ...(esOrientacion ? [{ key: 'catalogo', label: 'Catálogo de condiciones' }] : []),
             { key: 'configuracion', label: 'Configuración' },
           ]}
           active={pestana}
@@ -92,6 +94,9 @@ export function InclusionPage() {
         </TabPanel>
         <TabPanel active={pestana} tabKey="expedientes">
           <Expedientes />
+        </TabPanel>
+        <TabPanel active={pestana} tabKey="catalogo">
+          <CatalogoCondicionesPanel />
         </TabPanel>
         <TabPanel active={pestana} tabKey="configuracion">
           <ConfiguracionInclusionPanel puedeEditar={rol === 'ADMIN'} />

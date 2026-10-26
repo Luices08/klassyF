@@ -3,7 +3,6 @@ import { Alert, errorMessage } from '../ui/Alert';
 import { Button } from '../ui/Button';
 import { Input, Select, Textarea } from '../ui/Field';
 import {
-  CATEGORIAS_DISCAPACIDAD,
   NIVELES_FORMACION,
   descargarArchivo,
   useCargarSoporte,
@@ -11,6 +10,7 @@ import {
   type AnexoInfoGeneral,
   type Expediente,
 } from '../../hooks/useInclusion';
+import { SelectorCondicion } from './SelectorCondicion';
 import { PieGuardar, Seccion, SelectSiNo } from './campos';
 import { formatoFechaLocal } from '../../lib/fechas';
 
@@ -68,13 +68,7 @@ export function AnexoInfoForm({ exp }: { exp: Expediente }) {
         <Seccion titulo="Categoría de discapacidad (reporte SIMAT)">
           <div className="flex flex-wrap items-end gap-3">
             <div className="min-w-64 flex-1">
-              <Select label="Categoría" disabled={soloLectura} value={categoria} onChange={(e) => setCategoria(e.target.value)} hint="Puede quedar «por confirmar»: el soporte clínico no condiciona la atención pedagógica.">
-                {CATEGORIAS_DISCAPACIDAD.map((c) => (
-                  <option key={c.codigo} value={c.codigo}>
-                    {c.nombre}
-                  </option>
-                ))}
-              </Select>
+              <SelectorCondicion label="Categoría" tipo="PIAR" disabled={soloLectura} value={categoria} onChange={setCategoria} hint="Puede quedar «por confirmar»: el soporte clínico no condiciona la atención pedagógica." />
             </div>
             {!soloLectura && (
               <Button type="button" variant="soft-edit" isLoading={guardar.isPending} onClick={guardarCategoria}>

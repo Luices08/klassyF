@@ -2,8 +2,6 @@ import { HydratedDocument, Model, Schema, Types, model } from 'mongoose';
 import {
   ACTORES_PMI,
   ActorPmi,
-  CODIGOS_CATEGORIA_DISCAPACIDAD,
-  CategoriaDiscapacidad,
   DIMENSIONES_TRANSVERSALES,
   DimensionTransversal,
   ESTADOS_EXPEDIENTE,
@@ -15,9 +13,7 @@ import {
   NIVELES_FORMACION_FAMILIAR,
   NivelFormacionFamiliar,
   TIPOS_EXPEDIENTE,
-  TIPOS_NECESIDAD_PLAN_APOYO,
   TipoExpediente,
-  TipoNecesidadPlanApoyo,
 } from '../constants/inclusion';
 
 const corto = { type: String, trim: true, maxlength: MAX_TEXTO_CORTO, default: '' };
@@ -187,6 +183,8 @@ export interface IConsentimiento {
   otorgado: boolean;
   otorgado_por_nombre: string | null;
   parentesco: string | null;
+  /** Acudiente de M03 que autorizó; `null` si autorizó el propio estudiante mayor de edad o se escribió a mano. */
+  acudiente_id: Types.ObjectId | null;
   fecha: Date | null;
   version_politica: string | null;
   registrado_por_id: Types.ObjectId | null;
@@ -204,7 +202,8 @@ export interface ISoporteClinico {
 }
 
 export interface IPlanApoyo {
-  tipo_necesidad: TipoNecesidadPlanApoyo | null;
+  /** Código de una `CondicionApoyo` de tipo PLAN_APOYO; el servicio la valida contra el catálogo. */
+  tipo_necesidad: string | null;
   observacion_inicial: string;
   compromisos_casa: string;
   pautas_aula: string[];
@@ -226,7 +225,8 @@ export interface IExpedienteInclusion {
   sede_id: Types.ObjectId;
   tipo: TipoExpediente;
   estado: EstadoExpediente;
-  categoria_discapacidad: CategoriaDiscapacidad;
+  /** Código de una `CondicionApoyo` de tipo PIAR (el servicio la valida contra el catálogo); `POR_CONFIRMAR` hasta que llegue el soporte. */
+  categoria_discapacidad: string;
   solicitud_id: Types.ObjectId | null;
   consentimiento: IConsentimiento;
   anexo_info_general: IAnexoInfoGeneral;
@@ -268,7 +268,7 @@ const expedienteSchema = new Schema<IExpedienteInclusion, ExpedienteInclusionMod
     sede_id: { type: Schema.Types.ObjectId, ref: 'Campus', required: true },
     tipo: { type: String, enum: TIPOS_EXPEDIENTE, required: true },
     estado: { type: String, enum: ESTADOS_EXPEDIENTE, default: 'BORRADOR' },
-    categoria_discapacidad: { type: String, enum: CODIGOS_CATEGORIA_DISCAPACIDAD, default: 'POR_CONFIRMAR' },
+    categoria_discapacidad: { type: String, trim: true, default: 'POR_CONFIRMAR' },
     solicitud_id: { type: Schema.Types.ObjectId, ref: 'SolicitudApoyo', default: null },
     consentimiento: {
       type: new Schema<IConsentimiento>(
@@ -276,6 +276,7 @@ const expedienteSchema = new Schema<IExpedienteInclusion, ExpedienteInclusionMod
           otorgado: { type: Boolean, default: false },
           otorgado_por_nombre: { type: String, default: null, maxlength: 120 },
           parentesco: { type: String, default: null, maxlength: 60 },
+          acudiente_id: { type: Schema.Types.ObjectId, ref: 'Guardian', default: null },
           fecha: { type: Date, default: null },
           version_politica: { type: String, default: null },
           registrado_por_id: { type: Schema.Types.ObjectId, ref: 'User', default: null },
@@ -319,7 +320,7 @@ const expedienteSchema = new Schema<IExpedienteInclusion, ExpedienteInclusionMod
     plan_apoyo: {
       type: new Schema<IPlanApoyo>(
         {
-          tipo_necesidad: { type: String, enum: [...TIPOS_NECESIDAD_PLAN_APOYO, null], default: null },
+          tipo_necesidad: { type: String, trim: true, default: null },
           observacion_inicial: largo,
           compromisos_casa: largo,
           pautas_aula: { type: [corto], default: [] },

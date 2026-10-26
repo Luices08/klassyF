@@ -4,6 +4,8 @@
  * `ConfiguracionInclusion`. Los documentos se identifican por clave, nunca por número de anexo (varía según la fuente).
  */
 
+import { Parentesco } from './enums';
+
 // --- Solicitud de apoyo (bandeja de entrada única) ---
 
 export const ORIGENES_SOLICITUD_APOYO = ['MATRICULA', 'PREINSCRIPCION', 'DOCENTE', 'CONVIVENCIA', 'DIRECTO'] as const;
@@ -26,37 +28,62 @@ export const ESTADOS_EXPEDIENTE = ['BORRADOR', 'EN_CONSTRUCCION', 'LISTO_PARA_AC
 export type EstadoExpediente = (typeof ESTADOS_EXPEDIENTE)[number];
 
 /**
- * Categorías de discapacidad del reporte SIMAT. Lista a validar contra el anexo técnico vigente del MEN (cambia por versión);
- * por eso se versiona y `POR_CONFIRMAR` permite abrir el PIAR sin bloquear la atención mientras llega el soporte clínico.
+ * Condiciones que originan un expediente: las categorías de discapacidad del PIAR (reporte SIMAT) y las necesidades del plan de apoyo.
+ * Son datos del colegio (`CondicionApoyo`, con CRUD para el ADMIN y la orientación) y cada una declara a qué tipo de expediente
+ * pertenece. Esta lista es solo la semilla de la primera lectura; los nombres SIMAT deben contrastarse con el anexo técnico vigente
+ * del MEN, que cambia por versión, y por eso se ajustan desde la pantalla y no en el código.
  */
-export const VERSION_CATEGORIAS_DISCAPACIDAD = 'SIMAT-validar';
-export const CATEGORIAS_DISCAPACIDAD = [
-  { codigo: 'POR_CONFIRMAR', nombre: 'Por confirmar' },
-  { codigo: 'VISUAL_CEGUERA', nombre: 'Visual: ceguera' },
-  { codigo: 'VISUAL_BAJA_VISION', nombre: 'Visual: baja visión diagnosticada' },
-  { codigo: 'AUDITIVA_SORDERA', nombre: 'Auditiva: sordera profunda (usuario de LSC)' },
-  { codigo: 'AUDITIVA_HIPOACUSIA', nombre: 'Auditiva: hipoacusia o baja audición' },
-  { codigo: 'SORDOCEGUERA', nombre: 'Sordoceguera' },
-  { codigo: 'INTELECTUAL', nombre: 'Intelectual (cognitiva)' },
-  { codigo: 'FISICA', nombre: 'Física (movilidad)' },
-  { codigo: 'PSICOSOCIAL', nombre: 'Psicosocial (mental)' },
-  { codigo: 'SISTEMICA', nombre: 'Sistémica' },
-  { codigo: 'MULTIPLE', nombre: 'Múltiple' },
-  { codigo: 'TEA', nombre: 'Trastorno del espectro autista' },
-] as const;
-export const CODIGOS_CATEGORIA_DISCAPACIDAD = CATEGORIAS_DISCAPACIDAD.map((c) => c.codigo);
-export type CategoriaDiscapacidad = (typeof CATEGORIAS_DISCAPACIDAD)[number]['codigo'];
+export const MARCA_CONDICIONES_SEMBRADAS = 'INCLUSION_CONDICIONES_SEMBRADAS';
+export const PATRON_CODIGO_CONDICION = /^[A-Z0-9_]{2,40}$/;
+/** Condición con la que se abre un PIAR cuando aún no hay soporte clínico: no bloquea la atención pedagógica. */
+export const CODIGO_CONDICION_PIAR_POR_DEFECTO = 'POR_CONFIRMAR';
+/** Condición de reserva del plan de apoyo cuando ninguna otra describe la necesidad. */
+export const CODIGO_CONDICION_PLAN_RESERVA = 'OTRA';
 
-export const TIPOS_NECESIDAD_PLAN_APOYO = [
-  'TDAH_INATENTO',
-  'TDAH_HIPERACTIVO_IMPULSIVO',
-  'TDAH_MIXTO',
-  'DIFICULTAD_LECTOESCRITURA',
-  'DIFICULTAD_CALCULO',
-  'REZAGO_PEDAGOGICO_TRANSITORIO',
-  'OTRA',
-] as const;
-export type TipoNecesidadPlanApoyo = (typeof TIPOS_NECESIDAD_PLAN_APOYO)[number];
+export interface CondicionInicial {
+  codigo: string;
+  nombre: string;
+  tipo_expediente: TipoExpediente;
+  /** Las que el sistema usa por defecto: no se eliminan, no se desactivan y no cambian de tipo. */
+  sistema?: boolean;
+}
+
+export const CONDICIONES_INICIALES: readonly CondicionInicial[] = [
+  { codigo: 'POR_CONFIRMAR', nombre: 'Por confirmar', tipo_expediente: 'PIAR', sistema: true },
+  { codigo: 'VISUAL_CEGUERA', nombre: 'Visual: ceguera', tipo_expediente: 'PIAR' },
+  { codigo: 'VISUAL_BAJA_VISION', nombre: 'Visual: baja visión diagnosticada', tipo_expediente: 'PIAR' },
+  { codigo: 'AUDITIVA_SORDERA', nombre: 'Auditiva: sordera profunda (usuario de LSC)', tipo_expediente: 'PIAR' },
+  { codigo: 'AUDITIVA_HIPOACUSIA', nombre: 'Auditiva: hipoacusia o baja audición', tipo_expediente: 'PIAR' },
+  { codigo: 'SORDOCEGUERA', nombre: 'Sordoceguera', tipo_expediente: 'PIAR' },
+  { codigo: 'INTELECTUAL', nombre: 'Intelectual (cognitiva)', tipo_expediente: 'PIAR' },
+  { codigo: 'FISICA', nombre: 'Física (movilidad)', tipo_expediente: 'PIAR' },
+  { codigo: 'PSICOSOCIAL', nombre: 'Psicosocial (mental)', tipo_expediente: 'PIAR' },
+  { codigo: 'SISTEMICA', nombre: 'Sistémica', tipo_expediente: 'PIAR' },
+  { codigo: 'MULTIPLE', nombre: 'Múltiple', tipo_expediente: 'PIAR' },
+  { codigo: 'TEA', nombre: 'Trastorno del espectro autista', tipo_expediente: 'PIAR' },
+  { codigo: 'TDAH_INATENTO', nombre: 'TDAH: predominio inatento', tipo_expediente: 'PLAN_APOYO' },
+  { codigo: 'TDAH_HIPERACTIVO_IMPULSIVO', nombre: 'TDAH: predominio hiperactivo-impulsivo', tipo_expediente: 'PLAN_APOYO' },
+  { codigo: 'TDAH_MIXTO', nombre: 'TDAH: mixto', tipo_expediente: 'PLAN_APOYO' },
+  { codigo: 'DIFICULTAD_LECTOESCRITURA', nombre: 'Dificultad de lectoescritura', tipo_expediente: 'PLAN_APOYO' },
+  { codigo: 'DIFICULTAD_CALCULO', nombre: 'Dificultad de cálculo', tipo_expediente: 'PLAN_APOYO' },
+  { codigo: 'REZAGO_PEDAGOGICO_TRANSITORIO', nombre: 'Rezago pedagógico transitorio', tipo_expediente: 'PLAN_APOYO' },
+  { codigo: 'OTRA', nombre: 'Otra', tipo_expediente: 'PLAN_APOYO', sistema: true },
+];
+
+/** Nombre con el que se muestra el parentesco del acudiente en la autorización (el vínculo de M03 guarda solo el código). */
+export const NOMBRES_PARENTESCO: Record<Parentesco, string> = {
+  PADRE: 'Padre',
+  MADRE: 'Madre',
+  ABUELO: 'Abuelo',
+  ABUELA: 'Abuela',
+  TIO: 'Tío',
+  TIA: 'Tía',
+  HERMANO: 'Hermano',
+  HERMANA: 'Hermana',
+  TUTOR_LEGAL: 'Tutor legal',
+  OTRO: 'Otro',
+};
+export const PARENTESCO_ESTUDIANTE_MAYOR = 'Estudiante (mayor de edad)';
 
 // --- Anexo 2 (PIAR) ---
 

@@ -5,12 +5,21 @@ import { Jornada, JORNADAS, PARENTESCOS, Parentesco, TIPOS_DOCUMENTO, TipoDocume
 // proposito — nadie sin autenticar debe poder crear cuentas de usuario ni
 // consumir cupos de un grupo directamente. Secretaria la revisa aqui y, al
 // aprobarla, recien ahi se crea el User + Enrollment (PREINSCRITO).
-export const ESTADOS_SOLICITUD = ['PENDIENTE', 'EN_REVISION', 'APROBADA', 'RECHAZADA'] as const;
+// CUPO_RESERVADO y EN_ESPERA son de la prematrícula: el cupo se reserva por grado, sede y jornada, sin grupo, cuenta ni matrícula (ver prematricula.service).
+export const ESTADOS_SOLICITUD = ['PENDIENTE', 'EN_REVISION', 'CUPO_RESERVADO', 'EN_ESPERA', 'APROBADA', 'RECHAZADA'] as const;
 export type EstadoSolicitud = (typeof ESTADOS_SOLICITUD)[number];
 
 /** Quién radicó la solicitud: la familia desde el sitio público o secretaría en el mostrador. */
 export const ORIGENES_SOLICITUD = ['PUBLICA', 'SECRETARIA'] as const;
 export type OrigenSolicitud = (typeof ORIGENES_SOLICITUD)[number];
+
+/** El cupo que se le reservó a una solicitud: grado (el que pidió), sede y jornada. Sin grupo: el grupo se elige al matricular. */
+export interface IReservaDeCupo {
+  sede_id: Types.ObjectId;
+  jornada_id: Types.ObjectId;
+  reservado_por: Types.ObjectId;
+  fecha: Date;
+}
 
 /** Un documento recibido con la solicitud (antes de que haya matrícula). El archivo vive en el disco; la API nunca devuelve su ruta. */
 export interface IDocumentoSolicitud {
@@ -48,6 +57,9 @@ export interface IAdmissionRequest {
   enrollment_id: Types.ObjectId | null;
   origen: OrigenSolicitud;
   registrada_por: Types.ObjectId | null;
+  /** El año al que apunta: el siguiente mientras su ventana de prematrícula está abierta, o el año en curso. null en las solicitudes anteriores a la prematrícula. */
+  academic_year_id: Types.ObjectId | null;
+  reserva: IReservaDeCupo | null;
   documentos: IDocumentoSolicitud[];
   createdAt: Date;
   updatedAt: Date;
@@ -72,6 +84,16 @@ const documentoSolicitudSchema = new Schema<IDocumentoSolicitud>(
       },
     },
   }
+);
+
+const reservaSchema = new Schema<IReservaDeCupo>(
+  {
+    sede_id: { type: Schema.Types.ObjectId, ref: 'Campus', required: true },
+    jornada_id: { type: Schema.Types.ObjectId, ref: 'JornadaOperativa', required: true },
+    reservado_por: { type: Schema.Types.ObjectId, ref: 'User', required: true },
+    fecha: { type: Date, required: true },
+  },
+  { _id: false }
 );
 
 const admissionRequestSchema = new Schema<IAdmissionRequest, AdmissionRequestModel>(
@@ -111,12 +133,15 @@ const admissionRequestSchema = new Schema<IAdmissionRequest, AdmissionRequestMod
     enrollment_id: { type: Schema.Types.ObjectId, ref: 'Enrollment', default: null },
     origen: { type: String, enum: ORIGENES_SOLICITUD, default: 'PUBLICA' },
     registrada_por: { type: Schema.Types.ObjectId, ref: 'User', default: null },
+    academic_year_id: { type: Schema.Types.ObjectId, ref: 'AcademicYear', default: null },
+    reserva: { type: reservaSchema, default: null },
     documentos: { type: [documentoSolicitudSchema], default: [] },
   },
   { timestamps: true }
 );
 
 admissionRequestSchema.index({ numero_documento: 1, estado: 1 });
+admissionRequestSchema.index({ academic_year_id: 1, estado: 1 });
 
 export const AdmissionRequest = model<IAdmissionRequest, AdmissionRequestModel>(
   'AdmissionRequest',

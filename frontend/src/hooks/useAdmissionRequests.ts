@@ -41,6 +41,19 @@ export interface EstadoSolicitudResultado {
   motivo_rechazo: string | null;
   /** Solo con la solicitud APROBADA. */
   preinscripcion: PreinscripcionDetalle | null;
+  /** Solo con el cupo reservado o en espera (prematrícula). */
+  reserva?: ReservaPublica | null;
+  posicion_espera?: number | null;
+}
+
+export interface ReservaPublica {
+  grado: string;
+  sede: string;
+  jornada: string;
+  anio: number | null;
+  fecha_limite_matricula: string | null;
+  /** Pasó el último día para matricular: el cupo ya no está apartado. */
+  vencida: boolean;
 }
 
 /** El acudiente no tiene sesión: cada consulta y cada acción se autoriza con documento + fecha de nacimiento. */
@@ -102,6 +115,7 @@ export function useSubirDocumentoPreinscripcion() {
 
 export interface AdmissionRequestsFilter {
   estado?: EstadoSolicitud;
+  academic_year_id?: string;
   search?: string;
   page?: number;
   limit?: number;
@@ -155,6 +169,75 @@ export function useQuitarDocumentoSolicitud() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: ({ id, tipoDocumento }: { id: string; tipoDocumento: string }) => api.delete<AdmissionRequest>(`/admission-requests/${id}/documentos/${tipoDocumento}`),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['admission-requests'] });
+    },
+  });
+}
+
+// --- Prematrícula: ventana del año y cupos reservados por grado, sede y jornada ---
+
+export interface VentanaPrematricula {
+  desde: string;
+  hasta: string;
+  fecha_limite_matricula: string | null;
+  abierta: boolean;
+}
+
+export interface FilaDeCupos {
+  grado: { id: string; nombre: string; numero: number };
+  sede: { id: string; nombre: string };
+  jornada: { id: string; nombre: string };
+  capacidad: number;
+  ocupados: number;
+  reservados: number;
+  en_espera: number;
+  /** capacidad − ocupados − reservados; negativo si se aprobaron más de los que cabían. */
+  libres: number;
+}
+
+export interface VistaDeCupos {
+  anio: { id: string; year: number; estado: string };
+  ventana: VentanaPrematricula | null;
+  filas: FilaDeCupos[];
+  reservas_vencidas: number;
+}
+
+export function useCuposPrematricula(anioId: string | undefined) {
+  return useQuery({
+    queryKey: ['admission-requests', 'cupos', anioId],
+    queryFn: () => api.get<VistaDeCupos>('/admission-requests/cupos', { academic_year_id: anioId }),
+    enabled: Boolean(anioId),
+  });
+}
+
+export function useVentanaPrematricula(anioId: string | undefined) {
+  return useQuery({
+    queryKey: ['admission-requests', 'ventana', anioId],
+    queryFn: () => api.get<VentanaPrematricula | null>(`/admission-requests/prematricula/${anioId}`),
+    enabled: Boolean(anioId),
+  });
+}
+
+export function useGuardarVentanaPrematricula() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ anioId, ...cuerpo }: { anioId: string; desde: string; hasta: string; fecha_limite_matricula: string | null }) =>
+      api.put<VentanaPrematricula>(`/admission-requests/prematricula/${anioId}`, cuerpo),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['admission-requests'] });
+    },
+  });
+}
+
+/** Reserva cupo en un grado, sede y jornada, o la manda a la lista de espera si no cabe (el aviso dice por qué). */
+export function useReservarCupo() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, ...cuerpo }: { id: string; sede_id: string; jornada_id: string }) => {
+      const r = await api.raw<{ success: true; data: AdmissionRequest; aviso: string | null; posicion_espera: number | null }>(`/admission-requests/${id}/reservar-cupo`, { method: 'POST', body: cuerpo });
+      return { solicitud: r.data, aviso: r.aviso, posicion_espera: r.posicion_espera };
+    },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['admission-requests'] });
     },

@@ -19,10 +19,11 @@ import { buscarMatriculaDePreinscripcion, construirDetalle, PreinscripcionDetall
 import { avisarSolicitudAdmision } from './notificacionesEventos.service';
 import { crearDesdeMatricula } from './solicitudApoyo.service';
 import { registrarEvento } from './audit.service';
+import { anioDeLaAdmision, infoPublicaDeReserva, ReservaPublica } from './prematricula.service';
 
 // Incluye APROBADA para que un aspirante ya admitido no pueda radicar una segunda solicitud
 // paralela (terminaria chocando con el numero_documento unico del User al aprobarla de nuevo).
-const SOLICITUDES_QUE_BLOQUEAN_NUEVA = ['PENDIENTE', 'EN_REVISION', 'APROBADA'] as const;
+const SOLICITUDES_QUE_BLOQUEAN_NUEVA = ['PENDIENTE', 'EN_REVISION', 'CUPO_RESERVADO', 'EN_ESPERA', 'APROBADA'] as const;
 
 export interface CrearSolicitudInput {
   nombre_aspirante: string;
@@ -65,7 +66,8 @@ export async function crearSolicitud(input: CrearSolicitudInput, origen: OrigenD
     );
   }
 
-  const solicitud = await AdmissionRequest.create({ ...input, estado: 'PENDIENTE', origen: origen.origen ?? 'PUBLICA', registrada_por: origen.registrada_por ?? null });
+  // El año al que apunta lo decide el colegio, no la familia: el siguiente mientras su ventana de prematrícula está abierta, o el año en curso.
+  const solicitud = await AdmissionRequest.create({ ...input, estado: 'PENDIENTE', origen: origen.origen ?? 'PUBLICA', registrada_por: origen.registrada_por ?? null, academic_year_id: await anioDeLaAdmision() });
   // Quien la radica en el mostrador ya sabe que existe: el aviso a la bandeja es para las que llegan por el sitio público.
   if ((origen.origen ?? 'PUBLICA') === 'PUBLICA') await avisarSolicitudAdmision();
   return solicitud;
@@ -98,6 +100,9 @@ export interface EstadoSolicitudPublico {
   motivo_rechazo: string | null;
   /** Solo con la solicitud APROBADA: grado asignado, plazo, documentos y si aun puede subirlos. */
   preinscripcion: PreinscripcionDetalle | null;
+  /** Solo con el cupo reservado o en espera (prematrícula): dónde se reservó y hasta cuándo se puede matricular. */
+  reserva: ReservaPublica | null;
+  posicion_espera: number | null;
 }
 
 /** Consulta publica de estado (M04): exige documento + fecha de nacimiento para evitar enumeracion trivial. */
@@ -114,16 +119,21 @@ export async function consultarEstado(
 
   const matricula =
     solicitud.estado === 'APROBADA' ? await buscarMatriculaDePreinscripcion(numeroDocumento, fechaNacimiento) : null;
+  const { reserva, posicion_espera } = await infoPublicaDeReserva(solicitud);
   return {
     estado: solicitud.estado,
     fecha_solicitud: solicitud.createdAt,
     motivo_rechazo: solicitud.motivo_rechazo,
     preinscripcion: matricula ? construirDetalle(matricula.enrollment) : null,
+    reserva,
+    posicion_espera,
   };
 }
 
 export interface ListarSolicitudesFilter {
   estado?: string;
+  /** El año al que apuntan (la prematrícula del siguiente o el año en curso). */
+  academic_year_id?: string;
   search?: string;
   page?: number;
   limit?: number;
@@ -132,6 +142,7 @@ export interface ListarSolicitudesFilter {
 export async function listarSolicitudes(filter: ListarSolicitudesFilter) {
   const query: Record<string, unknown> = {};
   if (filter.estado) query.estado = filter.estado;
+  if (filter.academic_year_id) query.academic_year_id = new Types.ObjectId(filter.academic_year_id);
   if (filter.search) {
     const regex = new RegExp(filter.search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
     query.$or = [{ nombre_aspirante: regex }, { apellido_aspirante: regex }, { numero_documento: regex }];
@@ -142,7 +153,8 @@ export async function listarSolicitudes(filter: ListarSolicitudesFilter) {
 
   const [data, total] = await Promise.all([
     AdmissionRequest.find(query)
-      .sort({ createdAt: -1 })
+      // La lista de espera se lee en el orden en que se inscribieron (el que manda para dar el cupo); lo demás, del más reciente al más antiguo.
+      .sort({ createdAt: filter.estado === 'EN_ESPERA' ? 1 : -1 })
       .skip((page - 1) * limit)
       .limit(limit)
       .populate('grado_deseado_id', 'nombre nivel numero')

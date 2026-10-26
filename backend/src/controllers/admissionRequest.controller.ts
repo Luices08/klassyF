@@ -3,6 +3,7 @@ import { ParsedQs } from 'qs';
 import { Jornada, TipoDocumento, TipoDocumentoMatricula } from '../constants/enums';
 import * as admissionService from '../services/admissionRequest.service';
 import * as comprobanteService from '../services/comprobantePreinscripcion.service';
+import * as prematriculaService from '../services/prematricula.service';
 import * as solicitudDocumentos from '../services/solicitudDocumentos.service';
 import * as preinscripcionService from '../services/preinscripcionPublica.service';
 import { registrarEvento } from '../services/audit.service';
@@ -54,6 +55,27 @@ export const quitarDocumentoSolicitud = catchAsync<DocumentoSolicitudParams>(asy
 
 export const descargarDocumentoSolicitud = catchAsync<DocumentoSolicitudParams>(async (req, res) => {
   res.sendFile(await solicitudDocumentos.rutaDeDocumentoDeSolicitud(req.params.id, req.params.tipoDocumento));
+});
+
+export const cuposDePrematricula = catchAsync<unknown, unknown, unknown, { academic_year_id: string }>(async (req, res) => {
+  res.status(200).json({ success: true, data: await prematriculaService.cuposDelAnio(req.query.academic_year_id) });
+});
+
+interface VentanaParams extends ParamsDictionary {
+  academicYearId: string;
+}
+
+export const verVentanaDePrematricula = catchAsync<VentanaParams>(async (req, res) => {
+  res.status(200).json({ success: true, data: await prematriculaService.obtenerVentana(req.params.academicYearId) });
+});
+
+export const guardarVentanaDePrematricula = catchAsync<VentanaParams, unknown, prematriculaService.DatosVentana>(async (req, res) => {
+  res.status(200).json({ success: true, data: await prematriculaService.guardarVentana(req.params.academicYearId, req.body, req.user!, req.ip) });
+});
+
+export const reservarCupo = catchAsync<{ id: string } & ParamsDictionary, unknown, { sede_id: string; jornada_id: string }>(async (req, res) => {
+  const r = await prematriculaService.reservarCupo(req.params.id, req.body, { id: req.user!._id });
+  res.status(200).json({ success: true, data: r.solicitud, aviso: r.aviso, posicion_espera: r.posicion_espera });
 });
 
 interface ConsultarEstadoQuery extends ParsedQs {

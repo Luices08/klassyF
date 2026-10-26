@@ -8,6 +8,7 @@ import { Spinner } from '../../components/ui/Spinner';
 import { PreinscripcionAprobada } from '../../components/public/PreinscripcionAprobada';
 import { SitioRenderizado } from '../../components/sitioPublico/SitioRenderizado';
 import { useEstadoSolicitud, useSolicitarCupo, type CredencialesPreinscripcion } from '../../hooks/useAdmissionRequests';
+import { ReservaDeCupo } from '../../components/public/ReservaDeCupo';
 import { usePublicGrades, usePublicInstitutionInfo } from '../../hooks/usePublicInfo';
 import { urlImagenSitio, useSitioPublico } from '../../hooks/useSitioPublico';
 import { JORNADAS, TIPOS_DOCUMENTO, type Jornada, type TipoDocumento } from '../../types/domain';
@@ -287,12 +288,15 @@ function ConsultarEstadoDrawer({ open, onClose }: { open: boolean; onClose: () =
       {resultado && preinscripcion && credenciales ? (
         <PreinscripcionAprobada detalle={preinscripcion} credenciales={credenciales} />
       ) : (
-        resultado && (
+        resultado &&
+        (resultado.reserva ? (
+          <ReservaDeCupo resultado={resultado} />
+        ) : (
           <Alert tone={resultado.estado === 'RECHAZADA' ? 'error' : resultado.estado === 'APROBADA' ? 'success' : 'info'}>
             Estado: <strong>{resultado.estado}</strong>
             {resultado.motivo_rechazo && ` — ${resultado.motivo_rechazo}`}
           </Alert>
-        )
+        ))
       )}
     </Drawer>
   );

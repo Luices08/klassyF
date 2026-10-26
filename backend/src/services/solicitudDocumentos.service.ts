@@ -16,7 +16,7 @@ import { generarChecklistDesdeCatalogo } from './requisitoDocumental.service';
  */
 
 // Una solicitud ya aprobada tiene matrícula (sus documentos se cargan ahí); una rechazada no recibe nada.
-const ESTADOS_QUE_ADMITEN_DOCUMENTOS = ['PENDIENTE', 'EN_REVISION'];
+const ESTADOS_QUE_ADMITEN_DOCUMENTOS = ['PENDIENTE', 'EN_REVISION', 'CUPO_RESERVADO', 'EN_ESPERA'];
 
 async function cargarSolicitud(id: string): Promise<AdmissionRequestDocument> {
   const solicitud = await AdmissionRequest.findById(id);

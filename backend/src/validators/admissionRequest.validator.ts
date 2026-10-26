@@ -70,10 +70,33 @@ export const subirDocumentoPublico: ValidationSchema = {
 export const listarSolicitudes: ValidationSchema = {
   query: Joi.object({
     estado: Joi.string().valid(...ESTADOS_SOLICITUD),
+    academic_year_id: objectId,
     search: Joi.string().allow(''),
     page: Joi.number().integer().min(1),
     limit: Joi.number().integer().min(1).max(100),
   }),
+};
+
+export const cuposDePrematricula: ValidationSchema = {
+  query: Joi.object({ academic_year_id: objectId.required() }),
+};
+
+export const ventanaDePrematricula: ValidationSchema = {
+  params: Joi.object({ academicYearId: objectId.required() }),
+};
+
+export const guardarVentanaDePrematricula: ValidationSchema = {
+  params: Joi.object({ academicYearId: objectId.required() }),
+  body: Joi.object({
+    desde: Joi.date().required(),
+    hasta: Joi.date().required(),
+    fecha_limite_matricula: Joi.date().allow(null),
+  }),
+};
+
+export const reservarCupo: ValidationSchema = {
+  params: Joi.object({ id: objectId.required() }),
+  body: Joi.object({ sede_id: objectId.required(), jornada_id: objectId.required() }),
 };
 
 export const obtenerSolicitud: ValidationSchema = {

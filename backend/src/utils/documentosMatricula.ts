@@ -19,3 +19,9 @@ export function documentosObligatoriosPendientes(checklist: readonly ItemDeCheck
 export function checklistCompleto(checklist: readonly ItemDeChecklist[]): boolean {
   return documentosObligatoriosPendientes(checklist).length === 0;
 }
+
+/** Las claves marcadas como entregadas que no están entre los documentos que esa matrícula pide (una clave de otro grado o ya desactivada). */
+export function clavesNoPrevistas(previstas: readonly string[], entregadas: readonly string[]): string[] {
+  const conocidas = new Set(previstas);
+  return [...new Set(entregadas)].filter((clave) => !conocidas.has(clave));
+}

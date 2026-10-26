@@ -191,11 +191,11 @@ export const listarEvaluaciones: ValidationSchema = {
 export const idParam: ValidationSchema = { params: Joi.object({ id: objectId.required() }) };
 
 export const simulacionRollover: ValidationSchema = {
-  query: Joi.object({ origen_id: objectId.required(), destino_id: objectId.required(), sede_id: objectId, grade_id: objectId, group_id: objectId }),
+  query: Joi.object({ origen_id: objectId.required(), destino_id: objectId.required(), sede_id: objectId, grade_id: objectId, group_id: objectId, continuidad: Joi.string().valid('CONFIRMADOS', 'TODOS') }),
 };
 
 export const ejecutarRollover: ValidationSchema = {
-  body: Joi.object({ origen_id: objectId.required(), destino_id: objectId.required(), sede_id: objectId, grade_id: objectId, group_id: objectId, confirm_password: Joi.string().required() }),
+  body: Joi.object({ origen_id: objectId.required(), destino_id: objectId.required(), sede_id: objectId, grade_id: objectId, group_id: objectId, continuidad: Joi.string().valid('CONFIRMADOS', 'TODOS'), confirm_password: Joi.string().required() }),
 };
 
 export const configuracionRematricula: ValidationSchema = {

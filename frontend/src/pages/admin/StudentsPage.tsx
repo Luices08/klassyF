@@ -43,8 +43,6 @@ const PASOS = ['Identificación', 'Ubicación y contacto', 'Salud y vulnerabilid
 const FORM_VACIO = {
   tipo_documento: 'TI' as TipoDocumento,
   numero_documento: '',
-  nombre: '',
-  apellido: '',
   primer_nombre: '',
   segundo_nombre: '',
   primer_apellido: '',
@@ -125,12 +123,15 @@ export function StudentsPage() {
 
   const crearEstudiante = useCrearEstudianteCompleto();
   const [errorCreacion, setErrorCreacion] = useState<string | null>(null);
+  // El estudiante recién creado: el drawer ofrece matricularlo en seguida (la matrícula abre con él ya elegido) o ver su ficha.
+  const [creado, setCreado] = useState<{ id: string; nombre: string } | null>(null);
 
   function cerrarDrawer() {
     setDrawerOpen(false);
     setPaso(1);
     setForm(FORM_VACIO);
     setErrorCreacion(null);
+    setCreado(null);
   }
 
   async function handleSubmit(e: FormEvent) {
@@ -142,16 +143,14 @@ export function StudentsPage() {
 
     setErrorCreacion(null);
     try {
-      await crearEstudiante.mutateAsync({
+      const resultado = await crearEstudiante.mutateAsync({
         tipo_documento: form.tipo_documento,
         numero_documento: form.numero_documento.trim(),
-        nombre: form.nombre.trim(),
-        apellido: form.apellido.trim(),
         email: form.email.trim() || undefined,
         password: form.password.trim() || undefined,
-        primer_nombre: form.primer_nombre.trim() || undefined,
+        primer_nombre: form.primer_nombre.trim(),
         segundo_nombre: form.segundo_nombre.trim() || undefined,
-        primer_apellido: form.primer_apellido.trim() || undefined,
+        primer_apellido: form.primer_apellido.trim(),
         segundo_apellido: form.segundo_apellido.trim() || undefined,
         lugar_expedicion: form.lugar_expedicion.trim() || undefined,
         fecha_nacimiento: form.fecha_nacimiento,
@@ -188,7 +187,7 @@ export function StudentsPage() {
         acudiente_autorizado_retiro: form.acudiente_autorizado_retiro,
       });
 
-      cerrarDrawer();
+      setCreado({ id: resultado.estudiante._id, nombre: `${resultado.estudiante.nombre} ${resultado.estudiante.apellido}` });
       void studentsQuery.refetch();
     } catch (err) {
       setErrorCreacion(errorMessage(err));
@@ -342,30 +341,37 @@ export function StudentsPage() {
 
       <Drawer
         open={drawerOpen}
-        title="Nuevo estudiante"
-        subtitle={`Paso ${paso} de ${PASOS.length}`}
+        title={creado ? 'Estudiante registrado' : 'Nuevo estudiante'}
+        subtitle={creado ? creado.nombre : `Paso ${paso} de ${PASOS.length}`}
         onClose={cerrarDrawer}
-        onSubmit={handleSubmit}
+        onSubmit={creado ? undefined : handleSubmit}
         submitLabel={paso < PASOS.length ? 'Siguiente →' : 'Crear estudiante'}
         onBack={paso > 1 ? () => setPaso((p) => p - 1) : undefined}
         backLabel="← Atrás"
         isSubmitting={guardando}
       >
-        <Stepper steps={PASOS} current={paso} onStepClick={(s) => setPaso(s)} />
+        {creado && (
+          <div className="space-y-4">
+            <Alert tone="success">{creado.nombre} quedó registrado. Falta matricularlo para que entre a un grupo.</Alert>
+            <div className="flex flex-wrap gap-2">
+              <Button onClick={() => navigate(`/admin/enrollments?estudiante=${creado.id}`)}>Matricular ahora</Button>
+              <Button variant="outline" onClick={() => navigate(`/admin/students/${creado.id}`)}>
+                Ver ficha
+              </Button>
+              <Button variant="secondary" onClick={cerrarDrawer}>
+                Cerrar
+              </Button>
+            </div>
+          </div>
+        )}
+        {!creado && <Stepper steps={PASOS} current={paso} onStepClick={(s) => setPaso(s)} />}
         {errorCreacion && <Alert tone="error">{errorCreacion}</Alert>}
 
-        {paso === 1 && (
+        {!creado && paso === 1 && (
           <>
-            <Input label="Nombres" required value={form.nombre} onChange={(e) => setForm((f) => ({ ...f, nombre: e.target.value }))} />
-            <Input
-              label="Apellidos"
-              required
-              value={form.apellido}
-              onChange={(e) => setForm((f) => ({ ...f, apellido: e.target.value }))}
-            />
-            <Input label="Primer nombre" value={form.primer_nombre} maxLength={60} onChange={(e) => setForm((f) => ({ ...f, primer_nombre: e.target.value }))} hint="Opcional: los reportes oficiales (SIMAT) piden el nombre separado." />
+            <Input label="Primer nombre" required value={form.primer_nombre} maxLength={60} onChange={(e) => setForm((f) => ({ ...f, primer_nombre: e.target.value }))} hint="El nombre se escribe en cuatro partes: así lo piden los reportes oficiales (SIMAT)." />
             <Input label="Segundo nombre" value={form.segundo_nombre} maxLength={60} onChange={(e) => setForm((f) => ({ ...f, segundo_nombre: e.target.value }))} />
-            <Input label="Primer apellido" value={form.primer_apellido} maxLength={60} onChange={(e) => setForm((f) => ({ ...f, primer_apellido: e.target.value }))} />
+            <Input label="Primer apellido" required value={form.primer_apellido} maxLength={60} onChange={(e) => setForm((f) => ({ ...f, primer_apellido: e.target.value }))} />
             <Input label="Segundo apellido" value={form.segundo_apellido} maxLength={60} onChange={(e) => setForm((f) => ({ ...f, segundo_apellido: e.target.value }))} />
             <Select
               label="Tipo de documento"
@@ -420,7 +426,7 @@ export function StudentsPage() {
           </>
         )}
 
-        {paso === 2 && (
+        {!creado && paso === 2 && (
           <>
             <Input
               label="Dirección de residencia"
@@ -444,7 +450,7 @@ export function StudentsPage() {
           </>
         )}
 
-        {paso === 3 && (
+        {!creado && paso === 3 && (
           <>
             <Input label="EPS" value={form.eps} onChange={(e) => setForm((f) => ({ ...f, eps: e.target.value }))} />
             <Select
@@ -551,7 +557,7 @@ export function StudentsPage() {
           </>
         )}
 
-        {paso === 4 && (
+        {!creado && paso === 4 && (
           <>
             <Alert tone="info">
               Opcional: registra al acudiente principal ahora, o hazlo después desde la ficha del estudiante. Podrás

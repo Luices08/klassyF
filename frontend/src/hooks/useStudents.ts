@@ -127,15 +127,14 @@ export function useActualizarEstadoPerfil() {
 export interface CrearEstudianteCompletoInput {
   tipo_documento: TipoDocumento;
   numero_documento: string;
-  nombre: string;
-  apellido: string;
+  /** El nombre completo se arma en el servidor de estas cuatro partes (SIMAT las pide separadas). */
+  primer_nombre: string;
+  segundo_nombre?: string;
+  primer_apellido: string;
+  segundo_apellido?: string;
   email?: string;
   password?: string;
   telefono?: string;
-  primer_nombre?: string;
-  segundo_nombre?: string;
-  primer_apellido?: string;
-  segundo_apellido?: string;
   lugar_expedicion?: string;
   fecha_nacimiento: string;
   genero?: Genero;
@@ -176,6 +175,16 @@ export interface CrearEstudianteCompletoResult {
   perfil: StudentProfile;
   acudiente: Guardian | null;
   vinculo: unknown | null;
+}
+
+/** La hoja de vida de un estudiante (la ven quienes matriculan). Se pide solo cuando hace falta: `habilitado` evita leer la de todos. */
+export function useHojaDeVida(userId: string | undefined, habilitado = true) {
+  return useQuery({
+    queryKey: ['students', 'hoja-de-vida', userId],
+    queryFn: () => api.get<StudentProfile>(`/users/${userId}/student-profile`),
+    enabled: Boolean(userId) && habilitado,
+    retry: false,
+  });
 }
 
 export function useCrearEstudianteCompleto() {

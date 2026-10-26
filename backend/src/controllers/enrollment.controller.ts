@@ -1,5 +1,6 @@
 import { ParamsDictionary } from 'express-serve-static-core';
 import path from 'path';
+import { ParsedQs } from 'qs';
 import { EstadoMatricula, TipoDocumentoMatricula } from '../constants/enums';
 import * as actaCompromisoService from '../services/actaCompromiso.service';
 import { guardarArchivoDeDocumento } from '../services/documentoMatriculaArchivo.service';
@@ -30,6 +31,15 @@ export const listEnrollments = catchAsync<unknown, unknown, unknown, ListQuery>(
 export const situacionEstudiantes = catchAsync<unknown, unknown, unknown, { academic_year_id: string }>(async (req, res) => {
   const data = await enrollmentService.listarSituacionEstudiantes(req.query.academic_year_id);
   res.status(200).json({ success: true, data });
+});
+
+export const formalizar = catchAsync<EnrollmentParams, unknown, enrollmentService.DatosFormalizacion>(async (req, res) => {
+  const data = await enrollmentService.formalizarMatriculaPreinscrita(req.params.id, req.body, { id: req.user!._id });
+  res.status(200).json({ success: true, data });
+});
+
+export const grupoSugerido = catchAsync<unknown, unknown, unknown, ParsedQs & enrollmentService.ConsultaGrupoSugerido>(async (req, res) => {
+  res.status(200).json({ success: true, data: await enrollmentService.grupoSugerido(req.query) });
 });
 
 export const estudiantesPorGrado = catchAsync<unknown, unknown, unknown, { academic_year_id: string }>(async (req, res) => {
@@ -63,13 +73,13 @@ interface UpdateStatusBody extends FormalizacionOpciones {
 }
 
 export const updateStatus = catchAsync<EnrollmentParams, unknown, UpdateStatusBody>(async (req, res) => {
-  const { estado, motivo, numero_libro, fecha_limite_compromiso } = req.body;
+  const { estado, motivo, fecha_limite_compromiso } = req.body;
   const enrollment = await enrollmentService.updateEnrollmentStatus(
     req.params.id,
     estado,
     motivo,
     { id: req.user!._id },
-    { numero_libro, fecha_limite_compromiso }
+    { fecha_limite_compromiso }
   );
   res.status(200).json({ success: true, data: enrollment });
 });
@@ -100,6 +110,11 @@ export const cargarDocumento = catchAsync<ChecklistParams>(async (req, res) => {
     tipo: 'PERSONAL',
     aprobar,
   });
+  res.status(200).json({ success: true, data: enrollment });
+});
+
+export const marcarVerificacionFisica = catchAsync<EnrollmentParams, unknown, { tipos: string[]; verificado: boolean }>(async (req, res) => {
+  const enrollment = await enrollmentService.marcarVerificacionFisica(req.params.id, req.body.tipos, req.body.verificado, { id: req.user!._id });
   res.status(200).json({ success: true, data: enrollment });
 });
 

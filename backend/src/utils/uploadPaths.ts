@@ -5,6 +5,7 @@ import path from 'path';
 // `UPLOADS_DIR` solo la fijan las pruebas, para que no toquen (ni borren) los archivos reales de quien desarrolla.
 export const UPLOADS_ROOT = process.env.UPLOADS_DIR ? path.resolve(process.env.UPLOADS_DIR) : path.join(process.cwd(), 'uploads');
 export const MATRICULAS_DIR = path.join(UPLOADS_ROOT, 'matriculas');
+export const ADMISIONES_DIR = path.join(UPLOADS_ROOT, 'admisiones');
 export const ASISTENCIA_DIR = path.join(UPLOADS_ROOT, 'asistencia');
 export const INCLUSION_DIR = path.join(UPLOADS_ROOT, 'inclusion');
 export const CERTIFICADOS_DIR = path.join(UPLOADS_ROOT, 'certificados');
@@ -18,6 +19,11 @@ export const SERVICIO_SOCIAL_DIR = path.join(UPLOADS_ROOT, 'servicio-social');
 /** Carpeta de una matricula puntual, para aislar sus documentos del resto. */
 export function carpetaMatricula(enrollmentId: string): string {
   return path.join(MATRICULAS_DIR, enrollmentId);
+}
+
+/** Documentos que se reciben con una solicitud de admisión, antes de que exista la matrícula: una carpeta por solicitud. */
+export function carpetaSolicitud(solicitudId: string): string {
+  return path.join(ADMISIONES_DIR, solicitudId);
 }
 
 /** Soportes de un traslado (certificado de notas de origen, constancia de retiro...), una carpeta por traslado. */

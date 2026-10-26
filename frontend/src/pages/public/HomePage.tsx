@@ -8,16 +8,20 @@ import { Spinner } from '../../components/ui/Spinner';
 import { PreinscripcionAprobada } from '../../components/public/PreinscripcionAprobada';
 import { SitioRenderizado } from '../../components/sitioPublico/SitioRenderizado';
 import { useEstadoSolicitud, useSolicitarCupo, type CredencialesPreinscripcion } from '../../hooks/useAdmissionRequests';
-import { usePublicGrades, usePublicInstitutionInfo } from '../../hooks/usePublicInfo';
+import { ReservaDeCupo } from '../../components/public/ReservaDeCupo';
+import { SelectoresDeOferta } from '../../components/admisiones/SelectoresDeOferta';
+import { usePublicInstitutionInfo } from '../../hooks/usePublicInfo';
 import { urlImagenSitio, useSitioPublico } from '../../hooks/useSitioPublico';
-import { JORNADAS, TIPOS_DOCUMENTO, type Jornada, type TipoDocumento } from '../../types/domain';
+import { TIPOS_DOCUMENTO, type Jornada, type TipoDocumento } from '../../types/domain';
 import { CONFIGURACION_SITIO_INICIAL } from '../../types/sitioPublico';
 import { InformacionApoyoCampos } from '../../components/inclusion/InformacionApoyoCampos';
 import { APOYO_VACIO, aApoyoDeclarado } from '../../lib/apoyoDeclarado';
 
 const SOLICITUD_VACIA = {
-  nombre_aspirante: '',
-  apellido_aspirante: '',
+  primer_nombre: '',
+  segundo_nombre: '',
+  primer_apellido: '',
+  segundo_apellido: '',
   tipo_documento: 'RC' as TipoDocumento,
   numero_documento: '',
   fecha_nacimiento: '',
@@ -26,6 +30,8 @@ const SOLICITUD_VACIA = {
   jornada_deseada: '' as Jornada | '',
   acudiente_nombre: '',
   acudiente_apellido: '',
+  acudiente_tipo_documento: 'CC' as TipoDocumento,
+  acudiente_numero_documento: '',
   acudiente_telefono: '',
   acudiente_email: '',
   observaciones: '',
@@ -36,7 +42,6 @@ export function HomePage() {
   const navigate = useNavigate();
   const sitioQuery = useSitioPublico();
   const infoQuery = usePublicInstitutionInfo();
-  const gradosQuery = usePublicGrades();
 
   const [solicitarOpen, setSolicitarOpen] = useState(false);
   const [consultarOpen, setConsultarOpen] = useState(false);
@@ -49,6 +54,8 @@ export function HomePage() {
     const { apoyo, ...datos } = form;
     await solicitar.mutateAsync({
       ...datos,
+      segundo_nombre: form.segundo_nombre.trim() || undefined,
+      segundo_apellido: form.segundo_apellido.trim() || undefined,
       apoyo_declarado: aApoyoDeclarado(apoyo),
       sede_deseada_id: form.sede_deseada_id || undefined,
       jornada_deseada: form.jornada_deseada || undefined,
@@ -118,18 +125,10 @@ export function HomePage() {
           </Alert>
         ) : (
           <>
-            <Input
-              label="Nombres del aspirante"
-              required
-              value={form.nombre_aspirante}
-              onChange={(e) => setForm((f) => ({ ...f, nombre_aspirante: e.target.value }))}
-            />
-            <Input
-              label="Apellidos del aspirante"
-              required
-              value={form.apellido_aspirante}
-              onChange={(e) => setForm((f) => ({ ...f, apellido_aspirante: e.target.value }))}
-            />
+            <Input label="Primer nombre del aspirante" required maxLength={60} value={form.primer_nombre} onChange={(e) => setForm((f) => ({ ...f, primer_nombre: e.target.value }))} />
+            <Input label="Segundo nombre" maxLength={60} value={form.segundo_nombre} onChange={(e) => setForm((f) => ({ ...f, segundo_nombre: e.target.value }))} />
+            <Input label="Primer apellido del aspirante" required maxLength={60} value={form.primer_apellido} onChange={(e) => setForm((f) => ({ ...f, primer_apellido: e.target.value }))} />
+            <Input label="Segundo apellido" maxLength={60} value={form.segundo_apellido} onChange={(e) => setForm((f) => ({ ...f, segundo_apellido: e.target.value }))} />
             <Select
               label="Tipo de documento"
               value={form.tipo_documento}
@@ -154,43 +153,7 @@ export function HomePage() {
               value={form.fecha_nacimiento}
               onChange={(e) => setForm((f) => ({ ...f, fecha_nacimiento: e.target.value }))}
             />
-            <Select
-              label="Grado deseado"
-              required
-              value={form.grado_deseado_id}
-              onChange={(e) => setForm((f) => ({ ...f, grado_deseado_id: e.target.value }))}
-            >
-              <option value="">Selecciona...</option>
-              {(gradosQuery.data ?? []).map((g) => (
-                <option key={g._id} value={g._id}>
-                  {g.nombre}
-                </option>
-              ))}
-            </Select>
-            <Select
-              label="Sede deseada (opcional)"
-              value={form.sede_deseada_id}
-              onChange={(e) => setForm((f) => ({ ...f, sede_deseada_id: e.target.value }))}
-            >
-              <option value="">Sin preferencia</option>
-              {info.sedes.map((s) => (
-                <option key={s._id} value={s._id}>
-                  {s.nombre}
-                </option>
-              ))}
-            </Select>
-            <Select
-              label="Jornada deseada (opcional)"
-              value={form.jornada_deseada}
-              onChange={(e) => setForm((f) => ({ ...f, jornada_deseada: e.target.value as Jornada }))}
-            >
-              <option value="">Sin preferencia</option>
-              {JORNADAS.map((j) => (
-                <option key={j} value={j}>
-                  {j}
-                </option>
-              ))}
-            </Select>
+            <SelectoresDeOferta valor={form} onChange={(cambios) => setForm((f) => ({ ...f, ...cambios }))} />
             <Input
               label="Nombres del acudiente"
               required
@@ -202,6 +165,24 @@ export function HomePage() {
               required
               value={form.acudiente_apellido}
               onChange={(e) => setForm((f) => ({ ...f, acudiente_apellido: e.target.value }))}
+            />
+            <Select
+              label="Tipo de documento del acudiente"
+              value={form.acudiente_tipo_documento}
+              onChange={(e) => setForm((f) => ({ ...f, acudiente_tipo_documento: e.target.value as TipoDocumento }))}
+            >
+              {TIPOS_DOCUMENTO.map((t) => (
+                <option key={t} value={t}>
+                  {t}
+                </option>
+              ))}
+            </Select>
+            <Input
+              label="Número de documento del acudiente"
+              required
+              value={form.acudiente_numero_documento}
+              onChange={(e) => setForm((f) => ({ ...f, acudiente_numero_documento: e.target.value }))}
+              hint="Con él se abrirá tu acceso a la plataforma cuando el colegio confirme la matrícula."
             />
             <Input
               label="Teléfono del acudiente"
@@ -287,12 +268,15 @@ function ConsultarEstadoDrawer({ open, onClose }: { open: boolean; onClose: () =
       {resultado && preinscripcion && credenciales ? (
         <PreinscripcionAprobada detalle={preinscripcion} credenciales={credenciales} />
       ) : (
-        resultado && (
+        resultado &&
+        (resultado.reserva ? (
+          <ReservaDeCupo resultado={resultado} />
+        ) : (
           <Alert tone={resultado.estado === 'RECHAZADA' ? 'error' : resultado.estado === 'APROBADA' ? 'success' : 'info'}>
             Estado: <strong>{resultado.estado}</strong>
             {resultado.motivo_rechazo && ` — ${resultado.motivo_rechazo}`}
           </Alert>
-        )
+        ))
       )}
     </Drawer>
   );

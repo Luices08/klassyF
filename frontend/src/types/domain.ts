@@ -503,7 +503,13 @@ export interface ChecklistItem {
   comentario: string | null;
   fecha_carga: string | null;
   revisado_por: string | { _id: string; nombre: string; apellido: string } | null;
+  /** Cuándo secretaría vio el original y lo dio por bueno sin archivo (quién: `revisado_por`). */
+  fecha_verificacion_fisica?: string | null;
 }
+
+/** Secretaría lo vio en físico y lo aprobó, pero todavía no tiene archivo en el sistema. */
+export const soloVerificadoEnFisico = (c: Pick<ChecklistItem, 'estado' | 'archivo_path' | 'fecha_verificacion_fisica'>): boolean =>
+  c.estado === 'APROBADO' && !c.archivo_path && Boolean(c.fecha_verificacion_fisica);
 
 export const SITUACIONES_ESTUDIANTE = ['DISPONIBLE', 'MATRICULADO', 'REINGRESO', 'GRADUADO', 'USUARIO_INACTIVO'] as const;
 export type SituacionEstudiante = (typeof SITUACIONES_ESTUDIANTE)[number];
@@ -516,6 +522,10 @@ export interface SituacionEstudianteMatricula {
   numero_documento: string;
   tipo_documento: TipoDocumento;
   estado_expediente: EstadoEstudiante | null;
+  /** Lo registrado en su hoja de vida (M03): al matricularlo, orientación recibe la solicitud sin que se escriba de nuevo. */
+  tiene_discapacidad?: boolean;
+  /** Lo que respondió la familia sobre si continúa el año (renovación); null si no ha respondido. */
+  continuidad?: 'CONTINUA' | 'NO_CONTINUA' | null;
   situacion: SituacionEstudiante;
   matricula: { _id: string; estado: EstadoMatricula; grupo: string; folio: string | null } | null;
 }
@@ -765,7 +775,7 @@ export interface StudentFicha360 {
 
 // --- M04: Admisiones (sitio publico + revision interna) ---
 
-export const ESTADOS_SOLICITUD = ['PENDIENTE', 'EN_REVISION', 'APROBADA', 'RECHAZADA'] as const;
+export const ESTADOS_SOLICITUD = ['PENDIENTE', 'EN_REVISION', 'CUPO_RESERVADO', 'EN_ESPERA', 'APROBADA', 'RECHAZADA'] as const;
 export type EstadoSolicitud = (typeof ESTADOS_SOLICITUD)[number];
 
 export interface PublicSede {
@@ -790,13 +800,6 @@ export interface PublicInstitutionInfo {
   sedes: PublicSede[];
   niveles_educativos: string[];
   klassy_version: string;
-}
-
-export interface PublicGrade {
-  _id: string;
-  nivel: string;
-  numero: number;
-  nombre: string;
 }
 
 /** Lo que ve el acudiente en el sitio público cuando la solicitud está APROBADA. */
@@ -835,11 +838,22 @@ export interface AdmissionRequest {
   acudiente_apellido: string;
   acudiente_telefono: string;
   acudiente_email: string;
+  /** Los registra secretaría en la inscripción del mostrador; la solicitud pública no los trae. */
+  acudiente_tipo_documento?: TipoDocumento | null;
+  acudiente_numero_documento?: string | null;
+  acudiente_parentesco?: Parentesco | null;
   observaciones: string;
   estado: EstadoSolicitud;
   motivo_rechazo: string | null;
   student_user_id: string | null;
   enrollment_id: string | null;
+  origen?: 'PUBLICA' | 'SECRETARIA';
+  /** El año al que apunta (el siguiente durante la prematrícula). null en las solicitudes anteriores. */
+  academic_year_id?: string | null;
+  /** Donde se reservó el cupo (o donde espera): sede y jornada; el grado es el que pidió. */
+  reserva?: { sede_id: string; jornada_id: string; fecha: string } | null;
+  /** Documentos recibidos con la solicitud (la API nunca trae la ruta del archivo). */
+  documentos?: Array<{ tipo_documento: string; fecha_carga: string }>;
   createdAt: string;
 }
 

@@ -12,6 +12,7 @@ import User from '../models/user.model';
 import StudentProfile from '../models/studentProfile.model';
 import ApiError from '../utils/ApiError';
 import catchAsync from '../utils/catchAsync';
+import { resolverNombre } from '../utils/nombres';
 import { ocultarSaludAdministrativa, tieneDatoSaludSensible } from '../utils/datosSensibles';
 
 interface UserIdParams extends ParamsDictionary {
@@ -55,7 +56,7 @@ async function obtenerEstudiante(userId: string) {
 }
 
 export const upsertProfile = catchAsync<UserIdParams, unknown, UpsertProfileBody>(async (req, res) => {
-  await obtenerEstudiante(req.params.userId);
+  const estudiante = await obtenerEstudiante(req.params.userId);
 
   const { autorizacion_datos_sensibles, ...resto } = req.body;
 
@@ -89,6 +90,14 @@ export const upsertProfile = catchAsync<UserIdParams, unknown, UpsertProfileBody
   }
 
   await profile.save();
+
+  // El nombre que ven listados, boletines y certificados se arma de las cuatro partes: si cambian, el usuario las sigue (nunca al revés).
+  const nombre = resolverNombre(profile);
+  if (nombre && nombre.partes.primer_nombre && (estudiante.nombre !== nombre.nombre || estudiante.apellido !== nombre.apellido)) {
+    estudiante.nombre = nombre.nombre;
+    estudiante.apellido = nombre.apellido;
+    await estudiante.save();
+  }
 
   res.status(200).json({ success: true, data: profile });
 });

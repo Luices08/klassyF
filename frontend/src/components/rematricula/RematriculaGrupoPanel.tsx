@@ -14,6 +14,7 @@ import { useInstitution } from '../../hooks/useInstitution';
 import {
   type AlcanceRollover,
   type EstadoFilaRollover,
+  type ModoContinuidad,
   NOMBRES_DESTINO,
   NOMBRES_ESTADO_ROLLOVER,
   NOMBRES_RESULTADO,
@@ -22,7 +23,7 @@ import {
   useSimulacionRollover,
 } from '../../hooks/usePromocion';
 
-const TONO_ESTADO: Record<EstadoFilaRollover, Tone> = { POR_CREAR: 'green', YA_TIENE_MATRICULA: 'neutral', EN_ESPERA: 'orange', SIN_CUPO: 'red', NO_APLICA: 'neutral' };
+const TONO_ESTADO: Record<EstadoFilaRollover, Tone> = { POR_CREAR: 'green', YA_TIENE_MATRICULA: 'neutral', EN_ESPERA: 'orange', SIN_CUPO: 'red', SIN_CONFIRMAR: 'orange', NO_APLICA: 'neutral' };
 
 const nombreDe = <T extends { _id: string; nombre: string }>(valor: string | T) => (typeof valor === 'string' ? valor : valor.nombre);
 
@@ -43,6 +44,7 @@ export function RematriculaGrupoPanel({ puedeEjecutar }: { puedeEjecutar: boolea
   const [sedeId, setSedeId] = useState('');
   const [gradoId, setGradoId] = useState('');
   const [grupoId, setGrupoId] = useState('');
+  const [modo, setModo] = useState<'' | ModoContinuidad>('');
   const [simulado, setSimulado] = useState<AlcanceRollover | null>(null);
   const [reservando, setReservando] = useState(false);
   const [resultado, setResultado] = useState<ResultadoRollover | null>(null);
@@ -57,6 +59,7 @@ export function RematriculaGrupoPanel({ puedeEjecutar }: { puedeEjecutar: boolea
     sede_id: sedeId || undefined,
     grade_id: gradoId || undefined,
     group_id: grupoId || undefined,
+    continuidad: modo || undefined,
   };
   // Cambiar cualquier selector descarta lo simulado: lo que se confirma es siempre lo que se acaba de ver.
   const cambiar = (poner: () => void) => {
@@ -143,6 +146,18 @@ export function RematriculaGrupoPanel({ puedeEjecutar }: { puedeEjecutar: boolea
             ))}
           </Select>
         </div>
+        <div className="mt-4 max-w-md">
+          <Select
+            label="A quién se pre-matricula"
+            value={modo}
+            onChange={(e) => cambiar(() => setModo(e.target.value as typeof modo))}
+            hint="Con la renovación de matrícula en uso, lo normal es solo quienes la familia confirmó (octubre)."
+          >
+            <option value="">Según el colegio (confirmados si usa la renovación)</option>
+            <option value="CONFIRMADOS">Solo a quienes confirmaron que continúan</option>
+            <option value="TODOS">A todos los que su cierre deja seguir</option>
+          </Select>
+        </div>
         <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
           <p className="max-w-3xl text-xs text-muted">
             Avanza por etapas: cada grupo o grado se proyecta sin esperar a los demás. Solo se pre-matricula a quien ya tiene un resultado final de promoción; quien espera
@@ -171,6 +186,7 @@ export function RematriculaGrupoPanel({ puedeEjecutar }: { puedeEjecutar: boolea
               <Chip tone="green">Se pre-matricularán: {resumen.por_crear}</Chip>
               <Chip tone={resumen.en_espera > 0 ? 'orange' : 'neutral'}>Lista de espera: {resumen.en_espera}</Chip>
               <Chip tone="neutral">Ya tienen matrícula: {resumen.ya_tienen_matricula}</Chip>
+              {plan.data.modo_continuidad === 'CONFIRMADOS' && <Chip tone={resumen.sin_confirmar > 0 ? 'orange' : 'neutral'}>Sin confirmar: {resumen.sin_confirmar}</Chip>}
               <Chip tone={resumen.sin_cupo > 0 ? 'red' : 'neutral'}>Sin grupo: {resumen.sin_cupo}</Chip>
               <Chip tone="neutral">No aplican: {resumen.no_aplica}</Chip>
               {plan.data.retirados > 0 && <Chip tone="neutral">Retirados: {plan.data.retirados}</Chip>}

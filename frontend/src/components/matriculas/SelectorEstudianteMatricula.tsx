@@ -4,7 +4,7 @@ import { Alert } from '../ui/Alert';
 import { Button } from '../ui/Button';
 import { FiltrosRapidos } from '../ui/FiltrosRapidos';
 import { SelectBuscable, type OpcionBuscable } from '../ui/SelectBuscable';
-import { ETIQUETA_SITUACION, estudiantesDelFiltro, type FiltroEstudiante } from '../../lib/situacionEstudiante';
+import { ETIQUETA_SITUACION, estaPorFormalizar, estudiantesDelFiltro, type FiltroEstudiante } from '../../lib/situacionEstudiante';
 import type { SituacionEstudianteMatricula } from '../../types/domain';
 
 interface SelectorEstudianteMatriculaProps {
@@ -52,6 +52,8 @@ export function SelectorEstudianteMatricula({
         onChange={(clave) => onFiltroChange(clave as FiltroEstudiante)}
         items={[
           { clave: 'DISPONIBLES', etiqueta: 'Disponibles', cantidad: cuenta(estudiantes, 'DISPONIBLES') },
+          { clave: 'CONTINUARAN', etiqueta: 'Continuarán', cantidad: cuenta(estudiantes, 'CONTINUARAN') },
+          { clave: 'POR_FORMALIZAR', etiqueta: 'Preinscritos (con cupo)', cantidad: cuenta(estudiantes, 'POR_FORMALIZAR') },
           { clave: 'MATRICULADOS', etiqueta: 'Ya matriculados', cantidad: cuenta(estudiantes, 'MATRICULADOS') },
           { clave: 'REINGRESO', etiqueta: 'Retirados / Reingreso', cantidad: cuenta(estudiantes, 'REINGRESO') },
           { clave: 'TODOS', etiqueta: 'Todos', cantidad: estudiantes.length },
@@ -69,7 +71,13 @@ export function SelectorEstudianteMatricula({
         hint={visibles.length === 0 ? 'No hay estudiantes en este filtro.' : undefined}
       />
 
-      {elegido?.situacion === 'MATRICULADO' && elegido.matricula && (
+      {elegido && estaPorFormalizar(elegido) && elegido.matricula && (
+        <Alert tone="info">
+          Ya tiene un cupo en <strong>{elegido.matricula.grupo}</strong> con su matrícula preinscrita, sin folio. Aquí se formaliza: se ve qué documentos ya están subidos y se confirma si trae todos los obligatorios.
+        </Alert>
+      )}
+
+      {elegido?.situacion === 'MATRICULADO' && elegido.matricula && !estaPorFormalizar(elegido) && (
         <Alert tone="info">
           <div className="space-y-2">
             <p>

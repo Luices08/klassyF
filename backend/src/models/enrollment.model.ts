@@ -27,6 +27,11 @@ export interface IChecklistItem {
   /** Quién subió el archivo: la familia (sitio público o portal) o el personal. null en los anteriores. */
   cargado_por_tipo?: 'FAMILIA' | 'PERSONAL' | null;
   cargado_por?: Types.ObjectId | null;
+  /**
+   * Cuándo secretaría tuvo el original en la mano y lo dio por bueno, sin que haya archivo todavía (quién: `revisado_por`). El documento queda APROBADO
+   * y sin archivo; el archivo se sube después y no pasa de nuevo por revisión. null = nunca se verificó así.
+   */
+  fecha_verificacion_fisica?: Date | null;
 }
 
 /** Soporte documental de la salida (carta de retiro, constancia de la institución receptora...). Mientras no exista el archivo general (M29) vive en disco. */
@@ -112,6 +117,7 @@ const checklistItemSchema = new Schema<IChecklistItem>(
     revisado_por: { type: Schema.Types.ObjectId, ref: 'User', default: null },
     cargado_por_tipo: { type: String, enum: ['FAMILIA', 'PERSONAL', null], default: null },
     cargado_por: { type: Schema.Types.ObjectId, ref: 'User', default: null },
+    fecha_verificacion_fisica: { type: Date, default: null },
   },
   { _id: false }
 );

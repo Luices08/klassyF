@@ -46,7 +46,7 @@ interface CuentaPortal {
  * La contraseña temporal es el número de documento (decisión de producto); `debe_cambiar_password`
  * obliga a cambiarla en el primer ingreso.
  */
-async function asegurarCuentaPortal(guardian: GuardianDocument, session: ClientSession): Promise<CuentaPortal> {
+async function asegurarCuentaPortal(guardian: GuardianDocument, session: ClientSession, { aliasSiElCorreoEstaEnUso = false }: { aliasSiElCorreoEstaEnUso?: boolean } = {}): Promise<CuentaPortal> {
   const existente = await User.findOne({ numero_documento: guardian.numero_documento }).session(session);
   if (existente) {
     await concederRolAcudiente(existente, session);
@@ -56,8 +56,13 @@ async function asegurarCuentaPortal(guardian: GuardianDocument, session: ClientS
   if (!guardian.email) {
     throw new ApiError(400, 'Para habilitar el acceso al portal el acudiente debe tener un correo registrado.');
   }
-  if (await User.exists({ email: guardian.email }).session(session)) {
-    throw new ApiError(409, 'Ya existe un usuario con ese correo; usa otro correo para el acudiente.');
+  // El correo del acudiente suele estar ya en uso por el primer hijo que se admitió con él: automáticamente se usa un alias («+documento») que llega al mismo buzón.
+  let email = guardian.email;
+  if (await User.exists({ email }).session(session)) {
+    if (!aliasSiElCorreoEstaEnUso) throw new ApiError(409, 'Ya existe un usuario con ese correo; usa otro correo para el acudiente.');
+    const [local, dominio] = email.split('@');
+    email = `${local}+${guardian.numero_documento}@${dominio}`;
+    if (await User.exists({ email }).session(session)) throw new ApiError(409, 'Ya existe un usuario con ese correo; usa otro correo para el acudiente.');
   }
 
   const usuario = new User({
@@ -65,7 +70,7 @@ async function asegurarCuentaPortal(guardian: GuardianDocument, session: ClientS
     apellido: guardian.apellido,
     tipo_documento: guardian.tipo_documento,
     numero_documento: guardian.numero_documento,
-    email: guardian.email,
+    email,
     telefono: guardian.telefono_principal,
     roles: [ROLES.ACUDIENTE],
     debe_cambiar_password: true,
@@ -73,6 +78,57 @@ async function asegurarCuentaPortal(guardian: GuardianDocument, session: ClientS
   usuario.password = guardian.numero_documento;
   await usuario.save({ session });
   return { usuarioId: usuario._id, creada: true };
+}
+
+export interface ResultadoHabilitacionAutomatica {
+  habilitados: number;
+  /** Acudientes a los que no se les pudo abrir la cuenta y por qué (falta el documento o el correo, es estudiante, etc.). */
+  omitidos: Array<{ acudiente: string; motivo: string }>;
+}
+
+/**
+ * Cuando la matrícula de un estudiante queda confirmada (condicional o definitiva) se abre la cuenta del portal de su acudiente principal: el acudiente
+ * entra a la plataforma con la matrícula confirmada, no antes. Usa el número de documento como contraseña temporal (se cambia al primer ingreso).
+ * Es idempotente y nunca rompe la matrícula: a quien no se le puede abrir (documento provisional «TEL-…», sin correo, es estudiante) se le anota el motivo
+ * y secretaría lo resuelve en la ficha del estudiante.
+ */
+export async function habilitarPortalDeAcudientesDe(studentId: string | Types.ObjectId, { usuarioId, ip }: ContextoActor): Promise<ResultadoHabilitacionAutomatica> {
+  const vinculos = await StudentGuardian.find({ student_id: studentId }).populate<{ guardian_id: GuardianDocument | null }>('guardian_id');
+  const principales = vinculos.filter((v) => v.es_principal);
+  const resultado: ResultadoHabilitacionAutomatica = { habilitados: 0, omitidos: [] };
+
+  for (const vinculo of principales.length > 0 ? principales : vinculos.slice(0, 1)) {
+    const guardian = vinculo.guardian_id;
+    if (!guardian || guardian.user_id) continue;
+    const nombre = `${guardian.nombre} ${guardian.apellido}`;
+    if (guardian.numero_documento.startsWith('TEL-')) {
+      resultado.omitidos.push({ acudiente: nombre, motivo: 'Falta su documento de identidad: la ficha tiene solo el teléfono.' });
+      continue;
+    }
+    try {
+      const cuenta = await runTransaction(async (session) => {
+        const fresco = await Guardian.findById(guardian._id).session(session);
+        if (!fresco || fresco.user_id) return null;
+        const c = await asegurarCuentaPortal(fresco, session, { aliasSiElCorreoEstaEnUso: true });
+        fresco.user_id = c.usuarioId;
+        await fresco.save({ session });
+        return c;
+      });
+      if (!cuenta) continue;
+      resultado.habilitados += 1;
+      await registrarEvento({
+        usuario_id: usuarioId,
+        accion: 'ACUDIENTE_PORTAL_HABILITADO',
+        entidad: 'Guardian',
+        entidad_id: guardian._id,
+        detalle: `Acceso al portal de ${nombre} al confirmarse la matrícula del estudiante ${String(studentId)}: ${cuenta.creada ? 'cuenta creada' : 'cuenta existente reutilizada'}.`,
+        ip,
+      });
+    } catch (err) {
+      resultado.omitidos.push({ acudiente: nombre, motivo: err instanceof ApiError ? err.message : 'No se pudo abrir la cuenta.' });
+    }
+  }
+  return resultado;
 }
 
 async function obtenerEstudiante(studentId: string) {

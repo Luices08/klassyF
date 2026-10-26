@@ -23,10 +23,11 @@ const nombreDelDocumento = (d: DocumentoPorRevisar) => nombreDeItem(d);
 
 const quienSubio = (d: DocumentoPorRevisar) => (d.cargado_por_tipo === 'FAMILIA' ? 'La familia' : d.cargado_por_tipo === 'PERSONAL' ? d.cargado_por_nombre?.trim() || 'Personal del colegio' : '—');
 
-/** Bandeja de secretaría (M04): los documentos que ya subieron y nadie ha revisado, sin entrar a cada matrícula. */
+/** Bandeja de secretaría (M04), sin entrar a cada matrícula: archivos que ya subieron y nadie ha aprobado ni rechazado. */
 export function DocumentosPorRevisarPage() {
   const navigate = useNavigate();
   const { anio, query: aniosQuery } = useAnioDeTrabajo();
+
   const [page, setPage] = useState(1);
   const [subidoPor, setSubidoPor] = useState<'TODOS' | 'FAMILIA' | 'PERSONAL'>('TODOS');
   const lista = useDocumentosPorRevisar({ academic_year_id: anio?._id, subido_por: subidoPor === 'TODOS' ? undefined : subidoPor, page, limit: PAGE_SIZE });

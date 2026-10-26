@@ -23,6 +23,7 @@ import StudentGuardian from '../models/studentGuardian.model';
 import StudentProfile from '../models/studentProfile.model';
 import User from '../models/user.model';
 import ApiError from '../utils/ApiError';
+import { MENSAJE_NOMBRE_INCOMPLETO, resolverNombre } from '../utils/nombres';
 import { concederRolAcudiente } from '../utils/concederRolAcudiente';
 import { leerCsv } from '../utils/csv';
 import { ocultarSaludAdministrativa } from '../utils/datosSensibles';
@@ -128,14 +129,8 @@ function esVerdadero(valor: string): boolean {
   return ['si', 'sí', 'true', '1', 'x'].includes(valor.trim().toLowerCase());
 }
 
-const COLUMNAS_OBLIGATORIAS_ESTUDIANTES = [
-  'tipo_documento',
-  'numero_documento',
-  'nombre',
-  'apellido',
-  'email',
-  'fecha_nacimiento',
-];
+// El nombre llega en cuatro columnas (primer y segundo nombre, primer y segundo apellido); `nombre` y `apellido` completos se siguen admitiendo en cargas anteriores.
+const COLUMNAS_OBLIGATORIAS_ESTUDIANTES = ['tipo_documento', 'numero_documento', 'email', 'fecha_nacimiento'];
 
 /**
  * Valor de una lista cerrada (acepta minusculas). Vacio -> undefined; con valor pero fuera de la
@@ -175,7 +170,7 @@ const COLUMNAS_ACUDIENTE = [
 
 /**
  * Carga masiva (M03): CSV con encabezado
- * tipo_documento,numero_documento,nombre,apellido,email,fecha_nacimiento,genero,rh,eps,
+ * tipo_documento,numero_documento,primer_nombre,segundo_nombre,primer_apellido,segundo_apellido,email,fecha_nacimiento,genero,rh,eps,
  * regimen_salud,autorizacion_datos_sensibles,estrato,direccion_residencia,barrio_vereda,
  * municipio,grupo_etnico,victima_conflicto,tiene_discapacidad,tiene_talento_excepcional,
  * institucion_procedencia,acudiente_tipo_documento,acudiente_numero_documento,
@@ -202,12 +197,11 @@ export async function importarEstudiantesCsv(buffer: Buffer, registradoPorId: Ty
     let guardianCreadoId: Types.ObjectId | null = null;
 
     try {
-      if (!r.tipo_documento || !numeroDocumento || !r.nombre || !r.apellido || !r.email || !r.fecha_nacimiento) {
-        throw new ApiError(
-          400,
-          'Faltan columnas obligatorias (tipo_documento, numero_documento, nombre, apellido, email, fecha_nacimiento).'
-        );
+      const nombreFila = resolverNombre(r);
+      if (!r.tipo_documento || !numeroDocumento || !r.email || !r.fecha_nacimiento) {
+        throw new ApiError(400, 'Faltan columnas obligatorias (tipo_documento, numero_documento, email, fecha_nacimiento).');
       }
+      if (!nombreFila) throw new ApiError(400, 'Faltan primer_nombre y primer_apellido.');
       const tipoDocumento = valorDeLista('tipo_documento', r.tipo_documento, TIPOS_DOCUMENTO);
       const fechaNacimiento = parsearFechaNacimiento(r.fecha_nacimiento);
       const genero = valorDeLista('genero', r.genero, GENEROS);
@@ -251,8 +245,8 @@ export async function importarEstudiantesCsv(buffer: Buffer, registradoPorId: Ty
       }
 
       const student = new User({
-        nombre: r.nombre,
-        apellido: r.apellido,
+        nombre: nombreFila.nombre,
+        apellido: nombreFila.apellido,
         tipo_documento: tipoDocumento,
         numero_documento: numeroDocumento,
         email: r.email,
@@ -265,10 +259,7 @@ export async function importarEstudiantesCsv(buffer: Buffer, registradoPorId: Ty
 
       await StudentProfile.create({
         user_id: student._id,
-        primer_nombre: r.primer_nombre || undefined,
-        segundo_nombre: r.segundo_nombre || undefined,
-        primer_apellido: r.primer_apellido || undefined,
-        segundo_apellido: r.segundo_apellido || undefined,
+        ...nombreFila.partes,
         fecha_nacimiento: fechaNacimiento,
         genero,
         rh,
@@ -344,8 +335,9 @@ export async function importarEstudiantesCsv(buffer: Buffer, registradoPorId: Ty
 export interface CrearEstudianteCompletoInput {
   tipo_documento: TipoDocumento;
   numero_documento: string;
-  nombre: string;
-  apellido: string;
+  /** Alternativa a las cuatro partes de abajo (scripts y cargas anteriores). */
+  nombre?: string;
+  apellido?: string;
   email?: string;
   password?: string;
   telefono?: string;
@@ -402,6 +394,8 @@ export async function crearEstudianteCompleto(
 ) {
   return runTransaction(async (session) => {
     const numDocEstudiante = input.numero_documento.trim();
+    const nombreEstudiante = resolverNombre(input);
+    if (!nombreEstudiante) throw new ApiError(400, MENSAJE_NOMBRE_INCOMPLETO);
 
     // 1. Validar unicidad del documento del estudiante
     const yaExisteDoc = await User.findOne({ numero_documento: numDocEstudiante }).session(session);
@@ -422,8 +416,8 @@ export async function crearEstudianteCompleto(
     // Contraseña amigable: la suministrada o por defecto su número de documento
     const claveEstudiante = (input.password && input.password.trim() !== '') ? input.password.trim() : numDocEstudiante;
     const studentUser = new User({
-      nombre: input.nombre.trim(),
-      apellido: input.apellido.trim(),
+      nombre: nombreEstudiante.nombre,
+      apellido: nombreEstudiante.apellido,
       tipo_documento: input.tipo_documento,
       numero_documento: numDocEstudiante,
       email: emailEstudiante,
@@ -442,10 +436,7 @@ export async function crearEstudianteCompleto(
       [
         {
           user_id: studentUser._id,
-          primer_nombre: input.primer_nombre?.trim() || undefined,
-          segundo_nombre: input.segundo_nombre?.trim() || undefined,
-          primer_apellido: input.primer_apellido?.trim() || undefined,
-          segundo_apellido: input.segundo_apellido?.trim() || undefined,
+          ...nombreEstudiante.partes,
           lugar_expedicion: input.lugar_expedicion?.trim() || undefined,
           fecha_nacimiento: new Date(input.fecha_nacimiento),
           genero: input.genero || undefined,
@@ -549,7 +540,7 @@ export async function crearEstudianteCompleto(
             {
               student_id: studentUser._id,
               guardian_id: guardian._id,
-              parentesco: input.acudiente_parentesco || 'TUTOR',
+              parentesco: input.acudiente_parentesco || 'TUTOR_LEGAL',
               es_principal: input.acudiente_es_principal !== undefined ? Boolean(input.acudiente_es_principal) : true,
               autorizado_retiro: input.acudiente_autorizado_retiro !== undefined ? Boolean(input.acudiente_autorizado_retiro) : true,
             },

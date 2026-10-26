@@ -5,6 +5,7 @@ import { PortalCitaciones } from '../components/portal/PortalCitaciones';
 import { PortalCertificados } from '../components/portal/PortalCertificados';
 import { PortalConvivencia } from '../components/portal/PortalConvivencia';
 import { PortalDocumentos } from '../components/portal/PortalDocumentos';
+import { PortalRenovacion } from '../components/portal/PortalRenovacion';
 import { PortalInasistencias } from '../components/portal/PortalInasistencias';
 import { PortalNotas } from '../components/portal/PortalNotas';
 import { SelectorEstudiante } from '../components/portal/SelectorEstudiante';
@@ -108,6 +109,9 @@ function PortalDeHijo({
 
       <SelectorEstudiante hijos={hijos} seleccionado={hijo.student_id} onElegir={(id) => elegir({ hijo: id })} />
       <ResumenEstudiante hijo={hijo} />
+
+      {/* Solo aparece mientras el colegio tiene abierta la renovación de matrícula del año siguiente. */}
+      <PortalRenovacion key={hijo.student_id} studentId={hijo.student_id} />
 
       <Tabs
         items={[

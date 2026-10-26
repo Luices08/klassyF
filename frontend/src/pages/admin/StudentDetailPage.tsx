@@ -240,11 +240,11 @@ function DatosGeneralesTab({ studentId, perfil }: { studentId: string; perfil: S
       {upsertProfile.isSuccess && <Alert tone="success">Hoja de vida actualizada.</Alert>}
 
       <p className="text-xs text-muted">
-        Nombre, documento y correo se editan desde el módulo de Usuarios (M02) para no duplicar esa pantalla.
+        El nombre se escribe aquí en cuatro partes; el documento y el correo se editan desde el módulo de Usuarios (M02).
       </p>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <Input label="Primer nombre" value={form.primer_nombre} maxLength={60} onChange={(e) => setForm((f) => ({ ...f, primer_nombre: e.target.value }))} hint="Para los reportes oficiales (SIMAT)." />
+        <Input label="Primer nombre" value={form.primer_nombre} maxLength={60} onChange={(e) => setForm((f) => ({ ...f, primer_nombre: e.target.value }))} hint="Las cuatro partes arman el nombre que se muestra y que piden los reportes oficiales (SIMAT). Completa las que falten en los estudiantes anteriores." />
         <Input label="Segundo nombre" value={form.segundo_nombre} maxLength={60} onChange={(e) => setForm((f) => ({ ...f, segundo_nombre: e.target.value }))} />
         <Input label="Primer apellido" value={form.primer_apellido} maxLength={60} onChange={(e) => setForm((f) => ({ ...f, primer_apellido: e.target.value }))} />
         <Input label="Segundo apellido" value={form.segundo_apellido} maxLength={60} onChange={(e) => setForm((f) => ({ ...f, segundo_apellido: e.target.value }))} />

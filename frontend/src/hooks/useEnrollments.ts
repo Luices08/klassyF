@@ -7,9 +7,10 @@ export interface CreateEnrollmentInput {
   group_id: string;
   academic_year_id: string;
   tipo_ingreso: TipoIngreso;
-  numero_libro?: number;
   estado_inicial?: 'MATRICULADO_CONDICIONAL' | 'MATRICULADO_DEFINITIVO';
   documentacion_completa?: boolean;
+  /** Claves de los documentos que secretaría tuvo en la mano: el estado (definitiva o condicional) lo decide el servidor con esto. */
+  documentos_entregados?: string[];
   fecha_limite_compromiso?: string;
   forzar_sobrecupo?: boolean;
   /** Confirma la reincorporación de quien estaba RETIRADO o INACTIVO en su expediente. */
@@ -20,6 +21,37 @@ export interface CreateEnrollmentInput {
   ultimo_grado_aprobado?: number | null;
   /** Por qué se matricula en un grado distinto al que indica su historial o su certificado. */
   motivo_grado?: string;
+}
+
+/** Formaliza una matrícula preinscrita con la pregunta de «Nueva matrícula»: ¿el acudiente trae todos los documentos obligatorios? */
+export function useFormalizarMatricula() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, ...datos }: { id: string; trae_todos: boolean; fecha_limite_compromiso?: string }) => api.post<Enrollment>(`/enrollments/${id}/formalizar`, datos),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['enrollments'] });
+      void queryClient.invalidateQueries({ queryKey: ['groups'] });
+    },
+  });
+}
+
+export interface GrupoSugerido {
+  id: string;
+  nombre: string;
+  capacidad: number;
+  ocupados: number;
+  libres: number;
+  /** false si no quedó cupo en la sede y jornada de su renovación y se sugiere un grupo de otra. */
+  en_preferencia: boolean;
+}
+
+/** El grupo menos lleno del grado para matricular a alguien (sugerencia; secretaría elige). */
+export function useGrupoSugerido(anioId: string | undefined, gradeId: string | undefined, studentId?: string) {
+  return useQuery({
+    queryKey: ['enrollments', 'grupo-sugerido', anioId, gradeId, studentId ?? null],
+    queryFn: () => api.get<{ sugerido: GrupoSugerido | null; grupos_con_cupo: number }>('/enrollments/grupo-sugerido', { academic_year_id: anioId, grade_id: gradeId, student_id: studentId }),
+    enabled: Boolean(anioId && gradeId),
+  });
 }
 
 export function useCreateEnrollment() {
@@ -93,8 +125,7 @@ export function useUpdateEnrollmentStatus() {
       id: string;
       estado: EstadoMatricula;
       motivo?: string;
-      // Solo al formalizar (PREINSCRITO -> MATRICULADO_*), momento en que se asigna el folio.
-      numero_libro?: number;
+      // Solo al formalizar (PREINSCRITO -> MATRICULADO_*); el libro y el folio los asigna la configuración del Libro de Matrícula.
       fecha_limite_compromiso?: string;
     }) => api.patch<Enrollment>(`/enrollments/${id}/status`, cuerpo),
     onSuccess: (_data, variables) => {
@@ -131,6 +162,19 @@ export function useCargarDocumentoMatricula() {
     onSuccess: (_data, variables) => {
       void queryClient.invalidateQueries({ queryKey: ['enrollments', variables.id] });
       void queryClient.invalidateQueries({ queryKey: ['enrollments', 'documentos-por-revisar'] });
+    },
+  });
+}
+
+/** «Tengo el original en la mano»: aprueba sin archivo uno o varios documentos (queda aprobado sin archivo); `verificado: false` deshace una marca por error. */
+export function useMarcarVerificacionFisica() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, tipos, verificado = true }: { id: string; tipos: string[]; verificado?: boolean }) =>
+      api.patch<Enrollment>(`/enrollments/${id}/checklist/verificacion-fisica`, { tipos, verificado }),
+    onSuccess: (_data, variables) => {
+      void queryClient.invalidateQueries({ queryKey: ['enrollments'] });
+      void queryClient.invalidateQueries({ queryKey: ['enrollments', variables.id] });
     },
   });
 }
@@ -254,10 +298,12 @@ export interface DocumentoPrevisto {
   indicacion: string;
   categoria: string;
   obligatorio: boolean;
+  /** El paz y salvo del año anterior ya confirmado: el sistema lo aprueba al matricular, no hay nada que marcar como entregado. */
+  ya_cubierto?: boolean;
 }
 
 /** Los documentos que se le pedirán al estudiante según el grado del grupo y su tipo de ingreso (mismo cálculo que al crear la matrícula). */
-export function useDocumentosPrevistos(params: { group_id?: string; tipo_ingreso: TipoIngreso; student_id?: string }) {
+export function useDocumentosPrevistos(params: { group_id?: string; /** Sin grupo (una inscripción): el grado del que se piden. */ grade_id?: string; tipo_ingreso: TipoIngreso; student_id?: string }) {
   return useQuery({
     queryKey: ['enrollments', 'documentos-previstos', params],
     queryFn: () => api.get<DocumentoPrevisto[]>('/enrollments/documentos-previstos', { ...params }),

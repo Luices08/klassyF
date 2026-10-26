@@ -27,9 +27,9 @@ Durante cada año además: **salidas** (al abrir los periodos 2 a 4 algunas fami
 
 `fecha_corte` (en el JSON, o `--corte=AAAA-MM-DD`; sin ninguna de las dos, hoy) es el último día simulado. Las fases que empiezan después no se corren y, dentro de la última, lo que cae después del corte no se ejecuta. Para avanzar más tarde: cambia el corte y repite desde el periodo que quedó a medias, p. ej. `npm run sim -- --corte=2026-12-10 --desde=2026/periodo-4 --rehacer`.
 
-### Un hallazgo de la simulación
+### Un hallazgo de la simulación (resuelto)
 
-El índice único de folio de `Enrollment` es `(numero_libro, numero_folio)` sin el año y el consecutivo de folios reinicia cada año: con el libro 1 por defecto, la primera matrícula formalizada del segundo año choca con la del primero (409). La simulación abre un libro por año (`libroDelAnio`), como lo haría secretaría con el campo «libro»; el sistema no lo hace solo.
+Con el libro 1 fijo y el consecutivo reiniciado cada año, la primera matrícula formalizada del segundo año chocaba con la del primero (409). Lo resolvió la **foliatura configurable** del Libro de Matrícula: por defecto el esquema es anual (el libro se llama como el año), así que la simulación ya no pasa ningún libro.
 
 ## Requisitos
 

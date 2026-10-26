@@ -59,8 +59,10 @@ export const COLUMNAS_USUARIOS: ColumnaGuia[] = [
 export const COLUMNAS_ESTUDIANTES: ColumnaGuia[] = [
   { nombre: 'tipo_documento', obligatoria: true, formato: uno(TIPOS_DOCUMENTO), ejemplo: 'RC' },
   { nombre: 'numero_documento', obligatoria: true, formato: 'Solo el número, sin puntos ni espacios. No puede repetirse.', ejemplo: '1098765432' },
-  { nombre: 'nombre', obligatoria: true, formato: 'Texto', ejemplo: 'Sofía' },
-  { nombre: 'apellido', obligatoria: true, formato: 'Texto', ejemplo: 'Núñez' },
+  { nombre: 'primer_nombre', obligatoria: true, formato: 'Texto. El nombre se escribe en cuatro columnas: así lo piden los reportes oficiales (SIMAT).', ejemplo: 'Sofía' },
+  { nombre: 'segundo_nombre', obligatoria: false, formato: 'Texto. Déjalo vacío si no tiene.', ejemplo: 'Valentina' },
+  { nombre: 'primer_apellido', obligatoria: true, formato: 'Texto', ejemplo: 'Núñez' },
+  { nombre: 'segundo_apellido', obligatoria: false, formato: 'Texto. Déjalo vacío si no tiene.', ejemplo: 'Rojas' },
   { nombre: 'email', obligatoria: true, formato: 'Correo válido. No puede repetirse.', ejemplo: 'sofia@correo.com' },
   {
     nombre: 'fecha_nacimiento',
@@ -68,10 +70,6 @@ export const COLUMNAS_ESTUDIANTES: ColumnaGuia[] = [
     formato: 'Fecha YYYY-MM-DD (año-mes-día). También se acepta DD/MM/AAAA. No puede ser futura.',
     ejemplo: '2015-03-24',
   },
-  { nombre: 'primer_nombre', obligatoria: false, formato: 'Texto. Para los reportes oficiales (SIMAT), que piden el nombre separado.', ejemplo: 'Sofía' },
-  { nombre: 'segundo_nombre', obligatoria: false, formato: 'Texto. Déjalo vacío si no tiene.', ejemplo: 'Valentina' },
-  { nombre: 'primer_apellido', obligatoria: false, formato: 'Texto', ejemplo: 'Núñez' },
-  { nombre: 'segundo_apellido', obligatoria: false, formato: 'Texto. Déjalo vacío si no tiene.', ejemplo: 'Rojas' },
   { nombre: 'genero', obligatoria: false, formato: uno(GENEROS), ejemplo: 'F' },
   { nombre: 'rh', obligatoria: false, formato: uno(GRUPOS_SANGUINEOS), ejemplo: 'O+' },
   { nombre: 'eps', obligatoria: false, formato: 'Texto', ejemplo: 'Sura' },

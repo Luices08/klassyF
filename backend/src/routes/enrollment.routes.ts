@@ -10,10 +10,13 @@ import {
   descargarActa,
   descargarDocumento,
   eliminarDocumentoChecklist,
+  formalizar,
+  grupoSugerido,
   getEnrollment,
   listarDocumentosPorRevisar,
   listarDocumentosPrevistos,
   listEnrollments,
+  marcarVerificacionFisica,
   situacionEstudiantes,
   estudiantesPorGrado,
   revisarDocumento,
@@ -35,6 +38,7 @@ router.post('/', checkRole(...STAFF_MATRICULAS), validate(enrollmentValidator.cr
 router.get('/', checkRole(...STAFF_MATRICULAS), validate(enrollmentValidator.listEnrollments), listEnrollments);
 // Antes de '/:id' para que no la tome como un id.
 router.get('/estudiantes-situacion', checkRole(...STAFF_MATRICULAS), validate(enrollmentValidator.situacionEstudiantes), situacionEstudiantes);
+router.get('/grupo-sugerido', checkRole(...STAFF_MATRICULAS), validate(enrollmentValidator.grupoSugerido), grupoSugerido);
 router.get('/estudiantes-por-grado', checkRole(...STAFF_MATRICULAS), validate(enrollmentValidator.estudiantesPorGrado), estudiantesPorGrado);
 router.get(
   '/documentos-por-revisar',
@@ -51,6 +55,7 @@ router.get(
 router.get('/:id', checkRole(...STAFF_MATRICULAS), validate(enrollmentValidator.getEnrollment), getEnrollment);
 
 router.patch('/:id/status', checkRole(...STAFF_MATRICULAS), validate(enrollmentValidator.updateStatus), updateStatus);
+router.post('/:id/formalizar', checkRole(...STAFF_MATRICULAS), validate(enrollmentValidator.formalizar), formalizar);
 router.patch('/:id/grupo', checkRole(...STAFF_MATRICULAS), validate(enrollmentValidator.cambiarGrupo), cambiarGrupo);
 
 router.post(
@@ -59,6 +64,13 @@ router.post(
   validate(enrollmentValidator.cargarDocumento),
   subirDocumentoMatricula.single('file'),
   cargarDocumento
+);
+// Varios documentos a la vez («recibí todo lo obligatorio»); va con una ruta de un solo segmento después de `checklist` para no confundirse con `:tipoDocumento`.
+router.patch(
+  '/:id/checklist/verificacion-fisica',
+  checkRole(...STAFF_MATRICULAS),
+  validate(enrollmentValidator.marcarVerificacionFisica),
+  marcarVerificacionFisica
 );
 router.patch(
   '/:id/checklist/:tipoDocumento/revisar',

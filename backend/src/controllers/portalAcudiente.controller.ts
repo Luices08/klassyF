@@ -3,6 +3,7 @@ import { ParamsDictionary } from 'express-serve-static-core';
 import { ParsedQs } from 'qs';
 import { env } from '../config/env';
 import { TipoDocumentoMatricula } from '../constants/enums';
+import type { RespuestaDeContinuidad } from '../services/continuidad.service';
 import * as respuestasCitacion from '../services/citacionRespuesta.service';
 import * as portal from '../services/portalAcudiente.service';
 import ApiError from '../utils/ApiError';
@@ -47,6 +48,14 @@ export const subirDocumento = catchAsync<HijoParams & { tipoDocumento: TipoDocum
   if (!req.file) throw new ApiError(400, 'Debes adjuntar un archivo en el campo "file".');
   const data = await portal.subirDocumentoDelHijo(req.user!, req.params.studentId, req.params.tipoDocumento, req.file);
   res.status(200).json({ success: true, data });
+});
+
+export const continuidad = catchAsync<HijoParams>(async (req, res) => {
+  res.status(200).json({ success: true, data: await portal.continuidadDelHijo(req.user!, req.params.studentId) });
+});
+
+export const responderContinuidad = catchAsync<HijoParams, unknown, RespuestaDeContinuidad>(async (req, res) => {
+  res.status(200).json({ success: true, data: await portal.responderContinuidadDelHijo(req.user!, req.params.studentId, req.body, req.ip) });
 });
 
 export const certificados = catchAsync<HijoParams>(async (req, res) => {

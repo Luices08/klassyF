@@ -18,9 +18,10 @@ export const createEnrollment: ValidationSchema = {
     tipo_ingreso: Joi.string()
       .valid(...TIPOS_INGRESO)
       .required(),
-    numero_libro: Joi.number().integer().min(1),
     estado_inicial: Joi.string().valid('MATRICULADO_CONDICIONAL', 'MATRICULADO_DEFINITIVO'),
     documentacion_completa: Joi.boolean(),
+    // Los documentos que secretaría tuvo en la mano: el estado (definitiva o condicional) sale de aquí.
+    documentos_entregados: Joi.array().items(claveDocumento).unique(),
     fecha_limite_compromiso: Joi.date().allow(null, ''),
     forzar_sobrecupo: Joi.boolean(),
     reingreso: Joi.boolean(),
@@ -62,10 +63,21 @@ export const updateStatus: ValidationSchema = {
       .valid(...ESTADOS_MATRICULA)
       .required(),
     motivo: Joi.string().allow(''),
-    // Solo se usan al formalizar (PREINSCRITO -> MATRICULADO_*), que es cuando se asigna el folio.
-    numero_libro: Joi.number().integer().min(1),
+    // Solo se usa al formalizar (PREINSCRITO -> MATRICULADO_*). El libro y el folio los asigna la configuración del Libro de Matrícula.
     fecha_limite_compromiso: Joi.date(),
   }),
+};
+
+export const formalizar: ValidationSchema = {
+  params: Joi.object({ id: objectId.required() }),
+  body: Joi.object({
+    trae_todos: Joi.boolean().required(),
+    fecha_limite_compromiso: Joi.date().allow(null),
+  }),
+};
+
+export const grupoSugerido: ValidationSchema = {
+  query: Joi.object({ academic_year_id: objectId.required(), grade_id: objectId.required(), student_id: objectId }),
 };
 
 export const cambiarGrupo: ValidationSchema = {
@@ -90,6 +102,15 @@ export const revisarDocumento: ValidationSchema = {
       .valid(...ESTADOS_DOCUMENTO_MATRICULA.filter((e) => e === 'APROBADO' || e === 'RECHAZADO'))
       .required(),
     comentario: Joi.string().allow(''),
+  }),
+};
+
+export const marcarVerificacionFisica: ValidationSchema = {
+  params: Joi.object({ id: objectId.required() }),
+  body: Joi.object({
+    tipos: Joi.array().items(claveDocumento).min(1).unique().required(),
+    // true = «lo vi en físico»; false = deshacer una marca hecha por error.
+    verificado: Joi.boolean().default(true),
   }),
 };
 
@@ -133,6 +154,8 @@ export const actualizarComentario: ValidationSchema = {
 export const listarDocumentosPrevistos: ValidationSchema = {
   query: Joi.object({
     group_id: objectId.allow('', null),
+    // Para quien aún no tiene grupo (una inscripción): los documentos de ese grado.
+    grade_id: objectId.allow('', null),
     tipo_ingreso: Joi.string()
       .valid(...TIPOS_INGRESO)
       .required(),
@@ -149,3 +172,4 @@ export const listarDocumentosPorRevisar: ValidationSchema = {
     limit: Joi.number().integer().min(1).max(100),
   }),
 };
+

@@ -9,20 +9,30 @@ import { IconButton } from '../../components/ui/IconButton';
 import { PageHeader } from '../../components/ui/PageHeader';
 import { Spinner } from '../../components/ui/Spinner';
 import { EmptyRow, Table, TableBody, TableHead, Td, Th } from '../../components/ui/Table';
-import { CheckCircleIcon, XCircleIcon } from '../../components/ui/icons';
-import { useAnioDeTrabajo } from '../../hooks/useAniosLectivos';
+import { CheckCircleIcon, ClipboardListIcon, FileTextIcon, PlusIcon, XCircleIcon } from '../../components/ui/icons';
+import { Tabs } from '../../components/ui/Tabs';
+import { CuposPrematriculaPanel } from '../../components/admisiones/CuposPrematriculaPanel';
+import { RenovacionPanel } from '../../components/admisiones/RenovacionPanel';
+import { ReservarCupoDrawer } from '../../components/admisiones/ReservarCupoDrawer';
+import { VentanaPrematriculaPanel } from '../../components/admisiones/VentanaPrematriculaPanel';
+import { InscripcionDrawer } from '../../components/admisiones/InscripcionDrawer';
+import { SolicitudDocumentosDrawer } from '../../components/admisiones/SolicitudDocumentosDrawer';
+import { useAnioDeTrabajo, useAniosLectivos } from '../../hooks/useAniosLectivos';
 import {
   useAdmissionRequestsList,
   useAprobarSolicitud,
   useRechazarSolicitud,
   type AdmissionRequestsFilter,
 } from '../../hooks/useAdmissionRequests';
+import { ETIQUETA_JORNADA } from '../../hooks/useCertificados';
 import { useGroups } from '../../hooks/useGroups';
 import { ESTADOS_SOLICITUD, type AdmissionRequest, type EstadoSolicitud } from '../../types/domain';
 
 const ESTADO_TONE: Record<EstadoSolicitud, 'blue' | 'green' | 'red' | 'orange'> = {
   PENDIENTE: 'orange',
   EN_REVISION: 'blue',
+  CUPO_RESERVADO: 'blue',
+  EN_ESPERA: 'orange',
   APROBADA: 'green',
   RECHAZADA: 'red',
 };
@@ -31,33 +41,64 @@ function nombreDe(v: string | { nombre: string }): string {
   return typeof v === 'string' ? v : v.nombre;
 }
 
+/** La sede y la jornada que pidió la familia, o «Sin preferencia» si no eligió. */
+function sedeYJornadaPedidas(s: AdmissionRequest): string {
+  const sede = s.sede_deseada_id ? nombreDe(s.sede_deseada_id) : null;
+  const jornada = s.jornada_deseada ? (ETIQUETA_JORNADA[s.jornada_deseada] ?? s.jornada_deseada) : null;
+  return [sede, jornada].filter(Boolean).join(' · ') || 'Sin preferencia de sede ni jornada';
+}
+
 export function AdmissionRequestsPage() {
   const { anio } = useAnioDeTrabajo();
   const anioId = anio?._id;
+  const [pestana, setPestana] = useState<'solicitudes' | 'renovacion' | 'cupos' | 'ventana'>('solicitudes');
   const [filterEstado, setFilterEstado] = useState<EstadoSolicitud | ''>('');
+  const [filterAnio, setFilterAnio] = useState('');
   const [page, setPage] = useState(1);
 
-  const filter: AdmissionRequestsFilter = { estado: filterEstado || undefined, page, limit: 20 };
+  // Los años que admiten solicitudes (no cerrados): durante la prematrícula hay dos, el en curso y el siguiente.
+  const aniosQuery = useAniosLectivos();
+  const aniosAbiertos = [...(aniosQuery.data ?? [])].filter((a) => a.estado !== 'CERRADO').sort((a, b) => b.year - a.year);
+  const [anioElegido, setAnioElegido] = useState('');
+  const anioDePrematricula = anioElegido || (aniosAbiertos.find((a) => a.estado === 'PLANIFICACION') ?? aniosAbiertos.find((a) => a.estado === 'EN_CURSO'))?._id;
+
+  const filter: AdmissionRequestsFilter = { estado: filterEstado || undefined, academic_year_id: filterAnio || undefined, page, limit: 20 };
   const listQuery = useAdmissionRequestsList(filter);
 
   const [aprobando, setAprobando] = useState<AdmissionRequest | null>(null);
+  const [inscribiendo, setInscribiendo] = useState(false);
+  // Se guarda el id y no la solicitud: al subir o quitar un documento la lista se refresca y el drawer muestra lo nuevo.
+  const [documentosDe, setDocumentosDe] = useState<string | null>(null);
+  const [reservando, setReservando] = useState<AdmissionRequest | null>(null);
+  // Una solicitud de prematrícula se aprueba en un grupo del año al que apunta, no en el año en curso.
+  const anioDeAprobacion = aprobando?.academic_year_id ?? anioId;
   const [groupId, setGroupId] = useState('');
   const [fechaLimite, setFechaLimite] = useState('');
   const groupsQuery = useGroups({
-    academic_year_id: anioId,
+    academic_year_id: anioDeAprobacion,
     grade_id: aprobando ? (typeof aprobando.grado_deseado_id === 'string' ? aprobando.grado_deseado_id : aprobando.grado_deseado_id._id) : undefined,
     estado: 'ACTIVE',
   });
   const aprobar = useAprobarSolicitud();
+  // Los grupos del grado pedido, con los de la sede y jornada que pidió la familia primero; los demás se ofrecen pero avisan que son otra sede o jornada.
+  const sedePedida = aprobando?.sede_deseada_id ? (typeof aprobando.sede_deseada_id === 'string' ? aprobando.sede_deseada_id : aprobando.sede_deseada_id._id) : null;
+  const gruposParaAprobar = (groupsQuery.data ?? [])
+    .map((g) => ({
+      g,
+      loPedido:
+        (!sedePedida || (typeof g.sede_id === 'string' ? g.sede_id : g.sede_id._id) === sedePedida) &&
+        (!aprobando?.jornada_deseada || (typeof g.jornada_id === 'object' && g.jornada_id.nombre === aprobando.jornada_deseada)),
+    }))
+    .sort((a, b) => Number(b.loPedido) - Number(a.loPedido));
 
   async function handleAprobar(e: FormEvent) {
     e.preventDefault();
-    if (!aprobando || !anioId) return;
+    if (!aprobando || !anioDeAprobacion) return;
     aprobar.reset();
     await aprobar.mutateAsync({
       id: aprobando._id,
       group_id: groupId,
-      academic_year_id: anioId,
+      academic_year_id: anioDeAprobacion,
       fecha_limite_legalizacion: fechaLimite || undefined,
     });
     setAprobando(null);
@@ -84,13 +125,63 @@ export function AdmissionRequestsPage() {
     <div className="space-y-4">
       <PageHeader
         title="Admisiones"
-        subtitle="Solicitudes de cupo recibidas desde el sitio público (M04). Apruébalas para crear la matrícula, o recházalas con un motivo."
+        subtitle="Solicitudes de cupo que llegan por el sitio público o que se inscriben en el mostrador (M04). Apruébalas para crear la matrícula, o recházalas con un motivo."
+        action={
+          <Button onClick={() => setInscribiendo(true)}>
+            <PlusIcon className="h-4 w-4" />
+            Registrar inscripción
+          </Button>
+        }
       />
 
+      <Tabs
+        items={[
+          { key: 'solicitudes', label: 'Solicitudes' },
+          { key: 'renovacion', label: 'Renovación de antiguos' },
+          { key: 'cupos', label: 'Cupos de prematrícula' },
+          { key: 'ventana', label: 'Ventana de prematrícula' },
+        ]}
+        value={pestana}
+        onChange={(k) => setPestana(k as typeof pestana)}
+      />
+
+      {pestana !== 'solicitudes' && (
+        <div className="max-w-xs">
+          <Select label="Año" value={anioDePrematricula ?? ''} onChange={(e) => setAnioElegido(e.target.value)}>
+            {aniosAbiertos.map((a) => (
+              <option key={a._id} value={a._id}>
+                {a.year} · {a.estado === 'PLANIFICACION' ? 'planificación' : 'en curso'}
+              </option>
+            ))}
+          </Select>
+        </div>
+      )}
+      {pestana === 'renovacion' && <RenovacionPanel anioId={anioDePrematricula} />}
+      {pestana === 'cupos' && <CuposPrematriculaPanel anioId={anioDePrematricula} />}
+      {pestana === 'ventana' && <VentanaPrematriculaPanel anioId={anioDePrematricula} />}
+
+      {pestana === 'solicitudes' && (
       <Card>
         <CardHeader
           title="Solicitudes"
           action={
+            <div className="flex flex-wrap items-end gap-3">
+            <Select
+              label="Año"
+              value={filterAnio}
+              onChange={(e) => {
+                setFilterAnio(e.target.value);
+                setPage(1);
+              }}
+              className="w-40"
+            >
+              <option value="">Todos</option>
+              {aniosAbiertos.map((a) => (
+                <option key={a._id} value={a._id}>
+                  {a.year}
+                </option>
+              ))}
+            </Select>
             <Select
               label="Estado"
               value={filterEstado}
@@ -107,6 +198,7 @@ export function AdmissionRequestsPage() {
                 </option>
               ))}
             </Select>
+            </div>
           }
         />
 
@@ -119,8 +211,9 @@ export function AdmissionRequestsPage() {
               <TableHead>
                 <Th>Aspirante</Th>
                 <Th>Documento</Th>
-                <Th>Grado deseado</Th>
+                <Th>Cupo que pidió</Th>
                 <Th>Acudiente</Th>
+                <Th>Documentos</Th>
                 <Th>Fecha</Th>
                 <Th>Estado</Th>
                 <Th />
@@ -134,17 +227,29 @@ export function AdmissionRequestsPage() {
                     <Td>
                       {s.tipo_documento} {s.numero_documento}
                     </Td>
-                    <Td>{nombreDe(s.grado_deseado_id)}</Td>
+                    <Td>
+                      <span className="font-medium text-ink">{nombreDe(s.grado_deseado_id)}</span>
+                      <span className="block text-xs text-muted">{sedeYJornadaPedidas(s)}</span>
+                    </Td>
                     <Td>
                       {s.acudiente_nombre} {s.acudiente_apellido} · {s.acudiente_telefono}
                     </Td>
+                    <Td>{s.documentos?.length ? `${s.documentos.length} recibido${s.documentos.length === 1 ? '' : 's'}` : '—'}</Td>
                     <Td>{new Date(s.createdAt).toLocaleDateString()}</Td>
                     <Td>
-                      <Chip tone={ESTADO_TONE[s.estado]}>{s.estado}</Chip>
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        <Chip tone={ESTADO_TONE[s.estado]}>{s.estado}</Chip>
+                        {s.origen === 'SECRETARIA' && <Chip tone="neutral">Mostrador</Chip>}
+                      </div>
                     </Td>
                     <Td>
-                      {(s.estado === 'PENDIENTE' || s.estado === 'EN_REVISION') && (
-                        <div className="flex justify-end gap-2">
+                      <div className="flex justify-end gap-2">
+                        <IconButton tone="neutral" label="Documentos de la solicitud" icon={<FileTextIcon />} onClick={() => setDocumentosDe(s._id)} />
+                        {(s.estado === 'PENDIENTE' || s.estado === 'EN_REVISION' || s.estado === 'EN_ESPERA') && (
+                          <IconButton tone="edit" label="Reservar cupo" icon={<ClipboardListIcon />} onClick={() => setReservando(s)} />
+                        )}
+                        {(s.estado === 'PENDIENTE' || s.estado === 'EN_REVISION' || s.estado === 'CUPO_RESERVADO' || s.estado === 'EN_ESPERA') && (
+                          <>
                           <IconButton
                             tone="success"
                             label="Aprobar solicitud"
@@ -161,12 +266,13 @@ export function AdmissionRequestsPage() {
                             icon={<XCircleIcon />}
                             onClick={() => setRechazando(s)}
                           />
-                        </div>
-                      )}
+                          </>
+                        )}
+                      </div>
                     </Td>
                   </tr>
                 ))}
-                {paginaInfo.data.length === 0 && <EmptyRow colSpan={7}>Sin solicitudes.</EmptyRow>}
+                {paginaInfo.data.length === 0 && <EmptyRow colSpan={8}>Sin solicitudes.</EmptyRow>}
               </TableBody>
             </Table>
 
@@ -188,6 +294,11 @@ export function AdmissionRequestsPage() {
           </>
         )}
       </Card>
+      )}
+
+      <InscripcionDrawer open={inscribiendo} onClose={() => setInscribiendo(false)} />
+      <ReservarCupoDrawer key={reservando?._id ?? 'ninguna'} solicitud={reservando} onClose={() => setReservando(null)} />
+      <SolicitudDocumentosDrawer solicitud={paginaInfo?.data.find((s) => s._id === documentosDe) ?? null} onClose={() => setDocumentosDe(null)} />
 
       <Drawer
         open={aprobando !== null}
@@ -207,9 +318,10 @@ export function AdmissionRequestsPage() {
         </Alert>
         <Select label="Grupo" required value={groupId} onChange={(e) => setGroupId(e.target.value)}>
           <option value="">Selecciona...</option>
-          {(groupsQuery.data ?? []).map((g) => (
+          {gruposParaAprobar.map(({ g, loPedido }) => (
             <option key={g._id} value={g._id}>
-              {g.nomenclatura} ({g.cupos_ocupados}/{g.max_capacity})
+              {g.nomenclatura} · {typeof g.sede_id === 'object' ? g.sede_id.nombre : ''} · {typeof g.jornada_id === 'object' ? (ETIQUETA_JORNADA[g.jornada_id.nombre] ?? g.jornada_id.nombre) : ''} ({g.cupos_ocupados}/{g.max_capacity})
+              {loPedido ? '' : ' — otra sede o jornada'}
             </option>
           ))}
         </Select>

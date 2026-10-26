@@ -8,6 +8,7 @@ import { Drawer } from '../../components/ui/Drawer';
 import { Input, Select, Textarea } from '../../components/ui/Field';
 import { IconButton } from '../../components/ui/IconButton';
 import { CatalogoDocumentosMatricula } from '../../components/matriculas/CatalogoDocumentosMatricula';
+import { ConfiguracionFoliatura } from '../../components/matriculas/ConfiguracionFoliatura';
 import { PageHeader } from '../../components/ui/PageHeader';
 import { Tabs } from '../../components/ui/Tabs';
 import { Spinner } from '../../components/ui/Spinner';
@@ -16,29 +17,28 @@ import { EyeIcon, PlusIcon, SearchIcon } from '../../components/ui/icons';
 import { useAuth } from '../../context/AuthContext';
 import { useAnioDeTrabajo } from '../../hooks/useAniosLectivos';
 import { useCampuses, useGrades, useJornadas } from '../../hooks/useCatalogs';
-import { useCreateEnrollment, useEnrollmentsList, useEstudiantesPorGrado, useCargarDocumentoMatricula, type EnrollmentsFilter } from '../../hooks/useEnrollments';
+import { useCreateEnrollment, useDocumentosPrevistos, useEnrollment, useEnrollmentsList, useEstudiantesPorGrado, useFormalizarMatricula, useGrupoSugerido, type EnrollmentsFilter } from '../../hooks/useEnrollments';
+import { useHojaDeVida } from '../../hooks/useStudents';
+import { useFoliatura } from '../../hooks/useFoliatura';
 import { useGroups } from '../../hooks/useGroups';
 import { useInstitution } from '../../hooks/useInstitution';
-import { useCrearEstudianteCompleto } from '../../hooks/useStudents';
 import type { EstudiantePorGrado } from '../../types/domain';
 import {
   ESTADOS_MATRICULA,
-  PARENTESCOS,
-  TIPOS_DOCUMENTO,
   TIPOS_INGRESO,
   type EstadoMatricula,
-  type Parentesco,
-  type TipoDocumento,
   type ChecklistItem,
   type TipoIngreso,
 } from '../../types/domain';
-import { DocumentosPrevistos } from '../../components/matriculas/DocumentosPrevistos';
+import { DocumentosPrevistos, type TraeTodos } from '../../components/matriculas/DocumentosPrevistos';
+import { DocumentosDeLaPreinscrita } from '../../components/matriculas/DocumentosDeLaPreinscrita';
+import { hayObligatoriosPorAprobar } from '../../lib/documentosMatricula';
 import { InformacionApoyoCampos } from '../../components/inclusion/InformacionApoyoCampos';
 import { APOYO_VACIO, aApoyoDeclarado } from '../../lib/apoyoDeclarado';
 import { SelectBuscable } from '../../components/ui/SelectBuscable';
 import { opcionesDeGrupos } from '../../lib/opcionesBuscables';
 import { SelectorEstudianteMatricula } from '../../components/matriculas/SelectorEstudianteMatricula';
-import { admiteMatricula, type FiltroEstudiante } from '../../lib/situacionEstudiante';
+import { admiteMatricula, estaPorFormalizar, type FiltroEstudiante } from '../../lib/situacionEstudiante';
 import { MatriculaPorGrado } from '../../components/matriculas/MatriculaPorGrado';
 import { gradosOrdenados, tipoDeIngresoSugerido, veredictoDeGrado } from '../../lib/matriculaPorGrado';
 
@@ -68,38 +68,17 @@ function nombreGrupo(v: string | { nomenclatura: string }): string {
 }
 
 const FORM_VACIO = {
-  // Matrícula
   student_id: '',
   group_id: '',
   tipo_ingreso: 'NUEVO' as TipoIngreso,
-  documentacion_completa: true,
+  /** Si el acudiente trae todos los documentos obligatorios: de ahí sale si la matrícula nace definitiva o condicional. Sin elegir no se puede matricular. */
+  trae_todos: '' as TraeTodos,
   fecha_limite_compromiso: '',
   forzar_sobrecupo: false,
   apoyo: APOYO_VACIO,
   /** Id del grado cuyo certificado más alto presentó; solo para quien no tiene historial en el sistema. */
   ultimo_grado_aprobado_id: '',
   motivo_grado: '',
-
-  // Datos estudiante exprés
-  expres_tipo_documento: 'TI' as TipoDocumento,
-  expres_numero_documento: '',
-  expres_nombre: '',
-  expres_apellido: '',
-  expres_fecha_nacimiento: '',
-  expres_email: '',
-  expres_password: '',
-
-  // Datos acudiente exprés
-  expres_acudiente_tipo_documento: 'CC' as TipoDocumento,
-  expres_acudiente_numero_documento: '',
-  expres_acudiente_nombre: '',
-  expres_acudiente_apellido: '',
-  expres_acudiente_telefono_principal: '',
-  expres_acudiente_email: '',
-  expres_acudiente_parentesco: 'MADRE' as Parentesco,
-  expres_acudiente_password: '',
-  expres_acudiente_habilitar_portal: false,
-  expres_acudiente_es_principal: true,
 };
 
 export function EnrollmentsPage() {
@@ -148,27 +127,28 @@ export function EnrollmentsPage() {
   };
   const listQuery = useEnrollmentsList(filter);
 
-  // --- Formalizar matricula ---
-  // `?pestana=por-grado`, `?pestana=cupos` o `?pestana=documentos` abren directo esa sección.
+  // --- Nueva matrícula ---
+  // `?pestana=por-grado`, `cupos`, `documentos` o `libro` abren directo esa sección; `?estudiante=<id>` abre «Nueva matrícula» con ese estudiante ya elegido
+  // (el botón «Matricular ahora» de Estudiantes), así quien lo acaba de registrar no tiene que buscarlo.
   const [parametros, setParametros] = useSearchParams();
-  const pestana = ['por-grado', 'cupos', 'documentos'].includes(parametros.get('pestana') ?? '')
-    ? (parametros.get('pestana') as 'por-grado' | 'cupos' | 'documentos')
+  const pestana = ['por-grado', 'cupos', 'documentos', 'libro'].includes(parametros.get('pestana') ?? '')
+    ? (parametros.get('pestana') as 'por-grado' | 'cupos' | 'documentos' | 'libro')
     : 'matriculas';
   const cambiarPestana = (k: string) => setParametros(k === 'matriculas' ? {} : { pestana: k }, { replace: true });
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [matriculaCreadaId, setMatriculaCreadaId] = useState<string | null>(null);
-  const [modoMatricula, setModoMatricula] = useState<'existente' | 'expres'>('existente');
   const [form, setForm] = useState(FORM_VACIO);
   const [errorEnvio, setErrorEnvio] = useState<string | null>(null);
 
   const studentsQuery = useEstudiantesPorGrado(anioId);
   const [filtroEstudiante, setFiltroEstudiante] = useState<FiltroEstudiante>('DISPONIBLES');
   const [reingresoConfirmado, setReingresoConfirmado] = useState(false);
-  const estudianteElegido = modoMatricula === 'existente' ? studentsQuery.data?.find((e) => e._id === form.student_id) : undefined;
+  const estudianteElegido = studentsQuery.data?.find((e) => e._id === form.student_id);
   const esReingreso = estudianteElegido?.situacion === 'REINGRESO';
   // Matricular a quien ya está matriculado (o graduado / sin usuario activo) no se permite; el servidor lo rechaza igual.
-  const matriculaBloqueada =
-    modoMatricula === 'existente' && Boolean(estudianteElegido) && (!admiteMatricula(estudianteElegido!.situacion) || (esReingreso && !reingresoConfirmado));
+  // Quien ya tiene su matrícula preinscrita (cupo y grupo, sin folio) no se matricula de nuevo: aquí se formaliza.
+  const preinscrita = estudianteElegido && estaPorFormalizar(estudianteElegido) ? estudianteElegido.matricula : null;
+  const matriculaBloqueada = Boolean(estudianteElegido) && !preinscrita && (!admiteMatricula(estudianteElegido!.situacion) || (esReingreso && !reingresoConfirmado));
   // Solo grupos activos: uno CLOSED ya no admite nuevas matriculas (ver group.controller).
   const groupsQuery = useGroups({ academic_year_id: anioId, estado: 'ACTIVE' });
   const [gradoDelGrupo, setGradoDelGrupo] = useState('');
@@ -183,9 +163,9 @@ export function EnrollmentsPage() {
     const g = groupsQuery.data?.find((x) => x._id === form.group_id)?.grade_id;
     return g && typeof g === 'object' ? g : null;
   })();
-  const ubicacionDelElegido = modoMatricula === 'existente' ? (estudianteElegido?.ubicacion ?? null) : null;
-  // Quien no tiene historial (o es un estudiante nuevo) puede traer un certificado: con él se declara su último grado aprobado.
-  const pideGradoAprobado = modoMatricula === 'expres' || ubicacionDelElegido?.esperado.lugar === 'SIN_GRADO';
+  const ubicacionDelElegido = estudianteElegido?.ubicacion ?? null;
+  // Quien no tiene historial puede traer un certificado: con él se declara su último grado aprobado.
+  const pideGradoAprobado = ubicacionDelElegido?.esperado.lugar === 'SIN_GRADO';
   const gradoAprobado = pideGradoAprobado ? grados.find((g) => g._id === form.ultimo_grado_aprobado_id) : undefined;
   const veredictoGrado = veredictoDeGrado({
     ubicacion: ubicacionDelElegido,
@@ -198,10 +178,26 @@ export function EnrollmentsPage() {
   const gradoEsperado = gradoAprobado
     ? grados.find((g) => g.numero === gradoAprobado.numero + 1)
     : grados.find((g) => g._id === ubicacionDelElegido?.esperado_grado_id);
+  // El grupo menos lleno del grado (el que se eligió o el que le toca por su historial); con su renovación, en su sede y jornada.
+  const gradoParaSugerir = gradoDelGrupo || ubicacionDelElegido?.esperado_grado_id || '';
+  const sugerencia = useGrupoSugerido(anioId, preinscrita ? undefined : gradoParaSugerir || undefined, form.student_id || undefined);
   const createEnrollment = useCreateEnrollment();
-  const crearEstudiante = useCrearEstudianteCompleto();
-  const cargarDoc = useCargarDocumentoMatricula();
-  const [archivosDocumentos, setArchivosDocumentos] = useState<Record<string, File>>({});
+  const formalizar = useFormalizarMatricula();
+  // Lo que ya dice la hoja de vida de una discapacidad: se muestra (no se vuelve a escribir) y orientación la recibe al matricular.
+  const hojaDeVida = useHojaDeVida(form.student_id, Boolean(estudianteElegido?.tiene_discapacidad));
+  const detalleDeLaPreinscrita = useEnrollment(preinscrita?._id);
+  const [resumenCreada, setResumenCreada] = useState<{ definitiva: boolean } | null>(null);
+
+  // Lo que se pide a este estudiante en este grupo: con ello se sabe antes de guardar si la matrícula nace definitiva o condicional (el servidor decide igual).
+  const previstosQuery = useDocumentosPrevistos({ group_id: form.group_id || undefined, tipo_ingreso: form.tipo_ingreso, student_id: form.student_id || undefined });
+  const obligatoriosPorTraer = (previstosQuery.data ?? []).filter((d) => d.obligatorio && !d.ya_cubierto);
+  // Sin obligatorios por recibir no hay nada que preguntar: nace definitiva. En una preinscrita se mira lo que le falta de su propio checklist.
+  const checklistDeLaPreinscrita = detalleDeLaPreinscrita.data?.checklist;
+  const hayPorRecibir = preinscrita ? Boolean(checklistDeLaPreinscrita) && hayObligatoriosPorAprobar(checklistDeLaPreinscrita!) : obligatoriosPorTraer.length > 0;
+  const sinPreguntaDeDocumentos = preinscrita ? Boolean(checklistDeLaPreinscrita) && !hayPorRecibir : Boolean(previstosQuery.data) && !hayPorRecibir;
+  const traeTodos = sinPreguntaDeDocumentos || form.trae_todos === 'SI';
+  const nacerCondicional = form.trae_todos === 'NO' && hayPorRecibir;
+  const faltaRespuestaDeDocumentos = !sinPreguntaDeDocumentos && form.trae_todos === '';
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -210,102 +206,101 @@ export function EnrollmentsPage() {
     createEnrollment.reset();
 
     try {
-      let finalStudentId = form.student_id;
-
-      if (modoMatricula === 'expres') {
-        const resultado = await crearEstudiante.mutateAsync({
-          tipo_documento: form.expres_tipo_documento,
-          numero_documento: form.expres_numero_documento.trim(),
-          nombre: form.expres_nombre.trim(),
-          apellido: form.expres_apellido.trim(),
-          fecha_nacimiento: form.expres_fecha_nacimiento,
-          email: form.expres_email.trim() || undefined,
-          password: form.expres_password.trim() || undefined,
-
-          acudiente_tipo_documento: form.expres_acudiente_tipo_documento,
-          acudiente_numero_documento: form.expres_acudiente_numero_documento.trim(),
-          acudiente_nombre: form.expres_acudiente_nombre.trim(),
-          acudiente_apellido: form.expres_acudiente_apellido.trim(),
-          acudiente_telefono_principal: form.expres_acudiente_telefono_principal.trim(),
-          acudiente_email: form.expres_acudiente_email.trim() || undefined,
-          acudiente_parentesco: form.expres_acudiente_parentesco,
-          acudiente_password: form.expres_acudiente_habilitar_portal ? form.expres_acudiente_password.trim() || undefined : undefined,
-          acudiente_habilitar_portal: form.expres_acudiente_habilitar_portal,
-          acudiente_es_principal: form.expres_acudiente_es_principal,
-        });
-
-        finalStudentId = resultado.estudiante._id;
+      if (preinscrita) {
+        const formal = await formalizar.mutateAsync({ id: preinscrita._id, trae_todos: traeTodos, fecha_limite_compromiso: nacerCondicional ? form.fecha_limite_compromiso : undefined });
+        void studentsQuery.refetch();
+        // Con los originales en la mano, lo que sigue es subir los archivos: se abre el expediente.
+        if (traeTodos && hayPorRecibir) {
+          setDrawerOpen(false);
+          navigate(`/admin/enrollments/${formal._id}`);
+          reiniciarFormulario();
+          return;
+        }
+        setResumenCreada({ definitiva: formal.estado === 'MATRICULADO_DEFINITIVO' });
+        setMatriculaCreadaId(formal._id);
+        return;
       }
-
       const matricula = await createEnrollment.mutateAsync({
-        student_id: finalStudentId,
+        student_id: form.student_id,
         group_id: form.group_id,
         academic_year_id: anioId,
         tipo_ingreso: form.tipo_ingreso,
-        documentacion_completa: form.documentacion_completa,
-        estado_inicial: form.documentacion_completa ? 'MATRICULADO_DEFINITIVO' : 'MATRICULADO_CONDICIONAL',
-        fecha_limite_compromiso: form.documentacion_completa ? undefined : form.fecha_limite_compromiso,
+        // «Sí los trae»: todos los obligatorios quedan verificados en físico (sin archivo) y los sube en el expediente. «No»: ninguno se marca.
+        documentos_entregados: traeTodos ? obligatoriosPorTraer.map((d) => d.tipo_documento) : [],
+        fecha_limite_compromiso: nacerCondicional ? form.fecha_limite_compromiso : undefined,
         forzar_sobrecupo: form.forzar_sobrecupo,
-        reingreso: modoMatricula === 'existente' && esReingreso && reingresoConfirmado ? true : undefined,
-        apoyo_declarado: aApoyoDeclarado(form.apoyo),
+        reingreso: esReingreso && reingresoConfirmado ? true : undefined,
+        // Si la hoja de vida ya dice que tiene una discapacidad, el servidor la toma de allí; esto es solo lo que la familia declare de más.
+        apoyo_declarado: estudianteElegido?.tiene_discapacidad ? undefined : aApoyoDeclarado(form.apoyo),
         ultimo_grado_aprobado: gradoAprobado?.numero,
         motivo_grado: necesitaMotivoGrado ? form.motivo_grado.trim() : undefined,
       });
 
-      // Si se adjuntaron archivos digitales en este drawer, subirlos de inmediato
-      const entradasArchivos = Object.entries(archivosDocumentos);
-      if (entradasArchivos.length > 0) {
-        for (const [tipoDoc, file] of entradasArchivos) {
-          try {
-            await cargarDoc.mutateAsync({
-              id: matricula._id,
-              tipoDocumento: tipoDoc as any,
-              file,
-            });
-          } catch (uploadErr) {
-            console.error(`Error cargando archivo para ${tipoDoc}:`, uploadErr);
-          }
-        }
-      }
-
-      setForm(FORM_VACIO);
-      setGradoDelGrupo('');
-      setArchivosDocumentos({});
-      setReingresoConfirmado(false);
       void studentsQuery.refetch();
-      // Los documentos se cargan y se revisan en el expediente: el drawer ofrece el botón para ir a él.
+      // Con todos los documentos en la mano, lo que sigue es subir los archivos: se abre el expediente directamente.
+      if (traeTodos && obligatoriosPorTraer.length > 0) {
+        setDrawerOpen(false);
+        navigate(`/admin/enrollments/${matricula._id}`);
+        reiniciarFormulario();
+        return;
+      }
+      setResumenCreada({ definitiva: matricula.estado === 'MATRICULADO_DEFINITIVO' });
       setMatriculaCreadaId(matricula._id);
     } catch (err) {
       setErrorEnvio(errorMessage(err));
     }
   }
 
-  function handleSeguirMatriculando() {
+  function reiniciarFormulario() {
     setMatriculaCreadaId(null);
+    setResumenCreada(null);
     setErrorEnvio(null);
     setForm(FORM_VACIO);
     setGradoDelGrupo('');
-    setArchivosDocumentos({});
     setFiltroEstudiante('DISPONIBLES');
     setReingresoConfirmado(false);
     createEnrollment.reset();
-    crearEstudiante.reset();
+    formalizar.reset();
   }
 
-  // Abre el formulario de siempre con el estudiante y el grado de la pestaña ya elegidos; el grupo y lo demás se decide allí.
-  function matricularDesdeLista(estudiante: EstudiantePorGrado, gradoId: string | null) {
-    setModoMatricula('existente');
-    setMatriculaCreadaId(null);
-    setErrorEnvio(null);
-    setReingresoConfirmado(false);
-    setFiltroEstudiante(estudiante.situacion === 'REINGRESO' ? 'REINGRESO' : 'DISPONIBLES');
-    setForm({ ...FORM_VACIO, student_id: estudiante._id, tipo_ingreso: estudiante.situacion === 'REINGRESO' ? 'ANTIGUO' : tipoDeIngresoSugerido(estudiante, gradoId) });
-    setGradoDelGrupo(gradoId ?? '');
+  /** Abre «Nueva matrícula» con un estudiante ya elegido (y, si se sabe, el grado del grupo): así no hay que buscarlo. */
+  function abrirNuevaMatricula(estudiante: EstudiantePorGrado | null, gradoId: string | null = null) {
+    reiniciarFormulario();
+    if (estudiante) {
+      setFiltroEstudiante(estaPorFormalizar(estudiante) ? 'POR_FORMALIZAR' : estudiante.situacion === 'REINGRESO' ? 'REINGRESO' : estudiante.situacion === 'DISPONIBLE' ? 'DISPONIBLES' : 'TODOS');
+      setForm({ ...FORM_VACIO, student_id: estudiante._id, tipo_ingreso: estudiante.situacion === 'REINGRESO' ? 'ANTIGUO' : tipoDeIngresoSugerido(estudiante, gradoId) });
+      setGradoDelGrupo(gradoId ?? '');
+    }
     setDrawerOpen(true);
   }
 
+  // `?estudiante=<id>`: llega desde «Matricular ahora». Se abre una sola vez y se quita de la dirección.
+  const estudiantePedido = parametros.get('estudiante');
+  useEffect(() => {
+    if (!estudiantePedido || !anioId || !studentsQuery.data) return;
+    const encontrado = studentsQuery.data.find((e) => e._id === estudiantePedido);
+    const siguiente = new URLSearchParams(parametros);
+    siguiente.delete('estudiante');
+    setParametros(siguiente, { replace: true });
+    abrirNuevaMatricula(encontrado ?? null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [estudiantePedido, anioId, studentsQuery.data]);
+
   const esAdmin = user?.rol === 'ADMIN';
+  const sugerida = sugerencia.data?.sugerido ?? null;
+  const grupoSugeridoCompleto = sugerida ? groupsQuery.data?.find((g) => g._id === sugerida.id) : undefined;
+  const nombreDelGrupoSugerido = sugerida ? `${grupoSugeridoCompleto && typeof grupoSugeridoCompleto.grade_id === 'object' ? grupoSugeridoCompleto.grade_id.nombre : ''} ${sugerida.nombre}`.trim() : '';
+  const avisoDiscapacidad = estudianteElegido?.tiene_discapacidad ? (
+    <Alert tone="info">
+      <div className="space-y-1">
+        <p>En su hoja de vida está registrada una discapacidad: al matricularlo llega sola a orientación de la sede, con lo ya escrito. No hay que declararla otra vez.</p>
+        {hojaDeVida.data?.descripcion_inclusion && <p className="text-xs">Lo registrado: «{hojaDeVida.data.descripcion_inclusion}»</p>}
+      </div>
+    </Alert>
+  ) : null;
   const paginaInfo = listQuery.data;
+  // El libro físico del colegio no empieza en cero: mientras nadie confirme en qué folio va, se avisa antes de matricular.
+  const foliatura = useFoliatura();
 
   const pestanas = (
     <Tabs
@@ -314,18 +309,19 @@ export function EnrollmentsPage() {
         { key: 'por-grado', label: 'Por grado' },
         { key: 'cupos', label: 'Disponibilidad de cupos' },
         { key: 'documentos', label: 'Documentos que se piden' },
+        { key: 'libro', label: 'Libro y folios' },
       ]}
       value={pestana}
       onChange={cambiarPestana}
     />
   );
 
-  if (pestana === 'documentos') {
+  if (pestana === 'documentos' || pestana === 'libro') {
     return (
       <div className="space-y-4">
         <PageHeader title="Matrículas" subtitle="Cupos por sede/jornada/grado, formalización de matrícula y novedades." />
         {pestanas}
-        <CatalogoDocumentosMatricula />
+        {pestana === 'documentos' ? <CatalogoDocumentosMatricula /> : <ConfiguracionFoliatura />}
       </div>
     );
   }
@@ -340,33 +336,23 @@ export function EnrollmentsPage() {
             <Button variant="outline" onClick={() => navigate('/admin/documentos-por-revisar')}>
               Documentos por revisar
             </Button>
-            <Button
-              variant="outline"
-              onClick={() => {
-                setModoMatricula('expres');
-                setMatriculaCreadaId(null);
-                setDrawerOpen(true);
-              }}
-              disabled={!anioId}
-            >
+            <Button onClick={() => abrirNuevaMatricula(null)} disabled={!anioId}>
               <PlusIcon className="h-4 w-4" />
-              Matrícula exprés
-            </Button>
-            <Button
-              onClick={() => {
-                setModoMatricula('existente');
-                setMatriculaCreadaId(null);
-                setDrawerOpen(true);
-              }}
-              disabled={!anioId}
-            >
-              <PlusIcon className="h-4 w-4" />
-              Matricular existente
+              Nueva matrícula
             </Button>
           </div>
         }
       />
       {pestanas}
+
+      {foliatura.data && !foliatura.data.confirmada && (
+        <Alert tone="warning">
+          Falta confirmar en qué libro y folio va el colegio: el siguiente folio saldría como {foliatura.data.siguiente.codigo}.{' '}
+          <button type="button" className="font-semibold underline" onClick={() => cambiarPestana('libro')}>
+            Configurar el Libro de Matrícula
+          </button>
+        </Alert>
+      )}
 
       {!anio && <Alert tone="warning">Aún no hay un año lectivo. Créalo en "Año lectivo".</Alert>}
 
@@ -439,7 +425,7 @@ export function EnrollmentsPage() {
           grados={grados}
           cargando={studentsQuery.isLoading || gradosQuery.isLoading}
           error={studentsQuery.error}
-          onMatricular={matricularDesdeLista}
+          onMatricular={abrirNuevaMatricula}
         />
       )}
 
@@ -545,405 +531,194 @@ export function EnrollmentsPage() {
 
       <Drawer
         open={drawerOpen}
-        title={matriculaCreadaId ? 'Matrícula creada' : modoMatricula === 'expres' ? 'Matrícula exprés (nuevo estudiante)' : 'Formalizar matrícula'}
-        size={matriculaCreadaId ? 'md' : modoMatricula === 'expres' ? 'lg' : 'md'}
+        title={matriculaCreadaId ? 'Matrícula creada' : 'Nueva matrícula'}
+        size="md"
         onClose={() => {
           setDrawerOpen(false);
-          setMatriculaCreadaId(null);
-          setErrorEnvio(null);
-          setArchivosDocumentos({});
+          reiniciarFormulario();
         }}
         onSubmit={matriculaCreadaId ? undefined : handleSubmit}
-        submitLabel={modoMatricula === 'expres' ? 'Crear estudiante y matricular' : 'Matricular'}
-        isSubmitting={createEnrollment.isPending || crearEstudiante.isPending || cargarDoc.isPending}
-        submitDisabled={matriculaBloqueada || (necesitaMotivoGrado && !motivoGradoCompleto)}
+        submitLabel={preinscrita ? 'Formalizar matrícula' : 'Matricular'}
+        isSubmitting={createEnrollment.isPending || formalizar.isPending}
+        submitDisabled={!form.student_id || matriculaBloqueada || (!preinscrita && necesitaMotivoGrado && !motivoGradoCompleto) || faltaRespuestaDeDocumentos || (preinscrita !== null && !checklistDeLaPreinscrita)}
       >
         {matriculaCreadaId ? (
           <div className="space-y-4">
-            <Alert tone="success">La matrícula quedó registrada. Los documentos se cargan, aprueban o rechazan en su expediente.</Alert>
+            <Alert tone="success">
+              {resumenCreada?.definitiva
+                ? 'La matrícula quedó definitiva.'
+                : 'La matrícula quedó condicional: falta algún documento obligatorio. El acta de compromiso se imprime desde el expediente.'}{' '}
+              Los documentos se cargan, aprueban o rechazan en su expediente.
+            </Alert>
             <div className="flex flex-wrap gap-2">
               <Button onClick={() => navigate(`/admin/enrollments/${matriculaCreadaId}`)}>Ir al expediente</Button>
-              <Button variant="secondary" onClick={handleSeguirMatriculando}>
+              <Button variant="secondary" onClick={() => reiniciarFormulario()}>
                 Seguir matriculando
               </Button>
             </div>
           </div>
         ) : (
           <>
-        <div className="flex rounded-lg border border-border bg-subtle p-1 mb-2">
-          <button
-            type="button"
-            onClick={() => setModoMatricula('existente')}
-            className={`flex-1 rounded-md py-1.5 text-xs font-semibold transition ${
-              modoMatricula === 'existente'
-                ? 'bg-surface text-ink shadow-sm'
-                : 'text-muted hover:text-ink'
-            }`}
-          >
-            Estudiante existente
-          </button>
-          <button
-            type="button"
-            onClick={() => setModoMatricula('expres')}
-            className={`flex-1 rounded-md py-1.5 text-xs font-semibold transition ${
-              modoMatricula === 'expres'
-                ? 'bg-surface text-ink shadow-sm'
-                : 'text-muted hover:text-ink'
-            }`}
-          >
-            Matrícula exprés (nuevo)
-          </button>
-        </div>
+            {(errorEnvio || createEnrollment.isError) && <Alert tone="error">{errorEnvio ?? errorMessage(createEnrollment.error)}</Alert>}
 
-        {(errorEnvio || createEnrollment.isError) && (
-          <Alert tone="error">{errorEnvio ?? errorMessage(createEnrollment.error)}</Alert>
-        )}
-
-        {modoMatricula === 'existente' ? (
-          <SelectorEstudianteMatricula
-            estudiantes={studentsQuery.data ?? []}
-            filtro={filtroEstudiante}
-            onFiltroChange={(filtro) => {
-              setFiltroEstudiante(filtro);
-              setReingresoConfirmado(false);
-              setForm((f) => ({ ...f, student_id: '' }));
-            }}
-            valor={form.student_id}
-            onChange={(id) => {
-              setReingresoConfirmado(false);
-              const elegido = studentsQuery.data?.find((e) => e._id === id);
-              // Quien vuelve ya estudió aquí: el tipo de ingreso natural es ANTIGUO (secretaría lo puede cambiar).
-              setForm((f) => ({
-                ...f,
-                student_id: id,
-                tipo_ingreso: elegido?.situacion === 'REINGRESO' ? 'ANTIGUO' : f.tipo_ingreso,
-                ultimo_grado_aprobado_id: '',
-                motivo_grado: '',
-              }));
-            }}
-            reingresoConfirmado={reingresoConfirmado}
-            onReingresoChange={setReingresoConfirmado}
-          />
-        ) : (
-          <div className="space-y-4">
-            <div className="space-y-3 rounded-lg border border-border bg-subtle/40 p-3">
-              <h4 className="text-xs font-bold uppercase tracking-wider text-muted">1. Datos del estudiante</h4>
-              <div className="grid grid-cols-2 gap-2">
-                <Input
-                  label="Nombres"
-                  required
-                  value={form.expres_nombre}
-                  onChange={(e) => setForm((f) => ({ ...f, expres_nombre: e.target.value }))}
-                />
-                <Input
-                  label="Apellidos"
-                  required
-                  value={form.expres_apellido}
-                  onChange={(e) => setForm((f) => ({ ...f, expres_apellido: e.target.value }))}
-                />
-              </div>
-              <div className="grid grid-cols-2 gap-2">
-                <Select
-                  label="Tipo doc."
-                  value={form.expres_tipo_documento}
-                  onChange={(e) => setForm((f) => ({ ...f, expres_tipo_documento: e.target.value as TipoDocumento }))}
-                >
-                  {TIPOS_DOCUMENTO.map((t) => (
-                    <option key={t} value={t}>{t}</option>
-                  ))}
-                </Select>
-                <Input
-                  label="Número documento"
-                  required
-                  value={form.expres_numero_documento}
-                  onChange={(e) => setForm((f) => ({ ...f, expres_numero_documento: e.target.value }))}
-                />
-              </div>
-              <Input
-                label="Fecha de nacimiento"
-                type="date"
-                required
-                value={form.expres_fecha_nacimiento}
-                onChange={(e) => setForm((f) => ({ ...f, expres_fecha_nacimiento: e.target.value }))}
-              />
-              <div className="grid grid-cols-2 gap-2">
-                <Input
-                  label="Correo (opcional)"
-                  type="email"
-                  value={form.expres_email}
-                  onChange={(e) => setForm((f) => ({ ...f, expres_email: e.target.value }))}
-                />
-                <Input
-                  label="Contraseña (opcional)"
-                  type="password"
-                  hint="Por defecto su documento"
-                  value={form.expres_password}
-                  onChange={(e) => setForm((f) => ({ ...f, expres_password: e.target.value }))}
-                />
-              </div>
-            </div>
-
-            <div className="space-y-3 rounded-lg border border-border bg-subtle/40 p-3">
-              <h4 className="text-xs font-bold uppercase tracking-wider text-muted">2. Acudiente principal</h4>
-              <div className="grid grid-cols-2 gap-2">
-                <Input
-                  label="Nombres acudiente"
-                  required
-                  value={form.expres_acudiente_nombre}
-                  onChange={(e) => setForm((f) => ({ ...f, expres_acudiente_nombre: e.target.value }))}
-                />
-                <Input
-                  label="Apellidos acudiente"
-                  required
-                  value={form.expres_acudiente_apellido}
-                  onChange={(e) => setForm((f) => ({ ...f, expres_acudiente_apellido: e.target.value }))}
-                />
-              </div>
-              <div className="grid grid-cols-2 gap-2">
-                <Select
-                  label="Tipo doc. acudiente"
-                  value={form.expres_acudiente_tipo_documento}
-                  onChange={(e) => setForm((f) => ({ ...f, expres_acudiente_tipo_documento: e.target.value as TipoDocumento }))}
-                >
-                  {TIPOS_DOCUMENTO.map((t) => (
-                    <option key={t} value={t}>{t}</option>
-                  ))}
-                </Select>
-                <Input
-                  label="Número doc. acudiente"
-                  required
-                  value={form.expres_acudiente_numero_documento}
-                  onChange={(e) => setForm((f) => ({ ...f, expres_acudiente_numero_documento: e.target.value }))}
-                />
-              </div>
-              <div className="grid grid-cols-2 gap-2">
-                <Input
-                  label="Teléfono principal"
-                  required
-                  value={form.expres_acudiente_telefono_principal}
-                  onChange={(e) => setForm((f) => ({ ...f, expres_acudiente_telefono_principal: e.target.value }))}
-                />
-                <Select
-                  label="Parentesco"
-                  value={form.expres_acudiente_parentesco}
-                  onChange={(e) => setForm((f) => ({ ...f, expres_acudiente_parentesco: e.target.value as Parentesco }))}
-                >
-                  {PARENTESCOS.map((p) => (
-                    <option key={p} value={p}>{p}</option>
-                  ))}
-                </Select>
-              </div>
-              <Input
-                label="Correo acudiente (opcional)"
-                type="email"
-                value={form.expres_acudiente_email}
-                onChange={(e) => setForm((f) => ({ ...f, expres_acudiente_email: e.target.value }))}
-              />
-              <div className="space-y-2 pt-1">
-                <label className="flex items-center gap-2 text-xs text-body">
-                  <input
-                    type="checkbox"
-                    checked={form.expres_acudiente_es_principal}
-                    onChange={(e) => setForm((f) => ({ ...f, expres_acudiente_es_principal: e.target.checked }))}
-                    className="h-4 w-4 rounded border-border text-primary focus:ring-primary"
-                  />
-                  Acudiente principal (responsable legal de la matrícula)
-                </label>
-
-                <div className="rounded-lg border border-border bg-soft p-2.5 space-y-1.5">
-                  <label className="flex items-center gap-2 text-xs font-medium text-ink">
-                    <input
-                      type="checkbox"
-                      checked={form.expres_acudiente_habilitar_portal}
-                      onChange={(e) => setForm((f) => ({ ...f, expres_acudiente_habilitar_portal: e.target.checked }))}
-                      className="h-4 w-4 rounded border-border text-primary focus:ring-primary"
-                    />
-                    Habilitar acceso a la plataforma (Portal de Familias)
-                  </label>
-                  <p className="text-[11px] text-muted leading-tight">
-                    Crea un usuario para que pueda consultar notas y boletines. Si se desmarca (ej. abuelo o contacto de retiro), solo queda como contacto sin acceso.
-                  </p>
-                  {form.expres_acudiente_habilitar_portal && (
-                    <div className="pt-1 space-y-1">
-                      <Input
-                        label="Contraseña acudiente (opcional)"
-                        type="password"
-                        hint="Por defecto su número de documento"
-                        value={form.expres_acudiente_password}
-                        onChange={(e) => setForm((f) => ({ ...f, expres_acudiente_password: e.target.value }))}
-                      />
-                      {!form.expres_acudiente_email && (
-                        <p className="text-[11px] font-medium text-amber-600">
-                          ⚠️ Para habilitar el acceso a la plataforma, ingresa el correo del acudiente.
-                        </p>
-                      )}
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        <Select
-          label="Grado del grupo"
-          value={gradoDelGrupo}
-          onChange={(e) => {
-            const nuevo = e.target.value;
-            setGradoDelGrupo(nuevo);
-            // Un grupo elegido de otro grado ya no corresponde al filtro.
-            setForm((f) => (f.group_id && groupsQuery.data?.find((g) => g._id === f.group_id && nuevo && (typeof g.grade_id === 'object' ? g.grade_id._id : g.grade_id) !== nuevo) ? { ...f, group_id: '' } : f));
-          }}
-        >
-          <option value="">Todos los grados</option>
-          {gradosOrdenados(grados).map((g) => (
-            <option key={g._id} value={g._id}>
-              {g.nombre}
-            </option>
-          ))}
-        </Select>
-
-        <SelectBuscable
-          label="Grupo"
-          required
-          value={form.group_id}
-          onChange={(id) => setForm((f) => ({ ...f, group_id: id }))}
-          placeholder="Buscar grupo…"
-          vacioLabel="Selecciona..."
-          opciones={opcionesDeGrupos(gruposDelGrado, { conCupos: true })}
-        />
-
-        {pideGradoAprobado && (
-          <Select
-            label="Último grado aprobado (según su certificado)"
-            value={form.ultimo_grado_aprobado_id}
-            onChange={(e) => setForm((f) => ({ ...f, ultimo_grado_aprobado_id: e.target.value }))}
-            hint="Opcional. No tiene matrículas anteriores aquí: si presenta certificado, el sistema avisa cuando el grado elegido no sigue a ese."
-          >
-            <option value="">No presenta certificado</option>
-            {gradosOrdenados(grados).map((g) => (
-              <option key={g._id} value={g._id}>
-                {g.nombre}
-              </option>
-            ))}
-          </Select>
-        )}
-
-        {necesitaMotivoGrado && gradoElegido && (
-          <div className="space-y-2">
-            <Alert tone="warning">
-              Según {gradoAprobado ? `el último grado aprobado que declaraste (${gradoAprobado.nombre})` : 'su historial'},{' '}
-              {gradoEsperado ? `le corresponde ${gradoEsperado.nombre}` : 'ya terminó el último grado'}, y lo estás matriculando en {gradoElegido.nombre}. Puedes continuar si es una decisión de la
-              institución (por ejemplo, una promoción por decisión): escribe el motivo, que queda en la auditoría.
-            </Alert>
-            <Textarea
-              label="Motivo de matricularlo en este grado"
-              required
-              rows={2}
-              value={form.motivo_grado}
-              onChange={(e) => setForm((f) => ({ ...f, motivo_grado: e.target.value }))}
-              hint="Mínimo 10 caracteres."
+            <SelectorEstudianteMatricula
+              estudiantes={studentsQuery.data ?? []}
+              filtro={filtroEstudiante}
+              onFiltroChange={(filtro) => {
+                setFiltroEstudiante(filtro);
+                setReingresoConfirmado(false);
+                setForm((f) => ({ ...f, student_id: '' }));
+              }}
+              valor={form.student_id}
+              onChange={(id) => {
+                setReingresoConfirmado(false);
+                const elegido = studentsQuery.data?.find((e) => e._id === id);
+                // Quien vuelve ya estudió aquí: el tipo de ingreso natural es ANTIGUO (secretaría lo puede cambiar).
+                setForm((f) => ({
+                  ...f,
+                  student_id: id,
+                  tipo_ingreso: elegido?.situacion === 'REINGRESO' ? 'ANTIGUO' : f.tipo_ingreso,
+                  ultimo_grado_aprobado_id: '',
+                  motivo_grado: '',
+                }));
+              }}
+              reingresoConfirmado={reingresoConfirmado}
+              onReingresoChange={setReingresoConfirmado}
             />
-          </div>
-        )}
 
-        <Select
-          label="Tipo de ingreso"
-          value={form.tipo_ingreso}
-          onChange={(e) => setForm((f) => ({ ...f, tipo_ingreso: e.target.value as TipoIngreso }))}
-        >
-          {TIPOS_INGRESO.map((t) => (
-            <option key={t} value={t}>
-              {t}
-            </option>
-          ))}
-        </Select>
-
-        <div className="space-y-2 rounded-lg border border-border bg-subtle/30 p-3">
-          <label className="text-xs font-bold uppercase tracking-wider text-muted block">
-            Estado de la documentación física
-          </label>
-          <div className="grid grid-cols-2 gap-2">
-            <button
-              type="button"
-              onClick={() => setForm((f) => ({ ...f, documentacion_completa: true }))}
-              className={`rounded-md p-2.5 text-left text-xs font-semibold border transition ${
-                form.documentacion_completa
-                  ? 'bg-emerald-50 border-emerald-500 text-emerald-800 shadow-sm ring-1 ring-emerald-500'
-                  : 'bg-surface border-border text-muted hover:text-ink'
-              }`}
+            {preinscrita ? (
+              <>
+                <DocumentosDeLaPreinscrita matriculaId={preinscrita._id} traeTodos={form.trae_todos} onChange={(valor) => setForm((f) => ({ ...f, trae_todos: valor }))} />
+                {nacerCondicional && (
+                  <Input
+                    label="Fecha límite del acta de compromiso"
+                    type="date"
+                    required
+                    value={form.fecha_limite_compromiso}
+                    onChange={(e) => setForm((f) => ({ ...f, fecha_limite_compromiso: e.target.value }))}
+                    hint="Falta algún documento obligatorio: la matrícula queda condicional. Plazo máximo para entregar lo pendiente, que quedará escrito en el acta."
+                  />
+                )}
+                {avisoDiscapacidad}
+              </>
+            ) : (
+              <>
+            <Select
+              label="Grado del grupo"
+              value={gradoDelGrupo}
+              onChange={(e) => {
+                const nuevo = e.target.value;
+                setGradoDelGrupo(nuevo);
+                // Un grupo elegido de otro grado ya no corresponde al filtro.
+                setForm((f) => (f.group_id && groupsQuery.data?.find((g) => g._id === f.group_id && nuevo && (typeof g.grade_id === 'object' ? g.grade_id._id : g.grade_id) !== nuevo) ? { ...f, group_id: '' } : f));
+              }}
             >
-              <div className="font-bold">
-                Documentación completa
-              </div>
-              <p className="text-[11px] font-normal opacity-80 mt-1 leading-tight">
-                El estudiante entregó todos los documentos físicos. Matrícula definitiva directa.
-              </p>
-            </button>
-            <button
-              type="button"
-              onClick={() => setForm((f) => ({ ...f, documentacion_completa: false }))}
-              className={`rounded-md p-2.5 text-left text-xs font-semibold border transition ${
-                !form.documentacion_completa
-                  ? 'bg-amber-50 border-amber-500 text-amber-800 shadow-sm ring-1 ring-amber-500'
-                  : 'bg-surface border-border text-muted hover:text-ink'
-              }`}
-            >
-              <div className="font-bold">
-                Documentos pendientes
-              </div>
-              <p className="text-[11px] font-normal opacity-80 mt-1 leading-tight">
-                Tiene documentos faltantes. Matrícula condicional sujeta a acta de compromiso.
-              </p>
-            </button>
-          </div>
+              <option value="">Todos los grados</option>
+              {gradosOrdenados(grados).map((g) => (
+                <option key={g._id} value={g._id}>
+                  {g.nombre}
+                </option>
+              ))}
+            </Select>
 
-          {!form.documentacion_completa && (
-            <div className="pt-2">
+            <SelectBuscable
+              label="Grupo"
+              required
+              value={form.group_id}
+              onChange={(id) => setForm((f) => ({ ...f, group_id: id }))}
+              placeholder="Buscar grupo…"
+              vacioLabel="Selecciona..."
+              opciones={opcionesDeGrupos(gruposDelGrado, { conCupos: true })}
+            />
+
+            {sugerida && sugerida.id !== form.group_id && (
+              <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-soft px-3 py-2 text-sm text-body">
+                <span>
+                  Sugerido para repartir parejo: <strong className="text-ink">{nombreDelGrupoSugerido}</strong> · {sugerida.ocupados} de {sugerida.capacidad} cupos usados
+                  {sugerida.en_preferencia ? '' : ' (en su sede y jornada de renovación ya no queda cupo)'}.
+                </span>
+                <Button type="button" variant="outline" onClick={() => setForm((f) => ({ ...f, group_id: sugerida.id }))}>
+                  Usar este grupo
+                </Button>
+              </div>
+            )}
+
+            {pideGradoAprobado && (
+              <Select
+                label="Último grado aprobado (según su certificado)"
+                value={form.ultimo_grado_aprobado_id}
+                onChange={(e) => setForm((f) => ({ ...f, ultimo_grado_aprobado_id: e.target.value }))}
+                hint="Opcional. No tiene matrículas anteriores aquí: si presenta certificado, el sistema avisa cuando el grado elegido no sigue a ese."
+              >
+                <option value="">No presenta certificado</option>
+                {gradosOrdenados(grados).map((g) => (
+                  <option key={g._id} value={g._id}>
+                    {g.nombre}
+                  </option>
+                ))}
+              </Select>
+            )}
+
+            {necesitaMotivoGrado && gradoElegido && (
+              <div className="space-y-2">
+                <Alert tone="warning">
+                  Según {gradoAprobado ? `el último grado aprobado que declaraste (${gradoAprobado.nombre})` : 'su historial'},{' '}
+                  {gradoEsperado ? `le corresponde ${gradoEsperado.nombre}` : 'ya terminó el último grado'}, y lo estás matriculando en {gradoElegido.nombre}. Puedes continuar si es una decisión de la
+                  institución (por ejemplo, una promoción por decisión): escribe el motivo, que queda en la auditoría.
+                </Alert>
+                <Textarea
+                  label="Motivo de matricularlo en este grado"
+                  required
+                  rows={2}
+                  value={form.motivo_grado}
+                  onChange={(e) => setForm((f) => ({ ...f, motivo_grado: e.target.value }))}
+                  hint="Mínimo 10 caracteres."
+                />
+              </div>
+            )}
+
+            <Select label="Tipo de ingreso" value={form.tipo_ingreso} onChange={(e) => setForm((f) => ({ ...f, tipo_ingreso: e.target.value as TipoIngreso }))}>
+              {TIPOS_INGRESO.map((t) => (
+                <option key={t} value={t}>
+                  {t}
+                </option>
+              ))}
+            </Select>
+
+            <DocumentosPrevistos
+              groupId={form.group_id}
+              tipoIngreso={form.tipo_ingreso}
+              studentId={form.student_id || undefined}
+              traeTodos={form.trae_todos}
+              onChange={(valor) => setForm((f) => ({ ...f, trae_todos: valor }))}
+            />
+
+            {nacerCondicional && (
               <Input
                 label="Fecha límite del acta de compromiso"
                 type="date"
-                required={!form.documentacion_completa}
+                required
                 value={form.fecha_limite_compromiso}
                 onChange={(e) => setForm((f) => ({ ...f, fecha_limite_compromiso: e.target.value }))}
-                hint="Plazo máximo establecido en el acta para presentar los documentos pendientes."
+                hint="Falta algún documento obligatorio: la matrícula queda condicional. Plazo máximo para entregar lo pendiente, que quedará escrito en el acta."
               />
-            </div>
-          )}
-        </div>
+            )}
 
-        <DocumentosPrevistos
-          groupId={form.group_id}
-          tipoIngreso={form.tipo_ingreso}
-          studentId={modoMatricula === 'existente' ? form.student_id : undefined}
-          archivos={archivosDocumentos}
-          onArchivoChange={(tipoDoc, file) => {
-            setArchivosDocumentos((prev) => {
-              const copy = { ...prev };
-              if (!file) {
-                delete copy[tipoDoc];
-              } else {
-                copy[tipoDoc] = file;
-              }
-              return copy;
-            });
-          }}
-          documentacionCompleta={form.documentacion_completa}
-        />
+            {estudianteElegido?.tiene_discapacidad ? avisoDiscapacidad : <InformacionApoyoCampos valor={form.apoyo} onChange={(apoyo) => setForm((f) => ({ ...f, apoyo }))} />}
 
-        <InformacionApoyoCampos valor={form.apoyo} onChange={(apoyo) => setForm((f) => ({ ...f, apoyo }))} />
-
-        {esAdmin && (
-          <label className="flex items-center gap-2 text-sm text-body">
-            <input
-              type="checkbox"
-              checked={form.forzar_sobrecupo}
-              onChange={(e) => setForm((f) => ({ ...f, forzar_sobrecupo: e.target.checked }))}
-              className="h-4 w-4 rounded border-border text-primary focus:ring-primary"
-            />
-            Autorizar matrícula aunque el grupo esté en su capacidad máxima (sobrecupo)
-          </label>
-        )}
+            {esAdmin && (
+              <label className="flex items-center gap-2 text-sm text-body">
+                <input
+                  type="checkbox"
+                  checked={form.forzar_sobrecupo}
+                  onChange={(e) => setForm((f) => ({ ...f, forzar_sobrecupo: e.target.checked }))}
+                  className="h-4 w-4 rounded border-border text-primary focus:ring-primary"
+                />
+                Autorizar matrícula aunque el grupo esté en su capacidad máxima (sobrecupo)
+              </label>
+            )}
+              </>
+            )}
           </>
         )}
       </Drawer>

@@ -12,6 +12,7 @@ import ApiError from '../utils/ApiError';
 import { opcionesDeDestinatario } from '../utils/certificados';
 import { documentosObligatoriosPendientes } from '../utils/documentosMatricula';
 import { matriculaVigente } from '../utils/portalAcudiente';
+import { continuidadDelHijo as continuidadDe, responderContinuidadDelHijo as responderContinuidadDe, RespuestaDeContinuidad } from './continuidad.service';
 import { listarInasistencias } from './attendance.service';
 import { expedirCertificado, vistaCertificado, vistaCompleta } from './certificado.service';
 import { dibujarCertificadoEmitido } from './certificadoPdf.service';
@@ -331,4 +332,16 @@ export async function pdfDelCertificadoDelHijo(usuario: UserDocument, studentId:
   const certificado = Types.ObjectId.isValid(certificadoId) ? await CertificadoEmitido.findOne({ _id: certificadoId, student_id: estudiante._id }) : null;
   if (!certificado) throw new ApiError(404, 'Documento no encontrado.');
   return dibujarCertificadoEmitido(certificado, urlBase, usuario, ip);
+}
+
+// --- Renovación de matrícula (M04) ---
+
+export async function continuidadDelHijo(usuario: UserDocument, studentId: string) {
+  const { estudiante } = await exigirAcudienteDe(usuario, studentId);
+  return continuidadDe(String(estudiante._id));
+}
+
+export async function responderContinuidadDelHijo(usuario: UserDocument, studentId: string, respuesta: RespuestaDeContinuidad, ip?: string | null) {
+  const { estudiante } = await exigirAcudienteDe(usuario, studentId);
+  return responderContinuidadDe(usuario, String(estudiante._id), respuesta, ip);
 }

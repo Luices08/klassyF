@@ -33,6 +33,8 @@ describe('M04: requisitos documentales configurables', () => {
   beforeEach(async () => {
     await limpiarBaseDeDatos();
     e = await armarEscenario();
+    // El escenario deja matriculados a sus estudiantes; aquí se los matricula desde cero (una sola matrícula viva por año).
+    await Enrollment.deleteMany({});
     anio = String((await AcademicYear.findOne())!._id);
     const g = (await Group.findOne())!;
     grupo = String(g._id);

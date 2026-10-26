@@ -1,8 +1,10 @@
 import { ClientSession, Types } from 'mongoose';
 import { EstadoSolicitudApoyo, OrigenSolicitudApoyo, ResultadoSolicitudApoyo } from '../constants/inclusion';
 import { ROLES } from '../constants/roles';
+import ExpedienteInclusion from '../models/expedienteInclusion.model';
 import Group from '../models/group.model';
 import SolicitudApoyo, { SolicitudApoyoDocument } from '../models/solicitudApoyo.model';
+import StudentProfile from '../models/studentProfile.model';
 import { User, UserDocument } from '../models/user.model';
 import ApiError from '../utils/ApiError';
 import { alcanceDeInclusion, ROLES_BANDEJA_INCLUSION } from '../utils/permisosInclusion';
@@ -65,6 +67,25 @@ export interface SolicitudDesdeMatricula {
   aporta_soporte: boolean;
   observacion?: string;
   solicitada_por?: Types.ObjectId | string | null;
+}
+
+export interface ApoyoDelPerfil {
+  motivo_declarado: string;
+  aporta_soporte: boolean;
+  observacion: string;
+}
+
+/**
+ * Lo que la hoja de vida (M03) ya dice sobre una discapacidad, para que al matricular no se escriba de nuevo: la bandeja de orientación recibe lo registrado al
+ * crear al estudiante. null si no declara discapacidad o si ese año ya hay una solicitud o un expediente (no se repite: una matrícula nueva el mismo año, p. ej.
+ * un reingreso, no vuelve a avisar).
+ */
+export async function apoyoRegistradoEnPerfil(studentId: Types.ObjectId | string, academicYearId: Types.ObjectId | string, session: ClientSession): Promise<ApoyoDelPerfil | null> {
+  const perfil = await StudentProfile.findOne({ user_id: studentId }).select('tiene_discapacidad descripcion_inclusion').session(session);
+  if (!perfil?.tiene_discapacidad) return null;
+  const filtro = { student_id: studentId, academic_year_id: academicYearId };
+  if ((await SolicitudApoyo.exists(filtro).session(session)) || (await ExpedienteInclusion.exists(filtro).session(session))) return null;
+  return { motivo_declarado: 'Discapacidad registrada en la hoja de vida del estudiante', aporta_soporte: false, observacion: perfil.descripcion_inclusion?.trim() ?? '' };
 }
 
 /**

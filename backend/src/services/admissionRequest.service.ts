@@ -247,7 +247,7 @@ export async function aprobarSolicitud(
           {
             student_id: student._id,
             guardian_id: guardian._id,
-            parentesco: 'TUTOR',
+            parentesco: 'TUTOR_LEGAL',
             es_principal: true,
             autorizado_retiro: true,
           },
@@ -260,7 +260,7 @@ export async function aprobarSolicitud(
       nivel: grade.nivel,
       numeroGrado: grade.numero,
       tipoIngreso: 'NUEVO',
-      parentescoAcudiente: 'TUTOR',
+      parentescoAcudiente: 'TUTOR_LEGAL',
     });
 
     const checklist = itemsGenerados.map((item) => ({

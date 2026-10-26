@@ -549,7 +549,7 @@ export async function crearEstudianteCompleto(
             {
               student_id: studentUser._id,
               guardian_id: guardian._id,
-              parentesco: input.acudiente_parentesco || 'TUTOR',
+              parentesco: input.acudiente_parentesco || 'TUTOR_LEGAL',
               es_principal: input.acudiente_es_principal !== undefined ? Boolean(input.acudiente_es_principal) : true,
               autorizado_retiro: input.acudiente_autorizado_retiro !== undefined ? Boolean(input.acudiente_autorizado_retiro) : true,
             },

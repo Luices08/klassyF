@@ -14,7 +14,7 @@ describe('el catálogo sembrado pide exactamente lo mismo que las reglas de siem
   for (const numero of grados) {
     for (const tipoIngreso of TIPOS_INGRESO) {
       for (const tieneDiscapacidad of [false, true]) {
-        for (const parentescoAcudiente of ['MADRE', 'PADRE', 'TUTOR', undefined]) {
+        for (const parentescoAcudiente of ['MADRE', 'PADRE', 'TUTOR_LEGAL', undefined]) {
           it(`grado ${numero} · ${tipoIngreso} · discapacidad ${tieneDiscapacidad} · ${parentescoAcudiente ?? 'sin acudiente'}`, () => {
             const contexto = { nivel: nivelDe(numero), numeroGrado: numero, tipoIngreso, tieneDiscapacidad, parentescoAcudiente };
             const antes = generarChecklistMatricula(contexto).map((i) => ({ tipo: i.tipo_documento, obligatorio: i.obligatorio, nombre: i.nombre_personalizado }));

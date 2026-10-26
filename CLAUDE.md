@@ -63,7 +63,7 @@ que ya se han dado en el proyecto para que no haya que repetirlas cada vez.
   `{ requiere_seleccion_perfil, seleccion_token, perfiles, usuario }` y `POST /auth/seleccionar-perfil` lo canjea; el token dura 5 minutos, `purpose: 'seleccion_perfil'`, sin `rol`),
   pero **el frontend ya no lo usa**. Ya con sesión, `POST /auth/cambiar-perfil` (botones «Entrar como …» de `CambiadorDePerfil` en el encabezado) emite un token nuevo con otro
   perfil y se audita (`PERFIL_CAMBIADO`). Al abrir y cerrar sesión se limpia la caché de TanStack Query para que un perfil no vea datos del otro. Qué perfil puede entrar es por
-  perfil, no por persona (`motivoSinAccesoAlPerfil`): solo el de estudiante espera a la matrícula formalizada; el acudiente entra aunque su hijo siga preinscrito. La pantalla de
+  perfil, no por persona (`motivoSinAccesoAlPerfil`): el de estudiante espera a la matrícula formalizada y el de acudiente a que la matrícula de alguno de sus hijos esté **confirmada** (condicional o definitiva; un hijo retirado con folio también cuenta), no solo preinscrita. La pantalla de
   login muestra el nombre y el escudo del colegio y la foto de login (ver M01, Institución) tomados de `GET /public/institution-info`.
 
 ## 3. Alcance estricto por módulo (M01–M32)
@@ -1471,7 +1471,7 @@ frontend `PortalAcudientePage` (`/portal`, solo perfil ACUDIENTE) con `hooks/use
   + `StudentGuardian` (`exigirAcudienteDe`). Un estudiante que no es hijo suyo responde **404** (igual que si no existiera). El vínculo lo crea secretaría en M03
   («Habilitar portal»); sin vínculo el acudiente ve la lista vacía. El hijo seleccionado viaja en la URL (`?hijo=&pestana=`) y cada pestaña lleva `key` con el id
   del estudiante, así cambiarlo recarga todo.
-- **Qué ve según la matrícula** (`matriculaVigente`): con matrícula CONDICIONAL o DEFINITIVA, notas/inasistencias/convivencia; con la preinscripción en revisión solo
+- **Qué ve según la matrícula** (`matriculaVigente`): con matrícula CONDICIONAL o DEFINITIVA, notas/inasistencias/convivencia; con otra matrícula del acudiente confirmada y la de este hijo aún en preinscripción, solo
   Documentos (la pestaña por defecto) y un aviso en las demás. Boletín: no tiene pestaña propia; el `/report-card` existente ya lo sirve al ACUDIENTE publicado.
 - **Documentos pendientes** (`POST /portal/hijos/:id/documentos/:tipo`, multipart `file`): mismo guardado que secretaría y la preinscripción pública
   (`guardarArchivoDeDocumento`, 5 MB, firma de bytes). Solo mientras la matrícula es PREINSCRITO/CONDICIONAL (`ESTADOS_QUE_ADMITEN_DOCUMENTOS`) y un APROBADO no se
@@ -1533,6 +1533,7 @@ frontend `CitacionesPage` (`/reuniones`, ADMIN/COORDINADOR/DOCENTE), pestaña «
   personal se le **suma** el rol ACUDIENTE y elige perfil al entrar); si no, se crea con rol `ACUDIENTE`, contraseña temporal = número de documento y
   `debe_cambiar_password: true`. Requiere correo del acudiente (el `email` de `User` es obligatorio y único).
   El id queda en `Guardian.user_id`, que es lo que usa M27/boletín para ubicar al acudiente.
+- **La cuenta del acudiente se abre sola al confirmarse la matrícula** (`habilitarPortalDeAcudientesDe`, `guardian.service`; la llaman `createEnrollment` y `updateEnrollmentStatus` —y con él `formalizarMatriculaPreinscrita`— cuando la matrícula queda condicional o definitiva): al **acudiente principal** de ese estudiante que aún no tiene cuenta, con su documento como contraseña temporal y cambio obligatorio al entrar (si ya es personal se le suma el rol; si su correo ya lo usa el hijo admitido con él, la cuenta usa el alias `local+documento@dominio`, que llega al mismo buzón). **Nunca rompe la matrícula**: a quien no se le puede abrir (la ficha tiene el documento provisional `TEL-…` porque la solicitud no lo trajo, falta su correo o es estudiante) se le anota el motivo en el registro del servidor y secretaría lo resuelve desde la ficha del estudiante ("Habilitar portal"). Idempotente. Antes de confirmar no hay cuenta: la familia consulta el estado y sube documentos desde la página pública. **La solicitud pública pide el tipo y número de documento del acudiente** (la API los admite opcionales, así quien ya la usaba no se rompe; sin ellos la ficha lleva el teléfono como identificador provisional). Y aunque secretaría abra una cuenta a mano, el acudiente **no inicia sesión mientras ningún hijo tenga la matrícula confirmada** (`motivoSinAccesoAlPerfil`); un acudiente sin hijos vinculados todavía no se bloquea. Pruebas: `tests/integracion/accesoAcudiente.int.test.ts`.
 
 ## 4. Principios SOLID
 

@@ -29,6 +29,8 @@ const SOLICITUD_VACIA = {
   jornada_deseada: '' as Jornada | '',
   acudiente_nombre: '',
   acudiente_apellido: '',
+  acudiente_tipo_documento: 'CC' as TipoDocumento,
+  acudiente_numero_documento: '',
   acudiente_telefono: '',
   acudiente_email: '',
   observaciones: '',
@@ -199,6 +201,24 @@ export function HomePage() {
               required
               value={form.acudiente_apellido}
               onChange={(e) => setForm((f) => ({ ...f, acudiente_apellido: e.target.value }))}
+            />
+            <Select
+              label="Tipo de documento del acudiente"
+              value={form.acudiente_tipo_documento}
+              onChange={(e) => setForm((f) => ({ ...f, acudiente_tipo_documento: e.target.value as TipoDocumento }))}
+            >
+              {TIPOS_DOCUMENTO.map((t) => (
+                <option key={t} value={t}>
+                  {t}
+                </option>
+              ))}
+            </Select>
+            <Input
+              label="Número de documento del acudiente"
+              required
+              value={form.acudiente_numero_documento}
+              onChange={(e) => setForm((f) => ({ ...f, acudiente_numero_documento: e.target.value }))}
+              hint="Con él se abrirá tu acceso a la plataforma cuando el colegio confirme la matrícula."
             />
             <Input
               label="Teléfono del acudiente"

@@ -42,6 +42,9 @@ export interface CrearSolicitudInput {
   jornada_deseada?: Jornada;
   acudiente_nombre: string;
   acudiente_apellido: string;
+  /** Con su documento se abre la cuenta del portal al confirmarse la matrícula; la solicitud pública lo pide, la API lo admite sin él. */
+  acudiente_tipo_documento?: TipoDocumento;
+  acudiente_numero_documento?: string;
   acudiente_telefono: string;
   acudiente_email: string;
   observaciones?: string;

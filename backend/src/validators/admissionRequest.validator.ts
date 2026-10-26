@@ -23,6 +23,9 @@ export const crearSolicitud: ValidationSchema = {
     jornada_deseada: Joi.string().valid(...JORNADAS),
     acudiente_nombre: Joi.string().required(),
     acudiente_apellido: Joi.string().required(),
+    // El documento del acudiente permite abrir su cuenta del portal cuando se confirme la matrícula; la API lo admite sin él para quien ya la usaba.
+    acudiente_tipo_documento: Joi.string().valid(...TIPOS_DOCUMENTO),
+    acudiente_numero_documento: Joi.string().trim().min(3).max(20),
     acudiente_telefono: Joi.string().required(),
     acudiente_email: Joi.string().email().required(),
     observaciones: Joi.string().allow(''),

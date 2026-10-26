@@ -36,6 +36,7 @@ import { ubicarEstudiantes } from './ubicacionEstudiante.service';
 import { compararGradoElegido, Ubicacion } from '../utils/ubicacionEstudiante';
 import { GrupoSugerido, sugerirGrupo } from '../utils/sugerenciaDeGrupo';
 import { apoyoRegistradoEnPerfil, crearDesdeMatricula } from './solicitudApoyo.service';
+import { habilitarPortalDeAcudientesDe } from './guardian.service';
 
 // Un RETIRADO que venía matriculado libera su cupo en `aplicarSalida` (según la política de la institución); aquí llega solo quien se retira siendo PREINSCRITO.
 const ESTADOS_QUE_LIBERAN_CUPO: EstadoMatricula[] = ['RETIRADO', 'ANULADO'];
@@ -123,7 +124,7 @@ export async function createEnrollment(
   // La configuración del Libro de Matrícula se crea antes de abrir la transacción: dentro de ella, dos primeras matrículas a la vez chocarían.
   await asegurarFoliatura();
 
-  return runTransaction(async (session) => {
+  const matricula = await runTransaction(async (session) => {
     const student = await User.findOne({ _id: student_id, roles: ROLES.ESTUDIANTE }).session(session);
     if (!student) {
       throw new ApiError(404, 'El estudiante no existe o el usuario no tiene rol ESTUDIANTE.');
@@ -302,6 +303,18 @@ export async function createEnrollment(
 
     return enrollment;
   });
+  await habilitarPortalSinRomper(student_id, actor.id);
+  return matricula;
+}
+
+/** La matrícula confirmada abre el portal del acudiente (M27); si no se puede, la matrícula no se afecta: el motivo queda en el registro del servidor. */
+async function habilitarPortalSinRomper(studentId: string | Types.ObjectId, usuarioId: string | Types.ObjectId): Promise<void> {
+  try {
+    const r = await habilitarPortalDeAcudientesDe(studentId, { usuarioId });
+    for (const o of r.omitidos) console.warn(`[matrícula] No se abrió el portal de ${o.acudiente}: ${o.motivo}`);
+  } catch (err) {
+    console.error('[matrícula] No se pudo habilitar el portal del acudiente:', err);
+  }
 }
 
 export interface FormalizacionOpciones {
@@ -331,7 +344,7 @@ export async function updateEnrollmentStatus(
   }
   if (ESTADOS_MATRICULA_CON_FOLIO.includes(nuevoEstado)) await asegurarFoliatura();
 
-  return runTransaction(async (session) => {
+  const actualizada = await runTransaction(async (session) => {
     const enrollment = await Enrollment.findById(enrollmentId).session(session);
     if (!enrollment) {
       throw new ApiError(404, 'Matricula no encontrada.');
@@ -416,6 +429,9 @@ export async function updateEnrollmentStatus(
 
     return enrollment;
   });
+  // Confirmada la matrícula (condicional o definitiva), el acudiente puede entrar al portal.
+  if (ESTADOS_MATRICULA_CON_FOLIO.includes(nuevoEstado)) await habilitarPortalSinRomper(actualizada.student_id, actor.id);
+  return actualizada;
 }
 
 /** Reasignacion/cambio de grupo (M04-D): conserva el historial de notas/asistencia, que viven en otras colecciones por group_id+fecha. */

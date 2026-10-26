@@ -26,6 +26,9 @@ export interface SolicitarCupoInput {
   jornada_deseada?: Jornada;
   acudiente_nombre: string;
   acudiente_apellido: string;
+  /** Con su documento se abre su cuenta del portal cuando el colegio confirma la matrícula. */
+  acudiente_tipo_documento?: TipoDocumento;
+  acudiente_numero_documento?: string;
   acudiente_telefono: string;
   acudiente_email: string;
   observaciones?: string;

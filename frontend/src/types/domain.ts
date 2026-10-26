@@ -802,13 +802,6 @@ export interface PublicInstitutionInfo {
   klassy_version: string;
 }
 
-export interface PublicGrade {
-  _id: string;
-  nivel: string;
-  numero: number;
-  nombre: string;
-}
-
 /** Lo que ve el acudiente en el sitio público cuando la solicitud está APROBADA. */
 export interface DocumentoPreinscripcion {
   tipo_documento: TipoDocumentoMatricula;

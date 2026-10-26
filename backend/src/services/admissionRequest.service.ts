@@ -18,6 +18,7 @@ import { ESTADO_ACTIVO } from '../utils/filtroEstado';
 import { runTransaction } from '../utils/runTransaction';
 import { buscarMatriculaDePreinscripcion, construirDetalle, PreinscripcionDetalle } from './preinscripcionPublica.service';
 import { avisarSolicitudAdmision } from './notificacionesEventos.service';
+import { exigirOfertaDisponible } from './ofertaAdmision.service';
 import { crearDesdeMatricula } from './solicitudApoyo.service';
 import { registrarEvento } from './audit.service';
 import { anioDeLaAdmision, infoPublicaDeReserva, ReservaPublica } from './prematricula.service';
@@ -63,6 +64,8 @@ export async function crearSolicitud(input: CrearSolicitudInput, origen: OrigenD
   if (!nombre) throw new ApiError(400, MENSAJE_NOMBRE_INCOMPLETO);
   const grado = await Grade.findOne({ _id: input.grado_deseado_id, estado: ESTADO_ACTIVO });
   if (!grado) throw new ApiError(400, 'El grado seleccionado no existe o no esta activo.');
+  // Solo se radica lo que el colegio ofrece: un grado puede no estar en una sede o en una jornada, y no tiene sentido recibir lo que luego habría que rechazar.
+  await exigirOfertaDisponible({ grado_id: String(grado._id), sede_id: input.sede_deseada_id ?? null, jornada: input.jornada_deseada ?? null });
 
   const yaTieneAbierta = await AdmissionRequest.findOne({
     numero_documento: input.numero_documento,

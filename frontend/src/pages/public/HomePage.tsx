@@ -9,9 +9,10 @@ import { PreinscripcionAprobada } from '../../components/public/PreinscripcionAp
 import { SitioRenderizado } from '../../components/sitioPublico/SitioRenderizado';
 import { useEstadoSolicitud, useSolicitarCupo, type CredencialesPreinscripcion } from '../../hooks/useAdmissionRequests';
 import { ReservaDeCupo } from '../../components/public/ReservaDeCupo';
-import { usePublicGrades, usePublicInstitutionInfo } from '../../hooks/usePublicInfo';
+import { SelectoresDeOferta } from '../../components/admisiones/SelectoresDeOferta';
+import { usePublicInstitutionInfo } from '../../hooks/usePublicInfo';
 import { urlImagenSitio, useSitioPublico } from '../../hooks/useSitioPublico';
-import { JORNADAS, TIPOS_DOCUMENTO, type Jornada, type TipoDocumento } from '../../types/domain';
+import { TIPOS_DOCUMENTO, type Jornada, type TipoDocumento } from '../../types/domain';
 import { CONFIGURACION_SITIO_INICIAL } from '../../types/sitioPublico';
 import { InformacionApoyoCampos } from '../../components/inclusion/InformacionApoyoCampos';
 import { APOYO_VACIO, aApoyoDeclarado } from '../../lib/apoyoDeclarado';
@@ -41,7 +42,6 @@ export function HomePage() {
   const navigate = useNavigate();
   const sitioQuery = useSitioPublico();
   const infoQuery = usePublicInstitutionInfo();
-  const gradosQuery = usePublicGrades();
 
   const [solicitarOpen, setSolicitarOpen] = useState(false);
   const [consultarOpen, setConsultarOpen] = useState(false);
@@ -153,43 +153,7 @@ export function HomePage() {
               value={form.fecha_nacimiento}
               onChange={(e) => setForm((f) => ({ ...f, fecha_nacimiento: e.target.value }))}
             />
-            <Select
-              label="Grado deseado"
-              required
-              value={form.grado_deseado_id}
-              onChange={(e) => setForm((f) => ({ ...f, grado_deseado_id: e.target.value }))}
-            >
-              <option value="">Selecciona...</option>
-              {(gradosQuery.data ?? []).map((g) => (
-                <option key={g._id} value={g._id}>
-                  {g.nombre}
-                </option>
-              ))}
-            </Select>
-            <Select
-              label="Sede deseada (opcional)"
-              value={form.sede_deseada_id}
-              onChange={(e) => setForm((f) => ({ ...f, sede_deseada_id: e.target.value }))}
-            >
-              <option value="">Sin preferencia</option>
-              {info.sedes.map((s) => (
-                <option key={s._id} value={s._id}>
-                  {s.nombre}
-                </option>
-              ))}
-            </Select>
-            <Select
-              label="Jornada deseada (opcional)"
-              value={form.jornada_deseada}
-              onChange={(e) => setForm((f) => ({ ...f, jornada_deseada: e.target.value as Jornada }))}
-            >
-              <option value="">Sin preferencia</option>
-              {JORNADAS.map((j) => (
-                <option key={j} value={j}>
-                  {j}
-                </option>
-              ))}
-            </Select>
+            <SelectoresDeOferta valor={form} onChange={(cambios) => setForm((f) => ({ ...f, ...cambios }))} />
             <Input
               label="Nombres del acudiente"
               required

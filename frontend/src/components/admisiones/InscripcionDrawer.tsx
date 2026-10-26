@@ -8,11 +8,11 @@ import { Spinner } from '../ui/Spinner';
 import { UploadIcon } from '../ui/icons';
 import { InformacionApoyoCampos } from '../inclusion/InformacionApoyoCampos';
 import { useRegistrarInscripcion, useSubirDocumentoSolicitud } from '../../hooks/useAdmissionRequests';
-import { useCampuses, useGrades } from '../../hooks/useCatalogs';
+import { useGrades } from '../../hooks/useCatalogs';
+import { SelectoresDeOferta } from './SelectoresDeOferta';
 import { useDocumentosPrevistos } from '../../hooks/useEnrollments';
-import { useInstitution } from '../../hooks/useInstitution';
 import { APOYO_VACIO, aApoyoDeclarado } from '../../lib/apoyoDeclarado';
-import { JORNADAS, PARENTESCOS, TIPOS_DOCUMENTO, type Jornada, type Parentesco, type TipoDocumento } from '../../types/domain';
+import { PARENTESCOS, TIPOS_DOCUMENTO, type Jornada, type Parentesco, type TipoDocumento } from '../../types/domain';
 
 const FORM_VACIO = {
   primer_nombre: '',
@@ -52,9 +52,7 @@ interface Props {
  * del acudiente y los documentos que trae ese día. No crea cuenta ni matrícula ni consume cupo: queda PENDIENTE en la bandeja, donde se aprueba o se rechaza.
  */
 export function InscripcionDrawer({ open, onClose }: Props) {
-  const institucion = useInstitution();
   const grados = useGrades('activo');
-  const sedes = useCampuses(institucion.data?._id);
   const registrar = useRegistrarInscripcion();
   const subirDocumento = useSubirDocumentoSolicitud();
 
@@ -168,32 +166,7 @@ export function InscripcionDrawer({ open, onClose }: Props) {
               </Select>
               <Input label="Número de documento" required value={form.numero_documento} onChange={(e) => set('numero_documento', e.target.value)} />
               <Input label="Fecha de nacimiento" type="date" required max={new Date().toISOString().slice(0, 10)} value={form.fecha_nacimiento} onChange={(e) => set('fecha_nacimiento', e.target.value)} />
-              <Select label="Grado al que aspira" required value={form.grado_deseado_id} onChange={(e) => set('grado_deseado_id', e.target.value)}>
-                <option value="">Selecciona…</option>
-                {[...(grados.data ?? [])]
-                  .sort((a, b) => a.numero - b.numero)
-                  .map((g) => (
-                    <option key={g._id} value={g._id}>
-                      {g.nombre}
-                    </option>
-                  ))}
-              </Select>
-              <Select label="Sede (opcional)" value={form.sede_deseada_id} onChange={(e) => set('sede_deseada_id', e.target.value)}>
-                <option value="">Sin preferencia</option>
-                {(sedes.data ?? []).map((s) => (
-                  <option key={s._id} value={s._id}>
-                    {s.nombre}
-                  </option>
-                ))}
-              </Select>
-              <Select label="Jornada (opcional)" value={form.jornada_deseada} onChange={(e) => set('jornada_deseada', e.target.value as Jornada | '')}>
-                <option value="">Sin preferencia</option>
-                {JORNADAS.map((j) => (
-                  <option key={j} value={j}>
-                    {j}
-                  </option>
-                ))}
-              </Select>
+              <SelectoresDeOferta valor={form} onChange={(cambios) => setForm((f) => ({ ...f, ...cambios }))} />
             </div>
           </fieldset>
 

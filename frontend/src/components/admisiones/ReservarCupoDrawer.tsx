@@ -28,18 +28,21 @@ export function ReservarCupoDrawer({ solicitud, onClose }: { solicitud: Admissio
   const [jornadaId, setJornadaId] = useState('');
   const [resultado, setResultado] = useState<Resultado | null>(null);
   const jornadas = useJornadas(sedeId || undefined);
+  // La jornada que pidió la familia viene elegida (si la sede la tiene); se puede cambiar.
+  const jornadaPedida = jornadas.data?.find((j) => j.nombre === solicitud?.jornada_deseada)?._id ?? '';
+  const jornadaEfectiva = jornadaId || jornadaPedida;
   const cupos = useCuposPrematricula(solicitud?.academic_year_id ?? undefined);
 
   const gradoId = idDe(solicitud?.grado_deseado_id);
   const nombreGrado = solicitud && typeof solicitud.grado_deseado_id !== 'string' ? solicitud.grado_deseado_id.nombre : 'el grado pedido';
-  const fila = cupos.data?.filas.find((f) => f.grado.id === gradoId && f.sede.id === sedeId && f.jornada.id === jornadaId);
-  const eligio = Boolean(sedeId && jornadaId);
+  const fila = cupos.data?.filas.find((f) => f.grado.id === gradoId && f.sede.id === sedeId && f.jornada.id === jornadaEfectiva);
+  const eligio = Boolean(sedeId && jornadaEfectiva);
 
   async function enviar(e: FormEvent) {
     e.preventDefault();
     if (!solicitud) return;
     reservar.reset();
-    const r = await reservar.mutateAsync({ id: solicitud._id, sede_id: sedeId, jornada_id: jornadaId });
+    const r = await reservar.mutateAsync({ id: solicitud._id, sede_id: sedeId, jornada_id: jornadaEfectiva });
     setResultado({ aviso: r.aviso, posicion: r.posicion_espera });
   }
 
@@ -87,7 +90,7 @@ export function ReservarCupoDrawer({ solicitud, onClose }: { solicitud: Admissio
               </option>
             ))}
           </Select>
-          <Select label="Jornada" required value={jornadaId} onChange={(e) => setJornadaId(e.target.value)} disabled={!sedeId}>
+          <Select label="Jornada" required value={jornadaEfectiva} onChange={(e) => setJornadaId(e.target.value)} disabled={!sedeId}>
             <option value="">{sedeId ? 'Selecciona…' : 'Elige primero la sede'}</option>
             {(jornadas.data ?? []).map((j) => (
               <option key={j._id} value={j._id}>

@@ -24,6 +24,7 @@ import {
   useRechazarSolicitud,
   type AdmissionRequestsFilter,
 } from '../../hooks/useAdmissionRequests';
+import { ETIQUETA_JORNADA } from '../../hooks/useCertificados';
 import { useGroups } from '../../hooks/useGroups';
 import { ESTADOS_SOLICITUD, type AdmissionRequest, type EstadoSolicitud } from '../../types/domain';
 
@@ -38,6 +39,13 @@ const ESTADO_TONE: Record<EstadoSolicitud, 'blue' | 'green' | 'red' | 'orange'> 
 
 function nombreDe(v: string | { nombre: string }): string {
   return typeof v === 'string' ? v : v.nombre;
+}
+
+/** La sede y la jornada que pidió la familia, o «Sin preferencia» si no eligió. */
+function sedeYJornadaPedidas(s: AdmissionRequest): string {
+  const sede = s.sede_deseada_id ? nombreDe(s.sede_deseada_id) : null;
+  const jornada = s.jornada_deseada ? (ETIQUETA_JORNADA[s.jornada_deseada] ?? s.jornada_deseada) : null;
+  return [sede, jornada].filter(Boolean).join(' · ') || 'Sin preferencia de sede ni jornada';
 }
 
 export function AdmissionRequestsPage() {
@@ -72,6 +80,16 @@ export function AdmissionRequestsPage() {
     estado: 'ACTIVE',
   });
   const aprobar = useAprobarSolicitud();
+  // Los grupos del grado pedido, con los de la sede y jornada que pidió la familia primero; los demás se ofrecen pero avisan que son otra sede o jornada.
+  const sedePedida = aprobando?.sede_deseada_id ? (typeof aprobando.sede_deseada_id === 'string' ? aprobando.sede_deseada_id : aprobando.sede_deseada_id._id) : null;
+  const gruposParaAprobar = (groupsQuery.data ?? [])
+    .map((g) => ({
+      g,
+      loPedido:
+        (!sedePedida || (typeof g.sede_id === 'string' ? g.sede_id : g.sede_id._id) === sedePedida) &&
+        (!aprobando?.jornada_deseada || (typeof g.jornada_id === 'object' && g.jornada_id.nombre === aprobando.jornada_deseada)),
+    }))
+    .sort((a, b) => Number(b.loPedido) - Number(a.loPedido));
 
   async function handleAprobar(e: FormEvent) {
     e.preventDefault();
@@ -193,7 +211,7 @@ export function AdmissionRequestsPage() {
               <TableHead>
                 <Th>Aspirante</Th>
                 <Th>Documento</Th>
-                <Th>Grado deseado</Th>
+                <Th>Cupo que pidió</Th>
                 <Th>Acudiente</Th>
                 <Th>Documentos</Th>
                 <Th>Fecha</Th>
@@ -209,7 +227,10 @@ export function AdmissionRequestsPage() {
                     <Td>
                       {s.tipo_documento} {s.numero_documento}
                     </Td>
-                    <Td>{nombreDe(s.grado_deseado_id)}</Td>
+                    <Td>
+                      <span className="font-medium text-ink">{nombreDe(s.grado_deseado_id)}</span>
+                      <span className="block text-xs text-muted">{sedeYJornadaPedidas(s)}</span>
+                    </Td>
                     <Td>
                       {s.acudiente_nombre} {s.acudiente_apellido} · {s.acudiente_telefono}
                     </Td>
@@ -297,9 +318,10 @@ export function AdmissionRequestsPage() {
         </Alert>
         <Select label="Grupo" required value={groupId} onChange={(e) => setGroupId(e.target.value)}>
           <option value="">Selecciona...</option>
-          {(groupsQuery.data ?? []).map((g) => (
+          {gruposParaAprobar.map(({ g, loPedido }) => (
             <option key={g._id} value={g._id}>
-              {g.nomenclatura} ({g.cupos_ocupados}/{g.max_capacity})
+              {g.nomenclatura} · {typeof g.sede_id === 'object' ? g.sede_id.nombre : ''} · {typeof g.jornada_id === 'object' ? (ETIQUETA_JORNADA[g.jornada_id.nombre] ?? g.jornada_id.nombre) : ''} ({g.cupos_ocupados}/{g.max_capacity})
+              {loPedido ? '' : ' — otra sede o jornada'}
             </option>
           ))}
         </Select>

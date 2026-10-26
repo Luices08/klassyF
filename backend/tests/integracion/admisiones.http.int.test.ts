@@ -389,11 +389,11 @@ describe('M04: admisiones — solicitud pública y revisión (capa HTTP)', () =>
       expect(await cupos(String(lleno._id))).toBe(1);
     });
 
-    it('LIMITACIÓN ACTUAL: elige el grupo a mano y no comprueba que sea del grado, sede o jornada que pidió la familia', async () => {
+    it('LIMITACIÓN ACTUAL: al aprobar se elige el grupo a mano y no se comprueba que sea del grado que pidió la familia (al radicar sí se valida la oferta)', async () => {
       const g = (await Group.findById(grupoId))!;
       const septimo = await Grade.create({ nivel: 'SECUNDARIA', numero: 7, nombre: 'Séptimo' });
       const otroGrado = await Group.create({ sede_id: g.sede_id, academic_year_id: g.academic_year_id, grade_id: septimo._id, jornada_id: g.jornada_id, nomenclatura: '701', max_capacity: 30 });
-      const s = await radicar({ jornada_deseada: 'TARDE' });
+      const s = await radicar();
 
       const r = await aprobar(s._id, { group_id: String(otroGrado._id) });
 

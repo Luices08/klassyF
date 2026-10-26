@@ -12,6 +12,20 @@ import type {
 
 // --- Sitio publico (sin autenticar) ---
 
+/** Qué grados se ofrecen en qué sedes y jornadas (grupos activos del año al que apunta una solicitud nueva). Sin cupos: solo qué existe. */
+export interface OfertaDeAdmision {
+  anio: { id: string; year: number } | null;
+  oferta: Array<{ grado: { id: string; nombre: string; numero: number }; sede: { id: string; nombre: string }; jornada: Jornada }>;
+}
+
+export function useOfertaDeAdmision() {
+  return useQuery({
+    queryKey: ['public', 'oferta-admision'],
+    queryFn: () => api.get<OfertaDeAdmision>('/public/admission-requests/oferta'),
+    staleTime: 60_000,
+  });
+}
+
 export interface SolicitarCupoInput {
   /** El nombre se escribe en cuatro partes (SIMAT); el servidor arma el nombre y el apellido completos. */
   primer_nombre: string;

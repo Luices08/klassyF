@@ -11,7 +11,7 @@ import { verificarPublico } from '../controllers/certificado.controller';
 import { verImagenPublica } from '../controllers/institution.controller';
 import { verImagenPublica as verImagenSitio, verSitioPublico } from '../controllers/sitioPublico.controller';
 import { conIdDeImagen } from '../validators/sitioPublico.validator';
-import { listarGradosPublicos, obtenerInfoPublica } from '../controllers/public.controller';
+import { listarOfertaDeAdmision, obtenerInfoPublica } from '../controllers/public.controller';
 import * as institutionValidator from '../validators/institution.validator';
 import validate from '../middlewares/validate.middleware';
 import * as admissionValidator from '../validators/admissionRequest.validator';
@@ -41,7 +41,8 @@ router.get('/citaciones/:token', citacionLimiter, validate(citacionValidator.con
 router.post('/citaciones/:token/respuesta', citacionLimiter, validate(citacionValidator.responderPorToken), responderCitacion);
 
 router.get('/institution-info', lecturaLimiter, obtenerInfoPublica);
-router.get('/grades', lecturaLimiter, listarGradosPublicos);
+// Qué grados se ofrecen en qué sedes y jornadas: el formulario de solicitud solo deja elegir lo que existe.
+router.get('/admission-requests/oferta', lecturaLimiter, listarOfertaDeAdmision);
 router.get('/sitio', lecturaLimiter, verSitioPublico);
 router.get('/sitio/imagenes/:id', lecturaLimiter, validate(conIdDeImagen), verImagenSitio);
 router.get('/institution-imagen/:clave', lecturaLimiter, validate(institutionValidator.conClaveDeImagen), verImagenPublica);

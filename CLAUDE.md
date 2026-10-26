@@ -1332,6 +1332,11 @@ Todo vive en **su propia carpeta**: `backend/src/modulos/predictivo/` (rutas `/p
   APROBADO no se reemplaza; solo se sube mientras la matrícula es PREINSCRITO o MATRICULADO_CONDICIONAL. El plazo
   (`Enrollment.fecha_limite_legalizacion`) lo fija secretaría al aprobar; por omisión `DIAS_PLAZO_LEGALIZACION` (15).
   Es informativo: no se anula nada automáticamente al vencer.
+- **Pruebas que fijan el flujo de admisiones tal como es hoy** (`tests/integracion/admisiones.http.int.test.ts`, capa HTTP real, 34 casos): radicar sin sesión (PENDIENTE, sin cuenta ni cupo; lo que el cliente no decide se descarta; duplicados; correos con TLD real), consulta de estado
+  (404 igual para «no existe» y «fecha equivocada»), comprobante, carga de documentos (firma de bytes, nunca devuelve la ruta, un APROBADO no se reemplaza, definitiva ya no admite), bandeja y roles, **aprobar** (estudiante + perfil + acudiente + PREINSCRITO sin folio con el cupo reservado, hermanos con el
+  mismo acudiente, apoyo declarado a M16, grupo lleno o cerrado = 409 sin dejar nada), rechazar y el recorrido completo hasta legalizar con folio. **Son la red de seguridad antes de tocar la solicitud pública** (prematrícula, inscripción asistida): un cambio que las rompa debe ser consciente.
+  Una está marcada «LIMITACIÓN ACTUAL»: al aprobar se elige el grupo a mano y **no se comprueba que sea del grado, sede o jornada que pidió la familia** (la sede y la jornada deseadas solo se guardan). El POST público tiene límite de 10 por hora y por IP: las pruebas radican por el servicio y solo unas pocas por HTTP.
+  **Defecto que destapó (corregido):** aprobar una solicitud fallaba SIEMPRE con 400 (`TUTOR is not a valid enum value for path parentesco`): el código usaba `'TUTOR'` y el enum `PARENTESCOS` solo tiene `'TUTOR_LEGAL'` (también en `crearEstudianteCompleto` cuando no llegaba parentesco).
 - Nunca asumir que `folio_matricula` es un string: en frontend y PDFs manejar `null`.
 - Bases anteriores a este cambio: `npm run migrate:folio-al-matricular` (libera folios de preinscritos, reemplaza
   los índices y reajusta el contador heredado `MAT-…`, que ya no lee nadie: el siguiente folio sale de la configuración de foliatura, que parte de los folios reales; un hueco en medio del libro solo se reporta, no se renumera).

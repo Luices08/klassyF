@@ -464,7 +464,10 @@ Backend `/inclusion` (modelos `SolicitudApoyo`, `ExpedienteInclusion`, `AjusteAs
   (revelarían la condición). SECRETARIA, COORDINADOR_CONVIVENCIA, ACUDIENTE y ESTUDIANTE no tienen acceso (acudiente: M27). «No existe» = «no autorizado» = 404.
   El buscador reusa el de convivencia (`gruposAccesibles`/`buscarEstudiantes` con `soloVinculo`: el docente solo ve los grupos que dicta o dirige); no se abre `/students`.
 - **Datos sensibles (Ley 1581/1098).** Sin la **autorización específica del responsable legal** (`consentimiento`, propia de M16, distinta de la de salud de
-  M03) no se guarda nada clínico, no se inicia la construcción ni se emite ningún documento; revocarla lo bloquea de nuevo. EPS y régimen **se leen de M03**
+  M03) no se guarda nada clínico, no se inicia la construcción ni se emite ningún documento; revocarla lo bloquea de nuevo. **Quién autoriza sale de M03**: `acudiente_id`
+  (uno de los acudientes activos del estudiante, el principal primero; su nombre y su parentesco se toman de la ficha y no se digitan), `otorgado_por_estudiante` (solo si es
+  mayor de edad) o, como respaldo para un responsable aún no vinculado, nombre y parentesco escritos (`registrarConsentimiento`, `acudientesVinculados`; el detalle clínico del
+  expediente trae `acudientes` mientras no haya una autorización vigente). El sistema no contacta al acudiente: solo registra lo que orientación obtuvo. EPS y régimen **se leen de M03**
   dentro del expediente abierto (nunca se copian al expediente). Los soportes clínicos van a `uploads/inclusion/<expediente>/` (firma de bytes, 5 MB), solo se
   descargan con sesión y permiso, y cada descarga y **cada consulta de un expediente se audita** (el `detalle` nunca lleva contenido). El soporte clínico es
   **opcional**: no condiciona la atención pedagógica (sí el reporte a SIMAT); la categoría puede quedar `POR_CONFIRMAR`.
@@ -486,9 +489,16 @@ Backend `/inclusion` (modelos `SolicitudApoyo`, `ExpedienteInclusion`, `AjusteAs
   textos) lo personalizará M21/M32 y el archivo general será M29; hoy hay un solo punto de enganche: `encabezadoInstitucional.service.ts` (institución, DANE,
   NIT, resolución, sede, jornada, año y `logo_url`) y el registro `DOCUMENTOS_PIAR`. **No se construyó un constructor de plantillas en M16.**
 - **Configuración** (`ConfiguracionInclusion`, ADMIN): plazo de elaboración, seguimientos mínimos, retención (vacío = sin plazo; nunca se borra), textos de las
-  dos declaraciones del acta y versión de la política de datos. Las categorías de discapacidad (SIMAT) son una constante **versionada a validar** con el
-  anexo técnico vigente del MEN.
-- **Pruebas:** unitarias (`permisosInclusion`, `inclusion`, `piarPdf`) y de integración con base real (`tests/integracion/inclusion.int.test.ts`).
+  dos declaraciones del acta y versión de la política de datos.
+- **Las condiciones que originan un expediente son datos, no código** (`CondicionApoyo`, pestaña «Catálogo de condiciones» de `/inclusion`, `GET|POST|PATCH|DELETE /inclusion/condiciones`,
+  ADMIN y ORIENTADOR, auditadas `INCLUSION_CONDICION_*`): las categorías de discapacidad del PIAR (reporte SIMAT) y las necesidades del plan de apoyo, y **cada una declara a qué tipo
+  de expediente pertenece** (`tipo_expediente`). Se siembran **una sola vez** desde `CONDICIONES_INICIALES` (marca en `Counter`; si el colegio elimina una, no vuelve). El código no cambia
+  nunca; el tipo solo cambia mientras ningún expediente la use y si no es del sistema (`POR_CONFIRMAR` y `OTRA` no se eliminan, desactivan ni cambian de tipo). Una condición usada **se
+  desactiva, no se elimina**, y una desactivada solo sigue valiendo donde el expediente ya la tenía. El expediente guarda el código (`categoria_discapacidad`, `plan_apoyo.tipo_necesidad`)
+  y el servicio lo valida contra el catálogo (`resolverCondicion`: existe, es del tipo del expediente y está activa); el snapshot del Anexo 1 y del plan de apoyo congela el **nombre**
+  (`categoria_nombre`, `tipo_necesidad_nombre`) para que renombrar no cambie lo ya emitido. Al resolver una solicitud o abrir un expediente directo se puede elegir la condición
+  (`condicion_codigo`): sin `tipo` el tipo sale de ella, y si ambos no coinciden es 409. Los nombres SIMAT **deben contrastarse con el anexo técnico vigente del MEN**.
+- **Pruebas:** unitarias (`permisosInclusion`, `inclusion`, `piarPdf`) y de integración con base real (`tests/integracion/inclusion.int.test.ts` y `condicionesApoyo.int.test.ts`: catálogo, autorización con acudiente de M03).
 - **Pendiente, a propósito**: portal del acudiente (M27) y notificaciones (M28); archivo y versiones generales (M29); constructor de formatos y personalización
   (M21/M32); advertencia en la planilla de notas y ajuste de la evaluación (M12, solo se expone `GET /inclusion/grupos/:groupId/indicador`); anexo del informe
   al boletín final (M17) y promoción (M19/M20); reportes SIMAT (M30); firma electrónica certificada; cierre automático del expediente al retirar la matrícula

@@ -3,6 +3,7 @@ import { ParamsDictionary } from 'express-serve-static-core';
 import { ParsedQs } from 'qs';
 import { ClaveDocumentoPiar, EstadoExpediente, EstadoSolicitudApoyo, TipoExpediente } from '../constants/inclusion';
 import * as ajusteService from '../services/ajusteAsignatura.service';
+import * as condicionService from '../services/condicionApoyo.service';
 import * as configuracionService from '../services/configuracionInclusion.service';
 import * as documentoService from '../services/documentoPiar.service';
 import * as expedienteService from '../services/expedienteInclusion.service';
@@ -35,6 +36,18 @@ export const estudiantes = catchAsync<unknown, unknown, unknown, ParsedQs & { gr
 
 export const obtenerConfiguracionInclusion = catchAsync(async (_req, res) => ok(res, await obtenerConfiguracion()));
 export const actualizarConfiguracion = catchAsync(async (req, res) => ok(res, await configuracionService.actualizarConfiguracion(req.body, req.user!, req.ip)));
+
+// --- Condiciones de apoyo (catálogo del colegio: ADMIN y orientación) ---
+
+export const listarCondiciones = catchAsync<unknown, unknown, unknown, ParsedQs & { tipo?: TipoExpediente; incluir_inactivas?: string }>(async (req, res) =>
+  ok(res, await condicionService.listarCondiciones(req.user!, { tipo: req.query.tipo, incluirInactivas: req.query.incluir_inactivas === 'true' }))
+);
+export const crearCondicion = catchAsync(async (req, res) => ok(res, await condicionService.crearCondicion(req.body, req.user!, req.ip), 201));
+export const actualizarCondicion = catchAsync<IdParams>(async (req, res) => ok(res, await condicionService.actualizarCondicion(req.params.id, req.body, req.user!, req.ip)));
+export const eliminarCondicion = catchAsync<IdParams>(async (req, res) => {
+  await condicionService.eliminarCondicion(req.params.id, req.user!, req.ip);
+  ok(res, { eliminada: true });
+});
 
 // --- Solicitudes ---
 

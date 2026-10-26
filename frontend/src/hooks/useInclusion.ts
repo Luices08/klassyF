@@ -44,30 +44,29 @@ export const NOMBRES_ESTADO_EXPEDIENTE: Record<EstadoExpediente, string> = {
 export type TipoExpediente = 'PIAR' | 'PLAN_APOYO';
 export const NOMBRES_TIPO_EXPEDIENTE: Record<TipoExpediente, string> = { PIAR: 'PIAR', PLAN_APOYO: 'Plan de apoyo' };
 
-export const CATEGORIAS_DISCAPACIDAD = [
-  { codigo: 'POR_CONFIRMAR', nombre: 'Por confirmar' },
-  { codigo: 'VISUAL_CEGUERA', nombre: 'Visual: ceguera' },
-  { codigo: 'VISUAL_BAJA_VISION', nombre: 'Visual: baja visión diagnosticada' },
-  { codigo: 'AUDITIVA_SORDERA', nombre: 'Auditiva: sordera profunda (usuario de LSC)' },
-  { codigo: 'AUDITIVA_HIPOACUSIA', nombre: 'Auditiva: hipoacusia o baja audición' },
-  { codigo: 'SORDOCEGUERA', nombre: 'Sordoceguera' },
-  { codigo: 'INTELECTUAL', nombre: 'Intelectual (cognitiva)' },
-  { codigo: 'FISICA', nombre: 'Física (movilidad)' },
-  { codigo: 'PSICOSOCIAL', nombre: 'Psicosocial (mental)' },
-  { codigo: 'SISTEMICA', nombre: 'Sistémica' },
-  { codigo: 'MULTIPLE', nombre: 'Múltiple' },
-  { codigo: 'TEA', nombre: 'Trastorno del espectro autista' },
-] as const;
+/**
+ * Una condición del catálogo del colegio: categoría de discapacidad (PIAR) o necesidad del plan de apoyo. La lista y el tipo de
+ * expediente de cada una los define el ADMIN o la orientación en la pestaña «Catálogo»; aquí ya no hay ninguna quemada.
+ */
+export interface CondicionApoyo {
+  _id: string;
+  codigo: string;
+  nombre: string;
+  tipo_expediente: TipoExpediente;
+  descripcion: string;
+  orden: number;
+  estado: 'activo' | 'inactivo';
+  sistema: boolean;
+  usos: number;
+}
 
-export const TIPOS_NECESIDAD_PLAN_APOYO = [
-  { codigo: 'TDAH_INATENTO', nombre: 'TDAH: predominio inatento' },
-  { codigo: 'TDAH_HIPERACTIVO_IMPULSIVO', nombre: 'TDAH: predominio hiperactivo-impulsivo' },
-  { codigo: 'TDAH_MIXTO', nombre: 'TDAH: mixto' },
-  { codigo: 'DIFICULTAD_LECTOESCRITURA', nombre: 'Dificultad de lectoescritura' },
-  { codigo: 'DIFICULTAD_CALCULO', nombre: 'Dificultad de cálculo' },
-  { codigo: 'REZAGO_PEDAGOGICO_TRANSITORIO', nombre: 'Rezago pedagógico transitorio' },
-  { codigo: 'OTRA', nombre: 'Otra' },
-] as const;
+/** Acudiente de M03 que puede autorizar (el nombre y el parentesco salen de allí). */
+export interface AcudienteVinculado {
+  _id: string;
+  nombre: string;
+  parentesco: string;
+  es_principal: boolean;
+}
 
 export const TIPOS_BARRERA = [
   { codigo: 'ACTITUDINAL', nombre: 'Actitudinal' },
@@ -304,6 +303,7 @@ export interface Consentimiento {
   otorgado: boolean;
   otorgado_por_nombre: string | null;
   parentesco: string | null;
+  acudiente_id?: string | null;
   fecha: string | null;
   version_politica: string | null;
   revocado: { fecha: string; motivo: string } | null;
@@ -339,6 +339,9 @@ export interface Expediente {
   // Solo orientación y ADMIN:
   categoria_discapacidad?: string;
   consentimiento?: Consentimiento;
+  /** Acudientes de M03 que pueden autorizar (vacío si ya hay una autorización vigente). */
+  acudientes?: AcudienteVinculado[];
+  estudiante_mayor_de_edad?: boolean;
   anexo_info_general?: AnexoInfoGeneral;
   caracteristicas?: Caracteristicas;
   plan_apoyo?: PlanApoyo;
@@ -506,7 +509,7 @@ export function useValorarSolicitud() {
 export function useResolverSolicitud() {
   const invalidar = useInvalidarInclusion();
   return useMutation({
-    mutationFn: ({ id, ...datos }: { id: string; resultado: ResultadoSolicitud; motivo: string; copiar_anterior?: boolean }) =>
+    mutationFn: ({ id, ...datos }: { id: string; resultado: ResultadoSolicitud; motivo: string; copiar_anterior?: boolean; condicion_codigo?: string | null }) =>
       api.post<SolicitudApoyo>(`/inclusion/solicitudes/${id}/resolver`, datos),
     onSuccess: invalidar,
   });
@@ -525,10 +528,40 @@ export function useExpedientes(filtro: { estado?: EstadoExpediente | ''; tipo?: 
   });
 }
 
+export function useCondiciones(filtro: { tipo?: TipoExpediente; incluirInactivas?: boolean } = {}) {
+  return useQuery({
+    queryKey: ['inclusion', 'condiciones', filtro.tipo ?? 'todas', Boolean(filtro.incluirInactivas)],
+    queryFn: () => api.get<CondicionApoyo[]>('/inclusion/condiciones', { tipo: filtro.tipo, incluir_inactivas: filtro.incluirInactivas ? 'true' : undefined }),
+    staleTime: 60_000,
+  });
+}
+
+export function useCrearCondicion() {
+  const invalidar = useInvalidarInclusion();
+  return useMutation({
+    mutationFn: (datos: { codigo: string; nombre: string; tipo_expediente: TipoExpediente; descripcion?: string; orden?: number }) => api.post<CondicionApoyo>('/inclusion/condiciones', datos),
+    onSuccess: invalidar,
+  });
+}
+
+export function useActualizarCondicion() {
+  const invalidar = useInvalidarInclusion();
+  return useMutation({
+    mutationFn: ({ id, ...cambios }: { id: string; nombre?: string; descripcion?: string; orden?: number; estado?: 'activo' | 'inactivo'; tipo_expediente?: TipoExpediente }) =>
+      api.patch<CondicionApoyo>(`/inclusion/condiciones/${id}`, cambios),
+    onSuccess: invalidar,
+  });
+}
+
+export function useEliminarCondicion() {
+  const invalidar = useInvalidarInclusion();
+  return useMutation({ mutationFn: (id: string) => api.delete<{ eliminada: boolean }>(`/inclusion/condiciones/${id}`), onSuccess: invalidar });
+}
+
 export function useAbrirExpediente() {
   const invalidar = useInvalidarInclusion();
   return useMutation({
-    mutationFn: (datos: { student_id: string; tipo: TipoExpediente; copiar_anterior?: boolean }) => api.post<{ _id: string }>('/inclusion/expedientes', datos),
+    mutationFn: (datos: { student_id: string; tipo?: TipoExpediente; condicion_codigo?: string; copiar_anterior?: boolean }) => api.post<{ _id: string }>('/inclusion/expedientes', datos),
     onSuccess: invalidar,
   });
 }
@@ -559,7 +592,8 @@ export function useGuardarSeccion(id: string) {
 export function useRegistrarConsentimiento(id: string) {
   const invalidar = useInvalidarInclusion();
   return useMutation({
-    mutationFn: (datos: { otorgado_por_nombre: string; parentesco: string }) => api.post(`/inclusion/expedientes/${id}/consentimiento`, datos),
+    mutationFn: (datos: { acudiente_id: string } | { otorgado_por_estudiante: true } | { otorgado_por_nombre: string; parentesco: string }) =>
+      api.post(`/inclusion/expedientes/${id}/consentimiento`, datos),
     onSuccess: invalidar,
   });
 }

@@ -118,7 +118,7 @@ function anexoInfoGeneral(doc: Documento, s: Obj) {
   campo(doc, 'EPS / régimen', `${txt(adm.eps) || '—'} / ${txt(adm.regimen_salud) || '—'}`);
   campo(doc, 'Lugar de atención en emergencia', salud.lugar_atencion_emergencia);
   campo(doc, 'Atendido por el sector salud', `${siNo(salud.atendido_sector_salud)}${salud.frecuencia_atencion ? ` — ${txt(salud.frecuencia_atencion)}` : ''}`);
-  campo(doc, 'Categoría de discapacidad', humano(s.categoria_discapacidad));
+  campo(doc, 'Categoría de discapacidad', txt(s.categoria_nombre) || humano(s.categoria_discapacidad));
   parrafo(doc, 'Diagnóstico médico', salud.diagnostico_medico);
   tabla(doc, [{ titulo: 'Terapia', ancho: 3 }, { titulo: 'Frecuencia', ancho: 2 }], lista(salud.terapias).map((t) => [txt(t.nombre), txt(t.frecuencia)]));
   parrafo(doc, 'Tratamiento médico por enfermedad', salud.tratamiento_medico);
@@ -249,7 +249,7 @@ function planApoyo(doc: Documento, s: Obj) {
   bloqueEstudiante(doc, objeto(s.estudiante));
   const p = objeto(s.plan);
   seccion(doc, 'Identificación de la necesidad');
-  campo(doc, 'Necesidad', humano(p.tipo_necesidad));
+  campo(doc, 'Necesidad', txt(p.tipo_necesidad_nombre) || humano(p.tipo_necesidad));
   parrafo(doc, 'Observación inicial', p.observacion_inicial);
   seccion(doc, 'Estrategias para el aula');
   (Array.isArray(p.pautas_aula) ? (p.pautas_aula as string[]) : []).forEach((x) => doc.text(`•  ${x}`));

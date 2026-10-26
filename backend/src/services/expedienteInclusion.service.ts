@@ -5,6 +5,8 @@ import {
   EstadoExpediente,
   MAX_BYTES_SOPORTE,
   MAX_SOPORTES_POR_EXPEDIENTE,
+  NOMBRES_PARENTESCO,
+  PARENTESCO_ESTUDIANTE_MAYOR,
   TipoExpediente,
 } from '../constants/inclusion';
 import { ESTADOS_MATRICULA_ACTIVOS } from '../constants/enums';
@@ -16,7 +18,9 @@ import Enrollment from '../models/enrollment.model';
 import ExpedienteInclusion, { ExpedienteInclusionDocument } from '../models/expedienteInclusion.model';
 import Grade from '../models/grade.model';
 import Group from '../models/group.model';
+import Guardian from '../models/guardian.model';
 import JornadaOperativa from '../models/jornadaOperativa.model';
+import StudentGuardian from '../models/studentGuardian.model';
 import StudentProfile from '../models/studentProfile.model';
 import Subject from '../models/subject.model';
 import TeacherAssignment from '../models/teacherAssignment.model';
@@ -31,6 +35,7 @@ import {
   fechaLimiteElaboracion,
   fusionarSeccion,
   edadEnAnios,
+  esMayorDeEdad,
   huellaDeArchivo,
   pendientesParaAprobar,
   plazoVencido,
@@ -39,6 +44,7 @@ import {
 import { AccionInclusion, alcanceDeInclusion, permisoInclusion, ROLES_BANDEJA_INCLUSION } from '../utils/permisosInclusion';
 import { carpetaInclusion } from '../utils/uploadPaths';
 import { registrarEvento } from './audit.service';
+import { resolverCondicion } from './condicionApoyo.service';
 import {
   anioEnCurso,
   asignaturasEsperadas,
@@ -53,7 +59,9 @@ import {
 
 export interface AbrirExpedienteInput {
   student_id: string;
-  tipo: TipoExpediente;
+  /** Si se indica la condición, el tipo sale de ella (y si también se indica el tipo, deben coincidir). */
+  tipo?: TipoExpediente;
+  condicion_codigo?: string | null;
   solicitud_id?: string | null;
   /** Copia características, ajustes de contexto y transversales del año anterior como borrador (la autorización NO se hereda). */
   copiar_anterior?: boolean;
@@ -69,8 +77,11 @@ export async function abrirExpediente(input: AbrirExpedienteInput, usuario: User
   if (!ctx.vigente) throw new ApiError(409, 'El estudiante no tiene una matrícula activa en el año en curso.');
 
   const configuracion = await obtenerConfiguracion();
+  const condicion = input.condicion_codigo ? await resolverCondicion(input.condicion_codigo, { tipo: input.tipo }) : null;
+  const tipo = condicion?.tipo_expediente ?? input.tipo;
+  if (!tipo) throw new ApiError(400, 'Indica el tipo de expediente o la condición de apoyo.');
   const anterior = input.copiar_anterior
-    ? await ExpedienteInclusion.findOne({ student_id: input.student_id, academic_year_id: { $ne: anio._id }, tipo: input.tipo }).sort({ createdAt: -1 })
+    ? await ExpedienteInclusion.findOne({ student_id: input.student_id, academic_year_id: { $ne: anio._id }, tipo }).sort({ createdAt: -1 })
     : null;
 
   let creado: ExpedienteInclusionDocument;
@@ -79,7 +90,7 @@ export async function abrirExpediente(input: AbrirExpedienteInput, usuario: User
       student_id: input.student_id,
       academic_year_id: anio._id,
       sede_id: ctx.grupo.sede_id,
-      tipo: input.tipo,
+      tipo,
       estado: 'BORRADOR' as EstadoExpediente,
       solicitud_id: input.solicitud_id ?? null,
       fecha_limite_elaboracion: fechaLimiteElaboracion(anio.fecha_inicio, ctx.matricula.fecha_matricula, configuracion.plazo_elaboracion_dias),
@@ -94,6 +105,9 @@ export async function abrirExpediente(input: AbrirExpedienteInput, usuario: User
             plan_apoyo: anterior.toObject().plan_apoyo,
           }
         : {}),
+      // La condición elegida manda sobre lo copiado del año anterior.
+      ...(condicion && tipo === 'PIAR' ? { categoria_discapacidad: condicion.codigo } : {}),
+      ...(condicion && tipo === 'PLAN_APOYO' ? { plan_apoyo: { ...anterior?.toObject().plan_apoyo, tipo_necesidad: condicion.codigo } } : {}),
     };
     const [nuevo] = await ExpedienteInclusion.create([datos], { session });
     if (!nuevo) throw new ApiError(500, 'No se pudo crear el expediente.');
@@ -102,7 +116,7 @@ export async function abrirExpediente(input: AbrirExpedienteInput, usuario: User
     if ((err as { code?: number }).code === 11000) throw new ApiError(409, 'El estudiante ya tiene un expediente de inclusión en este año lectivo.');
     throw err;
   }
-  await registrarEvento({ usuario_id: usuario._id, accion: 'INCLUSION_EXPEDIENTE_CREADO', entidad: 'ExpedienteInclusion', entidad_id: creado._id, detalle: input.tipo, ip });
+  await registrarEvento({ usuario_id: usuario._id, accion: 'INCLUSION_EXPEDIENTE_CREADO', entidad: 'ExpedienteInclusion', entidad_id: creado._id, detalle: tipo, ip });
   return creado;
 }
 
@@ -280,6 +294,9 @@ export async function obtenerExpediente(id: string, usuario: UserDocument, ip?: 
     ...comun,
     categoria_discapacidad: exp.categoria_discapacidad,
     consentimiento: exp.consentimiento,
+    // Quién puede autorizar: los acudientes de M03 (solo hace falta mientras no haya una autorización vigente) o el propio estudiante si es mayor de edad.
+    acudientes: exp.consentimiento.otorgado ? [] : await acudientesVinculados(exp.student_id),
+    estudiante_mayor_de_edad: identidad.perfil?.fecha_nacimiento ? esMayorDeEdad(identidad.perfil.fecha_nacimiento, new Date()) : false,
     anexo_info_general: exp.anexo_info_general,
     caracteristicas: exp.caracteristicas,
     plan_apoyo: exp.plan_apoyo,
@@ -444,6 +461,15 @@ export async function actualizarSeccion(id: string, seccion: Seccion, valor: unk
   }
   if (seccion === 'plan_apoyo' && exp.tipo !== 'PLAN_APOYO') throw new ApiError(409, 'Esta sección es solo del plan de apoyo pedagógico.');
   if (seccion === 'transversales' && exp.tipo !== 'PIAR') throw new ApiError(409, 'Las dimensiones transversales son del PIAR.');
+  // Las condiciones son del catálogo del colegio: la categoría es del PIAR y la necesidad es del plan de apoyo; una desactivada solo sigue valiendo donde ya estaba.
+  if (seccion === 'categoria_discapacidad') {
+    if (exp.tipo !== 'PIAR') throw new ApiError(409, 'La categoría de discapacidad es solo del PIAR.');
+    await resolverCondicion(valor as string, { tipo: 'PIAR', permitirInactiva: valor === exp.categoria_discapacidad });
+  }
+  if (seccion === 'plan_apoyo') {
+    const necesidad = (valor as { tipo_necesidad?: string | null }).tipo_necesidad;
+    if (necesidad) await resolverCondicion(necesidad, { tipo: 'PLAN_APOYO', permitirInactiva: necesidad === exp.plan_apoyo.tipo_necesidad });
+  }
 
   const plano = exp.toObject() as unknown as Record<Seccion, unknown>;
   if (seccion === 'anexo_info_general' || seccion === 'caracteristicas' || seccion === 'plan_apoyo' || seccion === 'informe_anual') {
@@ -456,14 +482,61 @@ export async function actualizarSeccion(id: string, seccion: Seccion, valor: unk
 
 // --- Consentimiento (Ley 1581 / 1098): propio de M16, distinto de la autorización de salud de M03 ---
 
-export async function registrarConsentimiento(id: string, datos: { otorgado_por_nombre: string; parentesco: string }, usuario: UserDocument, ip?: string | null) {
+export interface AcudienteVinculado {
+  _id: string;
+  nombre: string;
+  parentesco: string;
+  es_principal: boolean;
+}
+
+/** Los acudientes activos del estudiante en M03 (el principal primero): de ahí sale quién autoriza, sin volver a digitar nombre ni parentesco. */
+export async function acudientesVinculados(studentId: Types.ObjectId | string): Promise<AcudienteVinculado[]> {
+  const vinculos = await StudentGuardian.find({ student_id: studentId });
+  const acudientes = await Guardian.find({ _id: { $in: vinculos.map((v) => v.guardian_id) }, estado: ESTADO_ACTIVO });
+  const porId = new Map(acudientes.map((a) => [String(a._id), a]));
+  return vinculos
+    .flatMap((v) => {
+      const a = porId.get(String(v.guardian_id));
+      return a ? [{ _id: String(a._id), nombre: `${a.nombre} ${a.apellido}`.trim(), parentesco: NOMBRES_PARENTESCO[v.parentesco] ?? v.parentesco, es_principal: v.es_principal }] : [];
+    })
+    .sort((x, y) => Number(y.es_principal) - Number(x.es_principal) || x.nombre.localeCompare(y.nombre, 'es'));
+}
+
+export interface DatosConsentimiento {
+  /** Acudiente vinculado en M03: el nombre y el parentesco salen de allí. */
+  acudiente_id?: string;
+  /** El estudiante mayor de edad autoriza por sí mismo. */
+  otorgado_por_estudiante?: boolean;
+  /** Respaldo para un responsable legal que aún no está vinculado en M03. */
+  otorgado_por_nombre?: string;
+  parentesco?: string;
+}
+
+async function quienAutoriza(exp: ExpedienteInclusionDocument, datos: DatosConsentimiento): Promise<{ nombre: string; parentesco: string; acudiente_id: Types.ObjectId | null }> {
+  if (datos.acudiente_id) {
+    const acudiente = (await acudientesVinculados(exp.student_id)).find((a) => a._id === datos.acudiente_id);
+    if (!acudiente) throw new ApiError(404, 'Ese acudiente no está vinculado al estudiante.');
+    return { nombre: acudiente.nombre, parentesco: acudiente.parentesco, acudiente_id: new Types.ObjectId(acudiente._id) };
+  }
+  if (datos.otorgado_por_estudiante) {
+    const [persona, perfil] = await Promise.all([User.findById(exp.student_id).select('nombre apellido'), StudentProfile.findOne({ user_id: exp.student_id }).select('fecha_nacimiento')]);
+    if (!perfil?.fecha_nacimiento || !esMayorDeEdad(perfil.fecha_nacimiento, new Date())) throw new ApiError(409, 'El estudiante es menor de edad (o no tiene fecha de nacimiento): autoriza su acudiente.');
+    return { nombre: `${persona?.nombre ?? ''} ${persona?.apellido ?? ''}`.trim(), parentesco: PARENTESCO_ESTUDIANTE_MAYOR, acudiente_id: null };
+  }
+  if (!datos.otorgado_por_nombre?.trim() || !datos.parentesco?.trim()) throw new ApiError(400, 'Indica quién autoriza: un acudiente del estudiante o, si aún no está vinculado, su nombre y parentesco.');
+  return { nombre: datos.otorgado_por_nombre.trim(), parentesco: datos.parentesco.trim(), acudiente_id: null };
+}
+
+export async function registrarConsentimiento(id: string, datos: DatosConsentimiento, usuario: UserDocument, ip?: string | null) {
   const { exp } = await cargarConPermiso(id, usuario, 'GESTIONAR_EXPEDIENTE');
   await exigirEditable(exp);
   const configuracion = await obtenerConfiguracion();
+  const autoriza = await quienAutoriza(exp, datos);
   exp.set('consentimiento', {
     otorgado: true,
-    otorgado_por_nombre: datos.otorgado_por_nombre.trim(),
-    parentesco: datos.parentesco.trim(),
+    otorgado_por_nombre: autoriza.nombre,
+    parentesco: autoriza.parentesco,
+    acudiente_id: autoriza.acudiente_id,
     fecha: new Date(),
     version_politica: configuracion.version_politica_datos,
     registrado_por_id: usuario._id,

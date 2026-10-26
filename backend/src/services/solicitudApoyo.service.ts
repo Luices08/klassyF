@@ -210,6 +210,8 @@ export interface ResolverSolicitudInput {
   resultado: ResultadoSolicitudApoyo;
   motivo: string;
   copiar_anterior?: boolean;
+  /** Condición del catálogo con la que nace el expediente; debe ser del tipo que se abre (PIAR o plan de apoyo). */
+  condicion_codigo?: string | null;
 }
 
 /**
@@ -222,10 +224,17 @@ export async function resolverSolicitud(id: string, input: ResolverSolicitudInpu
   if (solicitud.estado === 'PENDIENTE') throw new ApiError(409, 'Toma la solicitud (valoración) antes de resolverla.');
 
   const crea = input.resultado === 'ABRIR_PIAR' || input.resultado === 'PLAN_APOYO';
+  if (input.condicion_codigo && !crea) throw new ApiError(400, 'La condición solo se indica al abrir un expediente.');
   await runTransaction(async (session) => {
     if (crea) {
       const exp = await abrirExpediente(
-        { student_id: String(solicitud.student_id), tipo: input.resultado === 'ABRIR_PIAR' ? 'PIAR' : 'PLAN_APOYO', solicitud_id: String(solicitud._id), copiar_anterior: input.copiar_anterior },
+        {
+          student_id: String(solicitud.student_id),
+          tipo: input.resultado === 'ABRIR_PIAR' ? 'PIAR' : 'PLAN_APOYO',
+          condicion_codigo: input.condicion_codigo,
+          solicitud_id: String(solicitud._id),
+          copiar_anterior: input.copiar_anterior,
+        },
         usuario,
         ip,
         session

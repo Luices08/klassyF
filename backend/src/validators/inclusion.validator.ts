@@ -2,7 +2,6 @@ import Joi from 'joi';
 import {
   ACTORES_PMI,
   CATEGORIAS_AJUSTE,
-  CODIGOS_CATEGORIA_DISCAPACIDAD,
   CLAVES_DOCUMENTO_PIAR,
   DIMENSIONES_TRANSVERSALES,
   EFECTIVIDAD_AJUSTE,
@@ -12,11 +11,11 @@ import {
   MAX_TEXTO_CORTO,
   MAX_TEXTO_LARGO,
   NIVELES_FORMACION_FAMILIAR,
+  PATRON_CODIGO_CONDICION,
   RESULTADOS_SOLICITUD_APOYO,
   ROLES_FIRMANTE,
   TIPOS_BARRERA,
   TIPOS_EXPEDIENTE,
-  TIPOS_NECESIDAD_PLAN_APOYO,
 } from '../constants/inclusion';
 import { ValidationSchema } from '../middlewares/validate.middleware';
 import { objectId } from './common.validator';
@@ -24,6 +23,8 @@ import { objectId } from './common.validator';
 const largo = Joi.string().trim().allow('').max(MAX_TEXTO_LARGO);
 const corto = Joi.string().trim().allow('').max(MAX_TEXTO_CORTO);
 const siNo = Joi.boolean().allow(null);
+/** Código de una condición del catálogo (`CondicionApoyo`); que exista y sea del tipo correcto lo comprueba el servicio. */
+const codigoCondicion = Joi.string().trim().uppercase().pattern(PATRON_CODIGO_CONDICION);
 const nivel = Joi.string().valid(...NIVELES_FORMACION_FAMILIAR).allow(null);
 
 const idParam = { params: Joi.object({ id: objectId.required() }) };
@@ -56,13 +57,19 @@ export const resolverSolicitud: ValidationSchema = {
       .required(),
     motivo: Joi.string().trim().min(5).max(MAX_TEXTO_CORTO).required(),
     copiar_anterior: Joi.boolean(),
+    condicion_codigo: codigoCondicion.allow(null, ''),
   }),
 };
 
 // --- Expedientes ---
 
 export const abrirExpediente: ValidationSchema = {
-  body: Joi.object({ student_id: objectId.required(), tipo: Joi.string().valid(...TIPOS_EXPEDIENTE).required(), copiar_anterior: Joi.boolean() }),
+  body: Joi.object({
+    student_id: objectId.required(),
+    tipo: Joi.string().valid(...TIPOS_EXPEDIENTE),
+    condicion_codigo: codigoCondicion,
+    copiar_anterior: Joi.boolean(),
+  }).or('tipo', 'condicion_codigo'),
 };
 
 export const listarExpedientes: ValidationSchema = {
@@ -147,7 +154,7 @@ export const caracteristicas: ValidationSchema = {
 
 export const categoria: ValidationSchema = {
   params: idParam.params,
-  body: Joi.object({ categoria_discapacidad: Joi.string().valid(...CODIGOS_CATEGORIA_DISCAPACIDAD).required() }),
+  body: Joi.object({ categoria_discapacidad: codigoCondicion.required() }),
 };
 
 export const transversales: ValidationSchema = {
@@ -186,7 +193,7 @@ export const compromisosAula: ValidationSchema = { params: idParam.params, body:
 export const planApoyo: ValidationSchema = {
   params: idParam.params,
   body: Joi.object({
-    tipo_necesidad: Joi.string().valid(...TIPOS_NECESIDAD_PLAN_APOYO).allow(null),
+    tipo_necesidad: codigoCondicion.allow(null),
     observacion_inicial: largo,
     compromisos_casa: largo,
     pautas_aula: Joi.array().items(corto.min(2)).max(20),
@@ -199,9 +206,18 @@ export const informeAnual: ValidationSchema = {
   body: Joi.object({ logros: largo, dificultades_persistentes: largo, eficacia_de_ajustes: largo, recomendaciones_grado_siguiente: largo, ajustes_a_mantener: largo }),
 };
 
+/** Autoriza un acudiente vinculado en M03 (su nombre y parentesco salen de allí), el propio estudiante mayor de edad o, como respaldo, nombre y parentesco escritos a mano. */
 export const consentimiento: ValidationSchema = {
   params: idParam.params,
-  body: Joi.object({ otorgado_por_nombre: Joi.string().trim().min(3).max(120).required(), parentesco: Joi.string().trim().min(2).max(60).required() }),
+  body: Joi.object({
+    acudiente_id: objectId,
+    otorgado_por_estudiante: Joi.boolean().valid(true),
+    otorgado_por_nombre: Joi.string().trim().min(3).max(120),
+    parentesco: Joi.string().trim().min(2).max(60),
+  })
+    .xor('acudiente_id', 'otorgado_por_estudiante', 'otorgado_por_nombre')
+    .with('otorgado_por_nombre', 'parentesco')
+    .with('parentesco', 'otorgado_por_nombre'),
 };
 
 export const revocarConsentimiento: ValidationSchema = cerrarExpediente;
@@ -273,3 +289,32 @@ export const actualizarConfiguracion: ValidationSchema = {
 
 export const buscarEstudiantes: ValidationSchema = { query: Joi.object({ group_id: objectId, q: Joi.string().trim().max(60) }) };
 export const indicadorDeGrupo: ValidationSchema = { params: Joi.object({ groupId: objectId.required() }) };
+
+// --- Condiciones de apoyo (catálogo del colegio) ---
+
+export const listarCondiciones: ValidationSchema = {
+  query: Joi.object({ tipo: Joi.string().valid(...TIPOS_EXPEDIENTE), incluir_inactivas: Joi.boolean() }),
+};
+
+export const crearCondicion: ValidationSchema = {
+  body: Joi.object({
+    codigo: codigoCondicion.required(),
+    nombre: Joi.string().trim().min(3).max(120).required(),
+    tipo_expediente: Joi.string().valid(...TIPOS_EXPEDIENTE).required(),
+    descripcion: Joi.string().trim().allow('').max(300),
+    orden: Joi.number().integer().min(0).max(999),
+  }),
+};
+
+export const actualizarCondicion: ValidationSchema = {
+  params: idParam.params,
+  body: Joi.object({
+    nombre: Joi.string().trim().min(3).max(120),
+    descripcion: Joi.string().trim().allow('').max(300),
+    orden: Joi.number().integer().min(0).max(999),
+    estado: Joi.string().valid('activo', 'inactivo'),
+    tipo_expediente: Joi.string().valid(...TIPOS_EXPEDIENTE),
+  }).min(1),
+};
+
+export const eliminarCondicion: ValidationSchema = idParam;

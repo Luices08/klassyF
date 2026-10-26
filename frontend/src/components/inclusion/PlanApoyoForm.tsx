@@ -1,8 +1,9 @@
 import { type FormEvent, useState } from 'react';
 import { Alert } from '../ui/Alert';
 import { Button } from '../ui/Button';
-import { Input, Select, Textarea } from '../ui/Field';
-import { TIPOS_NECESIDAD_PLAN_APOYO, useGuardarSeccion, type Expediente, type PlanApoyo } from '../../hooks/useInclusion';
+import { Input, Textarea } from '../ui/Field';
+import { useGuardarSeccion, type Expediente, type PlanApoyo } from '../../hooks/useInclusion';
+import { SelectorCondicion } from './SelectorCondicion';
 import { PieGuardar, Seccion } from './campos';
 
 /**
@@ -24,14 +25,7 @@ export function PlanApoyoForm({ exp }: { exp: Expediente }) {
     <form onSubmit={enviar} className="space-y-6">
       {!exp.consentimiento?.otorgado && <Alert tone="warning">Registra la autorización del responsable legal (pestaña Resumen) para diligenciar el plan.</Alert>}
       <Seccion titulo="Identificación de la necesidad">
-        <Select label="Necesidad identificada" disabled={soloLectura} value={plan.tipo_necesidad ?? ''} onChange={(e) => setPlan((p) => ({ ...p, tipo_necesidad: e.target.value || null }))}>
-          <option value="">Sin definir</option>
-          {TIPOS_NECESIDAD_PLAN_APOYO.map((t) => (
-            <option key={t.codigo} value={t.codigo}>
-              {t.nombre}
-            </option>
-          ))}
-        </Select>
+        <SelectorCondicion label="Necesidad identificada" tipo="PLAN_APOYO" vacioLabel="Sin definir" disabled={soloLectura} value={plan.tipo_necesidad ?? ''} onChange={(codigo) => setPlan((p) => ({ ...p, tipo_necesidad: codigo || null }))} />
         <Textarea label="Observación inicial / motivo de acompañamiento" disabled={soloLectura} value={plan.observacion_inicial} onChange={(e) => setPlan((p) => ({ ...p, observacion_inicial: e.target.value }))} maxLength={4000} />
       </Seccion>
       <Seccion titulo="Estrategias para el aula">

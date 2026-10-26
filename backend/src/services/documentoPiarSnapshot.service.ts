@@ -9,6 +9,7 @@ import { UserDocument } from '../models/user.model';
 import ApiError from '../utils/ApiError';
 import { esMayorDeEdad } from '../utils/inclusion';
 import DocumentoPiar from '../models/documentoPiar.model';
+import { nombresDeCondiciones } from './condicionApoyo.service';
 import { identidadDelEstudiante } from './expedienteInclusion.service';
 import { asignaturasEsperadas, ContextoEstudianteInclusion, obtenerConfiguracion } from './inclusionContexto.service';
 import { User } from '../models/user.model';
@@ -105,6 +106,8 @@ export async function construirSnapshot(clave: ClaveDocumentoPiar, exp: Expedien
       return {
         ...comun,
         categoria_discapacidad: exp.categoria_discapacidad,
+        // El nombre se congela con el documento: renombrar la condición después no cambia lo emitido.
+        categoria_nombre: (await nombresDeCondiciones([exp.categoria_discapacidad])).get(exp.categoria_discapacidad) ?? null,
         salud_administrativa: { eps: perfil?.eps ?? null, regimen_salud: perfil?.regimen_salud ?? null },
         institucion_procedencia: perfil?.institucion_procedencia ?? '',
         anexo: exp.toObject().anexo_info_general,
@@ -175,7 +178,7 @@ export async function construirSnapshot(clave: ClaveDocumentoPiar, exp: Expedien
     case 'PLAN_APOYO':
       return {
         ...comun,
-        plan: exp.toObject().plan_apoyo,
+        plan: { ...exp.toObject().plan_apoyo, tipo_necesidad_nombre: (await nombresDeCondiciones([exp.plan_apoyo.tipo_necesidad])).get(exp.plan_apoyo.tipo_necesidad ?? '') ?? null },
         compromisos_familia: exp.toObject().compromisos_familia,
         acudientes: await acudientesDe(exp.student_id),
         firma_requerida: perfil?.fecha_nacimiento && esMayorDeEdad(perfil.fecha_nacimiento, new Date()) ? 'ESTUDIANTE' : 'ACUDIENTE',

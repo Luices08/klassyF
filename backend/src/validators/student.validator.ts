@@ -30,8 +30,9 @@ export const crearEstudianteCompleto: ValidationSchema = {
   body: Joi.object({
     tipo_documento: Joi.string().valid(...TIPOS_DOCUMENTO).required(),
     numero_documento: Joi.string().trim().required(),
-    nombre: Joi.string().trim().required(),
-    apellido: Joi.string().trim().required(),
+    // El nombre se escribe en cuatro partes (SIMAT las pide separadas); `nombre` y `apellido` completos solo se aceptan para scripts y cargas anteriores.
+    nombre: Joi.string().trim().allow('', null).optional(),
+    apellido: Joi.string().trim().allow('', null).optional(),
     email: Joi.string().email().allow('', null).optional(),
     password: Joi.string().min(4).allow('', null).optional(),
     telefono: Joi.string().trim().allow('', null).optional(),

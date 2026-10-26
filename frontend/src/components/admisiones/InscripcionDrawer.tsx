@@ -15,8 +15,10 @@ import { APOYO_VACIO, aApoyoDeclarado } from '../../lib/apoyoDeclarado';
 import { JORNADAS, PARENTESCOS, TIPOS_DOCUMENTO, type Jornada, type Parentesco, type TipoDocumento } from '../../types/domain';
 
 const FORM_VACIO = {
-  nombre_aspirante: '',
-  apellido_aspirante: '',
+  primer_nombre: '',
+  segundo_nombre: '',
+  primer_apellido: '',
+  segundo_apellido: '',
   tipo_documento: 'TI' as TipoDocumento,
   numero_documento: '',
   fecha_nacimiento: '',
@@ -78,8 +80,10 @@ export function InscripcionDrawer({ open, onClose }: Props) {
     e.preventDefault();
     registrar.reset();
     const solicitud = await registrar.mutateAsync({
-      nombre_aspirante: form.nombre_aspirante.trim(),
-      apellido_aspirante: form.apellido_aspirante.trim(),
+      primer_nombre: form.primer_nombre.trim(),
+      segundo_nombre: form.segundo_nombre.trim() || undefined,
+      primer_apellido: form.primer_apellido.trim(),
+      segundo_apellido: form.segundo_apellido.trim() || undefined,
       tipo_documento: form.tipo_documento,
       numero_documento: form.numero_documento.trim(),
       fecha_nacimiento: form.fecha_nacimiento,
@@ -151,8 +155,10 @@ export function InscripcionDrawer({ open, onClose }: Props) {
           <fieldset className="space-y-3 rounded-lg border border-border p-3">
             <legend className="px-1 text-sm font-semibold text-ink">Aspirante</legend>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <Input label="Nombres" required value={form.nombre_aspirante} onChange={(e) => set('nombre_aspirante', e.target.value)} />
-              <Input label="Apellidos" required value={form.apellido_aspirante} onChange={(e) => set('apellido_aspirante', e.target.value)} />
+              <Input label="Primer nombre" required maxLength={60} value={form.primer_nombre} onChange={(e) => set('primer_nombre', e.target.value)} />
+              <Input label="Segundo nombre" maxLength={60} value={form.segundo_nombre} onChange={(e) => set('segundo_nombre', e.target.value)} />
+              <Input label="Primer apellido" required maxLength={60} value={form.primer_apellido} onChange={(e) => set('primer_apellido', e.target.value)} />
+              <Input label="Segundo apellido" maxLength={60} value={form.segundo_apellido} onChange={(e) => set('segundo_apellido', e.target.value)} />
               <Select label="Tipo de documento" value={form.tipo_documento} onChange={(e) => set('tipo_documento', e.target.value as TipoDocumento)}>
                 {TIPOS_DOCUMENTO.map((t) => (
                   <option key={t} value={t}>

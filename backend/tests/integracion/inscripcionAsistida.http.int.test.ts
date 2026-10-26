@@ -123,10 +123,10 @@ describe('M04: inscripción asistida por secretaría (capa HTTP)', () => {
       expect((await inscribir({ numero_documento: primera.cuerpo.data.numero_documento })).estado).toBe(201);
     });
 
-    it('quien ya es persona registrada en el sistema no se inscribe de nuevo: se manda a «Matricular existente»', async () => {
+    it('quien ya es persona registrada en el sistema no se inscribe de nuevo: se manda a «Nueva matrícula»', async () => {
       const r = await inscribir({ numero_documento: e.estudiante.numero_documento });
       expect(r.estado).toBe(409);
-      expect(r.cuerpo.message).toMatch(/Matricular existente/);
+      expect(r.cuerpo.message).toMatch(/Nueva matrícula/);
       expect(await AdmissionRequest.countDocuments()).toBe(0);
     });
 

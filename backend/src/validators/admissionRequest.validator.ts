@@ -6,8 +6,13 @@ import { claveDocumento, objectId } from './common.validator';
 
 export const crearSolicitud: ValidationSchema = {
   body: Joi.object({
-    nombre_aspirante: Joi.string().required(),
-    apellido_aspirante: Joi.string().required(),
+    // Lo normal son las cuatro partes (SIMAT las pide separadas); el nombre y el apellido completos siguen admitiéndose para quien ya los enviaba.
+    primer_nombre: Joi.string().trim().max(60),
+    segundo_nombre: Joi.string().trim().allow('').max(60),
+    primer_apellido: Joi.string().trim().max(60),
+    segundo_apellido: Joi.string().trim().allow('').max(60),
+    nombre_aspirante: Joi.string(),
+    apellido_aspirante: Joi.string(),
     tipo_documento: Joi.string()
       .valid(...TIPOS_DOCUMENTO)
       .required(),

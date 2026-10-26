@@ -11,8 +11,12 @@ import ApiError from '../utils/ApiError';
 import catchAsync from '../utils/catchAsync';
 
 interface CrearSolicitudBody {
-  nombre_aspirante: string;
-  apellido_aspirante: string;
+  primer_nombre?: string;
+  segundo_nombre?: string;
+  primer_apellido?: string;
+  segundo_apellido?: string;
+  nombre_aspirante?: string;
+  apellido_aspirante?: string;
   tipo_documento: TipoDocumento;
   numero_documento: string;
   fecha_nacimiento: string;

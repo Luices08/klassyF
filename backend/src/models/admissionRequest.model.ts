@@ -30,8 +30,13 @@ export interface IDocumentoSolicitud {
 }
 
 export interface IAdmissionRequest {
+  /** El nombre completo del aspirante (primer + segundo nombre) y sus apellidos: se arman de las cuatro partes de abajo cuando llegan. */
   nombre_aspirante: string;
   apellido_aspirante: string;
+  primer_nombre?: string;
+  segundo_nombre?: string;
+  primer_apellido?: string;
+  segundo_apellido?: string;
   tipo_documento: TipoDocumento;
   numero_documento: string;
   fecha_nacimiento: Date;
@@ -100,6 +105,10 @@ const admissionRequestSchema = new Schema<IAdmissionRequest, AdmissionRequestMod
   {
     nombre_aspirante: { type: String, required: true, trim: true },
     apellido_aspirante: { type: String, required: true, trim: true },
+    primer_nombre: { type: String, trim: true, maxlength: 60 },
+    segundo_nombre: { type: String, trim: true, maxlength: 60 },
+    primer_apellido: { type: String, trim: true, maxlength: 60 },
+    segundo_apellido: { type: String, trim: true, maxlength: 60 },
     tipo_documento: { type: String, enum: TIPOS_DOCUMENTO, required: true },
     numero_documento: { type: String, required: true, trim: true },
     fecha_nacimiento: { type: Date, required: true },

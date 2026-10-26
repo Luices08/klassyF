@@ -13,8 +13,11 @@ import type {
 // --- Sitio publico (sin autenticar) ---
 
 export interface SolicitarCupoInput {
-  nombre_aspirante: string;
-  apellido_aspirante: string;
+  /** El nombre se escribe en cuatro partes (SIMAT); el servidor arma el nombre y el apellido completos. */
+  primer_nombre: string;
+  segundo_nombre?: string;
+  primer_apellido: string;
+  segundo_apellido?: string;
   tipo_documento: TipoDocumento;
   numero_documento: string;
   fecha_nacimiento: string;

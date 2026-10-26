@@ -17,8 +17,10 @@ import { InformacionApoyoCampos } from '../../components/inclusion/InformacionAp
 import { APOYO_VACIO, aApoyoDeclarado } from '../../lib/apoyoDeclarado';
 
 const SOLICITUD_VACIA = {
-  nombre_aspirante: '',
-  apellido_aspirante: '',
+  primer_nombre: '',
+  segundo_nombre: '',
+  primer_apellido: '',
+  segundo_apellido: '',
   tipo_documento: 'RC' as TipoDocumento,
   numero_documento: '',
   fecha_nacimiento: '',
@@ -50,6 +52,8 @@ export function HomePage() {
     const { apoyo, ...datos } = form;
     await solicitar.mutateAsync({
       ...datos,
+      segundo_nombre: form.segundo_nombre.trim() || undefined,
+      segundo_apellido: form.segundo_apellido.trim() || undefined,
       apoyo_declarado: aApoyoDeclarado(apoyo),
       sede_deseada_id: form.sede_deseada_id || undefined,
       jornada_deseada: form.jornada_deseada || undefined,
@@ -119,18 +123,10 @@ export function HomePage() {
           </Alert>
         ) : (
           <>
-            <Input
-              label="Nombres del aspirante"
-              required
-              value={form.nombre_aspirante}
-              onChange={(e) => setForm((f) => ({ ...f, nombre_aspirante: e.target.value }))}
-            />
-            <Input
-              label="Apellidos del aspirante"
-              required
-              value={form.apellido_aspirante}
-              onChange={(e) => setForm((f) => ({ ...f, apellido_aspirante: e.target.value }))}
-            />
+            <Input label="Primer nombre del aspirante" required maxLength={60} value={form.primer_nombre} onChange={(e) => setForm((f) => ({ ...f, primer_nombre: e.target.value }))} />
+            <Input label="Segundo nombre" maxLength={60} value={form.segundo_nombre} onChange={(e) => setForm((f) => ({ ...f, segundo_nombre: e.target.value }))} />
+            <Input label="Primer apellido del aspirante" required maxLength={60} value={form.primer_apellido} onChange={(e) => setForm((f) => ({ ...f, primer_apellido: e.target.value }))} />
+            <Input label="Segundo apellido" maxLength={60} value={form.segundo_apellido} onChange={(e) => setForm((f) => ({ ...f, segundo_apellido: e.target.value }))} />
             <Select
               label="Tipo de documento"
               value={form.tipo_documento}

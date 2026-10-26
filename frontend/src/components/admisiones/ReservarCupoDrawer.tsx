@@ -61,7 +61,7 @@ export function ReservarCupoDrawer({ solicitud, onClose }: { solicitud: Admissio
               Quedó en lista de espera{resultado.posicion ? ` (posición ${resultado.posicion})` : ''}. {resultado.aviso}
             </Alert>
           ) : (
-            <Alert tone="success">El cupo quedó reservado. No se creó la matrícula: se hace cuando la familia se presente, desde «Matricular existente».</Alert>
+            <Alert tone="success">El cupo quedó reservado. No se creó la matrícula: se hace cuando la familia se presente, desde «Nueva matrícula».</Alert>
           )}
           <Button onClick={onClose}>Listo</Button>
         </div>

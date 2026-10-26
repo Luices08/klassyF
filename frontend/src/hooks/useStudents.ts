@@ -127,15 +127,14 @@ export function useActualizarEstadoPerfil() {
 export interface CrearEstudianteCompletoInput {
   tipo_documento: TipoDocumento;
   numero_documento: string;
-  nombre: string;
-  apellido: string;
+  /** El nombre completo se arma en el servidor de estas cuatro partes (SIMAT las pide separadas). */
+  primer_nombre: string;
+  segundo_nombre?: string;
+  primer_apellido: string;
+  segundo_apellido?: string;
   email?: string;
   password?: string;
   telefono?: string;
-  primer_nombre?: string;
-  segundo_nombre?: string;
-  primer_apellido?: string;
-  segundo_apellido?: string;
   lugar_expedicion?: string;
   fecha_nacimiento: string;
   genero?: Genero;

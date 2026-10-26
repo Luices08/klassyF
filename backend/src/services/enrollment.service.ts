@@ -33,7 +33,7 @@ import { aprobarItemConPazYSalvo, pazYSalvoConfirmadoPrevio } from './pazYSalvo.
 import { aplicarSalida } from './salidaMatricula.service';
 import { ubicarEstudiantes } from './ubicacionEstudiante.service';
 import { compararGradoElegido, Ubicacion } from '../utils/ubicacionEstudiante';
-import { crearDesdeMatricula } from './solicitudApoyo.service';
+import { apoyoRegistradoEnPerfil, crearDesdeMatricula } from './solicitudApoyo.service';
 
 // Un RETIRADO que venía matriculado libera su cupo en `aplicarSalida` (según la política de la institución); aquí llega solo quien se retira siendo PREINSCRITO.
 const ESTADOS_QUE_LIBERAN_CUPO: EstadoMatricula[] = ['RETIRADO', 'ANULADO'];
@@ -244,17 +244,19 @@ export async function createEnrollment(
     );
     if (!enrollment) throw new ApiError(500, 'No se pudo crear la matricula.');
 
-    // Cambio mínimo de M16: en la misma transacción queda la solicitud en la bandeja de orientación.
-    if (input.apoyo_declarado) {
+    // Cambio mínimo de M16: en la misma transacción queda la solicitud en la bandeja de orientación. Lo declarado al matricular manda; si no se declara
+    // nada, se usa lo que la hoja de vida ya dice de una discapacidad (no se escribe dos veces).
+    const apoyo = input.apoyo_declarado ?? (await apoyoRegistradoEnPerfil(student_id, academic_year_id, session));
+    if (apoyo) {
       await crearDesdeMatricula(
         {
           student_id,
           academic_year_id,
           group_id,
           origen: 'MATRICULA',
-          motivo_declarado: input.apoyo_declarado.motivo_declarado,
-          aporta_soporte: Boolean(input.apoyo_declarado.aporta_soporte),
-          observacion: input.apoyo_declarado.observacion,
+          motivo_declarado: apoyo.motivo_declarado,
+          aporta_soporte: Boolean(apoyo.aporta_soporte),
+          observacion: apoyo.observacion,
           solicitada_por: actor.id,
         },
         session
@@ -521,6 +523,7 @@ export interface SituacionDeEstudianteMatricula {
   numero_documento: string;
   tipo_documento: string;
   estado_expediente: EstadoEstudiante | null;
+  tiene_discapacidad: boolean;
   situacion: SituacionEstudiante;
   matricula: { _id: string; estado: EstadoMatricula; grupo: string; folio: string | null } | null;
 }
@@ -529,7 +532,7 @@ export interface SituacionDeEstudianteMatricula {
 export async function listarSituacionEstudiantes(academicYearId: string): Promise<SituacionDeEstudianteMatricula[]> {
   const [usuarios, perfiles, vivas, retiradas] = await Promise.all([
     User.find({ roles: ROLES.ESTUDIANTE }).select('nombre apellido numero_documento tipo_documento estado').sort({ apellido: 1, nombre: 1 }).lean(),
-    StudentProfile.find().select('user_id estado').lean(),
+    StudentProfile.find().select('user_id estado tiene_discapacidad').lean(),
     Enrollment.find({ academic_year_id: academicYearId, estado: { $in: ESTADOS_MATRICULA_VIVOS } })
       .select('student_id group_id estado folio_matricula')
       .populate({ path: 'group_id', select: 'nomenclatura grade_id', populate: { path: 'grade_id', select: 'nombre' } })
@@ -538,6 +541,7 @@ export async function listarSituacionEstudiantes(academicYearId: string): Promis
   ]);
   const retiradosEnElAnio = new Set(retiradas.map(String));
   const estadoPorUsuario = new Map(perfiles.map((p) => [String(p.user_id), p.estado]));
+  const conDiscapacidad = new Set(perfiles.filter((p) => p.tiene_discapacidad).map((p) => String(p.user_id)));
   const matriculaPorUsuario = new Map(vivas.map((m) => [String(m.student_id), m]));
 
   return usuarios.map((u) => {
@@ -551,6 +555,7 @@ export async function listarSituacionEstudiantes(academicYearId: string): Promis
       numero_documento: u.numero_documento,
       tipo_documento: u.tipo_documento,
       estado_expediente: estadoPerfil ?? null,
+      tiene_discapacidad: conDiscapacidad.has(String(u._id)),
       situacion: situacionDeEstudiante({ tieneMatriculaViva: Boolean(viva), estadoPerfil, usuarioActivo: u.estado === 'activo', retiradoEnElAnio: retiradosEnElAnio.has(String(u._id)) }),
       matricula: viva
         ? {

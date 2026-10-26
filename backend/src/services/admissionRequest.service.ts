@@ -13,6 +13,7 @@ import StudentGuardian from '../models/studentGuardian.model';
 import StudentProfile from '../models/studentProfile.model';
 import User from '../models/user.model';
 import ApiError from '../utils/ApiError';
+import { MENSAJE_NOMBRE_INCOMPLETO, resolverNombre } from '../utils/nombres';
 import { ESTADO_ACTIVO } from '../utils/filtroEstado';
 import { runTransaction } from '../utils/runTransaction';
 import { buscarMatriculaDePreinscripcion, construirDetalle, PreinscripcionDetalle } from './preinscripcionPublica.service';
@@ -26,8 +27,13 @@ import { anioDeLaAdmision, infoPublicaDeReserva, ReservaPublica } from './premat
 const SOLICITUDES_QUE_BLOQUEAN_NUEVA = ['PENDIENTE', 'EN_REVISION', 'CUPO_RESERVADO', 'EN_ESPERA', 'APROBADA'] as const;
 
 export interface CrearSolicitudInput {
-  nombre_aspirante: string;
-  apellido_aspirante: string;
+  primer_nombre?: string;
+  segundo_nombre?: string;
+  primer_apellido?: string;
+  segundo_apellido?: string;
+  /** Alternativa a las cuatro partes: el nombre y el apellido ya completos. */
+  nombre_aspirante?: string;
+  apellido_aspirante?: string;
   tipo_documento: TipoDocumento;
   numero_documento: string;
   fecha_nacimiento: string | Date;
@@ -50,6 +56,8 @@ export interface OrigenDeSolicitud {
 
 /** Solicitud publica (M04): sin autenticar, no crea cuentas ni consume cupos todavia. */
 export async function crearSolicitud(input: CrearSolicitudInput, origen: OrigenDeSolicitud = {}): Promise<AdmissionRequestDocument> {
+  const nombre = resolverNombre({ ...input, nombre: input.nombre_aspirante, apellido: input.apellido_aspirante });
+  if (!nombre) throw new ApiError(400, MENSAJE_NOMBRE_INCOMPLETO);
   const grado = await Grade.findOne({ _id: input.grado_deseado_id, estado: ESTADO_ACTIVO });
   if (!grado) throw new ApiError(400, 'El grado seleccionado no existe o no esta activo.');
 
@@ -67,7 +75,7 @@ export async function crearSolicitud(input: CrearSolicitudInput, origen: OrigenD
   }
 
   // El año al que apunta lo decide el colegio, no la familia: el siguiente mientras su ventana de prematrícula está abierta, o el año en curso.
-  const solicitud = await AdmissionRequest.create({ ...input, estado: 'PENDIENTE', origen: origen.origen ?? 'PUBLICA', registrada_por: origen.registrada_por ?? null, academic_year_id: await anioDeLaAdmision() });
+  const solicitud = await AdmissionRequest.create({ ...input, ...nombre.partes, nombre_aspirante: nombre.nombre, apellido_aspirante: nombre.apellido, estado: 'PENDIENTE', origen: origen.origen ?? 'PUBLICA', registrada_por: origen.registrada_por ?? null, academic_year_id: await anioDeLaAdmision() });
   // Quien la radica en el mostrador ya sabe que existe: el aviso a la bandeja es para las que llegan por el sitio público.
   if ((origen.origen ?? 'PUBLICA') === 'PUBLICA') await avisarSolicitudAdmision();
   return solicitud;
@@ -83,11 +91,11 @@ export interface RegistrarInscripcionInput extends CrearSolicitudInput {
 /**
  * Inscripción en el mostrador (M04): secretaría o administración radican la misma solicitud que la familia radica por el sitio público, con el documento
  * y el parentesco del acudiente. No crea cuenta, matrícula ni consume cupo: eso lo decide quien la revisa. Quien ya figura en el sistema (por su documento)
- * no se inscribe de nuevo: se matricula desde «Matricular existente».
+ * no se inscribe de nuevo: se matricula desde «Nueva matrícula».
  */
 export async function registrarInscripcion(input: RegistrarInscripcionInput, usuario: { id: Types.ObjectId | string }): Promise<AdmissionRequestDocument> {
   if (await User.exists({ numero_documento: input.numero_documento })) {
-    throw new ApiError(409, 'Ya hay una persona registrada con ese documento. Si es un estudiante del colegio, matricúlalo desde «Matricular existente»; no se inscribe de nuevo.');
+    throw new ApiError(409, 'Ya hay una persona registrada con ese documento. Si es un estudiante del colegio, matricúlalo desde «Nueva matrícula»; no se inscribe de nuevo.');
   }
   const solicitud = await crearSolicitud(input, { origen: 'SECRETARIA', registrada_por: usuario.id });
   await registrarEvento({ usuario_id: usuario.id, accion: 'INSCRIPCION_REGISTRADA', entidad: 'AdmissionRequest', entidad_id: solicitud._id, detalle: `Inscripción en el mostrador: ${solicitud.nombre_aspirante} ${solicitud.apellido_aspirante}` });
@@ -251,7 +259,17 @@ export async function aprobarSolicitud(
     await student.save({ session });
 
     await StudentProfile.create(
-      [{ user_id: student._id, fecha_nacimiento: solicitud.fecha_nacimiento, estado: 'ACTIVO' }],
+      [
+        {
+          user_id: student._id,
+          primer_nombre: solicitud.primer_nombre,
+          segundo_nombre: solicitud.segundo_nombre,
+          primer_apellido: solicitud.primer_apellido,
+          segundo_apellido: solicitud.segundo_apellido,
+          fecha_nacimiento: solicitud.fecha_nacimiento,
+          estado: 'ACTIVO',
+        },
+      ],
       { session }
     );
 

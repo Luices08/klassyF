@@ -191,8 +191,10 @@ export interface FilaDeCupos {
   capacidad: number;
   ocupados: number;
   reservados: number;
+  /** Antiguos que confirmaron que continúan y aún no tienen pre-matrícula: su cupo está apartado. */
+  continuan: number;
   en_espera: number;
-  /** capacidad − ocupados − reservados; negativo si se aprobaron más de los que cabían. */
+  /** capacidad − ocupados − reservados − continuan; negativo si se aprobaron más de los que cabían. */
   libres: number;
 }
 

@@ -23,7 +23,7 @@ export function CuposPrematriculaPanel({ anioId }: { anioId: string | undefined 
     <Card>
       <CardHeader
         title={`Cupos ${v.anio.year}`}
-        subtitle="Capacidad de los grupos, matriculados o preinscritos, cupos reservados a solicitudes (sin grupo todavía) y solicitudes en espera, por grado, sede y jornada."
+        subtitle="Capacidad de los grupos, matriculados o preinscritos, cupos reservados a solicitudes (sin grupo todavía), antiguos que confirmaron su continuidad y solicitudes en espera, por grado, sede y jornada."
         action={v.ventana ? <Chip tone={v.ventana.abierta ? 'green' : 'neutral'}>{v.ventana.abierta ? 'Prematrícula abierta' : 'Prematrícula cerrada'}</Chip> : <Chip tone="orange">Sin ventana configurada</Chip>}
       />
       {v.reservas_vencidas > 0 && (
@@ -40,6 +40,7 @@ export function CuposPrematriculaPanel({ anioId }: { anioId: string | undefined 
           <Th className="text-right">Capacidad</Th>
           <Th className="text-right">Matriculados</Th>
           <Th className="text-right">Reservados</Th>
+          <Th className="text-right">Antiguos que continúan</Th>
           <Th className="text-right">En espera</Th>
           <Th className="text-right">Libres</Th>
         </TableHead>
@@ -52,13 +53,14 @@ export function CuposPrematriculaPanel({ anioId }: { anioId: string | undefined 
               <Td className="text-right">{f.capacidad}</Td>
               <Td className="text-right">{f.ocupados}</Td>
               <Td className="text-right">{f.reservados}</Td>
+              <Td className="text-right">{f.continuan}</Td>
               <Td className="text-right">{f.en_espera}</Td>
               <Td className="text-right">
                 <Chip tone={f.libres > 0 ? 'green' : f.libres === 0 ? 'orange' : 'red'}>{f.libres}</Chip>
               </Td>
             </tr>
           ))}
-          {v.filas.length === 0 && <EmptyRow colSpan={8}>El año {v.anio.year} aún no tiene grupos. Créalos en «Grupos».</EmptyRow>}
+          {v.filas.length === 0 && <EmptyRow colSpan={9}>El año {v.anio.year} aún no tiene grupos. Créalos en «Grupos».</EmptyRow>}
         </TableBody>
       </Table>
     </Card>

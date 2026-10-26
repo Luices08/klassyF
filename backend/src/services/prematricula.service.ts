@@ -1,10 +1,13 @@
 import { ClientSession, Types } from 'mongoose';
+import { ESTADOS_MATRICULA_VIVOS } from '../constants/enums';
 import { ROLES } from '../constants/roles';
 import AcademicYear from '../models/academicYear.model';
 import AdmissionRequest, { AdmissionRequestDocument } from '../models/admissionRequest.model';
 import Campus from '../models/campus.model';
 import ConfiguracionPrematricula, { ConfiguracionPrematriculaDocument } from '../models/configuracionPrematricula.model';
+import ConfirmacionContinuidad from '../models/confirmacionContinuidad.model';
 import Counter from '../models/counter.model';
+import Enrollment from '../models/enrollment.model';
 import Grade from '../models/grade.model';
 import Group from '../models/group.model';
 import JornadaOperativa from '../models/jornadaOperativa.model';
@@ -83,16 +86,23 @@ export async function guardarVentana(anioId: string, datos: DatosVentana, usuari
   return vistaDeVentana(config as ConfiguracionPrematriculaDocument, new Date());
 }
 
-/**
- * El año al que apunta una solicitud que llega ahora: el de una ventana de prematrícula abierta (el siguiente) o, si no hay ninguna, el año en curso. Sin
- * año en curso, el de planificación más reciente. null si el colegio aún no tiene años.
- */
-export async function anioDeLaAdmision(ahora: Date = new Date()): Promise<Types.ObjectId | null> {
+/** El año (no cerrado) cuya ventana de prematrícula está abierta ahora, o null si ninguna lo está. */
+export async function anioConVentanaAbierta(ahora: Date = new Date()): Promise<Types.ObjectId | null> {
   const abiertas = (await ConfiguracionPrematricula.find().sort({ desde: -1 })).filter((c) => ventanaAbierta(c, ahora));
   for (const ventana of abiertas) {
     const anio = await AcademicYear.findById(ventana.academic_year_id).select('estado');
     if (anio && anio.estado !== 'CERRADO') return anio._id;
   }
+  return null;
+}
+
+/**
+ * El año al que apunta una solicitud que llega ahora: el de una ventana de prematrícula abierta (el siguiente) o, si no hay ninguna, el año en curso. Sin
+ * año en curso, el de planificación más reciente. null si el colegio aún no tiene años.
+ */
+export async function anioDeLaAdmision(ahora: Date = new Date()): Promise<Types.ObjectId | null> {
+  const conVentana = await anioConVentanaAbierta(ahora);
+  if (conVentana) return conVentana;
   const enCurso = await AcademicYear.findOne({ estado: 'EN_CURSO' }).select('_id');
   if (enCurso) return enCurso._id;
   const planificacion = await AcademicYear.findOne({ estado: 'PLANIFICACION' }).sort({ year: -1 }).select('_id');
@@ -116,11 +126,16 @@ export interface VistaDeCupos {
 /** Lee los datos y calcula los cupos del año. Con `session` lee dentro de una transacción (la reserva lo necesita para decidir con lo último). */
 async function leerCupos(anioId: string | Types.ObjectId, ahora: Date, session?: ClientSession): Promise<{ filas: FilaDeCupos[]; vencidas: number; ventana: ConfiguracionPrematriculaDocument | null }> {
   const s = session ?? null;
-  const [ventana, grupos, solicitudes] = await Promise.all([
+  const [ventana, grupos, solicitudes, continuidades] = await Promise.all([
     ConfiguracionPrematricula.findOne({ academic_year_id: anioId }).session(s),
     Group.find({ academic_year_id: anioId, estado: { $ne: 'CLOSED' } }).select('grade_id sede_id jornada_id max_capacity cupos_ocupados').session(s),
     AdmissionRequest.find({ academic_year_id: anioId, estado: { $in: ['CUPO_RESERVADO', 'EN_ESPERA'] } }).select('estado grado_deseado_id reserva').session(s),
+    ConfirmacionContinuidad.find({ academic_year_id: anioId, decision: 'CONTINUA', grade_id: { $ne: null }, jornada_id: { $ne: null } }).select('student_id grade_id sede_id jornada_id').session(s),
   ]);
+  // Quien ya tiene su pre-matrícula en el año ya cuenta en `cupos_ocupados`: no se le aparta el cupo dos veces.
+  const yaMatriculados = new Set(
+    (await Enrollment.distinct('student_id', { academic_year_id: anioId, student_id: { $in: continuidades.map((c) => c.student_id) }, estado: { $in: ESTADOS_MATRICULA_VIVOS } }).session(s)).map(String)
+  );
   const vigente = reservaVigente(ventana?.fecha_limite_matricula ?? null, ahora);
   const cubetaDe = (sol: { grado_deseado_id: Types.ObjectId; reserva: { sede_id: Types.ObjectId; jornada_id: Types.ObjectId } | null }) =>
     sol.reserva ? { grade_id: String(sol.grado_deseado_id), sede_id: String(sol.reserva.sede_id), jornada_id: String(sol.reserva.jornada_id) } : null;
@@ -130,7 +145,12 @@ async function leerCupos(anioId: string | Types.ObjectId, ahora: Date, session?:
   const filas = calcularCupos(
     grupos.map((g) => ({ grade_id: String(g.grade_id), sede_id: String(g.sede_id), jornada_id: String(g.jornada_id), max_capacity: g.max_capacity, cupos_ocupados: g.cupos_ocupados })),
     vigente ? reservadas.map(cubetaDe).filter((c): c is NonNullable<typeof c> => c !== null) : [],
-    enEspera.map(cubetaDe).filter((c): c is NonNullable<typeof c> => c !== null)
+    enEspera.map(cubetaDe).filter((c): c is NonNullable<typeof c> => c !== null),
+    vigente
+      ? continuidades
+          .filter((c) => !yaMatriculados.has(String(c.student_id)))
+          .map((c) => ({ grade_id: String(c.grade_id), sede_id: String(c.sede_id), jornada_id: String(c.jornada_id) }))
+      : []
   );
   return { filas, vencidas: vigente ? 0 : reservadas.length, ventana };
 }

@@ -33,9 +33,11 @@ export interface FilaDeCupos extends CubetaDeCupos {
   ocupados: number;
   /** Solicitudes con el cupo reservado y vigente (aún sin grupo). */
   reservados: number;
+  /** Estudiantes antiguos que confirmaron que continúan y aún no tienen pre-matrícula: su cupo está apartado. */
+  continuan: number;
   /** Solicitudes esperando a que se libere un cupo, en orden de inscripción. */
   en_espera: number;
-  /** capacidad − ocupados − reservados. Puede ser negativo: se aprobaron más de los que cabían. */
+  /** capacidad − ocupados − reservados − continuan. Puede ser negativo: se aprobaron más de los que cabían. */
   libres: number;
 }
 
@@ -43,11 +45,16 @@ export interface FilaDeCupos extends CubetaDeCupos {
  * Los cupos por grado, sede y jornada. Un grupo cerrado no entra (el llamador solo pasa los activos). Las reservas y las esperas de una cubeta sin grupos
  * se ignoran: sin grupos no hay dónde reservar, y la pantalla ya avisa que faltan.
  */
-export function calcularCupos(grupos: readonly GrupoParaCupos[], reservas: readonly CubetaDeCupos[], enEspera: readonly CubetaDeCupos[]): FilaDeCupos[] {
+export function calcularCupos(
+  grupos: readonly GrupoParaCupos[],
+  reservas: readonly CubetaDeCupos[],
+  enEspera: readonly CubetaDeCupos[],
+  continuan: readonly CubetaDeCupos[] = []
+): FilaDeCupos[] {
   const filas = new Map<string, FilaDeCupos>();
   for (const g of grupos) {
     const clave = claveDeCubeta(g);
-    const fila = filas.get(clave) ?? { grade_id: g.grade_id, sede_id: g.sede_id, jornada_id: g.jornada_id, capacidad: 0, ocupados: 0, reservados: 0, en_espera: 0, libres: 0 };
+    const fila = filas.get(clave) ?? { grade_id: g.grade_id, sede_id: g.sede_id, jornada_id: g.jornada_id, capacidad: 0, ocupados: 0, reservados: 0, continuan: 0, en_espera: 0, libres: 0 };
     fila.capacidad += g.max_capacity;
     fila.ocupados += g.cupos_ocupados;
     filas.set(clave, fila);
@@ -56,11 +63,15 @@ export function calcularCupos(grupos: readonly GrupoParaCupos[], reservas: reado
     const fila = filas.get(claveDeCubeta(r));
     if (fila) fila.reservados += 1;
   }
+  for (const c of continuan) {
+    const fila = filas.get(claveDeCubeta(c));
+    if (fila) fila.continuan += 1;
+  }
   for (const w of enEspera) {
     const fila = filas.get(claveDeCubeta(w));
     if (fila) fila.en_espera += 1;
   }
-  for (const fila of filas.values()) fila.libres = fila.capacidad - fila.ocupados - fila.reservados;
+  for (const fila of filas.values()) fila.libres = fila.capacidad - fila.ocupados - fila.reservados - fila.continuan;
   return [...filas.values()];
 }
 

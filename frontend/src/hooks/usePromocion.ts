@@ -175,7 +175,9 @@ export interface ResumenCierre {
 // --- Rollover ---
 
 export type DestinoRollover = 'GRADO_SIGUIENTE' | 'MISMO_GRADO' | 'TERMINA_CICLO' | 'EGRESADO' | 'NO_RENUEVA_CUPO' | 'SIN_DECISION';
-export type EstadoFilaRollover = 'POR_CREAR' | 'YA_TIENE_MATRICULA' | 'EN_ESPERA' | 'SIN_CUPO' | 'NO_APLICA';
+export type EstadoFilaRollover = 'POR_CREAR' | 'YA_TIENE_MATRICULA' | 'EN_ESPERA' | 'SIN_CUPO' | 'SIN_CONFIRMAR' | 'NO_APLICA';
+/** A quién se pre-matricula: solo a quien la familia confirmó que continúa, o a todos los que su cierre deja seguir. */
+export type ModoContinuidad = 'CONFIRMADOS' | 'TODOS';
 
 export const NOMBRES_DESTINO: Record<DestinoRollover, string> = {
   GRADO_SIGUIENTE: 'Grado siguiente',
@@ -191,6 +193,7 @@ export const NOMBRES_ESTADO_ROLLOVER: Record<EstadoFilaRollover, string> = {
   YA_TIENE_MATRICULA: 'Ya tiene matrícula',
   EN_ESPERA: 'Lista de espera',
   SIN_CUPO: 'Sin cupo',
+  SIN_CONFIRMAR: 'Sin confirmar',
   NO_APLICA: 'No aplica',
 };
 
@@ -224,10 +227,12 @@ export interface PlanRollover {
   origen: { id: string; year: number };
   destino: { id: string; year: number };
   filas: FilaRollover[];
+  /** El modo con el que se calculó: el pedido o, si no se pidió, el que corresponde al colegio. */
+  modo_continuidad: ModoContinuidad;
   grupos_destino: GrupoDestinoPlan[];
   alertas: string[];
   retirados: number;
-  resumen: { total: number; por_crear: number; ya_tienen_matricula: number; en_espera: number; sin_cupo: number; no_aplica: number; por_destino: Partial<Record<DestinoRollover, number>> };
+  resumen: { total: number; por_crear: number; ya_tienen_matricula: number; en_espera: number; sin_cupo: number; sin_confirmar: number; no_aplica: number; por_destino: Partial<Record<DestinoRollover, number>> };
 }
 
 export interface ResultadoRollover {
@@ -281,6 +286,8 @@ export interface AlcanceRollover {
   sede_id?: string;
   grade_id?: string;
   group_id?: string;
+  /** Sin indicarlo, el servidor decide: confirmados si el colegio usa la renovación de matrícula, todos si no. */
+  continuidad?: ModoContinuidad;
 }
 
 /** La simulación solo se pide cuando `activa` (botón «Simular»): así lo que se ve es lo que se acaba de calcular, nunca algo viejo. */

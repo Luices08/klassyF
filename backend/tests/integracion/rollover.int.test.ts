@@ -1,6 +1,7 @@
 import { Types } from 'mongoose';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import AcademicYear from '../../src/models/academicYear.model';
+import ConfiguracionPrematricula from '../../src/models/configuracionPrematricula.model';
 import CalificacionAsignatura from '../../src/models/calificacionAsignatura.model';
 import Enrollment from '../../src/models/enrollment.model';
 import Grade from '../../src/models/grade.model';
@@ -10,6 +11,8 @@ import User from '../../src/models/user.model';
 import { UserDocument } from '../../src/models/user.model';
 import { verificarCierre } from '../../src/services/academicYear.service';
 import { cerrarGrupo } from '../../src/services/evaluacionPromocion.service';
+import { registrarContinuidad } from '../../src/services/continuidad.service';
+import { cuposDelAnio } from '../../src/services/prematricula.service';
 import { asignarDesdeEspera, descartarDeEspera, listarEspera } from '../../src/services/listaEsperaRematricula.service';
 import { ejecutarRollover, simularRollover } from '../../src/services/rolloverPromocion.service';
 import { detenerBaseDeDatos, iniciarBaseDeDatos, limpiarBaseDeDatos } from './baseDeDatos';
@@ -130,6 +133,55 @@ describe('M19: rollover al año siguiente', () => {
     await Group.deleteOne({ _id: septimoId });
     expect(await filaDe(e.estudiante)).toMatchObject({ estado: 'SIN_CUPO', grupo_destino: null });
     expect(await ejecutarRollover(filtros(), CLAVE, e.admin)).toMatchObject({ creadas: 0, en_espera: 0 });
+  });
+
+  describe('continuidad: solo se pre-matricula a quien la familia confirmó', () => {
+    const abrirProceso = () => ConfiguracionPrematricula.create({ academic_year_id: destinoId, desde: new Date(Date.UTC(2020, 0, 1)), hasta: new Date(Date.UTC(2020, 0, 31)) });
+    const responder = (u: UserDocument, decision: 'CONTINUA' | 'NO_CONTINUA' | null) => registrarContinuidad(destinoId, String(u._id), { decision }, { usuario: e.admin, canal: 'SECRETARIA' });
+
+    it('sin ventana de prematrícula el colegio no usa la renovación: se pre-matricula a todos los que su cierre deja seguir (como siempre)', async () => {
+      const plan = await simularRollover(filtros(), e.admin);
+      expect(plan.modo_continuidad).toBe('TODOS');
+      expect(await filaDe(e.estudiante)).toMatchObject({ estado: 'POR_CREAR' });
+      expect(plan.resumen.sin_confirmar).toBe(0);
+    });
+
+    it('con la ventana configurada rige «confirmados»: quien no respondió queda SIN_CONFIRMAR y no se pre-matricula; quien dijo que no continúa tampoco', async () => {
+      await abrirProceso();
+      const plan = await simularRollover(filtros(), e.admin);
+      expect(plan.modo_continuidad).toBe('CONFIRMADOS');
+      expect(await filaDe(e.estudiante)).toMatchObject({ estado: 'SIN_CONFIRMAR', destino: 'GRADO_SIGUIENTE', motivo: expect.stringMatching(/no ha confirmado/) });
+      expect(plan.resumen).toMatchObject({ por_crear: 0, sin_confirmar: 1 });
+      expect(await ejecutarRollover(filtros(), CLAVE, e.admin)).toMatchObject({ creadas: 0 });
+
+      await responder(e.estudiante, 'NO_CONTINUA');
+      expect(await filaDe(e.estudiante)).toMatchObject({ estado: 'NO_APLICA', motivo: expect.stringMatching(/no continúa/) });
+    });
+
+    it('quien confirmó se pre-matricula, y su cupo apartado deja de contarse aparte porque ya ocupa el grupo', async () => {
+      await abrirProceso();
+      await responder(e.estudiante, 'CONTINUA');
+      expect((await cuposDelAnio(destinoId)).filas.find((f) => f.grado.numero === 7)).toMatchObject({ continuan: 1, ocupados: 0, libres: 39 });
+      expect(await filaDe(e.estudiante)).toMatchObject({ estado: 'POR_CREAR', grupo_destino: 'Séptimo 701' });
+
+      expect(await ejecutarRollover(filtros(), CLAVE, e.admin)).toMatchObject({ creadas: 1 });
+      expect(await Enrollment.findOne({ student_id: e.estudiante._id, academic_year_id: destinoId })).toMatchObject({ estado: 'PREINSCRITO', tipo_ingreso: 'ANTIGUO' });
+      expect((await cuposDelAnio(destinoId)).filas.find((f) => f.grado.numero === 7)).toMatchObject({ continuan: 0, ocupados: 1, libres: 39 });
+    });
+
+    it('«todos» incluye también a quien no respondió, aunque el colegio use la renovación', async () => {
+      await abrirProceso();
+      const todos = await simularRollover({ ...filtros(), continuidad: 'TODOS' }, e.admin);
+      expect(todos.modo_continuidad).toBe('TODOS');
+      expect(todos.filas.find((f) => f.student_id === String(e.estudiante._id))).toMatchObject({ estado: 'POR_CREAR' });
+      expect(await ejecutarRollover({ ...filtros(), continuidad: 'TODOS' }, CLAVE, e.admin)).toMatchObject({ creadas: 1 });
+    });
+
+    it('lo que no es una promoción a otro grado no cambia: quien espera recuperación sigue sin proyectarse aunque haya confirmado', async () => {
+      await abrirProceso();
+      await responder(e.otroEstudiante, 'CONTINUA');
+      expect(await filaDe(e.otroEstudiante)).toMatchObject({ destino: 'SIN_DECISION', estado: 'NO_APLICA' });
+    });
   });
 
   describe('lista de espera, alcance por grupo y secretaría', () => {

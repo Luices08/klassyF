@@ -12,6 +12,7 @@ import { EmptyRow, Table, TableBody, TableHead, Td, Th } from '../../components/
 import { CheckCircleIcon, ClipboardListIcon, FileTextIcon, PlusIcon, XCircleIcon } from '../../components/ui/icons';
 import { Tabs } from '../../components/ui/Tabs';
 import { CuposPrematriculaPanel } from '../../components/admisiones/CuposPrematriculaPanel';
+import { RenovacionPanel } from '../../components/admisiones/RenovacionPanel';
 import { ReservarCupoDrawer } from '../../components/admisiones/ReservarCupoDrawer';
 import { VentanaPrematriculaPanel } from '../../components/admisiones/VentanaPrematriculaPanel';
 import { InscripcionDrawer } from '../../components/admisiones/InscripcionDrawer';
@@ -42,7 +43,7 @@ function nombreDe(v: string | { nombre: string }): string {
 export function AdmissionRequestsPage() {
   const { anio } = useAnioDeTrabajo();
   const anioId = anio?._id;
-  const [pestana, setPestana] = useState<'solicitudes' | 'cupos' | 'ventana'>('solicitudes');
+  const [pestana, setPestana] = useState<'solicitudes' | 'renovacion' | 'cupos' | 'ventana'>('solicitudes');
   const [filterEstado, setFilterEstado] = useState<EstadoSolicitud | ''>('');
   const [filterAnio, setFilterAnio] = useState('');
   const [page, setPage] = useState(1);
@@ -118,6 +119,7 @@ export function AdmissionRequestsPage() {
       <Tabs
         items={[
           { key: 'solicitudes', label: 'Solicitudes' },
+          { key: 'renovacion', label: 'Renovación de antiguos' },
           { key: 'cupos', label: 'Cupos de prematrícula' },
           { key: 'ventana', label: 'Ventana de prematrícula' },
         ]}
@@ -136,6 +138,7 @@ export function AdmissionRequestsPage() {
           </Select>
         </div>
       )}
+      {pestana === 'renovacion' && <RenovacionPanel anioId={anioDePrematricula} />}
       {pestana === 'cupos' && <CuposPrematriculaPanel anioId={anioDePrematricula} />}
       {pestana === 'ventana' && <VentanaPrematriculaPanel anioId={anioDePrematricula} />}
 

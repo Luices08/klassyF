@@ -54,6 +54,13 @@ describe('calcularCupos', () => {
     expect(filas.find((f) => f.grade_id === 'g7')).toMatchObject({ reservados: 0, libres: 35 });
   });
 
+  it('quien confirmó que continúa resta cupo y se cuenta aparte de las reservas', () => {
+    const filas = calcularCupos(grupos, [sexto], [], [sexto, sexto]);
+    expect(filas.find((f) => f.grade_id === 'g6')).toMatchObject({ reservados: 1, continuan: 2, libres: 12 });
+    expect(filas.find((f) => f.grade_id === 'g7')).toMatchObject({ continuan: 0, libres: 35 });
+    expect(calcularCupos(grupos, [], [], [{ grade_id: 'g9', sede_id: 's1', jornada_id: 'j1' }])).toHaveLength(2);
+  });
+
   it('distingue la jornada: la mañana llena no resta a la tarde', () => {
     const tarde = { ...sexto, jornada_id: 'j2' };
     const filas = calcularCupos([...grupos, { ...tarde, max_capacity: 30, cupos_ocupados: 0 }], [sexto], []);

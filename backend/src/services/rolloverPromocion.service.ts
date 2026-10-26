@@ -5,6 +5,8 @@ import { ESTADOS_MATRICULA_ACTIVOS, ESTADOS_MATRICULA_VIVOS, EstadoDocumentoMatr
 import { ResultadoPromocion } from '../constants/promocion';
 import { ROLES } from '../constants/roles';
 import AcademicYear, { AcademicYearDocument } from '../models/academicYear.model';
+import ConfiguracionPrematricula from '../models/configuracionPrematricula.model';
+import ConfirmacionContinuidad from '../models/confirmacionContinuidad.model';
 import Enrollment from '../models/enrollment.model';
 import EvaluacionPromocion from '../models/evaluacionPromocionEstudiante.model';
 import Grade from '../models/grade.model';
@@ -36,9 +38,16 @@ const PUEDEN_EJECUTAR = [ROLES.ADMIN, ROLES.SECRETARIA];
  * - YA_TIENE_MATRICULA: ya tiene matrícula viva en el año siguiente (el rollover se puede repetir sin duplicar).
  * - EN_ESPERA: le corresponde un grado con grupos, pero los cupos se agotaron con quienes tienen más prioridad: pasa a la lista de espera.
  * - SIN_CUPO: le corresponde un grado, pero su sede no tiene ningún grupo de ese grado en el año siguiente.
- * - NO_APLICA: no se pre-matricula (ver `destino` y `motivo`).
+ * - SIN_CONFIRMAR: la familia no respondió si continúa y el proceso es solo con confirmados (ver `ModoContinuidad`): no se pre-matricula.
+ * - NO_APLICA: no se pre-matricula (ver `destino` y `motivo`; incluye a quien la familia dijo que no continúa).
  */
-export type EstadoFilaRollover = 'POR_CREAR' | 'YA_TIENE_MATRICULA' | 'EN_ESPERA' | 'SIN_CUPO' | 'NO_APLICA';
+export type EstadoFilaRollover = 'POR_CREAR' | 'YA_TIENE_MATRICULA' | 'EN_ESPERA' | 'SIN_CUPO' | 'SIN_CONFIRMAR' | 'NO_APLICA';
+
+/**
+ * A quién se pre-matricula: `CONFIRMADOS` solo a quien la familia dijo que continúa (M04, continuidad); `TODOS` a todos los que su cierre de promoción deja
+ * seguir. Sin indicarlo, rige `CONFIRMADOS` si el colegio configuró la ventana de prematrícula del año de destino (usa la renovación) y `TODOS` si no.
+ */
+export type ModoContinuidad = 'CONFIRMADOS' | 'TODOS';
 
 export interface FiltrosRollover {
   origen_id: string;
@@ -47,6 +56,7 @@ export interface FiltrosRollover {
   grade_id?: string;
   /** Un solo grupo de origen; sin él se procesa la sede y el grado elegidos (o toda la institución). */
   group_id?: string;
+  continuidad?: ModoContinuidad;
 }
 
 export interface FilaRollover {
@@ -84,12 +94,14 @@ export interface PlanRollover {
   origen: { id: string; year: number };
   destino: { id: string; year: number };
   filas: FilaRollover[];
+  /** El modo con el que se calculó (el pedido o el que corresponde al colegio). */
+  modo_continuidad: ModoContinuidad;
   /** Cómo quedarían los grupos del año siguiente que reciben estudiantes de este alcance. */
   grupos_destino: GrupoDestinoPlan[];
   alertas: string[];
   /** Estudiantes retirados o anulados del año que termina: no se pre-matriculan. */
   retirados: number;
-  resumen: { total: number; por_crear: number; ya_tienen_matricula: number; en_espera: number; sin_cupo: number; no_aplica: number; por_destino: Partial<Record<DestinoRollover, number>> };
+  resumen: { total: number; por_crear: number; ya_tienen_matricula: number; en_espera: number; sin_cupo: number; sin_confirmar: number; no_aplica: number; por_destino: Partial<Record<DestinoRollover, number>> };
 }
 
 function exigirConsulta(usuario: UserDocument): void {
@@ -122,6 +134,7 @@ const cierreEntrada = (cierre: { entrada?: unknown } | undefined) =>
 export async function planificar(f: FiltrosRollover, alcance: 'TODAS' | string[] = 'TODAS'): Promise<PlanRollover> {
   const { origen, destino } = await cargarAnios(f);
   const config = datosDeConfiguracion(await obtenerConfiguracion());
+  const modoContinuidad: ModoContinuidad = f.continuidad ?? ((await ConfiguracionPrematricula.exists({ academic_year_id: destino._id })) ? 'CONFIRMADOS' : 'TODOS');
 
   const [matriculas, grupos, grados] = await Promise.all([
     Enrollment.find({ academic_year_id: origen._id, estado: { $in: ESTADOS_MATRICULA_ACTIVOS } }),
@@ -156,7 +169,7 @@ export async function planificar(f: FiltrosRollover, alcance: 'TODAS' | string[]
   const matriculasDestino = await Enrollment.find({ academic_year_id: destino._id, group_id: { $in: gruposDestino.map((g) => g._id) }, estado: { $in: ESTADOS_MATRICULA_VIVOS } }).select('student_id group_id tipo_ingreso');
   const yaEnDestinoIds = matriculasDestino.map((m) => m.student_id);
 
-  const [usuarios, perfiles, cierres, yaMatriculados, retiradosIds, pazConfirmado, graduados, historial, cierresDeDestino] = await Promise.all([
+  const [usuarios, perfiles, cierres, yaMatriculados, retiradosIds, pazConfirmado, graduados, historial, cierresDeDestino, respuestasContinuidad] = await Promise.all([
     User.find({ _id: { $in: estudiantesIds } }).select('nombre apellido numero_documento estado'),
     StudentProfile.find({ user_id: { $in: [...estudiantesIds, ...yaEnDestinoIds] } }).select('user_id estado fecha_nacimiento'),
     EvaluacionPromocion.find({ academic_year_id: origen._id, student_id: { $in: estudiantesIds }, vigente: true }),
@@ -166,7 +179,9 @@ export async function planificar(f: FiltrosRollover, alcance: 'TODAS' | string[]
     Titulacion.find({ academic_year_id: origen._id, student_id: { $in: estudiantesIds }, estado: { $in: ['GRADUADO', 'GRADUADO_EXTEMPORANEO'] } }).select('student_id'),
     Enrollment.find({ student_id: { $in: estudiantesIds }, estado: { $ne: 'ANULADO' }, academic_year_id: { $ne: destino._id } }).select('student_id academic_year_id'),
     EvaluacionPromocion.find({ academic_year_id: origen._id, student_id: { $in: yaEnDestinoIds }, vigente: true }).select('student_id entrada'),
+    ConfirmacionContinuidad.find({ academic_year_id: destino._id, student_id: { $in: estudiantesIds } }).select('student_id decision'),
   ]);
+  const continuidadPorId = new Map(respuestasContinuidad.map((r) => [String(r.student_id), r.decision]));
   const usuarioPorId = new Map(usuarios.map((u) => [String(u._id), u]));
   const perfilPorId = new Map(perfiles.map((p) => [String(p.user_id), p]));
   const cierrePorId = new Map(cierres.map((c) => [String(c.student_id), c]));
@@ -251,6 +266,11 @@ export async function planificar(f: FiltrosRollover, alcance: 'TODAS' | string[]
     const colocable = dest === 'GRADO_SIGUIENTE' || dest === 'MISMO_GRADO';
     if (colocable && u && u.estado !== 'activo') return sinColocar({ ...base, motivo: 'El usuario del estudiante está inactivo.' });
     if (colocable && matriculadosDestino.has(sid)) return sinColocar({ ...base, estado: 'YA_TIENE_MATRICULA', motivo: `Ya tiene matrícula en ${destino.year}.` });
+    if (colocable && modoContinuidad === 'CONFIRMADOS') {
+      const respuesta = continuidadPorId.get(sid);
+      if (respuesta === 'NO_CONTINUA') return sinColocar({ ...base, motivo: 'La familia informó que no continúa el año siguiente.' });
+      if (!respuesta) return sinColocar({ ...base, estado: 'SIN_CONFIRMAR', motivo: 'La familia no ha confirmado que continúa: no se pre-matricula (se puede incluir eligiendo «todos»).' });
+    }
     const perfil = perfilPorId.get(sid);
     if (colocable && perfil?.estado && ESTADOS_QUE_EXIGEN_REINGRESO.includes(perfil.estado)) {
       return sinColocar({ ...base, motivo: `Su expediente figura ${perfil.estado}: el regreso es un reingreso que se confirma en la matrícula.` });
@@ -382,6 +402,7 @@ export async function planificar(f: FiltrosRollover, alcance: 'TODAS' | string[]
     origen: { id: String(origen._id), year: origen.year },
     destino: { id: String(destino._id), year: destino.year },
     filas,
+    modo_continuidad: modoContinuidad,
     grupos_destino: gruposDelPlan,
     alertas,
     retirados,
@@ -391,6 +412,7 @@ export async function planificar(f: FiltrosRollover, alcance: 'TODAS' | string[]
       ya_tienen_matricula: cuenta('YA_TIENE_MATRICULA'),
       en_espera: cuenta('EN_ESPERA'),
       sin_cupo: cuenta('SIN_CUPO'),
+      sin_confirmar: cuenta('SIN_CONFIRMAR'),
       no_aplica: cuenta('NO_APLICA'),
       por_destino,
     },

@@ -12,6 +12,7 @@ interface Mensaje {
   autor: 'asistente' | 'usuario';
   texto: string;
   opciones?: Coincidencia[];
+  destino?: LugarVisitado;
 }
 
 const TAMANO_BOTON = 56;
@@ -98,7 +99,12 @@ export function AsistenteFlotante({ items }: AsistenteFlotanteProps) {
     [visitados, items]
   );
 
-  function redirigirA(ruta: string, url: string, nombre: string) {
+  function redirigirA(ruta: string, url: string, nombre: string, respuesta?: string) {
+    agregar({
+      autor: 'asistente',
+      texto: `${respuesta ?? `Te llevo a «${nombre}».`} 📍 Lugar visitado: «${nombre}».`,
+      destino: { ruta, url, nombre },
+    });
     navigate(url);
     setVisitados((actuales) => registrarVisita(actuales, { ruta, url, nombre }));
   }
@@ -108,8 +114,7 @@ export function AsistenteFlotante({ items }: AsistenteFlotanteProps) {
       agregar({ autor: 'asistente', texto: `Ya estás en «${destino.item.label}». ${destino.descripcion}` });
       return;
     }
-    agregar({ autor: 'asistente', texto: `Te llevo a «${destino.item.label}». ${destino.descripcion}` });
-    redirigirA(destino.item.to, destino.item.to, destino.item.label);
+    redirigirA(destino.item.to, destino.item.to, destino.item.label, `Te llevo a «${destino.item.label}». ${destino.descripcion}`);
   }
 
   function volverA(lugar: LugarVisitado) {
@@ -117,8 +122,7 @@ export function AsistenteFlotante({ items }: AsistenteFlotanteProps) {
       agregar({ autor: 'asistente', texto: `Ya estás en «${lugar.nombre}».` });
       return;
     }
-    agregar({ autor: 'asistente', texto: `Te llevo de nuevo a «${lugar.nombre}».` });
-    redirigirA(lugar.ruta, lugar.url, lugar.nombre);
+    redirigirA(lugar.ruta, lugar.url, lugar.nombre, `Te llevo de nuevo a «${lugar.nombre}».`);
   }
 
   function enviar(e: FormEvent) {
@@ -137,9 +141,10 @@ export function AsistenteFlotante({ items }: AsistenteFlotanteProps) {
             agregar({ autor: 'asistente', texto: r.mensaje });
             return;
           }
-          agregar({ autor: 'asistente', texto: r.mensaje });
           if (destino.to !== pathname || r.grado_id) {
-            redirigirA(destino.to, r.grado_id ? `${destino.to}?grado=${r.grado_id}` : destino.to, destino.label);
+            redirigirA(destino.to, r.grado_id ? `${destino.to}?grado=${r.grado_id}` : destino.to, destino.label, r.mensaje);
+          } else {
+            agregar({ autor: 'asistente', texto: r.mensaje });
           }
         },
         // Sin clave configurada, sin red o con el modelo caído: la búsqueda local sigue sirviendo.
@@ -223,6 +228,26 @@ export function AsistenteFlotante({ items }: AsistenteFlotanteProps) {
                   }`}
                 >
                   <p>{m.texto}</p>
+                  {m.destino && (() => {
+                    const destino = m.destino;
+                    const destinoItem = items.find((i) => i.to === destino.ruta);
+                    if (!destinoItem) return null;
+                    const IconoDestino = destinoItem.icon;
+                    const yaEsta = destino.url === `${pathname}${search}`;
+                    return (
+                      <Button
+                        type="button"
+                        variant="soft-edit"
+                        className="mt-2 w-full justify-start"
+                        onClick={() => volverA(destino)}
+                        aria-current={yaEsta ? 'page' : undefined}
+                        title={yaEsta ? 'Estás aquí' : `Ir a «${destino.nombre}»`}
+                      >
+                        <IconoDestino className="h-4 w-4 shrink-0" />
+                        {yaEsta ? 'Estás en' : 'Ir a'} {destino.nombre}
+                      </Button>
+                    );
+                  })()}
                   {m.opciones && (
                     <div className="mt-2 flex flex-col gap-2">
                       {m.opciones.map((o) => (

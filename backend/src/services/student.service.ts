@@ -33,6 +33,12 @@ export interface ListarEstudiantesFilter {
   estado?: EstadoEstudiante;
   eps?: string;
   discapacidad?: boolean;
+  /** Solo quienes llegaron por la importación desde SIMAT. */
+  importados_simat?: boolean;
+  /** Solo los importados de SIMAT cuya información aún nadie ha revisado. */
+  revision_pendiente?: boolean;
+  /** Solo los que no tienen ningún acudiente vinculado. */
+  sin_acudiente?: boolean;
   page?: number;
   limit?: number;
 }
@@ -70,7 +76,16 @@ export async function listarEstudiantes(filter: ListarEstudiantesFilter, rolSoli
     matchPerfil['perfil.eps'] = new RegExp(escapeRegex(filter.eps), 'i');
   }
   if (filter.discapacidad !== undefined) matchPerfil['perfil.tiene_discapacidad'] = filter.discapacidad;
+  if (filter.importados_simat) matchPerfil['perfil.origen_simat.lote_id'] = { $exists: true };
+  if (filter.revision_pendiente) matchPerfil['perfil.origen_simat.revision'] = 'PENDIENTE';
   if (Object.keys(matchPerfil).length > 0) pipeline.push({ $match: matchPerfil });
+  if (filter.sin_acudiente) {
+    pipeline.push(
+      { $lookup: { from: 'studentguardians', localField: '_id', foreignField: 'student_id', as: 'vinculos' } },
+      { $match: { 'vinculos.0': { $exists: false } } },
+      { $project: { vinculos: 0 } }
+    );
+  }
 
   pipeline.push(
     { $sort: { apellido: 1, nombre: 1 } },
@@ -362,10 +377,20 @@ export interface CrearEstudianteCompletoInput {
   tiene_talento_excepcional?: boolean;
   descripcion_inclusion?: string;
   institucion_procedencia?: string;
+  sisben_grupo?: string | null;
   autorizacion_datos_sensibles?: {
     otorgada: boolean;
     otorgado_por_nombre?: string | null;
   };
+  /** Solo la importación desde SIMAT (la API pública de este servicio no los acepta: el validador los descarta). */
+  pais_origen?: string;
+  pais_nacimiento?: string;
+  nacionalidad_2?: string;
+  etnia_detalle?: string;
+  correo_contacto?: string;
+  simat_per_id?: string;
+  simat_nui?: string;
+  origen_simat_lote_id?: Types.ObjectId | string;
 
   // Acudiente (opcional)
   acudiente_tipo_documento?: TipoDocumento;
@@ -444,6 +469,15 @@ export async function crearEstudianteCompleto(
           barrio_vereda: input.barrio_vereda?.trim() || undefined,
           municipio: input.municipio?.trim() || undefined,
           estrato: input.estrato || undefined,
+          sisben_grupo: input.sisben_grupo || null,
+          pais_origen: input.pais_origen || undefined,
+          pais_nacimiento: input.pais_nacimiento || undefined,
+          nacionalidad_2: input.nacionalidad_2 || undefined,
+          etnia_detalle: input.etnia_detalle || undefined,
+          correo_contacto: input.correo_contacto || undefined,
+          simat_per_id: input.simat_per_id || undefined,
+          simat_nui: input.simat_nui || undefined,
+          origen_simat: input.origen_simat_lote_id ? { lote_id: input.origen_simat_lote_id, fecha: new Date(), revision: 'PENDIENTE' } : null,
           eps: input.eps?.trim() || undefined,
           regimen_salud: input.regimen_salud || undefined,
           rh: input.rh || undefined,

@@ -40,6 +40,7 @@ interface UpsertProfileBody {
   barrio_vereda?: string;
   municipio?: string;
   estrato?: number;
+  sisben_grupo?: string | null;
   grupo_etnico?: GrupoEtnico;
   victima_conflicto?: boolean;
   tiene_discapacidad?: boolean;

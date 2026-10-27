@@ -11,6 +11,7 @@ import {
   REGIMENES_SALUD,
   RegimenSalud,
 } from '../constants/enums';
+import { GRUPOS_SISBEN } from '../constants/sisben';
 import { tieneDatoSaludSensible } from '../utils/datosSensibles';
 
 /**
@@ -26,6 +27,15 @@ export interface IAutorizacionDatosSensibles {
   fecha: Date | null;
   /** Funcionario que lo registro en el sistema (trazabilidad, no quien autoriza). */
   registrado_por_id: Types.ObjectId | null;
+}
+
+/** Marca de los estudiantes que llegaron por la importación desde SIMAT: sus datos y su acudiente quedan por revisar hasta que alguien lo confirme. */
+export interface IOrigenSimat {
+  lote_id: Types.ObjectId;
+  fecha: Date;
+  revision: 'PENDIENTE' | 'REVISADA';
+  revisada_por: Types.ObjectId | null;
+  fecha_revision: Date | null;
 }
 
 export interface IStudentProfile {
@@ -49,8 +59,17 @@ export interface IStudentProfile {
   barrio_vereda?: string;
   municipio?: string;
   estrato?: number;
+  /** Grupo del SISBEN IV (A1…D21). Vacío = no está en el SISBEN. */
+  sisben_grupo?: string | null;
+  pais_origen?: string;
+  pais_nacimiento?: string;
+  nacionalidad_2?: string;
+  /** Correo que el colegio tiene de contacto de la familia (SIMAT). No es el del usuario: ese es único y los hermanos comparten el de la familia. */
+  correo_contacto?: string;
   // Poblacion y vulnerabilidad
   grupo_etnico: GrupoEtnico;
+  /** El valor de SIMAT tal cual (pueblo indígena, «Negritudes»): `grupo_etnico` solo guarda la categoría general. */
+  etnia_detalle?: string;
   victima_conflicto: boolean;
   tiene_discapacidad: boolean;
   tiene_talento_excepcional: boolean;
@@ -60,6 +79,11 @@ export interface IStudentProfile {
   institucion_procedencia?: string;
   estado: EstadoEstudiante;
   autorizacion_datos_sensibles: IAutorizacionDatosSensibles;
+  /** Identificadores estables de la persona en SIMAT: sobreviven a un cambio de tipo o número de documento. */
+  simat_per_id?: string;
+  simat_nui?: string;
+  /** null = no vino de la importación SIMAT. */
+  origen_simat?: IOrigenSimat | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -73,6 +97,17 @@ const autorizacionDatosSensiblesSchema = new Schema<IAutorizacionDatosSensibles>
     otorgado_por_nombre: { type: String, default: null, trim: true },
     fecha: { type: Date, default: null },
     registrado_por_id: { type: Schema.Types.ObjectId, ref: 'User', default: null },
+  },
+  { _id: false }
+);
+
+const origenSimatSchema = new Schema<IOrigenSimat>(
+  {
+    lote_id: { type: Schema.Types.ObjectId, ref: 'ImportacionSimat', required: true },
+    fecha: { type: Date, required: true },
+    revision: { type: String, enum: ['PENDIENTE', 'REVISADA'], default: 'PENDIENTE' },
+    revisada_por: { type: Schema.Types.ObjectId, ref: 'User', default: null },
+    fecha_revision: { type: Date, default: null },
   },
   { _id: false }
 );
@@ -95,7 +130,13 @@ const studentProfileSchema = new Schema<IStudentProfile, StudentProfileModel>(
     barrio_vereda: { type: String, trim: true },
     municipio: { type: String, trim: true },
     estrato: { type: Number, min: 1, max: 6 },
+    sisben_grupo: { type: String, enum: [...GRUPOS_SISBEN, null], default: null },
+    pais_origen: { type: String, trim: true, maxlength: 80 },
+    pais_nacimiento: { type: String, trim: true, maxlength: 80 },
+    nacionalidad_2: { type: String, trim: true, maxlength: 80 },
+    correo_contacto: { type: String, trim: true, lowercase: true, maxlength: 120 },
     grupo_etnico: { type: String, enum: GRUPOS_ETNICOS, default: 'NINGUNO' },
+    etnia_detalle: { type: String, trim: true, maxlength: 120 },
     victima_conflicto: { type: Boolean, default: false },
     tiene_discapacidad: { type: Boolean, default: false },
     tiene_talento_excepcional: { type: Boolean, default: false },
@@ -103,9 +144,16 @@ const studentProfileSchema = new Schema<IStudentProfile, StudentProfileModel>(
     institucion_procedencia: { type: String, trim: true },
     estado: { type: String, enum: ESTADOS_ESTUDIANTE, default: 'ACTIVO' },
     autorizacion_datos_sensibles: { type: autorizacionDatosSensiblesSchema, default: () => ({}) },
+    simat_per_id: { type: String, trim: true, maxlength: 20 },
+    simat_nui: { type: String, trim: true, maxlength: 30 },
+    origen_simat: { type: origenSimatSchema, default: null },
   },
   { timestamps: true }
 );
+
+// Cruce estable con SIMAT (no único: dos registros de SIMAT nunca deben tumbar una importación; el servicio decide).
+studentProfileSchema.index({ simat_per_id: 1 }, { sparse: true });
+studentProfileSchema.index({ 'origen_simat.revision': 1 }, { sparse: true });
 
 // Ley 1581 de 2012, art. 6: tratar un dato sensible exige autorizacion previa y
 // explicita del titular (aqui, de su responsable legal). Sin esa autorizacion

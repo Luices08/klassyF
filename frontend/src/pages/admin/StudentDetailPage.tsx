@@ -2,6 +2,8 @@ import { type FormEvent, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { HistorialObservaciones } from '../../components/convivencia/HistorialObservaciones';
 import { ExpedienteDigitalTab } from '../../components/estudiantes/ExpedienteDigitalTab';
+import { MarcaMatriculaSimat, MarcaSimat } from '../../components/estudiantes/MarcaSimat';
+import { SelectorSisben } from '../../components/estudiantes/SelectorSisben';
 import { InclusionResumen } from '../../components/inclusion/InclusionResumen';
 import { ReportCardView } from '../../components/reportCard/ReportCardView';
 import { Alert, errorMessage } from '../../components/ui/Alert';
@@ -26,7 +28,7 @@ import {
 import { useReportCard } from '../../hooks/useReportCard';
 import { descargarInformeDescriptivo } from '../../hooks/useValoracionesDescriptivas';
 import { VisorDocumento } from '../../components/ui/VisorDocumento';
-import { useActualizarEstadoPerfil, useStudentFicha360, useUpsertStudentProfile } from '../../hooks/useStudents';
+import { useActualizarEstadoPerfil, useMarcarRevisadoSimat, useStudentFicha360, useUpsertStudentProfile } from '../../hooks/useStudents';
 import { formatoFechaHora } from '../../lib/fechas';
 import {
   ESTADOS_ESTUDIANTE,
@@ -63,6 +65,7 @@ function formPerfilVacio(perfil: StudentProfile | null) {
     barrio_vereda: perfil?.barrio_vereda ?? '',
     municipio: perfil?.municipio ?? '',
     estrato: perfil?.estrato ? String(perfil.estrato) : '',
+    sisben_grupo: perfil?.sisben_grupo ?? '',
     grupo_etnico: (perfil?.grupo_etnico ?? 'NINGUNO') as GrupoEtnico,
     victima_conflicto: perfil?.victima_conflicto ?? false,
     tiene_discapacidad: perfil?.tiene_discapacidad ?? false,
@@ -113,6 +116,7 @@ export function StudentDetailPage() {
         subtitle={`${estudiante.tipo_documento} ${estudiante.numero_documento} · ${estudiante.email}`}
         action={
           <div className="flex items-center gap-3">
+            <MarcaSimat origen={perfil?.origen_simat} />
             <EstadoSelector studentId={estudiante._id} estadoActual={perfil?.estado ?? 'ACTIVO'} />
             {(rol === 'ADMIN' || rol === 'SECRETARIA') && (
               <Button variant="outline" onClick={() => navigate(`/secretaria/certificados?estudiante=${estudiante._id}`)}>
@@ -125,6 +129,10 @@ export function StudentDetailPage() {
           </div>
         }
       />
+
+      {perfil?.origen_simat && (rol === 'ADMIN' || rol === 'SECRETARIA') && (
+        <RevisionSimat studentId={estudiante._id} perfil={perfil} cantidadAcudientes={acudientes.length} irAFamilia={() => setTab('familia')} />
+      )}
 
       <Card>
         <Tabs
@@ -167,6 +175,45 @@ export function StudentDetailPage() {
         </TabPanel>
       </Card>
     </div>
+  );
+}
+
+/**
+ * Quien llegó por la importación desde SIMAT trae solo lo que SIMAT sabe: sin acudiente, sin dirección, sin régimen de salud. Este aviso lo dice y
+ * deja dar por revisado el registro cuando ya tiene su acudiente (el servidor lo exige).
+ */
+function RevisionSimat({ studentId, perfil, cantidadAcudientes, irAFamilia }: { studentId: string; perfil: StudentProfile; cantidadAcudientes: number; irAFamilia: () => void }) {
+  const revisar = useMarcarRevisadoSimat();
+  const origen = perfil.origen_simat!;
+  if (origen.revision === 'REVISADA') {
+    return <Alert tone="success">Este estudiante llegó por la importación desde SIMAT y su información fue revisada{origen.fecha_revision ? ` el ${formatoFechaHora(origen.fecha_revision)}` : ''}.</Alert>;
+  }
+  return (
+    <Alert tone="warning">
+      <div className="space-y-2">
+        <p className="font-semibold">Importado de SIMAT · pendiente de revisión</p>
+        <ul className="list-disc space-y-1 pl-4">
+          <li>
+            {cantidadAcudientes > 0 ? (
+              'Acudiente registrado.'
+            ) : (
+              <>
+                Falta crear el acudiente: SIMAT no lo trae.{' '}
+                <button type="button" className="font-semibold underline" onClick={irAFamilia}>
+                  Registrarlo ahora
+                </button>
+              </>
+            )}
+          </li>
+          <li>Revisa los datos generales: SIMAT no trae dirección de residencia, régimen de salud ni lugar de expedición, y los nombres, barrio y teléfono pueden venir con errores.</li>
+          <li>Los documentos de la matrícula están pendientes: súbelos en el expediente de la matrícula.</li>
+        </ul>
+        {revisar.isError && <p className="text-danger">{errorMessage(revisar.error)}</p>}
+        <Button variant="outline" disabled={cantidadAcudientes === 0 || revisar.isPending} onClick={() => revisar.mutate(studentId)}>
+          {revisar.isPending ? 'Guardando…' : 'Marcar como revisado'}
+        </Button>
+      </div>
+    </Alert>
   );
 }
 
@@ -221,6 +268,7 @@ function DatosGeneralesTab({ studentId, perfil }: { studentId: string; perfil: S
       barrio_vereda: form.barrio_vereda || undefined,
       municipio: form.municipio || undefined,
       estrato: form.estrato ? Number(form.estrato) : undefined,
+      sisben_grupo: form.sisben_grupo || null,
       grupo_etnico: form.grupo_etnico,
       victima_conflicto: form.victima_conflicto,
       tiene_discapacidad: form.tiene_discapacidad,
@@ -347,8 +395,10 @@ function DatosGeneralesTab({ studentId, perfil }: { studentId: string; perfil: S
           value={form.estrato}
           onChange={(e) => setForm((f) => ({ ...f, estrato: e.target.value }))}
         />
+        <SelectorSisben value={form.sisben_grupo} onChange={(v) => setForm((f) => ({ ...f, sisben_grupo: v }))} />
         <Select
           label="Grupo étnico"
+          hint={perfil?.etnia_detalle ? `Según SIMAT: ${perfil.etnia_detalle}` : undefined}
           value={form.grupo_etnico}
           onChange={(e) => setForm((f) => ({ ...f, grupo_etnico: e.target.value as GrupoEtnico }))}
         >
@@ -746,7 +796,10 @@ function HistorialTab({
               <Td>{typeof m.group_id === 'string' ? m.group_id : m.group_id.nomenclatura}</Td>
               <Td>{m.folio_matricula ?? <span className="text-muted">Sin asignar</span>}</Td>
               <Td>
-                <EstadoMatriculaBadge value={m.estado} />
+                <div className="flex flex-wrap gap-1.5">
+                  <EstadoMatriculaBadge value={m.estado} />
+                  <MarcaMatriculaSimat origen={m.origen} />
+                </div>
               </Td>
               <Td>{new Date(m.fecha_matricula).toLocaleDateString()}</Td>
             </tr>

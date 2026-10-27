@@ -8,7 +8,7 @@ import ApiError from './ApiError';
  * la opcion elegida, en Windows-1252 o UTF-8 con BOM: todo eso se maneja aqui.
  */
 
-export type Delimitador = ',' | ';';
+export type Delimitador = ',' | ';' | '|' | '\t';
 
 /** UTF-8 estricto; si el archivo no lo es (Excel "CSV" en Windows) se lee como Windows-1252 para no romper tildes ni la ñ. */
 export function decodificarCsv(buffer: Buffer): string {

@@ -8,6 +8,7 @@ import {
   REGIMENES_SALUD,
   TIPOS_DOCUMENTO,
 } from '../constants/enums';
+import { GRUPOS_SISBEN } from '../constants/sisben';
 import { ValidationSchema } from '../middlewares/validate.middleware';
 import { objectId } from './common.validator';
 
@@ -17,6 +18,9 @@ export const listarEstudiantes: ValidationSchema = {
     estado: Joi.string().valid(...ESTADOS_ESTUDIANTE),
     eps: Joi.string().allow(''),
     discapacidad: Joi.boolean(),
+    importados_simat: Joi.boolean(),
+    revision_pendiente: Joi.boolean(),
+    sin_acudiente: Joi.boolean(),
     page: Joi.number().integer().min(1),
     limit: Joi.number().integer().min(1).max(100),
   }),
@@ -47,6 +51,7 @@ export const crearEstudianteCompleto: ValidationSchema = {
     barrio_vereda: Joi.string().trim().allow('', null).optional(),
     municipio: Joi.string().trim().allow('', null).optional(),
     estrato: Joi.number().integer().min(1).max(6).allow(null).optional(),
+    sisben_grupo: Joi.string().trim().uppercase().valid(...GRUPOS_SISBEN).allow('', null).optional(),
     eps: Joi.string().trim().allow('', null).optional(),
     regimen_salud: Joi.string().valid(...REGIMENES_SALUD).allow('', null).optional(),
     rh: Joi.string().valid(...GRUPOS_SANGUINEOS).allow('', null).optional(),

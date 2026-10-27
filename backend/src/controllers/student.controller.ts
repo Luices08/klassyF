@@ -11,6 +11,9 @@ interface ListarQuery {
   estado?: EstadoEstudiante;
   eps?: string;
   discapacidad?: boolean;
+  importados_simat?: boolean;
+  revision_pendiente?: boolean;
+  sin_acudiente?: boolean;
   page?: number;
   limit?: number;
 }

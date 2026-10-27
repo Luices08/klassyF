@@ -96,6 +96,9 @@ export interface IEnrollment {
   checklist: Types.DocumentArray<IChecklistItem>;
   /** Novedades institucionales que el sistema asienta solo (p. ej. promoción anticipada), con la referencia que las respalda. */
   novedades: Array<{ tipo: string; texto: string; referencia: string; fecha: Date; por: Types.ObjectId }>;
+  /** De dónde salió el asiento: null = lo registró una persona en Klassy; `IMPORTACION_SIMAT` = lo creó o confirmó la carga desde SIMAT (se distingue en las listas). */
+  origen: 'IMPORTACION_SIMAT' | null;
+  importacion_simat_id: Types.ObjectId | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -193,6 +196,8 @@ const enrollmentSchema = new Schema<IEnrollment, EnrollmentModel>(
       ],
       default: [],
     },
+    origen: { type: String, enum: ['IMPORTACION_SIMAT', null], default: null },
+    importacion_simat_id: { type: Schema.Types.ObjectId, ref: 'ImportacionSimat', default: null },
   },
   { timestamps: true }
 );

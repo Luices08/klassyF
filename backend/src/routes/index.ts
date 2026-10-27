@@ -16,6 +16,7 @@ import orientacionRoutes from './orientacion.routes';
 import dashboardRoutes from './dashboard.routes';
 import documentoReferenciaRoutes from './documentoReferencia.routes';
 import enrollmentRoutes from './enrollment.routes';
+import importacionSimatRoutes from './importacionSimat.routes';
 import continuidadRoutes from './continuidad.routes';
 import foliaturaRoutes from './foliatura.routes';
 import requisitoDocumentalRoutes from './requisitoDocumental.routes';
@@ -76,6 +77,8 @@ router.use('/campuses', campusRoutes);
 router.use('/shifts', jornadaOperativaRoutes);
 router.use('/grades', gradeRoutes);
 router.use('/groups', groupRoutes);
+// Antes de '/enrollments': la ruta del importador no debe confundirse con '/enrollments/:id'.
+router.use('/enrollments/importacion-simat', importacionSimatRoutes);
 router.use('/enrollments', enrollmentRoutes);
 router.use('/foliatura', foliaturaRoutes);
 router.use('/continuidad', continuidadRoutes);

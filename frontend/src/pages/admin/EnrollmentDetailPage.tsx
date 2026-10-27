@@ -2,6 +2,7 @@ import { type ChangeEvent, type FormEvent, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { RegistrarSalidaDrawer } from '../../components/salidas/RegistrarSalidaDrawer';
 import { Alert, errorMessage } from '../../components/ui/Alert';
+import { MarcaMatriculaSimat } from '../../components/estudiantes/MarcaSimat';
 import { Chip, EstadoDocumentoBadge, EstadoMatriculaBadge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import { Card, CardHeader } from '../../components/ui/Card';
@@ -400,6 +401,7 @@ export function EnrollmentDetailPage() {
         action={
           <div className="flex items-center gap-3">
             <EstadoMatriculaBadge value={enrollment.estado} />
+            <MarcaMatriculaSimat origen={enrollment.origen} />
             {estudiante && (rol === 'ADMIN' || rol === 'SECRETARIA') && ['MATRICULADO_CONDICIONAL', 'MATRICULADO_DEFINITIVO'].includes(enrollment.estado) && (
               <Button variant="outline" onClick={() => navigate(`/secretaria/certificados?estudiante=${estudiante._id}`)}>
                 Expedir constancia

@@ -570,6 +570,9 @@ export interface Enrollment {
   fecha_limite_legalizacion: string | null;
   motivo_retiro: string | null;
   checklist: ChecklistItem[];
+  /** `IMPORTACION_SIMAT` = la creó o formalizó la importación desde SIMAT. */
+  origen?: 'IMPORTACION_SIMAT' | null;
+  importacion_simat_id?: string | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -722,7 +725,15 @@ export interface StudentProfile {
   barrio_vereda?: string | null;
   municipio?: string | null;
   estrato?: number;
+  /** Grupo del SISBEN IV (A1…D21); vacío si no está en el SISBEN. */
+  sisben_grupo?: string | null;
+  pais_origen?: string | null;
+  pais_nacimiento?: string | null;
+  nacionalidad_2?: string | null;
+  correo_contacto?: string | null;
   grupo_etnico: GrupoEtnico;
+  /** El valor de SIMAT tal cual (pueblo indígena, «Negritudes»). */
+  etnia_detalle?: string | null;
   victima_conflicto: boolean;
   tiene_discapacidad: boolean;
   tiene_talento_excepcional: boolean;
@@ -730,6 +741,10 @@ export interface StudentProfile {
   institucion_procedencia?: string | null;
   estado: EstadoEstudiante;
   autorizacion_datos_sensibles?: AutorizacionDatosSensibles;
+  simat_per_id?: string | null;
+  simat_nui?: string | null;
+  /** Presente solo en quienes llegaron por la importación desde SIMAT: su información está pendiente de revisión hasta que alguien la confirme. */
+  origen_simat?: { lote_id: string; fecha: string; revision: 'PENDIENTE' | 'REVISADA'; revisada_por?: string | null; fecha_revision?: string | null } | null;
 }
 
 export interface Guardian {

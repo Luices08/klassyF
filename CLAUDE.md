@@ -1172,6 +1172,31 @@ frontend `SalidasPage` (`/secretaria/salidas`, ADMIN/COORDINADOR/SECRETARIA) con
 
 `GET /students/:id/expediente` (`expedienteDigital.service`, ADMIN, COORDINADOR y SECRETARIA; secretaría y coordinación solo de estudiantes que alguna vez estuvieron en sus sedes) y la pestaña «Expediente digital» de la ficha (`ExpedienteDigitalTab`). **No hay tabla propia ni se mueven archivos**: indexa por estudiante lo que cada módulo ya guarda —documentos de matrícula (`uploads/matriculas/`), soportes de retiro (`uploads/salidas/`), traslados (`uploads/traslados/`), paz y salvo de fin de año, servicio social (`uploads/servicio-social/`), soportes del PIAR (`uploads/inclusion/`, **solo el administrador**: son datos de salud y la ruta de descarga ya los limita) y los certificados y diplomas expedidos (código, clave corta y estado)—. Cada ítem trae `descarga`, la **ruta de la API** del módulo dueño (nunca una ruta de disco), o `null` si quien consulta no puede bajarlo (coordinación ve que un certificado existe pero lo baja Secretaría); el archivo se abre con la sesión. Cada consulta se audita (`EXPEDIENTE_DIGITAL_CONSULTADO`, sin contenido). **Pendiente:** los certificados del estudiante visibles para él o su acudiente (M27) y el archivo general con versiones (M29 completo).
 
+### M31 (Historial de acciones — auditoría) — estado: núcleo completo
+
+Backend `/audit-logs` (`auditLog.controller.ts`, `historialAcciones.service.ts`, catálogo puro `constants/auditoria.ts`) y `GET /enrollments/:id/historial`; frontend
+`HistorialAccionesPage` (`/admin/historial`, solo ADMIN, menú «Institución») y `HistorialMatriculaCard` al final del expediente de la matrícula. Reglas que no se ven leyendo un solo archivo:
+
+- **No hay datos nuevos: lee la bitácora que ya existía** (`AuditLog`, de solo escritura en el modelo, alimentada por `registrarEvento` en todos los módulos). La acción se guarda como código;
+  el **módulo y la etiqueta se derivan** en `constants/auditoria.ts` (`moduloDeAccion` por prefijo —gana el más largo: `CITACION_OBSERVACION_` es convivencia aunque `CITACION_` sea
+  comunicación—, `etiquetaDeAccion` con etiquetas a mano para matrícula y acceso y el resto armado del código con tildes). El servidor manda `modulo`, `modulo_nombre`, `etiqueta` y `enlace`
+  en cada evento (`vistaEvento`), así el frontend no repite la lista. **Una acción nueva en `ACCIONES_AUDITORIA` debe caer en un módulo** (lo comprueba `tests/historialAcciones.test.ts`);
+  si no calza en ningún prefijo, se agrega el prefijo al módulo que corresponda.
+- **Historial general** (`GET /audit-logs`, `/catalogo`, `/excel`; solo ADMIN): filtros por módulo, acción, usuario, días `desde`/`hasta` (hora de Colombia, ambos inclusive) y texto en el
+  detalle (literal, escapado), paginado de 25 y del más reciente al más antiguo. Exportar a Excel usa el contrato `ReporteTabular` (máx. `MAX_FILAS_EXPORTACION` = 10 000) y deja
+  `HISTORIAL_EXPORTADO` en la propia bitácora. Índices: `entidad_id + createdAt` y `createdAt`.
+- **Historial de una matrícula** (`historialDeMatricula`, ADMIN/COORDINADOR/SECRETARIA, los mismos de M04): los eventos de la matrícula **y de lo que nació de ella** (la solicitud de admisión
+  que la creó, sus certificados, su traslado, su paz y salvo de salida y el de fin de año del mismo año), máx. 500, más **las demás matrículas del estudiante** (año, grado, grupo, estado, folio),
+  como el drawer de detalle de Klassy-3.0. Su `queryKey` es `['enrollments', id, 'historial']` a propósito: toda mutación de matrícula ya invalida `['enrollments']` y el historial se refresca solo.
+- **Huecos de auditoría que se cerraron**: la solicitud pública de admisión (`ADMISION_SOLICITADA`, sin usuario), su rechazo (`ADMISION_RECHAZADA`), su aprobación (antes se registraba como
+  `USUARIO_CREADO`; ahora `ADMISION_APROBADA`) y la matrícula preinscrita que nace de ella (`MATRICULA_PREINSCRITA` sobre la `Enrollment`, así su historial empieza en el origen). El cambio de grupo
+  guarda la nomenclatura de los grupos («601 -> 602»), no sus ids; los eventos viejos conservan su texto.
+- **Pruebas:** `tests/historialAcciones.test.ts` (catálogo, etiquetas, filtros, vista) e `integracion/historialAcciones.int.test.ts` (base real). En este equipo la base en memoria de las
+  pruebas se cae a ratos; con `MONGOMS_SYSTEM_BINARY` apuntando al `mongod` 4.4 instalado sí corre, pero ese 4.4 no admite el índice parcial `matricula_viva_unica` (las pruebas de M04 necesitan el
+  binario que descarga `mongodb-memory-server`). La interfaz se revisó en un navegador contra `klassy_sim` (134 000 eventos).
+- **Pendiente, a propósito:** historial por estudiante, grupo o usuario desde sus propias pantallas (la API ya filtra por `entidad_id`/`usuario_id`); mostrar el valor anterior y el nuevo de cada
+  cambio (la bitácora solo guarda un detalle en texto); política de retención de la bitácora.
+
 ### M33 (Reportes de cierre anual) — estado: completo (sábana, informe final del año, listados de recuperación final, retirados, servicio social y balance de inclusión, plantilla SIMAT, causales del SIEE en el acta y libro de calificaciones foliado)
 
 Backend `/reportes` (`reportes.routes.ts`, `reportes.controller.ts`, `reportes.validator.ts`; servicios `sabanaCalificaciones.service`, `sabanaExcel.service`, `sabanaPdf.service`, `informeFinal.service`, `informeFinalPdf.service`, `listadosCierre.service`, `balanceInclusion.service`, `libroCalificaciones.service`, `libroCalificacionesPdf.service`, `alcanceReportes.service`, `simat.service`, `reporteTabularExcel.service`, `reporteTabularPdf.service`; reglas puras `utils/sabanaCalificaciones.ts`), frontend `ReportesCierrePage` (`/admin/reportes-cierre`, ADMIN, COORDINADOR y SECRETARIA) con `components/reportes/SabanaPanel` y `hooks/useReportes.ts`. Reglas que no se ven leyendo un solo archivo:

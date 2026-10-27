@@ -23,9 +23,11 @@ import {
   sincronizarRequisitos,
   updateStatus,
 } from '../controllers/enrollment.controller';
+import { historialDeMatricula } from '../controllers/auditLog.controller';
 import { authenticate, checkRole } from '../middlewares/auth.middleware';
 import { subirDocumentoMatricula } from '../middlewares/subidaDocumentosMatricula.middleware';
 import validate from '../middlewares/validate.middleware';
+import * as auditLogValidator from '../validators/auditLog.validator';
 import * as enrollmentValidator from '../validators/enrollment.validator';
 
 const router = Router();
@@ -53,6 +55,8 @@ router.get(
   listarDocumentosPrevistos
 );
 router.get('/:id', checkRole(...STAFF_MATRICULAS), validate(enrollmentValidator.getEnrollment), getEnrollment);
+// M31: lo que se hizo sobre la matrícula y lo que nació de ella (admisión, documentos, traslado, salida, certificados).
+router.get('/:id/historial', checkRole(...STAFF_MATRICULAS), validate(auditLogValidator.historialDeMatricula), historialDeMatricula);
 
 router.patch('/:id/status', checkRole(...STAFF_MATRICULAS), validate(enrollmentValidator.updateStatus), updateStatus);
 router.post('/:id/formalizar', checkRole(...STAFF_MATRICULAS), validate(enrollmentValidator.formalizar), formalizar);

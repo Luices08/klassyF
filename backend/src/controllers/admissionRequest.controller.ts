@@ -33,6 +33,14 @@ interface CrearSolicitudBody {
 
 export const crearSolicitud = catchAsync<unknown, unknown, CrearSolicitudBody>(async (req, res) => {
   const solicitud = await admissionService.crearSolicitud(req.body);
+  // Sin usuario: la radica la familia desde el sitio público.
+  await registrarEvento({
+    accion: 'ADMISION_SOLICITADA',
+    entidad: 'AdmissionRequest',
+    entidad_id: solicitud._id,
+    detalle: `Solicitud de ${solicitud.nombre_aspirante} ${solicitud.apellido_aspirante} desde el sitio público`,
+    ip: req.ip,
+  });
   res.status(201).json({ success: true, data: solicitud });
 });
 
@@ -158,12 +166,23 @@ export const aprobarSolicitud = catchAsync<SolicitudParams, unknown, AprobarBody
 
   await registrarEvento({
     usuario_id: req.user?._id,
-    accion: 'USUARIO_CREADO',
+    accion: 'ADMISION_APROBADA',
     entidad: 'AdmissionRequest',
     entidad_id: solicitud._id,
     detalle: `Solicitud aprobada: ${solicitud.nombre_aspirante} ${solicitud.apellido_aspirante}`,
     ip: req.ip,
   });
+  // La aprobación crea el usuario del estudiante y su matrícula preinscrita: así su historial empieza en el origen.
+  if (solicitud.enrollment_id) {
+    await registrarEvento({
+      usuario_id: req.user?._id,
+      accion: 'MATRICULA_PREINSCRITA',
+      entidad: 'Enrollment',
+      entidad_id: solicitud.enrollment_id,
+      detalle: `Preinscripción desde la solicitud de admisión${req.body.fecha_limite_legalizacion ? `, plazo para legalizar ${req.body.fecha_limite_legalizacion}` : ''}`,
+      ip: req.ip,
+    });
+  }
 
   res.status(200).json({ success: true, data: solicitud });
 });
@@ -174,5 +193,13 @@ interface RechazarBody {
 
 export const rechazarSolicitud = catchAsync<SolicitudParams, unknown, RechazarBody>(async (req, res) => {
   const solicitud = await admissionService.rechazarSolicitud(req.params.id, req.body.motivo, req.user!._id);
+  await registrarEvento({
+    usuario_id: req.user?._id,
+    accion: 'ADMISION_RECHAZADA',
+    entidad: 'AdmissionRequest',
+    entidad_id: solicitud._id,
+    detalle: `Solicitud rechazada: ${solicitud.nombre_aspirante} ${solicitud.apellido_aspirante}`,
+    ip: req.ip,
+  });
   res.status(200).json({ success: true, data: solicitud });
 });

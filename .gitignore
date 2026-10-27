@@ -42,3 +42,6 @@ DOCKER.md
 backend/uploads-sim/
 backend/respaldos-sim/
 backend/exportacion-sim/
+
+# Documento de funciones esenciales generado localmente (mapa del código), no se sube
+doc/Funciones_Esenciales_Klassy.docx

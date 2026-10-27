@@ -16,6 +16,7 @@ import { ahoraReal, alMoverReloj, horaReal, irA } from './nucleo/reloj';
 import { MONGO_URI_SIM, RESPALDOS_DIR_SIM, UPLOADS_DIR_SIM, nombreDeBase } from './nucleo/entorno';
 import path from 'path';
 import mongoose from 'mongoose';
+import type { CreateIndexesOptions, IndexSpecification } from 'mongodb';
 import { detenerApi, ErrorApi, iniciarApi } from './nucleo/api';
 import { aLaHora, diaDelAnio, sumarDias } from './nucleo/fechas';
 import { baseAjena, fases, registro } from './nucleo/registro';
@@ -76,10 +77,17 @@ function log(mensaje: string): void {
 
 async function prepararColecciones(): Promise<void> {
   // En una base vacía, crear colecciones e índices antes de la primera transacción evita choques de catálogo y deja listos los índices únicos.
+  // Índice por índice (no `init()`): MongoDB anterior a 6.0 —el único que corre en un CPU sin AVX— no admite `$in` en un índice
+  // parcial. Ese índice se omite con aviso y la regla la sigue cuidando el servicio (p. ej. `exigirSinMatriculaViva`).
   for (const nombre of mongoose.modelNames()) {
     const modelo = mongoose.model(nombre);
     await modelo.createCollection().catch(() => undefined);
-    await modelo.init();
+    for (const [campos, opciones] of modelo.schema.indexes()) {
+      await modelo.collection.createIndex(campos as IndexSpecification, opciones as CreateIndexesOptions).catch((error: unknown) => {
+        if (!/unsupported expression in partial index/i.test(String((error as Error)?.message))) throw error;
+        log(`Índice parcial de ${nombre} omitido: esta versión de MongoDB no lo admite.`);
+      });
+    }
   }
 }
 
@@ -96,7 +104,7 @@ async function main(): Promise<void> {
   }
 
   irA(aLaHora(new Date(config.inicio_simulacion), '08:00'));
-  await mongoose.connect(MONGO_URI_SIM);
+  await mongoose.connect(MONGO_URI_SIM, { autoIndex: false });
   // Mongoose da la conexión por caída si su último latido parece de hace más de dos intervalos (lo mide con el reloj
   // simulado): al saltar en el tiempo se corre también esa marca, o las transacciones esperan una reconexión que nunca llega.
   alMoverReloj((salto) => {

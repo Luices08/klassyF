@@ -488,7 +488,7 @@ export async function cambiarGrupo(
       accion: 'MATRICULA_GRUPO_CAMBIADO',
       entidad: 'Enrollment',
       entidad_id: enrollment._id,
-      detalle: `Grupo ${grupoAnteriorId} -> ${nuevoGrupo._id}`,
+      detalle: `Grupo ${(await Group.findById(grupoAnteriorId).select('nomenclatura').session(session))?.nomenclatura ?? grupoAnteriorId} -> ${nuevoGrupo.nomenclatura}`,
     });
 
     return enrollment;

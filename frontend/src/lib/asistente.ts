@@ -51,6 +51,10 @@ export const PALABRAS_CLAVE_POR_RUTA: Record<string, { descripcion: string; clav
     descripcion: 'Directorio de usuarios y roles.',
     claves: ['usuarios', 'usuario', 'roles', 'crear usuario', 'docentes', 'resetear contrasena', 'cuentas'],
   },
+  '/admin/historial': {
+    descripcion: 'Historial de acciones: quién hizo qué y cuándo en todo el sistema (bitácora de auditoría).',
+    claves: ['historial', 'historial de acciones', 'auditoria', 'bitacora', 'quien hizo', 'quien cambio', 'registro de cambios', 'trazabilidad', 'log'],
+  },
   '/admin/students': {
     descripcion: 'Estudiantes y su ficha completa.',
     claves: ['estudiantes', 'estudiante', 'alumnos', 'ficha del estudiante', 'acudiente', 'acudientes'],

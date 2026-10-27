@@ -16,6 +16,10 @@ export const ACCIONES_AUDITORIA = [
   'SESIONES_CERRADAS',
   'USUARIOS_IMPORTADOS',
   // M04: Admisiones y matriculas
+  'ADMISION_SOLICITADA',
+  'ADMISION_APROBADA',
+  'ADMISION_RECHAZADA',
+  'MATRICULA_PREINSCRITA',
   'MATRICULA_CREADA',
   'MATRICULA_ESTADO_CAMBIADO',
   'MATRICULA_GRUPO_CAMBIADO',
@@ -334,6 +338,8 @@ export const ACCIONES_AUDITORIA = [
   'PREDICTIVO_ENTRENAMIENTO_SOLICITADO',
   'PREDICTIVO_MODELO_ACTIVADO',
   'PREDICTIVO_ANALISIS_CONSULTADO',
+  // M31: exportar el historial saca datos de la bitácora del sistema
+  'HISTORIAL_EXPORTADO',
 ] as const;
 export type AccionAuditoria = (typeof ACCIONES_AUDITORIA)[number];
 
@@ -364,6 +370,9 @@ const auditLogSchema = new Schema<IAuditLog, AuditLogModel>(
 
 auditLogSchema.index({ usuario_id: 1, createdAt: -1 });
 auditLogSchema.index({ accion: 1, createdAt: -1 });
+// M31: el historial de un registro (p. ej. una matrícula) se busca por lo que afectó.
+auditLogSchema.index({ entidad_id: 1, createdAt: -1 });
+auditLogSchema.index({ createdAt: -1 });
 
 // M31: la bitácora solo se escribe. Corregir o borrar un evento sería reescribir la historia, así que el modelo lo impide.
 const MENSAJE_BITACORA = 'La bitácora de auditoría es de solo escritura: sus eventos no se modifican ni se eliminan.';

@@ -58,6 +58,7 @@ export const NAV_ITEMS: NavItem[] = [
   { to: '/anio-lectivo', label: 'Año lectivo', icon: CalendarIcon },
   { to: '/admin/grades', label: 'Catálogo de grados', icon: GraduationCapIcon, roles: STRUCTURAL_ADMINS },
   { to: '/admin/users', label: 'Usuarios', icon: UsersIcon, roles: STAFF },
+  { to: '/admin/historial', label: 'Historial de acciones', icon: ClockIcon, roles: STRUCTURAL_ADMINS },
   { to: '/admin/students', label: 'Estudiantes', icon: FolderIcon, roles: STAFF },
   { to: '/admin/groups', label: 'Grupos', icon: LayersIcon, roles: GROUP_MANAGERS },
   { to: '/admin/espacios', label: 'Espacios y aulas', icon: DoorIcon, roles: GROUP_MANAGERS, soloPresencial: true },
@@ -133,7 +134,7 @@ export const GRUPOS_NAV: GrupoNav[] = [
     clave: 'institucion',
     label: 'Institución',
     icon: BuildingIcon,
-    rutas: ['/admin/setup', '/admin/sitio-publico', '/admin/sedes', '/anio-lectivo', '/admin/grades', '/admin/users'],
+    rutas: ['/admin/setup', '/admin/sitio-publico', '/admin/sedes', '/anio-lectivo', '/admin/grades', '/admin/users', '/admin/historial'],
   },
   {
     clave: 'academico',

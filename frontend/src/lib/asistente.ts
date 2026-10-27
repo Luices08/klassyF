@@ -52,8 +52,8 @@ export const PALABRAS_CLAVE_POR_RUTA: Record<string, { descripcion: string; clav
     claves: ['usuarios', 'usuario', 'roles', 'crear usuario', 'docentes', 'resetear contrasena', 'cuentas'],
   },
   '/admin/historial': {
-    descripcion: 'Historial de acciones: quién hizo qué y cuándo en todo el sistema (bitácora de auditoría).',
-    claves: ['historial', 'historial de acciones', 'auditoria', 'bitacora', 'quien hizo', 'quien cambio', 'registro de cambios', 'trazabilidad', 'log'],
+    descripcion: 'Historial de acciones: quién creó, editó, matriculó o eliminó algo en el sistema y cuándo (bitácora de auditoría).',
+    claves: ['historial', 'historial de acciones', 'auditoria', 'bitacora', 'quien hizo', 'quien cambio', 'quien creo', 'quien edito', 'quien elimino', 'quien borro', 'registro de cambios', 'trazabilidad', 'log'],
   },
   '/admin/students': {
     descripcion: 'Estudiantes y su ficha completa.',
@@ -331,6 +331,23 @@ export function buscarDestinos(pregunta: string, items: NavItem[]): Coincidencia
     if (puntaje > 0) resultados.push({ item, descripcion: entrada?.descripcion ?? '', puntaje });
   }
   return resultados.sort((a, b) => b.puntaje - a.puntaje);
+}
+
+/** Una pantalla a la que el asistente llevó al usuario en esta visita. `url` conserva el filtro con que se abrió (p. ej. `?grado=`). */
+export interface LugarVisitado {
+  ruta: string;
+  url: string;
+  nombre: string;
+}
+
+export const MAX_LUGARES_VISITADOS = 12;
+
+/**
+ * Suma una pantalla a los lugares visitados: la más reciente va primero y una pantalla no se repite (si se vuelve a visitar,
+ * sube al principio y recuerda la última dirección con la que se abrió). Al pasar el tope se descarta la más antigua.
+ */
+export function registrarVisita(visitados: LugarVisitado[], nuevo: LugarVisitado): LugarVisitado[] {
+  return [nuevo, ...visitados.filter((v) => v.ruta !== nuevo.ruta)].slice(0, MAX_LUGARES_VISITADOS);
 }
 
 /** La primera es clara si saca ventaja suficiente sobre la segunda: ahí el asistente navega solo; si no, deja elegir. */

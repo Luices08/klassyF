@@ -1,12 +1,17 @@
 import type { Rol } from './api';
 import type { EstadoMatricula } from './domain';
 
-/** M31: espejo de `vistaEvento` (backend/src/services/historialAcciones.service.ts). Módulo y etiqueta los calcula el servidor. */
+/** Los cuatro tipos de evento que el historial muestra; el resto de la bitácora (consultas, descargas, accesos) no sale. */
+export type TipoEventoHistorial = 'CREACION' | 'EDICION' | 'MATRICULACION' | 'ELIMINACION';
+
+/** M31: espejo de `vistaEvento` (backend/src/services/historialAcciones.service.ts). Módulo, tipo y etiqueta los calcula el servidor. */
 export interface EventoHistorial {
   _id: string;
   fecha: string;
   accion: string;
   etiqueta: string;
+  tipo: TipoEventoHistorial | null;
+  tipo_nombre: string;
   modulo: string;
   modulo_nombre: string;
   entidad: string;
@@ -19,12 +24,14 @@ export interface EventoHistorial {
 }
 
 export interface CatalogoHistorial {
+  tipos: Array<{ clave: TipoEventoHistorial; nombre: string }>;
   modulos: Array<{ clave: string; nombre: string }>;
-  acciones: Array<{ accion: string; etiqueta: string; modulo: string }>;
+  acciones: Array<{ accion: string; etiqueta: string; modulo: string; tipo: TipoEventoHistorial }>;
 }
 
 export interface FiltrosHistorial {
   modulo?: string;
+  tipo?: string;
   accion?: string;
   usuario_id?: string;
   desde?: string;

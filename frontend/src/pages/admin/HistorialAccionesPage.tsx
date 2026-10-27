@@ -13,13 +13,16 @@ import { EmptyRow, Table, TableBody, TableHead, Td, Th } from '../../components/
 import { useCatalogoHistorial, useExportarHistorial, useHistorial } from '../../hooks/useHistorial';
 import { useUsers } from '../../hooks/useUsers';
 import { formatoFechaHora } from '../../lib/fechas';
-import { nombreDeUsuario, tonoDeAccion } from '../../lib/historial';
+import { nombreDeUsuario, tonoDeAccion, tonoDeTipo } from '../../lib/historial';
 import { opcionesDePersonas } from '../../lib/opcionesBuscables';
 import type { FiltrosHistorial } from '../../types/historial';
 
-const SIN_FILTROS: FiltrosHistorial = { modulo: '', accion: '', usuario_id: '', desde: '', hasta: '', texto: '' };
+const SIN_FILTROS: FiltrosHistorial = { modulo: '', tipo: '', accion: '', usuario_id: '', desde: '', hasta: '', texto: '' };
 
-/** M31: la bitácora de todo el sistema, solo lectura y solo para el administrador. */
+/**
+ * M31: lo que se creó, editó, matriculó y eliminó en el sistema, solo lectura y solo para el administrador.
+ * Las consultas, descargas e inicios de sesión se guardan en la bitácora pero no se muestran aquí.
+ */
 export function HistorialAccionesPage() {
   const [borrador, setBorrador] = useState<FiltrosHistorial>(SIN_FILTROS);
   const [filtros, setFiltros] = useState<FiltrosHistorial>(SIN_FILTROS);
@@ -29,12 +32,16 @@ export function HistorialAccionesPage() {
   const historial = useHistorial(filtros, page);
   const exportar = useExportarHistorial();
 
+  // La lista de acciones sigue al módulo y al tipo elegidos: así no se ofrece una combinación que no devolvería nada.
   const accionesDelModulo = useMemo(
-    () => (catalogo.data?.acciones ?? []).filter((a) => !borrador.modulo || a.modulo === borrador.modulo).sort((a, b) => a.etiqueta.localeCompare(b.etiqueta, 'es')),
-    [catalogo.data, borrador.modulo]
+    () =>
+      (catalogo.data?.acciones ?? [])
+        .filter((a) => (!borrador.modulo || a.modulo === borrador.modulo) && (!borrador.tipo || a.tipo === borrador.tipo))
+        .sort((a, b) => a.etiqueta.localeCompare(b.etiqueta, 'es')),
+    [catalogo.data, borrador.modulo, borrador.tipo]
   );
   const cambiar = (campo: keyof FiltrosHistorial, valor: string) =>
-    setBorrador((b) => ({ ...b, [campo]: valor, ...(campo === 'modulo' ? { accion: '' } : {}) }));
+    setBorrador((b) => ({ ...b, [campo]: valor, ...(campo === 'modulo' || campo === 'tipo' ? { accion: '' } : {}) }));
 
   const aplicar = (e: FormEvent) => {
     e.preventDefault();
@@ -53,7 +60,7 @@ export function HistorialAccionesPage() {
     <div className="space-y-4">
       <PageHeader
         title="Historial de acciones"
-        subtitle="Quién hizo qué y cuándo en todo el sistema. La bitácora es de solo escritura: ningún evento se modifica ni se elimina."
+        subtitle="Quién creó, editó, matriculó o eliminó algo en el sistema, y cuándo. Solo lectura: ningún evento se modifica ni se elimina."
         action={
           <Button variant="outline" onClick={() => exportar.mutate(filtros)} isLoading={exportar.isPending}>
             <DownloadIcon className="h-4 w-4" />
@@ -63,7 +70,15 @@ export function HistorialAccionesPage() {
       />
 
       <Card>
-        <form onSubmit={aplicar} className="grid gap-3 md:grid-cols-3 lg:grid-cols-6">
+        <form onSubmit={aplicar} className="grid gap-3 md:grid-cols-3 lg:grid-cols-4">
+          <Select label="Tipo de evento" value={borrador.tipo} onChange={(e) => cambiar('tipo', e.target.value)}>
+            <option value="">Todos los tipos</option>
+            {catalogo.data?.tipos.map((t) => (
+              <option key={t.clave} value={t.clave}>
+                {t.nombre}
+              </option>
+            ))}
+          </Select>
           <Select label="Módulo" value={borrador.modulo} onChange={(e) => cambiar('modulo', e.target.value)}>
             <option value="">Todos los módulos</option>
             {catalogo.data?.modulos.map((m) => (
@@ -90,7 +105,7 @@ export function HistorialAccionesPage() {
           <Input label="Desde" type="date" value={borrador.desde} onChange={(e) => cambiar('desde', e.target.value)} />
           <Input label="Hasta" type="date" value={borrador.hasta} onChange={(e) => cambiar('hasta', e.target.value)} />
           <Input label="Buscar en el detalle" placeholder="Folio, grupo, nombre…" value={borrador.texto} onChange={(e) => cambiar('texto', e.target.value)} />
-          <div className="flex gap-2 md:col-span-3 lg:col-span-6">
+          <div className="flex gap-2 md:col-span-3 lg:col-span-4">
             <Button type="submit">
               <SearchIcon className="h-4 w-4" />
               Buscar
@@ -112,13 +127,14 @@ export function HistorialAccionesPage() {
           <TableHead>
             <Th>Fecha y hora</Th>
             <Th>Usuario</Th>
+            <Th>Tipo</Th>
             <Th>Módulo</Th>
             <Th>Acción</Th>
             <Th>Detalle</Th>
             <Th>{''}</Th>
           </TableHead>
           <TableBody>
-            {pagina?.data.length === 0 && <EmptyRow colSpan={6}>No hay eventos con esos filtros.</EmptyRow>}
+            {pagina?.data.length === 0 && <EmptyRow colSpan={7}>No hay eventos con esos filtros.</EmptyRow>}
             {pagina?.data.map((ev) => (
               <tr key={ev._id}>
                 <Td>
@@ -136,7 +152,10 @@ export function HistorialAccionesPage() {
                   )}
                 </Td>
                 <Td>
-                  <Chip tone="blue">{ev.modulo_nombre}</Chip>
+                  <Chip tone={tonoDeTipo(ev.tipo)}>{ev.tipo_nombre}</Chip>
+                </Td>
+                <Td>
+                  <span className="text-sm text-body">{ev.modulo_nombre}</span>
                 </Td>
                 <Td>
                   <Chip tone={tonoDeAccion(ev.accion)}>{ev.etiqueta}</Chip>

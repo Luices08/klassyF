@@ -1,4 +1,5 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { ACCIONES_DEL_HISTORIAL } from '../../src/constants/tiposEventoAuditoria';
 import AuditLog from '../../src/models/auditLog.model';
 import Enrollment from '../../src/models/enrollment.model';
 import Group, { GroupDocument } from '../../src/models/group.model';
@@ -54,8 +55,8 @@ describe('M31: historial de acciones', () => {
   });
 
   it('filtra por módulo, usuario y texto, y pagina del más reciente al más antiguo', async () => {
-    // El escenario ya deja eventos (p. ej. el catálogo de convivencia): se cuentan aparte.
-    const previos = await AuditLog.countDocuments();
+    // El escenario ya deja eventos (p. ej. el catálogo de convivencia): se cuentan aparte, solo los que el historial muestra.
+    const previos = await AuditLog.countDocuments({ accion: { $in: ACCIONES_DEL_HISTORIAL } });
     const propia = await matriculaDe(e.estudiante._id);
     await registrarEvento({ usuario_id: e.secretaria._id, accion: 'MATRICULA_CREADA', entidad: 'Enrollment', entidad_id: propia._id, detalle: 'Folio L1-F000001-2026' });
     await registrarEvento({ usuario_id: e.admin._id, accion: 'HORARIO_PUBLICADO', entidad: 'Horario', detalle: 'Versión 1' });
@@ -70,6 +71,39 @@ describe('M31: historial de acciones', () => {
     const pagina = await listarHistorial({ limit: 2, page: 2 });
     expect(pagina).toMatchObject({ total, pages: Math.ceil(total / 2), page: 2 });
     expect((await listarHistorial({ limit: 2 })).data[0]?.accion).toBe('DOCUMENTO_CARGADO');
+  });
+
+  it('solo muestra crear, editar, matricular y eliminar: consultas, descargas y accesos se guardan pero no salen', async () => {
+    const propia = await matriculaDe(e.estudiante._id);
+    await registrarEvento({ usuario_id: e.secretaria._id, accion: 'MATRICULA_CREADA', entidad: 'Enrollment', entidad_id: propia._id, detalle: 'Folio A' });
+    await registrarEvento({ usuario_id: e.secretaria._id, accion: 'DOCUMENTO_REVISADO', entidad: 'Enrollment', entidad_id: propia._id, detalle: 'Revisado' });
+    await registrarEvento({ usuario_id: e.secretaria._id, accion: 'CERTIFICADO_DESCARGADO', entidad: 'Enrollment', entidad_id: propia._id, detalle: 'PDF' });
+    await registrarEvento({ usuario_id: e.secretaria._id, accion: 'CERTIFICADO_VISTA_PREVIA', entidad: 'Enrollment', entidad_id: propia._id, detalle: 'Vista' });
+    await registrarEvento({ usuario_id: e.secretaria._id, accion: 'LOGIN_EXITOSO', entidad: 'User', entidad_id: e.secretaria._id, detalle: 'Entró' });
+    await registrarEvento({ usuario_id: e.admin._id, accion: 'ESPACIO_ELIMINADO', entidad: 'Espacio', detalle: 'Aula 3' });
+
+    // La bitácora guarda todo (también lo que no se muestra)…
+    expect(await AuditLog.countDocuments({ accion: { $in: ['CERTIFICADO_DESCARGADO', 'CERTIFICADO_VISTA_PREVIA', 'LOGIN_EXITOSO'] } })).toBe(3);
+
+    // …pero el historial general y el de la matrícula solo traen lo que cambia componentes.
+    const general = await listarHistorial({ limit: 100 });
+    const acciones = general.data.map((x) => x.accion);
+    expect(acciones).toEqual(expect.arrayContaining(['MATRICULA_CREADA', 'DOCUMENTO_REVISADO', 'ESPACIO_ELIMINADO']));
+    expect(acciones).not.toEqual(expect.arrayContaining(['CERTIFICADO_DESCARGADO']));
+    expect(acciones).not.toEqual(expect.arrayContaining(['CERTIFICADO_VISTA_PREVIA']));
+    expect(acciones).not.toEqual(expect.arrayContaining(['LOGIN_EXITOSO']));
+    expect(general.data.every((x) => x.tipo !== null)).toBe(true);
+
+    const deMatricula = await historialDeMatricula(String(propia._id));
+    expect(deMatricula.eventos.map((x) => x.accion).sort()).toEqual(['DOCUMENTO_REVISADO', 'MATRICULA_CREADA']);
+
+    // El filtro por tipo separa cada clase de evento.
+    expect((await listarHistorial({ tipo: 'ELIMINACION' })).data.map((x) => x.accion)).toEqual(['ESPACIO_ELIMINADO']);
+    expect((await listarHistorial({ tipo: 'MATRICULACION', usuario_id: String(e.secretaria._id) })).data.map((x) => x.accion)).toEqual(['MATRICULA_CREADA']);
+    expect((await listarHistorial({ tipo: 'EDICION', usuario_id: String(e.secretaria._id) })).data.map((x) => x.accion)).toEqual(['DOCUMENTO_REVISADO']);
+
+    // Una acción que no se muestra no se puede pedir por nombre: no devuelve nada.
+    expect((await listarHistorial({ accion: 'LOGIN_EXITOSO' })).total).toBe(0);
   });
 
   it('exportar arma el listado y deja constancia en la propia bitácora', async () => {

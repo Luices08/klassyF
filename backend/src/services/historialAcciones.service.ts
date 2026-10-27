@@ -8,7 +8,8 @@ import {
   moduloDeAccion,
   nombreDeModulo,
 } from '../constants/auditoria';
-import { ACCIONES_AUDITORIA, AccionAuditoria, AuditLog, IAuditLog } from '../models/auditLog.model';
+import { ACCIONES_DEL_HISTORIAL, TIPOS_EVENTO, TipoEvento, accionesDeTipo, nombreDeTipoEvento, tipoDeAccion } from '../constants/tiposEventoAuditoria';
+import { AccionAuditoria, AuditLog, IAuditLog } from '../models/auditLog.model';
 import AdmissionRequest from '../models/admissionRequest.model';
 import CertificadoEmitido from '../models/certificadoEmitido.model';
 import Enrollment from '../models/enrollment.model';
@@ -23,6 +24,8 @@ import { registrarEvento } from './audit.service';
 
 export interface FiltrosHistorial {
   modulo?: ModuloAuditoria;
+  /** Crear, editar, matricular o eliminar: el historial solo muestra estos cuatro tipos de evento. */
+  tipo?: TipoEvento;
   accion?: AccionAuditoria;
   usuario_id?: string;
   entidad?: string;
@@ -54,12 +57,15 @@ type EventoPlano = Omit<IAuditLog, 'usuario_id'> & { _id: Types.ObjectId; usuari
 export function vistaEvento(e: EventoPlano) {
   const usuario = e.usuario_id && 'nombre' in e.usuario_id ? e.usuario_id : null;
   const modulo = moduloDeAccion(e.accion);
+  const tipo = tipoDeAccion(e.accion);
   const entidadId = e.entidad_id ? String(e.entidad_id) : null;
   return {
     _id: String(e._id),
     fecha: e.createdAt,
     accion: e.accion,
     etiqueta: etiquetaDeAccion(e.accion),
+    tipo,
+    tipo_nombre: nombreDeTipoEvento(tipo),
     modulo,
     modulo_nombre: nombreDeModulo(modulo),
     entidad: e.entidad,
@@ -80,12 +86,14 @@ const diaUtc = (iso: string): Date => new Date(`${iso}T00:00:00.000Z`);
 
 export function filtroDeHistorial(f: FiltrosHistorial): Record<string, unknown> {
   const filtro: Record<string, unknown> = {};
+  // Siempre se parte de lo que el historial muestra (crear, editar, matricular, eliminar): consultas, descargas y accesos quedan fuera.
+  let permitidas: AccionAuditoria[] = f.tipo ? accionesDeTipo(f.tipo) : ACCIONES_DEL_HISTORIAL;
   if (f.modulo) {
-    const delModulo = accionesDeModulo(f.modulo);
-    filtro.accion = f.accion ? (delModulo.includes(f.accion) ? f.accion : { $in: [] }) : { $in: delModulo };
-  } else if (f.accion) {
-    filtro.accion = f.accion;
+    const delModulo = new Set<AccionAuditoria>(accionesDeModulo(f.modulo));
+    permitidas = permitidas.filter((a) => delModulo.has(a));
   }
+  // Una acción que no corresponde al módulo o tipo elegido no devuelve nada (no se ignora el filtro en silencio).
+  filtro.accion = f.accion ? (permitidas.includes(f.accion) ? f.accion : { $in: [] }) : { $in: permitidas };
   if (f.usuario_id) filtro.usuario_id = new Types.ObjectId(f.usuario_id);
   if (f.entidad) filtro.entidad = f.entidad;
   if (f.entidad_id) filtro.entidad_id = new Types.ObjectId(f.entidad_id);
@@ -114,11 +122,15 @@ export async function listarHistorial(f: FiltrosHistorial) {
   return { data: eventos.map(vistaEvento), total, page, pages: Math.max(1, Math.ceil(total / limit)) };
 }
 
-/** Módulos y acciones con su nombre en pantalla: así el frontend no repite la lista. */
+/** Tipos, módulos y acciones del historial con su nombre en pantalla: así el frontend no repite la lista. */
 export function catalogoHistorial() {
+  const acciones = ACCIONES_DEL_HISTORIAL.map((a) => ({ accion: a, etiqueta: etiquetaDeAccion(a), modulo: moduloDeAccion(a), tipo: tipoDeAccion(a) as TipoEvento }));
+  const modulosConEventos = new Set(acciones.map((a) => a.modulo));
   return {
-    modulos: MODULOS_AUDITORIA.map((m) => ({ clave: m.clave, nombre: m.nombre })),
-    acciones: ACCIONES_AUDITORIA.map((a) => ({ accion: a, etiqueta: etiquetaDeAccion(a), modulo: moduloDeAccion(a) })),
+    tipos: TIPOS_EVENTO.map((t) => ({ clave: t.clave, nombre: t.nombre })),
+    // Un módulo sin ninguna acción de crear, editar, matricular o eliminar no se ofrece como filtro (quedaría siempre vacío).
+    modulos: MODULOS_AUDITORIA.filter((m) => modulosConEventos.has(m.clave)).map((m) => ({ clave: m.clave, nombre: m.nombre })),
+    acciones,
   };
 }
 
@@ -136,6 +148,7 @@ export async function exportarHistorial(f: FiltrosHistorial, usuarioId: Types.Ob
     fecha: FORMATO_FECHA_HORA.format(new Date(e.fecha)),
     usuario: e.usuario ? `${e.usuario.apellido}, ${e.usuario.nombre}` : 'Sistema',
     documento: e.usuario?.numero_documento ?? '',
+    tipo: e.tipo_nombre,
     modulo: e.modulo_nombre,
     accion: e.etiqueta,
     detalle: e.detalle ?? '',
@@ -144,6 +157,7 @@ export async function exportarHistorial(f: FiltrosHistorial, usuarioId: Types.Ob
   await registrarEvento({ usuario_id: usuarioId, accion: 'HISTORIAL_EXPORTADO', entidad: 'AuditLog', detalle: `${filas.length} de ${total} evento(s)`, ip });
   const alcance = [
     f.modulo ? nombreDeModulo(f.modulo) : 'Todos los módulos',
+    f.tipo ? nombreDeTipoEvento(f.tipo) : 'Creación, edición, matriculación y eliminación',
     f.accion ? etiquetaDeAccion(f.accion) : null,
     f.desde || f.hasta ? `del ${f.desde ?? 'inicio'} al ${f.hasta ?? 'hoy'}` : null,
     f.texto ? `con «${f.texto}»` : null,
@@ -162,6 +176,7 @@ export async function exportarHistorial(f: FiltrosHistorial, usuarioId: Types.Ob
       { clave: 'fecha', titulo: 'Fecha y hora', ancho: 18 },
       { clave: 'usuario', titulo: 'Usuario', ancho: 26 },
       { clave: 'documento', titulo: 'Documento', ancho: 14, texto: true },
+      { clave: 'tipo', titulo: 'Tipo', ancho: 16 },
       { clave: 'modulo', titulo: 'Módulo', ancho: 24 },
       { clave: 'accion', titulo: 'Acción', ancho: 30 },
       { clave: 'detalle', titulo: 'Detalle', ancho: 60 },
@@ -189,7 +204,11 @@ export async function historialDeMatricula(enrollmentId: string) {
   ]);
   const ids = [matricula._id, ...[...admisiones, ...certificados, ...traslados, ...salidas, ...pazYSalvo].map((d) => d._id)];
   const [eventos, otras] = await Promise.all([
-    AuditLog.find({ entidad_id: { $in: ids } }).sort({ createdAt: -1, _id: -1 }).limit(MAX_EVENTOS_MATRICULA).populate(POBLAR_USUARIO).lean<EventoPlano[]>(),
+    AuditLog.find({ entidad_id: { $in: ids }, accion: { $in: ACCIONES_DEL_HISTORIAL } })
+      .sort({ createdAt: -1, _id: -1 })
+      .limit(MAX_EVENTOS_MATRICULA)
+      .populate(POBLAR_USUARIO)
+      .lean<EventoPlano[]>(),
     Enrollment.find({ student_id: matricula.student_id, _id: { $ne: matricula._id } })
       .select('estado folio_matricula tipo_ingreso fecha_matricula academic_year_id group_id')
       .populate({ path: 'academic_year_id', select: 'year' })

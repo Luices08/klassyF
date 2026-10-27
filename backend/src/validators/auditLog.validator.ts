@@ -1,6 +1,6 @@
 import Joi from 'joi';
 import { MODULOS_AUDITORIA } from '../constants/auditoria';
-import { ACCIONES_AUDITORIA } from '../models/auditLog.model';
+import { ACCIONES_DEL_HISTORIAL, TIPOS_EVENTO } from '../constants/tiposEventoAuditoria';
 import { ValidationSchema } from '../middlewares/validate.middleware';
 import { objectId } from './common.validator';
 
@@ -8,7 +8,8 @@ const fechaDia = Joi.string().pattern(/^\d{4}-\d{2}-\d{2}$/).message('"{{#label}
 
 const filtros = {
   modulo: Joi.string().valid(...MODULOS_AUDITORIA.map((m) => m.clave)),
-  accion: Joi.string().valid(...ACCIONES_AUDITORIA),
+  tipo: Joi.string().valid(...TIPOS_EVENTO.map((t) => t.clave)),
+  accion: Joi.string().valid(...ACCIONES_DEL_HISTORIAL),
   usuario_id: objectId,
   entidad: Joi.string().trim().max(60),
   entidad_id: objectId,

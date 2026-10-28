@@ -9,7 +9,15 @@ import Group from '../models/group.model';
 import User, { UserDocument } from '../models/user.model';
 import ApiError from '../utils/ApiError';
 import { registrarEvento } from './audit.service';
-import { anioConVentanaAbierta } from './prematricula.service';
+async function anioDestinoContinuidad(): Promise<Types.ObjectId | null> {
+  const enCurso = await AcademicYear.findOne({ estado: 'EN_CURSO' }).select('year');
+  if (enCurso) {
+    const siguiente = await AcademicYear.findOne({ estado: { $ne: 'CERRADO' }, year: { $gt: enCurso.year } }).sort({ year: 1 }).select('_id');
+    if (siguiente) return siguiente._id;
+  }
+  const planificacion = await AcademicYear.findOne({ estado: 'PLANIFICACION' }).sort({ year: -1 }).select('_id');
+  return planificacion?._id ?? null;
+}
 
 /**
  * Continuidad de los estudiantes antiguos (M04, prematrícula): en octubre la familia dice si su hijo sigue el año siguiente. No es una matrícula ni pide
@@ -235,9 +243,9 @@ export interface ContinuidadDelHijo {
 }
 
 /** Lo que el acudiente ve en el portal sobre la continuidad de UN hijo (el vínculo ya lo comprobó quien llama). Sin ventana abierta no hay nada que responder. */
-export async function continuidadDelHijo(studentId: string, ahora: Date = new Date()): Promise<ContinuidadDelHijo> {
+export async function continuidadDelHijo(studentId: string, _ahora: Date = new Date()): Promise<ContinuidadDelHijo> {
   const sinProceso: ContinuidadDelHijo = { anio_destino: null, puede_responder: false, decision: 'SIN_RESPUESTA', grado_proyectado: null, motivo: '' };
-  const anioId = await anioConVentanaAbierta(ahora);
+  const anioId = await anioDestinoContinuidad();
   if (!anioId) return sinProceso;
   const destino = await AcademicYear.findById(anioId).select('year');
   const origen = destino ? await AcademicYear.findOne({ year: { $lt: destino.year } }).sort({ year: -1, createdAt: -1 }).select('_id') : null;
@@ -262,8 +270,8 @@ export async function continuidadDelHijo(studentId: string, ahora: Date = new Da
 }
 
 /** El acudiente responde por su hijo: solo mientras la ventana de prematrícula está abierta, y siempre sobre el año al que apunta esa ventana. */
-export async function responderContinuidadDelHijo(usuario: UserDocument, studentId: string, respuesta: RespuestaDeContinuidad, ip?: string | null, ahora: Date = new Date()) {
-  const anioId = await anioConVentanaAbierta(ahora);
+export async function responderContinuidadDelHijo(usuario: UserDocument, studentId: string, respuesta: RespuestaDeContinuidad, ip?: string | null, _ahora: Date = new Date()) {
+  const anioId = await anioDestinoContinuidad();
   if (!anioId) throw new ApiError(409, 'La renovación de matrícula no está abierta: la secretaría avisará cuándo.');
   return registrarContinuidad(String(anioId), studentId, respuesta, { usuario, canal: 'PORTAL' }, ip);
 }

@@ -41,6 +41,8 @@ import { SelectorEstudianteMatricula } from '../../components/matriculas/Selecto
 import { admiteMatricula, estaPorFormalizar, type FiltroEstudiante } from '../../lib/situacionEstudiante';
 import { MatriculaPorGrado } from '../../components/matriculas/MatriculaPorGrado';
 import { gradosOrdenados, tipoDeIngresoSugerido, veredictoDeGrado } from '../../lib/matriculaPorGrado';
+import { api } from '../../lib/apiClient';
+import { useDisponibilidadCupos } from '../../hooks/useAdmissionRequests';
 
 const PAGE_SIZE = 20;
 
@@ -97,6 +99,8 @@ export function EnrollmentsPage() {
   const jornadasQuery = useJornadas(filtroSede || undefined);
   const [filtroJornada, setFiltroJornada] = useState('');
 
+  const disponibilidadQuery = useDisponibilidadCupos(anioId);
+
   const cuposQuery = useGroups({
     academic_year_id: anioId,
     sede_id: filtroSede || undefined,
@@ -138,6 +142,7 @@ export function EnrollmentsPage() {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [matriculaCreadaId, setMatriculaCreadaId] = useState<string | null>(null);
   const [form, setForm] = useState(FORM_VACIO);
+  const [archivos, setArchivos] = useState<Record<string, File>>({});
   const [errorEnvio, setErrorEnvio] = useState<string | null>(null);
 
   const studentsQuery = useEstudiantesPorGrado(anioId);
@@ -207,10 +212,28 @@ export function EnrollmentsPage() {
 
     try {
       if (preinscrita) {
-        const formal = await formalizar.mutateAsync({ id: preinscrita._id, trae_todos: traeTodos, fecha_limite_compromiso: nacerCondicional ? form.fecha_limite_compromiso : undefined });
+        const formal = await formalizar.mutateAsync({
+          id: preinscrita._id,
+          trae_todos: traeTodos,
+          fecha_limite_compromiso: nacerCondicional ? form.fecha_limite_compromiso : undefined,
+        });
+
+        const listaArchivos = Object.entries(archivos);
+        if (listaArchivos.length > 0) {
+          for (const [tipo, file] of listaArchivos) {
+            try {
+              const formData = new FormData();
+              formData.append('aprobar', 'true');
+              formData.append('file', file);
+              await api.upload(`/enrollments/${formal._id}/checklist/${tipo}/upload`, formData);
+            } catch (err) {
+              console.error(`Error al subir archivo para ${tipo}:`, err);
+            }
+          }
+        }
+
         void studentsQuery.refetch();
-        // Con los originales en la mano, lo que sigue es subir los archivos: se abre el expediente.
-        if (traeTodos && hayPorRecibir) {
+        if (traeTodos && hayPorRecibir && listaArchivos.length === 0) {
           setDrawerOpen(false);
           navigate(`/admin/enrollments/${formal._id}`);
           reiniciarFormulario();
@@ -220,25 +243,37 @@ export function EnrollmentsPage() {
         setMatriculaCreadaId(formal._id);
         return;
       }
+
       const matricula = await createEnrollment.mutateAsync({
         student_id: form.student_id,
         group_id: form.group_id,
         academic_year_id: anioId,
         tipo_ingreso: form.tipo_ingreso,
-        // «Sí los trae»: todos los obligatorios quedan verificados en físico (sin archivo) y los sube en el expediente. «No»: ninguno se marca.
         documentos_entregados: traeTodos ? obligatoriosPorTraer.map((d) => d.tipo_documento) : [],
         fecha_limite_compromiso: nacerCondicional ? form.fecha_limite_compromiso : undefined,
         forzar_sobrecupo: form.forzar_sobrecupo,
         reingreso: esReingreso && reingresoConfirmado ? true : undefined,
-        // Si la hoja de vida ya dice que tiene una discapacidad, el servidor la toma de allí; esto es solo lo que la familia declare de más.
         apoyo_declarado: estudianteElegido?.tiene_discapacidad ? undefined : aApoyoDeclarado(form.apoyo),
         ultimo_grado_aprobado: gradoAprobado?.numero,
         motivo_grado: necesitaMotivoGrado ? form.motivo_grado.trim() : undefined,
       });
 
+      const listaArchivos = Object.entries(archivos);
+      if (listaArchivos.length > 0) {
+        for (const [tipo, file] of listaArchivos) {
+          try {
+            const formData = new FormData();
+            formData.append('aprobar', 'true');
+            formData.append('file', file);
+            await api.upload(`/enrollments/${matricula._id}/checklist/${tipo}/upload`, formData);
+          } catch (err) {
+            console.error(`Error al subir archivo para ${tipo}:`, err);
+          }
+        }
+      }
+
       void studentsQuery.refetch();
-      // Con todos los documentos en la mano, lo que sigue es subir los archivos: se abre el expediente directamente.
-      if (traeTodos && obligatoriosPorTraer.length > 0) {
+      if (traeTodos && obligatoriosPorTraer.length > 0 && listaArchivos.length === 0) {
         setDrawerOpen(false);
         navigate(`/admin/enrollments/${matricula._id}`);
         reiniciarFormulario();
@@ -252,6 +287,7 @@ export function EnrollmentsPage() {
   }
 
   function reiniciarFormulario() {
+    setArchivos({});
     setMatriculaCreadaId(null);
     setResumenCreada(null);
     setErrorEnvio(null);
@@ -357,66 +393,114 @@ export function EnrollmentsPage() {
       {!anio && <Alert tone="warning">Aún no hay un año lectivo. Créalo en "Año lectivo".</Alert>}
 
       {pestana === 'cupos' && (
-      <Card>
-        <CardHeader
-          title="Disponibilidad de cupos"
-          subtitle="Balance por sede, jornada y grado para el año lectivo activo."
-          action={
-            <div className="flex flex-wrap gap-3">
-              <Select label="Sede" value={filtroSede} onChange={(e) => setFiltroSede(e.target.value)} className="w-40">
-                <option value="">Todas</option>
-                {(sedesQuery.data ?? []).map((s) => (
-                  <option key={s._id} value={s._id}>
-                    {s.nombre}
-                  </option>
-                ))}
-              </Select>
-              <Select label="Jornada" value={filtroJornada} onChange={(e) => setFiltroJornada(e.target.value)} className="w-36">
-                <option value="">Todas</option>
-                {(jornadasQuery.data ?? []).map((j) => (
-                  <option key={j._id} value={j._id}>
-                    {j.nombre}
-                  </option>
-                ))}
-              </Select>
-              <Select label="Grado" value={filtroGrado} onChange={(e) => setFiltroGrado(e.target.value)} className="w-40">
-                <option value="">Todos</option>
-                {(gradosQuery.data ?? []).map((g) => (
-                  <option key={g._id} value={g._id}>
-                    {g.nombre}
-                  </option>
-                ))}
-              </Select>
+        <div className="space-y-4">
+          <Card>
+            <CardHeader
+              title="Disponibilidad y aforo real de cupos"
+              subtitle="Capacidad total vs. matriculados reales y solicitudes radicadas en espera."
+            />
+            <div className="overflow-x-auto p-4">
+              {disponibilidadQuery.isLoading && (
+                <div className="flex justify-center p-8">
+                  <Spinner label="Calculando aforo y cupos..." />
+                </div>
+              )}
+              {disponibilidadQuery.isError && (
+                <Alert tone="error">{errorMessage(disponibilidadQuery.error)}</Alert>
+              )}
+              {disponibilidadQuery.data && (
+                <Table>
+                  <TableHead>
+                    <Th>Grado / Sede / Jornada</Th>
+                    <Th className="text-center font-bold">Capacidad Total</Th>
+                    <Th className="text-center font-bold">Matriculados Reales</Th>
+                    <Th className="text-center font-bold">Solicitudes en Espera</Th>
+                    <Th className="text-center font-bold">Cupos Libres</Th>
+                  </TableHead>
+                  <TableBody>
+                    {disponibilidadQuery.data.filas.length === 0 ? (
+                      <EmptyRow colSpan={5}>No hay grupos configurados para este año lectivo.</EmptyRow>
+                    ) : (
+                      disponibilidadQuery.data.filas.map((f, i) => (
+                        <tr key={i}>
+                          <Td>
+                            <div className="font-semibold text-ink">{f.grado.nombre}</div>
+                            <div className="text-xs text-muted">{f.sede.nombre} · {f.jornada.nombre}</div>
+                          </Td>
+                          <Td className="text-center text-sm font-semibold">{f.capacidad_total}</Td>
+                          <Td className="text-center text-sm">{f.matriculados_reales}</Td>
+                          <Td className="text-center text-sm text-orange-600 font-medium">{f.solicitudes_espera}</Td>
+                          <Td className="text-center text-sm font-bold text-ink">{f.cupos_libres}</Td>
+                        </tr>
+                      ))
+                    )}
+                  </TableBody>
+                </Table>
+              )}
             </div>
-          }
-        />
-        {cuposQuery.isLoading && <Spinner />}
-        {cuposQuery.data && (
-          <Table>
-            <TableHead>
-              <Th>Grupo</Th>
-              <Th>Sede</Th>
-              <Th>Jornada</Th>
-              <Th>Grado</Th>
-              <Th>Cupos</Th>
-            </TableHead>
-            <TableBody>
-              {cuposQuery.data.map((g) => (
-                <tr key={g._id}>
-                  <Td className="font-medium text-ink">{g.nomenclatura}</Td>
-                  <Td>{typeof g.sede_id === 'string' ? g.sede_id : g.sede_id.nombre}</Td>
-                  <Td>{typeof g.jornada_id === 'string' ? g.jornada_id : g.jornada_id.nombre}</Td>
-                  <Td>{typeof g.grade_id === 'string' ? g.grade_id : g.grade_id.nombre}</Td>
-                  <Td>
-                    <CupoBadge ocupados={g.cupos_ocupados} max={g.max_capacity} />
-                  </Td>
-                </tr>
-              ))}
-              {cuposQuery.data.length === 0 && <EmptyRow colSpan={5}>Sin grupos para este filtro.</EmptyRow>}
-            </TableBody>
-          </Table>
-        )}
-      </Card>
+          </Card>
+
+          <Card>
+            <CardHeader
+              title="Detalle por grupo / salón"
+              subtitle="Aforo individual y ocupación grupo por grupo para el año lectivo activo."
+              action={
+                <div className="flex flex-wrap gap-3">
+                  <Select label="Sede" value={filtroSede} onChange={(e) => setFiltroSede(e.target.value)} className="w-40">
+                    <option value="">Todas</option>
+                    {(sedesQuery.data ?? []).map((s) => (
+                      <option key={s._id} value={s._id}>
+                        {s.nombre}
+                      </option>
+                    ))}
+                  </Select>
+                  <Select label="Jornada" value={filtroJornada} onChange={(e) => setFiltroJornada(e.target.value)} className="w-36">
+                    <option value="">Todas</option>
+                    {(jornadasQuery.data ?? []).map((j) => (
+                      <option key={j._id} value={j._id}>
+                        {j.nombre}
+                      </option>
+                    ))}
+                  </Select>
+                  <Select label="Grado" value={filtroGrado} onChange={(e) => setFiltroGrado(e.target.value)} className="w-40">
+                    <option value="">Todos</option>
+                    {(gradosQuery.data ?? []).map((g) => (
+                      <option key={g._id} value={g._id}>
+                        {g.nombre}
+                      </option>
+                    ))}
+                  </Select>
+                </div>
+              }
+            />
+            {cuposQuery.isLoading && <Spinner />}
+            {cuposQuery.data && (
+              <Table>
+                <TableHead>
+                  <Th>Grupo</Th>
+                  <Th>Sede</Th>
+                  <Th>Jornada</Th>
+                  <Th>Grado</Th>
+                  <Th>Cupos</Th>
+                </TableHead>
+                <TableBody>
+                  {cuposQuery.data.map((g) => (
+                    <tr key={g._id}>
+                      <Td className="font-medium text-ink">{g.nomenclatura}</Td>
+                      <Td>{typeof g.sede_id === 'string' ? g.sede_id : g.sede_id.nombre}</Td>
+                      <Td>{typeof g.jornada_id === 'string' ? g.jornada_id : g.jornada_id.nombre}</Td>
+                      <Td>{typeof g.grade_id === 'string' ? g.grade_id : g.grade_id.nombre}</Td>
+                      <Td>
+                        <CupoBadge ocupados={g.cupos_ocupados} max={g.max_capacity} />
+                      </Td>
+                    </tr>
+                  ))}
+                  {cuposQuery.data.length === 0 && <EmptyRow colSpan={5}>Sin grupos para este filtro.</EmptyRow>}
+                </TableBody>
+              </Table>
+            )}
+          </Card>
+        </div>
       )}
 
       {pestana === 'por-grado' && (
@@ -691,6 +775,16 @@ export function EnrollmentsPage() {
               studentId={form.student_id || undefined}
               traeTodos={form.trae_todos}
               onChange={(valor) => setForm((f) => ({ ...f, trae_todos: valor }))}
+              archivos={archivos}
+              onArchivoChange={(tipo, file) => {
+                setArchivos((prev) => {
+                  if (!file) {
+                    const { [tipo]: _quitado, ...resto } = prev;
+                    return resto;
+                  }
+                  return { ...prev, [tipo]: file };
+                });
+              }}
             />
 
             {nacerCondicional && (

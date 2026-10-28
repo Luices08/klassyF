@@ -75,7 +75,7 @@ export async function buscarMatriculaDePreinscripcion(numeroDocumento: string, f
     numero_documento: numeroDocumento,
     fecha_nacimiento: new Date(fechaNacimiento),
   }).sort({ createdAt: -1 });
-  if (!solicitud || solicitud.estado !== 'APROBADA' || !solicitud.enrollment_id) return null;
+  if (!solicitud || solicitud.estado !== 'MATRICULADO' || !solicitud.enrollment_id) return null;
 
   const enrollment = await Enrollment.findById(solicitud.enrollment_id).populate({
     path: 'group_id',

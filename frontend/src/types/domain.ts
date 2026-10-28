@@ -775,7 +775,7 @@ export interface StudentFicha360 {
 
 // --- M04: Admisiones (sitio publico + revision interna) ---
 
-export const ESTADOS_SOLICITUD = ['PENDIENTE', 'EN_REVISION', 'CUPO_RESERVADO', 'EN_ESPERA', 'APROBADA', 'RECHAZADA'] as const;
+export const ESTADOS_SOLICITUD = ['PENDIENTE', 'ADMITIDO', 'MATRICULADO', 'RECHAZADA'] as const;
 export type EstadoSolicitud = (typeof ESTADOS_SOLICITUD)[number];
 
 export interface PublicSede {
@@ -850,8 +850,8 @@ export interface AdmissionRequest {
   origen?: 'PUBLICA' | 'SECRETARIA';
   /** El año al que apunta (el siguiente durante la prematrícula). null en las solicitudes anteriores. */
   academic_year_id?: string | null;
-  /** Donde se reservó el cupo (o donde espera): sede y jornada; el grado es el que pidió. */
-  reserva?: { sede_id: string; jornada_id: string; fecha: string } | null;
+
+
   /** Documentos recibidos con la solicitud (la API nunca trae la ruta del archivo). */
   documentos?: Array<{ tipo_documento: string; fecha_carga: string }>;
   createdAt: string;

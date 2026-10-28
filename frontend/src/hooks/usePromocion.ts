@@ -232,12 +232,12 @@ export interface PlanRollover {
   grupos_destino: GrupoDestinoPlan[];
   alertas: string[];
   retirados: number;
-  resumen: { total: number; por_crear: number; ya_tienen_matricula: number; en_espera: number; sin_cupo: number; sin_confirmar: number; no_aplica: number; por_destino: Partial<Record<DestinoRollover, number>> };
+  resumen: { total: number; por_crear: number; ya_tienen_matricula: number; en_espera?: number; sin_cupo: number; sin_confirmar: number; no_aplica: number; por_destino: Partial<Record<DestinoRollover, number>> };
 }
 
 export interface ResultadoRollover {
   creadas: number;
-  en_espera: number;
+  en_espera?: number;
   plan: PlanRollover['resumen'];
 }
 

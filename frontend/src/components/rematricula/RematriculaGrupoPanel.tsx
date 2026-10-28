@@ -171,8 +171,8 @@ export function RematriculaGrupoPanel({ puedeEjecutar }: { puedeEjecutar: boolea
 
       {resultado && (
         <Alert tone="success">
-          <strong>{resultado.creadas} pre-matrícula(s) creada(s).</strong>
-          {resultado.en_espera > 0 && ` ${resultado.en_espera} estudiante(s) quedaron en la lista de espera.`}
+          <strong>{resultado.creadas} matrícula(s) definitiva(s) asentada(s) con Libro y Folio.</strong>
+
         </Alert>
       )}
 
@@ -183,17 +183,17 @@ export function RematriculaGrupoPanel({ puedeEjecutar }: { puedeEjecutar: boolea
         <>
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="flex flex-wrap gap-2">
-              <Chip tone="green">Se pre-matricularán: {resumen.por_crear}</Chip>
-              <Chip tone={resumen.en_espera > 0 ? 'orange' : 'neutral'}>Lista de espera: {resumen.en_espera}</Chip>
+              <Chip tone="green">Matrícula definitiva: {resumen.por_crear}</Chip>
+              <Chip tone={resumen.sin_cupo > 0 ? 'red' : 'neutral'}>Sin cupo por aforo: {resumen.sin_cupo}</Chip>
               <Chip tone="neutral">Ya tienen matrícula: {resumen.ya_tienen_matricula}</Chip>
               {plan.data.modo_continuidad === 'CONFIRMADOS' && <Chip tone={resumen.sin_confirmar > 0 ? 'orange' : 'neutral'}>Sin confirmar: {resumen.sin_confirmar}</Chip>}
-              <Chip tone={resumen.sin_cupo > 0 ? 'red' : 'neutral'}>Sin grupo: {resumen.sin_cupo}</Chip>
+
               <Chip tone="neutral">No aplican: {resumen.no_aplica}</Chip>
               {plan.data.retirados > 0 && <Chip tone="neutral">Retirados: {plan.data.retirados}</Chip>}
             </div>
             {puedeEjecutar && (
-              <Button onClick={() => setReservando(true)} disabled={resumen.por_crear + resumen.en_espera === 0}>
-                Confirmar rematrícula
+              <Button onClick={() => setReservando(true)} disabled={resumen.por_crear === 0}>
+                Asentar matrículas definitivas
               </Button>
             )}
           </div>
@@ -275,7 +275,7 @@ export function RematriculaGrupoPanel({ puedeEjecutar }: { puedeEjecutar: boolea
         <ConfirmarRematricula
           alcance={{ ...simulado, origen_id: simulado.origen_id as string, destino_id: simulado.destino_id as string }}
           cantidad={plan.data.resumen.por_crear}
-          enEspera={plan.data.resumen.en_espera}
+
           anioDestino={plan.data.destino.year}
           alcanceTexto={simulado.group_id ? 'el grupo elegido' : simulado.grade_id ? 'el grado elegido' : 'las sedes elegidas'}
           onClose={() => setReservando(false)}
@@ -293,7 +293,7 @@ export function RematriculaGrupoPanel({ puedeEjecutar }: { puedeEjecutar: boolea
 function ConfirmarRematricula({
   alcance,
   cantidad,
-  enEspera,
+
   anioDestino,
   alcanceTexto,
   onClose,
@@ -301,7 +301,7 @@ function ConfirmarRematricula({
 }: {
   alcance: AlcanceRollover & { origen_id: string; destino_id: string };
   cantidad: number;
-  enEspera: number;
+
   anioDestino: number;
   alcanceTexto: string;
   onClose: () => void;
@@ -322,10 +322,10 @@ function ConfirmarRematricula({
   }
 
   return (
-    <Drawer open title={`Confirmar rematrícula ${anioDestino}`} onClose={onClose} onSubmit={(e) => void enviar(e)} submitLabel="Crear pre-matrículas" isSubmitting={ejecutar.isPending} submitDisabled={!clave}>
+    <Drawer open title={`Asentar matrículas definitivas ${anioDestino}`} onClose={onClose} onSubmit={(e) => void enviar(e)} submitLabel="Asentar matrículas definitivas" isSubmitting={ejecutar.isPending} submitDisabled={!clave}>
       <Alert tone="info">
-        Para {alcanceTexto} se crearán {cantidad} pre-matrícula(s) sin folio y el cupo queda apartado.{enEspera > 0 && ` Otros ${enEspera} pasan a la lista de espera.`} Todo se guarda junto: si algo falla, no se crea nada.
-        La secretaría las formaliza desde «Matrículas» cuando el paz y salvo y los documentos estén aprobados; ahí se asigna el libro y el folio. Repetir esta acción no duplica a quien ya tiene matrícula.
+        Para {alcanceTexto} se asentarán {cantidad} matrícula(s) definitivas con asignación de Libro y Folio reglamentario.
+        Los estudiantes antiguos no transitan por condicional ni preinscrito, conservando sus documentos en archivo. Repetir esta acción no duplica a quien ya tiene matrícula.
       </Alert>
       <Input label="Tu contraseña" type="password" autoComplete="current-password" value={clave} onChange={(e) => setClave(e.target.value)} />
       {error && <Alert tone="error">{error}</Alert>}

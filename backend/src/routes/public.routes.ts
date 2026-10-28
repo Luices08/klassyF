@@ -21,27 +21,42 @@ import * as citacionValidator from '../validators/citacion.validator';
 
 const router = Router();
 
-// Sin autenticacion (home institucional publico, M01/M04). Rate limit generoso
-// para lectura, mas estricto para el POST que escribe (evita spam de solicitudes).
+// Sin autenticación (home institucional público, M01/M04). Rate limit generoso
+// para lectura, más estricto para el POST que escribe (evita spam de solicitudes).
 const lecturaLimiter = rateLimit({ windowMs: 15 * 60_000, max: 120, standardHeaders: true, legacyHeaders: false });
-const escrituraLimiter = rateLimit({ windowMs: 60 * 60_000, max: 10, standardHeaders: true, legacyHeaders: false });
+const escrituraLimiter = rateLimit({ windowMs: 60 * 60_000, max: 20, standardHeaders: true, legacyHeaders: false });
 
-// Documentos de la preinscripcion: en memoria (max 5MB) hasta verificar la identidad del acudiente;
-// solo despues se escriben a disco. El tipo real se confirma por firma de bytes en el servicio.
 const documentosLimiter = rateLimit({ windowMs: 60 * 60_000, max: 40, standardHeaders: true, legacyHeaders: false });
 const subirEnMemoria = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024, files: 1 } });
 
-// Verificación de certificados (M26): más estricto que la lectura normal, porque quien adivina códigos no debe poder probarlos a ritmo libre.
+const subirAdjuntosSolicitud = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 10 * 1024 * 1024 },
+}).fields([
+  { name: 'documento_identidad', maxCount: 1 },
+  { name: 'certificado_notas', maxCount: 1 },
+]);
+
+// Normaliza campos anidados si vienen como multipart/form-data
+const normalizarBodySolicitud = (req: any, _res: any, next: any) => {
+  if (typeof req.body?.apoyo_declarado === 'string') {
+    try {
+      req.body.apoyo_declarado = JSON.parse(req.body.apoyo_declarado);
+    } catch {
+      // ignore
+    }
+  }
+  next();
+};
+
 const verificacionLimiter = rateLimit({ windowMs: 15 * 60_000, max: 40, standardHeaders: true, legacyHeaders: false });
 router.get('/certificados/verificar', verificacionLimiter, validate(certificadoValidator.verificarPublico), verificarPublico);
 
-// Respuesta a una citación desde el correo (M24): el token del enlace es la credencial. Mismo cuidado que la verificación de certificados.
 const citacionLimiter = rateLimit({ windowMs: 15 * 60_000, max: 60, standardHeaders: true, legacyHeaders: false });
 router.get('/citaciones/:token', citacionLimiter, validate(citacionValidator.conToken), consultarCitacion);
 router.post('/citaciones/:token/respuesta', citacionLimiter, validate(citacionValidator.responderPorToken), responderCitacion);
 
 router.get('/institution-info', lecturaLimiter, obtenerInfoPublica);
-// Qué grados se ofrecen en qué sedes y jornadas: el formulario de solicitud solo deja elegir lo que existe.
 router.get('/admission-requests/oferta', lecturaLimiter, listarOfertaDeAdmision);
 router.get('/sitio', lecturaLimiter, verSitioPublico);
 router.get('/sitio/imagenes/:id', lecturaLimiter, validate(conIdDeImagen), verImagenSitio);
@@ -50,9 +65,12 @@ router.get('/institution-imagen/:clave', lecturaLimiter, validate(institutionVal
 router.post(
   '/admission-requests',
   escrituraLimiter,
+  subirAdjuntosSolicitud,
+  normalizarBodySolicitud,
   validate(admissionValidator.crearSolicitud),
   crearSolicitud
 );
+
 router.get(
   '/admission-requests/status',
   lecturaLimiter,
@@ -66,6 +84,7 @@ router.post(
   validate(admissionValidator.descargarComprobante),
   descargarComprobante
 );
+
 router.post(
   '/admission-requests/documentos/:tipoDocumento',
   documentosLimiter,

@@ -117,6 +117,8 @@ const ETIQUETAS: Partial<Record<AccionAuditoria, string>> = {
   SESIONES_CERRADAS: 'Sesiones cerradas',
   ADMISION_SOLICITADA: 'Solicitud de admisión recibida',
   ADMISION_APROBADA: 'Solicitud de admisión aprobada',
+  ADMISION_ADMITIDA: 'Aspirante admitido',
+  ADMISION_MATRICULADA: 'Matrícula formalizada desde admisión',
   ADMISION_RECHAZADA: 'Solicitud de admisión rechazada',
   MATRICULA_PREINSCRITA: 'Preinscripción creada',
   MATRICULA_CREADA: 'Matrícula creada',

@@ -24,7 +24,8 @@ export function PreguntaTraeTodos({ value, onChange }: { value: TraeTodos; onCha
 }
 
 interface Props {
-  groupId: string;
+  groupId?: string;
+  gradeId?: string;
   tipoIngreso: TipoIngreso;
   studentId?: string;
   traeTodos: TraeTodos;
@@ -38,15 +39,22 @@ interface Props {
  * Permite cargar directamente cada archivo si se cuenta con él, o bien marcar con las dos tarjetas
  * si trae todos los documentos o falta alguno (para cuando no se deseen adjuntar archivos en el momento).
  */
-export function DocumentosPrevistos({ groupId, tipoIngreso, studentId, traeTodos, onChange, archivos, onArchivoChange }: Props) {
-  const consulta = useDocumentosPrevistos({ group_id: groupId || undefined, tipo_ingreso: tipoIngreso, student_id: studentId || undefined });
+export function DocumentosPrevistos({ groupId, gradeId, tipoIngreso, studentId, traeTodos, onChange, archivos, onArchivoChange }: Props) {
+  const consulta = useDocumentosPrevistos({
+    group_id: groupId || undefined,
+    grade_id: gradeId || undefined,
+    tipo_ingreso: tipoIngreso,
+    student_id: studentId || undefined,
+  });
   const previstos = consulta.data ?? [];
   const obligatorios = previstos.filter((d) => d.obligatorio && !d.ya_cubierto);
 
   return (
     <div className="space-y-3 rounded-lg border border-border p-3">
       <h4 className="text-xs font-bold uppercase tracking-wider text-muted">Documentos de la matrícula</h4>
-      {!groupId && <p className="text-xs text-muted">Mostrando requisitos base. Al elegir un grupo se complementan los documentos específicos de su grado.</p>}
+      {!groupId && !gradeId && (
+        <p className="text-xs text-muted">Mostrando requisitos base. Al elegir un grado o grupo se complementan los documentos específicos.</p>
+      )}
       {consulta.isLoading && <Spinner />}
       {consulta.isError && <Alert tone="error">{errorMessage(consulta.error)}</Alert>}
       {consulta.data && (

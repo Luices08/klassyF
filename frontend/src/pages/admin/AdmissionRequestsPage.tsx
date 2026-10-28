@@ -466,6 +466,7 @@ export function AdmissionRequestsPage() {
 
             <DocumentosPrevistos
               groupId={groupId}
+              gradeId={matriculando ? (typeof matriculando.grado_deseado_id === 'string' ? matriculando.grado_deseado_id : matriculando.grado_deseado_id._id) : undefined}
               tipoIngreso="NUEVO"
               traeTodos={traeTodos}
               onChange={setTraeTodos}

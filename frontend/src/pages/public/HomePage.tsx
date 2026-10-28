@@ -88,15 +88,6 @@ export function HomePage() {
     e.preventDefault();
     setErrorArchivos(null);
 
-    if (!archivoDoc) {
-      setErrorArchivos('Debes adjuntar la fotocopia del documento de identidad del aspirante.');
-      return;
-    }
-    if (!archivoCert) {
-      setErrorArchivos('Debes adjuntar el certificado de notas o boletín del colegio anterior.');
-      return;
-    }
-
     const { apoyo, ...datos } = form;
     const formData = new FormData();
 
@@ -115,8 +106,8 @@ export function HomePage() {
       formData.append('apoyo_declarado', JSON.stringify(apoyoObj));
     }
 
-    formData.append('documento_identidad', archivoDoc);
-    formData.append('certificado_notas', archivoCert);
+    if (archivoDoc) formData.append('documento_identidad', archivoDoc);
+    if (archivoCert) formData.append('certificado_notas', archivoCert);
 
     await solicitar.mutateAsync(formData);
   }
@@ -169,8 +160,8 @@ export function HomePage() {
       {/* Drawer: Solicitar cupo en 2 pasos */}
       <Drawer
         open={solicitarOpen}
-        title={paso === 1 ? 'Solicitar cupo / Preinscripción' : 'Documentación obligatoria'}
-        subtitle={paso === 1 ? 'Paso 1 de 2: Datos generales del aspirante y acudiente' : 'Paso 2 de 2: Adjuntar requisitos documentales'}
+        title={paso === 1 ? 'Solicitar cupo / Preinscripción' : 'Documentación (Opcional)'}
+        subtitle={paso === 1 ? 'Paso 1 de 2: Datos generales del aspirante y acudiente' : 'Paso 2 de 2: Puedes adjuntar los requisitos ahora o entregarlos después'}
         size="lg"
         onClose={() => {
           setSolicitarOpen(false);
@@ -314,13 +305,14 @@ export function HomePage() {
             </Alert>
 
             <fieldset className="space-y-2 rounded-lg border border-border p-3">
-              <legend className="px-1 text-sm font-semibold text-ink">Documentación obligatoria</legend>
+              <legend className="px-1 text-sm font-semibold text-ink">Documentación del aspirante (Opcional)</legend>
+              <p className="px-1 text-xs text-muted mb-2">Puedes adjuntar los documentos ahora si los tienes a mano, o entregarlos después en ventanilla de secretaría.</p>
               <ul className="divide-y divide-border">
                 {/* Documento 1: Fotocopia de identidad */}
                 <li className="flex items-center justify-between gap-3 py-3">
                   <div>
                     <div className="text-sm font-medium text-ink">Fotocopia del Documento de Identidad</div>
-                    <div className="text-xs text-muted">Registro civil, tarjeta de identidad o cédula de extranjería del aspirante · Obligatorio</div>
+                    <div className="text-xs text-muted">Registro civil, tarjeta de identidad o cédula de extranjería del aspirante · Opcional</div>
                   </div>
                   {archivoDoc ? (
                     <div className="flex items-center gap-2">
@@ -357,7 +349,7 @@ export function HomePage() {
                 <li className="flex items-center justify-between gap-3 py-3">
                   <div>
                     <div className="text-sm font-medium text-ink">Certificado de notas o boletín escolar</div>
-                    <div className="text-xs text-muted">Boletín del último periodo o certificado oficial del colegio anterior · Obligatorio</div>
+                    <div className="text-xs text-muted">Boletín del último periodo o certificado oficial del colegio anterior · Opcional</div>
                   </div>
                   {archivoCert ? (
                     <div className="flex items-center gap-2">

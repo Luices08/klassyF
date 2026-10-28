@@ -193,8 +193,14 @@ export function EnrollmentsPage() {
   const detalleDeLaPreinscrita = useEnrollment(preinscrita?._id);
   const [resumenCreada, setResumenCreada] = useState<{ definitiva: boolean } | null>(null);
 
-  // Lo que se pide a este estudiante en este grupo: con ello se sabe antes de guardar si la matrícula nace definitiva o condicional (el servidor decide igual).
-  const previstosQuery = useDocumentosPrevistos({ group_id: form.group_id || undefined, tipo_ingreso: form.tipo_ingreso, student_id: form.student_id || undefined });
+    const gradoEfectivoId = (gradoElegido?._id as string | undefined) || gradoDelGrupo || undefined;
+  // Lo que se pide a este estudiante en este grupo o grado: con ello se sabe antes de guardar si la matrícula nace definitiva o condicional (el servidor decide igual).
+  const previstosQuery = useDocumentosPrevistos({
+    group_id: form.group_id || undefined,
+    grade_id: gradoEfectivoId,
+    tipo_ingreso: form.tipo_ingreso,
+    student_id: form.student_id || undefined,
+  });
   const obligatoriosPorTraer = (previstosQuery.data ?? []).filter((d) => d.obligatorio && !d.ya_cubierto);
   // Sin obligatorios por recibir no hay nada que preguntar: nace definitiva. En una preinscrita se mira lo que le falta de su propio checklist.
   const checklistDeLaPreinscrita = detalleDeLaPreinscrita.data?.checklist;
@@ -771,6 +777,7 @@ export function EnrollmentsPage() {
 
             <DocumentosPrevistos
               groupId={form.group_id}
+              gradeId={gradoEfectivoId}
               tipoIngreso={form.tipo_ingreso}
               studentId={form.student_id || undefined}
               traeTodos={form.trae_todos}

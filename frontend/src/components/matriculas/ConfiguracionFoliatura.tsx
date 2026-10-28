@@ -26,12 +26,21 @@ function Formulario({ vista }: { vista: VistaFoliatura }) {
   const [mascara, setMascara] = useState(vista.mascara);
   const [motivo, setMotivo] = useState('');
 
+  const libroInicial = vista.libro_actual ?? vista.anio_de_referencia;
+  const capacidadInicial = vista.esquema === 'CONTINUO' ? vista.capacidad_por_libro : null;
   const libroNum = entero(libro);
   const ultimoNum = entero(ultimo);
   const capacidadNum = esquema === 'CONTINUO' && capacidad.trim() ? entero(capacidad) : null;
   const capacidadValida = esquema === 'ANUAL' || !capacidad.trim() || (capacidadNum !== null && capacidadNum >= 1);
   const valores = libroNum !== null && libroNum >= 1 && ultimoNum !== null && capacidadValida ? { libro: libroNum, ultimo: ultimoNum } : null;
-  const falta = vista.hay_folios_emitidos && motivo.trim().length < 10;
+  const huboCambios =
+    esquema !== vista.esquema ||
+    mascara.trim() !== vista.mascara ||
+    capacidadNum !== capacidadInicial ||
+    libroNum !== libroInicial ||
+    ultimoNum !== vista.ultimo_folio;
+  const pideMotivo = vista.hay_folios_emitidos && huboCambios;
+  const falta = pideMotivo && motivo.trim().length < 10;
 
   const proximo = valores ? siguienteDelFormulario({ esquema, libro: valores.libro, ultimoFolio: valores.ultimo, capacidad: capacidadNum }) : null;
   const codigoProximo = proximo ? renderizarMascara(mascara, { ...proximo, anio: vista.anio_de_referencia }) : null;
@@ -46,7 +55,7 @@ function Formulario({ vista }: { vista: VistaFoliatura }) {
       capacidad_por_libro: capacidadNum,
       libro_actual: valores.libro,
       ultimo_folio: valores.ultimo,
-      motivo: vista.hay_folios_emitidos ? motivo.trim() : undefined,
+      motivo: pideMotivo ? motivo.trim() : undefined,
     });
   }
 
@@ -124,7 +133,7 @@ function Formulario({ vista }: { vista: VistaFoliatura }) {
           </p>
         )}
 
-        {vista.hay_folios_emitidos && (
+        {pideMotivo && (
           <Textarea
             label="Motivo del cambio"
             required
@@ -138,7 +147,7 @@ function Formulario({ vista }: { vista: VistaFoliatura }) {
 
         {puede && (
           <div className="flex justify-end">
-            <Button type="submit" isLoading={actualizar.isPending} disabled={!valores || falta}>
+            <Button type="submit" isLoading={actualizar.isPending} disabled={!valores || falta || (vista.confirmada && !huboCambios)}>
               Guardar configuración
             </Button>
           </div>

@@ -18,6 +18,3 @@ export const CRITERIOS_INICIALES: CriterioConfigurado[] = CRITERIOS_DESEMPATE.ma
 
 /** Cuánta diferencia de ocupación (en puntos porcentuales) se tolera entre grupos paralelos antes de privilegiar el balance de repitentes, edades e inclusión. */
 export const TOLERANCIA_OCUPACION_POR_DEFECTO = 10;
-
-export const ESTADOS_ESPERA_REMATRICULA = ['EN_ESPERA', 'ASIGNADA', 'DESCARTADA'] as const;
-export type EstadoEsperaRematricula = (typeof ESTADOS_ESPERA_REMATRICULA)[number];

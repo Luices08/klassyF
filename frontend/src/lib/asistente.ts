@@ -148,7 +148,7 @@ export const PALABRAS_CLAVE_POR_RUTA: Record<string, { descripcion: string; clav
   },
   '/admin/promocion': {
     descripcion: 'Promoción y cierre del año: política del colegio (SIEE), cierre de la promoción por grupo y paso de los estudiantes al año siguiente.',
-    claves: ['promocion', 'promover', 'cierre del año', 'cerrar el año', 'reprobar', 'perdio el año', 'no promovido', 'repitente', 'año siguiente', 'rollover', 'pre matricula', 'reservar cupos', 'reglas de promocion', 'siee'],
+    claves: ['promocion', 'promover', 'cierre del año', 'cerrar el año', 'reprobar', 'perdio el año', 'no promovido', 'repitente', 'año siguiente', 'rollover', 'matricula del año siguiente', 'reglas de promocion', 'siee'],
   },
   '/admin/reportes-cierre': {
     descripcion: 'Reportes de cierre anual: sábana de calificaciones en Excel y PDF por año, sede, jornada, grado o grupo, e informe final del año por grupo con su publicación para las familias, y listados de estudiantes en recuperación final, de retirados del servicio social de décimo y once, la plantilla de cierre para SIMAT el balance anual de inclusión (PIAR) y el libro de calificaciones foliado.',
@@ -199,8 +199,8 @@ export const PALABRAS_CLAVE_POR_RUTA: Record<string, { descripcion: string; clav
     claves: ['paz y salvo', 'pazysalvo', 'fin de ano', 'estar a paz y salvo', 'debe libros', 'renovar matricula'],
   },
   '/secretaria/rematricula': {
-    descripcion: 'Rematrícula de fin de año por sede, grado o grupo: simula y confirma las pre-matrículas del año siguiente, lista de espera por falta de cupos y reglas de prioridad.',
-    claves: ['rematricula', 'rematricular', 'renovar matricula', 'matricula del ano siguiente', 'pasar de ano', 'pre matricula', 'prematricula', 'lista de espera', 'cupos del ano siguiente', 'repitentes', 'proyeccion de matricula'],
+    descripcion: 'Rematrícula de fin de año por sede, grado o grupo: simula y registra las matrículas definitivas del año siguiente. Los estudiantes sin aforo disponible quedan identificados como «Sin cupo».',
+    claves: ['rematricula', 'rematricular', 'renovar matricula', 'matricula del ano siguiente', 'pasar de ano', 'repitentes', 'proyeccion de matricula', 'sin cupo'],
   },
   '/secretaria/traslados': {
     descripcion: 'Traslados extemporáneos de estudiantes y homologación de las notas del colegio de procedencia.',

@@ -27,7 +27,7 @@ import { asignarFolio } from './foliatura.service';
 
 /** Consultan coordinación, administración y secretaría (esta solo de sus sedes). */
 const PUEDEN_CONSULTAR = [ROLES.ADMIN, ROLES.COORDINADOR, ROLES.SECRETARIA];
-/** Reservan los cupos el administrador y la secretaría (esta solo en sus sedes), cada uno con su contraseña. */
+/** Ejecutan el paso de año el administrador y la secretaría (esta solo en sus sedes), cada uno con su contraseña. */
 const PUEDEN_EJECUTAR = [ROLES.ADMIN, ROLES.SECRETARIA];
 
 /**
@@ -65,7 +65,6 @@ export interface FilaRollover {
   sede_id: string | null;
   jornada_id: string | null;
   grado_destino_id: string | null;
-  posicion_espera: number | null;
   paz_y_salvo: 'CONFIRMADO' | 'PENDIENTE';
 }
 
@@ -227,7 +226,6 @@ async function planificar(f: FiltrosRollover, alcance: 'TODAS' | string[]): Prom
       sede_id: null,
       jornada_id: null,
       grado_destino_id: null,
-      posicion_espera: null,
       paz_y_salvo: pazConfirmado.has(sid) ? 'CONFIRMADO' : 'PENDIENTE',
     };
 

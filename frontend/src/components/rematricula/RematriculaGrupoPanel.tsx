@@ -23,15 +23,14 @@ import {
   useSimulacionRollover,
 } from '../../hooks/usePromocion';
 
-const TONO_ESTADO: Record<EstadoFilaRollover, Tone> = { POR_CREAR: 'green', YA_TIENE_MATRICULA: 'neutral', EN_ESPERA: 'orange', SIN_CUPO: 'red', SIN_CONFIRMAR: 'orange', NO_APLICA: 'neutral' };
+const TONO_ESTADO: Record<EstadoFilaRollover, Tone> = { POR_CREAR: 'green', YA_TIENE_MATRICULA: 'neutral', SIN_CUPO: 'red', SIN_CONFIRMAR: 'orange', NO_APLICA: 'neutral' };
 
 const nombreDe = <T extends { _id: string; nombre: string }>(valor: string | T) => (typeof valor === 'string' ? valor : valor.nombre);
 
 /**
  * Rematrícula de fin de año por sede, grado y grupo (M19 → M04). Se elige el alcance en cascada (Sede → Grado → Grupo de origen, o todo el
- * grado), se SIMULA —no escribe nada— y solo entonces se confirma. Confirmar reserva cupo con PRE-matrículas (sin folio) en una sola
- * transacción: la secretaría las formaliza después en «Matrículas», donde el paz y salvo del año que termina es el candado y nace el folio. Quien
- * no alcanza cupo pasa a la lista de espera; quien espera recuperaciones (M18) no se proyecta.
+ * grado), se SIMULA —no escribe nada— y solo entonces se confirma. La confirmación registra matrículas definitivas, con Libro y Folio, en una sola
+ * transacción. Quien no alcanza capacidad aparece como «Sin cupo» y debe resolverse antes de volver a ejecutar; quien espera recuperaciones (M18) no se proyecta.
  */
 export function RematriculaGrupoPanel({ puedeEjecutar }: { puedeEjecutar: boolean }) {
   const { data: anios = [] } = useAniosLectivos();
@@ -46,7 +45,7 @@ export function RematriculaGrupoPanel({ puedeEjecutar }: { puedeEjecutar: boolea
   const [grupoId, setGrupoId] = useState('');
   const [modo, setModo] = useState<'' | ModoContinuidad>('');
   const [simulado, setSimulado] = useState<AlcanceRollover | null>(null);
-  const [reservando, setReservando] = useState(false);
+  const [confirmando, setConfirmando] = useState(false);
   const [resultado, setResultado] = useState<ResultadoRollover | null>(null);
 
   const origen = anios.find((a) => a._id === origenId);
@@ -148,19 +147,19 @@ export function RematriculaGrupoPanel({ puedeEjecutar }: { puedeEjecutar: boolea
         </div>
         <div className="mt-4 max-w-md">
           <Select
-            label="A quién se pre-matricula"
+            label="A quién se matricula"
             value={modo}
             onChange={(e) => cambiar(() => setModo(e.target.value as typeof modo))}
-            hint="Con la renovación de matrícula en uso, lo normal es solo quienes la familia confirmó (octubre)."
+            hint="La respuesta de continuidad determina a quién incluye el rollover; no reserva cupos ni crea matrículas."
           >
-            <option value="">Según el colegio (confirmados si usa la renovación)</option>
+            <option value="">Valor predeterminado (solo quienes confirmaron)</option>
             <option value="CONFIRMADOS">Solo a quienes confirmaron que continúan</option>
             <option value="TODOS">A todos los que su cierre deja seguir</option>
           </Select>
         </div>
         <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
           <p className="max-w-3xl text-xs text-muted">
-            Avanza por etapas: cada grupo o grado se proyecta sin esperar a los demás. Solo se pre-matricula a quien ya tiene un resultado final de promoción; quien espera
+            Avanza por etapas: cada grupo o grado se proyecta sin esperar a los demás. Solo se matricula a quien ya tiene un resultado final de promoción; quien espera
             recuperaciones (M18), comisión o notas queda fuera hasta que se resuelva.
           </p>
           <Button onClick={() => setSimulado(alcance)} disabled={!origenId || !destinoId} isLoading={plan.isFetching}>
@@ -192,7 +191,7 @@ export function RematriculaGrupoPanel({ puedeEjecutar }: { puedeEjecutar: boolea
               {plan.data.retirados > 0 && <Chip tone="neutral">Retirados: {plan.data.retirados}</Chip>}
             </div>
             {puedeEjecutar && (
-              <Button onClick={() => setReservando(true)} disabled={resumen.por_crear === 0}>
+              <Button onClick={() => setConfirmando(true)} disabled={resumen.por_crear === 0}>
                 Asentar matrículas definitivas
               </Button>
             )}
@@ -261,7 +260,7 @@ export function RematriculaGrupoPanel({ puedeEjecutar }: { puedeEjecutar: boolea
                   </Td>
                   <Td>{f.paz_y_salvo === 'CONFIRMADO' ? <Chip tone="green">Confirmado</Chip> : <Chip tone="orange">Pendiente</Chip>}</Td>
                   <Td>
-                    <Chip tone={TONO_ESTADO[f.estado]}>{f.estado === 'EN_ESPERA' && f.posicion_espera ? `Espera n.º ${f.posicion_espera}` : NOMBRES_ESTADO_ROLLOVER[f.estado]}</Chip>
+                    <Chip tone={TONO_ESTADO[f.estado]}>{NOMBRES_ESTADO_ROLLOVER[f.estado]}</Chip>
                     {f.motivo && <span className="mt-1 block text-xs text-muted">{f.motivo}</span>}
                   </Td>
                 </tr>
@@ -271,18 +270,18 @@ export function RematriculaGrupoPanel({ puedeEjecutar }: { puedeEjecutar: boolea
         </>
       )}
 
-      {reservando && simulado && plan.data && (
+      {confirmando && simulado && plan.data && (
         <ConfirmarRematricula
           alcance={{ ...simulado, origen_id: simulado.origen_id as string, destino_id: simulado.destino_id as string }}
           cantidad={plan.data.resumen.por_crear}
 
           anioDestino={plan.data.destino.year}
           alcanceTexto={simulado.group_id ? 'el grupo elegido' : simulado.grade_id ? 'el grado elegido' : 'las sedes elegidas'}
-          onClose={() => setReservando(false)}
+          onClose={() => setConfirmando(false)}
           onHecho={(r) => {
             setResultado(r);
             setSimulado(null);
-            setReservando(false);
+            setConfirmando(false);
           }}
         />
       )}

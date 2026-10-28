@@ -9,7 +9,7 @@ import { IconButton } from '../../components/ui/IconButton';
 import { PageHeader } from '../../components/ui/PageHeader';
 import { Spinner } from '../../components/ui/Spinner';
 import { EmptyRow, Table, TableBody, TableHead, Td, Th } from '../../components/ui/Table';
-import { FileTextIcon, PlusIcon, XCircleIcon } from '../../components/ui/icons';
+import { CheckCircleIcon, FileTextIcon, PlusIcon, XCircleIcon } from '../../components/ui/icons';
 import { Tabs } from '../../components/ui/Tabs';
 import { InscripcionDrawer } from '../../components/admisiones/InscripcionDrawer';
 import { SolicitudDocumentosDrawer } from '../../components/admisiones/SolicitudDocumentosDrawer';
@@ -23,14 +23,13 @@ import {
   useRechazarSolicitud,
   type AdmissionRequestsFilter,
 } from '../../hooks/useAdmissionRequests';
-import { useGrades } from '../../hooks/useCatalogs';
 import { ETIQUETA_JORNADA } from '../../hooks/useCertificados';
 import { useGroups } from '../../hooks/useGroups';
 import { ESTADOS_SOLICITUD, type AdmissionRequest, type EstadoSolicitud } from '../../types/domain';
 
 const ESTADO_TONE: Record<EstadoSolicitud, 'blue' | 'green' | 'red' | 'orange'> = {
   PENDIENTE: 'orange',
-  ADMITIDO: 'green',
+  ADMITIDO: 'blue',
   MATRICULADO: 'green',
   RECHAZADA: 'red',
 };
@@ -42,38 +41,32 @@ function nombreDe(v: string | { nombre: string }): string {
 function sedeYJornadaPedidas(s: AdmissionRequest): string {
   const sede = s.sede_deseada_id ? nombreDe(s.sede_deseada_id) : null;
   const jornada = s.jornada_deseada ? (ETIQUETA_JORNADA[s.jornada_deseada] ?? s.jornada_deseada) : null;
-  return [sede, jornada].filter(Boolean).join(' · ') || 'Sin preferencia';
+  return [sede, jornada].filter(Boolean).join(' · ') || 'Sin preferencia de sede ni jornada';
 }
 
 export function AdmissionRequestsPage() {
-  const { anio: anioTrabajo } = useAnioDeTrabajo();
-  const anioId = anioTrabajo?._id;
+  const { anio } = useAnioDeTrabajo();
+  const anioId = anio?._id;
+  const anioActualYear = anio?.year ?? new Date().getFullYear();
 
   const [pestana, setPestana] = useState<'solicitudes' | 'cupos'>('solicitudes');
   const [filterEstado, setFilterEstado] = useState<EstadoSolicitud | ''>('');
   const [filterAnio, setFilterAnio] = useState('');
-  const [filterGrado, setFilterGrado] = useState('');
-  const [busqueda, setBusqueda] = useState('');
   const [page, setPage] = useState(1);
 
   const aniosQuery = useAniosLectivos();
   const aniosAbiertos = [...(aniosQuery.data ?? [])].filter((a) => a.estado !== 'CERRADO').sort((a, b) => b.year - a.year);
-  const anioActualYear = anioTrabajo?.year ?? new Date().getFullYear();
-
-  const gradosQuery = useGrades('activo');
 
   const filter: AdmissionRequestsFilter = {
     estado: filterEstado || undefined,
     academic_year_id: filterAnio || undefined,
-    grade_id: filterGrado || undefined,
     page,
     limit: 20,
-    search: busqueda.trim() || undefined,
   };
   const listQuery = useAdmissionRequestsList(filter);
 
   const [inscribiendo, setInscribiendo] = useState(false);
-  const [solicitudDocumentos, setSolicitudDocumentos] = useState<AdmissionRequest | null>(null);
+  const [documentosDe, setDocumentosDe] = useState<AdmissionRequest | null>(null);
 
   // Formalización / Matrícula
   const [matriculando, setMatriculando] = useState<AdmissionRequest | null>(null);
@@ -98,7 +91,6 @@ export function AdmissionRequestsPage() {
   const [rechazando, setRechazando] = useState<AdmissionRequest | null>(null);
   const [motivo, setMotivo] = useState('');
 
-  // Sede y jornada preferida para ordenar grupos
   const sedePedida = matriculando?.sede_deseada_id ? (typeof matriculando.sede_deseada_id === 'string' ? matriculando.sede_deseada_id : matriculando.sede_deseada_id._id) : null;
   const gruposParaMatricular = (groupsQuery.data ?? [])
     .map((g) => ({
@@ -139,16 +131,24 @@ export function AdmissionRequestsPage() {
     setMotivo('');
   }
 
-  // Pestaña Cupos: selector de año
+  // Pestaña Cupos
   const [anioCuposId, setAnioCuposId] = useState('');
-  const anioCuposSeleccionado = anioCuposId || aniosAbiertos[0]?._id || anioId;
+  const anioCuposSeleccionado = anioCuposId || aniosAbiertos[0]?._id || anioId || '';
   const disponibilidadQuery = useDisponibilidadCupos(anioCuposSeleccionado);
+
+  const paginaInfo = listQuery.data;
 
   return (
     <div className="space-y-4">
       <PageHeader
-        title="Admisiones y Solicitudes de Cupo"
-        subtitle="Gestión de solicitudes radicadas, asignación reglamentaria de vacantes y control de aforo por salones."
+        title="Admisiones"
+        subtitle="Solicitudes de cupo radicadas por familias o registradas en el mostrador. Para el año en curso matricula directamente; para el año siguiente admite antes del cierre escolar."
+        action={
+          <Button onClick={() => setInscribiendo(true)}>
+            <PlusIcon className="h-4 w-4" />
+            Registrar inscripción
+          </Button>
+        }
       />
 
       <Tabs
@@ -157,314 +157,198 @@ export function AdmissionRequestsPage() {
           { key: 'cupos', label: 'Disponibilidad de cupos' },
         ]}
         value={pestana}
-        onChange={(v) => setPestana(v as 'solicitudes' | 'cupos')}
+        onChange={(k) => setPestana(k as typeof pestana)}
       />
 
       {pestana === 'solicitudes' && (
-        <>
-          <Card>
-            <CardHeader
-              title="Solicitudes de admisión"
-              subtitle="Revisa y gestiona los aspirantes. Para el año en curso puedes matricular directamente; para el año lectivo siguiente puedes admitir antes de formalizar en ventanilla."
-              action={
-                <Button  onClick={() => setInscribiendo(true)}>
-                  <PlusIcon className="mr-1 h-4 w-4" />
-                  Nueva inscripción en mostrador
-                </Button>
-              }
-            />
+        <Card>
+          <CardHeader
+            title="Solicitudes"
+            action={
+              <div className="flex flex-wrap items-end gap-3">
+                <Select
+                  label="Año"
+                  value={filterAnio}
+                  onChange={(e) => {
+                    setFilterAnio(e.target.value);
+                    setPage(1);
+                  }}
+                  className="w-40"
+                >
+                  <option value="">Todos</option>
+                  {aniosAbiertos.map((a) => (
+                    <option key={a._id} value={a._id}>
+                      {a.year} {a.estado === 'PLANIFICACION' ? '(próximo)' : ''}
+                    </option>
+                  ))}
+                </Select>
+                <Select
+                  label="Estado"
+                  value={filterEstado}
+                  onChange={(e) => {
+                    setFilterEstado(e.target.value as EstadoSolicitud | '');
+                    setPage(1);
+                  }}
+                  className="w-44"
+                >
+                  <option value="">Todos</option>
+                  {ESTADOS_SOLICITUD.map((e) => (
+                    <option key={e} value={e}>
+                      {e}
+                    </option>
+                  ))}
+                </Select>
+              </div>
+            }
+          />
 
-            {/* Filtros */}
-            <div className="grid grid-cols-1 gap-3 p-4 border-b border-border sm:grid-cols-4">
-              <Select label="Año lectivo" value={filterAnio} onChange={(e) => { setFilterAnio(e.target.value); setPage(1); }}>
-                <option value="">Todos los años</option>
-                {aniosAbiertos.map((a) => (
-                  <option key={a._id} value={a._id}>
-                    Año {a.year} ({a.estado})
-                  </option>
-                ))}
-              </Select>
+          {listQuery.isLoading && <Spinner />}
+          {listQuery.isError && <Alert tone="error">{errorMessage(listQuery.error)}</Alert>}
 
-              <Select label="Grado deseado" value={filterGrado} onChange={(e) => { setFilterGrado(e.target.value); setPage(1); }}>
-                <option value="">Todos los grados</option>
-                {(gradosQuery.data ?? []).map((g) => (
-                  <option key={g._id} value={g._id}>
-                    {g.nombre}
-                  </option>
-                ))}
-              </Select>
-
-              <Select label="Estado" value={filterEstado} onChange={(e) => { setFilterEstado(e.target.value as EstadoSolicitud); setPage(1); }}>
-                <option value="">Todos los estados</option>
-                {ESTADOS_SOLICITUD.map((est) => (
-                  <option key={est} value={est}>
-                    {est}
-                  </option>
-                ))}
-              </Select>
-
-              <Input
-                label="Buscar por nombre o documento"
-                placeholder="Nombre, apellido o documento..."
-                value={busqueda}
-                onChange={(e) => { setBusqueda(e.target.value); setPage(1); }}
-              />
-            </div>
-
-            {/* Tabla de solicitudes */}
-            <div className="overflow-x-auto">
+          {paginaInfo && (
+            <>
               <Table>
                 <TableHead>
                   <Th>Aspirante</Th>
-                  <Th>Grado y Año</Th>
-                  <Th>Sede y Jornada</Th>
+                  <Th>Documento</Th>
+                  <Th>Cupo que pidió</Th>
                   <Th>Acudiente</Th>
                   <Th>Documentos</Th>
+                  <Th>Fecha</Th>
                   <Th>Estado</Th>
-                  <Th className="text-right">Acciones</Th>
+                  <Th />
                 </TableHead>
                 <TableBody>
-                  {listQuery.isLoading && (
-                    <tr>
-                      <Td colSpan={7}>
-                        <div className="flex justify-center p-4">
-                          <Spinner />
-                        </div>
-                      </Td>
-                    </tr>
-                  )}
-                  {listQuery.isError && (
-                    <tr>
-                      <Td colSpan={7}>
-                        <Alert tone="error">{errorMessage(listQuery.error)}</Alert>
-                      </Td>
-                    </tr>
-                  )}
-                  {listQuery.data?.data.length === 0 && <EmptyRow colSpan={7}>No hay solicitudes con los filtros elegidos.</EmptyRow>}
-                  {listQuery.data?.data.map((sol) => {
-                    const solAnioYear = typeof sol.academic_year_id === 'object' && sol.academic_year_id
-                      ? (sol.academic_year_id as { year?: number }).year
+                  {paginaInfo.data.map((s) => {
+                    const solAnioYear = typeof s.academic_year_id === 'object' && s.academic_year_id
+                      ? (s.academic_year_id as { year?: number }).year
                       : undefined;
                     const esAnioSiguiente = solAnioYear !== undefined && solAnioYear > anioActualYear;
 
                     return (
-                      <tr key={sol._id} className="hover:bg-surface-hover">
+                      <tr key={s._id}>
+                        <Td className="font-medium text-ink">
+                          {s.nombre_aspirante} {s.apellido_aspirante}
+                        </Td>
                         <Td>
-                          <div className="font-semibold text-ink">
-                            {sol.nombre_aspirante} {sol.apellido_aspirante}
+                          {s.tipo_documento} {s.numero_documento}
+                        </Td>
+                        <Td>
+                          <span className="font-medium text-ink">{nombreDe(s.grado_deseado_id)}</span>
+                          <span className="block text-xs text-muted">
+                            {solAnioYear ? `Año ${solAnioYear} · ` : ''}{sedeYJornadaPedidas(s)}
+                          </span>
+                        </Td>
+                        <Td>
+                          {s.acudiente_nombre} {s.acudiente_apellido} · {s.acudiente_telefono}
+                        </Td>
+                        <Td>{s.documentos?.length ? `${s.documentos.length} recibido${s.documentos.length === 1 ? '' : 's'}` : '—'}</Td>
+                        <Td>{new Date(s.createdAt).toLocaleDateString()}</Td>
+                        <Td>
+                          <div className="flex flex-wrap items-center gap-1.5">
+                            <Chip tone={ESTADO_TONE[s.estado]}>{s.estado}</Chip>
+                            {s.origen === 'SECRETARIA' && <Chip tone="neutral">Mostrador</Chip>}
                           </div>
-                          <div className="text-xs text-muted">
-                            {sol.tipo_documento} {sol.numero_documento}
-                          </div>
                         </Td>
                         <Td>
-                          <div className="text-sm font-medium text-ink">{nombreDe(sol.grado_deseado_id)}</div>
-                          <div className="text-xs text-muted">
-                            {solAnioYear ? `Año ${solAnioYear}` : 'Vigencia actual'}
-                          </div>
-                        </Td>
-                        <Td>
-                          <span className="text-xs text-muted">{sedeYJornadaPedidas(sol)}</span>
-                        </Td>
-                        <Td>
-                          <div className="text-sm text-ink">{sol.acudiente_nombre} {sol.acudiente_apellido}</div>
-                          <div className="text-xs text-muted">{sol.acudiente_telefono}</div>
-                        </Td>
-                        <Td>
-                          <button
-                            type="button"
-                            onClick={() => setSolicitudDocumentos(sol)}
-                            className="inline-flex items-center gap-1.5 text-xs font-semibold text-primary hover:underline"
-                          >
-                            <FileTextIcon className="h-4 w-4" />
-                            <span>{sol.documentos?.length ?? 0} archivo(s)</span>
-                          </button>
-                        </Td>
-                        <Td>
-                          <Chip tone={ESTADO_TONE[sol.estado] ?? 'neutral'}>{sol.estado}</Chip>
-                        </Td>
-                        <Td className="text-right">
-                          <div className="flex items-center justify-end gap-1.5">
-                            {/* Solicitudes del año en curso */}
-                            {!esAnioSiguiente && sol.estado === 'PENDIENTE' && (
+                          <div className="flex justify-end gap-2">
+                            <IconButton
+                              tone="neutral"
+                              label="Documentos de la solicitud"
+                              icon={<FileTextIcon />}
+                              onClick={() => setDocumentosDe(s)}
+                            />
+
+                            {/* Solicitud del año en curso: aprobar y matricular de inmediato */}
+                            {!esAnioSiguiente && s.estado === 'PENDIENTE' && (
                               <>
-                                <Button
-                                  
+                                <IconButton
+                                  tone="success"
+                                  label="Aprobar y matricular"
+                                  icon={<CheckCircleIcon />}
                                   onClick={() => {
-                                    setMatriculando(sol);
                                     setGroupId('');
                                     setTraeTodos('');
                                     setFechaLimiteCompromiso('');
+                                    setMatriculando(s);
                                   }}
-                                >
-                                  Aprobar y Matricular
-                                </Button>
+                                />
                                 <IconButton
-                                  label="Rechazar solicitud"
                                   tone="danger"
+                                  label="Rechazar solicitud"
                                   icon={<XCircleIcon />}
-                                  onClick={() => setRechazando(sol)}
+                                  onClick={() => setRechazando(s)}
                                 />
                               </>
                             )}
 
-                            {/* Solicitudes del año siguiente */}
-                            {esAnioSiguiente && sol.estado === 'PENDIENTE' && (
+                            {/* Solicitud del año siguiente: admitir o rechazar */}
+                            {esAnioSiguiente && s.estado === 'PENDIENTE' && (
                               <>
-                                <Button
-                                  
-                                  variant="secondary"
-                                  disabled={admitir.isPending}
-                                  onClick={() => handleAdmitir(sol)}
-                                >
-                                  Admitir
-                                </Button>
                                 <IconButton
-                                  label="Rechazar solicitud"
+                                  tone="edit"
+                                  label="Admitir aspirante para el año entrante"
+                                  icon={<CheckCircleIcon />}
+                                  disabled={admitir.isPending}
+                                  onClick={() => void handleAdmitir(s)}
+                                />
+                                <IconButton
                                   tone="danger"
+                                  label="Rechazar solicitud"
                                   icon={<XCircleIcon />}
-                                  onClick={() => setRechazando(sol)}
+                                  onClick={() => setRechazando(s)}
                                 />
                               </>
                             )}
 
-                            {/* Solicitudes ya admitidas (del año siguiente) para formalizar cuando asisten a ventanilla */}
-                            {sol.estado === 'ADMITIDO' && (
-                              <Button
-                                
+                            {/* Solicitud ya admitida del año entrante: formalizar en ventanilla */}
+                            {s.estado === 'ADMITIDO' && (
+                              <IconButton
+                                tone="success"
+                                label="Formalizar matrícula en ventanilla"
+                                icon={<CheckCircleIcon />}
                                 onClick={() => {
-                                  setMatriculando(sol);
                                   setGroupId('');
                                   setTraeTodos('');
                                   setFechaLimiteCompromiso('');
+                                  setMatriculando(s);
                                 }}
-                              >
-                                Formalizar y Matricular
-                              </Button>
-                            )}
-
-                            {sol.estado === 'MATRICULADO' && (
-                              <span className="text-xs text-success font-medium">Matrícula formalizada</span>
-                            )}
-                            {sol.estado === 'RECHAZADA' && (
-                              <span className="text-xs text-error font-medium truncate max-w-[120px]" title={sol.motivo_rechazo ?? ''}>
-                                {sol.motivo_rechazo ?? 'Rechazada'}
-                              </span>
+                              />
                             )}
                           </div>
                         </Td>
                       </tr>
                     );
                   })}
+                  {paginaInfo.data.length === 0 && <EmptyRow colSpan={8}>Sin solicitudes con los filtros seleccionados.</EmptyRow>}
                 </TableBody>
               </Table>
-            </div>
-          </Card>
 
-          {/* Drawer: Formalizar Matrícula / Aprobar y Matricular */}
-          <Drawer
-            open={matriculando !== null}
-            title={matriculando?.estado === 'ADMITIDO' ? 'Formalizar matrícula en ventanilla' : 'Aprobar y matricular aspirante'}
-            subtitle={matriculando ? `${matriculando.nombre_aspirante} ${matriculando.apellido_aspirante} · ${matriculando.tipo_documento} ${matriculando.numero_documento}` : undefined}
-            size="md"
-            onClose={() => setMatriculando(null)}
-            onSubmit={handleMatricular}
-            submitLabel="Asentar matrícula y folio"
-            isSubmitting={matricular.isPending}
-            submitDisabled={!groupId || !traeTodos || (traeTodos === 'NO' && !fechaLimiteCompromiso)}
-          >
-            {matricular.isError && <Alert tone="error">{errorMessage(matricular.error)}</Alert>}
-
-            {matriculando && (
-              <div className="space-y-4">
-                <div className="rounded-lg border border-border p-3 space-y-1 bg-surface-subtle text-xs">
-                  <p><strong>Grado:</strong> {nombreDe(matriculando.grado_deseado_id)}</p>
-                  <p><strong>Preferencia:</strong> {sedeYJornadaPedidas(matriculando)}</p>
-                  <p><strong>Acudiente:</strong> {matriculando.acudiente_nombre} {matriculando.acudiente_apellido} ({matriculando.acudiente_telefono})</p>
+              {paginaInfo.pages > 1 && (
+                <div className="mt-3 flex items-center justify-between text-sm text-muted">
+                  <span>
+                    Página {paginaInfo.page} de {paginaInfo.pages} ({paginaInfo.total} solicitudes)
+                  </span>
+                  <div className="flex gap-2">
+                    <Button variant="secondary" disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>
+                      Anterior
+                    </Button>
+                    <Button variant="secondary" disabled={page >= paginaInfo.pages} onClick={() => setPage((p) => p + 1)}>
+                      Siguiente
+                    </Button>
+                  </div>
                 </div>
-
-                <Select
-                  label="Salón / Grupo asignado"
-                  required
-                  value={groupId}
-                  onChange={(e) => setGroupId(e.target.value)}
-                >
-                  <option value="">Selecciona un grupo con cupo disponible...</option>
-                  {gruposParaMatricular.map(({ g, loPedido }) => {
-                    const cuposLibres = Math.max(0, g.max_capacity - g.cupos_ocupados);
-                    return (
-                      <option key={g._id} value={g._id} disabled={cuposLibres <= 0}>
-                        {g.nomenclatura} — {cuposLibres} cupo(s) libre(s)
-                        {loPedido ? ' (coincide con sede y jornada pedidas)' : ''}
-                      </option>
-                    );
-                  })}
-                </Select>
-
-                {/* Documentos previstos según grado */}
-                <DocumentosPrevistos
-                  groupId={groupId}
-                  tipoIngreso="NUEVO"
-                  traeTodos={traeTodos}
-                  onChange={(v) => setTraeTodos(v)}
-                />
-
-                {traeTodos === 'NO' && (
-                  <Input
-                    label="Fecha límite del acta de compromiso"
-                    type="date"
-                    required
-                    min={new Date().toISOString().slice(0, 10)}
-                    value={fechaLimiteCompromiso}
-                    onChange={(e) => setFechaLimiteCompromiso(e.target.value)}
-                    hint="La matrícula nace condicional. Plazo máximo legal para que el acudiente radique los documentos adeudados."
-                  />
-                )}
-
-                {traeTodos === 'SI' && (
-                  <Alert tone="success">
-                    La matrícula quedará asentada como <strong>DEFINITIVA</strong> en el sistema, generando Libro y Folio reglamentario.
-                  </Alert>
-                )}
-              </div>
-            )}
-          </Drawer>
-
-          {/* Drawer: Rechazar solicitud */}
-          <Drawer
-            open={rechazando !== null}
-            title="Rechazar solicitud"
-            onClose={() => setRechazando(null)}
-            onSubmit={handleRechazar}
-            submitLabel="Confirmar rechazo"
-            isSubmitting={rechazar.isPending}
-            submitDisabled={!motivo.trim()}
-          >
-            {rechazar.isError && <Alert tone="error">{errorMessage(rechazar.error)}</Alert>}
-            <p className="text-sm text-ink mb-3">
-              Indica el motivo por el cual no se concede el cupo a {rechazando?.nombre_aspirante} {rechazando?.apellido_aspirante}.
-              La familia podrá visualizar este mensaje en la consulta pública.
-            </p>
-            <Input
-              label="Motivo del rechazo"
-              required
-              value={motivo}
-              onChange={(e) => setMotivo(e.target.value)}
-              placeholder="Ej: No disponibilidad de cupo en la sede solicitada..."
-            />
-          </Drawer>
-
-          <InscripcionDrawer open={inscribiendo} onClose={() => setInscribiendo(false)} />
-          <SolicitudDocumentosDrawer solicitud={solicitudDocumentos} onClose={() => setSolicitudDocumentos(null)} />
-        </>
+              )}
+            </>
+          )}
+        </Card>
       )}
 
-      {/* Pestaña: Disponibilidad de cupos (Tabla limpia de 4 columnas) */}
+      {/* Pestaña: Disponibilidad de cupos (4 columnas reglamentarias) */}
       {pestana === 'cupos' && (
         <Card>
           <CardHeader
             title="Disponibilidad de cupos"
-            subtitle="Cálculo directo de capacidad y vacantes reales. Capacidad Total − Matriculados Reales = Cupos Libres."
             action={
               <div className="flex items-center gap-2">
                 <span className="text-xs font-semibold text-muted">Vigencia:</span>
@@ -507,7 +391,7 @@ export function AdmissionRequestsPage() {
                     <EmptyRow colSpan={5}>No hay grupos configurados para este año lectivo.</EmptyRow>
                   ) : (
                     disponibilidadQuery.data.filas.map((f, i) => (
-                      <tr key={i} className="hover:bg-surface-hover">
+                      <tr key={i}>
                         <Td>
                           <div className="font-semibold text-ink">{f.grado.nombre}</div>
                           <div className="text-xs text-muted">{f.sede.nombre} · {f.jornada.nombre}</div>
@@ -515,23 +399,9 @@ export function AdmissionRequestsPage() {
                         <Td className="text-center text-sm font-semibold">{f.capacidad_total}</Td>
                         <Td className="text-center text-sm">{f.matriculados_reales}</Td>
                         <Td className="text-center text-sm text-orange-600 font-medium">{f.solicitudes_espera}</Td>
-                        <Td className="text-center text-sm font-bold text-ink">
-                          <span className={f.cupos_libres > 0 ? 'text-success font-bold' : 'text-error font-bold'}>
-                            {f.cupos_libres}
-                          </span>
-                        </Td>
+                        <Td className="text-center text-sm font-bold text-ink">{f.cupos_libres}</Td>
                       </tr>
                     ))
-                  )}
-                  {/* Totales */}
-                  {disponibilidadQuery.data.filas.length > 0 && (
-                    <tr className="bg-surface-subtle font-bold border-t-2 border-border">
-                      <Td className="text-ink font-bold">TOTALES INSTITUCIONALES</Td>
-                      <Td className="text-center text-sm font-bold text-ink">{disponibilidadQuery.data.totales.capacidad_total}</Td>
-                      <Td className="text-center text-sm font-bold text-ink">{disponibilidadQuery.data.totales.matriculados_reales}</Td>
-                      <Td className="text-center text-sm font-bold text-orange-600">{disponibilidadQuery.data.totales.solicitudes_espera}</Td>
-                      <Td className="text-center text-sm font-bold text-success">{disponibilidadQuery.data.totales.cupos_libres}</Td>
-                    </tr>
                   )}
                 </TableBody>
               </Table>
@@ -539,6 +409,90 @@ export function AdmissionRequestsPage() {
           </div>
         </Card>
       )}
+
+      {/* Drawer: Formalizar Matrícula / Aprobar */}
+      {matriculando && (
+        <Drawer
+          open
+          title={`Formalizar Matrícula — ${matriculando.nombre_aspirante} ${matriculando.apellido_aspirante}`}
+          size="lg"
+          onClose={() => setMatriculando(null)}
+          onSubmit={handleMatricular}
+          submitLabel={traeTodos === 'SI' ? 'Asentar Matrícula Definitiva' : traeTodos === 'NO' ? 'Asentar Matrícula Condicional' : 'Selecciona entrega de documentos'}
+          submitDisabled={!groupId || !traeTodos || (traeTodos === 'NO' && !fechaLimiteCompromiso)}
+          isSubmitting={matricular.isPending}
+        >
+          {matricular.isError && <Alert tone="error">{errorMessage(matricular.error)}</Alert>}
+
+          <div className="space-y-4">
+            <div className="rounded-lg border border-border p-3 text-sm space-y-1 bg-surface-subtle">
+              <div><strong>Aspirante:</strong> {matriculando.nombre_aspirante} {matriculando.apellido_aspirante} ({matriculando.tipo_documento} {matriculando.numero_documento})</div>
+              <div><strong>Grado deseado:</strong> {nombreDe(matriculando.grado_deseado_id)}</div>
+              <div><strong>Preferencia:</strong> {sedeYJornadaPedidas(matriculando)}</div>
+            </div>
+
+            <Select
+              label="Grupo asignado"
+              required
+              value={groupId}
+              onChange={(e) => setGroupId(e.target.value)}
+              hint={groupsQuery.isLoading ? 'Cargando grupos...' : !groupsQuery.data?.length ? 'No hay grupos activos en este grado.' : undefined}
+            >
+              <option value="">Selecciona el grupo...</option>
+              {gruposParaMatricular.map(({ g, loPedido }) => (
+                <option key={g._id} value={g._id}>
+                  {g.nomenclatura} · {typeof g.sede_id === 'object' ? g.sede_id.nombre : 'Sede'} · {typeof g.jornada_id === 'object' ? g.jornada_id.nombre : 'Jornada'} ({g.cupos_ocupados}/{g.max_capacity} cupos) {loPedido ? '★ Preferido' : ''}
+                </option>
+              ))}
+            </Select>
+
+            <DocumentosPrevistos
+              groupId={groupId}
+              tipoIngreso="NUEVO"
+              traeTodos={traeTodos}
+              onChange={setTraeTodos}
+            />
+            {traeTodos === 'NO' && (
+              <Input
+                label="Fecha límite del compromiso"
+                type="date"
+                required
+                value={fechaLimiteCompromiso}
+                onChange={(e) => setFechaLimiteCompromiso(e.target.value)}
+                hint="Plazo otorgado al acudiente para entregar los documentos pendientes."
+              />
+            )}
+
+            <Alert tone="info">
+              Al formalizar la matrícula, el sistema asignará correlativamente el <strong>Libro</strong> y <strong>Folio</strong> correspondiente y creará la cuenta institucional del estudiante y acudiente.
+            </Alert>
+          </div>
+        </Drawer>
+      )}
+
+      {/* Drawer: Rechazar */}
+      {rechazando && (
+        <Drawer
+          open
+          title={`Rechazar Solicitud — ${rechazando.nombre_aspirante} ${rechazando.apellido_aspirante}`}
+          onClose={() => setRechazando(null)}
+          onSubmit={handleRechazar}
+          submitLabel="Confirmar Rechazo"
+          isSubmitting={rechazar.isPending}
+        >
+          {rechazar.isError && <Alert tone="error">{errorMessage(rechazar.error)}</Alert>}
+          <Input
+            label="Motivo del rechazo"
+            required
+            value={motivo}
+            onChange={(e) => setMotivo(e.target.value)}
+            placeholder="Ej: No disponibilidad de cupo en la sede solicitada..."
+          />
+        </Drawer>
+      )}
+
+      <InscripcionDrawer open={inscribiendo} onClose={() => setInscribiendo(false)} />
+      <SolicitudDocumentosDrawer solicitud={documentosDe} onClose={() => setDocumentosDe(null)} />
     </div>
   );
 }

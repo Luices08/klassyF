@@ -1,27 +1,33 @@
 import { type FormEvent, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Alert, errorMessage } from '../../components/ui/Alert';
+import { Chip } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import { Drawer } from '../../components/ui/Drawer';
-import { Input, Select } from '../../components/ui/Field';
+import { Input, Select, Textarea } from '../../components/ui/Field';
 import { Spinner } from '../../components/ui/Spinner';
-import { Chip } from '../../components/ui/Badge';
-import { SitioRenderizado } from '../../components/sitioPublico/SitioRenderizado';
-import { useEstadoSolicitud, useOfertaDeAdmision, useSolicitarCupo, type CredencialesPreinscripcion } from '../../hooks/useAdmissionRequests';
+import { UploadIcon } from '../../components/ui/icons';
+import { InformacionApoyoCampos } from '../../components/inclusion/InformacionApoyoCampos';
 import { SelectoresDeOferta } from '../../components/admisiones/SelectoresDeOferta';
+import { SitioRenderizado } from '../../components/sitioPublico/SitioRenderizado';
+import {
+  useEstadoSolicitud,
+  useOfertaDeAdmision,
+  useSolicitarCupo,
+  type CredencialesPreinscripcion,
+} from '../../hooks/useAdmissionRequests';
 import { usePublicInstitutionInfo } from '../../hooks/usePublicInfo';
 import { urlImagenSitio, useSitioPublico } from '../../hooks/useSitioPublico';
-import { TIPOS_DOCUMENTO, type Jornada, type TipoDocumento } from '../../types/domain';
 import { CONFIGURACION_SITIO_INICIAL } from '../../types/sitioPublico';
-import { InformacionApoyoCampos } from '../../components/inclusion/InformacionApoyoCampos';
 import { APOYO_VACIO, aApoyoDeclarado } from '../../lib/apoyoDeclarado';
+import { TIPOS_DOCUMENTO, type Jornada, type TipoDocumento } from '../../types/domain';
 
 const SOLICITUD_VACIA = {
   primer_nombre: '',
   segundo_nombre: '',
   primer_apellido: '',
   segundo_apellido: '',
-  tipo_documento: 'RC' as TipoDocumento,
+  tipo_documento: 'TI' as TipoDocumento,
   numero_documento: '',
   fecha_nacimiento: '',
   grado_deseado_id: '',
@@ -48,9 +54,12 @@ export function HomePage() {
   const [paso, setPaso] = useState<1 | 2>(1);
   const [form, setForm] = useState(SOLICITUD_VACIA);
 
-  // Selector explícito de año: año en curso vs año lectivo siguiente
-  const anioReferencia = ofertaQuery.data?.anio?.year ?? new Date().getFullYear();
-  const [tipoAnio, setTipoAnio] = useState<'EN_CURSO' | 'SIGUIENTE'>('EN_CURSO');
+  // Años abiertos: solo si hay más de 1 año en el sistema (ej. 2026 en curso y 2027 en planificación) se muestra el selector
+  const aniosDisponibles = ofertaQuery.data?.anios_disponibles;
+  const anioSiguiente = aniosDisponibles?.find((a) => a.es_siguiente);
+
+  const [anioSeleccionadoId, setAnioSeleccionadoId] = useState('');
+  const idAnioFinal = anioSeleccionadoId || aniosDisponibles?.[0]?.id || ofertaQuery.data?.anio?.id || '';
 
   // Archivos obligatorios del paso 2
   const [archivoDoc, setArchivoDoc] = useState<File | null>(null);
@@ -62,6 +71,7 @@ export function HomePage() {
   function reiniciarSolicitud() {
     setForm(SOLICITUD_VACIA);
     setPaso(1);
+    setAnioSeleccionadoId('');
     setArchivoDoc(null);
     setArchivoCert(null);
     setErrorArchivos(null);
@@ -96,6 +106,7 @@ export function HomePage() {
       }
     });
 
+    if (idAnioFinal) formData.append('academic_year_id', idAnioFinal);
     if (form.segundo_nombre.trim()) formData.set('segundo_nombre', form.segundo_nombre.trim());
     if (form.segundo_apellido.trim()) formData.set('segundo_apellido', form.segundo_apellido.trim());
 
@@ -104,8 +115,8 @@ export function HomePage() {
       formData.append('apoyo_declarado', JSON.stringify(apoyoObj));
     }
 
-    if (archivoDoc) formData.append('documento_identidad', archivoDoc);
-    if (archivoCert) formData.append('certificado_notas', archivoCert);
+    formData.append('documento_identidad', archivoDoc);
+    formData.append('certificado_notas', archivoCert);
 
     await solicitar.mutateAsync(formData);
   }
@@ -136,6 +147,8 @@ export function HomePage() {
   const config = sitio ?? CONFIGURACION_SITIO_INICIAL;
   const imagenes = (sitio?.imagenes ?? []).map(urlImagenSitio);
 
+  const esSiguienteSeleccionado = anioSiguiente && idAnioFinal === anioSiguiente.id;
+
   return (
     <>
       <SitioRenderizado
@@ -149,14 +162,16 @@ export function HomePage() {
             setSolicitarOpen(true);
           },
           consultar: () => setConsultarOpen(true),
-          irA: (ruta) => navigate(ruta),
+          irA: (ruta: string) => navigate(ruta),
         }}
       />
 
       {/* Drawer: Solicitar cupo en 2 pasos */}
       <Drawer
         open={solicitarOpen}
-        title={paso === 1 ? 'Solicitar cupo — Paso 1: Datos generales' : 'Solicitar cupo — Paso 2: Documentación obligatoria'}
+        title={paso === 1 ? 'Solicitar cupo / Preinscripción' : 'Documentación obligatoria'}
+        subtitle={paso === 1 ? 'Paso 1 de 2: Datos generales del aspirante y acudiente' : 'Paso 2 de 2: Adjuntar requisitos documentales'}
+        size="lg"
         onClose={() => {
           setSolicitarOpen(false);
           reiniciarSolicitud();
@@ -171,7 +186,7 @@ export function HomePage() {
         {solicitar.isSuccess ? (
           <div className="space-y-4">
             <Alert tone="success">
-              {tipoAnio === 'SIGUIENTE'
+              {esSiguienteSeleccionado
                 ? 'La inscripción quedó radicada y la asignación de cupos se informará tras el cierre del año escolar vigente, invitando a consultar nuevamente en esa fecha.'
                 : 'Solicitud enviada correctamente con tu documentación. La secretaría académica revisará la solicitud y podrás consultar el estado con el documento del aspirante.'}
             </Alert>
@@ -181,113 +196,116 @@ export function HomePage() {
           </div>
         ) : paso === 1 ? (
           <>
-            {/* Selector de año lectivo */}
-            <div className="rounded-lg border border-border p-3 space-y-2 bg-surface-subtle">
-              <label className="text-xs font-bold uppercase tracking-wider text-muted">¿Para qué año lectivo solicitas el cupo?</label>
-              <div className="grid grid-cols-2 gap-2">
-                <button
-                  type="button"
-                  onClick={() => setTipoAnio('EN_CURSO')}
-                  className={`rounded-md border p-2.5 text-center text-sm font-medium transition ${
-                    tipoAnio === 'EN_CURSO'
-                      ? 'border-primary bg-primary/10 text-primary font-semibold'
-                      : 'border-border bg-surface text-ink hover:bg-surface-hover'
-                  }`}
-                >
-                  Año en curso ({anioReferencia})
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setTipoAnio('SIGUIENTE')}
-                  className={`rounded-md border p-2.5 text-center text-sm font-medium transition ${
-                    tipoAnio === 'SIGUIENTE'
-                      ? 'border-primary bg-primary/10 text-primary font-semibold'
-                      : 'border-border bg-surface text-ink hover:bg-surface-hover'
-                  }`}
-                >
-                  Año siguiente ({anioReferencia + 1})
-                </button>
+            {/* Selector de año: solo se muestra si el colegio ya creó el año siguiente en planificación */}
+            {aniosDisponibles && aniosDisponibles.length > 1 && (
+              <div className="flex items-center gap-2 rounded-lg border border-border p-3 bg-surface">
+                <span className="text-xs font-semibold text-muted">¿Para qué año lectivo solicitas el cupo?</span>
+                <div className="flex flex-wrap gap-2">
+                  {aniosDisponibles.map((a) => (
+                    <button
+                      key={a.id}
+                      type="button"
+                      onClick={() => setAnioSeleccionadoId(a.id)}
+                      className={`px-3 py-1 text-xs font-semibold rounded-md border transition ${
+                        idAnioFinal === a.id
+                          ? 'border-primary bg-primary-soft text-primary'
+                          : 'border-border bg-surface text-ink hover:bg-soft'
+                      }`}
+                    >
+                      Año {a.year} {a.es_siguiente ? '(próximo año)' : '(en curso)'}
+                    </button>
+                  ))}
+                </div>
               </div>
-            </div>
+            )}
 
-            <Input label="Primer nombre del aspirante" required maxLength={60} value={form.primer_nombre} onChange={(e) => setForm((f) => ({ ...f, primer_nombre: e.target.value }))} />
-            <Input label="Segundo nombre" maxLength={60} value={form.segundo_nombre} onChange={(e) => setForm((f) => ({ ...f, segundo_nombre: e.target.value }))} />
-            <Input label="Primer apellido del aspirante" required maxLength={60} value={form.primer_apellido} onChange={(e) => setForm((f) => ({ ...f, primer_apellido: e.target.value }))} />
-            <Input label="Segundo apellido" maxLength={60} value={form.segundo_apellido} onChange={(e) => setForm((f) => ({ ...f, segundo_apellido: e.target.value }))} />
-            <Select
-              label="Tipo de documento"
-              value={form.tipo_documento}
-              onChange={(e) => setForm((f) => ({ ...f, tipo_documento: e.target.value as TipoDocumento }))}
-            >
-              {TIPOS_DOCUMENTO.map((t) => (
-                <option key={t} value={t}>
-                  {t}
-                </option>
-              ))}
-            </Select>
-            <Input
-              label="Número de documento"
-              required
-              value={form.numero_documento}
-              onChange={(e) => setForm((f) => ({ ...f, numero_documento: e.target.value }))}
-            />
-            <Input
-              label="Fecha de nacimiento"
-              type="date"
-              required
-              value={form.fecha_nacimiento}
-              onChange={(e) => setForm((f) => ({ ...f, fecha_nacimiento: e.target.value }))}
-            />
-            <SelectoresDeOferta valor={form} onChange={(cambios) => setForm((f) => ({ ...f, ...cambios }))} />
-            <Input
-              label="Nombres del acudiente"
-              required
-              value={form.acudiente_nombre}
-              onChange={(e) => setForm((f) => ({ ...f, acudiente_nombre: e.target.value }))}
-            />
-            <Input
-              label="Apellidos del acudiente"
-              required
-              value={form.acudiente_apellido}
-              onChange={(e) => setForm((f) => ({ ...f, acudiente_apellido: e.target.value }))}
-            />
-            <Select
-              label="Tipo de documento del acudiente"
-              value={form.acudiente_tipo_documento}
-              onChange={(e) => setForm((f) => ({ ...f, acudiente_tipo_documento: e.target.value as TipoDocumento }))}
-            >
-              {TIPOS_DOCUMENTO.map((t) => (
-                <option key={t} value={t}>
-                  {t}
-                </option>
-              ))}
-            </Select>
-            <Input
-              label="Número de documento del acudiente"
-              required
-              value={form.acudiente_numero_documento}
-              onChange={(e) => setForm((f) => ({ ...f, acudiente_numero_documento: e.target.value }))}
-              hint="Con él se abrirá tu acceso a la plataforma cuando el colegio confirme la matrícula."
-            />
-            <Input
-              label="Teléfono del acudiente"
-              required
-              value={form.acudiente_telefono}
-              onChange={(e) => setForm((f) => ({ ...f, acudiente_telefono: e.target.value }))}
-            />
-            <Input
-              label="Correo del acudiente"
-              type="email"
-              required
-              value={form.acudiente_email}
-              onChange={(e) => setForm((f) => ({ ...f, acudiente_email: e.target.value }))}
-            />
-            <Input
-              label="Observaciones (opcional)"
-              value={form.observaciones}
-              onChange={(e) => setForm((f) => ({ ...f, observaciones: e.target.value }))}
-            />
+            <fieldset className="space-y-3 rounded-lg border border-border p-3">
+              <legend className="px-1 text-sm font-semibold text-ink">Aspirante</legend>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <Input label="Primer nombre" required maxLength={60} value={form.primer_nombre} onChange={(e) => setForm((f) => ({ ...f, primer_nombre: e.target.value }))} />
+                <Input label="Segundo nombre" maxLength={60} value={form.segundo_nombre} onChange={(e) => setForm((f) => ({ ...f, segundo_nombre: e.target.value }))} />
+                <Input label="Primer apellido" required maxLength={60} value={form.primer_apellido} onChange={(e) => setForm((f) => ({ ...f, primer_apellido: e.target.value }))} />
+                <Input label="Segundo apellido" maxLength={60} value={form.segundo_apellido} onChange={(e) => setForm((f) => ({ ...f, segundo_apellido: e.target.value }))} />
+                <Select
+                  label="Tipo de documento"
+                  value={form.tipo_documento}
+                  onChange={(e) => setForm((f) => ({ ...f, tipo_documento: e.target.value as TipoDocumento }))}
+                >
+                  {TIPOS_DOCUMENTO.map((t) => (
+                    <option key={t} value={t}>
+                      {t}
+                    </option>
+                  ))}
+                </Select>
+                <Input
+                  label="Número de documento"
+                  required
+                  value={form.numero_documento}
+                  onChange={(e) => setForm((f) => ({ ...f, numero_documento: e.target.value }))}
+                />
+                <Input
+                  label="Fecha de nacimiento"
+                  type="date"
+                  required
+                  max={new Date().toISOString().slice(0, 10)}
+                  value={form.fecha_nacimiento}
+                  onChange={(e) => setForm((f) => ({ ...f, fecha_nacimiento: e.target.value }))}
+                />
+                <SelectoresDeOferta valor={form} onChange={(cambios) => setForm((f) => ({ ...f, ...cambios }))} />
+              </div>
+            </fieldset>
+
+            <fieldset className="space-y-3 rounded-lg border border-border p-3">
+              <legend className="px-1 text-sm font-semibold text-ink">Acudiente</legend>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <Input
+                  label="Nombres"
+                  required
+                  value={form.acudiente_nombre}
+                  onChange={(e) => setForm((f) => ({ ...f, acudiente_nombre: e.target.value }))}
+                />
+                <Input
+                  label="Apellidos"
+                  required
+                  value={form.acudiente_apellido}
+                  onChange={(e) => setForm((f) => ({ ...f, acudiente_apellido: e.target.value }))}
+                />
+                <Select
+                  label="Tipo de documento"
+                  value={form.acudiente_tipo_documento}
+                  onChange={(e) => setForm((f) => ({ ...f, acudiente_tipo_documento: e.target.value as TipoDocumento }))}
+                >
+                  {TIPOS_DOCUMENTO.map((t) => (
+                    <option key={t} value={t}>
+                      {t}
+                    </option>
+                  ))}
+                </Select>
+                <Input
+                  label="Número de documento"
+                  required
+                  value={form.acudiente_numero_documento}
+                  onChange={(e) => setForm((f) => ({ ...f, acudiente_numero_documento: e.target.value }))}
+                  hint="Con él se abrirá tu acceso a la plataforma cuando el colegio confirme la matrícula."
+                />
+                <Input
+                  label="Teléfono"
+                  required
+                  value={form.acudiente_telefono}
+                  onChange={(e) => setForm((f) => ({ ...f, acudiente_telefono: e.target.value }))}
+                />
+                <Input
+                  label="Correo electrónico"
+                  type="email"
+                  required
+                  value={form.acudiente_email}
+                  onChange={(e) => setForm((f) => ({ ...f, acudiente_email: e.target.value }))}
+                />
+              </div>
+            </fieldset>
+
             <InformacionApoyoCampos valor={form.apoyo} onChange={(apoyo) => setForm((f) => ({ ...f, apoyo }))} />
+            <Textarea label="Observaciones (opcional)" rows={2} value={form.observaciones} onChange={(e) => setForm((f) => ({ ...f, observaciones: e.target.value }))} />
           </>
         ) : (
           <div className="space-y-4">
@@ -295,48 +313,98 @@ export function HomePage() {
               Para tramitar la solicitud de cupo, adjunta a continuación la documentación obligatoria requerida por la institución (formatos permitidos: PDF, JPG, PNG).
             </Alert>
 
-            <div className="rounded-lg border border-border p-4 space-y-2">
-              <label className="text-sm font-semibold text-ink flex items-center justify-between">
-                <span>Fotocopia del Documento de Identidad del aspirante *</span>
-                {archivoDoc && <Chip tone="green">Cargado</Chip>}
-              </label>
-              <p className="text-xs text-muted">Registro civil, tarjeta de identidad o documento de extranjería del menor.</p>
-              <input
-                type="file"
-                accept=".pdf,.png,.jpg,.jpeg,.webp"
-                required
-                onChange={(e) => setArchivoDoc(e.target.files?.[0] ?? null)}
-                className="w-full text-sm text-ink file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-primary file:text-white hover:file:opacity-90 cursor-pointer"
-              />
-              {archivoDoc && <p className="text-xs text-ink/80 font-mono">Archivo: {archivoDoc.name}</p>}
-            </div>
+            <fieldset className="space-y-2 rounded-lg border border-border p-3">
+              <legend className="px-1 text-sm font-semibold text-ink">Documentación obligatoria</legend>
+              <ul className="divide-y divide-border">
+                {/* Documento 1: Fotocopia de identidad */}
+                <li className="flex items-center justify-between gap-3 py-3">
+                  <div>
+                    <div className="text-sm font-medium text-ink">Fotocopia del Documento de Identidad</div>
+                    <div className="text-xs text-muted">Registro civil, tarjeta de identidad o cédula de extranjería del aspirante · Obligatorio</div>
+                  </div>
+                  {archivoDoc ? (
+                    <div className="flex items-center gap-2">
+                      <Chip tone="green">Adjunto</Chip>
+                      <span className="max-w-[140px] truncate text-xs text-ink" title={archivoDoc.name}>
+                        {archivoDoc.name}
+                      </span>
+                      <button
+                        type="button"
+                        className="text-xs font-semibold text-danger hover:underline"
+                        onClick={() => setArchivoDoc(null)}
+                      >
+                        Quitar
+                      </button>
+                    </div>
+                  ) : (
+                    <label className="inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-full bg-soft text-body transition hover:bg-border/80 hover:text-primary" title="Adjuntar documento de identidad">
+                      <input
+                        type="file"
+                        className="hidden"
+                        accept=".pdf,image/png,image/jpeg,image/webp"
+                        aria-label="Adjuntar fotocopia de documento de identidad"
+                        onChange={(e) => {
+                          const f = e.target.files?.[0];
+                          if (f) setArchivoDoc(f);
+                        }}
+                      />
+                      <UploadIcon className="h-4 w-4" />
+                    </label>
+                  )}
+                </li>
 
-            <div className="rounded-lg border border-border p-4 space-y-2">
-              <label className="text-sm font-semibold text-ink flex items-center justify-between">
-                <span>Certificado de notas o boletín del colegio anterior *</span>
-                {archivoCert && <Chip tone="green">Cargado</Chip>}
-              </label>
-              <p className="text-xs text-muted">Boletín del último periodo o certificado oficial de calificaciones cursadas.</p>
-              <input
-                type="file"
-                accept=".pdf,.png,.jpg,.jpeg,.webp"
-                required
-                onChange={(e) => setArchivoCert(e.target.files?.[0] ?? null)}
-                className="w-full text-sm text-ink file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-primary file:text-white hover:file:opacity-90 cursor-pointer"
-              />
-              {archivoCert && <p className="text-xs text-ink/80 font-mono">Archivo: {archivoCert.name}</p>}
-            </div>
+                {/* Documento 2: Certificado de notas o boletín */}
+                <li className="flex items-center justify-between gap-3 py-3">
+                  <div>
+                    <div className="text-sm font-medium text-ink">Certificado de notas o boletín escolar</div>
+                    <div className="text-xs text-muted">Boletín del último periodo o certificado oficial del colegio anterior · Obligatorio</div>
+                  </div>
+                  {archivoCert ? (
+                    <div className="flex items-center gap-2">
+                      <Chip tone="green">Adjunto</Chip>
+                      <span className="max-w-[140px] truncate text-xs text-ink" title={archivoCert.name}>
+                        {archivoCert.name}
+                      </span>
+                      <button
+                        type="button"
+                        className="text-xs font-semibold text-danger hover:underline"
+                        onClick={() => setArchivoCert(null)}
+                      >
+                        Quitar
+                      </button>
+                    </div>
+                  ) : (
+                    <label className="inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-full bg-soft text-body transition hover:bg-border/80 hover:text-primary" title="Adjuntar certificado de notas">
+                      <input
+                        type="file"
+                        className="hidden"
+                        accept=".pdf,image/png,image/jpeg,image/webp"
+                        aria-label="Adjuntar certificado de notas"
+                        onChange={(e) => {
+                          const f = e.target.files?.[0];
+                          if (f) setArchivoCert(f);
+                        }}
+                      />
+                      <UploadIcon className="h-4 w-4" />
+                    </label>
+                  )}
+                </li>
+              </ul>
+            </fieldset>
 
-            <div className="flex justify-between pt-2">
-              <Button type="button" variant="outline" onClick={() => setPaso(1)}>
-                ← Volver al paso 1
+            <div className="flex justify-start">
+              <Button variant="secondary" onClick={() => setPaso(1)}>
+                Volver al Paso 1
               </Button>
             </div>
           </div>
         )}
       </Drawer>
 
-      <ConsultarEstadoDrawer open={consultarOpen} onClose={() => setConsultarOpen(false)} />
+      <ConsultarEstadoDrawer
+        open={consultarOpen}
+        onClose={() => setConsultarOpen(false)}
+      />
     </>
   );
 }
@@ -365,8 +433,7 @@ function ConsultarEstadoDrawer({ open, onClose }: { open: boolean; onClose: () =
   }
 
   const resultado = estadoQuery.data;
-  const esSiguiente = Boolean(resultado?.academic_year?.es_anio_siguiente);
-  const anioTexto = resultado?.academic_year ? String(resultado.academic_year.year) : 'el próximo año';
+  const esSiguiente = resultado?.academic_year?.es_anio_siguiente ?? false;
 
   return (
     <Drawer
@@ -402,7 +469,7 @@ function ConsultarEstadoDrawer({ open, onClose }: { open: boolean; onClose: () =
                 resultado.estado === 'MATRICULADO'
                   ? 'green'
                   : resultado.estado === 'ADMITIDO'
-                  ? 'green'
+                  ? 'blue'
                   : resultado.estado === 'RECHAZADA'
                   ? 'red'
                   : 'orange'
@@ -412,30 +479,28 @@ function ConsultarEstadoDrawer({ open, onClose }: { open: boolean; onClose: () =
             </Chip>
           </div>
 
-          {/* Mensajes dinámicos contextuales según año y estado */}
+          {/* Mensajes contextuales según año y estado */}
           {esSiguiente && resultado.estado === 'PENDIENTE' && (
             <Alert tone="info">
-              La inscripción quedó radicada y la asignación de cupos se informará tras el cierre del año escolar vigente,
-              invitando a consultar nuevamente en esa fecha.
+              La inscripción quedó radicada y la asignación de cupos se informará tras el cierre del año escolar vigente, invitando a consultar nuevamente en esa fecha.
             </Alert>
           )}
 
           {esSiguiente && resultado.estado === 'ADMITIDO' && (
             <Alert tone="success">
-              ¡Felicitaciones! El aspirante ha sido <strong>ADMITIDO</strong> para el año escolar {anioTexto}. Por favor acércate a la
-              ventanilla de secretaría académica en las fechas establecidas para formalizar la matrícula con los documentos físicos.
+              ¡Felicitaciones! Has sido <strong>ADMITIDO</strong> para el año escolar entrante. Preséntate en ventanilla de secretaría académica en las fechas establecidas para asentar la matrícula.
             </Alert>
           )}
 
           {!esSiguiente && resultado.estado === 'PENDIENTE' && (
             <Alert tone="info">
-              Tu solicitud de cupo para el año escolar {anioTexto} está en trámite y se encuentra pendiente de revisión por secretaría académica.
+              Tu solicitud está en trámite y se encuentra pendiente de revisión por secretaría académica.
             </Alert>
           )}
 
           {!esSiguiente && resultado.estado === 'ADMITIDO' && (
             <Alert tone="success">
-              ¡Felicitaciones! El aspirante ha sido <strong>ADMITIDO</strong>. Presenta los documentos en ventanilla para formalizar la matrícula.
+              ¡Felicitaciones! Has sido <strong>ADMITIDO</strong>. Presenta los documentos en ventanilla para formalizar la matrícula.
             </Alert>
           )}
 
@@ -456,7 +521,7 @@ function ConsultarEstadoDrawer({ open, onClose }: { open: boolean; onClose: () =
 
           {resultado.documentos && resultado.documentos.length > 0 && (
             <div className="rounded-lg border border-border p-3 space-y-1">
-              <span className="text-xs font-semibold text-muted uppercase">Documentos anexados:</span>
+              <span className="text-xs font-semibold text-muted uppercase">Documentos radicados:</span>
               <ul className="text-xs space-y-1 text-ink">
                 {resultado.documentos.map((d) => (
                   <li key={d.tipo_documento} className="flex justify-between">

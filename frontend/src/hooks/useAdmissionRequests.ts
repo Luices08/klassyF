@@ -12,7 +12,15 @@ import type {
 
 // --- Sitio público (sin autenticar) ---
 
+export interface AnioOferta {
+  id: string;
+  year: number;
+  estado: string;
+  es_siguiente: boolean;
+}
+
 export interface OfertaDeAdmision {
+  anios_disponibles?: AnioOferta[];
   anio: { id: string; year: number } | null;
   oferta: Array<{ grado: { id: string; nombre: string; numero: number }; sede: { id: string; nombre: string }; jornada: Jornada }>;
 }

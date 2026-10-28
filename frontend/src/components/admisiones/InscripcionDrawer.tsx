@@ -8,13 +8,14 @@ import { Spinner } from '../ui/Spinner';
 import { UploadIcon } from '../ui/icons';
 import { InformacionApoyoCampos } from '../inclusion/InformacionApoyoCampos';
 import { useRegistrarInscripcion, useSubirDocumentoSolicitud } from '../../hooks/useAdmissionRequests';
-import { useGrades } from '../../hooks/useCatalogs';
+import { useAniosLectivos } from '../../hooks/useAniosLectivos';
 import { SelectoresDeOferta } from './SelectoresDeOferta';
 import { useDocumentosPrevistos } from '../../hooks/useEnrollments';
 import { APOYO_VACIO, aApoyoDeclarado } from '../../lib/apoyoDeclarado';
 import { PARENTESCOS, TIPOS_DOCUMENTO, type Jornada, type Parentesco, type TipoDocumento } from '../../types/domain';
 
 const FORM_VACIO = {
+  academic_year_id: '',
   primer_nombre: '',
   segundo_nombre: '',
   primer_apellido: '',
@@ -48,11 +49,13 @@ interface Props {
 }
 
 /**
- * Inscripción en el mostrador (M04): secretaría o administración registran la misma solicitud que la familia radica por el sitio público, con el documento
- * del acudiente y los documentos que trae ese día. No crea cuenta ni matrícula ni consume cupo: queda PENDIENTE en la bandeja, donde se aprueba o se rechaza.
+ * Inscripción en el mostrador (M04): secretaría o administración registran la misma solicitud que la familia radica por el sitio público,
+ * con el documento del acudiente y los documentos que trae ese día. Queda PENDIENTE en la bandeja.
  */
 export function InscripcionDrawer({ open, onClose }: Props) {
-  const grados = useGrades('activo');
+  const aniosQuery = useAniosLectivos();
+  const aniosAbiertos = [...(aniosQuery.data ?? [])].filter((a) => a.estado !== 'CERRADO').sort((a, b) => b.year - a.year);
+
   const registrar = useRegistrarInscripcion();
   const subirDocumento = useSubirDocumentoSolicitud();
 
@@ -60,9 +63,9 @@ export function InscripcionDrawer({ open, onClose }: Props) {
   const [archivos, setArchivos] = useState<Record<string, File>>({});
   const [resultado, setResultado] = useState<Resultado | null>(null);
 
-  // Los documentos que el colegio pide a un aspirante nuevo del grado elegido (el mismo catálogo de la matrícula).
+  const anioActivoId = form.academic_year_id || aniosAbiertos[0]?._id || '';
+
   const previstos = useDocumentosPrevistos({ grade_id: form.grado_deseado_id || undefined, tipo_ingreso: 'NUEVO' });
-  const nombreDeGrado = (grados.data ?? []).find((g) => g._id === form.grado_deseado_id)?.nombre;
 
   const set = <K extends keyof typeof FORM_VACIO>(clave: K, valor: (typeof FORM_VACIO)[K]) => setForm((f) => ({ ...f, [clave]: valor }));
 
@@ -78,6 +81,7 @@ export function InscripcionDrawer({ open, onClose }: Props) {
     e.preventDefault();
     registrar.reset();
     const solicitud = await registrar.mutateAsync({
+      academic_year_id: anioActivoId || undefined,
       primer_nombre: form.primer_nombre.trim(),
       segundo_nombre: form.segundo_nombre.trim() || undefined,
       primer_apellido: form.primer_apellido.trim(),
@@ -99,7 +103,6 @@ export function InscripcionDrawer({ open, onClose }: Props) {
       apoyo_declarado: aApoyoDeclarado(form.apoyo),
     });
 
-    // La solicitud ya existe: si un archivo falla no se pierde nada, se puede subir después desde «Documentos».
     const fallidos: string[] = [];
     for (const [tipoDocumento, file] of Object.entries(archivos)) {
       try {
@@ -122,7 +125,7 @@ export function InscripcionDrawer({ open, onClose }: Props) {
     <Drawer
       open={open}
       title={resultado ? 'Inscripción registrada' : 'Registrar inscripción'}
-      subtitle={resultado ? undefined : 'Una inscripción reserva el interés de la familia: no crea la cuenta ni la matrícula.'}
+      subtitle={resultado ? undefined : 'Radica la solicitud del aspirante en ventanilla sin apartar cupos ficticios ni crear matrícula prematura.'}
       size="lg"
       onClose={cerrar}
       onSubmit={resultado ? undefined : enviar}
@@ -149,6 +152,27 @@ export function InscripcionDrawer({ open, onClose }: Props) {
       ) : (
         <>
           {registrar.isError && <Alert tone="error">{errorMessage(registrar.error)}</Alert>}
+
+          {/* Selector de Año Lectivo */}
+          <div className="rounded-lg border border-border p-3 space-y-2 bg-surface-subtle">
+            <label className="text-xs font-bold uppercase tracking-wider text-muted">Año lectivo de la inscripción</label>
+            <div className="flex flex-wrap gap-2">
+              {aniosAbiertos.map((a) => (
+                <button
+                  key={a._id}
+                  type="button"
+                  onClick={() => set('academic_year_id', a._id)}
+                  className={`px-3 py-1.5 text-xs font-semibold rounded-md border transition ${
+                    (form.academic_year_id || anioActivoId) === a._id
+                      ? 'border-primary bg-primary/10 text-primary'
+                      : 'border-border bg-surface text-ink hover:bg-surface-hover'
+                  }`}
+                >
+                  Año {a.year} ({a.estado})
+                </button>
+              ))}
+            </div>
+          </div>
 
           <fieldset className="space-y-3 rounded-lg border border-border p-3">
             <legend className="px-1 text-sm font-semibold text-ink">Aspirante</legend>
@@ -182,11 +206,11 @@ export function InscripcionDrawer({ open, onClose }: Props) {
                   </option>
                 ))}
               </Select>
-              <Input label="Número de documento" required value={form.acudiente_numero_documento} onChange={(e) => set('acudiente_numero_documento', e.target.value)} hint="Con él se crea la ficha del acudiente." />
+              <Input label="Número de documento" required value={form.acudiente_numero_documento} onChange={(e) => set('acudiente_numero_documento', e.target.value)} />
               <Select label="Parentesco" value={form.acudiente_parentesco} onChange={(e) => set('acudiente_parentesco', e.target.value as Parentesco)}>
                 {PARENTESCOS.map((p) => (
                   <option key={p} value={p}>
-                    {p.replace('_', ' ')}
+                    {p}
                   </option>
                 ))}
               </Select>
@@ -195,69 +219,47 @@ export function InscripcionDrawer({ open, onClose }: Props) {
             </div>
           </fieldset>
 
-          <fieldset className="space-y-2 rounded-lg border border-border p-3">
-            <legend className="px-1 text-sm font-semibold text-ink">Documentos que trae hoy</legend>
-            {!form.grado_deseado_id && <p className="text-xs text-muted">Elige el grado para ver qué documentos se piden.</p>}
-            {form.grado_deseado_id && previstos.isLoading && <Spinner />}
-            {form.grado_deseado_id && previstos.isError && <Alert tone="error">{errorMessage(previstos.error)}</Alert>}
-            {form.grado_deseado_id && previstos.data && (
-              <>
-                <p className="text-xs text-muted">
-                  Los que pide el colegio a un aspirante nuevo de {nombreDeGrado}. Adjunta los que la familia entregue; el resto se recibe después. Todo queda por revisar al aprobar la solicitud.
-                </p>
-                <ul className="divide-y divide-border">
-                  {previstos.data.map((d) => {
-                    const archivo = archivos[d.tipo_documento];
-                    return (
-                      <li key={d.tipo_documento} className="flex items-center justify-between gap-3 py-2">
-                        <div>
-                          <div className="text-sm font-medium text-ink">{d.nombre}</div>
-                          <div className="text-xs text-muted">{d.obligatorio ? 'Obligatorio' : 'Opcional'}</div>
+          <fieldset className="space-y-3 rounded-lg border border-border p-3">
+            <legend className="px-1 text-sm font-semibold text-ink">Documentos que entrega hoy</legend>
+            {!form.grado_deseado_id ? (
+              <p className="text-xs text-muted">Elige el grado para ver qué documentos le corresponden al estudiante.</p>
+            ) : previstos.isLoading ? (
+              <Spinner />
+            ) : (
+              <ul className="space-y-2">
+                {(previstos.data ?? []).map((d) => {
+                  const cargado = archivos[d.tipo_documento];
+                  return (
+                    <li key={d.tipo_documento} className="flex flex-wrap items-center justify-between gap-2 rounded border border-border p-2 text-sm">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium text-ink">{d.nombre}</span>
+                          <Chip tone={d.obligatorio ? 'blue' : 'neutral'}>{d.obligatorio ? 'Obligatorio' : 'Opcional'}</Chip>
                         </div>
-                        {archivo ? (
-                          <div className="flex items-center gap-2">
-                            <Chip tone="green">Adjunto</Chip>
-                            <span className="max-w-[140px] truncate text-xs text-ink" title={archivo.name}>
-                              {archivo.name}
-                            </span>
-                            <button
-                              type="button"
-                              className="text-xs font-semibold text-danger hover:underline"
-                              onClick={() =>
-                                setArchivos((prev) => {
-                                  const { [d.tipo_documento]: _quitado, ...resto } = prev;
-                                  return resto;
-                                })
-                              }
-                            >
-                              Quitar
-                            </button>
-                          </div>
-                        ) : (
-                          <label className="inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-full bg-soft text-body transition hover:bg-border/80 hover:text-primary" title="Adjuntar archivo">
-                            <input
-                              type="file"
-                              className="hidden"
-                              accept=".pdf,image/png,image/jpeg,image/webp"
-                              aria-label={`Adjuntar ${d.nombre}`}
-                              onChange={(e) => {
-                                const f = e.target.files?.[0];
-                                if (f) setArchivos((prev) => ({ ...prev, [d.tipo_documento]: f }));
-                              }}
-                            />
-                            <UploadIcon className="h-4 w-4" />
-                          </label>
-                        )}
-                      </li>
-                    );
-                  })}
-                </ul>
-              </>
+                        {cargado && <p className="truncate text-xs text-muted">{cargado.name}</p>}
+                      </div>
+                      <label className="inline-flex cursor-pointer items-center gap-1.5 rounded border border-border bg-surface px-2.5 py-1 text-xs font-semibold text-ink hover:bg-surface-hover">
+                        <UploadIcon className="h-3.5 w-3.5" />
+                        <span>{cargado ? 'Cambiar' : 'Adjuntar'}</span>
+                        <input
+                          type="file"
+                          accept=".pdf,.png,.jpg,.jpeg,.webp"
+                          className="hidden"
+                          onChange={(e) => {
+                            const f = e.target.files?.[0];
+                            if (f) setArchivos((prev) => ({ ...prev, [d.tipo_documento]: f }));
+                          }}
+                        />
+                      </label>
+                    </li>
+                  );
+                })}
+              </ul>
             )}
           </fieldset>
 
+          <Textarea label="Observaciones (opcional)" value={form.observaciones} onChange={(e) => set('observaciones', e.target.value)} />
           <InformacionApoyoCampos valor={form.apoyo} onChange={(apoyo) => set('apoyo', apoyo)} />
-          <Textarea label="Observaciones (opcional)" rows={2} value={form.observaciones} onChange={(e) => set('observaciones', e.target.value)} />
         </>
       )}
     </Drawer>

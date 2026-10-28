@@ -10,13 +10,13 @@ import { registrarEvento } from './audit.service';
 import { generarChecklistDesdeCatalogo } from './requisitoDocumental.service';
 
 /**
- * Documentos que se reciben con una solicitud de admisión, antes de que exista la matrícula (M04): la inscripción en el mostrador trae, por ejemplo,
+ * Documentos que se reciben con una solicitud de admisión, antes de que exista la matrícula (M04): la inscripción en el mostrador o pública trae, por ejemplo,
  * la identidad del estudiante y del acudiente y el boletín del grado anterior. Al aprobar la solicitud pasan al checklist de la matrícula como
  * CARGADO (por revisar), así no se vuelven a pedir. La API nunca devuelve la ruta del archivo: se baja con sesión por su propia ruta.
  */
 
-// Una solicitud ya aprobada tiene matrícula (sus documentos se cargan ahí); una rechazada no recibe nada.
-const ESTADOS_QUE_ADMITEN_DOCUMENTOS = ['PENDIENTE', 'EN_REVISION', 'CUPO_RESERVADO', 'EN_ESPERA'];
+// Una solicitud ya formalizada tiene matrícula (sus documentos se cargan ahí); una rechazada no recibe nada.
+const ESTADOS_QUE_ADMITEN_DOCUMENTOS = ['PENDIENTE', 'ADMITIDO'];
 
 async function cargarSolicitud(id: string): Promise<AdmissionRequestDocument> {
   const solicitud = await AdmissionRequest.findById(id);
@@ -26,7 +26,7 @@ async function cargarSolicitud(id: string): Promise<AdmissionRequestDocument> {
 
 function exigirQueAdmitaDocumentos(solicitud: AdmissionRequestDocument): void {
   if (!ESTADOS_QUE_ADMITEN_DOCUMENTOS.includes(solicitud.estado)) {
-    throw new ApiError(409, 'La solicitud ya fue aprobada o rechazada: los documentos de una aprobada se cargan en su matrícula.');
+    throw new ApiError(409, 'La solicitud ya fue formalizada o rechazada: los documentos de una matriculada se cargan en su matrícula.');
   }
 }
 
@@ -55,14 +55,11 @@ const borrarSinRomper = async (ruta: string): Promise<void> => {
 export async function subirDocumentoDeSolicitud(
   solicitudId: string,
   tipoDocumento: string,
-  archivo: { buffer: Buffer; mimetype: string },
-  usuario: { id: Types.ObjectId | string }
+  archivo: { buffer: Buffer; mimetype: string; originalname?: string },
+  usuario?: { id: Types.ObjectId | string } | null
 ): Promise<AdmissionRequestDocument> {
   const solicitud = await cargarSolicitud(solicitudId);
   exigirQueAdmitaDocumentos(solicitud);
-  if (!(await documentosQuePideLaSolicitud(solicitud)).includes(tipoDocumento)) {
-    throw new ApiError(400, 'Ese documento no se pide para el grado de esta solicitud.');
-  }
   const firma = detectarFirmaArchivo(archivo.mimetype, archivo.buffer);
   if (!firma) throw new ApiError(400, 'El archivo no es un PDF, JPG, PNG o WEBP válido.');
 
@@ -73,15 +70,22 @@ export async function subirDocumentoDeSolicitud(
   const ruta = path.relative(process.cwd(), destino);
 
   const anterior = solicitud.documentos.find((d) => d.tipo_documento === tipoDocumento);
-  // La ruta vieja se guarda antes de reasignar: `anterior` es el propio subdocumento y quedaría apuntando al archivo nuevo.
   const rutaAnterior = anterior?.archivo_path;
-  const nuevo = { tipo_documento: tipoDocumento, archivo_path: ruta, cargado_por: new Types.ObjectId(usuario.id), fecha_carga: new Date() };
+  const nuevo = {
+    tipo_documento: tipoDocumento,
+    archivo_path: ruta,
+    nombre_original: archivo.originalname || null,
+    cargado_por: usuario?.id ? new Types.ObjectId(usuario.id) : null,
+    fecha_carga: new Date(),
+  };
   if (anterior) Object.assign(anterior, nuevo);
   else solicitud.documentos.push(nuevo);
   await solicitud.save();
   if (rutaAnterior && rutaAnterior !== ruta) await borrarSinRomper(rutaAnterior);
 
-  await registrarEvento({ usuario_id: usuario.id, accion: 'SOLICITUD_DOCUMENTO_CARGADO', entidad: 'AdmissionRequest', entidad_id: solicitud._id, detalle: tipoDocumento });
+  if (usuario?.id) {
+    await registrarEvento({ usuario_id: usuario.id, accion: 'SOLICITUD_DOCUMENTO_CARGADO', entidad: 'AdmissionRequest', entidad_id: solicitud._id, detalle: tipoDocumento });
+  }
   return solicitud;
 }
 

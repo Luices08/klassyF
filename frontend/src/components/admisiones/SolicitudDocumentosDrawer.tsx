@@ -21,7 +21,7 @@ export function SolicitudDocumentosDrawer({ solicitud, onClose }: { solicitud: A
   const subir = useSubirDocumentoSolicitud();
   const quitar = useQuitarDocumentoSolicitud();
 
-  const enTramite = solicitud?.estado === 'PENDIENTE' || solicitud?.estado === 'EN_REVISION';
+  const enTramite = solicitud?.estado === 'PENDIENTE' || solicitud?.estado === 'ADMITIDO';
   const recibido = (tipo: string) => solicitud?.documentos?.find((d) => d.tipo_documento === tipo);
 
   async function verArchivo(tipo: string) {

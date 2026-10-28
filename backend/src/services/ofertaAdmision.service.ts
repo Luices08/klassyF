@@ -6,7 +6,7 @@ import JornadaOperativa from '../models/jornadaOperativa.model';
 import ApiError from '../utils/ApiError';
 import { ESTADO_ACTIVO } from '../utils/filtroEstado';
 import { motivoDeOfertaNoDisponible, OpcionDeOferta, PedidoDeCupo } from '../utils/ofertaDeAdmision';
-import { anioDeLaAdmision } from './prematricula.service';
+import { anioDeLaAdmision } from './admissionRequest.service';
 
 /**
  * La oferta de admisión (M04): qué grados hay en qué sedes y jornadas, según los grupos activos del año al que apunta una solicitud nueva (el siguiente si la

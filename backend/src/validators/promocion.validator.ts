@@ -190,6 +190,9 @@ export const listarEvaluaciones: ValidationSchema = {
 
 export const idParam: ValidationSchema = { params: Joi.object({ id: objectId.required() }) };
 
+export const simularRollover: ValidationSchema = {
+  query: Joi.object({ origen_id: objectId.required(), destino_id: objectId.required(), sede_id: objectId, grade_id: objectId, group_id: objectId, continuidad: Joi.string().valid('CONFIRMADOS', 'TODOS') }),
+};
 export const simulacionRollover: ValidationSchema = {
   query: Joi.object({ origen_id: objectId.required(), destino_id: objectId.required(), sede_id: objectId, grade_id: objectId, group_id: objectId, continuidad: Joi.string().valid('CONFIRMADOS', 'TODOS') }),
 };

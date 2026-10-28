@@ -14,6 +14,7 @@ import { Tabs } from '../../components/ui/Tabs';
 import { InscripcionDrawer } from '../../components/admisiones/InscripcionDrawer';
 import { SolicitudDocumentosDrawer } from '../../components/admisiones/SolicitudDocumentosDrawer';
 import { DocumentosPrevistos, type TraeTodos } from '../../components/matriculas/DocumentosPrevistos';
+import { api } from '../../lib/apiClient';
 import { useAnioDeTrabajo, useAniosLectivos } from '../../hooks/useAniosLectivos';
 import {
   useAdmissionRequestsList,
@@ -88,6 +89,7 @@ export function AdmissionRequestsPage() {
   const matricular = useAprobarSolicitud();
   const rechazar = useRechazarSolicitud();
 
+  const [archivosFormalizacion, setArchivosFormalizacion] = useState<Record<string, File>>({});
   const [rechazando, setRechazando] = useState<AdmissionRequest | null>(null);
   const [motivo, setMotivo] = useState('');
 
@@ -105,6 +107,21 @@ export function AdmissionRequestsPage() {
     e.preventDefault();
     if (!matriculando || !anioDeMatricula || !groupId || !traeTodos) return;
     matricular.reset();
+
+    // Si se adjuntaron archivos en la formalización, subirlos primero a la solicitud
+    const listaArchivos = Object.entries(archivosFormalizacion);
+    if (listaArchivos.length > 0) {
+      for (const [tipo, file] of listaArchivos) {
+        try {
+          const formData = new FormData();
+          formData.append('file', file);
+          await api.upload(`/admission-requests/${matriculando._id}/documentos/${tipo}`, formData);
+        } catch (err) {
+          console.error(`Error al subir documento ${tipo}:`, err);
+        }
+      }
+    }
+
     await matricular.mutateAsync({
       id: matriculando._id,
       group_id: groupId,
@@ -113,6 +130,7 @@ export function AdmissionRequestsPage() {
       fecha_limite_compromiso: traeTodos === 'NO' ? fechaLimiteCompromiso : undefined,
     });
     setMatriculando(null);
+    setArchivosFormalizacion({});
     setGroupId('');
     setTraeTodos('');
     setFechaLimiteCompromiso('');
@@ -416,7 +434,7 @@ export function AdmissionRequestsPage() {
           open
           title={`Formalizar Matrícula — ${matriculando.nombre_aspirante} ${matriculando.apellido_aspirante}`}
           size="lg"
-          onClose={() => setMatriculando(null)}
+          onClose={() => { setMatriculando(null); setArchivosFormalizacion({}); }}
           onSubmit={handleMatricular}
           submitLabel={traeTodos === 'SI' ? 'Asentar Matrícula Definitiva' : traeTodos === 'NO' ? 'Asentar Matrícula Condicional' : 'Selecciona entrega de documentos'}
           submitDisabled={!groupId || !traeTodos || (traeTodos === 'NO' && !fechaLimiteCompromiso)}
@@ -451,6 +469,16 @@ export function AdmissionRequestsPage() {
               tipoIngreso="NUEVO"
               traeTodos={traeTodos}
               onChange={setTraeTodos}
+              archivos={archivosFormalizacion}
+              onArchivoChange={(tipo, file) => {
+                setArchivosFormalizacion((prev) => {
+                  if (!file) {
+                    const { [tipo]: _quitado, ...resto } = prev;
+                    return resto;
+                  }
+                  return { ...prev, [tipo]: file };
+                });
+              }}
             />
             {traeTodos === 'NO' && (
               <Input

@@ -1271,6 +1271,23 @@ Backend `/sitio-publico` (ADMIN; modelos `SitioPublico` —una configuración po
 - **Vista previa en vivo** con el borrador sin guardar (`SitioRenderizado` con `vistaPrevia`: los enlaces no navegan). Si la plantilla elegida tiene carrusel pero aún no se guardó, las imágenes se ven en la vista previa solo después de guardar. Pruebas: `tests/sitioPublico.test.ts`. La interfaz compila (`tsc -b`) pero **no se probó en un navegador**.
 - **Pendiente, a propósito**: textos del hero editables, reordenar las imágenes del carrusel, más plantillas, subir fuentes propias.
 
+### Términos y condiciones de uso
+
+- **Cuatro documentos, una sola fuente: el backend** (`constants/terminos.ts`, `DOCUMENTOS_TERMINOS`): `GENERAL`, `DOCENTE`, `ESTUDIANTE` (también lo acepta el ACUDIENTE) y `ADMINISTRATIVO`
+  (ADMIN, COORDINADOR, COORDINADOR_CONVIVENCIA, ORIENTADOR, SECRETARIA); el mapeo es `TERMINOS_POR_ROL` y `tiposExigidos(rol)` = generales + los del perfil. Se leen sin sesión por
+  `GET /public/terminos`. El texto usa `{institucion}` (lo reemplaza el frontend con `GET /public/institution-info`). Es un texto de partida: **debe revisarlo el asesor jurídico del colegio**.
+  **Cambiar un texto exige subir su `version`**: todos deben volver a aceptarlo.
+- **Constancia en el servidor** (`AceptacionTerminos`, `terminos.service`; `GET /terminos/pendientes` y `POST /terminos/aceptar { terminos: [{ tipo, version }] }`, con sesión): una por persona,
+  tipo y versión (índice único; no se modifica), con el perfil activo, la IP y el navegador. **No se registra en el historial de acciones (M31)** por decisión del usuario: la constancia es
+  esa colección. Es idempotente. No se aceptan términos de otro perfil (400) ni una versión que ya no es la vigente (409). Una persona con dos
+  perfiles acepta los del segundo al entrar con él. Pruebas: `tests/integracion/terminos.http.int.test.ts`.
+- **Dos compuertas en el frontend** (`components/terminos/CompuertasTerminos.tsx`, `PantallaTerminos`, hook `useTerminos.ts`): la general envuelve toda la app en `main.tsx` (también las
+  páginas públicas) y, como antes de iniciar sesión no hay a quién atribuirla, se recuerda **por navegador** (`localStorage` con la versión). La del perfil envuelve a `AppShell` y pide
+  lo que el servidor dice pendiente; si la persona aceptó los generales en esa misma pestaña antes de iniciar sesión (`sessionStorage`) se registran a su nombre sin volver a mostrarlos.
+  Rechazar muestra «si no se aceptan los términos y condiciones, no se puede ingresar» y no deja pasar (la del perfil ofrece cerrar sesión).
+- **Pendiente, a propósito:** la API no rechaza peticiones de quien no ha aceptado (el bloqueo es de la pantalla; un bloqueo en `authenticate` rompería scripts y la simulación); pantalla
+  para que el ADMIN consulte quién aceptó qué (hoy solo está en la colección `aceptacionterminos`).
+
 ### Asistente flotante de navegación
 
 - **Menú lateral y encabezado** (`components/layout/`): el layout ocupa la altura de la ventana (`h-dvh`) y **solo `<main>` se desplaza**; el menú (con scroll propio si es largo) y el encabezado quedan fijos. El menú se arma con `agruparMenu(items)` (`navigation.ts`, pura) a partir de `GRUPOS_NAV`: cada categoría lista sus rutas, no sale si el rol no ve ninguna, y una con una sola pantalla visible se muestra suelta. **Una pantalla nueva en `NAV_ITEMS` se agrega también a la categoría que le corresponda en `GRUPOS_NAV`** (si no, queda suelta arriba) y a `PALABRAS_CLAVE_POR_RUTA`. `MenuLateral` abre sola la categoría de la pantalla activa y recuerda las abiertas en `localStorage` (solo comodidad); cerrada, la categoría suma los puntos rojos de sus pantallas. `Mi cuenta` (`soloEncabezado: true`) no está en el menú ni en los accesos del Inicio: es el botón de usuario junto a la campanita.

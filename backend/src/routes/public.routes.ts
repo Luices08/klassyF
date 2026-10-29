@@ -12,6 +12,7 @@ import { verImagenPublica } from '../controllers/institution.controller';
 import { verImagenPublica as verImagenSitio, verSitioPublico } from '../controllers/sitioPublico.controller';
 import { conIdDeImagen } from '../validators/sitioPublico.validator';
 import { listarOfertaDeAdmision, obtenerInfoPublica } from '../controllers/public.controller';
+import { documentos as terminosVigentes } from '../controllers/terminos.controller';
 import * as institutionValidator from '../validators/institution.validator';
 import validate from '../middlewares/validate.middleware';
 import * as admissionValidator from '../validators/admissionRequest.validator';
@@ -57,6 +58,8 @@ router.get('/citaciones/:token', citacionLimiter, validate(citacionValidator.con
 router.post('/citaciones/:token/respuesta', citacionLimiter, validate(citacionValidator.responderPorToken), responderCitacion);
 
 router.get('/institution-info', lecturaLimiter, obtenerInfoPublica);
+// Términos y condiciones: se leen antes de iniciar sesión (la primera vez que se abre la plataforma en un navegador).
+router.get('/terminos', lecturaLimiter, terminosVigentes);
 router.get('/admission-requests/oferta', lecturaLimiter, listarOfertaDeAdmision);
 router.get('/sitio', lecturaLimiter, verSitioPublico);
 router.get('/sitio/imagenes/:id', lecturaLimiter, validate(conIdDeImagen), verImagenSitio);

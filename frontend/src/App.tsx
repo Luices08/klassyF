@@ -1,6 +1,7 @@
 import { Navigate, Route, Routes } from 'react-router-dom';
 import { AppShell } from './components/layout/AppShell';
 import { ProtectedRoute } from './components/layout/ProtectedRoute';
+import { CompuertaTerminosPerfil } from './components/terminos/CompuertasTerminos';
 import { DashboardPage } from './pages/DashboardPage';
 import { LoginPage } from './pages/LoginPage';
 import { MyAccountPage } from './pages/MyAccountPage';
@@ -89,7 +90,7 @@ export default function App() {
       <Route path="/citacion/:token" element={<ConfirmarCitacionPage />} />
 
       <Route element={<ProtectedRoute />}>
-        <Route element={<AppShell />}>
+        <Route element={<CompuertaTerminosPerfil><AppShell /></CompuertaTerminosPerfil>}>
           <Route path="/panel" element={<DashboardPage />} />
           <Route path="/report-card" element={<ReportCardPage />} />
           <Route path="/mi-cuenta" element={<MyAccountPage />} />

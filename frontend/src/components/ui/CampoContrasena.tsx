@@ -1,4 +1,4 @@
-import { type InputHTMLAttributes, forwardRef, useState } from 'react';
+import { type ComponentType, type InputHTMLAttributes, type SVGProps, forwardRef, useState } from 'react';
 import { FieldWrapper, baseFieldClasses } from './Field';
 import { EyeIcon, EyeOffIcon } from './icons';
 
@@ -6,16 +6,19 @@ interface CampoContrasenaProps extends Omit<InputHTMLAttributes<HTMLInputElement
   label: string;
   error?: string;
   hint?: string;
+  /** Un icono dentro del campo, a la izquierda (p. ej. el candado del login). */
+  iconoInicial?: ComponentType<SVGProps<SVGSVGElement>>;
 }
 
 /** Un `Input` de contraseña con el ojito para verla u ocultarla. El valor sigue siendo del formulario; esto solo cambia cómo se dibuja. */
-export const CampoContrasena = forwardRef<HTMLInputElement, CampoContrasenaProps>(({ label, error, hint, id, className = '', ...rest }, ref) => {
+export const CampoContrasena = forwardRef<HTMLInputElement, CampoContrasenaProps>(({ label, error, hint, id, className = '', iconoInicial: IconoInicial, ...rest }, ref) => {
   const [visible, setVisible] = useState(false);
   const fieldId = id ?? rest.name ?? label;
   return (
     <FieldWrapper label={label} htmlFor={fieldId} error={error} hint={hint}>
       <div className="relative">
-        <input ref={ref} id={fieldId} type={visible ? 'text' : 'password'} className={`${baseFieldClasses} pr-10 ${className}`} {...rest} />
+        {IconoInicial && <IconoInicial aria-hidden="true" className="pointer-events-none absolute left-3 top-1/2 h-[18px] w-[18px] -translate-y-1/2 text-primary/70" />}
+        <input ref={ref} id={fieldId} type={visible ? 'text' : 'password'} className={`${baseFieldClasses} pr-10 ${IconoInicial ? 'pl-10' : ''} ${className}`} {...rest} />
         <button
           type="button"
           onClick={() => setVisible((v) => !v)}

@@ -10,6 +10,8 @@
     "seed": "tsx scripts/seed.ts",
     "migrar": "tsx scripts/migrarTodo.ts",
     "crear:colegio": "tsx scripts/crearColegio.ts",
+    "crear:usuarios": "tsx scripts/crearUsuarios.ts",
+    "crear:todo": "tsx scripts/crearTodo.ts",
     "seed:demo": "tsx scripts/seedDemoCompleto.ts",
     "seed:subjects": "tsx scripts/seedSubjects.ts",
     "sim": "tsx scripts/simulacion/orquestador.ts",

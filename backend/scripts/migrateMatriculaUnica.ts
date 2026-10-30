@@ -60,6 +60,7 @@ async function run(): Promise<void> {
   if (!aplicar && duplicados.length > 0) {
     console.log('\n[migrate] Simulación: no se cambió nada. Revisa la lista y corre de nuevo con --aplicar (haz respaldo de Mongo antes).');
   } else {
+    await Enrollment.createCollection();
     const coleccion = Enrollment.collection;
     const indices = await coleccion.indexes();
     const viejo = indices.find((i) => i.name === 'student_id_1_academic_year_id_1');

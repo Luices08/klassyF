@@ -86,6 +86,36 @@
     { "clave": "COMP", "nombre": "Comportamiento", "porcentaje": 10, "max_casillas": 1 }
   ],
 
+  "personas": {
+    "semilla": 20270101,
+    "clave": "Corazones2027*",
+    "dominio_correo": "loscorazones.edu.co",
+    "personal": ["COORDINADOR", "SECRETARIA", "COORDINADOR_CONVIVENCIA", "ORIENTADOR"],
+    "horas_max_docente": 22,
+    "grupos": [
+      { "grado": -2, "nomenclaturas": ["PJ-A"], "cupo": 20, "estudiantes": 12 },
+      { "grado": -1, "nomenclaturas": ["J-A"], "cupo": 20, "estudiantes": 14 },
+      { "grado": 0, "nomenclaturas": ["T-A"], "cupo": 25, "estudiantes": 18 },
+      { "grado": 1, "nomenclaturas": ["101"], "cupo": 30, "estudiantes": 20 },
+      { "grado": 2, "nomenclaturas": ["201"], "cupo": 30, "estudiantes": 20 },
+      { "grado": 3, "nomenclaturas": ["301"], "cupo": 30, "estudiantes": 20 },
+      { "grado": 4, "nomenclaturas": ["401"], "cupo": 30, "estudiantes": 20 },
+      { "grado": 5, "nomenclaturas": ["501"], "cupo": 30, "estudiantes": 20 },
+      { "grado": 6, "nomenclaturas": ["601"], "cupo": 35, "estudiantes": 22 },
+      { "grado": 7, "nomenclaturas": ["701"], "cupo": 35, "estudiantes": 22 },
+      { "grado": 8, "nomenclaturas": ["801"], "cupo": 35, "estudiantes": 22 },
+      { "grado": 9, "nomenclaturas": ["901"], "cupo": 35, "estudiantes": 22 },
+      { "grado": 10, "nomenclaturas": ["1001"], "cupo": 35, "estudiantes": 20 },
+      { "grado": 11, "nomenclaturas": ["1101"], "cupo": 35, "estudiantes": 18 }
+    ],
+    "plan_estudios": [
+      { "grados": [-2, -1, 0], "asignaturas": { "COM": 5, "COG": 5, "COR": 3, "ESTT": 2, "SAF": 2, "DET": 1, "ESP": 1, "ING": 1 } },
+      { "grados": [1, 2, 3, 4, 5], "asignaturas": { "MAT": 5, "LEN": 5, "ING": 2, "CN": 3, "SOC": 3, "ETI": 1, "REL": 1, "EFI": 2, "ART": 2, "TEC": 1 } },
+      { "grados": [6, 7, 8, 9], "asignaturas": { "MAT": 4, "GEO": 1, "LEN": 4, "ING": 3, "CN": 4, "SOC": 4, "ETI": 1, "REL": 1, "EFI": 2, "ART": 2, "TEC": 2 } },
+      { "grados": [10, 11], "asignaturas": { "MAT": 3, "EST": 1, "LEN": 4, "ING": 3, "FIS": 3, "QUI": 3, "SOC": 2, "ECO": 1, "FIL": 2, "ETI": 1, "REL": 1, "EFI": 2, "ART": 1, "TEC": 2 } }
+    ]
+  },
+
   "areas": [
     { "codigo": "MAT", "nombre": "Matemáticas", "asignaturas": [
       { "nombre": "Matemáticas", "abreviatura": "MAT", "niveles": ["PRIMARIA", "SECUNDARIA", "MEDIA"] },

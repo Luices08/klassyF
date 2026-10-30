@@ -1,5 +1,5 @@
 import { type FormEvent, useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Alert, errorMessage } from '../../components/ui/Alert';
 import { Chip, EstadoEstudianteBadge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
@@ -8,6 +8,9 @@ import { Drawer } from '../../components/ui/Drawer';
 import { Input, Select } from '../../components/ui/Field';
 import { IconButton } from '../../components/ui/IconButton';
 import { GuiaColumnas } from '../../components/ui/GuiaColumnas';
+import { FiltrosRapidos } from '../../components/ui/FiltrosRapidos';
+import { MarcaSimat } from '../../components/estudiantes/MarcaSimat';
+import { SelectorSisben } from '../../components/estudiantes/SelectorSisben';
 import { PageHeader } from '../../components/ui/PageHeader';
 import { Spinner } from '../../components/ui/Spinner';
 import { Stepper } from '../../components/ui/Stepper';
@@ -56,6 +59,7 @@ const FORM_VACIO = {
   barrio_vereda: '',
   municipio: '',
   estrato: '',
+  sisben_grupo: '',
   eps: '',
   regimen_salud: '' as RegimenSalud | '',
   rh: '' as GrupoSanguineo | '',
@@ -89,6 +93,9 @@ export function StudentsPage() {
   const [filterEstado, setFilterEstado] = useState<EstadoEstudiante | ''>('');
   const [soloDiscapacidad, setSoloDiscapacidad] = useState(false);
   const [page, setPage] = useState(1);
+  // Quienes llegaron por la importación desde SIMAT: `?simat=pendientes` abre directo los que aún nadie ha revisado.
+  const [parametros] = useSearchParams();
+  const [vistaSimat, setVistaSimat] = useState<'' | 'IMPORTADOS' | 'PENDIENTES' | 'SIN_ACUDIENTE'>(parametros.get('simat') === 'pendientes' ? 'PENDIENTES' : '');
 
   useEffect(() => {
     const timeout = setTimeout(() => {
@@ -112,6 +119,9 @@ export function StudentsPage() {
     search: search || undefined,
     estado: filterEstado || undefined,
     discapacidad: soloDiscapacidad ? true : undefined,
+    importados_simat: vistaSimat === 'IMPORTADOS' ? true : undefined,
+    revision_pendiente: vistaSimat === 'PENDIENTES' ? true : undefined,
+    sin_acudiente: vistaSimat === 'SIN_ACUDIENTE' ? true : undefined,
     page,
     limit: PAGE_SIZE,
   };
@@ -159,6 +169,7 @@ export function StudentsPage() {
         barrio_vereda: form.barrio_vereda.trim() || undefined,
         municipio: form.municipio.trim() || undefined,
         estrato: form.estrato ? Number(form.estrato) : undefined,
+        sisben_grupo: form.sisben_grupo || undefined,
         eps: form.eps.trim() || undefined,
         regimen_salud: form.regimen_salud || undefined,
         rh: form.rh || undefined,
@@ -268,6 +279,23 @@ export function StudentsPage() {
           }
         />
 
+        <div className="mb-3">
+          <FiltrosRapidos
+            ariaLabel="Filtrar estudiantes importados de SIMAT"
+            valor={vistaSimat}
+            onChange={(v) => {
+              setVistaSimat(v as typeof vistaSimat);
+              setPage(1);
+            }}
+            items={[
+              { clave: '', etiqueta: 'Todos' },
+              { clave: 'IMPORTADOS', etiqueta: 'Importados de SIMAT' },
+              { clave: 'PENDIENTES', etiqueta: 'Por revisar' },
+              { clave: 'SIN_ACUDIENTE', etiqueta: 'Sin acudiente' },
+            ]}
+          />
+        </div>
+
         {studentsQuery.isLoading && <Spinner />}
         {studentsQuery.isError && <Alert tone="error">{errorMessage(studentsQuery.error)}</Alert>}
 
@@ -287,7 +315,12 @@ export function StudentsPage() {
                 {paginaInfo.data.map((s) => (
                   <tr key={s._id}>
                     <Td className="font-medium text-ink">
-                      {s.nombre} {s.apellido}
+                      <div className="space-y-1">
+                        <p>
+                          {s.nombre} {s.apellido}
+                        </p>
+                        <MarcaSimat origen={s.perfil?.origen_simat} />
+                      </div>
                     </Td>
                     <Td>
                       {s.tipo_documento} {s.numero_documento}
@@ -447,6 +480,7 @@ export function StudentsPage() {
               value={form.estrato}
               onChange={(e) => setForm((f) => ({ ...f, estrato: e.target.value }))}
             />
+            <SelectorSisben value={form.sisben_grupo} onChange={(v) => setForm((f) => ({ ...f, sisben_grupo: v }))} />
           </>
         )}
 

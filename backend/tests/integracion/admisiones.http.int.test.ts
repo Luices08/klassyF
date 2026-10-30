@@ -24,8 +24,9 @@ const PDF = { contenido: '%PDF-1.4 documento de prueba', nombre: 'documento.pdf'
 
 /**
  * CARACTERIZACIÓN del flujo de admisiones tal como funciona HOY (M04), contra la capa HTTP real: la solicitud pública sin sesión, la consulta de
- * estado, el comprobante, la carga de documentos, y la revisión de secretaría (aprobar / rechazar). No dice cómo «debería» ser: fija lo que hace
- * para que cualquier cambio posterior (prematrícula, inscripción asistida, cupos) sea consciente. Lo que hoy es una limitación está marcado como tal.
+ * estado, el comprobante, la carga de documentos, y la revisión de secretaría (admitir / matricular / rechazar). Una solicitud es PENDIENTE → ADMITIDO →
+ * MATRICULADO (o RECHAZADA): matricular crea de una vez al estudiante y su matrícula con folio, sin cupos reservados ni lista de espera. Lo que hoy es una
+ * limitación está marcado como tal.
  *
  * El POST público tiene un límite de 10 por hora y por IP: las solicitudes de apoyo de cada prueba se radican por el servicio, y solo unas pocas
  * pasan por HTTP.
@@ -98,10 +99,12 @@ describe('M04: admisiones — solicitud pública y revisión (capa HTTP)', () =>
     };
   };
   const radicar = (extra: Record<string, unknown> = {}) => crearSolicitud(datos(extra));
-  const aprobar = async (id: unknown, extra: Record<string, unknown> = {}, usuario: UserDocument = e.secretaria) => {
-    const r = await personal('PATCH', `/${id}/aprobar`, usuario, { group_id: grupoId, academic_year_id: anioId, ...extra });
-    return r;
-  };
+  const diasDespues = (dias: number) => new Date(Date.now() + dias * 86_400_000).toISOString().slice(0, 10);
+  // Por defecto el acudiente no trae todo: nace condicional con el plazo del acta, como la mayoría de las matrículas de una solicitud.
+  const aprobar = async (id: unknown, extra: Record<string, unknown> = {}, usuario: UserDocument = e.secretaria) =>
+    personal('PATCH', `/${id}/aprobar`, usuario, { group_id: grupoId, academic_year_id: anioId, trae_todos: 'NO', fecha_limite_compromiso: diasDespues(20), ...extra });
+  const periodosDe = (anio: number) =>
+    [1, 2].map((n) => ({ numero: n, nombre: `Periodo ${n}`, porcentaje: 50, fecha_inicio: new Date(Date.UTC(anio, (n - 1) * 6, 1)), fecha_fin: new Date(Date.UTC(anio, n * 6, 0)), estado: 'PROGRAMADO' }));
   const cupos = async (id = grupoId) => (await Group.findById(id))!.cupos_ocupados;
 
   describe('la solicitud pública (sin sesión)', () => {
@@ -149,21 +152,55 @@ describe('M04: admisiones — solicitud pública y revisión (capa HTTP)', () =>
       await expect(crearSolicitud(datos({ numero_documento: primera.numero_documento }))).resolves.toMatchObject({ estado: 'PENDIENTE' });
     });
 
-    it('una solicitud ya aprobada tampoco admite una segunda: el mensaje manda a consultar el estado', async () => {
+    it('una solicitud ya matriculada tampoco admite una segunda en ese año', async () => {
       const s = await radicar();
       await aprobar(s._id);
       const r = await publica('POST', '', datos({ numero_documento: s.numero_documento }));
       expect(r.estado).toBe(409);
-      expect(r.cuerpo.message).toMatch(/aprobada/i);
+      expect(r.cuerpo.message).toMatch(/matrícula formalizada/i);
+    });
+
+    it('el año se elige en el formulario: un año cerrado o inexistente es 400, y el mismo documento puede radicar en otro año', async () => {
+      const institucion = (await AcademicYear.findById(anioId))!.institucion_id;
+      const siguiente = await AcademicYear.create({ institucion_id: institucion, year: 2099, nombre: 'Año 2099', calendario: 'A', fecha_inicio: new Date('2099-01-01'), fecha_fin: new Date('2099-12-31'), estado: 'PLANIFICACION', periodos: periodosDe(2099) });
+      const cerrado = await AcademicYear.create({ institucion_id: institucion, year: 2000, nombre: 'Año 2000', calendario: 'A', fecha_inicio: new Date('2000-01-01'), fecha_fin: new Date('2000-12-31'), estado: 'CERRADO', periodos: periodosDe(2000) });
+      const g = (await Group.findById(grupoId))!;
+      await Group.create({ sede_id: g.sede_id, academic_year_id: siguiente._id, grade_id: g.grade_id, jornada_id: g.jornada_id, nomenclatura: '601', max_capacity: 30 });
+      const primera = await radicar();
+
+      expect((await publica('POST', '', datos({ academic_year_id: String(cerrado._id) }))).estado).toBe(400);
+      expect((await publica('POST', '', datos({ academic_year_id: '64b000000000000000000000' }))).estado).toBe(400);
+      const otroAnio = await crearSolicitud(datos({ numero_documento: primera.numero_documento, academic_year_id: String(siguiente._id) }));
+      expect(String(otroAnio.academic_year_id)).toBe(String(siguiente._id));
+      expect(String(primera.academic_year_id)).toBe(anioId);
+    });
+  });
+
+  describe('la oferta depende del año elegido', () => {
+    it('un grado que solo se abre el año siguiente se puede pedir ahí y no en el año en curso', async () => {
+      const actual = (await AcademicYear.findById(anioId))!;
+      const siguiente = await AcademicYear.create({ institucion_id: actual.institucion_id, year: actual.year + 1, nombre: `Año ${actual.year + 1}`, calendario: 'A', fecha_inicio: new Date(Date.UTC(actual.year + 1, 0, 1)), fecha_fin: new Date(Date.UTC(actual.year + 1, 11, 31)), estado: 'PLANIFICACION', periodos: periodosDe(actual.year + 1) });
+      const g = (await Group.findById(grupoId))!;
+      const septimo = await Grade.create({ nivel: 'SECUNDARIA', numero: 7, nombre: 'Séptimo' });
+      await Group.create({ sede_id: g.sede_id, academic_year_id: siguiente._id, grade_id: septimo._id, jornada_id: g.jornada_id, nomenclatura: '701', max_capacity: 30 });
+
+      const ofertaDe = async (anio?: string) => (await publica('GET', `/oferta${anio ? `?academic_year_id=${anio}` : ''}`)).cuerpo.data.oferta.map((o: { grado: { nombre: string } }) => o.grado.nombre);
+      expect(await ofertaDe(anioId)).toEqual(['Sexto']);
+      expect(await ofertaDe(String(siguiente._id))).toEqual(['Séptimo']);
+
+      expect((await publica('POST', '', datos({ grado_deseado_id: String(septimo._id) }))).estado).toBe(400);
+      const alSiguiente = await publica('POST', '', datos({ grado_deseado_id: String(septimo._id), academic_year_id: String(siguiente._id) }));
+      expect(alSiguiente.estado).toBe(201);
+      expect((await publica('POST', '', datos({ academic_year_id: String(siguiente._id) }))).estado).toBe(400);
     });
   });
 
   describe('consultar el estado (documento + fecha de nacimiento)', () => {
-    it('pendiente: devuelve el estado y todavía no hay preinscripción', async () => {
+    it('pendiente: devuelve el estado, el año y el grado, y todavía no hay matrícula', async () => {
       const s = await radicar();
       const r = await estado(s.numero_documento);
       expect(r.estado).toBe(200);
-      expect(r.cuerpo.data).toMatchObject({ estado: 'PENDIENTE', motivo_rechazo: null, preinscripcion: null });
+      expect(r.cuerpo.data).toMatchObject({ estado: 'PENDIENTE', motivo_rechazo: null, matricula: null, grado: { nombre: 'Sexto' }, academic_year: { id: anioId } });
     });
 
     it('no revela si existe: documento desconocido y fecha equivocada responden lo mismo (404)', async () => {
@@ -185,22 +222,26 @@ describe('M04: admisiones — solicitud pública y revisión (capa HTTP)', () =>
       expect((await estado(s.numero_documento)).cuerpo.data).toMatchObject({ estado: 'RECHAZADA', motivo_rechazo: 'No hay cupo en ese grado' });
     });
 
-    it('aprobada: trae la preinscripción con grado, grupo, sede, jornada, plazo y los documentos que faltan', async () => {
+    it('admitida: la familia ve que fue admitida, todavía sin matrícula', async () => {
+      const s = await radicar();
+      expect((await personal('PATCH', `/${s._id}/admitir`, e.secretaria)).estado).toBe(200);
+      expect((await estado(s.numero_documento)).cuerpo.data).toMatchObject({ estado: 'ADMITIDO', matricula: null });
+    });
+
+    it('matriculada: trae el grupo y el folio del Libro de Matrícula', async () => {
       const s = await radicar();
       await aprobar(s._id);
 
       const { cuerpo } = await estado(s.numero_documento);
 
-      expect(cuerpo.data.estado).toBe('APROBADA');
-      expect(cuerpo.data.preinscripcion).toMatchObject({ grado: 'Sexto', grupo: '601', matricula_estado: 'PREINSCRITO', folio_matricula: null, plazo_vencido: false, puede_subir_documentos: true });
-      expect(cuerpo.data.preinscripcion.fecha_limite_legalizacion).toBeTruthy();
-      const identidad = cuerpo.data.preinscripcion.documentos.find((d: { tipo_documento: string }) => d.tipo_documento === 'DOCUMENTO_IDENTIDAD');
-      expect(identidad).toMatchObject({ obligatorio: true, estado: 'PENDIENTE', comentario: null });
+      expect(cuerpo.data.estado).toBe('MATRICULADO');
+      expect(cuerpo.data.matricula).toMatchObject({ estado: 'MATRICULADO_CONDICIONAL', grupo_nombre: '601', numero_folio: 1 });
+      expect(cuerpo.data.matricula.folio_matricula).toEqual(expect.any(String));
     });
   });
 
   describe('el comprobante y los documentos de la preinscripción', () => {
-    it('el comprobante en PDF solo existe con la solicitud aprobada (404 antes)', async () => {
+    it('el comprobante en PDF solo existe con la solicitud matriculada (404 antes)', async () => {
       const s = await radicar();
       const credenciales = { numero_documento: s.numero_documento, fecha_nacimiento: NACIMIENTO };
       expect((await publica('POST', '/comprobante', credenciales)).estado).toBe(404);
@@ -238,7 +279,7 @@ describe('M04: admisiones — solicitud pública y revisión (capa HTTP)', () =>
       await aprobar(s._id);
       const falso = await subirDocumento('DOCUMENTO_IDENTIDAD', s.numero_documento, { contenido: 'esto es texto plano', nombre: 'identidad.pdf', mime: 'application/pdf' });
       expect(falso.estado).toBe(400);
-      expect((await Enrollment.findOne({ estado: 'PREINSCRITO' }))!.checklist.find((c) => c.tipo_documento === 'DOCUMENTO_IDENTIDAD')!.estado).toBe('PENDIENTE');
+      expect((await Enrollment.findOne({ estado: 'MATRICULADO_CONDICIONAL' }))!.checklist.find((c) => c.tipo_documento === 'DOCUMENTO_IDENTIDAD')!.estado).toBe('PENDIENTE');
     });
 
     it('exige el archivo y un documento que ese grado pida', async () => {
@@ -265,7 +306,7 @@ describe('M04: admisiones — solicitud pública y revisión (capa HTTP)', () =>
     it('un documento ya aprobado por secretaría no se reemplaza (409), y con la matrícula definitiva ya no se admiten documentos', async () => {
       const s = await radicar();
       await aprobar(s._id);
-      const matricula = (await Enrollment.findOne({ estado: 'PREINSCRITO' }))!;
+      const matricula = (await Enrollment.findOne({ estado: 'MATRICULADO_CONDICIONAL' }))!;
       await subirDocumento('DOCUMENTO_IDENTIDAD', s.numero_documento);
       await personal('PATCH', `/${matricula._id}/checklist/DOCUMENTO_IDENTIDAD/revisar`, e.secretaria, { estado: 'APROBADO' }, '/enrollments');
 
@@ -309,15 +350,77 @@ describe('M04: admisiones — solicitud pública y revisión (capa HTTP)', () =>
     });
   });
 
-  describe('aprobar', () => {
-    it('crea al estudiante, su perfil, el acudiente y una matrícula PREINSCRITO sin folio, con el cupo reservado', async () => {
+  describe('admitir', () => {
+    it('deja la solicitud ADMITIDO con quién y cuándo, sin crear cuenta, matrícula ni consumir cupo', async () => {
       const s = await radicar();
-      const antes = await cupos();
+      const antes = { usuarios: await User.countDocuments(), cupos: await cupos() };
 
-      const r = await aprobar(s._id);
+      const r = await personal('PATCH', `/${s._id}/admitir`, e.secretaria);
 
       expect(r.estado).toBe(200);
-      expect(r.cuerpo.data).toMatchObject({ estado: 'APROBADA' });
+      const guardada = (await AdmissionRequest.findById(s._id))!;
+      expect(guardada.estado).toBe('ADMITIDO');
+      expect(String(guardada.revisado_por)).toBe(String(e.secretaria._id));
+      expect(await User.countDocuments()).toBe(antes.usuarios);
+      expect(await cupos()).toBe(antes.cupos);
+    });
+
+    it('una rechazada o ya matriculada no se admite, y solo lo hace el personal de matrículas', async () => {
+      const rechazada = await radicar();
+      await personal('PATCH', `/${rechazada._id}/rechazar`, e.secretaria, { motivo: 'Fuera de edad para el grado' });
+      expect((await personal('PATCH', `/${rechazada._id}/admitir`, e.secretaria)).estado).toBe(400);
+
+      const matriculada = await radicar();
+      await aprobar(matriculada._id);
+      expect((await personal('PATCH', `/${matriculada._id}/admitir`, e.secretaria)).estado).toBe(400);
+
+      const s = await radicar();
+      expect((await personal('PATCH', `/${s._id}/admitir`, e.docenteDeClase)).estado).toBe(403);
+      expect((await AdmissionRequest.findById(s._id))!.estado).toBe('PENDIENTE');
+    });
+
+    it('para el año siguiente solo se acepta cuando el año anterior ya tiene resuelta la promoción de todos sus estudiantes', async () => {
+      const actual = (await AcademicYear.findById(anioId))!;
+      const siguiente = await AcademicYear.create({
+        institucion_id: actual.institucion_id,
+        year: actual.year + 1,
+        nombre: `Año ${actual.year + 1}`,
+        calendario: 'A',
+        fecha_inicio: new Date(Date.UTC(actual.year + 1, 0, 1)),
+        fecha_fin: new Date(Date.UTC(actual.year + 1, 11, 31)),
+        estado: 'PLANIFICACION',
+        periodos: periodosDe(actual.year + 1),
+      });
+      const g = (await Group.findById(grupoId))!;
+      const grupoSiguiente = await Group.create({ sede_id: g.sede_id, academic_year_id: siguiente._id, grade_id: g.grade_id, jornada_id: g.jornada_id, nomenclatura: '601', max_capacity: 30 });
+      const s = await radicar({ academic_year_id: String(siguiente._id) });
+      const paraElSiguiente = { group_id: String(grupoSiguiente._id), academic_year_id: String(siguiente._id) };
+
+      const bloqueada = await personal('PATCH', `/${s._id}/admitir`, e.secretaria);
+      expect(bloqueada.estado).toBe(409);
+      expect(bloqueada.cuerpo.message).toMatch(/resultado final de promoción/i);
+      expect((await aprobar(s._id, paraElSiguiente)).estado).toBe(409);
+      expect(await Enrollment.countDocuments({ academic_year_id: siguiente._id })).toBe(0);
+      expect(await cupos(String(grupoSiguiente._id))).toBe(0);
+
+      // Con los estudiantes del año que termina retirados, ya no hay a quién esperar.
+      await Enrollment.updateMany({ academic_year_id: actual._id }, { estado: 'RETIRADO' });
+      expect((await personal('PATCH', `/${s._id}/admitir`, e.secretaria)).estado).toBe(200);
+      expect((await aprobar(s._id, paraElSiguiente)).estado).toBe(200);
+      expect(await cupos(String(grupoSiguiente._id))).toBe(1);
+    });
+  });
+
+  describe('matricular (aprobar)', () => {
+    it('crea al estudiante, su perfil, el acudiente y la matrícula condicional con folio y cupo ocupado', async () => {
+      const s = await radicar();
+      const antes = await cupos();
+      const limite = diasDespues(20);
+
+      const r = await aprobar(s._id, { fecha_limite_compromiso: limite });
+
+      expect(r.estado).toBe(200);
+      expect(r.cuerpo.data).toMatchObject({ estado: 'MATRICULADO' });
       expect(r.cuerpo.data.enrollment_id).toBeTruthy();
       expect(r.cuerpo.data.student_user_id).toBeTruthy();
       expect(await cupos()).toBe(antes + 1);
@@ -329,41 +432,60 @@ describe('M04: admisiones — solicitud pública y revisión (capa HTTP)', () =>
       expect(await StudentProfile.findOne({ user_id: estudiante._id })).toMatchObject({ estado: 'ACTIVO' });
 
       const matricula = (await Enrollment.findById(r.cuerpo.data.enrollment_id))!;
-      expect(matricula).toMatchObject({ estado: 'PREINSCRITO', tipo_ingreso: 'NUEVO', folio_matricula: null, numero_libro: null, numero_folio: null });
+      expect(matricula).toMatchObject({ estado: 'MATRICULADO_CONDICIONAL', tipo_ingreso: 'NUEVO', numero_folio: 1 });
+      expect(matricula.folio_matricula).toEqual(expect.any(String));
+      expect(matricula.fecha_limite_compromiso!.toISOString().slice(0, 10)).toBe(limite);
       expect(matricula.checklist.length).toBeGreaterThan(0);
       expect(matricula.checklist.every((c) => c.estado === 'PENDIENTE')).toBe(true);
-      const limite = matricula.fecha_limite_legalizacion!.getTime();
-      expect(limite).toBeGreaterThan(Date.now());
-      expect(limite).toBeLessThan(Date.now() + 16 * 86_400_000);
 
       const acudiente = (await Guardian.findOne())!;
       expect(acudiente).toMatchObject({ numero_documento: `TEL-${s.acudiente_telefono}`, email: s.acudiente_email });
       expect(await StudentGuardian.findOne({ student_id: estudiante._id })).toMatchObject({ parentesco: 'TUTOR_LEGAL', es_principal: true });
-      expect(await AuditLog.countDocuments({ accion: 'USUARIO_CREADO', entidad: 'AdmissionRequest' })).toBe(1);
+      expect(await AuditLog.countDocuments({ accion: 'ADMISION_MATRICULADA', entidad: 'AdmissionRequest' })).toBe(1);
+      expect(await AuditLog.countDocuments({ accion: 'MATRICULA_CREADA', entidad: 'Enrollment' })).toBe(1);
     });
 
-    it('el acudiente queda como ficha de contacto: no se le crea cuenta ni acceso al portal al aprobar', async () => {
+    it('si el acudiente trae todos los documentos nace definitiva, sin fecha de compromiso y con cada obligatorio verificado en físico', async () => {
+      const s = await radicar();
+      const r = await aprobar(s._id, { trae_todos: 'SI', fecha_limite_compromiso: undefined });
+
+      expect(r.estado).toBe(200);
+      const matricula = (await Enrollment.findById(r.cuerpo.data.enrollment_id))!;
+      expect(matricula).toMatchObject({ estado: 'MATRICULADO_DEFINITIVO', fecha_limite_compromiso: null });
+      expect(matricula.checklist.every((c) => c.estado === 'APROBADO' && c.fecha_verificacion_fisica && !c.archivo_path)).toBe(true);
+    });
+
+    it('exige decir si trae todos los documentos, y la fecha del acta cuando no los trae', async () => {
+      const s = await radicar();
+      const sinRespuesta = await personal('PATCH', `/${s._id}/aprobar`, e.secretaria, { group_id: grupoId, academic_year_id: anioId });
+      expect(sinRespuesta.estado).toBe(400);
+      const sinFecha = await aprobar(s._id, { fecha_limite_compromiso: undefined });
+      expect(sinFecha.estado).toBe(400);
+      expect(await Enrollment.countDocuments({ student_id: { $nin: [e.estudiante._id, e.otroEstudiante._id, e.tercerEstudiante._id] } })).toBe(0);
+      expect((await AdmissionRequest.findById(s._id))!.estado).toBe('PENDIENTE');
+    });
+
+    it('los documentos que se recibieron con la solicitud pasan al checklist como CARGADO, por revisar', async () => {
+      const s = await radicar();
+      await AdmissionRequest.updateOne({ _id: s._id }, { $set: { documentos: [{ tipo_documento: 'DOCUMENTO_IDENTIDAD', archivo_path: 'admisiones/x/identidad.pdf', cargado_por: e.secretaria._id, fecha_carga: new Date() }] } });
+      const r = await aprobar(s._id);
+      const matricula = (await Enrollment.findById(r.cuerpo.data.enrollment_id))!;
+      expect(matricula.checklist.find((c) => c.tipo_documento === 'DOCUMENTO_IDENTIDAD')).toMatchObject({ estado: 'CARGADO', cargado_por_tipo: 'PERSONAL' });
+    });
+
+    it('el acudiente queda como ficha de contacto: no se le crea cuenta ni acceso al portal al matricular', async () => {
       const s = await radicar();
       await aprobar(s._id);
       expect(await Guardian.findOne({ user_id: { $ne: null } })).toBeNull();
       expect(await User.countDocuments({ roles: 'ACUDIENTE' })).toBe(0);
     });
 
-    it('acepta un plazo propio para legalizar y rechaza uno en el pasado', async () => {
-      const s = await radicar();
-      expect((await aprobar(s._id, { fecha_limite_legalizacion: '2020-01-01' })).estado).toBe(400);
-      const limite = new Date(Date.now() + 40 * 86_400_000).toISOString().slice(0, 10);
-      const r = await aprobar(s._id, { fecha_limite_legalizacion: limite });
-      expect(r.estado).toBe(200);
-      expect((await Enrollment.findById(r.cuerpo.data.enrollment_id))!.fecha_limite_legalizacion!.toISOString().slice(0, 10)).toBe(limite);
-    });
-
-    it('no se aprueba dos veces ni una ya rechazada', async () => {
+    it('no se matricula dos veces ni una ya rechazada', async () => {
       const s = await radicar();
       await aprobar(s._id);
       const otra = await aprobar(s._id);
       expect(otra.estado).toBe(400);
-      expect(otra.cuerpo.message).toMatch(/ya fue aprobada/i);
+      expect(otra.cuerpo.message).toMatch(/ya fue matriculada/i);
 
       const r = await radicar();
       await personal('PATCH', `/${r._id}/rechazar`, e.secretaria, { motivo: 'Fuera de edad para el grado' });
@@ -389,7 +511,7 @@ describe('M04: admisiones — solicitud pública y revisión (capa HTTP)', () =>
       expect(await cupos(String(lleno._id))).toBe(1);
     });
 
-    it('LIMITACIÓN ACTUAL: al aprobar se elige el grupo a mano y no se comprueba que sea del grado que pidió la familia (al radicar sí se valida la oferta)', async () => {
+    it('LIMITACIÓN ACTUAL: al matricular se elige el grupo a mano y no se comprueba que sea del grado que pidió la familia (al radicar sí se valida la oferta)', async () => {
       const g = (await Group.findById(grupoId))!;
       const septimo = await Grade.create({ nivel: 'SECUNDARIA', numero: 7, nombre: 'Séptimo' });
       const otroGrado = await Group.create({ sede_id: g.sede_id, academic_year_id: g.academic_year_id, grade_id: septimo._id, jornada_id: g.jornada_id, nomenclatura: '701', max_capacity: 30 });
@@ -413,6 +535,7 @@ describe('M04: admisiones — solicitud pública y revisión (capa HTTP)', () =>
       expect(await StudentGuardian.countDocuments()).toBe(2);
       expect((await User.findById(a.cuerpo.data.student_user_id))!.email).toBe('familia@correo.com');
       expect((await User.findById(b.cuerpo.data.student_user_id))!.email).toBe(`familia+${dos.numero_documento}@correo.com`);
+      expect((await Enrollment.findById(b.cuerpo.data.enrollment_id))!.numero_folio).toBe(2);
     });
 
     it('lo que la familia declaró sobre apoyos pasa a la bandeja de orientación (M16) en la misma operación', async () => {
@@ -422,7 +545,7 @@ describe('M04: admisiones — solicitud pública y revisión (capa HTTP)', () =>
       expect(solicitud).toMatchObject({ origen: 'PREINSCRIPCION' });
     });
 
-    it('solo el personal de matrículas aprueba: docente y estudiante 403', async () => {
+    it('solo el personal de matrículas matricula: docente y estudiante 403', async () => {
       const s = await radicar();
       expect((await aprobar(s._id, {}, e.docenteDeClase)).estado).toBe(403);
       expect((await aprobar(s._id, {}, e.estudiante)).estado).toBe(403);
@@ -442,41 +565,32 @@ describe('M04: admisiones — solicitud pública y revisión (capa HTTP)', () =>
       expect(guardada).toMatchObject({ estado: 'RECHAZADA', motivo_rechazo: 'No hay cupo en ese grado' });
       expect(String(guardada.revisado_por)).toBe(String(e.secretaria._id));
       expect(guardada.fecha_revision).toBeInstanceOf(Date);
-      expect(await Enrollment.countDocuments({ estado: 'PREINSCRITO' })).toBe(0);
+      expect(await Enrollment.countDocuments({ student_id: { $nin: [e.estudiante._id, e.otroEstudiante._id, e.tercerEstudiante._id] } })).toBe(0);
     });
 
-    it('una aprobada no se puede rechazar', async () => {
+    it('una matriculada no se puede rechazar', async () => {
       const s = await radicar();
       await aprobar(s._id);
       const r = await personal('PATCH', `/${s._id}/rechazar`, e.secretaria, { motivo: 'Cambio de opinión' });
       expect(r.estado).toBe(400);
-      expect((await AdmissionRequest.findById(s._id))!.estado).toBe('APROBADA');
+      expect((await AdmissionRequest.findById(s._id))!.estado).toBe('MATRICULADO');
     });
   });
 
-  describe('el recorrido completo: solicitud → aprobación → documentos → legalización', () => {
-    it('termina en una matrícula con folio, y la familia ve el resultado en la consulta pública', async () => {
+  describe('el recorrido completo: solicitud → admisión → matrícula → documentos', () => {
+    it('termina en una matrícula con folio, y la familia ve el resultado y sube lo que le falta', async () => {
       const s = await radicar();
-      const aprobada = await aprobar(s._id);
-      const matriculaId = aprobada.cuerpo.data.enrollment_id;
+      await personal('PATCH', `/${s._id}/admitir`, e.secretaria);
+      const matriculada = await aprobar(s._id);
+      const matriculaId = matriculada.cuerpo.data.enrollment_id;
 
-      // La familia sube el documento y secretaría lo aprueba desde su bandeja.
+      // La matrícula nace condicional con su folio: la familia sube el documento y secretaría lo aprueba desde su bandeja.
       await subirDocumento('DOCUMENTO_IDENTIDAD', s.numero_documento);
       const revisada = await personal('PATCH', `/${matriculaId}/checklist/DOCUMENTO_IDENTIDAD/revisar`, e.secretaria, { estado: 'APROBADO' }, '/enrollments');
       expect(revisada.estado).toBe(200);
 
-      // Legaliza como condicional (faltan documentos): se asigna el folio del Libro de Matrícula.
-      const plazo = new Date(Date.now() + 20 * 86_400_000).toISOString();
-      const legalizada = await personal('PATCH', `/${matriculaId}/status`, e.secretaria, { estado: 'MATRICULADO_CONDICIONAL', fecha_limite_compromiso: plazo }, '/enrollments');
-      expect(legalizada.estado).toBe(200);
-      expect(legalizada.cuerpo.data).toMatchObject({ estado: 'MATRICULADO_CONDICIONAL' });
-      expect(legalizada.cuerpo.data.folio_matricula).toEqual(expect.any(String));
-      expect(legalizada.cuerpo.data.numero_folio).toBe(1);
-
-      // La familia ve el folio y todavía puede subir lo que le falta (condicional).
-      const consulta = (await estado(s.numero_documento)).cuerpo.data.preinscripcion;
-      expect(consulta).toMatchObject({ matricula_estado: 'MATRICULADO_CONDICIONAL', puede_subir_documentos: true });
-      expect(consulta.folio_matricula).toBe(legalizada.cuerpo.data.folio_matricula);
+      const consulta = (await estado(s.numero_documento)).cuerpo.data;
+      expect(consulta).toMatchObject({ estado: 'MATRICULADO', matricula: { estado: 'MATRICULADO_CONDICIONAL', numero_folio: 1 } });
       expect((await subirDocumento('FOTO', s.numero_documento)).estado).toBe(200);
     });
   });

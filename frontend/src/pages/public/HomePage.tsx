@@ -242,7 +242,7 @@ export function HomePage() {
                   value={form.fecha_nacimiento}
                   onChange={(e) => setForm((f) => ({ ...f, fecha_nacimiento: e.target.value }))}
                 />
-                <SelectoresDeOferta valor={form} onChange={(cambios) => setForm((f) => ({ ...f, ...cambios }))} />
+                <SelectoresDeOferta anioId={idAnioFinal || undefined} valor={form} onChange={(cambios) => setForm((f) => ({ ...f, ...cambios }))} />
               </div>
             </fieldset>
 

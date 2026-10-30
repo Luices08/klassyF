@@ -16,6 +16,8 @@ export interface IGroup {
   aula_id: Types.ObjectId | null;
   /** Título de bachiller de este grupo (último grado); null = hereda `Institution.titulo_bachiller_defecto`. */
   titulo_bachiller: string | null;
+  /** Código del grupo en SIMAT (`601`, `JRD`): con la sede, la jornada y el grado identifica al grupo aunque el colegio lo renombre. */
+  codigo_simat: string | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -40,9 +42,12 @@ const groupSchema = new Schema<IGroup, GroupModel>(
     director_grupo_id: { type: Schema.Types.ObjectId, ref: 'User', default: null },
     aula_id: { type: Schema.Types.ObjectId, ref: 'Espacio', default: null },
     titulo_bachiller: { type: String, trim: true, maxlength: 80, default: null },
+    codigo_simat: { type: String, trim: true, uppercase: true, maxlength: 20, default: null },
   },
   { timestamps: true }
 );
+
+groupSchema.index({ academic_year_id: 1, sede_id: 1, codigo_simat: 1 }, { partialFilterExpression: { codigo_simat: { $type: 'string' } } });
 
 // Regla de unicidad de M01: un mismo nombre de grupo no puede repetirse para
 // la misma sede, jornada y grado dentro del mismo año lectivo.

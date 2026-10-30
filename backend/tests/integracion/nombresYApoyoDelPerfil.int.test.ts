@@ -7,7 +7,7 @@ import Insignia from '../../src/models/insignia.model';
 import SolicitudApoyo from '../../src/models/solicitudApoyo.model';
 import StudentProfile from '../../src/models/studentProfile.model';
 import User, { UserDocument } from '../../src/models/user.model';
-import { aprobarSolicitud, crearSolicitud } from '../../src/services/admissionRequest.service';
+import { aprobarYMatricular, crearSolicitud } from '../../src/services/admissionRequest.service';
 import { createEnrollment } from '../../src/services/enrollment.service';
 import { crearEstudianteCompleto, importarEstudiantesCsv } from '../../src/services/student.service';
 import { detenerBaseDeDatos, iniciarBaseDeDatos, limpiarBaseDeDatos } from './baseDeDatos';
@@ -110,7 +110,7 @@ describe('M03/M04: cuatro nombres y discapacidad desde la hoja de vida', () => {
         acudiente_email: 'familia@correo.com',
       });
       expect(solicitud).toMatchObject({ nombre_aspirante: 'Laura Isabel', apellido_aspirante: 'López Mora' });
-      await aprobarSolicitud(String(solicitud._id), { group_id: grupo, academic_year_id: anio }, e.secretaria._id);
+      await aprobarYMatricular(String(solicitud._id), { group_id: grupo, academic_year_id: anio, trae_todos: 'NO', fecha_limite_compromiso: new Date(Date.now() + 15 * 86_400_000) }, e.secretaria._id);
       const u = (await User.findOne({ numero_documento: '7700001' }))!;
       expect(u).toMatchObject({ nombre: 'Laura Isabel', apellido: 'López Mora' });
       expect(await StudentProfile.findOne({ user_id: u._id })).toMatchObject({ primer_nombre: 'Laura', segundo_nombre: 'Isabel', primer_apellido: 'López', segundo_apellido: 'Mora' });

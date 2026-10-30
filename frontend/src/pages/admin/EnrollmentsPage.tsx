@@ -7,7 +7,9 @@ import { Card, CardHeader } from '../../components/ui/Card';
 import { Drawer } from '../../components/ui/Drawer';
 import { Input, Select, Textarea } from '../../components/ui/Field';
 import { IconButton } from '../../components/ui/IconButton';
+import { MarcaMatriculaSimat } from '../../components/estudiantes/MarcaSimat';
 import { CatalogoDocumentosMatricula } from '../../components/matriculas/CatalogoDocumentosMatricula';
+import { ImportacionSimat } from '../../components/matriculas/ImportacionSimat';
 import { ConfiguracionFoliatura } from '../../components/matriculas/ConfiguracionFoliatura';
 import { PageHeader } from '../../components/ui/PageHeader';
 import { Tabs } from '../../components/ui/Tabs';
@@ -135,8 +137,10 @@ export function EnrollmentsPage() {
   // `?pestana=por-grado`, `cupos`, `documentos` o `libro` abren directo esa sección; `?estudiante=<id>` abre «Nueva matrícula» con ese estudiante ya elegido
   // (el botón «Matricular ahora» de Estudiantes), así quien lo acaba de registrar no tiene que buscarlo.
   const [parametros, setParametros] = useSearchParams();
-  const pestana = ['por-grado', 'cupos', 'documentos', 'libro'].includes(parametros.get('pestana') ?? '')
-    ? (parametros.get('pestana') as 'por-grado' | 'cupos' | 'documentos' | 'libro')
+  // La importación desde SIMAT crea cuentas y asienta folios: solo la ven administración y secretaría (el servidor lo vuelve a exigir).
+  const puedeImportar = user?.rol === 'ADMIN' || user?.rol === 'SECRETARIA';
+  const pestana = ['por-grado', 'cupos', 'documentos', 'libro', ...(puedeImportar ? ['simat'] : [])].includes(parametros.get('pestana') ?? '')
+    ? (parametros.get('pestana') as 'por-grado' | 'cupos' | 'documentos' | 'libro' | 'simat')
     : 'matriculas';
   const cambiarPestana = (k: string) => setParametros(k === 'matriculas' ? {} : { pestana: k }, { replace: true });
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -352,11 +356,22 @@ export function EnrollmentsPage() {
         { key: 'cupos', label: 'Disponibilidad de cupos' },
         { key: 'documentos', label: 'Documentos que se piden' },
         { key: 'libro', label: 'Libro y folios' },
+        ...(puedeImportar ? [{ key: 'simat', label: 'Importar desde SIMAT' }] : []),
       ]}
       value={pestana}
       onChange={cambiarPestana}
     />
   );
+
+  if (pestana === 'simat') {
+    return (
+      <div className="space-y-4">
+        <PageHeader title="Matrículas" subtitle="Cupos por sede/jornada/grado, formalización de matrícula y novedades." />
+        {pestanas}
+        <ImportacionSimat />
+      </div>
+    );
+  }
 
   if (pestana === 'documentos' || pestana === 'libro') {
     return (
@@ -578,7 +593,10 @@ export function EnrollmentsPage() {
                     <Td>{en.folio_matricula ?? <span className="text-muted">Sin asignar</span>}</Td>
                     <Td>{en.tipo_ingreso}</Td>
                     <Td>
-                      <EstadoMatriculaBadge value={en.estado} />
+                      <div className="flex flex-wrap gap-1.5">
+                        <EstadoMatriculaBadge value={en.estado} />
+                        <MarcaMatriculaSimat origen={en.origen} />
+                      </div>
                     </Td>
                     <Td>
                       <ResumenDocumentos checklist={en.checklist ?? []} />

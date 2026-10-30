@@ -19,7 +19,9 @@ import { avisarSolicitudAdmision } from './notificacionesEventos.service';
 import { exigirOfertaDisponible } from './ofertaAdmision.service';
 import { crearDesdeMatricula } from './solicitudApoyo.service';
 import { registrarEvento } from './audit.service';
-import { asignarFolio } from './foliatura.service';
+import { asegurarConfiguracion as asegurarFoliatura, asignarFolio } from './foliatura.service';
+import { estudiantesSinPromocionResuelta } from './academicYear.service';
+import { habilitarPortalDeAcudientesDe } from './guardian.service';
 
 const SOLICITUDES_QUE_BLOQUEAN_NUEVA = ['PENDIENTE', 'ADMITIDO', 'MATRICULADO'] as const;
 
@@ -60,6 +62,22 @@ export async function anioDeLaAdmision(): Promise<Types.ObjectId | null> {
   return planificacion?._id ?? null;
 }
 
+/**
+ * Las solicitudes de un año posterior solo se aceptan cuando ya se sabe quién continúa: mientras el año anterior tenga estudiantes sin resultado final
+ * de promoción (M19), cada cupo que se entrega a un aspirante nuevo se lo quita a un antiguo que todavía puede seguir.
+ */
+async function exigirPromocionResuelta(anioDestino: { _id: Types.ObjectId; year: number }): Promise<void> {
+  const anterior = await AcademicYear.findOne({ year: { $lt: anioDestino.year } }).sort({ year: -1, createdAt: -1 });
+  if (!anterior || anterior.estado === 'CERRADO') return;
+  const sinResolver = await estudiantesSinPromocionResuelta(anterior);
+  if (sinResolver > 0) {
+    throw new ApiError(
+      409,
+      `Aún no se puede aceptar: ${sinResolver} estudiante(s) de ${anterior.year} no tienen resultado final de promoción. Cierra los grupos y resuelve las recuperaciones antes de admitir o matricular aspirantes de ${anioDestino.year}.`
+    );
+  }
+}
+
 /** Solicitud pública (M04): sin autenticar, no crea cuentas ni consume cupos todavía. */
 export async function crearSolicitud(input: CrearSolicitudInput, origen: OrigenDeSolicitud = {}): Promise<AdmissionRequestDocument> {
   const nombre = resolverNombre({ ...input, nombre: input.nombre_aspirante, apellido: input.apellido_aspirante });
@@ -67,8 +85,6 @@ export async function crearSolicitud(input: CrearSolicitudInput, origen: OrigenD
 
   const grado = await Grade.findOne({ _id: input.grado_deseado_id, estado: ESTADO_ACTIVO });
   if (!grado) throw new ApiError(400, 'El grado seleccionado no existe o no está activo.');
-
-  await exigirOfertaDisponible({ grado_id: String(grado._id), sede_id: input.sede_deseada_id ?? null, jornada: input.jornada_deseada ?? null });
 
   let anioId: Types.ObjectId | null = null;
   if (input.academic_year_id) {
@@ -80,6 +96,9 @@ export async function crearSolicitud(input: CrearSolicitudInput, origen: OrigenD
   } else {
     anioId = await anioDeLaAdmision();
   }
+
+  // Se comprueba contra la oferta del año al que apunta la solicitud, no contra la del año en curso.
+  await exigirOfertaDisponible({ grado_id: String(grado._id), sede_id: input.sede_deseada_id ?? null, jornada: input.jornada_deseada ?? null }, anioId ? String(anioId) : undefined);
 
   const yaTieneAbierta = await AdmissionRequest.findOne({
     numero_documento: input.numero_documento,
@@ -256,6 +275,8 @@ export async function admitirSolicitud(id: string, revisorId: string | Types.Obj
   if (!solicitud) throw new ApiError(404, 'Solicitud no encontrada.');
   if (solicitud.estado === 'MATRICULADO') throw new ApiError(400, 'Esta solicitud ya tiene matrícula formalizada.');
   if (solicitud.estado === 'RECHAZADA') throw new ApiError(400, 'Esta solicitud fue rechazada.');
+  const anioSolicitud = solicitud.academic_year_id ? await AcademicYear.findById(solicitud.academic_year_id).select('year') : null;
+  if (anioSolicitud) await exigirPromocionResuelta(anioSolicitud);
 
   solicitud.estado = 'ADMITIDO';
   solicitud.revisado_por = new Types.ObjectId(revisorId);
@@ -292,7 +313,12 @@ export async function aprobarYMatricular(
   input: AprobarYMatricularInput,
   revisorId: string | Types.ObjectId
 ): Promise<AdmissionRequestDocument> {
-  return runTransaction(async (session) => {
+  if (input.trae_todos === 'NO' && !input.fecha_limite_compromiso) {
+    throw new ApiError(400, 'La fecha límite del acta de compromiso es obligatoria cuando el acudiente no trae todos los documentos.');
+  }
+  // La configuración de foliatura se crea antes de abrir la transacción (ver `asegurarConfiguracion`): dentro de ella, la primera matrícula falla.
+  await asegurarFoliatura();
+  const matriculada = await runTransaction(async (session) => {
     const solicitud = await AdmissionRequest.findById(id).session(session);
     if (!solicitud) throw new ApiError(404, 'Solicitud no encontrada.');
     if (solicitud.estado === 'MATRICULADO') throw new ApiError(400, 'Esta solicitud ya fue matriculada.');
@@ -301,6 +327,7 @@ export async function aprobarYMatricular(
     const academicYear = await AcademicYear.findById(input.academic_year_id).session(session);
     if (!academicYear) throw new ApiError(404, 'Año lectivo no encontrado.');
     if (academicYear.estado === 'CERRADO') throw new ApiError(409, 'El año lectivo seleccionado ya está cerrado.');
+    await exigirPromocionResuelta(academicYear);
 
     const updatedGroup = await Group.findOneAndUpdate(
       { _id: input.group_id, academic_year_id: input.academic_year_id, estado: 'ACTIVE', $expr: { $lt: ['$cupos_ocupados', '$max_capacity'] } },
@@ -411,7 +438,9 @@ export async function aprobarYMatricular(
         archivo_path: recibido?.archivo_path ?? null,
         comentario: null,
         fecha_carga: recibido?.fecha_carga ?? null,
-        revisado_por: recibido ? new Types.ObjectId(revisorId) : null,
+        // Sin archivo y marcado como entregado: el original se vio en el mostrador («verificado en físico»).
+        fecha_verificacion_fisica: !recibido && input.trae_todos === 'SI' ? new Date() : null,
+        revisado_por: recibido || input.trae_todos === 'SI' ? new Types.ObjectId(revisorId) : null,
         cargado_por_tipo: recibido ? ('PERSONAL' as const) : null,
         cargado_por: recibido?.cargado_por ?? null,
       };
@@ -434,10 +463,7 @@ export async function aprobarYMatricular(
           numero_libro,
           numero_folio,
           folio_matricula,
-          fecha_limite_legalizacion:
-            input.trae_todos === 'NO' && input.fecha_limite_compromiso
-              ? new Date(input.fecha_limite_compromiso)
-              : undefined,
+          fecha_limite_compromiso: input.trae_todos === 'NO' && input.fecha_limite_compromiso ? new Date(input.fecha_limite_compromiso) : null,
           checklist,
         },
       ],
@@ -487,6 +513,17 @@ export async function aprobarYMatricular(
 
     return solicitud;
   });
+
+  // La matrícula ya está confirmada (condicional o definitiva): se abre la cuenta del portal del acudiente. Si no se puede, la matrícula no se afecta.
+  if (matriculada.student_user_id) {
+    try {
+      const r = await habilitarPortalDeAcudientesDe(matriculada.student_user_id, { usuarioId: revisorId });
+      for (const o of r.omitidos) console.warn(`[matrícula] No se abrió el portal de ${o.acudiente}: ${o.motivo}`);
+    } catch (err) {
+      console.error('[matrícula] No se pudo habilitar el portal del acudiente:', err);
+    }
+  }
+  return matriculada;
 }
 
 export async function rechazarSolicitud(

@@ -40,6 +40,8 @@ const FUERA_DEL_HISTORIAL: RegExp[] = [
   /^GRUPO_EXCEDE_AFORO_AULA$/,
   /^CITACION_CORREO_REENVIADO$/,
   /^PREDICTIVO_/,
+  // Simular un archivo de SIMAT o descartar la simulación no escribe ningún estudiante ni matrícula: solo la aplicación lo hace.
+  /^IMPORTACION_SIMAT_(SIMULADA|DESCARTADA)$/,
 ];
 
 const MATRICULACION: RegExp[] = [
@@ -55,6 +57,7 @@ const MATRICULACION: RegExp[] = [
   /^SALIDA_CUPO_LIBERADO$/,
   /^TRASLADO_REGISTRADO$/,
   /^PROMOCION_ROLLOVER_EJECUTADO$/,
+  /^IMPORTACION_SIMAT_(APLICADA|REINGRESO)$/,
 ];
 
 // «Anular» no entra aquí a propósito: en Klassy anular deja el registro marcado y eliminar lo borra, y son cosas distintas.

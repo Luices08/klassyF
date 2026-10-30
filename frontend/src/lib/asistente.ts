@@ -187,8 +187,8 @@ export const PALABRAS_CLAVE_POR_RUTA: Record<string, { descripcion: string; clav
     claves: ['gestion de asistencia', 'justificaciones', 'excusas', 'reporte de asistencia', 'ausentismo', 'estados de asistencia'],
   },
   '/admin/enrollments': {
-    descripcion: 'Matrículas, libro de matrícula y el catálogo de documentos que se piden al matricular.',
-    claves: ['matriculas', 'matricula', 'matricular', 'folio', 'libro de matricula', 'documentos de matricula', 'documentos que se piden', 'requisitos de matricula', 'configurar documentos'],
+    descripcion: 'Matrículas, libro de matrícula, el catálogo de documentos que se piden al matricular y la importación masiva de matrículas desde el archivo de SIMAT.',
+    claves: ['importar simat', 'importar matriculas', 'archivo de simat', 'carga masiva de matriculas', 'subir simat', 'matriculas', 'matricula', 'matricular', 'folio', 'libro de matricula', 'documentos de matricula', 'documentos que se piden', 'requisitos de matricula', 'configurar documentos'],
   },
   '/admin/documentos-por-revisar': {
     descripcion: 'Bandeja de documentos de matrícula subidos que falta aprobar o rechazar.',

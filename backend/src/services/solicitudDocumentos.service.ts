@@ -60,6 +60,9 @@ export async function subirDocumentoDeSolicitud(
 ): Promise<AdmissionRequestDocument> {
   const solicitud = await cargarSolicitud(solicitudId);
   exigirQueAdmitaDocumentos(solicitud);
+  if (!(await documentosQuePideLaSolicitud(solicitud)).includes(tipoDocumento)) {
+    throw new ApiError(400, 'Ese documento no se pide para el grado de esta solicitud.');
+  }
   const firma = detectarFirmaArchivo(archivo.mimetype, archivo.buffer);
   if (!firma) throw new ApiError(400, 'El archivo no es un PDF, JPG, PNG o WEBP válido.');
 

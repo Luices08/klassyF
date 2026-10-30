@@ -65,6 +65,10 @@ export interface CreateEnrollmentInput {
   ultimo_grado_aprobado?: number | null;
   /** Por qué se matricula en un grado distinto al que indica su historial o su certificado (p. ej. promoción por decisión). */
   motivo_grado?: string;
+  /** Solo la importación desde SIMAT: la fecha en que SIMAT registró la matrícula (si no, hoy) y la marca que distingue estos asientos en las listas. */
+  fecha_matricula?: string | Date;
+  origen?: 'IMPORTACION_SIMAT';
+  importacion_simat_id?: string | Types.ObjectId;
 }
 
 export interface OpcionesCreacionMatricula {
@@ -238,7 +242,9 @@ export async function createEnrollment(
           tipo_ingreso,
           ultimo_grado_aprobado: input.ultimo_grado_aprobado ?? null,
           estado: estadoFinal,
-          fecha_matricula: new Date(),
+          fecha_matricula: input.fecha_matricula ? new Date(input.fecha_matricula) : new Date(),
+          origen: input.origen ?? null,
+          importacion_simat_id: input.importacion_simat_id ?? null,
           fecha_limite_compromiso: estadoFinal === 'MATRICULADO_CONDICIONAL' && input.fecha_limite_compromiso ? new Date(input.fecha_limite_compromiso) : null,
           checklist,
         },

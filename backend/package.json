@@ -22,6 +22,7 @@
     "sembrar:tipos-titulacion": "tsx scripts/sembrarTiposTitulacion.ts",
     "migrate:m05-anio-lectivo": "tsx scripts/migrateM05AnioLectivo.ts",
     "migrate:folio-al-matricular": "tsx scripts/migrateFolioAlMatricular.ts",
+    "migrate:solicitudes-admision": "tsx scripts/migrateSolicitudesAdmision.ts",
     "migrate:requisitos-documentales": "tsx scripts/migrateRequisitosDocumentales.ts",
     "migrate:documentos-antiguos": "tsx scripts/migrateDocumentosAntiguos.ts",
     "migrate:matricula-unica": "tsx scripts/migrateMatriculaUnica.ts",

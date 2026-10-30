@@ -6,6 +6,7 @@ import ConfirmacionContinuidad from '../../src/models/confirmacionContinuidad.mo
 import Enrollment from '../../src/models/enrollment.model';
 import Grade from '../../src/models/grade.model';
 import Group from '../../src/models/group.model';
+import PazYSalvo from '../../src/models/pazYSalvo.model';
 import User from '../../src/models/user.model';
 import { UserDocument } from '../../src/models/user.model';
 import { verificarCierre } from '../../src/services/academicYear.service';
@@ -109,14 +110,17 @@ describe('M19: rollover al año siguiente', () => {
     await expect(simularRollover(filtros(), e.admin)).rejects.toMatchObject({ statusCode: 409, message: expect.stringMatching(/cerrado/) });
   });
 
-  it('asienta la matrícula definitiva con Libro y Folio, solo por ADMIN/SECRETARIA, y repetirlo no duplica', async () => {
+  it('asienta la matrícula con Libro y Folio, solo por ADMIN/SECRETARIA, y repetirlo no duplica; sin el paz y salvo del año que termina nace condicional con su plazo', async () => {
     await expect(ejecutarRollover(filtros(), CLAVE, e.coordAcademico)).rejects.toMatchObject({ statusCode: 403 });
     await expect(ejecutarRollover(filtros(), 'otra', e.admin)).rejects.toMatchObject({ statusCode: 401 });
 
     const r = await ejecutarRollover(filtros(), CLAVE, e.admin);
     expect(r).toMatchObject({ creadas: 1 });
     const m = (await Enrollment.findOne({ student_id: e.estudiante._id, academic_year_id: destinoId }))!;
-    expect(m).toMatchObject({ estado: 'MATRICULADO_DEFINITIVO', tipo_ingreso: 'ANTIGUO' });
+    expect(m).toMatchObject({ estado: 'MATRICULADO_CONDICIONAL', tipo_ingreso: 'ANTIGUO' });
+    expect(m.fecha_limite_compromiso).toBeInstanceOf(Date);
+    expect(m.checklist.find((c) => c.tipo_documento === 'PAZ_Y_SALVO_ANIO_ANTERIOR')).toMatchObject({ estado: 'PENDIENTE' });
+    expect(m.checklist.filter((c) => c.tipo_documento !== 'PAZ_Y_SALVO_ANIO_ANTERIOR').every((c) => c.estado === 'APROBADO')).toBe(true);
     expect(String(m.group_id)).toBe(septimoId);
     expect(m.folio_matricula).toBeTruthy();
     expect((await Group.findById(septimoId))!.cupos_ocupados).toBe(1);
@@ -131,6 +135,18 @@ describe('M19: rollover al año siguiente', () => {
     await Group.deleteOne({ _id: septimoId });
     expect(await filaDe(e.estudiante)).toMatchObject({ estado: 'SIN_CUPO', grupo_destino: null });
     expect(await ejecutarRollover(filtros(), CLAVE, e.admin)).toMatchObject({ creadas: 0 });
+  });
+
+  it('con el paz y salvo del año que termina confirmado nace definitiva y con todo el checklist aprobado', async () => {
+    const confirmar = (estudiante: UserDocument) =>
+      PazYSalvo.create({ student_id: estudiante._id, academic_year_id: n.anioId, estado: 'CONFIRMADO', revisado_por: e.secretaria._id, fecha_revision: new Date() });
+
+    await confirmar(e.estudiante);
+    expect(await filaDe(e.estudiante)).toMatchObject({ paz_y_salvo: 'CONFIRMADO' });
+    await ejecutarRollover(filtros(), CLAVE, e.admin);
+    const definitiva = (await Enrollment.findOne({ student_id: e.estudiante._id, academic_year_id: destinoId }))!;
+    expect(definitiva).toMatchObject({ estado: 'MATRICULADO_DEFINITIVO', fecha_limite_compromiso: null });
+    expect(definitiva.checklist.every((c) => c.estado === 'APROBADO')).toBe(true);
   });
 
   describe('continuidad: la respuesta filtra el rollover, no reserva matrícula ni cupo', () => {
@@ -186,7 +202,7 @@ describe('M19: rollover al año siguiente', () => {
 
       await Group.updateOne({ _id: septimoId }, { max_capacity: 2 });
       expect(await ejecutarRollover(filtros(), CLAVE, e.admin)).toMatchObject({ creadas: 1 });
-      expect(await Enrollment.findOne({ student_id: e.estudiante._id, academic_year_id: destinoId })).toMatchObject({ estado: 'MATRICULADO_DEFINITIVO' });
+      expect(await Enrollment.findOne({ student_id: e.estudiante._id, academic_year_id: destinoId })).toMatchObject({ estado: 'MATRICULADO_CONDICIONAL' });
     });
   });
 
@@ -225,6 +241,6 @@ describe('M19: rollover al año siguiente', () => {
     expect(await filaDe(e.otroEstudiante)).toMatchObject({ resultado: 'NO_PROMOVIDO', destino: 'MISMO_GRADO', tipo_ingreso: 'REPITENTE', grupo_destino: 'Sexto 601', estado: 'POR_CREAR' });
     await ejecutarRollover(filtros(), CLAVE, e.admin);
     const repite = (await Enrollment.findOne({ student_id: e.otroEstudiante._id, academic_year_id: destinoId }))!;
-    expect(repite).toMatchObject({ estado: 'MATRICULADO_DEFINITIVO', tipo_ingreso: 'REPITENTE' });
+    expect(repite).toMatchObject({ estado: 'MATRICULADO_CONDICIONAL', tipo_ingreso: 'REPITENTE' });
   });
 });

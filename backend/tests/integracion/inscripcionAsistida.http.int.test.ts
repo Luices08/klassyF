@@ -81,7 +81,8 @@ describe('M04: inscripción asistida por secretaría (capa HTTP)', () => {
     };
   };
   const inscribir = async (extra: Record<string, unknown> = {}, usuario: UserDocument = e.secretaria) => personal('POST', '', usuario, datos(extra));
-  const aprobar = (id: string) => personal('PATCH', `/${id}/aprobar`, e.secretaria, { group_id: grupoId, academic_year_id: anioId });
+  const aprobar = (id: string) =>
+    personal('PATCH', `/${id}/aprobar`, e.secretaria, { group_id: grupoId, academic_year_id: anioId, trae_todos: 'NO', fecha_limite_compromiso: new Date(Date.now() + 20 * 86_400_000).toISOString().slice(0, 10) });
 
   describe('registrar la inscripción', () => {
     it('solo la registra el personal de matrículas: sin sesión 401; docente y estudiante 403', async () => {

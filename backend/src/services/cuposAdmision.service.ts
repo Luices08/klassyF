@@ -86,22 +86,17 @@ export async function obtenerDisponibilidadCupos(academicYearId: string): Promis
   const sedePorId = new Map(sedes.map((s) => [String(s._id), s]));
   const jornadaPorId = new Map(jornadas.map((j) => [String(j._id), j]));
 
-  // Conteo de solicitudes en espera (PENDIENTE) agrupadas por grado deseado
-  const pendientes = await AdmissionRequest.aggregate<{ _id: Types.ObjectId; total: number }>([
-    {
-      $match: {
-        academic_year_id: anio._id,
-        estado: 'PENDIENTE',
-      },
-    },
-    {
-      $group: {
-        _id: '$grado_deseado_id',
-        total: { $sum: 1 },
-      },
-    },
+  // Solicitudes pendientes por grado, sede y jornada deseadas. Las que no indicaron sede o jornada no se atribuyen a ninguna fila (aparecerían repetidas
+  // en todas): solo suman en el total del año.
+  const pendientes = await AdmissionRequest.aggregate<{ _id: { grado: Types.ObjectId; sede: Types.ObjectId | null; jornada: string | null }; total: number }>([
+    { $match: { academic_year_id: anio._id, estado: 'PENDIENTE' } },
+    { $group: { _id: { grado: '$grado_deseado_id', sede: '$sede_deseada_id', jornada: '$jornada_deseada' }, total: { $sum: 1 } } },
   ]);
-  const pendientesPorGrado = new Map(pendientes.map((p) => [String(p._id), p.total]));
+  const totalPendientes = pendientes.reduce((acc, p) => acc + p.total, 0);
+  const pendientesDeFila = (gradoId: string, sedeId: string, jornadaNombre: string | null): number =>
+    pendientes
+      .filter((p) => String(p._id.grado) === gradoId && p._id.sede && String(p._id.sede) === sedeId && (!p._id.jornada || p._id.jornada === jornadaNombre))
+      .reduce((acc, p) => acc + p.total, 0);
 
   const filas: FilaDisponibilidadCupos[] = [];
   let totalCapacidad = 0;
@@ -116,8 +111,7 @@ export async function obtenerDisponibilidadCupos(academicYearId: string): Promis
 
     const capacidad = c.capacidad_total;
     const matriculados = c.matriculados_reales;
-    // Solicitudes en espera para este grado (distribuido proporcional o total por grado)
-    const enEspera = pendientesPorGrado.get(c.grade_id) || 0;
+    const enEspera = pendientesDeFila(c.grade_id, c.sede_id, jo?.nombre ?? null);
     const libres = Math.max(0, capacidad - matriculados);
 
     totalCapacidad += capacidad;
@@ -135,8 +129,7 @@ export async function obtenerDisponibilidadCupos(academicYearId: string): Promis
     });
   }
 
-  // Sumar solicitudes pendientes totales del año
-  totalEspera = [...pendientesPorGrado.values()].reduce((acc, v) => acc + v, 0);
+  totalEspera = totalPendientes;
 
   filas.sort((a, b) => a.grado.numero - b.grado.numero || a.sede.nombre.localeCompare(b.sede.nombre, 'es'));
 

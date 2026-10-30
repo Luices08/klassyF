@@ -6,6 +6,7 @@ import {
   GRUPOS_SANGUINEOS,
   REGIMENES_SALUD,
 } from '../constants/enums';
+import { GRUPOS_SISBEN } from '../constants/sisben';
 import { ValidationSchema } from '../middlewares/validate.middleware';
 import { objectId } from './common.validator';
 
@@ -29,6 +30,7 @@ export const upsertProfile: ValidationSchema = {
     barrio_vereda: Joi.string().allow('', null),
     municipio: Joi.string().allow('', null),
     estrato: Joi.number().integer().min(1).max(6),
+    sisben_grupo: Joi.string().trim().uppercase().valid(...GRUPOS_SISBEN).allow('', null),
     grupo_etnico: Joi.string().valid(...GRUPOS_ETNICOS),
     victima_conflicto: Joi.boolean(),
     tiene_discapacidad: Joi.boolean(),

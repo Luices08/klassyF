@@ -21,6 +21,12 @@ export interface StudentsFilter {
   estado?: EstadoEstudiante;
   eps?: string;
   discapacidad?: boolean;
+  /** Solo quienes llegaron por la importación desde SIMAT. */
+  importados_simat?: boolean;
+  /** Solo los importados de SIMAT cuya información aún nadie ha revisado. */
+  revision_pendiente?: boolean;
+  /** Solo los que no tienen ningún acudiente vinculado. */
+  sin_acudiente?: boolean;
   page?: number;
   limit?: number;
 }
@@ -39,7 +45,15 @@ export function useStudentsDirectory(filter: StudentsFilter, enabled = true) {
     queryFn: () =>
       api.raw<{ success: true; data: StudentDirectoryItem[]; total: number; page: number; pages: number }>(
         '/students',
-        { query: { ...filter, discapacidad: filter.discapacidad === undefined ? undefined : String(filter.discapacidad) } }
+        {
+          query: {
+            ...filter,
+            discapacidad: filter.discapacidad === undefined ? undefined : String(filter.discapacidad),
+            importados_simat: filter.importados_simat ? 'true' : undefined,
+            revision_pendiente: filter.revision_pendiente ? 'true' : undefined,
+            sin_acudiente: filter.sin_acudiente ? 'true' : undefined,
+          },
+        }
       ),
     select: (res): StudentsPageResult => ({ data: res.data, total: res.total, page: res.page, pages: res.pages }),
   });
@@ -91,6 +105,8 @@ export interface UpsertStudentProfileInput {
   barrio_vereda?: string;
   municipio?: string;
   estrato?: number;
+  /** Grupo del SISBEN IV (A1…D21); vacío = no está en el SISBEN. */
+  sisben_grupo?: string | null;
   grupo_etnico?: GrupoEtnico;
   victima_conflicto?: boolean;
   tiene_discapacidad?: boolean;
@@ -142,6 +158,8 @@ export interface CrearEstudianteCompletoInput {
   barrio_vereda?: string;
   municipio?: string;
   estrato?: number;
+  /** Grupo del SISBEN IV (A1…D21); vacío = no está en el SISBEN. */
+  sisben_grupo?: string | null;
   eps?: string;
   regimen_salud?: RegimenSalud;
   rh?: GrupoSanguineo;
@@ -199,6 +217,18 @@ export function useCrearEstudianteCompleto() {
       void queryClient.invalidateQueries({ queryKey: ['students'] });
       void queryClient.invalidateQueries({ queryKey: ['users'] });
       void queryClient.invalidateQueries({ queryKey: ['guardians'] });
+    },
+  });
+}
+
+/** Da por revisado a un estudiante que llegó de SIMAT (exige que ya tenga un acudiente). */
+export function useMarcarRevisadoSimat() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (studentId: string) => api.patch<StudentProfile>(`/students/${studentId}/revision-simat`),
+    onSuccess: (_data, studentId) => {
+      void queryClient.invalidateQueries({ queryKey: ['students'] });
+      void queryClient.invalidateQueries({ queryKey: ['students', 'ficha360', studentId] });
     },
   });
 }

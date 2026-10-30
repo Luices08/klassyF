@@ -13,25 +13,18 @@ import catchAsync from '../utils/catchAsync';
 export const crearSolicitud = catchAsync<unknown, unknown, admissionService.CrearSolicitudInput>(async (req, res) => {
   const solicitud = await admissionService.crearSolicitud(req.body);
 
+  // Los adjuntos del formulario público se guardan con la clave que el catálogo usa para ese documento; si el grado no lo pide, no se recibe.
   const files = req.files as { [fieldname: string]: Express.Multer.File[] } | undefined;
   if (files) {
-    if (files['documento_identidad']?.[0]) {
-      const f = files['documento_identidad'][0];
-      await solicitudDocumentos.subirDocumentoDeSolicitud(
-        String(solicitud._id),
-        'DOCUMENTO_IDENTIDAD',
-        { buffer: f.buffer, mimetype: f.mimetype, originalname: f.originalname },
-        null
-      );
-    }
-    if (files['certificado_notas']?.[0]) {
-      const f = files['certificado_notas'][0];
-      await solicitudDocumentos.subirDocumentoDeSolicitud(
-        String(solicitud._id),
-        'CERTIFICADO_NOTAS',
-        { buffer: f.buffer, mimetype: f.mimetype, originalname: f.originalname },
-        null
-      );
+    const pedidos = await solicitudDocumentos.documentosQuePideLaSolicitud(solicitud);
+    const adjuntos: Array<[string, string]> = [
+      ['documento_identidad', 'DOCUMENTO_IDENTIDAD'],
+      ['certificado_notas', 'CERTIFICADOS_NOTAS_ANTERIORES'],
+    ];
+    for (const [campo, tipo] of adjuntos) {
+      const f = files[campo]?.[0];
+      if (!f || !pedidos.includes(tipo)) continue;
+      await solicitudDocumentos.subirDocumentoDeSolicitud(String(solicitud._id), tipo, { buffer: f.buffer, mimetype: f.mimetype, originalname: f.originalname }, null);
     }
   }
 

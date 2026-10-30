@@ -72,7 +72,7 @@ export async function faseRematricula(ctx: ContextoFase, anio: number): Promise<
     });
     matriculasCreadas += resultado.data.creadas;
   }
-  ctx.log(`Paso de año ${anioPrevio} → ${anio}: ${matriculasCreadas} matrículas definitivas asentadas en ${sedes.length} sedes.`);
+  ctx.log(`Paso de año ${anioPrevio} → ${anio}: ${matriculasCreadas} matrículas asentadas en ${sedes.length} sedes (condicionales las de quien no tiene el paz y salvo del año anterior).`);
 
   // 2. Resolver los SIN_CUPO con matrícula directa en otro grupo del grado que aún tenga capacidad (p. ej., cambio de sede de 5° a 6°).
   irA(aLaHora(diaDelAnio(anio, '01-10'), '09:00'));

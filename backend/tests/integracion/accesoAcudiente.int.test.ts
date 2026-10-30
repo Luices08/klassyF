@@ -6,12 +6,13 @@ import Group from '../../src/models/group.model';
 import Guardian from '../../src/models/guardian.model';
 import StudentGuardian from '../../src/models/studentGuardian.model';
 import User, { UserDocument } from '../../src/models/user.model';
-import { aprobarSolicitud, crearSolicitud } from '../../src/services/admissionRequest.service';
+import { aprobarYMatricular, crearSolicitud } from '../../src/services/admissionRequest.service';
 import { motivoSinAccesoAlPerfil, perfilesDisponibles } from '../../src/services/accesoPerfil.service';
 import { createEnrollment, formalizarMatriculaPreinscrita } from '../../src/services/enrollment.service';
 import { crearEstudianteCompleto } from '../../src/services/student.service';
 import { detenerBaseDeDatos, iniciarBaseDeDatos, limpiarBaseDeDatos } from './baseDeDatos';
 import { armarEscenario, crearUsuario, Escenario } from './escenario';
+import { crearPreinscritaHeredada } from './preinscritaHeredada';
 
 const actor = (e: Escenario) => ({ id: e.secretaria._id });
 const PLAZO = new Date(Date.now() + 15 * 86_400_000);
@@ -37,14 +38,28 @@ describe('M04/M27: acceso del acudiente al confirmarse la matrícula', () => {
     grupo = String((await Group.findOne())!._id);
   });
 
-  /** Una preinscrita desde la solicitud pública (con o sin el documento del acudiente). */
-  const preinscrita = async (extra: Record<string, unknown> = {}) => {
+  /** Una preinscrita heredada (con o sin el documento del acudiente): la matrícula aún no está confirmada. */
+  const preinscrita = async (extra: Partial<Parameters<typeof crearPreinscritaHeredada>[0]> = {}) => {
     contador += 1;
+    return crearPreinscritaHeredada({
+      grupo,
+      anio,
+      numero_documento: `5500${contador}`,
+      acudiente_tipo_documento: 'CC',
+      acudiente_numero_documento: '52111222',
+      acudiente_telefono: '3205550001',
+      acudiente_email: 'marta@correo.com',
+      ...extra,
+    });
+  };
+
+  /** Matricular desde una solicitud deja la matrícula confirmada de una vez, así que abre el portal en ese momento. */
+  const matricularDesdeSolicitud = async () => {
     const solicitud = await crearSolicitud({
       primer_nombre: 'Laura',
-      primer_apellido: `López${contador}`,
+      primer_apellido: 'López',
       tipo_documento: 'TI',
-      numero_documento: `5500${contador}`,
+      numero_documento: '5599777',
       fecha_nacimiento: '2014-05-10' as unknown as string,
       grado_deseado_id: String((await Grade.findOne())!._id),
       acudiente_nombre: 'Marta',
@@ -53,12 +68,8 @@ describe('M04/M27: acceso del acudiente al confirmarse la matrícula', () => {
       acudiente_numero_documento: '52111222',
       acudiente_telefono: '3205550001',
       acudiente_email: 'marta@correo.com',
-      ...extra,
     });
-    await aprobarSolicitud(String(solicitud._id), { group_id: grupo, academic_year_id: anio }, e.secretaria._id);
-    const estudiante = (await User.findOne({ numero_documento: `5500${contador}` }))!;
-    const matricula = (await Enrollment.findOne({ student_id: estudiante._id }))!;
-    return { estudiante, matricula };
+    return aprobarYMatricular(String(solicitud._id), { group_id: grupo, academic_year_id: anio, trae_todos: 'NO', fecha_limite_compromiso: PLAZO }, e.secretaria._id);
   };
   const confirmar = (id: unknown) => formalizarMatriculaPreinscrita(String(id), { trae_todos: false, fecha_limite_compromiso: PLAZO }, actor(e));
   const cuentaDe = (documento: string) => User.findOne({ numero_documento: documento });
@@ -74,6 +85,12 @@ describe('M04/M27: acceso del acudiente al confirmarse la matrícula', () => {
     expect(String((await Guardian.findOne({ numero_documento: '52111222' }))!.user_id)).toBe(String(cuenta._id));
     const conClave = (await User.findById(cuenta._id).select('+password_hash'))!;
     expect(await conClave.comparePassword('52111222')).toBe(true);
+  });
+
+  it('matricular desde una solicitud confirma la matrícula y abre la cuenta del acudiente en el mismo paso', async () => {
+    expect(await cuentaDe('52111222')).toBeNull();
+    await matricularDesdeSolicitud();
+    expect(await cuentaDe('52111222')).toMatchObject({ debe_cambiar_password: true, roles: ['ACUDIENTE'] });
   });
 
   it('su correo suele estar ya en uso por el hijo admitido con él: la cuenta se abre con un alias que llega al mismo buzón', async () => {

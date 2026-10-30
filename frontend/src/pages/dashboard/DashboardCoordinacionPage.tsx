@@ -1,15 +1,14 @@
-import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { AnuncioDrawer } from '../../components/anuncios/AnuncioDrawer';
 import { AccesosRapidos, type AccesoRapido } from '../../components/dashboard/AccesosRapidos';
 import { BarraFiltrosDashboard } from '../../components/dashboard/BarraFiltrosDashboard';
 import { BarrasHorizontales } from '../../components/dashboard/BarrasHorizontales';
 import { BloqueDashboard } from '../../components/dashboard/BloqueDashboard';
-import { CuadriculaDeAccesos } from '../../components/dashboard/CuadriculaDeAccesos';
-import { PanelComunicacion } from '../../components/dashboard/PanelComunicacion';
-import { SeccionPlegable } from '../../components/dashboard/SeccionPlegable';
+import { FilaAdaptable, FilaPrincipal } from '../../components/dashboard/FilaAdaptable';
+import { GraficaBarrasVerticales } from '../../components/dashboard/GraficaBarrasVerticales';
+import { SeccionTodasLasPantallas } from '../../components/dashboard/SeccionTodasLasPantallas';
 import { TarjetaIndicador } from '../../components/dashboard/TarjetaIndicador';
 import type { NavItem } from '../../components/layout/navigation';
+import { MosaicoNoticiasInicio } from '../../components/noticias/MosaicoNoticiasInicio';
 import { Alert } from '../../components/ui/Alert';
 import { Chip } from '../../components/ui/Badge';
 import { Card } from '../../components/ui/Card';
@@ -25,7 +24,6 @@ import {
   useRiesgoCritico,
   useServicioSocialResumen,
 } from '../../hooks/useDashboard';
-import { ANUNCIO_VACIO, type FormularioAnuncio } from '../../lib/anuncios';
 import { formatoFechaCalendario } from '../../lib/fechas';
 import { TONO_DE_NIVEL, formatoNumero, formatoPorcentaje } from '../../lib/dashboard';
 
@@ -39,20 +37,20 @@ export function DashboardCoordinacionPage({ links }: { links: NavItem[] }) {
   const desempeno = useDesempeno(f.filtros);
   const comparativo = useComparativoDeGrupos(f.filtros);
   const alertas = useAlertasCoordinacion(f.filtros);
-  const [comunicado, setComunicado] = useState<FormularioAnuncio | null>(null);
 
   const e = entrega.data;
   const r = riesgo.data;
   const rec = recuperaciones.data;
   const ss = servicio.data;
 
+  // El color agrupa por tipo de tarea, igual que en rectoría: reportes (verde), gestión (azul) y seguimiento que requiere atención (naranja).
   const accesos: AccesoRapido[] = [
-    { etiqueta: 'Comisión de evaluación', descripcion: 'Preparar la sesión y el acta', icono: UsersIcon, to: '/comision', contador: alertas.data?.sesiones_sin_realizar },
-    { etiqueta: 'Sábana de notas', descripcion: 'Por grupo o por grado', icono: FileTextIcon, to: '/admin/reportes-cierre' },
-    { etiqueta: 'Inasistencias', descripcion: 'Seguimiento por fecha y curso', icono: ActivityIcon, to: '/asistencia/gestion', contador: alertas.data?.justificaciones_pendientes },
-    { etiqueta: 'Servicio social', descripcion: 'Listado consolidado de 10.° y 11.°', icono: GraduationCapIcon, to: '/admin/reportes-cierre?pestana=listados' },
-    { etiqueta: 'Seguimiento de notas', descripcion: 'Planillas por docente y periodo', icono: ClipboardListIcon, to: '/admin/notas' },
-    { etiqueta: 'Recuperaciones', descripcion: 'Quién debe presentarlas', icono: BookIcon, to: '/recuperaciones' },
+    { etiqueta: 'Comisión de evaluación', descripcion: 'Preparar la sesión y el acta', icono: UsersIcon, tono: 'blue', to: '/comision', contador: alertas.data?.sesiones_sin_realizar },
+    { etiqueta: 'Sábana de notas', descripcion: 'Por grupo o por grado', icono: FileTextIcon, tono: 'green', to: '/admin/reportes-cierre' },
+    { etiqueta: 'Inasistencias', descripcion: 'Seguimiento por fecha y curso', icono: ActivityIcon, tono: 'blue', to: '/asistencia/gestion', contador: alertas.data?.justificaciones_pendientes },
+    { etiqueta: 'Servicio social', descripcion: 'Listado consolidado de 10.° y 11.°', icono: GraduationCapIcon, tono: 'green', to: '/admin/reportes-cierre?pestana=listados' },
+    { etiqueta: 'Seguimiento de notas', descripcion: 'Planillas por docente y periodo', icono: ClipboardListIcon, tono: 'blue', to: '/admin/notas' },
+    { etiqueta: 'Recuperaciones', descripcion: 'Quién debe presentarlas', icono: BookIcon, tono: 'orange', to: '/recuperaciones' },
   ];
 
   return (
@@ -64,6 +62,7 @@ export function DashboardCoordinacionPage({ links }: { links: NavItem[] }) {
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <TarjetaIndicador
+          tinte
           titulo="Entrega de notas"
           icono={ClipboardListIcon}
           tono="orange"
@@ -86,6 +85,7 @@ export function DashboardCoordinacionPage({ links }: { links: NavItem[] }) {
           error={entrega.error}
         />
         <TarjetaIndicador
+          tinte
           titulo="Estudiantes en riesgo crítico"
           icono={AlertTriangleIcon}
           tono="red"
@@ -102,6 +102,7 @@ export function DashboardCoordinacionPage({ links }: { links: NavItem[] }) {
           error={riesgo.error}
         />
         <TarjetaIndicador
+          tinte
           titulo="Nivelaciones y recuperaciones"
           icono={BookIcon}
           tono="blue"
@@ -119,6 +120,7 @@ export function DashboardCoordinacionPage({ links }: { links: NavItem[] }) {
           error={recuperaciones.error}
         />
         <TarjetaIndicador
+          tinte
           titulo="Servicio social (10.° y 11.°)"
           icono={GraduationCapIcon}
           tono="green"
@@ -131,162 +133,162 @@ export function DashboardCoordinacionPage({ links }: { links: NavItem[] }) {
         />
       </div>
 
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-        <div className="space-y-4 lg:col-span-2">
-          <BloqueDashboard
-            titulo="Docentes con entregas pendientes"
-            subtitulo={e ? `Planillas sin cerrar del periodo ${e.corte.periodo_numero}` : 'Planillas sin cerrar'}
-            accion={
-              <Link to="/admin/notas" className="text-sm font-semibold text-primary hover:underline">
-                Seguimiento completo
-              </Link>
-            }
-            consulta={entrega}
-          >
-            {(datos) =>
-              datos.pendientes.total === 0 ? (
-                <Alert tone="success">Todos los docentes entregaron sus planillas de este periodo.</Alert>
-              ) : (
-                <div className="space-y-3">
-                  <ul className="space-y-3">
-                    {datos.pendientes.docentes.map((d) => (
-                      <li key={d.docente_id} className="border-t border-border pt-3 first:border-t-0 first:pt-0">
-                        <p className="flex items-center justify-between gap-2 text-sm font-semibold text-ink">
-                          {d.docente}
-                          <Chip tone="orange">{d.pendientes} sin cerrar</Chip>
-                        </p>
-                        <p className="text-xs text-muted">{d.clases.map((c) => `${c.asignatura} ${c.grupo} (${c.cerradas}/${c.estudiantes})`).join(' · ')}</p>
-                      </li>
-                    ))}
-                  </ul>
-                  {datos.pendientes.total > datos.pendientes.docentes.length && (
-                    <p className="text-xs text-muted">Y {datos.pendientes.total - datos.pendientes.docentes.length} docentes más. El detalle está en el seguimiento de notas.</p>
-                  )}
-                </div>
-              )
-            }
-          </BloqueDashboard>
+      <FilaPrincipal
+        izquierda={
+          <>
+            <BloqueDashboard
+              titulo="Docentes con entregas pendientes"
+              subtitulo={e ? `Planillas sin cerrar del periodo ${e.corte.periodo_numero}` : 'Planillas sin cerrar'}
+              accion={
+                <Link to="/admin/notas" className="text-sm font-semibold text-primary hover:underline">
+                  Seguimiento completo
+                </Link>
+              }
+              consulta={entrega}
+            >
+              {(datos) =>
+                datos.pendientes.total === 0 ? (
+                  <Alert tone="success">Todos los docentes entregaron sus planillas de este periodo.</Alert>
+                ) : (
+                  <div className="space-y-3">
+                    <ul className="space-y-3">
+                      {datos.pendientes.docentes.map((d) => (
+                        <li key={d.docente_id} className="border-t border-border pt-3 first:border-t-0 first:pt-0">
+                          <p className="flex items-center justify-between gap-2 text-sm font-semibold text-ink">
+                            {d.docente}
+                            <Chip tone="orange">{d.pendientes} sin cerrar</Chip>
+                          </p>
+                          <p className="text-xs text-muted">{d.clases.map((c) => `${c.asignatura} ${c.grupo} (${c.cerradas}/${c.estudiantes})`).join(' · ')}</p>
+                        </li>
+                      ))}
+                    </ul>
+                    {datos.pendientes.total > datos.pendientes.docentes.length && (
+                      <p className="text-xs text-muted">Y {datos.pendientes.total - datos.pendientes.docentes.length} docentes más. El detalle está en el seguimiento de notas.</p>
+                    )}
+                  </div>
+                )
+              }
+            </BloqueDashboard>
 
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             <BloqueDashboard
               titulo="Distribución de desempeño"
               subtitulo={desempeno.data ? `Notas cerradas del periodo ${desempeno.data.contexto.periodo_notas}` : 'Escala nacional'}
               consulta={desempeno}
             >
               {(datos) => (
-                <BarrasHorizontales
+                <GraficaBarrasVerticales
+                  etiquetaEje="Porcentaje de notas por nivel de desempeño"
                   vacio="Aún no hay notas cerradas con las que medirlo."
-                  filas={
+                  barras={
                     datos.total === 0
                       ? []
                       : datos.niveles.map((n) => ({
                           clave: n.nivel,
                           etiqueta: n.etiqueta,
                           valor: n.porcentaje ?? 0,
-                          maximo: 100,
-                          texto: `${formatoPorcentaje(n.porcentaje)} · ${formatoNumero(n.total)}`,
                           tono: TONO_DE_NIVEL[n.nivel],
+                          ayuda: `${n.etiqueta}: ${formatoPorcentaje(n.porcentaje)} · ${formatoNumero(n.total)} notas`,
                         }))
                   }
                 />
               )}
             </BloqueDashboard>
-
-            <BloqueDashboard
-              titulo="Comparativo por grupos"
-              subtitulo={comparativo.data ? `Promedio de notas del periodo ${comparativo.data.contexto.periodo_notas}` : 'Grupos del mismo grado'}
-              consulta={comparativo}
-            >
-              {(datos) =>
-                datos.grados.length === 0 ? (
-                  <p className="py-4 text-center text-sm text-muted">Hace falta más de un grupo por grado con notas cerradas para compararlos.</p>
-                ) : (
-                  <div className="space-y-5">
-                    {datos.grados.map((g) => (
-                      <div key={g.grado_id} className="space-y-2">
-                        <p className="flex items-center justify-between text-sm font-semibold text-ink">
-                          {g.grado}
-                          {g.brecha !== null && <span className="text-xs font-normal text-muted">Brecha: {g.brecha.toLocaleString('es-CO')}</span>}
-                        </p>
-                        <BarrasHorizontales
-                          vacio=""
-                          filas={g.grupos.map((x) => ({
-                            clave: x.grupo_id,
-                            etiqueta: x.etiqueta,
-                            valor: x.promedio ?? 0,
-                            maximo: datos.contexto.nota_maxima,
-                            texto: x.promedio === null ? 'Sin notas' : x.promedio.toLocaleString('es-CO'),
-                            tono: x.promedio !== null && x.promedio < datos.contexto.nota_aprobatoria ? 'red' : 'blue',
-                          }))}
-                        />
-                      </div>
+          </>
+        }
+        derecha={
+          <>
+            <AccesosRapidos destacados columnas={1} accesos={accesos} />
+            <BloqueDashboard titulo="Alertas tempranas" subtitulo="Lo que requiere atención de coordinación" consulta={alertas}>
+              {(datos) => {
+                const filas = [
+                  { etiqueta: 'Justificaciones de inasistencia por revisar', valor: datos.justificaciones_pendientes, to: '/asistencia/gestion' },
+                  { etiqueta: 'Sesiones de la comisión sin realizar', valor: datos.sesiones_sin_realizar, to: '/comision' },
+                  { etiqueta: 'Estudiantes en riesgo crítico', valor: r?.resumen.ROJO ?? 0, to: '/comision' },
+                ];
+                return (
+                  <ul className="space-y-2">
+                    {filas.map((a) => (
+                      <li key={a.etiqueta}>
+                        <Link to={a.to} className="flex items-center justify-between gap-3 rounded-lg px-2 py-2 text-sm text-body hover:bg-soft">
+                          <span>{a.etiqueta}</span>
+                          <Chip tone={a.valor > 0 ? 'orange' : 'green'}>{a.valor}</Chip>
+                        </Link>
+                      </li>
                     ))}
-                  </div>
-                )
-              }
+                  </ul>
+                );
+              }}
             </BloqueDashboard>
-          </div>
-        </div>
+          </>
+        }
+      />
 
-        <div className="space-y-4">
-          <AccesosRapidos accesos={accesos} />
-          <BloqueDashboard titulo="Alertas tempranas" subtitulo="Lo que requiere atención de coordinación" consulta={alertas}>
-            {(datos) => {
-              const filas = [
-                { etiqueta: 'Justificaciones de inasistencia por revisar', valor: datos.justificaciones_pendientes, to: '/asistencia/gestion' },
-                { etiqueta: 'Sesiones de la comisión sin realizar', valor: datos.sesiones_sin_realizar, to: '/comision' },
-                { etiqueta: 'Estudiantes en riesgo crítico', valor: r?.resumen.ROJO ?? 0, to: '/comision' },
-              ];
-              return (
-                <ul className="space-y-2">
-                  {filas.map((a) => (
-                    <li key={a.etiqueta}>
-                      <Link to={a.to} className="flex items-center justify-between gap-3 rounded-lg px-2 py-2 text-sm text-body hover:bg-soft">
-                        <span>{a.etiqueta}</span>
-                        <Chip tone={a.valor > 0 ? 'orange' : 'green'}>{a.valor}</Chip>
-                      </Link>
-                    </li>
-                  ))}
-                </ul>
-              );
-            }}
+      {/* Si no hay estudiantes en riesgo, el comparativo ocupa todo el ancho en vez de dejar un hueco. */}
+      <FilaAdaptable>
+        {r && r.estudiantes.length > 0 && (
+          <BloqueDashboard
+            titulo="Estudiantes en riesgo crítico"
+            subtitulo={`Los ${r.estudiantes.length} con más asignaturas perdidas (de ${formatoNumero(r.resumen.ROJO)}). Los convoca la comisión de evaluación.`}
+            accion={
+              <Link to="/comision" className="text-sm font-semibold text-primary hover:underline">
+                Ir a la comisión
+              </Link>
+            }
+            consulta={riesgo}
+          >
+            {(datos) => (
+              <ul className="divide-y divide-border">
+                {datos.estudiantes.map((x) => (
+                  <li key={x.student_id} className="flex flex-wrap items-center justify-between gap-2 py-2 text-sm">
+                    <span className="font-medium text-ink">
+                      {x.apellido} {x.nombre} <span className="font-normal text-muted">· {x.grupo}</span>
+                    </span>
+                    <span className="text-xs text-muted">{x.motivos.join(' · ')}</span>
+                  </li>
+                ))}
+              </ul>
+            )}
           </BloqueDashboard>
-          <PanelComunicacion onRedactar={() => setComunicado(ANUNCIO_VACIO)} />
-        </div>
-      </div>
+        )}
 
-      {r && r.estudiantes.length > 0 && (
         <BloqueDashboard
-          titulo="Estudiantes en riesgo crítico"
-          subtitulo={`Los ${r.estudiantes.length} con más asignaturas perdidas (de ${formatoNumero(r.resumen.ROJO)}). Los convoca la comisión de evaluación.`}
-          accion={
-            <Link to="/comision" className="text-sm font-semibold text-primary hover:underline">
-              Ir a la comisión
-            </Link>
-          }
-          consulta={riesgo}
+          titulo="Comparativo por grupos"
+          subtitulo={comparativo.data ? `Promedio de notas del periodo ${comparativo.data.contexto.periodo_notas}` : 'Grupos del mismo grado'}
+          consulta={comparativo}
         >
-          {(datos) => (
-            <ul className="divide-y divide-border">
-              {datos.estudiantes.map((x) => (
-                <li key={x.student_id} className="flex flex-wrap items-center justify-between gap-2 py-2 text-sm">
-                  <span className="font-medium text-ink">
-                    {x.apellido} {x.nombre} <span className="font-normal text-muted">· {x.grupo}</span>
-                  </span>
-                  <span className="text-xs text-muted">{x.motivos.join(' · ')}</span>
-                </li>
-              ))}
-            </ul>
-          )}
+          {(datos) =>
+            datos.grados.length === 0 ? (
+              <p className="py-4 text-center text-sm text-muted">Hace falta más de un grupo por grado con notas cerradas para compararlos.</p>
+            ) : (
+              <div className="space-y-5">
+                {datos.grados.map((g) => (
+                  <div key={g.grado_id} className="space-y-2">
+                    <p className="flex items-center justify-between text-sm font-semibold text-ink">
+                      {g.grado}
+                      {g.brecha !== null && <span className="text-xs font-normal text-muted">Brecha: {g.brecha.toLocaleString('es-CO')}</span>}
+                    </p>
+                    <BarrasHorizontales
+                      vacio=""
+                      filas={g.grupos.map((x) => ({
+                        clave: x.grupo_id,
+                        etiqueta: x.etiqueta,
+                        valor: x.promedio ?? 0,
+                        maximo: datos.contexto.nota_maxima,
+                        texto: x.promedio === null ? 'Sin notas' : x.promedio.toLocaleString('es-CO'),
+                        tono: x.promedio !== null && x.promedio < datos.contexto.nota_aprobatoria ? 'red' : 'blue',
+                      }))}
+                    />
+                  </div>
+                ))}
+              </div>
+            )
+          }
         </BloqueDashboard>
-      )}
+      </FilaAdaptable>
 
-      {/* En pantallas pequeñas el menú lateral se oculta y esta cuadrícula es la navegación: ahí nace abierta. */}
-      <SeccionPlegable titulo="Todas las pantallas" subtitulo="Los accesos del menú, con sus novedades." abiertaPorDefecto={window.innerWidth < 1024}>
-        <CuadriculaDeAccesos links={links} />
-      </SeccionPlegable>
+      <MosaicoNoticiasInicio />
 
-      <AnuncioDrawer form={comunicado} onChange={setComunicado} />
+      <SeccionTodasLasPantallas links={links} />
     </div>
   );
 }

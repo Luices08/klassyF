@@ -26,6 +26,14 @@ export const NOMBRE_ESTADO_CASO: Record<string, string> = {
   REABIERTO: 'Reabierto',
 };
 
+export const NOMBRE_ESTADO_MATRICULA: Record<string, string> = {
+  PREINSCRITO: 'Preinscritos',
+  MATRICULADO_CONDICIONAL: 'Condicionales',
+  MATRICULADO_DEFINITIVO: 'Definitivas',
+  RETIRADO: 'Retirados',
+  ANULADO: 'Anuladas',
+};
+
 export const NOMBRE_ESTADO_EXPEDIENTE: Record<string, string> = {
   BORRADOR: 'Borrador',
   EN_CONSTRUCCION: 'En construcción',

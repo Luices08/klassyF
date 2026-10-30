@@ -3,11 +3,11 @@ import { AnuncioDrawer } from '../../components/anuncios/AnuncioDrawer';
 import { AccesosRapidos, type AccesoRapido } from '../../components/dashboard/AccesosRapidos';
 import { BarraFiltrosDashboard } from '../../components/dashboard/BarraFiltrosDashboard';
 import { BloqueDashboard } from '../../components/dashboard/BloqueDashboard';
-import { CuadriculaDeAccesos } from '../../components/dashboard/CuadriculaDeAccesos';
+import { FilaPrincipal } from '../../components/dashboard/FilaAdaptable';
 import { GraficaBarrasVerticales } from '../../components/dashboard/GraficaBarrasVerticales';
 import { MatrizEficienciaCompacta } from '../../components/dashboard/MatrizEficienciaCompacta';
 import { PanelComunicacion } from '../../components/dashboard/PanelComunicacion';
-import { SeccionPlegable } from '../../components/dashboard/SeccionPlegable';
+import { SeccionTodasLasPantallas } from '../../components/dashboard/SeccionTodasLasPantallas';
 import { TarjetaIndicador } from '../../components/dashboard/TarjetaIndicador';
 import type { NavItem } from '../../components/layout/navigation';
 import { Alert, errorMessage } from '../../components/ui/Alert';
@@ -137,53 +137,50 @@ export function DashboardDirectivoPage({ links }: { links: NavItem[] }) {
         />
       </div>
 
-      <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-3">
-        <div className="space-y-4 lg:col-span-2">
-          <BloqueDashboard titulo="Matriz de eficiencia interna" subtitulo="Resultado por nivel educativo" consulta={eficiencia}>
-            {(datos) => <MatrizEficienciaCompacta datos={datos} />}
-          </BloqueDashboard>
+      <FilaPrincipal
+        izquierda={
+          <>
+            <BloqueDashboard titulo="Matriz de eficiencia interna" subtitulo="Resultado por nivel educativo" consulta={eficiencia}>
+              {(datos) => <MatrizEficienciaCompacta datos={datos} />}
+            </BloqueDashboard>
 
-          <BloqueDashboard
-            titulo="Morbilidad académica"
-            subtitulo={morbilidad.data ? `Mayor reprobación · periodo ${morbilidad.data.contexto.periodo_notas} (mínimo ${morbilidad.data.minimo_evaluados} evaluados)` : 'Asignaturas y áreas con más reprobación'}
-            accion={
-              <FiltrosRapidos
-                ariaLabel="Ver morbilidad por"
-                valor={morbilidadPor}
-                onChange={setMorbilidadPor}
-                items={[
-                  { clave: 'asignaturas', etiqueta: 'Asignaturas' },
-                  { clave: 'areas', etiqueta: 'Áreas' },
-                ]}
-              />
-            }
-            consulta={morbilidad}
-          >
-            {(datos) => (
-              <GraficaBarrasVerticales
-                etiquetaEje="Porcentaje de reprobación"
-                vacio={`Ninguna ${morbilidadPor === 'asignaturas' ? 'asignatura' : 'área'} tiene reprobados con al menos ${datos.minimo_evaluados} evaluados en este periodo.`}
-                barras={(morbilidadPor === 'asignaturas' ? datos.asignaturas : datos.areas).slice(0, MAX_BARRAS_MORBILIDAD).map((m) => ({
-                  clave: m.clave,
-                  etiqueta: m.nombre,
-                  valor: m.porcentaje,
-                  ayuda: `${m.nombre}${morbilidadPor === 'asignaturas' && m.area ? ` (${m.area})` : ''}: ${formatoPorcentaje(m.porcentaje)} · ${m.reprobados} de ${m.evaluados} evaluados`,
-                }))}
-              />
-            )}
-          </BloqueDashboard>
-        </div>
+            <BloqueDashboard
+              titulo="Morbilidad académica"
+              subtitulo={morbilidad.data ? `Mayor reprobación · periodo ${morbilidad.data.contexto.periodo_notas} (mínimo ${morbilidad.data.minimo_evaluados} evaluados)` : 'Asignaturas y áreas con más reprobación'}
+              accion={
+                <FiltrosRapidos
+                  ariaLabel="Ver morbilidad por"
+                  valor={morbilidadPor}
+                  onChange={setMorbilidadPor}
+                  items={[
+                    { clave: 'asignaturas', etiqueta: 'Asignaturas' },
+                    { clave: 'areas', etiqueta: 'Áreas' },
+                  ]}
+                />
+              }
+              consulta={morbilidad}
+            >
+              {(datos) => (
+                <GraficaBarrasVerticales
+                  etiquetaEje="Porcentaje de reprobación"
+                  vacio={`Ninguna ${morbilidadPor === 'asignaturas' ? 'asignatura' : 'área'} tiene reprobados con al menos ${datos.minimo_evaluados} evaluados en este periodo.`}
+                  barras={(morbilidadPor === 'asignaturas' ? datos.asignaturas : datos.areas).slice(0, MAX_BARRAS_MORBILIDAD).map((m) => ({
+                    clave: m.clave,
+                    etiqueta: m.nombre,
+                    valor: m.porcentaje,
+                    ayuda: `${m.nombre}${morbilidadPor === 'asignaturas' && m.area ? ` (${m.area})` : ''}: ${formatoPorcentaje(m.porcentaje)} · ${m.reprobados} de ${m.evaluados} evaluados`,
+                  }))}
+                />
+              )}
+            </BloqueDashboard>
+          </>
+        }
+        derecha={<AccesosRapidos destacados columnas={1} accesos={accesos} />}
+      />
 
-        <div className="space-y-4">
-          <AccesosRapidos destacados columnas={1} accesos={accesos} />
-          <PanelComunicacion variante="lista" onRedactar={() => setComunicado(ANUNCIO_VACIO)} />
-        </div>
-      </div>
+      <PanelComunicacion onRedactar={() => setComunicado(ANUNCIO_VACIO)} />
 
-      {/* En pantallas pequeñas el menú lateral se oculta y esta cuadrícula es la navegación: ahí nace abierta. */}
-      <SeccionPlegable titulo="Todas las pantallas" subtitulo="Los accesos del menú, con sus novedades." abiertaPorDefecto={window.innerWidth < 1024}>
-        <CuadriculaDeAccesos links={links} />
-      </SeccionPlegable>
+      <SeccionTodasLasPantallas links={links} />
 
       <AnuncioDrawer form={comunicado} onChange={setComunicado} />
     </div>

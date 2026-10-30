@@ -310,3 +310,22 @@ export function useDocumentosPrevistos(params: { group_id?: string; /** Sin grup
     enabled: Boolean(params.tipo_ingreso),
   });
 }
+
+/** El grado y el grupo del propio estudiante (su inicio); `null` si todavía no tiene matrícula. */
+export interface MatriculaPropia {
+  estado: EstadoMatricula;
+  anio: number;
+  grado: string;
+  grupo: string;
+  sede: string;
+  jornada: string;
+}
+
+export function useMiMatricula(habilitado = true) {
+  return useQuery({
+    queryKey: ['enrollments', 'mia'],
+    queryFn: () => api.get<MatriculaPropia | null>('/enrollments/mia'),
+    enabled: habilitado,
+    staleTime: 5 * 60_000,
+  });
+}

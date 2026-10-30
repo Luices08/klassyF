@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { CategoriasPanel } from '../components/noticias/CategoriasPanel';
 import { MosaicoDeNoticias } from '../components/noticias/MosaicoDeNoticias';
@@ -16,7 +16,6 @@ import { PlusIcon } from '../components/ui/icons';
 import { useAuth } from '../context/AuthContext';
 import { type NoticiaDetalle, type NoticiaGestion, ETIQUETA_ALCANCE, ETIQUETA_ROL_DESTINO, useArchivarNoticia, useNoticiasGestion, useNoticiasParaMi, usePermisosNoticias } from '../hooks/useNoticias';
 import { api } from '../lib/apiClient';
-import { paraMosaico } from '../lib/mosaicoNoticias';
 import { type FormularioNoticia, NOTICIA_VACIA, formularioDeNoticia } from '../lib/noticias';
 import { formatoFechaHora } from '../lib/fechas';
 
@@ -38,7 +37,6 @@ export function NoticiasPage() {
   const [errorEdicion, setErrorEdicion] = useState<string | null>(null);
   const qc = useQueryClient();
   // En la página de noticias se ven todas (en el inicio, solo las que caben): el mosaico con todos sus tamaños.
-  const elegidas = useMemo(() => paraMosaico(mias.data ?? [], Number.POSITIVE_INFINITY), [mias.data]);
 
   /** El cuerpo con formato no viene en los listados: se pide al abrir la edición para que el editor lo muestre completo. */
   const editar = async (n: NoticiaGestion) => {
@@ -83,7 +81,7 @@ export function NoticiasPage() {
           {mias.isLoading && <Spinner />}
           {mias.isError && <Alert tone="error">{errorMessage(mias.error)}</Alert>}
           {!mias.isLoading && (mias.data?.length ?? 0) === 0 && <Alert tone="info">No hay noticias ni eventos por ahora.</Alert>}
-          {elegidas.length > 0 && <MosaicoDeNoticias elegidas={elegidas} onAbrir={setAbierta} />}
+          {(mias.data ?? []).length > 0 && <MosaicoDeNoticias noticias={mias.data ?? []} presupuesto={Number.POSITIVE_INFINITY} onAbrir={setAbierta} />}
         </div>
       )}
 

@@ -3,6 +3,7 @@ import * as coordinacion from '../services/dashboardCoordinacion.service';
 import { FiltrosDashboard } from '../services/dashboardContexto.service';
 import * as bienestar from '../services/dashboardBienestar.service';
 import * as directivo from '../services/dashboardDirectivo.service';
+import * as secretaria from '../services/dashboardSecretaria.service';
 import catchAsync from '../utils/catchAsync';
 
 type ConsultaDashboard = ParsedQs & Omit<FiltrosDashboard, 'periodo_numero'> & { periodo_numero?: string };
@@ -40,3 +41,7 @@ const panelDeBienestar = (calcular: (f: bienestar.FiltrosBienestar, usuario: Non
 
 export const panelConvivencia = panelDeBienestar(bienestar.obtenerPanelConvivencia);
 export const panelOrientacion = panelDeBienestar(bienestar.obtenerPanelOrientacion);
+
+// --- Secretaría: sus trámites, acotados a las sedes que tiene asignadas ---
+
+export const panelSecretaria = panelDeBienestar(secretaria.obtenerPanelSecretaria);

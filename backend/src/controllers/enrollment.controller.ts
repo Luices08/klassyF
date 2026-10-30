@@ -5,6 +5,7 @@ import { EstadoMatricula, TipoDocumentoMatricula } from '../constants/enums';
 import * as actaCompromisoService from '../services/actaCompromiso.service';
 import { guardarArchivoDeDocumento } from '../services/documentoMatriculaArchivo.service';
 import * as enrollmentService from '../services/enrollment.service';
+import { miMatricula } from '../services/matriculaPropia.service';
 import { CreateEnrollmentInput, FormalizacionOpciones, RevisarDocumentoInput } from '../services/enrollment.service';
 import ApiError from '../utils/ApiError';
 import catchAsync from '../utils/catchAsync';
@@ -176,3 +177,8 @@ export const actualizarComentarioDocumento = catchAsync<ChecklistParams, unknown
     res.status(200).json({ success: true, data: enrollment });
   }
 );
+
+/** El estudiante ve su propio grado y grupo en el inicio. */
+export const miMatriculaPropia = catchAsync(async (req, res) => {
+  res.status(200).json({ success: true, data: await miMatricula(req.user!) });
+});

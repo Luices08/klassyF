@@ -22,6 +22,8 @@ export interface AccesoRapido {
 const CLASES = 'flex items-center gap-3 rounded-xl border border-border bg-surface p-3 text-left text-sm font-semibold text-ink transition-colors hover:border-primary/40 hover:bg-primary-soft hover:text-primary';
 const CLASES_DESTACADO = 'group flex items-center gap-4 rounded-xl border border-border bg-surface p-4 text-left text-sm font-semibold text-ink shadow-sm transition-colors hover:border-primary/40 hover:bg-primary-soft/50';
 
+const CLASES_VERTICAL = 'group flex flex-col items-start gap-3 rounded-xl border border-border bg-surface p-4 text-left text-sm font-semibold text-ink shadow-sm transition-colors hover:border-primary/40 hover:bg-primary-soft/50';
+
 const TONO_ICONO: Record<Tone, string> = {
   blue: 'bg-primary-soft text-primary',
   green: 'bg-success-soft text-success',
@@ -30,7 +32,24 @@ const TONO_ICONO: Record<Tone, string> = {
   neutral: 'bg-soft text-muted',
 };
 
-function Contenido({ a, destacado }: { a: AccesoRapido; destacado: boolean }) {
+function Contenido({ a, destacado, vertical }: { a: AccesoRapido; destacado: boolean; vertical: boolean }) {
+  if (vertical) {
+    return (
+      <>
+        <span className="flex w-full items-start justify-between gap-2">
+          <span className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-full ${TONO_ICONO[a.tono ?? 'blue']}`}>
+            <a.icono className="h-6 w-6" />
+          </span>
+          <ContadorInsignia valor={a.contador ?? 0} />
+        </span>
+        <span className="block min-w-0">
+          <span className="block">{a.etiqueta}</span>
+          {a.descripcion && <span className="mt-0.5 block text-xs font-normal text-muted">{a.descripcion}</span>}
+        </span>
+        <ChevronRightIcon className="mt-auto h-4 w-4 shrink-0 text-primary transition-transform group-hover:translate-x-0.5" />
+      </>
+    );
+  }
   return (
     <>
       <span className={`flex shrink-0 items-center justify-center rounded-full ${destacado ? `h-11 w-11 ${TONO_ICONO[a.tono ?? 'blue']}` : 'h-9 w-9 bg-primary-soft text-primary'}`}>
@@ -56,6 +75,7 @@ export function AccesosRapidos({
   subtitulo,
   destacados = false,
   columnas = 2,
+  vertical = false,
 }: {
   accesos: AccesoRapido[];
   titulo?: string;
@@ -63,20 +83,22 @@ export function AccesosRapidos({
   destacados?: boolean;
   /** `1` para una columna angosta (los accesos se apilan); por defecto dos en pantallas medianas. */
   columnas?: 1 | 2;
+  /** Tarjetas verticales (icono arriba, título, descripción y flecha) en una fila de tres: la versión de los inicios de docentes, estudiantes y acudientes. */
+  vertical?: boolean;
 }) {
-  const clases = destacados ? CLASES_DESTACADO : CLASES;
+  const clases = vertical ? CLASES_VERTICAL : destacados ? CLASES_DESTACADO : CLASES;
   return (
-    <Card>
+    <Card className="flex flex-col">
       <CardHeader title={titulo} subtitle={subtitulo} />
-      <div className={`grid grid-cols-1 gap-3 ${columnas === 2 ? 'sm:grid-cols-2' : ''}`}>
+      <div className={`grid grid-cols-1 gap-3 ${vertical ? 'sm:grid-cols-3' : columnas === 2 ? 'sm:grid-cols-2' : ''} ${destacados || vertical ? 'flex-1 auto-rows-fr' : ''}`}>
         {accesos.map((a) =>
           a.to ? (
             <Link key={a.etiqueta} to={a.to} className={clases}>
-              <Contenido a={a} destacado={destacados} />
+              <Contenido a={a} destacado={destacados} vertical={vertical} />
             </Link>
           ) : (
             <button key={a.etiqueta} type="button" onClick={a.onClick} className={clases}>
-              <Contenido a={a} destacado={destacados} />
+              <Contenido a={a} destacado={destacados} vertical={vertical} />
             </button>
           )
         )}

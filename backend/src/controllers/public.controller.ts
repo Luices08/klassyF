@@ -7,6 +7,6 @@ export const obtenerInfoPublica = catchAsync(async (_req, res) => {
   res.status(200).json({ success: true, data: info });
 });
 
-export const listarOfertaDeAdmision = catchAsync(async (_req, res) => {
-  res.status(200).json({ success: true, data: await ofertaDeAdmision() });
+export const listarOfertaDeAdmision = catchAsync<unknown, unknown, unknown, { academic_year_id?: string }>(async (req, res) => {
+  res.status(200).json({ success: true, data: await ofertaDeAdmision(req.query.academic_year_id || undefined) });
 });

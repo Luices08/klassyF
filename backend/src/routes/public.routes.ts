@@ -60,7 +60,7 @@ router.post('/citaciones/:token/respuesta', citacionLimiter, validate(citacionVa
 router.get('/institution-info', lecturaLimiter, obtenerInfoPublica);
 // Términos y condiciones: se leen antes de iniciar sesión (la primera vez que se abre la plataforma en un navegador).
 router.get('/terminos', lecturaLimiter, terminosVigentes);
-router.get('/admission-requests/oferta', lecturaLimiter, listarOfertaDeAdmision);
+router.get('/admission-requests/oferta', lecturaLimiter, validate(admissionValidator.ofertaDeAdmision), listarOfertaDeAdmision);
 router.get('/sitio', lecturaLimiter, verSitioPublico);
 router.get('/sitio/imagenes/:id', lecturaLimiter, validate(conIdDeImagen), verImagenSitio);
 router.get('/institution-imagen/:clave', lecturaLimiter, validate(institutionValidator.conClaveDeImagen), verImagenPublica);

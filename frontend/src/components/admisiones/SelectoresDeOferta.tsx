@@ -11,12 +11,12 @@ export interface PedidoDeCupo {
 }
 
 /**
- * Grado, sede y jornada que pide una solicitud de cupo, limitados a lo que el colegio ofrece (grupos activos del año de admisión): cada lista solo trae
+ * Grado, sede y jornada que pide una solicitud de cupo, limitados a lo que el colegio ofrece (grupos activos del año elegido): cada lista solo trae
  * lo que existe junto con lo ya elegido, así nadie radica un grado en una sede o jornada donde no hay. Sede y jornada son opcionales («sin preferencia»).
  * El servidor vuelve a comprobarlo al radicar.
  */
-export function SelectoresDeOferta({ valor, onChange }: { valor: PedidoDeCupo; onChange: (cambios: Partial<PedidoDeCupo>) => void }) {
-  const { data, isLoading } = useOfertaDeAdmision();
+export function SelectoresDeOferta({ valor, onChange, anioId }: { valor: PedidoDeCupo; onChange: (cambios: Partial<PedidoDeCupo>) => void; anioId?: string }) {
+  const { data, isLoading } = useOfertaDeAdmision(anioId);
   const oferta = data?.oferta ?? [];
 
   const coincide = (o: (typeof oferta)[number], sin: keyof PedidoDeCupo) =>

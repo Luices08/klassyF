@@ -195,7 +195,7 @@ export function InscripcionDrawer({ open, onClose }: Props) {
               </Select>
               <Input label="Número de documento" required value={form.numero_documento} onChange={(e) => set('numero_documento', e.target.value)} />
               <Input label="Fecha de nacimiento" type="date" required max={new Date().toISOString().slice(0, 10)} value={form.fecha_nacimiento} onChange={(e) => set('fecha_nacimiento', e.target.value)} />
-              <SelectoresDeOferta valor={form} onChange={(cambios) => setForm((f) => ({ ...f, ...cambios }))} />
+              <SelectoresDeOferta anioId={anioActivoId || undefined} valor={form} onChange={(cambios) => setForm((f) => ({ ...f, ...cambios }))} />
             </div>
           </fieldset>
 

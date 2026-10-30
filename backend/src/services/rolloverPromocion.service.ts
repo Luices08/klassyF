@@ -23,7 +23,9 @@ import { registrarEvento } from './audit.service';
 import { cargarAnio } from './configuracionRecuperaciones.service';
 import { obtenerConfiguracion } from './configuracionRematricula.service';
 import { exigirSinMatriculaViva } from './enrollment.service';
-import { asignarFolio } from './foliatura.service';
+import { asegurarConfiguracion as asegurarFoliatura, asignarFolio } from './foliatura.service';
+import { aprobarItemConPazYSalvo, pazYSalvoConfirmadoPrevio } from './pazYSalvo.service';
+import { DIAS_PLAZO_LEGALIZACION } from '../constants/matriculaChecklist';
 
 /** Consultan coordinación, administración y secretaría (esta solo de sus sedes). */
 const PUEDEN_CONSULTAR = [ROLES.ADMIN, ROLES.COORDINADOR, ROLES.SECRETARIA];
@@ -112,9 +114,10 @@ async function cargarAnios(f: FiltrosRollover): Promise<{ origen: AcademicYearDo
   return { origen, destino };
 }
 
-function cierreEntrada(cierre: { detalle?: unknown } | null | undefined): Record<string, any> {
-  if (!cierre?.detalle || typeof cierre.detalle !== 'object') return {};
-  return cierre.detalle as Record<string, any>;
+/** Lo que el cierre de M19 congeló del año (promedio, faltas, PIAR) vive en `entrada`; `detalle` es la explicación del resultado. */
+function cierreEntrada(cierre: { entrada?: unknown } | null | undefined): { promedio_general?: number | null; tiene_piar?: boolean } {
+  if (!cierre?.entrada || typeof cierre.entrada !== 'object') return {};
+  return cierre.entrada as { promedio_general?: number | null; tiene_piar?: boolean };
 }
 
 async function planificar(f: FiltrosRollover, alcance: 'TODAS' | string[]): Promise<PlanRollover> {
@@ -157,25 +160,21 @@ async function planificar(f: FiltrosRollover, alcance: 'TODAS' | string[]): Prom
   const [usuarios, perfiles, cierres, graduaciones] = await Promise.all([
     User.find({ _id: { $in: estudiantesIds } }).select('_id nombre apellido numero_documento estado').lean(),
     StudentProfile.find({ user_id: { $in: estudiantesIds } }).select('user_id fecha_nacimiento estado').lean(),
-    EvaluacionPromocion.find({ academic_year_id: origen._id, student_id: { $in: estudiantesIds } }).sort({ momento: -1, version: -1 }).lean(),
-    Titulacion.find({ student_id: { $in: estudiantesIds }, estado: 'GRADUADO' }).select('student_id').lean(),
+    EvaluacionPromocion.find({ academic_year_id: origen._id, student_id: { $in: estudiantesIds }, vigente: true }).lean(),
+    Titulacion.find({ academic_year_id: origen._id, student_id: { $in: estudiantesIds }, estado: { $in: ['GRADUADO', 'GRADUADO_EXTEMPORANEO'] } }).select('student_id').lean(),
   ]);
 
   const usuarioPorId = new Map(usuarios.map((u) => [String(u._id), u]));
   const perfilPorId = new Map(perfiles.map((p) => [String(p.user_id), p]));
   const graduadosIds = new Set(graduaciones.map((g) => String(g.student_id)));
 
-  // Cierre más reciente por estudiante
-  const cierrePorId = new Map<string, typeof cierres[0]>();
-  for (const c of cierres) {
-    const sid = String(c.student_id);
-    if (!cierrePorId.has(sid)) cierrePorId.set(sid, c);
-  }
+  const cierrePorId = new Map(cierres.map((c) => [String(c.student_id), c]));
 
   const grupoPorId = new Map(gruposOrigen.map((g) => [String(g._id), g]));
   const gradoPorId = new Map(grados.map((g) => [String(g._id), g]));
   const gradoPorNumero = new Map(grados.map((g) => [g.numero, g]));
 
+  // Quien continúa lo dice la familia (o secretaría por ella): sin indicarlo, solo se matricula a quienes confirmaron.
   const modoContinuidad: ModoContinuidad = f.continuidad ?? 'CONFIRMADOS';
 
   const ordenadas = [...activosOrigen].sort((a, b) => {
@@ -414,6 +413,12 @@ export async function simularRollover(f: FiltrosRollover, usuario: UserDocument)
   return planificar(f, alcanceParaConsulta(f, usuario));
 }
 
+/** Plazo para entregar el paz y salvo: desde que arranca el año siguiente (o desde hoy, si ya arrancó), los días que el colegio da de partida. */
+function plazoDeLegalizacion(destino: AcademicYearDocument): Date {
+  const base = Math.max(destino.fecha_inicio.getTime(), Date.now());
+  return new Date(new Date(base + DIAS_PLAZO_LEGALIZACION * 86_400_000).toISOString().slice(0, 10));
+}
+
 export interface DatosMatriculaRollover {
   student_id: string;
   tipo_ingreso: TipoIngreso;
@@ -424,8 +429,8 @@ export interface DatosMatriculaRollover {
 
 /**
  * Formaliza directamente la matrícula para estudiantes antiguos (promovidos o repitentes):
- * Asigna nuevo Libro y Folio del año destino, genera checklist aprobado (documentos ya en archivo),
- * y nace en MATRICULADO_DEFINITIVO sin transitar por condicional ni preinscrito.
+ * Asigna nuevo Libro y Folio del año destino y genera el checklist con los documentos ya en archivo aprobados.
+ * Nace MATRICULADO_DEFINITIVO si el paz y salvo del año que termina está confirmado, y MATRICULADO_CONDICIONAL (con plazo) si no.
  */
 export async function crearMatriculaRollover(fila: DatosMatriculaRollover, destino: AcademicYearDocument, session: ClientSession): Promise<Types.ObjectId> {
   await exigirSinMatriculaViva(fila.student_id, destino._id, session);
@@ -453,19 +458,26 @@ export async function crearMatriculaRollover(fila: DatosMatriculaRollover, desti
     parentescoAcudiente: vinculo?.parentesco,
   });
 
-  // Los estudiantes antiguos ya tienen sus documentos en el archivo del colegio; se asientan aprobados.
+  // Los estudiantes antiguos ya tienen sus documentos en el archivo del colegio; se asientan aprobados, salvo el paz y salvo del año que termina:
+  // ese es el candado de la matrícula definitiva y solo se aprueba si ya está confirmado.
   const checklist = itemsCatalogo.map((item) => ({
     tipo_documento: item.tipo_documento,
     nombre_personalizado: item.nombre_personalizado ?? null,
     indicacion: item.indicacion ?? null,
     categoria: item.categoria ?? null,
     obligatorio: item.obligatorio,
-    estado: 'APROBADO' as EstadoDocumentoMatricula,
+    estado: (item.tipo_documento === 'PAZ_Y_SALVO_ANIO_ANTERIOR' ? 'PENDIENTE' : 'APROBADO') as EstadoDocumentoMatricula,
     archivo_path: null,
     comentario: null,
-    fecha_carga: new Date(),
+    fecha_carga: item.tipo_documento === 'PAZ_Y_SALVO_ANIO_ANTERIOR' ? null : new Date(),
     revisado_por: null,
   }));
+  const itemPazYSalvo = checklist.find((c) => c.tipo_documento === 'PAZ_Y_SALVO_ANIO_ANTERIOR');
+  if (itemPazYSalvo) {
+    const previo = await pazYSalvoConfirmadoPrevio(fila.student_id, destino.year);
+    if (previo) aprobarItemConPazYSalvo(itemPazYSalvo, previo);
+  }
+  const pazPendiente = Boolean(itemPazYSalvo && itemPazYSalvo.estado !== 'APROBADO');
 
   const { numero_libro, numero_folio, folio_matricula } = await asignarFolio(destino.year, session);
 
@@ -476,11 +488,12 @@ export async function crearMatriculaRollover(fila: DatosMatriculaRollover, desti
         group_id: grupo._id,
         academic_year_id: destino._id,
         tipo_ingreso: fila.tipo_ingreso,
-        estado: 'MATRICULADO_DEFINITIVO',
+        estado: pazPendiente ? 'MATRICULADO_CONDICIONAL' : 'MATRICULADO_DEFINITIVO',
         numero_libro,
         numero_folio,
         folio_matricula,
         fecha_matricula: new Date(),
+        ...(pazPendiente ? { fecha_limite_compromiso: plazoDeLegalizacion(destino) } : {}),
         checklist,
       },
     ],
@@ -504,6 +517,8 @@ export async function ejecutarRollover(f: FiltrosRollover, contrasena: string, u
 
   const plan = await planificar(f, alcance);
   const destino = await cargarAnio(f.destino_id);
+  // Antes de abrir la transacción: crearla dentro de ella choca entre dos primeras matrículas y la lectura transaccional no la vería.
+  await asegurarFoliatura();
   const porCrear = plan.filas.filter((x) => x.estado === 'POR_CREAR');
 
   let creadas: Array<{ fila: FilaRollover; matriculaId: Types.ObjectId }> = [];

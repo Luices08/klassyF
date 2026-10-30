@@ -29,7 +29,7 @@ router.get('/:id', checkRole(...STAFF), validate(admissionValidator.obtenerSolic
 router.post('/:id/documentos/:tipoDocumento', checkRole(...STAFF), subirDocumentoMatricula.single('file'), validate(admissionValidator.documentoDeSolicitud), subirDocumentoSolicitud);
 router.get('/:id/documentos/:tipoDocumento/archivo', checkRole(...STAFF), validate(admissionValidator.documentoDeSolicitud), descargarDocumentoSolicitud);
 router.delete('/:id/documentos/:tipoDocumento', checkRole(...STAFF), validate(admissionValidator.documentoDeSolicitud), quitarDocumentoSolicitud);
-router.patch('/:id/admitir', checkRole(...STAFF), admitirSolicitud);
+router.patch('/:id/admitir', checkRole(...STAFF), validate(admissionValidator.admitirSolicitud), admitirSolicitud);
 router.patch('/:id/aprobar', checkRole(...STAFF), validate(admissionValidator.aprobarYMatricular), aprobarYMatricular);
 router.patch('/:id/matricular', checkRole(...STAFF), validate(admissionValidator.aprobarYMatricular), aprobarYMatricular);
 router.patch('/:id/rechazar', checkRole(...STAFF), validate(admissionValidator.rechazarSolicitud), rechazarSolicitud);

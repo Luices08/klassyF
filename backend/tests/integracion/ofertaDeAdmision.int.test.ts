@@ -2,7 +2,6 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import AcademicYear from '../../src/models/academicYear.model';
 import AdmissionRequest from '../../src/models/admissionRequest.model';
 import Campus from '../../src/models/campus.model';
-import ConfiguracionPrematricula from '../../src/models/configuracionPrematricula.model';
 import Grade from '../../src/models/grade.model';
 import Group from '../../src/models/group.model';
 import JornadaOperativa from '../../src/models/jornadaOperativa.model';
@@ -68,11 +67,6 @@ describe('M04: oferta de admisión y validación de grado, sede y jornada', () =
       ),
     });
   };
-  const abrirVentana = (anioId: unknown) => {
-    const hoy = Date.now();
-    return ConfiguracionPrematricula.create({ academic_year_id: anioId, desde: new Date(hoy - 86_400_000), hasta: new Date(hoy + 30 * 86_400_000) });
-  };
-
   it('la oferta lista cada combinación de grado, sede y jornada con un grupo activo, sin repetir y sin los grupos cerrados', async () => {
     const base = (await Group.findOne())!;
     await Group.create({ sede_id: base.sede_id, academic_year_id: base.academic_year_id, grade_id: base.grade_id, jornada_id: base.jornada_id, nomenclatura: '602', max_capacity: 30 });
@@ -98,29 +92,33 @@ describe('M04: oferta de admisión y validación de grado, sede y jornada', () =
     expect(await AdmissionRequest.countDocuments()).toBe(0);
   });
 
-  it('con la ventana de prematrícula abierta la oferta es la del año siguiente', async () => {
+  it('la oferta es la del año que se elige: el siguiente ofrece lo suyo y el en curso lo suyo', async () => {
     const actual = (await AcademicYear.findOne())!;
     const siguiente = await crearSiguiente();
     const base = (await Group.findOne())!;
     const tarde = await JornadaOperativa.create({ sede_id: base.sede_id, nombre: 'TARDE', hora_inicio: '13:00', hora_fin: '18:00' });
     await Group.create({ sede_id: base.sede_id, academic_year_id: siguiente._id, grade_id: septimo, jornada_id: tarde._id, nomenclatura: '701', max_capacity: 30 });
-    await abrirVentana(siguiente._id);
 
-    const { oferta, anio } = await ofertaDeAdmision();
-    expect(anio).toMatchObject({ year: actual.year + 1 });
-    expect(oferta.map((o) => `${o.grado.nombre}/${o.jornada}`)).toEqual(['Séptimo/TARDE']);
-    // Sexto ya no se ofrece para el año que viene (no tiene grupos allá): se rechaza.
-    await expect(solicitar()).rejects.toMatchObject({ statusCode: 400 });
-    expect(await solicitar({ grado_deseado_id: septimo, jornada_deseada: 'TARDE' })).toMatchObject({ estado: 'PENDIENTE' });
+    const delSiguiente = await ofertaDeAdmision(String(siguiente._id));
+    expect(delSiguiente.anio).toMatchObject({ year: actual.year + 1 });
+    expect(delSiguiente.oferta.map((o) => `${o.grado.nombre}/${o.jornada}`)).toEqual(['Séptimo/TARDE']);
+    expect((await ofertaDeAdmision()).oferta.map((o) => o.grado.nombre)).toEqual(['Sexto']);
+    expect((await ofertaDeAdmision()).anios_disponibles.map((a) => a.year)).toEqual([actual.year, actual.year + 1]);
+
+    // Sexto no tiene grupos el año que viene: ahí se rechaza; en el año en curso sí se acepta.
+    await expect(solicitar({ academic_year_id: String(siguiente._id) })).rejects.toMatchObject({ statusCode: 400 });
+    expect(await solicitar({ academic_year_id: String(siguiente._id), grado_deseado_id: septimo, jornada_deseada: 'TARDE' })).toMatchObject({ estado: 'PENDIENTE' });
+    expect(await solicitar()).toMatchObject({ estado: 'PENDIENTE' });
   });
 
-  it('si el año de la admisión aún no tiene grupos se usa el del año sin cerrar más reciente que sí los tenga', async () => {
-    const actual = (await AcademicYear.findOne())!;
+  it('un año elegido sin grupos no ofrece nada (no se cae al año en curso), y uno cerrado o inexistente es 400', async () => {
     const siguiente = await crearSiguiente();
-    await abrirVentana(siguiente._id);
-    const { oferta, anio } = await ofertaDeAdmision();
-    expect(anio).toMatchObject({ year: actual.year });
-    expect(oferta).toHaveLength(1);
+    expect((await ofertaDeAdmision(String(siguiente._id))).oferta).toEqual([]);
+    await expect(solicitar({ academic_year_id: String(siguiente._id) })).rejects.toMatchObject({ statusCode: 400, message: expect.stringMatching(/aún no tiene grupos/) });
+
+    await AcademicYear.updateOne({ _id: siguiente._id }, { estado: 'CERRADO' });
+    await expect(ofertaDeAdmision(String(siguiente._id))).rejects.toMatchObject({ statusCode: 400 });
+    await expect(ofertaDeAdmision('64b000000000000000000000')).rejects.toMatchObject({ statusCode: 400 });
   });
 
   it('sin ningún grupo activo no se puede solicitar', async () => {

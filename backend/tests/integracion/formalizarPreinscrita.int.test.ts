@@ -2,14 +2,12 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import AcademicYear from '../../src/models/academicYear.model';
 import ConfirmacionContinuidad from '../../src/models/confirmacionContinuidad.model';
 import Enrollment from '../../src/models/enrollment.model';
-import Grade from '../../src/models/grade.model';
 import Group from '../../src/models/group.model';
 import SolicitudApoyo from '../../src/models/solicitudApoyo.model';
 import StudentProfile from '../../src/models/studentProfile.model';
-import User from '../../src/models/user.model';
-import { aprobarSolicitud, crearSolicitud } from '../../src/services/admissionRequest.service';
 import { cargarDocumento, formalizarMatriculaPreinscrita, grupoSugerido, listarSituacionEstudiantes } from '../../src/services/enrollment.service';
 import { detenerBaseDeDatos, iniciarBaseDeDatos, limpiarBaseDeDatos } from './baseDeDatos';
+import { crearPreinscritaHeredada } from './preinscritaHeredada';
 import { armarEscenario, Escenario } from './escenario';
 
 /**
@@ -33,25 +31,10 @@ describe('M04: formalizar preinscritas y sugerir grupo', () => {
     grupo = String((await Group.findOne())!._id);
   });
 
-  /** Una preinscrita real: la solicitud se aprueba (crea al estudiante y su matrícula sin folio, con el checklist del grado). */
+  /** Una preinscrita heredada: sin folio, con el cupo ocupado y el checklist del grado (ya ningún flujo nuevo las crea, pero siguen formalizándose). */
   const preinscrita = async () => {
     contador += 1;
-    const solicitud = await crearSolicitud({
-      primer_nombre: 'Laura',
-      primer_apellido: `López${contador}`,
-      tipo_documento: 'TI',
-      numero_documento: `6600${contador}`,
-      fecha_nacimiento: '2014-05-10' as unknown as string,
-      grado_deseado_id: String((await Grade.findOne())!._id),
-      acudiente_nombre: 'Marta',
-      acudiente_apellido: 'Morales',
-      acudiente_telefono: `32000${contador}`,
-      acudiente_email: `familia${contador}@correo.com`,
-    });
-    await aprobarSolicitud(String(solicitud._id), { group_id: grupo, academic_year_id: anio }, e.secretaria._id);
-    const estudiante = (await User.findOne({ numero_documento: `6600${contador}` }))!;
-    const matricula = (await Enrollment.findOne({ student_id: estudiante._id }))!;
-    return { estudiante, matricula };
+    return crearPreinscritaHeredada({ grupo, anio, numero_documento: `6600${contador}`, acudiente_telefono: `32000${contador}`, acudiente_email: `familia${contador}@correo.com` });
   };
   const actor = () => ({ id: e.secretaria._id });
   const obligatorios = (checklist: Array<{ obligatorio?: boolean; tipo_documento: string }>) => checklist.filter((c) => c.obligatorio !== false);

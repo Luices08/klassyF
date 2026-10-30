@@ -93,14 +93,22 @@ export const obtenerSolicitud: ValidationSchema = {
   params: Joi.object({ id: objectId.required() }),
 };
 
+export const ofertaDeAdmision: ValidationSchema = {
+  query: Joi.object({ academic_year_id: objectId }),
+};
+
+export const admitirSolicitud: ValidationSchema = {
+  params: Joi.object({ id: objectId.required() }),
+};
+
 export const aprobarYMatricular: ValidationSchema = {
   params: Joi.object({ id: objectId.required() }),
   body: Joi.object({
     group_id: objectId.required(),
     academic_year_id: objectId.required(),
-    trae_todos: Joi.string().valid('SI', 'NO').default('SI'),
+    // Sin default a propósito: omitirlo no debe dar por vistos los documentos.
+    trae_todos: Joi.string().valid('SI', 'NO').required(),
     fecha_limite_compromiso: Joi.date().allow(null, ''),
-    fecha_limite_legalizacion: Joi.date().allow(null, ''),
   }),
 };
 export const aprobarSolicitud = aprobarYMatricular;

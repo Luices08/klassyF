@@ -446,7 +446,7 @@ export interface VerificacionCierre {
 }
 
 /** Estudiantes con matrícula activa en el año cuyo cierre de promoción (M19) aún no es un resultado final. */
-async function estudiantesSinPromocionResuelta(anio: AcademicYearDocument): Promise<number> {
+export async function estudiantesSinPromocionResuelta(anio: AcademicYearDocument): Promise<number> {
   const [matriculas, finales] = await Promise.all([
     Enrollment.distinct('student_id', { academic_year_id: anio._id, estado: { $in: ESTADOS_MATRICULA_ACTIVOS } }),
     EvaluacionPromocion.distinct('student_id', { academic_year_id: anio._id, vigente: true, resultado: { $in: RESULTADOS_FINALES } }),

@@ -10,7 +10,7 @@ import { anioDeLaAdmision } from './admissionRequest.service';
 
 /**
  * La oferta de admisión (M04): qué grados hay en qué sedes y jornadas, según los grupos activos del año al que apunta una solicitud nueva.
- * Incluye los años disponibles abiertos (en curso y siguiente en planificación si existe).
+ * Incluye los años disponibles abiertos (en curso y siguiente en planificación si existe). Con `anioElegido` la oferta es la de ese año.
  */
 
 export interface AnioOferta {
@@ -30,7 +30,14 @@ export interface OfertaDeAdmision {
   }>;
 }
 
-async function gruposActivosDelAnioDeAdmision() {
+async function gruposActivosDelAnioDeAdmision(anioElegido?: string) {
+  // El año elegido en el formulario manda: su oferta es la de sus propios grupos, aunque aún no tenga ninguno (no se cae al año en curso).
+  if (anioElegido) {
+    const anio = await AcademicYear.findById(anioElegido).select('estado');
+    if (!anio || anio.estado === 'CERRADO') throw new ApiError(400, 'El año lectivo seleccionado no existe o se encuentra cerrado.');
+    const grupos = await Group.find({ academic_year_id: anio._id, estado: 'ACTIVE' }).select('grade_id sede_id jornada_id').lean();
+    return { anioId: anio._id, grupos };
+  }
   const preferido = await anioDeLaAdmision();
   const candidatos = preferido ? [preferido] : [];
   const otros = await AcademicYear.find({ estado: { $ne: 'CERRADO' }, ...(preferido ? { _id: { $ne: preferido } } : {}) }).sort({ year: -1, createdAt: -1 }).select('_id');
@@ -41,8 +48,8 @@ async function gruposActivosDelAnioDeAdmision() {
   return { anioId: preferido, grupos: [] };
 }
 
-export async function ofertaDeAdmision(): Promise<OfertaDeAdmision> {
-  const { anioId, grupos } = await gruposActivosDelAnioDeAdmision();
+export async function ofertaDeAdmision(anioElegido?: string): Promise<OfertaDeAdmision> {
+  const { anioId, grupos } = await gruposActivosDelAnioDeAdmision(anioElegido);
   const [anio, aniosAbiertos, grados, sedes, jornadas] = await Promise.all([
     anioId ? AcademicYear.findById(anioId).select('year') : null,
     AcademicYear.find({ estado: { $ne: 'CERRADO' } }).sort({ year: 1 }).select('year estado').lean(),
@@ -82,8 +89,8 @@ export async function ofertaDeAdmision(): Promise<OfertaDeAdmision> {
 }
 
 /** Rechaza (400) un pedido de cupo que el colegio no ofrece. Lo usan la solicitud pública y la inscripción en el mostrador: nadie radica algo que luego haya que rechazar. */
-export async function exigirOfertaDisponible(pedido: PedidoDeCupo): Promise<void> {
-  const { oferta } = await ofertaDeAdmision();
+export async function exigirOfertaDisponible(pedido: PedidoDeCupo, anioElegido?: string): Promise<void> {
+  const { oferta } = await ofertaDeAdmision(anioElegido);
   const opciones: OpcionDeOferta[] = oferta.map((o) => ({ grado_id: o.grado.id, sede_id: o.sede.id, jornada: o.jornada }));
   const motivo = motivoDeOfertaNoDisponible(opciones, pedido);
   if (motivo) throw new ApiError(400, motivo);

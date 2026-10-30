@@ -25,10 +25,11 @@ export interface OfertaDeAdmision {
   oferta: Array<{ grado: { id: string; nombre: string; numero: number }; sede: { id: string; nombre: string }; jornada: Jornada }>;
 }
 
-export function useOfertaDeAdmision() {
+/** La oferta del año elegido en el formulario; sin año, la del año de admisión por defecto. */
+export function useOfertaDeAdmision(anioId?: string) {
   return useQuery({
-    queryKey: ['public', 'oferta-admision'],
-    queryFn: () => api.get<OfertaDeAdmision>('/public/admission-requests/oferta'),
+    queryKey: ['public', 'oferta-admision', anioId ?? null],
+    queryFn: () => api.get<OfertaDeAdmision>(`/public/admission-requests/oferta${anioId ? `?academic_year_id=${anioId}` : ''}`),
     staleTime: 60_000,
   });
 }
@@ -254,7 +255,6 @@ export interface AprobarYMatricularParams {
   academic_year_id: string;
   trae_todos: 'SI' | 'NO';
   fecha_limite_compromiso?: string;
-  fecha_limite_legalizacion?: string;
 }
 
 export function useAprobarSolicitud() {

@@ -19,7 +19,8 @@ export function nombreDeBase(uri: string): string {
   return sinParametros.slice(sinParametros.lastIndexOf('/') + 1);
 }
 
-if (!/sim/i.test(nombreDeBase(MONGO_URI_SIM))) {
+// `llenar:sistema` lo apaga a propósito para cargar la historia en la base de trabajo, solo después de vaciarla con permiso explícito.
+if (process.env.SIM_BASE_DE_TRABAJO !== '1' && !/sim/i.test(nombreDeBase(MONGO_URI_SIM))) {
   throw new Error(`La base de la simulación debe tener «sim» en su nombre (recibí «${nombreDeBase(MONGO_URI_SIM)}»). Revisa SIM_MONGO_URI.`);
 }
 

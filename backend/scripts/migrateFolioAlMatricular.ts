@@ -28,6 +28,8 @@ async function run(): Promise<void> {
   await mongoose.connect(env.mongoUri);
   console.log('[migrate] Conectado a MongoDB.');
 
+  // En una instalación nueva la colección aún no existe y listar sus índices fallaría.
+  await Enrollment.createCollection();
   const coleccion = Enrollment.collection;
 
   const indices = await coleccion.indexes();

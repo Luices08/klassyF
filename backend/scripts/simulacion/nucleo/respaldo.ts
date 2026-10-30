@@ -33,6 +33,8 @@ export function restaurar(uri: string, uploadsDir: string, respaldosDir: string,
   const base = path.join(respaldosDir, nombreArchivo(clave));
   if (!fs.existsSync(`${base}.db.gz`)) throw new Error(`No hay respaldo de la fase ${clave} en ${respaldosDir}.`);
   correr('mongorestore', [`--uri=${uri}`, `--archive=${base}.db.gz`, '--gzip', '--drop', '--quiet']);
-  fs.rmSync(uploadsDir, { recursive: true, force: true });
+  // Se vacía el contenido y no la carpeta: en Docker es un volumen montado y no se puede borrar.
+  fs.mkdirSync(uploadsDir, { recursive: true });
+  for (const entrada of fs.readdirSync(uploadsDir)) fs.rmSync(path.join(uploadsDir, entrada), { recursive: true, force: true });
   correr('tar', ['-xzf', `${base}.archivos.tgz`, '-C', path.dirname(uploadsDir)]);
 }

@@ -41,6 +41,7 @@ DOCKER.md
 # Simulación multi-año (scripts/simulacion): archivos y respaldos de la base klassy_sim, datos ficticios regenerables.
 backend/uploads-sim/
 backend/respaldos-sim/
+respaldos-sim/
 backend/exportacion-sim/
 
 # Documento de funciones esenciales generado localmente (mapa del código), no se sube

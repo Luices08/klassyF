@@ -62,6 +62,9 @@ services:
     environment:
       NODE_ENV: production
       MONGO_URI: mongodb://mongo:27017/${MONGO_DB:-klassy}?replicaSet=rs0
+    # La misma carpeta de archivos del backend: lo que un script guarda (p. ej. los PDF de la simulacion) se puede descargar en la app.
+    volumes:
+      - uploads:/app/uploads
     depends_on:
       mongo:
         condition: service_healthy

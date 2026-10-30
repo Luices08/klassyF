@@ -19,6 +19,9 @@ ENV NODE_ENV=production
 COPY tsconfig.json tsconfig.scripts.json ./
 COPY src ./src
 COPY scripts ./scripts
+# Mismo usuario que el backend: los archivos que un script deja en el volumen uploads los puede seguir escribiendo la API.
+RUN mkdir -p uploads && chown node:node /app uploads && chown -R node:node src scripts
+USER node
 CMD ["npm", "run", "seed"]
 
 FROM node:22-alpine AS produccion

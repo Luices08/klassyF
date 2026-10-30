@@ -1,12 +1,12 @@
 import { AccesosRapidos, type AccesoRapido } from '../../components/dashboard/AccesosRapidos';
 import { BarraFiltrosDashboard } from '../../components/dashboard/BarraFiltrosDashboard';
-import { BarrasHorizontales } from '../../components/dashboard/BarrasHorizontales';
 import { BloqueDashboard } from '../../components/dashboard/BloqueDashboard';
-import { CuadriculaDeAccesos } from '../../components/dashboard/CuadriculaDeAccesos';
-import { MosaicoNoticiasInicio } from '../../components/noticias/MosaicoNoticiasInicio';
-import { SeccionPlegable } from '../../components/dashboard/SeccionPlegable';
+import { FilaAdaptable, FilaPrincipal } from '../../components/dashboard/FilaAdaptable';
+import { GraficaBarrasVerticales } from '../../components/dashboard/GraficaBarrasVerticales';
+import { SeccionTodasLasPantallas } from '../../components/dashboard/SeccionTodasLasPantallas';
 import { TarjetaIndicador } from '../../components/dashboard/TarjetaIndicador';
 import type { NavItem } from '../../components/layout/navigation';
+import { MosaicoNoticiasInicio } from '../../components/noticias/MosaicoNoticiasInicio';
 import { Alert } from '../../components/ui/Alert';
 import { Chip } from '../../components/ui/Badge';
 import { Card } from '../../components/ui/Card';
@@ -27,9 +27,9 @@ export function DashboardOrientacionPage({ links }: { links: NavItem[] }) {
   const p = panel.data;
 
   const accesos: AccesoRapido[] = [
-    { etiqueta: 'Remisiones a orientación', descripcion: 'Estudiantes que convivencia te remitió', icono: InboxIcon, to: '/orientacion/remisiones', contador: p?.remisiones.PENDIENTE },
-    { etiqueta: 'Inclusión (PIAR)', descripcion: 'Solicitudes de apoyo y expedientes', icono: FolderIcon, to: '/inclusion', contador: p?.solicitudes_apoyo.pendientes },
-    { etiqueta: 'Balance de inclusión', descripcion: 'Cierre anual en Excel o PDF', icono: ClipboardListIcon, to: '/admin/reportes-cierre?pestana=listados' },
+    { etiqueta: 'Remisiones a orientación', descripcion: 'Estudiantes que convivencia te remitió', icono: InboxIcon, tono: 'orange', to: '/orientacion/remisiones', contador: p?.remisiones.PENDIENTE },
+    { etiqueta: 'Inclusión (PIAR)', descripcion: 'Solicitudes de apoyo y expedientes', icono: FolderIcon, tono: 'blue', to: '/inclusion', contador: p?.solicitudes_apoyo.pendientes },
+    { etiqueta: 'Balance de inclusión', descripcion: 'Cierre anual en Excel o PDF', icono: ClipboardListIcon, tono: 'green', to: '/admin/reportes-cierre?pestana=listados' },
   ];
 
   return (
@@ -41,6 +41,7 @@ export function DashboardOrientacionPage({ links }: { links: NavItem[] }) {
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <TarjetaIndicador
+          tinte
           titulo="Remisiones por atender"
           icono={InboxIcon}
           tono={p && p.remisiones.PENDIENTE > 0 ? 'orange' : 'green'}
@@ -50,6 +51,7 @@ export function DashboardOrientacionPage({ links }: { links: NavItem[] }) {
           error={panel.error}
         />
         <TarjetaIndicador
+          tinte
           titulo="Solicitudes de apoyo"
           icono={FolderIcon}
           tono={p && p.solicitudes_apoyo.pendientes > 0 ? 'orange' : 'green'}
@@ -59,6 +61,7 @@ export function DashboardOrientacionPage({ links }: { links: NavItem[] }) {
           error={panel.error}
         />
         <TarjetaIndicador
+          tinte
           titulo="Expedientes de inclusión"
           icono={ClipboardListIcon}
           tono="blue"
@@ -69,6 +72,7 @@ export function DashboardOrientacionPage({ links }: { links: NavItem[] }) {
           error={panel.error}
         />
         <TarjetaIndicador
+          tinte
           titulo="Sin autorización de datos"
           icono={LockIcon}
           tono={p && p.expedientes.sin_autorizacion > 0 ? 'red' : 'green'}
@@ -79,55 +83,60 @@ export function DashboardOrientacionPage({ links }: { links: NavItem[] }) {
         />
       </div>
 
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-        <div className="space-y-4 lg:col-span-2">
+      <FilaPrincipal
+        izquierda={
           <BloqueDashboard titulo="Expedientes por estado" subtitulo="Cómo va cada expediente del año" consulta={panel}>
             {(datos) => (
-              <BarrasHorizontales
+              <GraficaBarrasVerticales
+                unidad="conteo"
+                etiquetaEje="Expedientes de inclusión por estado"
                 vacio="Aún no hay expedientes este año."
-                filas={Object.entries(datos.expedientes.por_estado)
+                barras={Object.entries(datos.expedientes.por_estado)
                   .filter(([, total]) => total > 0)
-                  .map(([estado, total]) => ({ clave: estado, etiqueta: NOMBRE_ESTADO_EXPEDIENTE[estado] ?? estado, valor: total, maximo: datos.expedientes.total, texto: formatoNumero(total) }))}
+                  .map(([estado, total]) => ({
+                    clave: estado,
+                    etiqueta: NOMBRE_ESTADO_EXPEDIENTE[estado] ?? estado,
+                    valor: total,
+                    ayuda: `${NOMBRE_ESTADO_EXPEDIENTE[estado] ?? estado}: ${formatoNumero(total)} de ${formatoNumero(datos.expedientes.total)} expedientes`,
+                  }))}
               />
             )}
           </BloqueDashboard>
+        }
+        derecha={<AccesosRapidos destacados columnas={1} accesos={accesos} />}
+      />
 
-          <BloqueDashboard titulo="Seguimiento de los ajustes del PIAR" subtitulo="Ajustes de expedientes activos" consulta={panel}>
-            {(datos) =>
-              datos.seguimiento.total === 0 ? (
-                <Alert tone="info">No hay ajustes razonables en expedientes activos todavía.</Alert>
-              ) : (
-                <div className="space-y-2">
-                  <p className="flex items-center justify-between text-sm text-body">
-                    <span>
-                      {datos.seguimiento.con_minimo} de {datos.seguimiento.total} ajustes ya tienen seguimientos en {datos.seguimiento.minimo} periodos distintos
-                    </span>
-                    <Chip tone={datos.seguimiento.con_minimo === datos.seguimiento.total ? 'green' : 'orange'}>{Math.round((datos.seguimiento.con_minimo / datos.seguimiento.total) * 100)} %</Chip>
-                  </p>
-                  <ProgressBar value={datos.seguimiento.con_minimo} max={datos.seguimiento.total} tone="green" label="Ajustes con el seguimiento mínimo" />
-                  <p className="text-xs text-muted">El mínimo lo fija el colegio. Durante el año es normal que aún falte: se exige al cierre.</p>
-                </div>
-              )
-            }
-          </BloqueDashboard>
-        </div>
+      <FilaAdaptable>
+        <BloqueDashboard titulo="Seguimiento de los ajustes del PIAR" subtitulo="Ajustes de expedientes activos" consulta={panel}>
+          {(datos) =>
+            datos.seguimiento.total === 0 ? (
+              <Alert tone="info">No hay ajustes razonables en expedientes activos todavía.</Alert>
+            ) : (
+              <div className="space-y-2">
+                <p className="flex items-center justify-between text-sm text-body">
+                  <span>
+                    {datos.seguimiento.con_minimo} de {datos.seguimiento.total} ajustes ya tienen seguimientos en {datos.seguimiento.minimo} periodos distintos
+                  </span>
+                  <Chip tone={datos.seguimiento.con_minimo === datos.seguimiento.total ? 'green' : 'orange'}>{Math.round((datos.seguimiento.con_minimo / datos.seguimiento.total) * 100)} %</Chip>
+                </p>
+                <ProgressBar value={datos.seguimiento.con_minimo} max={datos.seguimiento.total} tone="green" label="Ajustes con el seguimiento mínimo" />
+                <p className="text-xs text-muted">El mínimo lo fija el colegio. Durante el año es normal que aún falte: se exige al cierre.</p>
+              </div>
+            )
+          }
+        </BloqueDashboard>
 
-        <div className="space-y-4">
-          <AccesosRapidos accesos={accesos} />
-          <Card className="space-y-2">
-            <p className="flex items-center gap-2 text-label font-semibold text-ink">
-              <AlertTriangleIcon className="h-4 w-4 text-warning" /> Información confidencial
-            </p>
-            <p className="text-sm text-muted">Este panel solo cuenta. La categoría, los diagnósticos y lo escrito en cada atención se ven dentro de cada expediente y quedan auditados.</p>
-          </Card>
-        </div>
-      </div>
+        <Card className="space-y-2">
+          <p className="flex items-center gap-2 text-label font-semibold text-ink">
+            <AlertTriangleIcon className="h-4 w-4 text-warning" /> Información confidencial
+          </p>
+          <p className="text-sm text-muted">Este panel solo cuenta. La categoría, los diagnósticos y lo escrito en cada atención se ven dentro de cada expediente y quedan auditados.</p>
+        </Card>
+      </FilaAdaptable>
 
       <MosaicoNoticiasInicio />
 
-      <SeccionPlegable titulo="Todas las pantallas" subtitulo="Los accesos del menú, con sus novedades." abiertaPorDefecto={window.innerWidth < 1024}>
-        <CuadriculaDeAccesos links={links} />
-      </SeccionPlegable>
+      <SeccionTodasLasPantallas links={links} />
     </div>
   );
 }

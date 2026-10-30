@@ -229,6 +229,15 @@ export const EyeIcon = (p: IconProps) => (
   </Icon>
 );
 
+export const EyeOffIcon = (p: IconProps) => (
+  <Icon {...p}>
+    <path d="M17.94 17.94A10.94 10.94 0 0 1 12 20C5 20 1 12 1 12a18.5 18.5 0 0 1 5.06-5.94" />
+    <path d="M9.9 4.24A9.1 9.1 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19" />
+    <path d="M14.12 14.12A3 3 0 1 1 9.88 9.88" />
+    <path d="m1 1 22 22" />
+  </Icon>
+);
+
 export const InboxIcon = (p: IconProps) => (
   <Icon {...p}>
     <path d="M4 13h4l1.5 3h5L16 13h4" />

@@ -29,4 +29,7 @@ router.get('/coordinacion/alertas', checkRole(...DIRECTIVOS), validate(v.consult
 router.get('/convivencia', checkRole(ROLES.ADMIN, ROLES.COORDINADOR_CONVIVENCIA), validate(v.consultaBienestar), c.panelConvivencia);
 router.get('/orientacion', checkRole(ROLES.ADMIN, ROLES.ORIENTADOR), validate(v.consultaBienestar), c.panelOrientacion);
 
+// Secretaría: conteos de matrículas, admisiones, documentos y salidas de sus sedes. Rectoría tiene sus propios indicadores; el resto de roles no entra.
+router.get('/secretaria', checkRole(ROLES.SECRETARIA), validate(v.consultaBienestar), c.panelSecretaria);
+
 export default router;

@@ -94,5 +94,7 @@ export const verImagenPublica = catchAsync<{ clave: ClaveImagenInstitucional }>(
   const { mime, datos } = await institutionService.leerImagenInstitucional(req.params.clave);
   // La URL lleva `?v=<fecha>`, así que puede cachearse sin riesgo de ver una foto vieja.
   res.setHeader('Cache-Control', 'public, max-age=86400');
+  // helmet pone `same-origin` por defecto: con el frontend en otro origen (desarrollo) el navegador bloquearía la foto y no se vería ni en el login.
+  res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
   res.type(mime).send(datos);
 });

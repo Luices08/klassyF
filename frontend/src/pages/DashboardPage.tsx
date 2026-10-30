@@ -1,5 +1,4 @@
 import { Link, Navigate } from 'react-router-dom';
-import { CuadriculaDeAccesos } from '../components/dashboard/CuadriculaDeAccesos';
 import { MosaicoNoticiasInicio } from '../components/noticias/MosaicoNoticiasInicio';
 import { Card } from '../components/ui/Card';
 import { Chip } from '../components/ui/Badge';
@@ -11,6 +10,7 @@ import { DashboardConvivenciaPage } from './dashboard/DashboardConvivenciaPage';
 import { DashboardCoordinacionPage } from './dashboard/DashboardCoordinacionPage';
 import { DashboardDirectivoPage } from './dashboard/DashboardDirectivoPage';
 import { DashboardOrientacionPage } from './dashboard/DashboardOrientacionPage';
+import { DashboardSecretariaPage } from './dashboard/DashboardSecretariaPage';
 
 const ROLE_LABELS: Record<string, string> = {
   ADMIN: 'Administrador',
@@ -32,12 +32,14 @@ export function DashboardPage() {
 
   const links = NAV_ITEMS.filter((item) => item.to !== '/panel' && !item.soloEncabezado && (!item.roles || item.roles.includes(user.rol)));
 
-  // Rectoría, coordinación académica, convivencia y orientación tienen su propio panel (M30); conserva debajo la cuadrícula de accesos, que es la navegación en pantallas pequeñas.
+  // Rectoría, coordinación académica, secretaría, convivencia y orientación tienen su propio panel (M30), con la cuadrícula de accesos plegada al final.
   if (user.rol === 'ADMIN') return <DashboardDirectivoPage links={links} />;
   if (user.rol === 'COORDINADOR') return <DashboardCoordinacionPage links={links} />;
   // Convivencia y orientación ven lo suyo (casos, remisiones, expedientes) y solo en conteos: el detalle está en sus pantallas, con la consulta auditada.
   if (user.rol === 'COORDINADOR_CONVIVENCIA') return <DashboardConvivenciaPage links={links} />;
   if (user.rol === 'ORIENTADOR') return <DashboardOrientacionPage links={links} />;
+  // Secretaría ve sus trámites (matrículas, admisiones, documentos, salidas) y solo en conteos.
+  if (user.rol === 'SECRETARIA') return <DashboardSecretariaPage links={links} />;
 
   return (
     <div className="space-y-4">
@@ -63,10 +65,8 @@ export function DashboardPage() {
         </Card>
       )}
 
-      {/* Las noticias que le tocan a cada perfil, como mosaico (docentes, estudiantes y secretaría; el acudiente las ve en su portal). */}
+      {/* Las noticias que le tocan a cada perfil, como mosaico. La navegación es el menú lateral (en celular, la hamburguesa), no una cuadrícula en el inicio. */}
       <MosaicoNoticiasInicio />
-
-      <CuadriculaDeAccesos links={links} />
     </div>
   );
 }

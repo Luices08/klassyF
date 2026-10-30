@@ -3,8 +3,9 @@ import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { SelectorRolLogin } from '../components/auth/SelectorRolLogin';
 import { Alert, errorMessage } from '../components/ui/Alert';
 import { Button } from '../components/ui/Button';
+import { CampoContrasena } from '../components/ui/CampoContrasena';
 import { Input } from '../components/ui/Field';
-import { ArrowLeftIcon, BuildingIcon } from '../components/ui/icons';
+import { ArrowLeftIcon, BuildingIcon, InfoIcon } from '../components/ui/icons';
 import { useAuth } from '../context/AuthContext';
 import { usePublicInstitutionInfo } from '../hooks/usePublicInfo';
 import { urlDeApi } from '../lib/apiClient';
@@ -74,19 +75,25 @@ export function LoginPage() {
         <div className={`absolute inset-0 ${imagen ? 'bg-gradient-to-t from-ink/85 via-ink/40 to-ink/20' : 'bg-gradient-to-br from-primary to-ink/70'}`} />
 
         <div className="relative flex items-center gap-3 text-surface">
-          {institucion?.logo_url ? (
-            <img src={institucion.logo_url} alt="" className="h-12 w-12 rounded-xl bg-surface object-contain p-1.5 shadow-md" />
-          ) : (
-            <span className="flex h-12 w-12 items-center justify-center rounded-xl bg-surface/20 backdrop-blur">
-              <BuildingIcon className="h-6 w-6" />
-            </span>
-          )}
+          <span className="flex h-12 w-12 items-center justify-center rounded-xl bg-surface p-1.5 shadow-md">
+            <img src="/logo-k.png" alt="" className="h-full w-full object-contain" />
+          </span>
           <span className="text-h3 font-semibold">Klassy</span>
         </div>
 
+        {/* El escudo del colegio va junto a su nombre y más grande que el logo de Klassy: así se distingue el colegio de la plataforma. */}
         <div className="relative max-w-md text-surface">
-          <h1 className="text-h1">{institucion ? nombreColegio : 'Bienvenido a Klassy'}</h1>
-          <p className="mt-3 text-body text-surface/85">Gestor académico y administrativo. Un solo lugar para estudiantes, docentes, familias y directivos.</p>
+          <div className="flex items-center gap-4">
+            {institucion?.logo_url ? (
+              <img src={institucion.logo_url} alt={`Escudo de ${nombreColegio}`} className="h-20 w-20 shrink-0 rounded-2xl bg-surface object-contain p-2 shadow-md" />
+            ) : (
+              <span className="flex h-20 w-20 shrink-0 items-center justify-center rounded-2xl bg-surface/20 backdrop-blur">
+                <BuildingIcon className="h-9 w-9" />
+              </span>
+            )}
+            <h1 className="text-h1">{institucion ? nombreColegio : 'Bienvenido a Klassy'}</h1>
+          </div>
+          <p className="mt-4 text-body text-surface/85">Gestor académico y administrativo. Un solo lugar para estudiantes, docentes, familias y directivos.</p>
         </div>
       </aside>
 
@@ -104,8 +111,11 @@ export function LoginPage() {
         <div className="w-full max-w-md pt-10 lg:pt-0">
           {/* En pantallas pequeñas el panel de marca no cabe: se resume en un encabezado. */}
           <div className="mb-6 text-center lg:hidden">
-            {institucion?.logo_url && <img src={institucion.logo_url} alt="" className="mx-auto mb-3 h-14 w-14 rounded-xl border border-border bg-surface object-contain p-1.5" />}
-            <h1 className="text-h2 text-primary">{nombreColegio}</h1>
+            <img src="/logo-klassy.png" alt="Klassy" className="mx-auto h-10 w-auto" />
+            <div className="mt-4 flex items-center justify-center gap-3">
+              {institucion?.logo_url && <img src={institucion.logo_url} alt={`Escudo de ${nombreColegio}`} className="h-14 w-14 shrink-0 rounded-xl border border-border bg-surface object-contain p-1.5" />}
+              <h1 className="text-h2 text-primary">{nombreColegio}</h1>
+            </div>
             <p className="mt-1 text-sm text-muted">Gestor académico y administrativo</p>
           </div>
 
@@ -128,9 +138,8 @@ export function LoginPage() {
               value={numeroDocumento}
               onChange={(e) => setNumeroDocumento(e.target.value)}
             />
-            <Input
+            <CampoContrasena
               label="Contraseña"
-              type="password"
               name="password"
               autoComplete="current-password"
               required
@@ -143,6 +152,26 @@ export function LoginPage() {
             </Button>
 
             <p className="text-center text-xs text-muted">Si tienes más de un perfil (por ejemplo docente y acudiente) puedes cambiar de uno a otro después, sin volver a escribir tu contraseña.</p>
+
+            <div className="flex items-start gap-3 rounded-xl bg-primary-soft p-4">
+              <InfoIcon className="mt-0.5 h-5 w-5 shrink-0 text-primary" />
+              <div className="text-xs">
+                <p className="font-semibold text-ink">¿Necesitas ayuda?</p>
+                <p className="mt-0.5 text-muted">
+                  Si tienes problemas para acceder, comunícate con la secretaría del colegio
+                  {institucion?.correo_secretaria ? (
+                    <>
+                      :{' '}
+                      <a href={`mailto:${institucion.correo_secretaria}`} className="font-semibold text-primary hover:underline">
+                        {institucion.correo_secretaria}
+                      </a>
+                    </>
+                  ) : (
+                    '.'
+                  )}
+                </p>
+              </div>
+            </div>
           </form>
         </div>
       </main>

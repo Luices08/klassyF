@@ -224,3 +224,17 @@ export interface PanelOrientacion {
 
 export const usePanelConvivencia = (f: FiltrosDashboard | null, habilitado = true) => useBloqueBienestar<PanelConvivencia>('/convivencia', habilitado ? f : null);
 export const usePanelOrientacion = (f: FiltrosDashboard | null, habilitado = true) => useBloqueBienestar<PanelOrientacion>('/orientacion', habilitado ? f : null);
+
+// --- Secretaría: sus trámites en conteos, acotados a las sedes que tiene asignadas ---
+
+export interface PanelSecretaria {
+  contexto: { academic_year_id: string; anio: number; grupos: number };
+  matricula: { matriculados: number; capacidad: number; disponibles: number; ocupacion_pct: number | null; preinscritos: number; por_estado: Record<string, number> };
+  admisiones: { pendientes: number; admitidas: number; mas_antigua_dias: number | null };
+  documentos: { por_revisar: number; condicionales: { total: number; plazo_vencido: number } };
+  salidas: { total: number; paz_y_salvo_pendiente: number; paz_y_salvo_bloqueado: number; cupo_retenido: number };
+  renovacion: { continuan: number; no_continuan: number; sin_respuesta: number };
+  ocupacion_por_grado: Array<{ grado_id: string; grado: string; grado_numero: number; ocupados: number; capacidad: number; ocupacion_pct: number | null }>;
+}
+
+export const usePanelSecretaria = (f: FiltrosDashboard | null) => useBloqueBienestar<PanelSecretaria>('/secretaria', f);

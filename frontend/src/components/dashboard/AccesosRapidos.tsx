@@ -66,9 +66,9 @@ export function AccesosRapidos({
 }) {
   const clases = destacados ? CLASES_DESTACADO : CLASES;
   return (
-    <Card>
+    <Card className="flex flex-col">
       <CardHeader title={titulo} subtitle={subtitulo} />
-      <div className={`grid grid-cols-1 gap-3 ${columnas === 2 ? 'sm:grid-cols-2' : ''}`}>
+      <div className={`grid grid-cols-1 gap-3 ${columnas === 2 ? 'sm:grid-cols-2' : ''} ${destacados ? 'flex-1 auto-rows-fr' : ''}`}>
         {accesos.map((a) =>
           a.to ? (
             <Link key={a.etiqueta} to={a.to} className={clases}>

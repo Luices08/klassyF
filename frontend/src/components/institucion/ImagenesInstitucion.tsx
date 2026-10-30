@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Alert, errorMessage } from '../ui/Alert';
 import { Button } from '../ui/Button';
 import { Card, CardHeader } from '../ui/Card';
@@ -21,8 +21,15 @@ function BloqueImagen({ clave, titulo, subtitulo, actualizadaEn }: BloqueImagenP
   const subir = useSubirImagenInstitucion();
   const quitar = useQuitarImagenInstitucion();
   const [archivo, setArchivo] = useState<File | null>(null);
+  // Al elegir un archivo se ve de inmediato, antes de guardarlo: así se nota que la selección funcionó.
+  const vistaLocal = useMemo(() => (archivo ? URL.createObjectURL(archivo) : null), [archivo]);
+  useEffect(() => {
+    if (!vistaLocal) return;
+    return () => URL.revokeObjectURL(vistaLocal);
+  }, [vistaLocal]);
 
-  const url = actualizadaEn ? urlDeApi(`/public/institution-imagen/${clave}?v=${new Date(actualizadaEn).getTime()}`) : null;
+  const urlGuardada = actualizadaEn ? urlDeApi(`/public/institution-imagen/${clave}?v=${new Date(actualizadaEn).getTime()}`) : null;
+  const url = vistaLocal ?? urlGuardada;
 
   async function guardar() {
     if (!archivo) return;
@@ -37,7 +44,10 @@ function BloqueImagen({ clave, titulo, subtitulo, actualizadaEn }: BloqueImagenP
         {(subir.isError || quitar.isError) && <Alert tone="error">{errorMessage(subir.error ?? quitar.error)}</Alert>}
 
         {url ? (
-          <img src={url} alt={titulo} className="aspect-video w-full rounded-xl border border-border object-cover" />
+          <div className="relative">
+            <img src={url} alt={titulo} className="aspect-video w-full rounded-xl border border-border object-cover" />
+            {vistaLocal && <span className="absolute left-2 top-2 rounded-full bg-warning-soft px-2.5 py-1 text-xs font-semibold text-warning">Vista previa: aún sin guardar</span>}
+          </div>
         ) : (
           <div className="flex aspect-video w-full flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-border bg-soft text-muted">
             <BuildingIcon className="h-8 w-8" />
@@ -57,9 +67,9 @@ function BloqueImagen({ clave, titulo, subtitulo, actualizadaEn }: BloqueImagenP
 
         <div className="flex flex-wrap gap-2">
           <Button type="button" onClick={() => void guardar()} isLoading={subir.isPending} disabled={!archivo}>
-            {url ? 'Reemplazar imagen' : 'Guardar imagen'}
+            {urlGuardada ? 'Reemplazar imagen' : 'Guardar imagen'}
           </Button>
-          {url && (
+          {urlGuardada && !archivo && (
             <Button type="button" variant="secondary" onClick={() => quitar.mutate(clave)} isLoading={quitar.isPending}>
               Quitar imagen
             </Button>
@@ -70,27 +80,19 @@ function BloqueImagen({ clave, titulo, subtitulo, actualizadaEn }: BloqueImagenP
   );
 }
 
-/** Fotos de la institución, fuera del drawer: la del ingreso (login) y la del tablero que verán docentes, estudiantes y demás perfiles. */
+/** Fotos de la institución, fuera del drawer: la del ingreso (login). La del tablero se quitó de la pantalla porque ninguna vista la usa todavía. */
 export function ImagenesInstitucion() {
   const imagenes = useImagenesInstitucion();
 
   return (
-    <div className="space-y-3">
+    <div className="max-w-2xl space-y-3">
       {imagenes.isError && <Alert tone="error">{errorMessage(imagenes.error)}</Alert>}
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <BloqueImagen
-          clave="login"
-          titulo="Imagen del inicio de sesión"
-          subtitulo="Se muestra junto al formulario de ingreso."
-          actualizadaEn={imagenes.data?.login?.actualizada_en ?? null}
-        />
-        <BloqueImagen
-          clave="dashboard"
-          titulo="Imagen del tablero"
-          subtitulo="Para el próximo tablero de docentes, estudiantes y demás perfiles."
-          actualizadaEn={imagenes.data?.dashboard?.actualizada_en ?? null}
-        />
-      </div>
+      <BloqueImagen
+        clave="login"
+        titulo="Imagen del inicio de sesión"
+        subtitulo="Se muestra en el panel izquierdo de la pantalla de ingreso."
+        actualizadaEn={imagenes.data?.login?.actualizada_en ?? null}
+      />
     </div>
   );
 }

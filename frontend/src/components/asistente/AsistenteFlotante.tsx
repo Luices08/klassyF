@@ -1,7 +1,7 @@
-import { type FormEvent, useEffect, useRef, useState } from 'react';
+import { type FormEvent, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useOrientarAsistente } from '../../hooks/useAsistente';
-import { buscarDestinos, destinoClaro, destinosParaServidor, type Coincidencia } from '../../lib/asistente';
+import { buscarDestinos, destinoClaro, destinosParaServidor, registrarVisita, type Coincidencia, type LugarVisitado } from '../../lib/asistente';
 import type { NavItem } from '../layout/navigation';
 import { Button } from '../ui/Button';
 import { MessageCircleIcon, SendIcon, XIcon } from '../ui/icons';
@@ -12,6 +12,7 @@ interface Mensaje {
   autor: 'asistente' | 'usuario';
   texto: string;
   opciones?: Coincidencia[];
+  destino?: LugarVisitado;
 }
 
 const TAMANO_BOTON = 56;
@@ -32,10 +33,12 @@ interface AsistenteFlotanteProps {
 
 export function AsistenteFlotante({ items }: AsistenteFlotanteProps) {
   const navigate = useNavigate();
-  const { pathname } = useLocation();
+  const { pathname, search } = useLocation();
   const [abierto, setAbierto] = useState(false);
   const [texto, setTexto] = useState('');
   const [mensajes, setMensajes] = useState<Mensaje[]>([SALUDO]);
+  // Solo en memoria, igual que la conversación: se reinicia al cerrar o recargar la página (y al cerrar sesión, porque el asistente se desmonta).
+  const [visitados, setVisitados] = useState<LugarVisitado[]>([]);
   const orientar = useOrientarAsistente();
   const finRef = useRef<HTMLDivElement>(null);
   const panelRef = useRef<HTMLElement>(null);
@@ -86,13 +89,40 @@ export function AsistenteFlotante({ items }: AsistenteFlotanteProps) {
     setMensajes((actuales) => [...actuales, ...nuevos.map((m) => ({ ...m, id: contador.current++ }))]);
   }
 
+  // Los lugares visitados son solo las pantallas a las que el asistente llevó: se anotan en el mismo momento en que redirige.
+  // Si el usuario cambia de perfil, solo se muestran los que su menú todavía le permite abrir.
+  const visitadosVisibles = useMemo(
+    () => visitados.flatMap((v) => {
+      const item = items.find((i) => i.to === v.ruta);
+      return item ? [{ ...v, icono: item.icon }] : [];
+    }),
+    [visitados, items]
+  );
+
+  function redirigirA(ruta: string, url: string, nombre: string, respuesta?: string) {
+    agregar({
+      autor: 'asistente',
+      texto: `${respuesta ?? `Te llevo a «${nombre}».`} 📍 Lugar visitado: «${nombre}».`,
+      destino: { ruta, url, nombre },
+    });
+    navigate(url);
+    setVisitados((actuales) => registrarVisita(actuales, { ruta, url, nombre }));
+  }
+
   function irA(destino: Coincidencia) {
     if (destino.item.to === pathname) {
       agregar({ autor: 'asistente', texto: `Ya estás en «${destino.item.label}». ${destino.descripcion}` });
       return;
     }
-    agregar({ autor: 'asistente', texto: `Te llevo a «${destino.item.label}». ${destino.descripcion}` });
-    navigate(destino.item.to);
+    redirigirA(destino.item.to, destino.item.to, destino.item.label, `Te llevo a «${destino.item.label}». ${destino.descripcion}`);
+  }
+
+  function volverA(lugar: LugarVisitado) {
+    if (lugar.url === `${pathname}${search}`) {
+      agregar({ autor: 'asistente', texto: `Ya estás en «${lugar.nombre}».` });
+      return;
+    }
+    redirigirA(lugar.ruta, lugar.url, lugar.nombre, `Te llevo de nuevo a «${lugar.nombre}».`);
   }
 
   function enviar(e: FormEvent) {
@@ -111,9 +141,10 @@ export function AsistenteFlotante({ items }: AsistenteFlotanteProps) {
             agregar({ autor: 'asistente', texto: r.mensaje });
             return;
           }
-          agregar({ autor: 'asistente', texto: r.mensaje });
           if (destino.to !== pathname || r.grado_id) {
-            navigate(r.grado_id ? `${destino.to}?grado=${r.grado_id}` : destino.to);
+            redirigirA(destino.to, r.grado_id ? `${destino.to}?grado=${r.grado_id}` : destino.to, destino.label, r.mensaje);
+          } else {
+            agregar({ autor: 'asistente', texto: r.mensaje });
           }
         },
         // Sin clave configurada, sin red o con el modelo caído: la búsqueda local sigue sirviendo.
@@ -161,6 +192,33 @@ export function AsistenteFlotante({ items }: AsistenteFlotanteProps) {
             </button>
           </header>
 
+          {visitadosVisibles.length > 0 && (
+            <nav aria-label="Lugares visitados con el asistente" className="border-b border-border bg-surface px-3 py-2">
+              <p className="text-xs font-semibold text-muted">Lugares visitados</p>
+              <ul className="mt-1.5 flex gap-1.5 overflow-x-auto pb-1">
+                {visitadosVisibles.map((v) => {
+                  const actual = v.ruta === pathname;
+                  return (
+                    <li key={v.ruta} className="shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => volverA(v)}
+                        aria-current={actual ? 'page' : undefined}
+                        title={actual ? 'Estás aquí' : `Volver a «${v.nombre}»`}
+                        className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium ring-1 ring-inset ring-border ${
+                          actual ? 'bg-primary-soft text-primary' : 'bg-surface text-body hover:bg-soft'
+                        }`}
+                      >
+                        <v.icono className="h-3.5 w-3.5 shrink-0" />
+                        {v.nombre}
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+            </nav>
+          )}
+
           <div className="flex-1 space-y-3 overflow-y-auto bg-soft px-4 py-3">
             {mensajes.map((m) => (
               <div key={m.id} className={m.autor === 'usuario' ? 'flex justify-end' : 'flex justify-start'}>
@@ -170,6 +228,26 @@ export function AsistenteFlotante({ items }: AsistenteFlotanteProps) {
                   }`}
                 >
                   <p>{m.texto}</p>
+                  {m.destino && (() => {
+                    const destino = m.destino;
+                    const destinoItem = items.find((i) => i.to === destino.ruta);
+                    if (!destinoItem) return null;
+                    const IconoDestino = destinoItem.icon;
+                    const yaEsta = destino.url === `${pathname}${search}`;
+                    return (
+                      <Button
+                        type="button"
+                        variant="soft-edit"
+                        className="mt-2 w-full justify-start"
+                        onClick={() => volverA(destino)}
+                        aria-current={yaEsta ? 'page' : undefined}
+                        title={yaEsta ? 'Estás aquí' : `Ir a «${destino.nombre}»`}
+                      >
+                        <IconoDestino className="h-4 w-4 shrink-0" />
+                        {yaEsta ? 'Estás en' : 'Ir a'} {destino.nombre}
+                      </Button>
+                    );
+                  })()}
                   {m.opciones && (
                     <div className="mt-2 flex flex-col gap-2">
                       {m.opciones.map((o) => (

@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { ENTRADAS_MODELO } from '../src/modulos/predictivo/constants/predictivo';
 import { aVector, corteVigente, cortesDeEntrenamiento, DatosAlCorte, entradasDeAsignatura, notaDelAnioAnterior } from '../src/modulos/predictivo/utils/caracteristicas';
 import { entrenarYEvaluar, FilaEntrenamiento, partirParaPrueba } from '../src/modulos/predictivo/utils/entrenamiento';
-import { fodaDeAsignatura, fodaGeneral, PLANTILLAS_FODA, rellenar, ResumenAsignaturaFoda } from '../src/modulos/predictivo/utils/foda';
+import { crearVariador, fodaDeAsignatura, fodaGeneral, lista, PLANTILLAS_FODA, rellenar, ResumenAsignaturaFoda } from '../src/modulos/predictivo/utils/foda';
+import { combinarProbabilidades, historialDeAsignatura, probabilidadPorHistorial, SenalesAsignatura } from '../src/modulos/predictivo/utils/historial';
 import { auc, calcularMetricas, motivoDeRechazo } from '../src/modulos/predictivo/utils/metricas';
 import { notaRequerida } from '../src/modulos/predictivo/utils/notaRequerida';
 import { puedePredictivo, vistaDelAnalisis } from '../src/modulos/predictivo/utils/permisos';
@@ -210,12 +211,184 @@ describe('predictivo: FODA', () => {
     expect(fodaGeneral(g, ['Matemáticas'], false).oportunidades[0]?.texto).toContain('Matemáticas');    expect(fodaGeneral(g, [], true).debilidades[0]?.texto).toBe('Va perdiendo 2 asignaturas en los periodos cerrados.');
     expect(fodaGeneral({ ...g, perdidas: 1 }, [], true).debilidades[0]?.texto).toBe('Va perdiendo 1 asignatura en los periodos cerrados.');
     expect(fodaGeneral(g, [], true).amenazas.at(-1)?.texto).toBe('Tiene 1 falta de convivencia Tipo II o III este año.');
-    expect(fodaGeneral(g, [], false, ['Inglés', 'Artes']).fortalezas.map((f) => f.texto)).toEqual(['Con lo que lleva ya tiene asegurado aprobar: Inglés, Artes.']);
+    expect(fodaGeneral(g, [], false, ['Inglés', 'Artes']).fortalezas.map((f) => f.texto)).toContain('Con lo que lleva ya tiene asegurado aprobar: Inglés, Artes.');
   });
 
   it('ninguna plantilla para todos menciona convivencia, y las marcas se reemplazan', () => {
-    for (const p of PLANTILLAS_FODA.filter((x) => x.audiencia === 'TODOS')) expect(p.texto.toLowerCase()).not.toMatch(/convivencia|faltas? (de|tipo)|observador/);
+    for (const p of PLANTILLAS_FODA.filter((x) => x.audiencia === 'TODOS')) for (const t of p.textos) expect(t.toLowerCase()).not.toMatch(/convivencia|faltas? (de|tipo)|observador/);
     expect(rellenar('{a} y {b}', { a: 1 })).toBe('1 y {b}');
+  });
+});
+
+describe('predictivo: FODA ampliado', () => {
+  const base: ResumenAsignaturaFoda = {
+    nombre: 'Matemáticas',
+    nota: 3.1,
+    nivel: 'BASICO',
+    desempeno: 'Básico',
+    tendencia: 'ESTABLE',
+    actividades: 10,
+    no_entregadas: 0,
+    registros: 40,
+    fallas: 0,
+    nota_requerida: { estado: 'ALCANZABLE', nota: 3.0, definitiva: null, periodos_restantes: 2 },
+    riesgo: 'MEDIO',
+    nota_anio_anterior: null,
+    minima: 1,
+    maxima: 5,
+  };
+
+  it('cada clave tiene varias redacciones y ninguna se repite', () => {
+    const claves = PLANTILLAS_FODA.map((p) => p.clave);
+    expect(new Set(claves).size).toBe(claves.length);
+    expect(PLANTILLAS_FODA.length).toBeGreaterThanOrEqual(50);
+    for (const p of PLANTILLAS_FODA) {
+      expect(p.textos.length).toBeGreaterThanOrEqual(2);
+      expect(new Set(p.textos).size).toBe(p.textos.length);
+    }
+  });
+
+  it('el variador rota las redacciones entre asignaturas y es determinista', () => {
+    const textos = (semilla: string) => {
+      const variar = crearVariador(semilla);
+      return ['Matemáticas', 'Física', 'Química'].map((nombre) => fodaDeAsignatura({ ...base, nombre }, 3, 1, variar).fortalezas.find((f) => f.clave === 'ENTREGA_TODO')?.texto);
+    };
+    const a = textos('estudiante-1');
+    expect(a).toEqual(textos('estudiante-1'));
+    const formas = a.map((t) => t?.replace(/Matemáticas|Física|Química/, '·'));
+    expect(new Set(formas).size).toBe(3);
+  });
+
+  it('descarta una redacción que usa una marca sin valor', () => {
+    // Sin notas por periodo no se conoce {primera} ni {ultima}: la variante que las usa no puede salir.
+    for (let i = 0; i < 8; i += 1) {
+      const variar = crearVariador(`s${i}`);
+      const f = fodaDeAsignatura({ ...base, tendencia: 'SUBE' }, 3, 1, variar);
+      expect(f.fortalezas.find((x) => x.clave === 'TENDENCIA_SUBE')?.texto).not.toMatch(/\{/);
+    }
+  });
+
+  it('reconoce nota en el límite, historia difícil, cambio reciente y la nota exigente', () => {
+    const f = fodaDeAsignatura(
+      {
+        ...base,
+        nota: 3.1,
+        notas_periodos: [3.3, 3.4, 2.9],
+        historial: { anios: 2, perdidas: 1, promedio: 0.45 },
+        nota_requerida: { estado: 'ALCANZABLE', nota: 4.6, definitiva: null, periodos_restantes: 1 },
+      },
+      3
+    );
+    expect(f.debilidades.map((d) => d.clave)).toEqual(expect.arrayContaining(['NOTA_LIMITE', 'CAIDA_RECIENTE', 'HISTORIAL_DEBIL']));
+    expect(f.amenazas.map((d) => d.clave)).toEqual(expect.arrayContaining(['REQUERIDA_ALTA', 'HISTORIAL_REPITE']));
+    expect(f.debilidades.find((d) => d.clave === 'HISTORIAL_DEBIL')).toBeDefined();
+  });
+
+  it('si con su nivel actual le alcanza, dice «mantener» en vez de «alcanzable»', () => {
+    const f = fodaDeAsignatura({ ...base, nota: 3.8, nota_requerida: { estado: 'ALCANZABLE', nota: 3.2, definitiva: null, periodos_restantes: 1 } }, 3);
+    expect(f.oportunidades.map((o) => o.clave)).toContain('MANTENER_NIVEL');
+    expect(f.oportunidades.map((o) => o.clave)).not.toContain('ALCANZABLE');
+  });
+
+  it('el FODA general nombra mejores, débiles, pendientes y varias en riesgo', () => {
+    const f = fodaGeneral(
+      {
+        promedio: 3.4,
+        nivel: 'BASICO',
+        desempeno: 'Básico',
+        perdidas: 2,
+        registros: 100,
+        fallas: 20,
+        faltas_graves: 0,
+        hay_periodos_cerrados: true,
+        riesgo_no_promocion: 0.1,
+        riesgo_recuperacion: 0.1,
+        actividades: 20,
+        no_entregadas: 8,
+        mejores: ['Artes'],
+        debiles: ['Física', 'Química'],
+        en_riesgo: ['Física', 'Química', 'Inglés'],
+        con_pendientes: ['Física'],
+        periodos_restantes: 2,
+        promedio_primero: 3.8,
+        promedio_ultimo: 3.2,
+        minima: 1,
+        maxima: 5,
+        aprobatoria: 3,
+      },
+      ['Física'],
+      true
+    );
+    expect(f.fortalezas.map((x) => x.clave)).toEqual(['GEN_MEJORES', 'GEN_SIN_FALTAS_GRAVES']);
+    expect(f.debilidades.map((x) => x.clave)).toEqual(['GEN_PERDIDAS', 'GEN_DEBILES', 'GEN_INASISTENCIA', 'GEN_INCUMPLIMIENTO', 'GEN_CAIDA']);
+    expect(f.oportunidades.map((x) => x.clave)).toEqual(['GEN_RECUPERABLES', 'GEN_PONERSE_AL_DIA', 'GEN_APOYARSE', 'GEN_TIEMPO']);
+    expect(f.amenazas.map((x) => x.clave)).toEqual(['GEN_VARIAS_EN_RIESGO', 'GEN_INASISTENCIA_CRITICA']);
+    expect(f.debilidades[1]?.texto).toContain('Física y Química');
+    expect(lista(['A', 'B', 'C'])).toBe('A, B y C');
+  });
+});
+
+describe('predictivo: historial y probabilidad sin notas', () => {
+  const escala = { minima: 1, maxima: 5, aprobatoria: 3 };
+  const anios = [
+    { year: 2025, escala, asignaturas: [{ subject_id: 'mat', area_id: 'ma', nota: 2.6 }, { subject_id: 'art', area_id: 'ar', nota: 4.6 }], promedio_general: 3.6 },
+    { year: 2024, escala, asignaturas: [{ subject_id: 'mat', area_id: 'ma', nota: 2.8 }, { subject_id: 'geo', area_id: 'ma', nota: 3.4 }], promedio_general: 3.5 },
+  ];
+  const senales = (subject: string, area: string, extra: Partial<SenalesAsignatura> = {}): SenalesAsignatura => ({
+    nota_actual: null,
+    periodos_con_nota: 0,
+    promedio_general: null,
+    historial: historialDeAsignatura(anios, subject, area),
+    inasistencia: null,
+    no_entregadas: null,
+    alertas_convivencia: 0,
+    es_repitente: false,
+    aprobatoria: 0.5,
+    ...extra,
+  });
+
+  it('arma la historia de la asignatura (o de su área) del año más reciente al más antiguo', () => {
+    const mat = historialDeAsignatura(anios, 'mat', 'ma');
+    expect(mat.anios.map((a) => [a.year, a.misma, a.perdida])).toEqual([
+      [2025, true, true],
+      [2024, true, true],
+    ]);
+    expect(mat.perdidas).toBe(2);
+    const fis = historialDeAsignatura(anios, 'fis', 'ma');
+    expect(fis.anios.map((a) => [a.year, a.misma])).toEqual([
+      [2025, false],
+      [2024, false],
+    ]);
+    expect(fis.perdidas).toBe(0);
+  });
+
+  it('sin ninguna nota del año da una cifra: alta para la que siempre ha perdido y baja para la que siempre gana', () => {
+    const mala = probabilidadPorHistorial(senales('mat', 'ma')) as number;
+    const buena = probabilidadPorHistorial(senales('art', 'ar')) as number;
+    expect(mala).toBeGreaterThan(0.5);
+    expect(buena).toBeLessThan(0.1);
+  });
+
+  it('con 3.0 cerrado y una historia mala la probabilidad sigue siendo considerable', () => {
+    const p = probabilidadPorHistorial(senales('mat', 'ma', { nota_actual: 0.5, periodos_con_nota: 1, promedio_general: 0.6 })) as number;
+    expect(p).toBeGreaterThan(0.35);
+    const sinHistoria = probabilidadPorHistorial({ ...senales('x', 'y'), historial: { anios: [], promedio: null, perdidas: 0 }, nota_actual: 0.5, periodos_con_nota: 1, promedio_general: 0.6 }) as number;
+    expect(p).toBeGreaterThan(sinHistoria);
+  });
+
+  it('las fallas y las entregas pendientes suben la probabilidad; sin nada que mirar no inventa', () => {
+    const sin = { ...senales('x', 'y'), historial: { anios: [], promedio: null, perdidas: 0 } };
+    expect(probabilidadPorHistorial(sin)).toBeNull();
+    const asiste = probabilidadPorHistorial({ ...sin, inasistencia: 0, no_entregadas: 0 }) as number;
+    const falta = probabilidadPorHistorial({ ...sin, inasistencia: 0.25, no_entregadas: 0.6 }) as number;
+    expect(falta).toBeGreaterThan(asiste);
+  });
+
+  it('combina la red con la historia solo con dos o más años de la misma asignatura', () => {
+    expect(combinarProbabilidades(0.4, 0.8, 1)).toEqual({ probabilidad: 0.4, fuente: 'MODELO' });
+    expect(combinarProbabilidades(0.4, 0.8, 2)).toEqual({ probabilidad: 0.52, fuente: 'MODELO_E_HISTORIAL' });
+    expect(combinarProbabilidades(null, 0.8, 0)).toEqual({ probabilidad: 0.8, fuente: 'HISTORIAL' });
+    expect(combinarProbabilidades(null, null, 0)).toEqual({ probabilidad: null, fuente: null });
   });
 });
 

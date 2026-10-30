@@ -1,37 +1,34 @@
-import { AccionAuditoria } from '../models/auditLog.model';
-import AuditLog from '../models/auditLog.model';
+import { ParamsDictionary } from 'express-serve-static-core';
+import * as historialService from '../services/historialAcciones.service';
+import { generarExcelTabular } from '../services/reporteTabularExcel.service';
 import catchAsync from '../utils/catchAsync';
 
-interface ListAuditLogsQuery {
-  usuario_id?: string;
-  accion?: AccionAuditoria;
-  page?: number;
-  limit?: number;
-}
+type ConsultaHistorial = Omit<historialService.FiltrosHistorial, 'page' | 'limit'> & { page?: string; limit?: string };
 
-export const listAuditLogs = catchAsync<unknown, unknown, unknown, ListAuditLogsQuery>(async (req, res) => {
-  const filter: Record<string, unknown> = {};
-  if (req.query.usuario_id) filter.usuario_id = req.query.usuario_id;
-  if (req.query.accion) filter.accion = req.query.accion;
+const aFiltros = (q: ConsultaHistorial): historialService.FiltrosHistorial => ({
+  ...q,
+  page: q.page ? Number(q.page) : undefined,
+  limit: q.limit ? Number(q.limit) : undefined,
+});
 
-  const page = Math.max(1, Number(req.query.page) || 1);
-  const limit = Math.min(100, Math.max(1, Number(req.query.limit) || 20));
+export const listAuditLogs = catchAsync<unknown, unknown, unknown, ConsultaHistorial>(async (req, res) => {
+  const resultado = await historialService.listarHistorial(aFiltros(req.query));
+  res.status(200).json({ success: true, count: resultado.data.length, ...resultado });
+});
 
-  const [logs, total] = await Promise.all([
-    AuditLog.find(filter)
-      .sort({ createdAt: -1 })
-      .skip((page - 1) * limit)
-      .limit(limit)
-      .populate('usuario_id', 'nombre apellido numero_documento roles'),
-    AuditLog.countDocuments(filter),
-  ]);
+export const catalogoHistorial = catchAsync(async (_req, res) => {
+  res.status(200).json({ success: true, data: historialService.catalogoHistorial() });
+});
 
-  res.status(200).json({
-    success: true,
-    count: logs.length,
-    total,
-    page,
-    pages: Math.max(1, Math.ceil(total / limit)),
-    data: logs,
-  });
+export const exportarHistorial = catchAsync<unknown, unknown, unknown, ConsultaHistorial>(async (req, res) => {
+  const reporte = await historialService.exportarHistorial(aFiltros(req.query), req.user!._id, req.ip);
+  const { buffer, nombreArchivo } = await generarExcelTabular(reporte);
+  res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+  res.setHeader('Content-Disposition', `attachment; filename="${nombreArchivo}"`);
+  res.send(buffer);
+});
+
+export const historialDeMatricula = catchAsync<ParamsDictionary & { id: string }>(async (req, res) => {
+  const data = await historialService.historialDeMatricula(req.params.id);
+  res.status(200).json({ success: true, data });
 });

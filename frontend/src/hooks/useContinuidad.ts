@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../lib/apiClient';
 
-/** Continuidad de los estudiantes antiguos (M04): la familia o la secretaría dicen si siguen el año siguiente; «continúa» aparta un cupo. */
+/** Continuidad de los estudiantes antiguos (M04): registra si seguirán el año siguiente; no crea ni reserva una matrícula. */
 
 export type DecisionContinuidad = 'CONTINUA' | 'NO_CONTINUA';
 export type EstadoDeContinuidad = DecisionContinuidad | 'SIN_RESPUESTA';
@@ -24,7 +24,7 @@ export interface FilaContinuidad {
   canal: 'SECRETARIA' | 'PORTAL' | null;
   motivo: string;
   fecha: string | null;
-  /** El grado donde se aparta el cupo si continúa; null en el último grado. */
+  /** El grado siguiente proyectado si continúa; null en el último grado. */
   grado_proyectado: string | null;
   /** Ya tiene matrícula en el año siguiente: su respuesta ya no cambia nada. */
   ya_matriculado: boolean;
@@ -52,12 +52,11 @@ export function useContinuidad(destinoId: string | undefined, filtros: FiltrosCo
   });
 }
 
-/** Cada cambio de respuesta mueve los cupos y la simulación de la rematrícula: se refrescan junto con la lista. */
+/** Cada cambio de respuesta actualiza la lista y la simulación de rollover. */
 function useInvalidarContinuidad() {
   const queryClient = useQueryClient();
   return () => {
     void queryClient.invalidateQueries({ queryKey: ['continuidad'] });
-    void queryClient.invalidateQueries({ queryKey: ['admission-requests', 'cupos'] });
     void queryClient.invalidateQueries({ queryKey: ['promocion', 'rollover'] });
   };
 }
@@ -75,7 +74,7 @@ export function useRegistrarContinuidad(destinoId: string | undefined) {
 
 export interface ContinuidadDelHijo {
   anio_destino: { id: string; year: number } | null;
-  /** La ventana de prematrícula está abierta y el estudiante aún no tiene matrícula en el año siguiente. */
+  /** El estudiante aún no tiene matrícula en el año siguiente y puede cambiar su respuesta. */
   puede_responder: boolean;
   decision: EstadoDeContinuidad;
   grado_proyectado: string | null;

@@ -1,7 +1,8 @@
 import type { ReactNode } from 'react';
 import { type Noticia, type TamanoMosaico, useImagenNoticia } from '../../hooks/useNoticias';
 import { fechaDeTarjeta } from '../../lib/noticias';
-import { CLASES_CELDA, type NoticiaEnMosaico } from '../../lib/mosaicoNoticias';
+import { CLASES_CELDA, disponerNoticias } from '../../lib/mosaicoNoticias';
+import { TarjetaBanda } from './TarjetaBanda';
 import { TarjetaMosaico } from './TarjetaMosaico';
 
 interface CuadriculaMosaicoProps {
@@ -25,29 +26,55 @@ export function CeldaMosaico({ tamano, children }: { tamano: TamanoMosaico; chil
   return <div className={`min-h-0 min-w-0 ${CLASES_CELDA[tamano]}`}>{children}</div>;
 }
 
-/** Una noticia real en el mosaico: pide su portada con la sesión (no hay dirección pública) y abre su detalle al tocarla. */
-export function TarjetaMosaicoDeNoticia({ noticia, tamano, onAbrir }: { noticia: Noticia; tamano: TamanoMosaico; onAbrir?: (id: string) => void }) {
-  const { data: portada } = useImagenNoticia(noticia.id, noticia.imagen_version);
-  return (
-    <TarjetaMosaico
-      tamano={tamano}
-      portadaUrl={noticia.imagen_version === null ? null : (portada ?? null)}
-      enfoque={{ x: noticia.enfoque_x, y: noticia.enfoque_y }}
-      onAbrir={onAbrir ? () => onAbrir(noticia.id) : undefined}
-      datos={{
-        titulo: noticia.titulo,
-        subtitulo: noticia.subtitulo,
-        categoria: { nombre: noticia.categoria.nombre, tono: noticia.categoria.tono },
-        autor: noticia.autor,
-        cuando: fechaDeTarjeta(noticia),
-        fijada: noticia.fijada,
-      }}
-    />
-  );
+/** Los datos de una noticia ya escritos para dibujarla en cualquier tarjeta. */
+function datosDeNoticia(noticia: Noticia) {
+  return {
+    titulo: noticia.titulo,
+    subtitulo: noticia.subtitulo,
+    descripcion: noticia.descripcion,
+    categoria: { nombre: noticia.categoria.nombre, tono: noticia.categoria.tono },
+    autor: noticia.autor,
+    cuando: fechaDeTarjeta(noticia),
+    fijada: noticia.fijada,
+  };
 }
 
-/** Las noticias ya elegidas (ver `paraMosaico`) acomodadas en el mosaico. */
-export function MosaicoDeNoticias({ elegidas, onAbrir }: { elegidas: NoticiaEnMosaico[]; onAbrir: (id: string) => void }) {
+/**
+ * Una noticia real: pide su portada con la sesión (no hay dirección pública) y abre su detalle al tocarla. Se dibuja como banda cuando hay pocas noticias (`enBandas`)
+ * o si su tamaño es «Banda»; si no, como tarjeta de mosaico.
+ */
+export function TarjetaMosaicoDeNoticia({ noticia, tamano, onAbrir, enBandas = false }: { noticia: Noticia; tamano: TamanoMosaico; onAbrir?: (id: string) => void; enBandas?: boolean }) {
+  const { data: portada } = useImagenNoticia(noticia.id, noticia.imagen_version);
+  const comunes = {
+    portadaUrl: noticia.imagen_version === null ? null : (portada ?? null),
+    enfoque: { x: noticia.enfoque_x, y: noticia.enfoque_y },
+    onAbrir: onAbrir ? () => onAbrir(noticia.id) : undefined,
+    datos: datosDeNoticia(noticia),
+  };
+  if (enBandas || tamano === 'BANDA') return <TarjetaBanda {...comunes} alta={tamano === 'PRINCIPAL' || tamano === 'DESTACADA' || tamano === 'BANDA'} llenarAlto={!enBandas} />;
+  return <TarjetaMosaico {...comunes} tamano={tamano} />;
+}
+
+/** Las bandas de una o dos noticias: una debajo de la otra, cada una a todo el ancho. */
+export function ListaDeBandas({ children }: { children: ReactNode }) {
+  return <div className="space-y-3">{children}</div>;
+}
+
+/**
+ * Las noticias de un inicio, dispuestas según cuántas hay (ver `disponerNoticias`): una o dos, como bandas a todo el ancho; tres o más, el mosaico con el tamaño de
+ * cada una y sin huecos al final.
+ */
+export function MosaicoDeNoticias({ noticias, presupuesto, onAbrir }: { noticias: Noticia[]; presupuesto?: number; onAbrir: (id: string) => void }) {
+  const { disposicion, elegidas } = disponerNoticias(noticias, presupuesto);
+  if (disposicion === 'BANDAS') {
+    return (
+      <ListaDeBandas>
+        {elegidas.map(({ noticia, tamano }) => (
+          <TarjetaMosaicoDeNoticia key={noticia.id} noticia={noticia} tamano={tamano} onAbrir={onAbrir} enBandas />
+        ))}
+      </ListaDeBandas>
+    );
+  }
   return (
     <CuadriculaMosaico>
       {elegidas.map(({ noticia, tamano }) => (

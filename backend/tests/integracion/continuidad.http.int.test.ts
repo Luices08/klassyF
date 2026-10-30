@@ -8,21 +8,15 @@ import Group from '../../src/models/group.model';
 import Guardian from '../../src/models/guardian.model';
 import StudentGuardian from '../../src/models/studentGuardian.model';
 import { UserDocument } from '../../src/models/user.model';
-import { crearSolicitud } from '../../src/services/admissionRequest.service';
-import { reservarCupo } from '../../src/services/prematricula.service';
 import { generateToken } from '../../src/services/token.service';
 import { detenerBaseDeDatos, iniciarBaseDeDatos, limpiarBaseDeDatos } from './baseDeDatos';
 import { armarEscenario, crearUsuario, Escenario } from './escenario';
 
 type Respuesta = { estado: number; cuerpo: { success?: boolean; data?: any; message?: string } };
 
-const DIA = 86_400_000;
-// «Hoy» en Colombia (UTC-5), como fecha ISO, desplazada `dias`.
-const fecha = (dias = 0) => new Date(Date.now() - 5 * 3_600_000 + dias * DIA).toISOString().slice(0, 10);
-
 /**
  * M04: continuidad de los antiguos. La familia (por el portal) o la secretaría (en la lista) dicen si el estudiante sigue el año siguiente; «continúa»
- * aparta un cupo en el grado siguiente, su sede y su jornada hasta que tiene pre-matrícula. «No continúa» y «sin respuesta» no lo hacen.
+ * registra su intención y conserva el grado, sede y jornada proyectados. La respuesta no crea matrículas ni modifica la consulta informativa de cupos.
  */
 describe('M04: continuidad de los estudiantes antiguos (capa HTTP)', () => {
   let e: Escenario;
@@ -33,8 +27,6 @@ describe('M04: continuidad de los estudiantes antiguos (capa HTTP)', () => {
   let sedeId: string;
   let jornadaId: string;
   let acudiente: UserDocument;
-  let contador = 0;
-
   beforeAll(async () => {
     process.env.JWT_SECRET = 'secreto-de-pruebas';
     process.env.MONGO_URI = 'mongodb://no-se-usa';
@@ -92,11 +84,9 @@ describe('M04: continuidad de los estudiantes antiguos (capa HTTP)', () => {
   const lista = (usuario: UserDocument, consulta = '') => llamar('GET', `/continuidad?destino_id=${anioSiguiente}${consulta}`, usuario);
   const responder = (estudiante: UserDocument, decision: string | null, usuario: UserDocument = e.secretaria, extra: Record<string, unknown> = {}) =>
     llamar('PUT', `/continuidad/${estudiante._id}`, usuario, { destino_id: anioSiguiente, decision, ...extra });
-  const abrirVentana = (extra: Record<string, unknown> = {}) =>
-    llamar('PUT', `/admission-requests/prematricula/${anioSiguiente}`, e.secretaria, { desde: fecha(-1), hasta: fecha(30), fecha_limite_matricula: fecha(60), ...extra });
-  const filaDeCupos = async () => {
+  const cuposInformativos = async () => {
     const r = await llamar('GET', `/admission-requests/cupos?academic_year_id=${anioSiguiente}`, e.secretaria);
-    return (r.cuerpo.data.filas as Array<{ capacidad: number; ocupados: number; reservados: number; continuan: number; en_espera: number; libres: number }>)[0]!;
+    return r.cuerpo.data;
   };
 
   describe('la lista de quién renueva (secretaría)', () => {
@@ -133,27 +123,28 @@ describe('M04: continuidad de los estudiantes antiguos (capa HTTP)', () => {
   });
 
   describe('registrar la respuesta', () => {
-    it('«continúa» aparta un cupo en el grado siguiente, la sede y la jornada; «no continúa» y borrarla no', async () => {
-      expect((await filaDeCupos()).libres).toBe(10);
+    it('«continúa» conserva su proyección, pero no aparta cupo; «no continúa» y borrar la respuesta tampoco alteran la disponibilidad', async () => {
+      const cuposAntes = await cuposInformativos();
       expect((await responder(e.estudiante, 'CONTINUA')).estado).toBe(200);
-      expect(await filaDeCupos()).toMatchObject({ capacidad: 10, ocupados: 0, continuan: 1, libres: 9 });
+      expect(await cuposInformativos()).toEqual(cuposAntes);
       const guardada = (await ConfirmacionContinuidad.findOne({ student_id: e.estudiante._id }))!;
       expect(String(guardada.sede_id)).toBe(sedeId);
       expect(String(guardada.jornada_id)).toBe(jornadaId);
       expect(guardada.canal).toBe('SECRETARIA');
 
-      // Cambiar de idea: no continúa libera el cupo; volver a «sin respuesta» borra el registro.
       expect((await responder(e.estudiante, 'NO_CONTINUA', e.secretaria, { motivo: 'Cambio de colegio' })).estado).toBe(200);
-      expect((await filaDeCupos()).libres).toBe(10);
+      expect(await cuposInformativos()).toEqual(cuposAntes);
       expect((await responder(e.estudiante, null)).cuerpo.data.decision).toBe('SIN_RESPUESTA');
       expect(await ConfirmacionContinuidad.countDocuments()).toBe(0);
+      expect(await cuposInformativos()).toEqual(cuposAntes);
     });
 
-    it('responder dos veces lo mismo no duplica el cupo apartado', async () => {
+    it('responder dos veces actualiza un solo registro y no cambia la disponibilidad', async () => {
+      const cuposAntes = await cuposInformativos();
       await responder(e.estudiante, 'CONTINUA');
       await responder(e.estudiante, 'CONTINUA');
       expect(await ConfirmacionContinuidad.countDocuments()).toBe(1);
-      expect((await filaDeCupos()).continuan).toBe(1);
+      expect(await cuposInformativos()).toEqual(cuposAntes);
     });
 
     it('solo el administrador y la secretaría registran; la secretaría solo estudiantes de sus sedes', async () => {
@@ -179,13 +170,10 @@ describe('M04: continuidad de los estudiantes antiguos (capa HTTP)', () => {
       expect((await responder(e.estudiante, 'CONTINUA')).estado).toBe(409);
     });
 
-    it('con matrícula ya en el año siguiente la respuesta no cambia nada: se rechaza y no cuenta dos veces', async () => {
+    it('con matrícula ya en el año siguiente no puede cambiar la respuesta', async () => {
       await responder(e.estudiante, 'CONTINUA');
       const grupoSiguiente = (await Group.findOne({ academic_year_id: anioSiguiente }))!;
       await Enrollment.create({ student_id: e.estudiante._id, group_id: grupoSiguiente._id, academic_year_id: anioSiguiente, tipo_ingreso: 'ANTIGUO', estado: 'PREINSCRITO' });
-      await Group.updateOne({ _id: grupoSiguiente._id }, { $inc: { cupos_ocupados: 1 } });
-      // Ya está en cupos_ocupados: el cupo apartado por la confirmación deja de contarse.
-      expect(await filaDeCupos()).toMatchObject({ ocupados: 1, continuan: 0, libres: 9 });
       expect((await responder(e.estudiante, 'NO_CONTINUA')).estado).toBe(409);
       expect((await lista(e.secretaria)).cuerpo.data.filas.find((f: { student_id: string }) => f.student_id === String(e.estudiante._id))).toMatchObject({ ya_matriculado: true });
     });
@@ -199,66 +187,38 @@ describe('M04: continuidad de los estudiantes antiguos (capa HTTP)', () => {
     });
   });
 
-  describe('el cupo apartado y las solicitudes nuevas', () => {
-    it('quien confirmó ocupa cupo: una solicitud nueva queda en espera si no queda lugar para ella', async () => {
-      await Group.updateOne({ academic_year_id: anioSiguiente }, { max_capacity: 1 });
-      await responder(e.estudiante, 'CONTINUA');
-      expect(await filaDeCupos()).toMatchObject({ capacidad: 1, continuan: 1, libres: 0 });
-      await abrirVentana();
-      contador += 1;
-      const solicitud = await crearSolicitud({
-        nombre_aspirante: 'Laura',
-        apellido_aspirante: 'López',
-        tipo_documento: 'TI',
-        numero_documento: `7100${contador}`,
-        fecha_nacimiento: '2014-05-10' as unknown as string,
-        grado_deseado_id: String((await Grade.findOne({ numero: 7 }))!._id),
-        acudiente_nombre: 'Marta',
-        acudiente_apellido: 'Morales',
-        acudiente_telefono: '3200001',
-        acudiente_email: 'familia@correo.com',
-      });
-      const r = await reservarCupo(String(solicitud._id), { sede_id: sedeId, jornada_id: jornadaId }, e.secretaria);
-      expect(r.solicitud.estado).toBe('EN_ESPERA');
-    });
-
-    it('pasado el último día para matricular el cupo apartado se libera, como el de una solicitud', async () => {
-      await responder(e.estudiante, 'CONTINUA');
-      await abrirVentana({ desde: fecha(-30), hasta: fecha(-10), fecha_limite_matricula: fecha(-1) });
-      expect(await filaDeCupos()).toMatchObject({ continuan: 0, libres: 10 });
-    });
-  });
-
   describe('el portal del acudiente', () => {
     const hijo = (ruta = '') => `/portal/hijos/${e.estudiante._id}/continuidad${ruta}`;
 
-    it('sin ventana de prematrícula abierta no hay nada que responder: lo dice y rechaza la respuesta (409)', async () => {
+    it('puede consultar y responder sin una ventana de prematrícula', async () => {
       const r = await llamar('GET', hijo(), acudiente);
       expect(r.estado).toBe(200);
-      expect(r.cuerpo.data).toMatchObject({ anio_destino: null, puede_responder: false, decision: 'SIN_RESPUESTA' });
-      expect((await llamar('PUT', hijo(), acudiente, { decision: 'CONTINUA' })).estado).toBe(409);
-      expect(await ConfirmacionContinuidad.countDocuments()).toBe(0);
+      expect(r.cuerpo.data).toMatchObject({ anio_destino: { id: anioSiguiente }, puede_responder: true, decision: 'SIN_RESPUESTA' });
+      const cuposAntes = await cuposInformativos();
+      expect((await llamar('PUT', hijo(), acudiente, { decision: 'CONTINUA' })).estado).toBe(200);
+      expect((await llamar('GET', hijo(), acudiente)).cuerpo.data.decision).toBe('CONTINUA');
+      expect(await cuposInformativos()).toEqual(cuposAntes);
+      expect((await ConfirmacionContinuidad.findOne())!.canal).toBe('PORTAL');
     });
 
-    it('con la ventana abierta el acudiente responde por su hijo, cambia de idea y se registra por el portal', async () => {
-      await abrirVentana();
+    it('el acudiente puede cambiar su respuesta; la actualización tampoco altera cupos', async () => {
       const antes = await llamar('GET', hijo(), acudiente);
       expect(antes.cuerpo.data).toMatchObject({ puede_responder: true, decision: 'SIN_RESPUESTA', grado_proyectado: 'Séptimo' });
       expect(antes.cuerpo.data.anio_destino.id).toBe(anioSiguiente);
 
+      const cuposAntes = await cuposInformativos();
       expect((await llamar('PUT', hijo(), acudiente, { decision: 'CONTINUA' })).estado).toBe(200);
       expect((await llamar('GET', hijo(), acudiente)).cuerpo.data.decision).toBe('CONTINUA');
-      expect(await filaDeCupos()).toMatchObject({ continuan: 1, libres: 9 });
+      expect(await cuposInformativos()).toEqual(cuposAntes);
       expect((await ConfirmacionContinuidad.findOne())!.canal).toBe('PORTAL');
       expect((await lista(e.secretaria)).cuerpo.data.filas.find((f: { decision: string }) => f.decision === 'CONTINUA')).toMatchObject({ canal: 'PORTAL' });
 
       expect((await llamar('PUT', hijo(), acudiente, { decision: 'NO_CONTINUA', motivo: 'Cambio de ciudad' })).estado).toBe(200);
       expect((await llamar('GET', hijo(), acudiente)).cuerpo.data).toMatchObject({ decision: 'NO_CONTINUA', motivo: 'Cambio de ciudad' });
-      expect((await filaDeCupos()).libres).toBe(10);
+      expect(await cuposInformativos()).toEqual(cuposAntes);
     });
 
     it('solo responde por sus hijos (404 con un estudiante ajeno) y solo con el perfil de acudiente', async () => {
-      await abrirVentana();
       const ajeno = `/portal/hijos/${e.otroEstudiante._id}/continuidad`;
       expect((await llamar('GET', ajeno, acudiente)).estado).toBe(404);
       expect((await llamar('PUT', ajeno, acudiente, { decision: 'CONTINUA' })).estado).toBe(404);
@@ -268,7 +228,6 @@ describe('M04: continuidad de los estudiantes antiguos (capa HTTP)', () => {
     });
 
     it('con la matrícula del año siguiente ya hecha no puede responder', async () => {
-      await abrirVentana();
       const grupoSiguiente = (await Group.findOne({ academic_year_id: anioSiguiente }))!;
       await Enrollment.create({ student_id: e.estudiante._id, group_id: grupoSiguiente._id, academic_year_id: anioSiguiente, tipo_ingreso: 'ANTIGUO', estado: 'PREINSCRITO' });
       expect((await llamar('GET', hijo(), acudiente)).cuerpo.data.puede_responder).toBe(false);

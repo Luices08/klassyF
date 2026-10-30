@@ -1,7 +1,7 @@
 import { type FormEvent, type ReactNode, useState } from 'react';
 import { Alert, errorMessage } from '../ui/Alert';
 import { Button } from '../ui/Button';
-import { Input } from '../ui/Field';
+import { CampoContrasena } from '../ui/CampoContrasena';
 import { useAuth } from '../../context/AuthContext';
 import { useCambiarMiPassword } from '../../hooks/useUsers';
 
@@ -48,24 +48,21 @@ export function ForcedPasswordChangeGate({ children }: { children: ReactNode }) 
           {cambiarPassword.isError && <Alert tone="error">{errorMessage(cambiarPassword.error)}</Alert>}
           {errorLocal && <Alert tone="error">{errorLocal}</Alert>}
 
-          <Input
+          <CampoContrasena
             label="Contraseña temporal actual"
-            type="password"
             required
             value={form.password_actual}
             onChange={(e) => setForm((f) => ({ ...f, password_actual: e.target.value }))}
           />
-          <Input
+          <CampoContrasena
             label="Nueva contraseña"
-            type="password"
             required
             minLength={8}
             value={form.password_nueva}
             onChange={(e) => setForm((f) => ({ ...f, password_nueva: e.target.value }))}
           />
-          <Input
+          <CampoContrasena
             label="Confirmar nueva contraseña"
-            type="password"
             required
             minLength={8}
             value={form.confirmar}

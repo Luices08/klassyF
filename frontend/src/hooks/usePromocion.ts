@@ -175,8 +175,8 @@ export interface ResumenCierre {
 // --- Rollover ---
 
 export type DestinoRollover = 'GRADO_SIGUIENTE' | 'MISMO_GRADO' | 'TERMINA_CICLO' | 'EGRESADO' | 'NO_RENUEVA_CUPO' | 'SIN_DECISION';
-export type EstadoFilaRollover = 'POR_CREAR' | 'YA_TIENE_MATRICULA' | 'EN_ESPERA' | 'SIN_CUPO' | 'SIN_CONFIRMAR' | 'NO_APLICA';
-/** A quién se pre-matricula: solo a quien la familia confirmó que continúa, o a todos los que su cierre deja seguir. */
+export type EstadoFilaRollover = 'POR_CREAR' | 'YA_TIENE_MATRICULA' | 'SIN_CUPO' | 'SIN_CONFIRMAR' | 'NO_APLICA';
+/** A quién se matricula: solo a quien confirmó que continúa, o a todos los que su cierre deja seguir. */
 export type ModoContinuidad = 'CONFIRMADOS' | 'TODOS';
 
 export const NOMBRES_DESTINO: Record<DestinoRollover, string> = {
@@ -189,9 +189,8 @@ export const NOMBRES_DESTINO: Record<DestinoRollover, string> = {
 };
 
 export const NOMBRES_ESTADO_ROLLOVER: Record<EstadoFilaRollover, string> = {
-  POR_CREAR: 'Se pre-matriculará',
+  POR_CREAR: 'Se matriculará',
   YA_TIENE_MATRICULA: 'Ya tiene matrícula',
-  EN_ESPERA: 'Lista de espera',
   SIN_CUPO: 'Sin cupo',
   SIN_CONFIRMAR: 'Sin confirmar',
   NO_APLICA: 'No aplica',
@@ -209,8 +208,6 @@ export interface FilaRollover {
   tipo_ingreso: 'ANTIGUO' | 'REPITENTE' | null;
   grupo_destino_id: string | null;
   grupo_destino: string | null;
-  /** Lugar en la lista de espera de su sede y grado (solo si el estado es EN_ESPERA). */
-  posicion_espera: number | null;
   paz_y_salvo: 'CONFIRMADO' | 'PENDIENTE';
 }
 
@@ -232,12 +229,11 @@ export interface PlanRollover {
   grupos_destino: GrupoDestinoPlan[];
   alertas: string[];
   retirados: number;
-  resumen: { total: number; por_crear: number; ya_tienen_matricula: number; en_espera: number; sin_cupo: number; sin_confirmar: number; no_aplica: number; por_destino: Partial<Record<DestinoRollover, number>> };
+  resumen: { total: number; por_crear: number; ya_tienen_matricula: number; sin_cupo: number; sin_confirmar: number; no_aplica: number; por_destino: Partial<Record<DestinoRollover, number>> };
 }
 
 export interface ResultadoRollover {
   creadas: number;
-  en_espera: number;
   plan: PlanRollover['resumen'];
 }
 
@@ -286,7 +282,7 @@ export interface AlcanceRollover {
   sede_id?: string;
   grade_id?: string;
   group_id?: string;
-  /** Sin indicarlo, el servidor decide: confirmados si el colegio usa la renovación de matrícula, todos si no. */
+  /** Sin indicarlo, el servidor incluye solo a quienes confirmaron. */
   continuidad?: ModoContinuidad;
 }
 

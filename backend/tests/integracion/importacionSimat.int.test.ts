@@ -68,7 +68,8 @@ describe('Importación de matrículas desde SIMAT (M04)', () => {
     const foliatura = await obtenerConfiguracion();
     foliatura.confirmada = true;
     await foliatura.save();
-  });
+    // Armar el escenario crea ~14 usuarios (bcrypt de 12 rondas): en una máquina ocupada pasa de los 10 s por defecto de un hook.
+  }, 120_000);
 
   const aplicar = async (lote: { _id: unknown }, usuario = e.admin) => {
     await aplicarImportacion(String(lote._id), { contrasena: CLAVE, confirmo_advertencias: true }, usuario);

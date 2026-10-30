@@ -35,7 +35,7 @@ export function ReglasRematriculaPanel({ puedeEditar }: { puedeEditar: boolean }
     setMensaje(null);
     try {
       await guardar.mutateAsync(borrador as ConfiguracionRematricula);
-      setMensaje({ tone: 'success', texto: 'Reglas guardadas. Las pre-matrículas ya creadas no se recalculan.' });
+      setMensaje({ tone: 'success', texto: 'Reglas guardadas. Las matrículas definitivas ya asentadas no se recalculan.' });
     } catch (e) {
       setMensaje({ tone: 'error', texto: errorMessage(e) });
     }
@@ -46,7 +46,7 @@ export function ReglasRematriculaPanel({ puedeEditar }: { puedeEditar: boolean }
       <Card>
         <CardHeader title="Prioridad cuando faltan cupos" />
         <p className="mb-3 text-sm text-muted">
-          Si los promovidos superan los cupos del grado siguiente, el proceso no se detiene: se aplica este orden y quien no alcanza queda en la lista de espera para asignación directiva.
+          El orden de los criterios se conserva para la configuración de rematrícula. Si el aforo disponible no alcanza, el estudiante queda marcado «Sin cupo» y no se matricula hasta resolverlo.
         </p>
         <ol className="space-y-3">
           {borrador.criterios_desempate.map((c, i) => (

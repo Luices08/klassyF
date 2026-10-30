@@ -51,6 +51,10 @@ export const PALABRAS_CLAVE_POR_RUTA: Record<string, { descripcion: string; clav
     descripcion: 'Directorio de usuarios y roles.',
     claves: ['usuarios', 'usuario', 'roles', 'crear usuario', 'docentes', 'resetear contrasena', 'cuentas'],
   },
+  '/admin/historial': {
+    descripcion: 'Historial de acciones: quién creó, editó, matriculó o eliminó algo en el sistema y cuándo (bitácora de auditoría).',
+    claves: ['historial', 'historial de acciones', 'auditoria', 'bitacora', 'quien hizo', 'quien cambio', 'quien creo', 'quien edito', 'quien elimino', 'quien borro', 'registro de cambios', 'trazabilidad', 'log'],
+  },
   '/admin/students': {
     descripcion: 'Estudiantes y su ficha completa.',
     claves: ['estudiantes', 'estudiante', 'alumnos', 'ficha del estudiante', 'acudiente', 'acudientes'],
@@ -144,7 +148,7 @@ export const PALABRAS_CLAVE_POR_RUTA: Record<string, { descripcion: string; clav
   },
   '/admin/promocion': {
     descripcion: 'Promoción y cierre del año: política del colegio (SIEE), cierre de la promoción por grupo y paso de los estudiantes al año siguiente.',
-    claves: ['promocion', 'promover', 'cierre del año', 'cerrar el año', 'reprobar', 'perdio el año', 'no promovido', 'repitente', 'año siguiente', 'rollover', 'pre matricula', 'reservar cupos', 'reglas de promocion', 'siee'],
+    claves: ['promocion', 'promover', 'cierre del año', 'cerrar el año', 'reprobar', 'perdio el año', 'no promovido', 'repitente', 'año siguiente', 'rollover', 'matricula del año siguiente', 'reglas de promocion', 'siee'],
   },
   '/admin/reportes-cierre': {
     descripcion: 'Reportes de cierre anual: sábana de calificaciones en Excel y PDF por año, sede, jornada, grado o grupo, e informe final del año por grupo con su publicación para las familias, y listados de estudiantes en recuperación final, de retirados del servicio social de décimo y once, la plantilla de cierre para SIMAT el balance anual de inclusión (PIAR) y el libro de calificaciones foliado.',
@@ -195,8 +199,8 @@ export const PALABRAS_CLAVE_POR_RUTA: Record<string, { descripcion: string; clav
     claves: ['paz y salvo', 'pazysalvo', 'fin de ano', 'estar a paz y salvo', 'debe libros', 'renovar matricula'],
   },
   '/secretaria/rematricula': {
-    descripcion: 'Rematrícula de fin de año por sede, grado o grupo: simula y confirma las pre-matrículas del año siguiente, lista de espera por falta de cupos y reglas de prioridad.',
-    claves: ['rematricula', 'rematricular', 'renovar matricula', 'matricula del ano siguiente', 'pasar de ano', 'pre matricula', 'prematricula', 'lista de espera', 'cupos del ano siguiente', 'repitentes', 'proyeccion de matricula'],
+    descripcion: 'Rematrícula de fin de año por sede, grado o grupo: simula y registra las matrículas definitivas del año siguiente. Los estudiantes sin aforo disponible quedan identificados como «Sin cupo».',
+    claves: ['rematricula', 'rematricular', 'renovar matricula', 'matricula del ano siguiente', 'pasar de ano', 'repitentes', 'proyeccion de matricula', 'sin cupo'],
   },
   '/secretaria/traslados': {
     descripcion: 'Traslados extemporáneos de estudiantes y homologación de las notas del colegio de procedencia.',
@@ -327,6 +331,23 @@ export function buscarDestinos(pregunta: string, items: NavItem[]): Coincidencia
     if (puntaje > 0) resultados.push({ item, descripcion: entrada?.descripcion ?? '', puntaje });
   }
   return resultados.sort((a, b) => b.puntaje - a.puntaje);
+}
+
+/** Una pantalla a la que el asistente llevó al usuario en esta visita. `url` conserva el filtro con que se abrió (p. ej. `?grado=`). */
+export interface LugarVisitado {
+  ruta: string;
+  url: string;
+  nombre: string;
+}
+
+export const MAX_LUGARES_VISITADOS = 12;
+
+/**
+ * Suma una pantalla a los lugares visitados: la más reciente va primero y una pantalla no se repite (si se vuelve a visitar,
+ * sube al principio y recuerda la última dirección con la que se abrió). Al pasar el tope se descarta la más antigua.
+ */
+export function registrarVisita(visitados: LugarVisitado[], nuevo: LugarVisitado): LugarVisitado[] {
+  return [nuevo, ...visitados.filter((v) => v.ruta !== nuevo.ruta)].slice(0, MAX_LUGARES_VISITADOS);
 }
 
 /** La primera es clara si saca ventaja suficiente sobre la segunda: ahí el asistente navega solo; si no, deja elegir. */

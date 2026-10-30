@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { Rol } from '../constants/enums';
 import { ROLES } from '../constants/roles';
 import {
+  miMatriculaPropia,
   actualizarComentarioDocumento,
   agregarDocumentoChecklist,
   cambiarGrupo,
@@ -23,9 +24,11 @@ import {
   sincronizarRequisitos,
   updateStatus,
 } from '../controllers/enrollment.controller';
+import { historialDeMatricula } from '../controllers/auditLog.controller';
 import { authenticate, checkRole } from '../middlewares/auth.middleware';
 import { subirDocumentoMatricula } from '../middlewares/subidaDocumentosMatricula.middleware';
 import validate from '../middlewares/validate.middleware';
+import * as auditLogValidator from '../validators/auditLog.validator';
 import * as enrollmentValidator from '../validators/enrollment.validator';
 
 const router = Router();
@@ -37,6 +40,8 @@ router.use(authenticate);
 router.post('/', checkRole(...STAFF_MATRICULAS), validate(enrollmentValidator.createEnrollment), createEnrollment);
 router.get('/', checkRole(...STAFF_MATRICULAS), validate(enrollmentValidator.listEnrollments), listEnrollments);
 // Antes de '/:id' para que no la tome como un id.
+// Solo lee la matrícula del propio estudiante; va antes de '/:id' para que no la tome como un id.
+router.get('/mia', checkRole(ROLES.ESTUDIANTE), miMatriculaPropia);
 router.get('/estudiantes-situacion', checkRole(...STAFF_MATRICULAS), validate(enrollmentValidator.situacionEstudiantes), situacionEstudiantes);
 router.get('/grupo-sugerido', checkRole(...STAFF_MATRICULAS), validate(enrollmentValidator.grupoSugerido), grupoSugerido);
 router.get('/estudiantes-por-grado', checkRole(...STAFF_MATRICULAS), validate(enrollmentValidator.estudiantesPorGrado), estudiantesPorGrado);
@@ -53,6 +58,8 @@ router.get(
   listarDocumentosPrevistos
 );
 router.get('/:id', checkRole(...STAFF_MATRICULAS), validate(enrollmentValidator.getEnrollment), getEnrollment);
+// M31: lo que se hizo sobre la matrícula y lo que nació de ella (admisión, documentos, traslado, salida, certificados).
+router.get('/:id/historial', checkRole(...STAFF_MATRICULAS), validate(auditLogValidator.historialDeMatricula), historialDeMatricula);
 
 router.patch('/:id/status', checkRole(...STAFF_MATRICULAS), validate(enrollmentValidator.updateStatus), updateStatus);
 router.post('/:id/formalizar', checkRole(...STAFF_MATRICULAS), validate(enrollmentValidator.formalizar), formalizar);

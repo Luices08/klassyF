@@ -9,12 +9,19 @@ import Group from '../models/group.model';
 import User, { UserDocument } from '../models/user.model';
 import ApiError from '../utils/ApiError';
 import { registrarEvento } from './audit.service';
-import { anioConVentanaAbierta } from './prematricula.service';
+async function anioDestinoContinuidad(): Promise<Types.ObjectId | null> {
+  const enCurso = await AcademicYear.findOne({ estado: 'EN_CURSO' }).select('year');
+  if (enCurso) {
+    const siguiente = await AcademicYear.findOne({ estado: { $ne: 'CERRADO' }, year: { $gt: enCurso.year } }).sort({ year: 1 }).select('_id');
+    if (siguiente) return siguiente._id;
+  }
+  const planificacion = await AcademicYear.findOne({ estado: 'PLANIFICACION' }).sort({ year: -1 }).select('_id');
+  return planificacion?._id ?? null;
+}
 
 /**
- * Continuidad de los estudiantes antiguos (M04, prematrícula): en octubre la familia dice si su hijo sigue el año siguiente. No es una matrícula ni pide
- * documentos (el antiguo solo firma el libro en enero): es una respuesta por estudiante y año. «Continúa» aparta un cupo en el grado siguiente, su sede y su
- * jornada hasta que el rollover le crea la pre-matrícula; «no continúa» y «sin respuesta» no la crean, y el rollover los deja fuera salvo que se pida lo contrario.
+ * Continuidad de los estudiantes antiguos (M04): la familia o secretaría registra si el estudiante piensa seguir el año siguiente. La respuesta no crea
+ * matrícula ni reserva cupo; M19 la usa al simular y ejecutar el rollover.
  */
 
 const PUEDEN_REGISTRAR = [ROLES.ADMIN, ROLES.SECRETARIA];
@@ -41,7 +48,7 @@ export interface FilaContinuidad {
   canal: CanalContinuidad | null;
   motivo: string;
   fecha: Date | null;
-  /** El grado donde se aparta el cupo si continúa; null en el último grado. */
+  /** El grado siguiente proyectado si continúa; null en el último grado. */
   grado_proyectado: string | null;
   /** Ya tiene matrícula en el año siguiente: la respuesta ya no cambia nada. */
   ya_matriculado: boolean;
@@ -154,7 +161,7 @@ export interface RespuestaDeContinuidad {
 
 /**
  * Guarda (o borra) la respuesta de continuidad de un estudiante para el año de destino. La usan secretaría (desde la lista) y el portal del acudiente
- * (`canal`); las reglas son las mismas y el cupo se aparta con el grado siguiente, la sede y la jornada de su matrícula actual.
+ * (`canal`). El registro conserva la proyección de grado, sede y jornada, pero no aparta cupo ni matrícula.
  */
 export async function registrarContinuidad(
   destinoId: string,
@@ -226,7 +233,7 @@ export async function registrarContinuidad(
 
 export interface ContinuidadDelHijo {
   anio_destino: { id: string; year: number } | null;
-  /** La ventana de prematrícula está abierta y no tiene matrícula en el año siguiente: la familia puede responder o cambiar su respuesta. */
+  /** No tiene matrícula en el año siguiente y puede registrar o cambiar su respuesta. */
   puede_responder: boolean;
   decision: EstadoDeContinuidad;
   /** El grado al que pasaría si continúa; null en el último grado. */
@@ -234,10 +241,10 @@ export interface ContinuidadDelHijo {
   motivo: string;
 }
 
-/** Lo que el acudiente ve en el portal sobre la continuidad de UN hijo (el vínculo ya lo comprobó quien llama). Sin ventana abierta no hay nada que responder. */
-export async function continuidadDelHijo(studentId: string, ahora: Date = new Date()): Promise<ContinuidadDelHijo> {
+/** Lo que el acudiente ve en el portal sobre la continuidad de UN hijo (el vínculo ya lo comprobó quien llama). */
+export async function continuidadDelHijo(studentId: string, _ahora: Date = new Date()): Promise<ContinuidadDelHijo> {
   const sinProceso: ContinuidadDelHijo = { anio_destino: null, puede_responder: false, decision: 'SIN_RESPUESTA', grado_proyectado: null, motivo: '' };
-  const anioId = await anioConVentanaAbierta(ahora);
+  const anioId = await anioDestinoContinuidad();
   if (!anioId) return sinProceso;
   const destino = await AcademicYear.findById(anioId).select('year');
   const origen = destino ? await AcademicYear.findOne({ year: { $lt: destino.year } }).sort({ year: -1, createdAt: -1 }).select('_id') : null;
@@ -261,9 +268,9 @@ export async function continuidadDelHijo(studentId: string, ahora: Date = new Da
   };
 }
 
-/** El acudiente responde por su hijo: solo mientras la ventana de prematrícula está abierta, y siempre sobre el año al que apunta esa ventana. */
-export async function responderContinuidadDelHijo(usuario: UserDocument, studentId: string, respuesta: RespuestaDeContinuidad, ip?: string | null, ahora: Date = new Date()) {
-  const anioId = await anioConVentanaAbierta(ahora);
-  if (!anioId) throw new ApiError(409, 'La renovación de matrícula no está abierta: la secretaría avisará cuándo.');
+/** El acudiente responde por su hijo sobre el año destino disponible. La respuesta no aparta cupo ni matrícula. */
+export async function responderContinuidadDelHijo(usuario: UserDocument, studentId: string, respuesta: RespuestaDeContinuidad, ip?: string | null, _ahora: Date = new Date()) {
+  const anioId = await anioDestinoContinuidad();
+  if (!anioId) throw new ApiError(409, 'No hay un año lectivo de destino disponible para registrar la respuesta de continuidad.');
   return registrarContinuidad(String(anioId), studentId, respuesta, { usuario, canal: 'PORTAL' }, ip);
 }

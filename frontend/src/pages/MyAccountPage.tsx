@@ -3,6 +3,7 @@ import { Alert, errorMessage } from '../components/ui/Alert';
 import { RolBadge } from '../components/ui/Badge';
 import { Button } from '../components/ui/Button';
 import { Card, CardHeader } from '../components/ui/Card';
+import { CampoContrasena } from '../components/ui/CampoContrasena';
 import { Input } from '../components/ui/Field';
 import { PageHeader } from '../components/ui/PageHeader';
 import { Spinner } from '../components/ui/Spinner';
@@ -153,24 +154,21 @@ function PasswordCard() {
       {cambiarPassword.isSuccess && <Alert tone="success">Contraseña actualizada correctamente.</Alert>}
 
       <form onSubmit={handleSubmit} className="space-y-4">
-        <Input
+        <CampoContrasena
           label="Contraseña actual"
-          type="password"
           required
           value={form.password_actual}
           onChange={(e) => setForm((f) => ({ ...f, password_actual: e.target.value }))}
         />
-        <Input
+        <CampoContrasena
           label="Nueva contraseña"
-          type="password"
           required
           minLength={8}
           value={form.password_nueva}
           onChange={(e) => setForm((f) => ({ ...f, password_nueva: e.target.value }))}
         />
-        <Input
+        <CampoContrasena
           label="Confirmar nueva contraseña"
-          type="password"
           required
           minLength={8}
           value={form.confirmar}

@@ -8,13 +8,14 @@ import { Spinner } from '../ui/Spinner';
 import { UploadIcon } from '../ui/icons';
 import { InformacionApoyoCampos } from '../inclusion/InformacionApoyoCampos';
 import { useRegistrarInscripcion, useSubirDocumentoSolicitud } from '../../hooks/useAdmissionRequests';
-import { useGrades } from '../../hooks/useCatalogs';
+import { useAniosLectivos } from '../../hooks/useAniosLectivos';
 import { SelectoresDeOferta } from './SelectoresDeOferta';
 import { useDocumentosPrevistos } from '../../hooks/useEnrollments';
 import { APOYO_VACIO, aApoyoDeclarado } from '../../lib/apoyoDeclarado';
 import { PARENTESCOS, TIPOS_DOCUMENTO, type Jornada, type Parentesco, type TipoDocumento } from '../../types/domain';
 
 const FORM_VACIO = {
+  academic_year_id: '',
   primer_nombre: '',
   segundo_nombre: '',
   primer_apellido: '',
@@ -48,11 +49,13 @@ interface Props {
 }
 
 /**
- * Inscripción en el mostrador (M04): secretaría o administración registran la misma solicitud que la familia radica por el sitio público, con el documento
- * del acudiente y los documentos que trae ese día. No crea cuenta ni matrícula ni consume cupo: queda PENDIENTE en la bandeja, donde se aprueba o se rechaza.
+ * Inscripción en el mostrador (M04): secretaría o administración registran la misma solicitud que la familia radica por el sitio público,
+ * con el documento del acudiente y los documentos que trae ese día. Queda PENDIENTE en la bandeja.
  */
 export function InscripcionDrawer({ open, onClose }: Props) {
-  const grados = useGrades('activo');
+  const aniosQuery = useAniosLectivos();
+  const aniosAbiertos = [...(aniosQuery.data ?? [])].filter((a) => a.estado !== 'CERRADO').sort((a, b) => b.year - a.year);
+
   const registrar = useRegistrarInscripcion();
   const subirDocumento = useSubirDocumentoSolicitud();
 
@@ -60,9 +63,9 @@ export function InscripcionDrawer({ open, onClose }: Props) {
   const [archivos, setArchivos] = useState<Record<string, File>>({});
   const [resultado, setResultado] = useState<Resultado | null>(null);
 
-  // Los documentos que el colegio pide a un aspirante nuevo del grado elegido (el mismo catálogo de la matrícula).
+  const anioActivoId = form.academic_year_id || aniosAbiertos[0]?._id || '';
+
   const previstos = useDocumentosPrevistos({ grade_id: form.grado_deseado_id || undefined, tipo_ingreso: 'NUEVO' });
-  const nombreDeGrado = (grados.data ?? []).find((g) => g._id === form.grado_deseado_id)?.nombre;
 
   const set = <K extends keyof typeof FORM_VACIO>(clave: K, valor: (typeof FORM_VACIO)[K]) => setForm((f) => ({ ...f, [clave]: valor }));
 
@@ -78,6 +81,7 @@ export function InscripcionDrawer({ open, onClose }: Props) {
     e.preventDefault();
     registrar.reset();
     const solicitud = await registrar.mutateAsync({
+      academic_year_id: anioActivoId || undefined,
       primer_nombre: form.primer_nombre.trim(),
       segundo_nombre: form.segundo_nombre.trim() || undefined,
       primer_apellido: form.primer_apellido.trim(),
@@ -99,7 +103,6 @@ export function InscripcionDrawer({ open, onClose }: Props) {
       apoyo_declarado: aApoyoDeclarado(form.apoyo),
     });
 
-    // La solicitud ya existe: si un archivo falla no se pierde nada, se puede subir después desde «Documentos».
     const fallidos: string[] = [];
     for (const [tipoDocumento, file] of Object.entries(archivos)) {
       try {
@@ -122,26 +125,29 @@ export function InscripcionDrawer({ open, onClose }: Props) {
     <Drawer
       open={open}
       title={resultado ? 'Inscripción registrada' : 'Registrar inscripción'}
-      subtitle={resultado ? undefined : 'Una inscripción reserva el interés de la familia: no crea la cuenta ni la matrícula.'}
+      subtitle={resultado ? undefined : 'Radica la solicitud del aspirante en ventanilla sin apartar cupos ficticios ni crear matrícula prematura.'}
       size="lg"
       onClose={cerrar}
       onSubmit={resultado ? undefined : enviar}
       submitLabel="Registrar inscripción"
       isSubmitting={registrar.isPending || subirDocumento.isPending}
-      submitDisabled={!form.grado_deseado_id}
     >
       {resultado ? (
         <div className="space-y-4">
           <Alert tone="success">
-            La inscripción de {resultado.nombre} quedó pendiente en la bandeja de admisiones
-            {resultado.recibidos > 0 ? ` con ${resultado.recibidos} documento${resultado.recibidos === 1 ? '' : 's'} recibido${resultado.recibidos === 1 ? '' : 's'}` : ''}.
+            Se radicó la solicitud de <strong>{resultado.nombre}</strong>. Queda en estado <strong>PENDIENTE</strong> para su revisión.
           </Alert>
+          {resultado.recibidos > 0 && <p className="text-sm text-ink">Se adjuntaron {resultado.recibidos} documento(s) físico(s).</p>}
           {resultado.fallidos.length > 0 && (
-            <Alert tone="warning">No se pudo subir: {resultado.fallidos.join(', ')}. Súbelos desde «Documentos» en la fila de la solicitud.</Alert>
+            <Alert tone="warning">
+              No se pudieron guardar estos archivos: {resultado.fallidos.join(', ')}. Puedes volver a subirlos desde «Documentos».
+            </Alert>
           )}
-          <div className="flex flex-wrap gap-2">
-            <Button onClick={cerrar}>Listo</Button>
-            <Button variant="secondary" onClick={registrarOtra}>
+          <div className="flex justify-end gap-2 pt-2">
+            <Button variant="secondary" onClick={cerrar}>
+              Cerrar
+            </Button>
+            <Button variant="primary" onClick={registrarOtra}>
               Registrar otra
             </Button>
           </div>
@@ -149,6 +155,29 @@ export function InscripcionDrawer({ open, onClose }: Props) {
       ) : (
         <>
           {registrar.isError && <Alert tone="error">{errorMessage(registrar.error)}</Alert>}
+
+          {/* Selector de Año Lectivo solo si hay más de 1 año abierto */}
+          {aniosAbiertos.length > 1 && (
+            <div className="flex items-center gap-2 rounded-lg border border-border p-3 bg-surface">
+              <span className="text-xs font-semibold text-muted">Año lectivo:</span>
+              <div className="flex flex-wrap gap-2">
+                {aniosAbiertos.map((a) => (
+                  <button
+                    key={a._id}
+                    type="button"
+                    onClick={() => set('academic_year_id', a._id)}
+                    className={`px-3 py-1 text-xs font-semibold rounded-md border transition ${
+                      (form.academic_year_id || anioActivoId) === a._id
+                        ? 'border-primary bg-primary-soft text-primary'
+                        : 'border-border bg-surface text-ink hover:bg-soft'
+                    }`}
+                  >
+                    Año {a.year} {a.estado === 'PLANIFICACION' ? '(próximo año)' : ''}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
 
           <fieldset className="space-y-3 rounded-lg border border-border p-3">
             <legend className="px-1 text-sm font-semibold text-ink">Aspirante</legend>
@@ -203,7 +232,7 @@ export function InscripcionDrawer({ open, onClose }: Props) {
             {form.grado_deseado_id && previstos.data && (
               <>
                 <p className="text-xs text-muted">
-                  Los que pide el colegio a un aspirante nuevo de {nombreDeGrado}. Adjunta los que la familia entregue; el resto se recibe después. Todo queda por revisar al aprobar la solicitud.
+                  Los que pide el colegio a un aspirante nuevo. Adjunta los que la familia entregue; el resto se recibe después. Todo queda por revisar al aprobar la solicitud.
                 </p>
                 <ul className="divide-y divide-border">
                   {previstos.data.map((d) => {

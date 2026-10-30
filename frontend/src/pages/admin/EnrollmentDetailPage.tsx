@@ -1,5 +1,6 @@
 import { type ChangeEvent, type FormEvent, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
+import { HistorialMatriculaCard } from '../../components/historial/HistorialMatriculaCard';
 import { RegistrarSalidaDrawer } from '../../components/salidas/RegistrarSalidaDrawer';
 import { Alert, errorMessage } from '../../components/ui/Alert';
 import { MarcaMatriculaSimat } from '../../components/estudiantes/MarcaSimat';
@@ -598,6 +599,8 @@ export function EnrollmentDetailPage() {
           {renderTablaDocumentos(itemsInstitucional)}
         </Card>
       )}
+
+      <HistorialMatriculaCard enrollmentId={enrollment._id} />
 
       <RegistrarSalidaDrawer
         open={salidaOpen}

@@ -34,6 +34,7 @@ import liderAreaRoutes from './liderArea.routes';
 import notasRoutes from './notas.routes';
 import noticiaRoutes from './noticia.routes';
 import notificacionRoutes from './notificacion.routes';
+import terminosRoutes from './terminos.routes';
 import observacionRoutes from './observacion.routes';
 import periodLockRoutes from './periodLock.routes';
 import portalAcudienteRoutes from './portalAcudiente.routes';
@@ -64,6 +65,7 @@ router.use('/auth', authRoutes);
 
 // M28: campanita, contadores del menú y tablero de anuncios
 router.use('/notificaciones', notificacionRoutes);
+router.use('/terminos', terminosRoutes);
 // Noticias y eventos institucionales (módulo propio, aparte de los anuncios): categorías del colegio, alcance por sede, grado o grupo y docentes habilitados
 router.use('/noticias', noticiaRoutes);
 router.use('/users', userRoutes);

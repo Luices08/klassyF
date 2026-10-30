@@ -189,7 +189,7 @@ export function telefonoDeSimat(valor: unknown): string | null {
     if (d.length === 7 && !/^(\d)\1+$/.test(d)) return d;
     return null;
   };
-  for (const parte of texto.split(/[/,;|\-]/)) {
+  for (const parte of texto.split(/[/,;|-]/)) {
     const directo = valido(parte.replace(/\D/g, ''));
     if (directo) return directo;
   }

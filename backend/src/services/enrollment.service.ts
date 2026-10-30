@@ -494,7 +494,7 @@ export async function cambiarGrupo(
       accion: 'MATRICULA_GRUPO_CAMBIADO',
       entidad: 'Enrollment',
       entidad_id: enrollment._id,
-      detalle: `Grupo ${grupoAnteriorId} -> ${nuevoGrupo._id}`,
+      detalle: `Grupo ${(await Group.findById(grupoAnteriorId).select('nomenclatura').session(session))?.nomenclatura ?? grupoAnteriorId} -> ${nuevoGrupo.nomenclatura}`,
     });
 
     return enrollment;
@@ -1140,23 +1140,25 @@ export async function listarDocumentosPrevistos(filtro: FiltroDocumentosPrevisto
   let nivel: NivelEducativo = 'PRIMARIA';
   let numeroGrado = 1;
   let anioId: Types.ObjectId | null = null;
+  let gradoEncontrado = null;
 
   if (filtro.group_id) {
     const group = await Group.findById(filtro.group_id);
     if (group) {
       anioId = group.academic_year_id;
-      const grade = await Grade.findById(group.grade_id);
-      if (grade) {
-        nivel = grade.nivel;
-        numeroGrado = grade.numero;
-      }
+      gradoEncontrado = await Grade.findById(group.grade_id);
     }
-  } else if (filtro.grade_id) {
-    const grade = await Grade.findById(filtro.grade_id);
-    if (grade) {
-      nivel = grade.nivel;
-      numeroGrado = grade.numero;
-    }
+  }
+
+  if (!gradoEncontrado && filtro.grade_id) {
+    gradoEncontrado = await Grade.findById(filtro.grade_id);
+  }
+
+  const sinGrado = !gradoEncontrado;
+
+  if (gradoEncontrado) {
+    nivel = gradoEncontrado.nivel;
+    numeroGrado = gradoEncontrado.numero;
   }
 
   const [profile, vinculoAcudiente] = filtro.student_id
@@ -1172,6 +1174,7 @@ export async function listarDocumentosPrevistos(filtro: FiltroDocumentosPrevisto
     tipoIngreso: filtro.tipo_ingreso,
     tieneDiscapacidad: profile?.tiene_discapacidad,
     parentescoAcudiente: vinculoAcudiente?.parentesco,
+    sinGrado,
   });
 
   // El paz y salvo del año anterior ya confirmado lo aprueba el sistema al matricular: no hay nada que marcar como entregado.

@@ -1,5 +1,6 @@
 import { Types } from 'mongoose';
 import AuditLog, { AccionAuditoria } from '../models/auditLog.model';
+import { tipoDeAccion } from '../constants/tiposEventoAuditoria';
 
 interface RegistrarEventoInput {
   usuario_id?: Types.ObjectId | string | null;
@@ -15,6 +16,11 @@ interface RegistrarEventoInput {
  * negocio que la origino: un fallo aqui solo se deja en consola.
  */
 export async function registrarEvento(input: RegistrarEventoInput): Promise<void> {
+  // La bitácora del historial conserva solo cambios de componentes del sistema:
+  // creación, edición, matriculación y eliminación. Consultas, accesos, descargas,
+  // reportes y acciones rechazadas no se persisten aquí.
+  if (tipoDeAccion(input.accion) === null) return;
+
   try {
     await AuditLog.create({
       usuario_id: input.usuario_id ?? null,

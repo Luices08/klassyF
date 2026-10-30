@@ -229,6 +229,15 @@ export const EyeIcon = (p: IconProps) => (
   </Icon>
 );
 
+export const EyeOffIcon = (p: IconProps) => (
+  <Icon {...p}>
+    <path d="M17.94 17.94A10.94 10.94 0 0 1 12 20C5 20 1 12 1 12a18.5 18.5 0 0 1 5.06-5.94" />
+    <path d="M9.9 4.24A9.1 9.1 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19" />
+    <path d="M14.12 14.12A3 3 0 1 1 9.88 9.88" />
+    <path d="m1 1 22 22" />
+  </Icon>
+);
+
 export const InboxIcon = (p: IconProps) => (
   <Icon {...p}>
     <path d="M4 13h4l1.5 3h5L16 13h4" />
@@ -245,6 +254,22 @@ export const FolderIcon = (p: IconProps) => (
 export const StarIcon = (p: IconProps) => (
   <Icon {...p}>
     <path d="m12 3 2.6 5.6 6.1.6-4.6 4.1 1.3 6-5.4-3.2-5.4 3.2 1.3-6-4.6-4.1 6.1-.6Z" />
+  </Icon>
+);
+
+export const IdCardIcon = (p: IconProps) => (
+  <Icon {...p}>
+    <rect x="2" y="5" width="20" height="14" rx="2" />
+    <circle cx="8.5" cy="11" r="2" />
+    <path d="M5.5 16c.6-1.6 1.7-2.3 3-2.3s2.4.7 3 2.3" />
+    <path d="M14 10h5M14 14h4" />
+  </Icon>
+);
+
+export const ArrowRightIcon = (p: IconProps) => (
+  <Icon {...p}>
+    <path d="M5 12h14" />
+    <path d="m13 6 6 6-6 6" />
   </Icon>
 );
 

@@ -1,39 +1,50 @@
 import { ParamsDictionary } from 'express-serve-static-core';
 import { ParsedQs } from 'qs';
-import { Jornada, TipoDocumento, TipoDocumentoMatricula } from '../constants/enums';
+import { TipoDocumentoMatricula } from '../constants/enums';
 import * as admissionService from '../services/admissionRequest.service';
 import * as comprobanteService from '../services/comprobantePreinscripcion.service';
-import * as prematriculaService from '../services/prematricula.service';
+import * as cuposAdmisionService from '../services/cuposAdmision.service';
 import * as solicitudDocumentos from '../services/solicitudDocumentos.service';
 import * as preinscripcionService from '../services/preinscripcionPublica.service';
 import { registrarEvento } from '../services/audit.service';
 import ApiError from '../utils/ApiError';
 import catchAsync from '../utils/catchAsync';
 
-interface CrearSolicitudBody {
-  primer_nombre?: string;
-  segundo_nombre?: string;
-  primer_apellido?: string;
-  segundo_apellido?: string;
-  nombre_aspirante?: string;
-  apellido_aspirante?: string;
-  tipo_documento: TipoDocumento;
-  numero_documento: string;
-  fecha_nacimiento: string;
-  grado_deseado_id: string;
-  sede_deseada_id?: string;
-  jornada_deseada?: Jornada;
-  acudiente_nombre: string;
-  acudiente_apellido: string;
-  acudiente_telefono: string;
-  acudiente_email: string;
-  observaciones?: string;
-  apoyo_declarado?: { motivo_declarado: string; aporta_soporte?: boolean; observacion?: string };
-}
-
-export const crearSolicitud = catchAsync<unknown, unknown, CrearSolicitudBody>(async (req, res) => {
+export const crearSolicitud = catchAsync<unknown, unknown, admissionService.CrearSolicitudInput>(async (req, res) => {
   const solicitud = await admissionService.crearSolicitud(req.body);
-  res.status(201).json({ success: true, data: solicitud });
+
+  const files = req.files as { [fieldname: string]: Express.Multer.File[] } | undefined;
+  if (files) {
+    if (files['documento_identidad']?.[0]) {
+      const f = files['documento_identidad'][0];
+      await solicitudDocumentos.subirDocumentoDeSolicitud(
+        String(solicitud._id),
+        'DOCUMENTO_IDENTIDAD',
+        { buffer: f.buffer, mimetype: f.mimetype, originalname: f.originalname },
+        null
+      );
+    }
+    if (files['certificado_notas']?.[0]) {
+      const f = files['certificado_notas'][0];
+      await solicitudDocumentos.subirDocumentoDeSolicitud(
+        String(solicitud._id),
+        'CERTIFICADO_NOTAS',
+        { buffer: f.buffer, mimetype: f.mimetype, originalname: f.originalname },
+        null
+      );
+    }
+  }
+
+  await registrarEvento({
+    accion: 'ADMISION_SOLICITADA',
+    entidad: 'AdmissionRequest',
+    entidad_id: solicitud._id,
+    detalle: `Solicitud de ${solicitud.nombre_aspirante} ${solicitud.apellido_aspirante} desde el sitio público`,
+    ip: req.ip,
+  });
+
+  const finalSolicitud = await admissionService.obtenerSolicitud(String(solicitud._id));
+  res.status(201).json({ success: true, data: finalSolicitud });
 });
 
 export const registrarInscripcion = catchAsync<unknown, unknown, admissionService.RegistrarInscripcionInput>(async (req, res) => {
@@ -48,7 +59,12 @@ interface DocumentoSolicitudParams extends ParamsDictionary {
 
 export const subirDocumentoSolicitud = catchAsync<DocumentoSolicitudParams>(async (req, res) => {
   if (!req.file) throw new ApiError(400, 'Debes adjuntar un archivo en el campo "file".');
-  const solicitud = await solicitudDocumentos.subirDocumentoDeSolicitud(req.params.id, req.params.tipoDocumento, { buffer: req.file.buffer, mimetype: req.file.mimetype }, { id: req.user!._id });
+  const solicitud = await solicitudDocumentos.subirDocumentoDeSolicitud(
+    req.params.id,
+    req.params.tipoDocumento,
+    { buffer: req.file.buffer, mimetype: req.file.mimetype, originalname: req.file.originalname },
+    { id: req.user!._id }
+  );
   res.status(200).json({ success: true, data: solicitud });
 });
 
@@ -61,26 +77,10 @@ export const descargarDocumentoSolicitud = catchAsync<DocumentoSolicitudParams>(
   res.sendFile(await solicitudDocumentos.rutaDeDocumentoDeSolicitud(req.params.id, req.params.tipoDocumento));
 });
 
-export const cuposDePrematricula = catchAsync<unknown, unknown, unknown, { academic_year_id: string }>(async (req, res) => {
-  res.status(200).json({ success: true, data: await prematriculaService.cuposDelAnio(req.query.academic_year_id) });
+export const cuposDeAdmision = catchAsync<unknown, unknown, unknown, { academic_year_id: string }>(async (req, res) => {
+  res.status(200).json({ success: true, data: await cuposAdmisionService.obtenerDisponibilidadCupos(req.query.academic_year_id) });
 });
-
-interface VentanaParams extends ParamsDictionary {
-  academicYearId: string;
-}
-
-export const verVentanaDePrematricula = catchAsync<VentanaParams>(async (req, res) => {
-  res.status(200).json({ success: true, data: await prematriculaService.obtenerVentana(req.params.academicYearId) });
-});
-
-export const guardarVentanaDePrematricula = catchAsync<VentanaParams, unknown, prematriculaService.DatosVentana>(async (req, res) => {
-  res.status(200).json({ success: true, data: await prematriculaService.guardarVentana(req.params.academicYearId, req.body, req.user!, req.ip) });
-});
-
-export const reservarCupo = catchAsync<{ id: string } & ParamsDictionary, unknown, { sede_id: string; jornada_id: string }>(async (req, res) => {
-  const r = await prematriculaService.reservarCupo(req.params.id, req.body, { id: req.user!._id });
-  res.status(200).json({ success: true, data: r.solicitud, aviso: r.aviso, posicion_espera: r.posicion_espera });
-});
+export const cuposDePrematricula = cuposDeAdmision;
 
 interface ConsultarEstadoQuery extends ParsedQs {
   numero_documento: string;
@@ -98,7 +98,6 @@ interface CredencialesPreinscripcion {
   fecha_nacimiento: string;
 }
 
-// POST y no GET: documento + fecha de nacimiento de un menor no deben viajar en la URL (logs, historial).
 export const descargarComprobante = catchAsync<unknown, unknown, CredencialesPreinscripcion>(async (req, res) => {
   const { pdf, codigo } = await comprobanteService.generarComprobantePreinscripcionPdf(
     req.body.numero_documento,
@@ -128,6 +127,8 @@ export const subirDocumentoPublico = catchAsync<SubirDocumentoParams, unknown, C
 
 interface ListarQuery {
   estado?: string;
+  academic_year_id?: string;
+  grade_id?: string;
   search?: string;
   page?: number;
   limit?: number;
@@ -147,26 +148,16 @@ export const obtenerSolicitud = catchAsync<SolicitudParams>(async (req, res) => 
   res.status(200).json({ success: true, data: solicitud });
 });
 
-interface AprobarBody {
-  group_id: string;
-  academic_year_id: string;
-  fecha_limite_legalizacion?: string;
-}
-
-export const aprobarSolicitud = catchAsync<SolicitudParams, unknown, AprobarBody>(async (req, res) => {
-  const solicitud = await admissionService.aprobarSolicitud(req.params.id, req.body, req.user!._id);
-
-  await registrarEvento({
-    usuario_id: req.user?._id,
-    accion: 'USUARIO_CREADO',
-    entidad: 'AdmissionRequest',
-    entidad_id: solicitud._id,
-    detalle: `Solicitud aprobada: ${solicitud.nombre_aspirante} ${solicitud.apellido_aspirante}`,
-    ip: req.ip,
-  });
-
+export const admitirSolicitud = catchAsync<SolicitudParams>(async (req, res) => {
+  const solicitud = await admissionService.admitirSolicitud(req.params.id, req.user!._id);
   res.status(200).json({ success: true, data: solicitud });
 });
+
+export const aprobarYMatricular = catchAsync<SolicitudParams, unknown, admissionService.AprobarYMatricularInput>(async (req, res) => {
+  const solicitud = await admissionService.aprobarYMatricular(req.params.id, req.body, req.user!._id);
+  res.status(200).json({ success: true, data: solicitud });
+});
+export const aprobarSolicitud = aprobarYMatricular;
 
 interface RechazarBody {
   motivo: string;

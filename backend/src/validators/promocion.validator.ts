@@ -1,6 +1,6 @@
 import Joi from 'joi';
 import { NIVELES_EDUCATIVOS } from '../constants/enums';
-import { CRITERIOS_DESEMPATE, ESTADOS_ESPERA_REMATRICULA } from '../constants/rematricula';
+import { CRITERIOS_DESEMPATE } from '../constants/rematricula';
 import { GRADO_TITULACION } from '../constants/titulacion';
 import {
   ACCIONES_REGLA,
@@ -190,6 +190,9 @@ export const listarEvaluaciones: ValidationSchema = {
 
 export const idParam: ValidationSchema = { params: Joi.object({ id: objectId.required() }) };
 
+export const simularRollover: ValidationSchema = {
+  query: Joi.object({ origen_id: objectId.required(), destino_id: objectId.required(), sede_id: objectId, grade_id: objectId, group_id: objectId, continuidad: Joi.string().valid('CONFIRMADOS', 'TODOS') }),
+};
 export const simulacionRollover: ValidationSchema = {
   query: Joi.object({ origen_id: objectId.required(), destino_id: objectId.required(), sede_id: objectId, grade_id: objectId, group_id: objectId, continuidad: Joi.string().valid('CONFIRMADOS', 'TODOS') }),
 };
@@ -206,18 +209,4 @@ export const configuracionRematricula: ValidationSchema = {
       .required(),
     tolerancia_ocupacion_pct: Joi.number().min(0).max(50).required(),
   }),
-};
-
-export const listaEspera: ValidationSchema = {
-  query: Joi.object({ destino_id: objectId.required(), sede_id: objectId, grade_id: objectId, estado: Joi.string().valid(...ESTADOS_ESPERA_REMATRICULA) }),
-};
-
-export const asignarEspera: ValidationSchema = {
-  params: Joi.object({ id: objectId.required() }),
-  body: Joi.object({ group_id: objectId.required() }),
-};
-
-export const descartarEspera: ValidationSchema = {
-  params: Joi.object({ id: objectId.required() }),
-  body: Joi.object({ motivo: Joi.string().trim().min(10).max(500).required() }),
 };

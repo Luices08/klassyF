@@ -1,31 +1,25 @@
 import { HydratedDocument, Model, Schema, Types, model } from 'mongoose';
 import { Jornada, JORNADAS, PARENTESCOS, Parentesco, TIPOS_DOCUMENTO, TipoDocumento } from '../constants/enums';
 
-// M04 (Admisiones): solicitud publica de cupo, separada de Enrollment a
-// proposito — nadie sin autenticar debe poder crear cuentas de usuario ni
-// consumir cupos de un grupo directamente. Secretaria la revisa aqui y, al
-// aprobarla, recien ahi se crea el User + Enrollment (PREINSCRITO).
-// CUPO_RESERVADO y EN_ESPERA son de la prematrícula: el cupo se reserva por grado, sede y jornada, sin grupo, cuenta ni matrícula (ver prematricula.service).
-export const ESTADOS_SOLICITUD = ['PENDIENTE', 'EN_REVISION', 'CUPO_RESERVADO', 'EN_ESPERA', 'APROBADA', 'RECHAZADA'] as const;
+// M04 (Admisiones): solicitud pública o de mostrador de cupo, separada de Enrollment.
+// Estados definidos:
+// - PENDIENTE: Radicada, a la espera de revisión/cupos.
+// - ADMITIDO: Aspirante admitido (usado para solicitudes del año siguiente tras conocer cupos).
+// - MATRICULADO: Matrícula formalizada en el sistema con salón, libro y folio.
+// - RECHAZADA: Solicitud rechazada con motivo.
+export const ESTADOS_SOLICITUD = ['PENDIENTE', 'ADMITIDO', 'MATRICULADO', 'RECHAZADA'] as const;
 export type EstadoSolicitud = (typeof ESTADOS_SOLICITUD)[number];
 
 /** Quién radicó la solicitud: la familia desde el sitio público o secretaría en el mostrador. */
 export const ORIGENES_SOLICITUD = ['PUBLICA', 'SECRETARIA'] as const;
 export type OrigenSolicitud = (typeof ORIGENES_SOLICITUD)[number];
 
-/** El cupo que se le reservó a una solicitud: grado (el que pidió), sede y jornada. Sin grupo: el grupo se elige al matricular. */
-export interface IReservaDeCupo {
-  sede_id: Types.ObjectId;
-  jornada_id: Types.ObjectId;
-  reservado_por: Types.ObjectId;
-  fecha: Date;
-}
-
 /** Un documento recibido con la solicitud (antes de que haya matrícula). El archivo vive en el disco; la API nunca devuelve su ruta. */
 export interface IDocumentoSolicitud {
   tipo_documento: string;
   archivo_path: string;
-  cargado_por: Types.ObjectId;
+  nombre_original?: string | null;
+  cargado_por?: Types.ObjectId | null;
   fecha_carga: Date;
 }
 
@@ -62,9 +56,8 @@ export interface IAdmissionRequest {
   enrollment_id: Types.ObjectId | null;
   origen: OrigenSolicitud;
   registrada_por: Types.ObjectId | null;
-  /** El año al que apunta: el siguiente mientras su ventana de prematrícula está abierta, o el año en curso. null en las solicitudes anteriores a la prematrícula. */
+  /** El año lectivo al que apunta la solicitud (año en curso o año siguiente). */
   academic_year_id: Types.ObjectId | null;
-  reserva: IReservaDeCupo | null;
   documentos: IDocumentoSolicitud[];
   createdAt: Date;
   updatedAt: Date;
@@ -77,8 +70,9 @@ const documentoSolicitudSchema = new Schema<IDocumentoSolicitud>(
   {
     tipo_documento: { type: String, required: true, trim: true },
     archivo_path: { type: String, required: true },
-    cargado_por: { type: Schema.Types.ObjectId, ref: 'User', required: true },
-    fecha_carga: { type: Date, required: true },
+    nombre_original: { type: String, trim: true, default: null },
+    cargado_por: { type: Schema.Types.ObjectId, ref: 'User', default: null },
+    fecha_carga: { type: Date, required: true, default: Date.now },
   },
   {
     _id: false,
@@ -89,16 +83,6 @@ const documentoSolicitudSchema = new Schema<IDocumentoSolicitud>(
       },
     },
   }
-);
-
-const reservaSchema = new Schema<IReservaDeCupo>(
-  {
-    sede_id: { type: Schema.Types.ObjectId, ref: 'Campus', required: true },
-    jornada_id: { type: Schema.Types.ObjectId, ref: 'JornadaOperativa', required: true },
-    reservado_por: { type: Schema.Types.ObjectId, ref: 'User', required: true },
-    fecha: { type: Date, required: true },
-  },
-  { _id: false }
 );
 
 const admissionRequestSchema = new Schema<IAdmissionRequest, AdmissionRequestModel>(
@@ -143,7 +127,6 @@ const admissionRequestSchema = new Schema<IAdmissionRequest, AdmissionRequestMod
     origen: { type: String, enum: ORIGENES_SOLICITUD, default: 'PUBLICA' },
     registrada_por: { type: Schema.Types.ObjectId, ref: 'User', default: null },
     academic_year_id: { type: Schema.Types.ObjectId, ref: 'AcademicYear', default: null },
-    reserva: { type: reservaSchema, default: null },
     documentos: { type: [documentoSolicitudSchema], default: [] },
   },
   { timestamps: true }

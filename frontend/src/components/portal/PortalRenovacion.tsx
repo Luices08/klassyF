@@ -5,8 +5,8 @@ import { Card, CardHeader } from '../ui/Card';
 import { useContinuidadDelHijo, useResponderContinuidadDelHijo } from '../../hooks/useContinuidad';
 
 /**
- * Renovación de matrícula (M04): mientras el colegio tiene abierta la prematrícula, la familia dice si su hijo continúa el año siguiente. «Continúa» aparta
- * su cupo; no es la matrícula (eso se firma en el libro cuando la secretaría lo cite) y no pide documentos. Sin proceso abierto no muestra nada.
+ * Continuidad (M04): la familia registra si su hijo piensa seguir el año siguiente. La respuesta se usa en el rollover, pero no crea ni reserva cupo o
+ * matrícula. La matrícula definitiva se asienta cuando secretaría ejecuta el rollover.
  */
 export function PortalRenovacion({ studentId }: { studentId: string }) {
   const { data } = useContinuidadDelHijo(studentId);
@@ -39,7 +39,7 @@ export function PortalRenovacion({ studentId }: { studentId: string }) {
           <Button variant="outline" disabled={responder.isPending || data.decision === 'NO_CONTINUA'} onClick={() => responder.mutate({ decision: 'NO_CONTINUA' })}>
             No continúa
           </Button>
-          <p className="basis-full text-xs text-muted">Puedes cambiar tu respuesta mientras el colegio mantenga abierto este proceso.</p>
+          <p className="basis-full text-xs text-muted">La respuesta no reserva un cupo ni crea una matrícula. Puedes cambiarla hasta que se registre la matrícula del año siguiente.</p>
         </div>
       ) : (
         <p className="text-sm text-body">Ya tiene su matrícula del {anio} en proceso: tu respuesta quedó registrada.</p>

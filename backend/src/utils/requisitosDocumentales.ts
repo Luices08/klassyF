@@ -21,6 +21,7 @@ export interface ContextoDeRequisitos {
   tipoIngreso: TipoIngreso;
   tieneDiscapacidad?: boolean;
   parentescoAcudiente?: string;
+  sinGrado?: boolean;
 }
 
 export interface ItemDeRequisito {
@@ -34,6 +35,7 @@ export interface ItemDeRequisito {
 /** Sin nada marcado aplica a todos; con grados o niveles, basta con que el grado coincida con uno de los dos criterios. */
 function aplicaAlGrado(r: RequisitoDelCatalogo, c: ContextoDeRequisitos): boolean {
   if (r.niveles.length === 0 && r.grados_numeros.length === 0) return true;
+  if (c.sinGrado) return false;
   return r.niveles.includes(c.nivel) || r.grados_numeros.includes(c.numeroGrado);
 }
 

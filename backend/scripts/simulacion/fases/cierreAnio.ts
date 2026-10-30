@@ -4,7 +4,7 @@
  * el paz y salvo, el ADMIN cierra de nuevo la promoción de quienes recuperaron y, verificado todo, cierra el año lectivo con su
  * contraseña. Cada paso es una llamada a la API en su fecha.
  */
-import { como } from '../nucleo/api';
+import { como, ErrorApi } from '../nucleo/api';
 import { azarPara } from '../nucleo/azar';
 import { perfiles, registro } from '../nucleo/registro';
 import { aLaHora, diaDelAnio, isoDia, sumarDias } from '../nucleo/fechas';
@@ -118,7 +118,10 @@ export async function faseCierreAnio(ctx: ContextoFase, anio: number): Promise<v
       cuando,
       correr: async () => {
         if (!confirmaPazYSalvo(azar)) return;
-        await secre.patch(`/paz-y-salvo/estudiantes/${m.student_id}/anios/${anioId}`, { estado: 'CONFIRMADO' });
+        // Al retomar una fase que quedó a medias, el paz y salvo puede estar ya confirmado: se cuenta y se sigue.
+        await secre.patch(`/paz-y-salvo/estudiantes/${m.student_id}/anios/${anioId}`, { estado: 'CONFIRMADO' }).catch((error: unknown) => {
+          if (!(error instanceof ErrorApi && error.status === 400 && /ya está confirmado/i.test(error.message))) throw error;
+        });
         pazConfirmados += 1;
       },
     });

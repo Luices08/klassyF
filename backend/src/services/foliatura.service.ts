@@ -166,10 +166,25 @@ export async function actualizarFoliatura(cambios: CambiosFoliatura, usuario: Us
   if (capacidad !== null && cambios.ultimo_folio > capacidad) throw new ApiError(400, 'El último folio no puede pasar de la capacidad del libro.');
 
   await asegurarConfiguracion();
+  const referencia = await anioDeReferencia();
   const motivo = cambios.motivo?.trim() ?? '';
   await runTransaction(async (session) => {
+    const actual = await ConfiguracionFoliatura.findById(ID).session(session);
+    const libroPrevio = actual ? libroDeFolio(actual.esquema, referencia, actual.libro_actual) : null;
+    const ultimoPrevio = actual ? ULTIMO_FOLIO(actual, cambios.libro_actual) : 0;
+    const capacidadPrevia = actual && actual.esquema === 'CONTINUO' ? actual.capacidad_por_libro : null;
+    const huboCambio =
+      !actual ||
+      actual.esquema !== cambios.esquema ||
+      actual.mascara !== cambios.mascara.trim() ||
+      capacidadPrevia !== capacidad ||
+      libroPrevio !== cambios.libro_actual ||
+      ultimoPrevio !== cambios.ultimo_folio;
+
     const hayEmitidos = Boolean(await Enrollment.exists({ numero_folio: { $ne: null } }).session(session));
-    if (hayEmitidos && motivo.length < 10) throw new ApiError(400, 'Ya hay folios asentados: escribe el motivo del cambio (mínimo 10 caracteres).');
+    if (hayEmitidos && huboCambio && motivo.length < 10) {
+      throw new ApiError(400, 'Ya hay folios asentados: escribe el motivo del cambio (mínimo 10 caracteres).');
+    }
 
     const emitidoEnElLibro = await Enrollment.findOne({ numero_libro: cambios.libro_actual, numero_folio: { $ne: null } }).sort({ numero_folio: -1 }).select('numero_folio').session(session);
     const mayorEmitido = emitidoEnElLibro?.numero_folio ?? 0;

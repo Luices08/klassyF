@@ -1,8 +1,10 @@
 import type { Tone } from '../../../components/ui/Badge';
-import type { AnalisisEstudiante, AsignaturaAnalizada, EstadoModelo, NivelRiesgo, NotaRequerida } from '../hooks/usePredictivo';
+import type { NivelDesempeno } from '../../../types/domain';
+import type { AnalisisEstudiante, AsignaturaAnalizada, EstadoModelo, FuenteProbabilidad, NivelRiesgo, NotaRequerida } from '../hooks/usePredictivo';
 
 /** Textos y tonos del módulo predictivo; aparte de los componentes para que la vista del personal y la de la familia digan lo mismo. */
 
+export const TONO_DESEMPENO: Record<NivelDesempeno, Tone> = { SUPERIOR: 'green', ALTO: 'blue', BASICO: 'orange', BAJO: 'red' };
 export const TONO_RIESGO: Record<NivelRiesgo, Tone> = { BAJO: 'green', MEDIO: 'orange', ALTO: 'red' };
 export const NOMBRE_RIESGO: Record<NivelRiesgo, string> = { BAJO: 'Riesgo bajo', MEDIO: 'Riesgo medio', ALTO: 'Riesgo alto' };
 
@@ -40,9 +42,38 @@ export function textoNotaRequerida(nr: NotaRequerida, decimales: number): { text
   }
 }
 
+/** De dónde sale la probabilidad de perder una asignatura (solo personal). */
+export const NOMBRE_FUENTE: Record<FuenteProbabilidad, string> = {
+  NOTAS: 'Ya lo deciden sus notas',
+  MODELO: 'Estimado por el modelo',
+  MODELO_E_HISTORIAL: 'Modelo e historial de años anteriores',
+  HISTORIAL: 'Según su historial y lo que va del año',
+};
+
+/** La nota que necesita en el periodo en curso, para el número grande de la tarjeta: etiqueta, valor y una aclaración. */
+export function notaParaEstePeriodo(nr: NotaRequerida, periodoActual: number | null, decimales: number): { etiqueta: string; valor: string | null; detalle: string; tono: Tone } {
+  const etiqueta = periodoActual === null ? 'Resultado del año' : `Necesita en el periodo ${periodoActual}`;
+  if (nr.estado === 'ALCANZABLE' && nr.nota !== null) {
+    return {
+      etiqueta,
+      valor: nota(nr.nota, decimales),
+      detalle: nr.periodos_restantes > 1 ? `En promedio, en este y en los ${nr.periodos_restantes - 1} periodos siguientes.` : 'Es el último periodo del año.',
+      tono: 'blue',
+    };
+  }
+  const { texto, tono } = textoNotaRequerida(nr, decimales);
+  return { etiqueta, valor: null, detalle: texto, tono };
+}
+
+/** Tono de una proporción buena (asistencia, entregas): verde desde 90 %, naranja desde 75 %, si no rojo. */
+export const tonoDeProporcion = (porcentaje: number | null): Tone => (porcentaje === null ? 'neutral' : porcentaje >= 90 ? 'green' : porcentaje >= 75 ? 'orange' : 'red');
+
+/** Tono de una nota frente a la aprobatoria. */
+export const tonoDeNota = (valor: number | null, aprobatoria: number): Tone => (valor === null ? 'neutral' : valor >= aprobatoria ? 'green' : 'red');
+
 /** Con qué se hizo el análisis: los periodos cerrados o, recién abierto el año, el año anterior. */
 export function textoCorte(a: Pick<AnalisisEstudiante, 'corte' | 'total_periodos'>): string {
-  if (a.corte === 0) return 'Periodo recién abierto: se analiza con lo que pasó el año anterior.';
+  if (a.corte === 0) return 'Aún no hay periodos cerrados: se analiza con su historial de años anteriores, la asistencia y las entregas que van.';
   if (a.corte >= a.total_periodos) return `Con los ${a.total_periodos} periodos ya cerrados.`;
   return `Con ${a.corte === 1 ? 'el periodo 1 cerrado' : `los periodos 1 a ${a.corte} cerrados`} de ${a.total_periodos}.`;
 }

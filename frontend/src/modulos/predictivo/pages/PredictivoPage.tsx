@@ -59,8 +59,8 @@ export function PredictivoPage() {
         />
       )}
       <TabPanel active={pestana} tabKey="analisis">
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-[20rem_1fr]">
-          <div>
+        <div className="space-y-4">
+          <div className="max-w-xl">
             <BuscadorEstudiante seleccionado={studentId} onElegir={(id) => cambiar({ estudiante: id })} />
           </div>
           <AnalisisElegido studentId={studentId} />

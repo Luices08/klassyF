@@ -11,17 +11,10 @@ import mongoose from 'mongoose';
 dotenv.config();
 
 import { env } from '../src/config/env';
-import Institution from '../src/models/institution.model';
 import { sembrarTiposDeTitulacion } from '../src/services/tipoCertificado.service';
 
 async function run(): Promise<void> {
   await mongoose.connect(env.mongoUri);
-  // Una instalación nueva aún no tiene institución: no es un error, M26 siembra estos tipos solo la primera vez que se usa.
-  if (!(await Institution.exists({}))) {
-    console.log('[sembrar] Aún no hay institución configurada: se omite (los tipos se crean solos al usar Certificados).');
-    await mongoose.disconnect();
-    return;
-  }
   const creados = await sembrarTiposDeTitulacion();
   console.log(creados.length > 0 ? `[sembrar] Tipos creados en borrador: ${creados.join(', ')}.` : '[sembrar] Los tipos de titulación ya existían.');
   await mongoose.disconnect();

@@ -19,8 +19,6 @@ async function run(): Promise<void> {
   await mongoose.connect(env.mongoUri);
   console.log('[migrate] Conectado a MongoDB.');
 
-  // En una instalación nueva la colección aún no existe y listar sus índices fallaría.
-  await AcademicYear.createCollection();
   const indices = await AcademicYear.collection.indexes();
   if (indices.some((i) => i.name === INDICE_VIEJO)) {
     await AcademicYear.collection.dropIndex(INDICE_VIEJO);

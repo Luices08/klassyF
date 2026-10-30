@@ -16,8 +16,6 @@ RUN npm run build
 
 FROM dependencias AS herramientas
 ENV NODE_ENV=production
-# mongodump/mongorestore: respaldos por fase de `npm run llenar:sistema`. Si el paquete no está, el script corre sin respaldo.
-RUN apk add --no-cache mongodb-tools || echo "mongodb-tools no disponible: la simulación correrá sin respaldo por fase"
 COPY tsconfig.json tsconfig.scripts.json ./
 COPY src ./src
 COPY scripts ./scripts

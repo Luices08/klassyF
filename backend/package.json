@@ -8,6 +8,7 @@
     "build": "tsc",
     "start": "node dist/server.js",
     "seed": "tsx scripts/seed.ts",
+    "migrar": "tsx scripts/migrarTodo.ts",
     "seed:demo": "tsx scripts/seedDemoCompleto.ts",
     "seed:subjects": "tsx scripts/seedSubjects.ts",
     "sim": "tsx scripts/simulacion/orquestador.ts",

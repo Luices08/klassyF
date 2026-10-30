@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { Rol } from '../constants/enums';
 import { ROLES } from '../constants/roles';
 import {
+  miMatriculaPropia,
   actualizarComentarioDocumento,
   agregarDocumentoChecklist,
   cambiarGrupo,
@@ -39,6 +40,8 @@ router.use(authenticate);
 router.post('/', checkRole(...STAFF_MATRICULAS), validate(enrollmentValidator.createEnrollment), createEnrollment);
 router.get('/', checkRole(...STAFF_MATRICULAS), validate(enrollmentValidator.listEnrollments), listEnrollments);
 // Antes de '/:id' para que no la tome como un id.
+// Solo lee la matrícula del propio estudiante; va antes de '/:id' para que no la tome como un id.
+router.get('/mia', checkRole(ROLES.ESTUDIANTE), miMatriculaPropia);
 router.get('/estudiantes-situacion', checkRole(...STAFF_MATRICULAS), validate(enrollmentValidator.situacionEstudiantes), situacionEstudiantes);
 router.get('/grupo-sugerido', checkRole(...STAFF_MATRICULAS), validate(enrollmentValidator.grupoSugerido), grupoSugerido);
 router.get('/estudiantes-por-grado', checkRole(...STAFF_MATRICULAS), validate(enrollmentValidator.estudiantesPorGrado), estudiantesPorGrado);

@@ -10,6 +10,8 @@ export interface DatosDeTarjeta {
   /** La fecha ya escrita («25 may 2026, 9:30»); vacía si no hay. */
   cuando: string;
   fijada?: boolean;
+  /** El texto sin formato de la noticia (la banda lo usa si no hay bajada). */
+  descripcion?: string;
 }
 
 interface TarjetaMosaicoProps {
@@ -28,6 +30,8 @@ const ESTILO: Record<TamanoMosaico, { titulo: string; bajada: string | null }> =
   DESTACADA: { titulo: 'text-h3 line-clamp-2', bajada: 'line-clamp-1 text-sm' },
   ESTANDAR: { titulo: 'text-h3 line-clamp-4', bajada: 'line-clamp-3 text-sm' },
   BREVE: { titulo: 'text-sm font-semibold leading-snug line-clamp-3', bajada: null },
+  // La banda se dibuja con `TarjetaBanda`; este valor solo completa el tipo.
+  BANDA: { titulo: 'text-h3 line-clamp-2', bajada: 'line-clamp-1 text-sm' },
 };
 
 /**

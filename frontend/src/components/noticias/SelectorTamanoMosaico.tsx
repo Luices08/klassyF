@@ -14,6 +14,7 @@ const FORMA: Record<TamanoMosaico, { ancho: string; alto: string }> = {
   DESTACADA: { ancho: 'w-full', alto: 'h-1/2' },
   ESTANDAR: { ancho: 'w-1/2', alto: 'h-full' },
   BREVE: { ancho: 'w-1/2', alto: 'h-1/2' },
+  BANDA: { ancho: 'w-full', alto: 'h-1/3' },
 };
 
 /**
@@ -24,7 +25,7 @@ export function SelectorTamanoMosaico({ value, onChange, hayOtraPrincipal }: Sel
   return (
     <fieldset className="space-y-2">
       <legend className="text-label text-ink">Tamaño de impacto en el mosaico</legend>
-      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+      <div className="grid grid-cols-3 gap-2 sm:grid-cols-5">
         {ORDEN_TAMANOS.map((t) => {
           const info = INFO_TAMANO[t];
           return (
@@ -42,6 +43,7 @@ export function SelectorTamanoMosaico({ value, onChange, hayOtraPrincipal }: Sel
         })}
       </div>
       <p className="text-xs text-muted">{INFO_TAMANO[value].descripcion}</p>
+      <p className="text-xs text-muted">Con una o dos noticias vigentes, el inicio las muestra siempre como bandas a todo el ancho, sea cual sea el tamaño; el tamaño cuenta cuando hay tres o más.</p>
       {value === 'PRINCIPAL' && hayOtraPrincipal && (
         <p className="text-xs text-warning">Ya hay otra noticia Principal vigente: en los inicios solo la primera se ve grande y las demás se dibujan como Destacadas.</p>
       )}

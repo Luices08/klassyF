@@ -9,6 +9,19 @@ export function FilaAdaptable({ children }: { children: ReactNode }) {
 }
 
 /**
+ * La primera fila del inicio de docentes, estudiantes y acudientes: la bienvenida a la izquierda y los accesos rápidos a la derecha, a la misma altura. En pantallas
+ * medianas se apilan (con el menú lateral abierto no cabrían tres accesos en una columna angosta).
+ */
+export function FilaBienvenida({ bienvenida, accesos }: { bienvenida: ReactNode; accesos: ReactNode }) {
+  return (
+    <div className="grid grid-cols-1 items-stretch gap-4 xl:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)]">
+      {bienvenida}
+      {accesos}
+    </div>
+  );
+}
+
+/**
  * La fila principal de un panel: lo analítico a la izquierda (dos tercios) y los accesos a la derecha (un tercio). Ambas columnas se estiran a la misma altura y
  * sus tarjetas se llenan (`[&>*]:flex-1`), de modo que ninguna deja un espacio en blanco debajo.
  */

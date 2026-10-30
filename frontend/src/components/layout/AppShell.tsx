@@ -1,15 +1,14 @@
 import { useEffect, useRef, useState } from 'react';
-import { NavLink, Outlet, useLocation } from 'react-router-dom';
+import { Outlet, useLocation } from 'react-router-dom';
 import { AsistenteFlotante } from '../asistente/AsistenteFlotante';
-import { RolBadge } from '../ui/Badge';
-import { LogOutIcon, MenuIcon, UserIcon, XIcon } from '../ui/icons';
+import { MenuIcon, XIcon } from '../ui/icons';
 import { useAuth } from '../../context/AuthContext';
 import { useInstitution } from '../../hooks/useInstitution';
-import { CambiadorDePerfil } from './CambiadorDePerfil';
 import { ForcedPasswordChangeGate } from './ForcedPasswordChangeGate';
 import { NAV_ITEMS } from './navigation';
 import { BotonNoticias } from '../noticias/BotonNoticias';
 import { Campanita } from '../notificaciones/Campanita';
+import { MenuDeUsuario } from './MenuDeUsuario';
 import { MenuLateral } from './MenuLateral';
 import { contadorDeRuta, useMarcarVisto, useResumenNotificaciones } from '../../hooks/useNotificaciones';
 import type { Rol } from '../../types/api';
@@ -17,7 +16,7 @@ import type { Rol } from '../../types/api';
 const PERSONAL_CON_NOTICIAS: Rol[] = ['ADMIN', 'COORDINADOR', 'SECRETARIA', 'COORDINADOR_CONVIVENCIA', 'ORIENTADOR'];
 
 export function AppShell() {
-  const { user, logout } = useAuth();
+  const { user } = useAuth();
   const { data: institucion } = useInstitution();
   const { data: resumen } = useResumenNotificaciones();
   const marcarVisto = useMarcarVisto();
@@ -75,52 +74,31 @@ export function AppShell() {
           </aside>
 
           <div className="flex min-w-0 flex-1 flex-col">
-            <header className="flex h-16 shrink-0 items-center justify-between border-b border-border bg-surface px-4 sm:px-6">
-              <div className="flex items-center gap-3 sm:hidden">
+            <header className="flex h-16 shrink-0 items-center justify-between gap-3 border-b border-border bg-surface px-4 sm:px-6">
+              <div className="flex min-w-0 items-center gap-3">
                 <button
                   type="button"
                   onClick={() => setMenuMovilAbierto(true)}
                   aria-label="Abrir el menú"
                   aria-expanded={menuMovilAbierto}
-                  className="relative inline-flex h-9 w-9 items-center justify-center rounded-lg text-body ring-1 ring-inset ring-border hover:bg-soft"
+                  className="relative inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-body ring-1 ring-inset ring-border hover:bg-soft sm:hidden"
                 >
                   <MenuIcon className="h-5 w-5" />
                   {hayNovedadesEnMenu && <span aria-hidden="true" className="absolute -right-0.5 -top-0.5 h-2.5 w-2.5 rounded-full bg-danger ring-2 ring-surface" />}
                 </button>
-                <img src="/logo-klassy.png" alt="Klassy" className="h-8 w-auto" />
-              </div>
-              <div className="ml-auto flex items-center gap-4">
-                {/* Docentes, estudiantes y acudientes ven las noticias en su inicio; el personal tiene mucho en el suyo y las abre aquí. */}
-                {user && PERSONAL_CON_NOTICIAS.includes(user.rol) && <BotonNoticias />}
-                <Campanita />
-                <NavLink
-                  to="/mi-cuenta"
-                  title="Mi cuenta"
-                  aria-label="Mi cuenta"
-                  className={({ isActive }) =>
-                    `inline-flex h-9 w-9 items-center justify-center rounded-full ring-1 ring-inset ring-border ${
-                      isActive ? 'bg-primary-soft text-primary' : 'text-body hover:bg-soft'
-                    }`
-                  }
-                >
-                  <UserIcon className="h-[18px] w-[18px]" />
-                </NavLink>
-                <CambiadorDePerfil />
-                <div className="text-right">
-                  <p className="text-sm font-semibold text-ink">
-                    {user.nombre} {user.apellido}
-                  </p>
-                  <div className="mt-0.5 flex justify-end">
-                    <RolBadge value={user.rol} />
+                {/* El colegio: su escudo y su nombre, en todas las pantallas y para todos los perfiles. */}
+                {institucion && (
+                  <div className="flex min-w-0 items-center gap-3">
+                    {institucion.logo_url && <img src={institucion.logo_url} alt={`Escudo de ${institucion.nombre}`} className="h-9 w-9 shrink-0 object-contain" />}
+                    <span className="truncate text-h3 text-ink">{institucion.nombre}</span>
                   </div>
-                </div>
-                <button
-                  onClick={logout}
-                  className="inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-body ring-1 ring-inset ring-border hover:bg-soft"
-                >
-                  <LogOutIcon className="h-4 w-4" />
-                  Salir
-                </button>
+                )}
+              </div>
+              <div className="flex shrink-0 items-center gap-3 sm:gap-4">
+                {/* Docentes, estudiantes y acudientes ven las noticias en su inicio; el personal tiene mucho en el suyo y las abre aquí. */}
+                {PERSONAL_CON_NOTICIAS.includes(user.rol) && <BotonNoticias />}
+                <Campanita />
+                <MenuDeUsuario />
               </div>
             </header>
 

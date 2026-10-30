@@ -12,8 +12,8 @@ interface EnfoqueDePortadaProps {
 }
 
 /** La forma (ancho/alto) de cada tarjeta, para mostrar cómo queda la portada encuadrada en cada una. */
-const PROPORCION: Record<TamanoMosaico, string> = { PRINCIPAL: 'aspect-square', DESTACADA: 'aspect-[2/1]', ESTANDAR: 'aspect-[1/2]', BREVE: 'aspect-square' };
-const ANCHO_MINIATURA: Record<TamanoMosaico, string> = { PRINCIPAL: 'w-16', DESTACADA: 'w-24', ESTANDAR: 'w-12', BREVE: 'w-12' };
+const PROPORCION: Record<TamanoMosaico, string> = { PRINCIPAL: 'aspect-square', DESTACADA: 'aspect-[2/1]', ESTANDAR: 'aspect-[1/2]', BREVE: 'aspect-square', BANDA: 'aspect-[3/2]' };
+const ANCHO_MINIATURA: Record<TamanoMosaico, string> = { PRINCIPAL: 'w-16', DESTACADA: 'w-24', ESTANDAR: 'w-12', BREVE: 'w-12', BANDA: 'w-20' };
 
 const acotar = (n: number): number => Math.min(100, Math.max(0, Math.round(n)));
 

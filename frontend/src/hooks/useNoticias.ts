@@ -8,7 +8,7 @@ export type RolDestinoNoticia = 'DOCENTE' | 'ESTUDIANTE' | 'ACUDIENTE';
 export type TonoCategoria = 'blue' | 'green' | 'orange' | 'red' | 'neutral';
 
 /** Qué tan grande se ve una noticia en el mosaico (el servidor usa los mismos nombres). */
-export type TamanoMosaico = 'PRINCIPAL' | 'DESTACADA' | 'ESTANDAR' | 'BREVE';
+export type TamanoMosaico = 'PRINCIPAL' | 'DESTACADA' | 'ESTANDAR' | 'BREVE' | 'BANDA';
 
 export interface Noticia {
   id: string;

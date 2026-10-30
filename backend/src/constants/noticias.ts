@@ -43,10 +43,10 @@ export const CATEGORIAS_INICIALES: ReadonlyArray<{ nombre: string; tono: TonoCat
 ];
 
 /**
- * Tamaño de una noticia en el mosaico (cuadrícula de 4 columnas): Principal 2x2, Destacada 2x1 (horizontal), Estándar 1x2 (vertical) y Breve 1x1. El redactor elige qué tan
- * importante es la noticia; así las tarjetas del «periódico» no son todas iguales.
+ * Tamaño de una noticia en el mosaico (cuadrícula de 4 columnas): Principal 2x2, Destacada 2x1 (horizontal), Estándar 1x2 (vertical), Breve 1x1 y Banda 4x1 (una fila entera, con la foto a un lado). El redactor elige qué tan
+ * importante es la noticia; así las tarjetas del «periódico» no son todas iguales. Con una o dos noticias vigentes el frontend las dibuja siempre como bandas, sea cual sea el tamaño.
  */
-export const TAMANOS_MOSAICO = ['PRINCIPAL', 'DESTACADA', 'ESTANDAR', 'BREVE'] as const;
+export const TAMANOS_MOSAICO = ['PRINCIPAL', 'DESTACADA', 'ESTANDAR', 'BREVE', 'BANDA'] as const;
 export type TamanoMosaico = (typeof TAMANOS_MOSAICO)[number];
 export const TAMANO_MOSAICO_POR_DEFECTO: TamanoMosaico = 'ESTANDAR';
 

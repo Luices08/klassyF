@@ -18,7 +18,7 @@ const MAX_ITEMS = 4;
 /** Los eventos que importan son los próximos: más allá de un mes ya no son «lo que viene». */
 const DIAS_DE_ANTICIPACION = 30;
 
-interface ItemComunicacion {
+export interface ItemComunicacion {
   clave: string;
   titulo: string;
   cuando: string | null;
@@ -26,6 +26,27 @@ interface ItemComunicacion {
   tono: Tone;
   to: string;
   icono: ComponentType<SVGProps<SVGSVGElement>>;
+}
+
+/** Una entrada de la banda de comunicación (un aviso o una noticia): icono, título de dos líneas, fecha y categoría. La usan la banda de rectoría y los avisos de los inicios. */
+export function EntradaComunicacion({ item: i }: { item: ItemComunicacion }) {
+  return (
+    <li>
+      <Link to={i.to} className="group flex h-full items-start gap-3 rounded-xl border border-border bg-surface p-3 transition-colors hover:border-primary/40 hover:bg-primary-soft/50">
+        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary-soft text-primary">
+          <i.icono className="h-[18px] w-[18px]" />
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="line-clamp-2 text-sm font-semibold text-ink group-hover:text-primary">{i.titulo}</span>
+          <span className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted">
+            {i.cuando && <span>{i.cuando}</span>}
+            <Chip tone={i.tono}>{i.etiqueta}</Chip>
+          </span>
+        </span>
+        <ChevronRightIcon className="mt-1 h-4 w-4 shrink-0 text-muted" />
+      </Link>
+    </li>
+  );
 }
 
 /**
@@ -75,21 +96,7 @@ export function PanelComunicacion({ onRedactar }: { onRedactar: () => void }) {
             <li className="rounded-xl border border-dashed border-border p-4 text-sm text-muted sm:col-span-2 xl:col-auto">No hay avisos ni noticias vigentes. Publica uno con «Redactar comunicado».</li>
           )}
           {items.map((i) => (
-            <li key={i.clave}>
-              <Link to={i.to} className="group flex h-full items-start gap-3 rounded-xl border border-border bg-surface p-3 transition-colors hover:border-primary/40 hover:bg-primary-soft/50">
-                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary-soft text-primary">
-                  <i.icono className="h-[18px] w-[18px]" />
-                </span>
-                <span className="min-w-0 flex-1">
-                  <span className="line-clamp-2 text-sm font-semibold text-ink group-hover:text-primary">{i.titulo}</span>
-                  <span className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted">
-                    {i.cuando && <span>{i.cuando}</span>}
-                    <Chip tone={i.tono}>{i.etiqueta}</Chip>
-                  </span>
-                </span>
-                <ChevronRightIcon className="mt-1 h-4 w-4 shrink-0 text-muted" />
-              </Link>
-            </li>
+            <EntradaComunicacion key={i.clave} item={i} />
           ))}
           <li className="rounded-xl bg-gradient-to-br from-primary-soft to-surface p-4">
             <p className="text-xs font-semibold text-muted">Próximo evento</p>

@@ -24,6 +24,7 @@ import { cargarContextoNotas, clave } from '../../../services/recuperacion.servi
 import { escalaEfectiva } from '../../../utils/escalaEvaluacion';
 import { EntradaPromocion } from '../../../utils/promocion';
 import { AnioAnterior, DatosDeAsignatura, EscalaNotas, FaltaRegistrada, PeriodoDeAsignatura } from '../utils/caracteristicas';
+import { AnioHistorial } from '../utils/historial';
 
 export interface AsignaturaDelAnio extends DatosDeAsignatura {
   asignacion_id: string;
@@ -87,7 +88,8 @@ export async function cargarDatosDelAnio(anio: AcademicYearDocument, studentIds?
   const [subjects, contexto, actividades, estados, faltas] = await Promise.all([
     Subject.find({ _id: { $in: [...new Set(asignaciones.map((a) => id(a.subject_id)))] } }).select('nombre area_id').lean(),
     cargarContextoNotas(anio, asignacionIds),
-    Activity.find({ teacher_assignment_id: { $in: asignacionIds }, requiere_entrega: true }).select('teacher_assignment_id periodo_numero').lean(),
+    // Solo las actividades ya vencidas: una que aún está abierta no cuenta como «no entregada». En los años cerrados ya vencieron todas.
+    Activity.find({ teacher_assignment_id: { $in: asignacionIds }, requiere_entrega: true, fecha_entrega: { $lte: new Date() } }).select('teacher_assignment_id periodo_numero').lean(),
     AttendanceState.find({}).select('cuenta_como_falla es_justificada').lean(),
     faltasContadas({ academic_year_id: anio._id, ...(studentIds ? { estudiantes_ids: studentIds } : {}) }),
   ]);
@@ -224,6 +226,33 @@ export async function anioAnteriorDe(anio: AcademicYearDocument, studentIds?: st
       asignaturas: entrada.asignaturas.map((a) => ({ subject_id: String(a.subject_id), area_id: String(a.area_id), nota: a.nota_antes })),
       promedio_general: entrada.promedio_general,
     });
+  }
+  return salida;
+}
+
+/** Años anteriores con cierre que se miran en la historia de un estudiante. */
+export const ANIOS_DE_HISTORIAL = 5;
+
+/** La historia de cada estudiante: el cierre de M19 de cada uno de sus años anteriores (hasta `ANIOS_DE_HISTORIAL`), del más reciente al más antiguo. */
+export async function historialDe(anio: AcademicYearDocument, studentIds: string[]): Promise<Map<string, AnioHistorial[]>> {
+  const anteriores = (await AcademicYear.find({ _id: { $ne: anio._id }, year: { $lte: anio.year } }).sort({ year: -1, createdAt: -1 }))
+    .filter((a) => a.year < anio.year || a.createdAt < anio.createdAt)
+    .slice(0, ANIOS_DE_HISTORIAL);
+  const salida = new Map<string, AnioHistorial[]>();
+  for (const previo of anteriores) {
+    const escala = escalaDeNotas(escalaEfectiva(previo.escala_evaluacion ?? null));
+    for (const [estudiante, entrada] of await cierresDelAnio(previo._id, studentIds)) {
+      if (!entrada?.asignaturas) continue;
+      salida.set(estudiante, [
+        ...(salida.get(estudiante) ?? []),
+        {
+          year: previo.year,
+          escala,
+          asignaturas: entrada.asignaturas.map((a) => ({ subject_id: String(a.subject_id), area_id: String(a.area_id), nota: a.nota_antes })),
+          promedio_general: entrada.promedio_general,
+        },
+      ]);
+    }
   }
   return salida;
 }

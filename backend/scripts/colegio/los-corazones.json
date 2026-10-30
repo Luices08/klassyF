@@ -1,0 +1,150 @@
+{
+  "institucion": {
+    "nombre": "Colegio Los Corazones",
+    "dane": "100000000001",
+    "nit": "900000000-0",
+    "resolucion": "Resolución por definir (Preescolar, Básica y Media)",
+    "ciudad": "",
+    "departamento": "",
+    "modalidad": "PRESENCIAL",
+    "politica_aforo_aula": "BLOQUEAR",
+    "titulo_bachiller": "Bachiller Académico"
+  },
+
+  "sede_principal": {
+    "nombre": "Sede Principal",
+    "dane": "100000000001",
+    "direccion": "Dirección por definir"
+  },
+
+  "jornadas": [
+    {
+      "nombre": "MANANA",
+      "inicio": "06:30",
+      "fin": "12:30",
+      "dias": [1, 2, 3, 4, 5],
+      "franjas": [
+        { "nombre": "1ª hora", "tipo": "CLASE", "inicio": "06:30", "fin": "07:25" },
+        { "nombre": "2ª hora", "tipo": "CLASE", "inicio": "07:25", "fin": "08:20" },
+        { "nombre": "3ª hora", "tipo": "CLASE", "inicio": "08:20", "fin": "09:15" },
+        { "nombre": "Descanso", "tipo": "DESCANSO", "inicio": "09:15", "fin": "09:45" },
+        { "nombre": "4ª hora", "tipo": "CLASE", "inicio": "09:45", "fin": "10:40" },
+        { "nombre": "5ª hora", "tipo": "CLASE", "inicio": "10:40", "fin": "11:35" },
+        { "nombre": "6ª hora", "tipo": "CLASE", "inicio": "11:35", "fin": "12:30" }
+      ]
+    }
+  ],
+
+  "plantilla_franjas": [
+    { "nombre": "1ª hora", "tipo": "CLASE", "duracion_min": 55 },
+    { "nombre": "2ª hora", "tipo": "CLASE", "duracion_min": 55 },
+    { "nombre": "3ª hora", "tipo": "CLASE", "duracion_min": 55 },
+    { "nombre": "Descanso", "tipo": "DESCANSO", "duracion_min": 30 },
+    { "nombre": "4ª hora", "tipo": "CLASE", "duracion_min": 55 },
+    { "nombre": "5ª hora", "tipo": "CLASE", "duracion_min": 55 },
+    { "nombre": "6ª hora", "tipo": "CLASE", "duracion_min": 55 }
+  ],
+
+  "grados_activos": [-2, -1, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11],
+
+  "anio": 2027,
+  "calendario": {
+    "calendario": "A",
+    "inicio_anio": "01-18",
+    "fin_anio": "12-10",
+    "periodos": [
+      { "numero": 1, "nombre": "Primer periodo", "porcentaje": 25, "inicio": "01-25", "fin": "04-09" },
+      { "numero": 2, "nombre": "Segundo periodo", "porcentaje": 25, "inicio": "04-12", "fin": "06-18" },
+      { "numero": 3, "nombre": "Tercer periodo", "porcentaje": 25, "inicio": "07-12", "fin": "09-17" },
+      { "numero": 4, "nombre": "Cuarto periodo", "porcentaje": 25, "inicio": "09-20", "fin": "11-26" }
+    ],
+    "no_lectivos": [
+      { "tipo": "DESARROLLO_INSTITUCIONAL", "nombre": "Semana de desarrollo institucional", "inicio": "01-18", "fin": "01-22" },
+      { "tipo": "VACACIONES", "nombre": "Vacaciones de mitad de año", "inicio": "06-21", "fin": "07-09" },
+      { "tipo": "RECESO", "nombre": "Receso estudiantil de octubre", "inicio": "10-11", "fin": "10-15" }
+    ],
+    "semana_santa": true,
+    "festivos": true,
+    "recuperacion_periodo": { "dias_antes_del_fin": 4, "dias_limite_despues_del_fin": 4 },
+    "recuperacion_final": { "inicio": "11-29", "fin": "12-03", "limite_resultados": "12-07" }
+  },
+
+  "escala": {
+    "minima": 1.0, "maxima": 5.0, "aprobatoria": 3.0, "decimales": 1,
+    "rangos": [
+      { "nivel": "BAJO", "etiqueta": "Desempeño bajo", "minimo": 1.0, "maximo": 2.9, "aprobatorio": false },
+      { "nivel": "BASICO", "etiqueta": "Desempeño básico", "minimo": 3.0, "maximo": 3.9, "aprobatorio": true },
+      { "nivel": "ALTO", "etiqueta": "Desempeño alto", "minimo": 4.0, "maximo": 4.5, "aprobatorio": true },
+      { "nivel": "SUPERIOR", "etiqueta": "Desempeño superior", "minimo": 4.6, "maximo": 5.0, "aprobatorio": true }
+    ]
+  },
+
+  "molde_planilla": [
+    { "clave": "HETERO", "nombre": "Heteroevaluación", "porcentaje": 70, "max_casillas": 12 },
+    { "clave": "AUTO", "nombre": "Autoevaluación", "porcentaje": 10, "max_casillas": 1 },
+    { "clave": "COEV", "nombre": "Coevaluación", "porcentaje": 10, "max_casillas": 1 },
+    { "clave": "COMP", "nombre": "Comportamiento", "porcentaje": 10, "max_casillas": 1 }
+  ],
+
+  "areas": [
+    { "codigo": "MAT", "nombre": "Matemáticas", "asignaturas": [
+      { "nombre": "Matemáticas", "abreviatura": "MAT", "niveles": ["PRIMARIA", "SECUNDARIA", "MEDIA"] },
+      { "nombre": "Geometría y estadística", "abreviatura": "GEO", "niveles": ["SECUNDARIA"] },
+      { "nombre": "Estadística", "abreviatura": "EST", "niveles": ["MEDIA"] }
+    ] },
+    { "codigo": "HUM", "nombre": "Humanidades: lengua castellana e idioma extranjero", "asignaturas": [
+      { "nombre": "Lengua castellana", "abreviatura": "LEN", "niveles": ["PRIMARIA", "SECUNDARIA", "MEDIA"] },
+      { "nombre": "Inglés", "abreviatura": "ING", "niveles": ["PREESCOLAR", "PRIMARIA", "SECUNDARIA", "MEDIA"] }
+    ] },
+    { "codigo": "CNA", "nombre": "Ciencias naturales y educación ambiental", "asignaturas": [
+      { "nombre": "Ciencias naturales", "abreviatura": "CN", "niveles": ["PRIMARIA", "SECUNDARIA"] },
+      { "nombre": "Física", "abreviatura": "FIS", "niveles": ["MEDIA"] },
+      { "nombre": "Química", "abreviatura": "QUI", "niveles": ["MEDIA"] }
+    ] },
+    { "codigo": "SOC", "nombre": "Ciencias sociales, historia, geografía, constitución y democracia", "asignaturas": [
+      { "nombre": "Ciencias sociales", "abreviatura": "SOC", "niveles": ["PRIMARIA", "SECUNDARIA", "MEDIA"] }
+    ] },
+    { "codigo": "ECP", "nombre": "Ciencias económicas y políticas", "asignaturas": [
+      { "nombre": "Ciencias económicas y políticas", "abreviatura": "ECO", "niveles": ["MEDIA"] }
+    ] },
+    { "codigo": "FIL", "nombre": "Filosofía", "asignaturas": [
+      { "nombre": "Filosofía", "abreviatura": "FIL", "niveles": ["MEDIA"] }
+    ] },
+    { "codigo": "ETI", "nombre": "Educación ética y en valores humanos", "asignaturas": [
+      { "nombre": "Ética y valores", "abreviatura": "ETI", "niveles": ["PRIMARIA", "SECUNDARIA", "MEDIA"] }
+    ] },
+    { "codigo": "REL", "nombre": "Educación religiosa", "asignaturas": [
+      { "nombre": "Educación religiosa", "abreviatura": "REL", "niveles": ["PRIMARIA", "SECUNDARIA", "MEDIA"] }
+    ] },
+    { "codigo": "EFI", "nombre": "Educación física, recreación y deportes", "asignaturas": [
+      { "nombre": "Educación física", "abreviatura": "EFI", "niveles": ["PRIMARIA", "SECUNDARIA", "MEDIA"] }
+    ] },
+    { "codigo": "ART", "nombre": "Educación artística y cultural", "asignaturas": [
+      { "nombre": "Educación artística", "abreviatura": "ART", "niveles": ["PRIMARIA", "SECUNDARIA", "MEDIA"] }
+    ] },
+    { "codigo": "TEC", "nombre": "Tecnología e informática", "asignaturas": [
+      { "nombre": "Tecnología e informática", "abreviatura": "TEC", "niveles": ["PRIMARIA", "SECUNDARIA", "MEDIA"] }
+    ] },
+    { "codigo": "DCOM", "nombre": "Dimensión comunicativa", "asignaturas": [
+      { "nombre": "Dimensión comunicativa", "abreviatura": "COM", "niveles": ["PREESCOLAR"] }
+    ] },
+    { "codigo": "DCOG", "nombre": "Dimensión cognitiva", "asignaturas": [
+      { "nombre": "Dimensión cognitiva", "abreviatura": "COG", "niveles": ["PREESCOLAR"] }
+    ] },
+    { "codigo": "DCOR", "nombre": "Dimensión corporal", "asignaturas": [
+      { "nombre": "Dimensión corporal", "abreviatura": "COR", "niveles": ["PREESCOLAR"] }
+    ] },
+    { "codigo": "DEST", "nombre": "Dimensión estética", "asignaturas": [
+      { "nombre": "Dimensión estética", "abreviatura": "ESTT", "niveles": ["PREESCOLAR"] }
+    ] },
+    { "codigo": "DSOC", "nombre": "Dimensión socioafectiva", "asignaturas": [
+      { "nombre": "Dimensión socioafectiva", "abreviatura": "SAF", "niveles": ["PREESCOLAR"] }
+    ] },
+    { "codigo": "DETI", "nombre": "Dimensión ética", "asignaturas": [
+      { "nombre": "Dimensión ética", "abreviatura": "DET", "niveles": ["PREESCOLAR"] }
+    ] },
+    { "codigo": "DESP", "nombre": "Dimensión espiritual", "asignaturas": [
+      { "nombre": "Dimensión espiritual", "abreviatura": "ESP", "niveles": ["PREESCOLAR"] }
+    ] }
+  ]
+}

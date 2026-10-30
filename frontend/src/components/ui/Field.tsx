@@ -1,4 +1,4 @@
-import { type InputHTMLAttributes, type ReactNode, type SelectHTMLAttributes, type TextareaHTMLAttributes, forwardRef } from 'react';
+import { type ComponentType, type InputHTMLAttributes, type ReactNode, type SVGProps, type SelectHTMLAttributes, type TextareaHTMLAttributes, forwardRef } from 'react';
 
 export const baseFieldClasses =
   'block w-full rounded-lg border-0 py-2 px-3 text-sm text-ink ring-1 ring-inset ring-border placeholder:text-muted focus:ring-2 focus:ring-inset focus:ring-primary disabled:bg-soft disabled:text-muted';
@@ -31,14 +31,24 @@ interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
   hideLabel?: boolean;
   error?: string;
   hint?: string;
+  /** Un icono dentro del campo, a la izquierda (p. ej. el de documento en el login). */
+  iconoInicial?: ComponentType<SVGProps<SVGSVGElement>>;
 }
 
 export const Input = forwardRef<HTMLInputElement, InputProps>(
-  ({ label, hideLabel, error, hint, id, className = '', ...rest }, ref) => {
+  ({ label, hideLabel, error, hint, id, className = '', iconoInicial: IconoInicial, ...rest }, ref) => {
     const fieldId = id ?? rest.name ?? label;
+    const campo = <input ref={ref} id={fieldId} className={`${baseFieldClasses} ${IconoInicial ? 'pl-10' : ''} ${className}`} {...rest} />;
     return (
       <FieldWrapper label={label} hideLabel={hideLabel} htmlFor={fieldId} error={error} hint={hint}>
-        <input ref={ref} id={fieldId} className={`${baseFieldClasses} ${className}`} {...rest} />
+        {IconoInicial ? (
+          <div className="relative">
+            <IconoInicial aria-hidden="true" className="pointer-events-none absolute left-3 top-1/2 h-[18px] w-[18px] -translate-y-1/2 text-primary/70" />
+            {campo}
+          </div>
+        ) : (
+          campo
+        )}
       </FieldWrapper>
     );
   }

@@ -81,7 +81,7 @@ export function SelectorRolLogin({ value, onChange, disabled }: SelectorRolLogin
         disabled={disabled}
         onClick={() => (abierto ? setAbierto(false) : abrir())}
         onKeyDown={alPulsar}
-        className={`flex w-full items-center gap-3 rounded-lg border bg-surface px-3 py-2.5 text-left text-sm transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:cursor-not-allowed disabled:opacity-60 ${
+        className={`flex w-full items-center gap-3 rounded-xl border bg-surface px-3 py-3 text-left text-sm transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:cursor-not-allowed disabled:opacity-60 ${
           abierto ? 'border-primary' : 'border-border hover:border-primary/40'
         }`}
       >

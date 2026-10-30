@@ -257,6 +257,22 @@ export const StarIcon = (p: IconProps) => (
   </Icon>
 );
 
+export const IdCardIcon = (p: IconProps) => (
+  <Icon {...p}>
+    <rect x="2" y="5" width="20" height="14" rx="2" />
+    <circle cx="8.5" cy="11" r="2" />
+    <path d="M5.5 16c.6-1.6 1.7-2.3 3-2.3s2.4.7 3 2.3" />
+    <path d="M14 10h5M14 14h4" />
+  </Icon>
+);
+
+export const ArrowRightIcon = (p: IconProps) => (
+  <Icon {...p}>
+    <path d="M5 12h14" />
+    <path d="m13 6 6 6-6 6" />
+  </Icon>
+);
+
 export const LockIcon = (p: IconProps) => (
   <Icon {...p}>
     <rect x="5" y="11" width="14" height="10" rx="2" />

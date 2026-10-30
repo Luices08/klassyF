@@ -1,11 +1,12 @@
 import { type FormEvent, useState } from 'react';
 import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom';
+import { OlasLogin } from '../components/auth/OlasLogin';
 import { SelectorRolLogin } from '../components/auth/SelectorRolLogin';
 import { Alert, errorMessage } from '../components/ui/Alert';
 import { Button } from '../components/ui/Button';
 import { CampoContrasena } from '../components/ui/CampoContrasena';
 import { Input } from '../components/ui/Field';
-import { ArrowLeftIcon, BuildingIcon, InfoIcon } from '../components/ui/icons';
+import { ArrowLeftIcon, ArrowRightIcon, BuildingIcon, IdCardIcon, InfoIcon, LockIcon } from '../components/ui/icons';
 import { useAuth } from '../context/AuthContext';
 import { usePublicInstitutionInfo } from '../hooks/usePublicInfo';
 import { urlDeApi } from '../lib/apiClient';
@@ -73,6 +74,7 @@ export function LoginPage() {
       <aside className="relative hidden overflow-hidden bg-primary lg:flex lg:flex-col lg:justify-between lg:p-12">
         {imagen && <img src={imagen} alt="" className="absolute inset-0 h-full w-full object-cover" />}
         <div className={`absolute inset-0 ${imagen ? 'bg-gradient-to-t from-ink/85 via-ink/40 to-ink/20' : 'bg-gradient-to-br from-primary to-ink/70'}`} />
+        <OlasLogin />
 
         <div className="relative flex items-center gap-3 text-surface">
           <span className="flex h-12 w-12 items-center justify-center rounded-xl bg-surface p-1.5 shadow-md">
@@ -94,10 +96,24 @@ export function LoginPage() {
             <h1 className="text-h1">{institucion ? nombreColegio : 'Bienvenido a Klassy'}</h1>
           </div>
           <p className="mt-4 text-body text-surface/85">Gestor académico y administrativo. Un solo lugar para estudiantes, docentes, familias y directivos.</p>
+
+          {/* El lema, en letra manuscrita con su subrayado en curva. */}
+          <div className="mt-8 -rotate-6 text-surface">
+            <p className="text-4xl leading-none" style={{ fontFamily: "'Caveat', cursive" }}>
+              Juntos construimos
+              <br />
+              grandes historias
+            </p>
+            <svg viewBox="0 0 220 14" fill="none" aria-hidden="true" className="mt-1 h-3 w-56 text-surface/90">
+              <path d="M2 10c40-8 120-10 216-4" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
+            </svg>
+          </div>
         </div>
       </aside>
 
-      <main className="relative flex items-center justify-center px-4 py-10 sm:px-8">
+      <main className="relative flex items-center justify-center overflow-hidden px-4 py-10 sm:px-8">
+        <span aria-hidden="true" className="pointer-events-none absolute -right-24 -top-24 h-72 w-72 rounded-full bg-[#CFE3FF]" />
+        <span aria-hidden="true" className="pointer-events-none absolute -bottom-28 -right-20 h-64 w-64 rounded-full bg-[#BBD8FF]" />
         <div className="absolute top-4 left-4 sm:top-6 sm:left-6">
           <Link
             to="/"
@@ -108,20 +124,23 @@ export function LoginPage() {
           </Link>
         </div>
 
-        <div className="w-full max-w-md pt-10 lg:pt-0">
+        <div className="relative w-full max-w-md pt-10 lg:pt-0">
           {/* En pantallas pequeñas el panel de marca no cabe: se resume en un encabezado. */}
           <div className="mb-6 text-center lg:hidden">
-            <img src="/logo-klassy.png" alt="Klassy" className="mx-auto h-10 w-auto" />
-            <div className="mt-4 flex items-center justify-center gap-3">
+            <div className="flex items-center justify-center gap-3">
               {institucion?.logo_url && <img src={institucion.logo_url} alt={`Escudo de ${nombreColegio}`} className="h-14 w-14 shrink-0 rounded-xl border border-border bg-surface object-contain p-1.5" />}
               <h1 className="text-h2 text-primary">{nombreColegio}</h1>
             </div>
             <p className="mt-1 text-sm text-muted">Gestor académico y administrativo</p>
           </div>
 
-          <form onSubmit={handleSubmit} className="space-y-5 rounded-2xl border border-border bg-surface p-6 shadow-md sm:p-8">
-            <div>
-              <h2 className="text-h3 text-ink">Iniciar sesión</h2>
+          <form
+            onSubmit={handleSubmit}
+            className="space-y-5 rounded-3xl border border-border/60 bg-surface p-6 shadow-[0_24px_70px_-20px_rgb(40_120_234/0.30)] sm:p-9"
+          >
+            <div className="text-center">
+              <img src="/logo-klassy.png" alt="Klassy" className="mx-auto h-14 w-auto" />
+              <h2 className="mt-3 text-h2 font-bold text-ink">Iniciar sesión</h2>
               <p className="mt-1 text-sm text-muted">Elige tu perfil e ingresa con tu documento y contraseña.</p>
             </div>
 
@@ -134,6 +153,9 @@ export function LoginPage() {
               type="text"
               name="numero_documento"
               autoComplete="username"
+              placeholder="Tu número de documento"
+              iconoInicial={IdCardIcon}
+              className="h-12 rounded-xl! bg-surface"
               required
               value={numeroDocumento}
               onChange={(e) => setNumeroDocumento(e.target.value)}
@@ -142,35 +164,40 @@ export function LoginPage() {
               label="Contraseña"
               name="password"
               autoComplete="current-password"
+              placeholder="Ingresa tu contraseña"
+              iconoInicial={LockIcon}
+              className="h-12 rounded-xl! bg-surface"
               required
               value={password}
               onChange={(e) => setPassword(e.target.value)}
             />
 
-            <Button type="submit" isLoading={isLoading} className="w-full">
+            <Button type="submit" isLoading={isLoading} className="h-12 w-full rounded-xl! text-base">
               Ingresar
+              <ArrowRightIcon className="h-5 w-5" />
             </Button>
 
-            <p className="text-center text-xs text-muted">Si tienes más de un perfil (por ejemplo docente y acudiente) puedes cambiar de uno a otro después, sin volver a escribir tu contraseña.</p>
+            <div className="flex items-center gap-3 text-xs text-muted" role="separator">
+              <span className="h-px flex-1 bg-border" />
+              ¿Necesitas ayuda?
+              <span className="h-px flex-1 bg-border" />
+            </div>
 
             <div className="flex items-start gap-3 rounded-xl bg-primary-soft p-4">
               <InfoIcon className="mt-0.5 h-5 w-5 shrink-0 text-primary" />
-              <div className="text-xs">
-                <p className="font-semibold text-ink">¿Necesitas ayuda?</p>
-                <p className="mt-0.5 text-muted">
-                  Si tienes problemas para acceder, comunícate con la secretaría del colegio
-                  {institucion?.correo_secretaria ? (
-                    <>
-                      :{' '}
-                      <a href={`mailto:${institucion.correo_secretaria}`} className="font-semibold text-primary hover:underline">
-                        {institucion.correo_secretaria}
-                      </a>
-                    </>
-                  ) : (
-                    '.'
-                  )}
-                </p>
-              </div>
+              <p className="text-xs text-muted">
+                Si tienes problemas para acceder, comunícate con la secretaría del colegio
+                {institucion?.correo_secretaria ? (
+                  <>
+                    :{' '}
+                    <a href={`mailto:${institucion.correo_secretaria}`} className="font-semibold text-primary hover:underline">
+                      {institucion.correo_secretaria}
+                    </a>
+                  </>
+                ) : (
+                  '.'
+                )}
+              </p>
             </div>
           </form>
         </div>

@@ -21,7 +21,7 @@ export const createUser: ValidationSchema = {
     numero_documento: Joi.string().required(),
     email: Joi.string().email().required(),
     telefono: Joi.string().allow(''),
-    password: Joi.string().min(8).required(),
+    password: Joi.string().trim().min(8).allow(''),
     rol: Joi.string().valid(...ROLES),
     roles: rolesAsignados,
     estado: Joi.string().valid(...ESTADOS_USUARIO),

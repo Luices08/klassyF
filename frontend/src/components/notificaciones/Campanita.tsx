@@ -66,7 +66,7 @@ export function Campanita() {
               </button>
             )}
           </div>
-          <ul className="max-h-96 overflow-y-auto">
+          <ul className="scrollbar-fino max-h-96 overflow-y-auto">
             {isLoading && <li className="px-4 py-6 text-center text-sm text-muted">Cargando…</li>}
             {!isLoading && (lista?.length ?? 0) === 0 && <li className="px-4 py-6 text-center text-sm text-muted">No tienes notificaciones.</li>}
             {lista?.map((n) => (

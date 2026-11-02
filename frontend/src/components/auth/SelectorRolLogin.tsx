@@ -95,7 +95,7 @@ export function SelectorRolLogin({ value, onChange, disabled }: SelectorRolLogin
           id="selector-rol-lista"
           role="listbox"
           aria-labelledby="selector-rol-etiqueta"
-          className="absolute inset-x-0 top-full z-20 mt-1 max-h-72 overflow-y-auto rounded-xl border border-border bg-surface p-1.5 shadow-lg"
+          className="scrollbar-fino absolute inset-x-0 top-full z-20 mt-1 max-h-72 overflow-y-auto overflow-x-hidden rounded-xl border border-border bg-surface p-1.5 shadow-lg"
         >
           {ROLES.map((rol, i) => {
             const ItemIcono = ICONO_PERFIL[rol];

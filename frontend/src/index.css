@@ -100,3 +100,72 @@ body {
 .contenido-rico.ProseMirror {
   @apply min-h-[10rem] px-3 py-2 outline-none;
 }
+
+
+/* ==========================================================================
+   Barras de desplazamiento (Scrollbars) — Klassy UI
+   Diseño delgado y elegante en tono azul claro acorde a la plataforma.
+   ========================================================================== */
+
+/* Regla global para mantener coherencia en toda la plataforma */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(40, 120, 234, 0.35) transparent;
+}
+
+*::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+*::-webkit-scrollbar-thumb {
+  background-color: rgba(40, 120, 234, 0.35);
+  border-radius: 9999px;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(40, 120, 234, 0.65);
+}
+
+/* Clase reutilizable para componentes y listas desplegables */
+.scrollbar-fino,
+.scrollbar-delgado {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(40, 120, 234, 0.35) transparent;
+}
+
+.scrollbar-fino::-webkit-scrollbar,
+.scrollbar-delgado::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.scrollbar-fino::-webkit-scrollbar-track,
+.scrollbar-delgado::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.scrollbar-fino::-webkit-scrollbar-thumb,
+.scrollbar-delgado::-webkit-scrollbar-thumb {
+  background-color: rgba(40, 120, 234, 0.35);
+  border-radius: 9999px;
+}
+
+.scrollbar-fino::-webkit-scrollbar-thumb:hover,
+.scrollbar-delgado::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(40, 120, 234, 0.65);
+}
+
+
+/* Ocultar botones nativos de revelar/borrar contraseña del navegador (Edge / IE)
+   para mantener únicamente el botón de ojito personalizado de Klassy */
+input::-ms-reveal,
+input::-ms-clear {
+  display: none;
+  width: 0;
+  height: 0;
+}

@@ -56,7 +56,7 @@ export interface CreateUserInput {
   numero_documento: string;
   email: string;
   telefono?: string;
-  password: string;
+  password?: string;
   rol: Rol;
   /** Todos los perfiles de la persona (si se manda, manda sobre `rol`). */
   roles?: Rol[];

@@ -216,7 +216,7 @@ export function SelectBuscable({
               id={`${id}-lista`}
               role="listbox"
               style={{ position: 'fixed', ...posicion }}
-              className="z-50 overflow-y-auto rounded-lg border border-border bg-surface py-1 shadow-lg"
+              className="scrollbar-fino z-50 overflow-y-auto rounded-lg border border-border bg-surface py-1 shadow-lg"
             >
               {items.length === 0 && <li className="px-3 py-2 text-sm text-muted">Sin coincidencias.</li>}
               {items.map((o, i) => (

@@ -491,11 +491,10 @@ export function UsersPage() {
         />
         <Input label="Teléfono" value={form.telefono} onChange={(e) => setForm((f) => ({ ...f, telefono: e.target.value }))} />
         <Input
-          label="Contraseña temporal"
+          label="Contraseña temporal (opcional)"
           type="password"
-          required
           minLength={8}
-          hint="El usuario deberá cambiarla en su primer inicio de sesión."
+          hint="Si la dejas vacía, se usará el número de documento. El usuario deberá cambiarla en su primer inicio de sesión."
           value={form.password}
           onChange={(e) => setForm((f) => ({ ...f, password: e.target.value }))}
         />

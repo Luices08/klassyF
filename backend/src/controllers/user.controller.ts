@@ -49,7 +49,7 @@ interface CreateUserBody {
   numero_documento: string;
   email: string;
   telefono?: string;
-  password: string;
+  password?: string;
   /** Un solo rol (forma anterior) o varios: la persona escoge con cuál entrar al iniciar sesión. */
   rol?: Rol;
   roles?: Rol[];
@@ -80,22 +80,22 @@ function validarRolesAsignables(operador: Rol, roles: Rol[]): void {
 
 export const createUser = catchAsync<unknown, unknown, CreateUserBody>(async (req, res) => {
   const roles = req.body.roles ?? (req.body.rol ? [req.body.rol] : []);
+  const numeroDocumento = req.body.numero_documento.trim();
   if (!req.user) throw new ApiError(401, 'Usuario no autenticado.');
   validarRolesAsignables(req.user.rol, roles);
   await exigirSedesExistentes(req.body.sedes_ids);
 
   // Una persona, un solo registro: si el documento ya existe se le agrega el rol, no se crea otro usuario.
-  const existente = await User.findOne({ numero_documento: req.body.numero_documento }).select('nombre apellido roles');
+  const existente = await User.findOne({ numero_documento: numeroDocumento }).select('nombre apellido roles');
   if (existente) {
     throw new ApiError(
       409,
       `Ya existe un usuario con ese documento (${existente.nombre} ${existente.apellido}, ${existente.roles.join(' + ')}). Edítalo y agrégale el rol en lugar de crear otro registro.`
     );
   }
-
   const { password, rol: _rol, roles: _roles, ...rest } = req.body;
-  const user = new User({ ...rest, roles, debe_cambiar_password: true });
-  user.password = password;
+  const user = new User({ ...rest, numero_documento: numeroDocumento, roles, debe_cambiar_password: true });
+  user.password = password?.trim() || numeroDocumento;
   await user.save();
 
   await registrarEvento({
@@ -501,7 +501,7 @@ export const bulkImportUsers = catchAsync(async (req, res) => {
   for (let i = 0; i < registros.length; i++) {
     const fila = i + 2; // +1 por el encabezado, +1 porque las filas se cuentan desde 1
     const registro = registros[i]!;
-    const numeroDocumento = registro.numero_documento;
+    const numeroDocumento = registro.numero_documento?.trim();
 
     try {
       if (!registro.tipo_documento || !numeroDocumento || !registro.nombre || !registro.apellido || !registro.email || !registro.rol) {
@@ -547,7 +547,7 @@ export const bulkImportUsers = catchAsync(async (req, res) => {
         sedes_ids: sedesIds,
         debe_cambiar_password: true,
       });
-      user.password = generarPasswordTemporal();
+      user.password = numeroDocumento;
       await user.save();
       creados += 1;
     } catch (err) {

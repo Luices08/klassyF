@@ -145,7 +145,7 @@ export function MultiSelect<T extends string = string>({
 
           <div className="my-1.5 border-t border-border" />
 
-          <div className="max-h-60 overflow-y-auto space-y-0.5">
+          <div className="scrollbar-fino max-h-60 overflow-y-auto space-y-0.5">
             {options.map((opt) => {
               const isChecked = selected.includes(opt.value);
               return (

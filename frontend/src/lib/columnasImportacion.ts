@@ -30,7 +30,7 @@ export const NOTAS_CSV_USUARIOS = [
   ...NOTAS_CSV_GENERALES,
   'Aplica únicamente para personal administrativo, directivo y docente (M02). Los estudiantes y acudientes se cargan desde el módulo de Estudiantes (M03).',
   'Para varias sedes en sedes_codigos sepáralas con | (barra vertical), p. ej. 111111111112|111111111113.',
-  'A cada usuario creado se le asigna una contraseña temporal que deberá cambiar en su primer ingreso.',
+  'El número de documento será la contraseña temporal de cada usuario; deberá cambiarla en su primer ingreso.',
 ];
 
 export const NOTAS_CSV_ESTUDIANTES = [

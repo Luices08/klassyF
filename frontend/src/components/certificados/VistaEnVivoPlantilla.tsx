@@ -8,7 +8,7 @@ const ESCALA_CSS: Record<TamanoDiseno, number> = { PEQUENO: 0.9, NORMAL: 1, GRAN
 
 /**
  * El documento tal como quedará, con datos de muestra, mientras se redacta. Es una aproximación en pantalla: el encabezado oficial (escudo,
- * DANE, NIT, resolución), el QR y las firmas los pone el sistema al dibujar el PDF; el botón «Vista previa (PDF)» muestra el documento exacto.
+ * DANE, NIT, resolución), la verificación y las firmas los pone el sistema al dibujar el PDF; el botón «Vista previa (PDF)» muestra el documento exacto.
  */
 export function VistaEnVivoPlantilla({ datos, cargando, error, diseno }: { datos: RenderPlantilla | undefined; cargando: boolean; error: unknown; diseno?: DisenoPlantilla | null }) {
   if (error && !datos) return <Alert tone="error">{errorMessage(error)}</Alert>;

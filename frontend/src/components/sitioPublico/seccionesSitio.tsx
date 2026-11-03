@@ -37,7 +37,7 @@ const TRAMITES_ACTIVOS = [
     modulo: 'M26',
     ruta: '/verificar',
     icon: ClipboardListIcon,
-    descripcion: 'Verifica la autenticidad de una constancia o certificado con su código QR o con el código y la clave impresos.',
+    descripcion: 'Verifica la autenticidad de una constancia o certificado con el código y la clave impresos.',
   },
 ];
 

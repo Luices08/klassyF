@@ -298,7 +298,7 @@ export function useExpedirCertificado() {
   });
 }
 
-/** El PDF de la vista previa no guarda nada: es el mismo documento sin consecutivo, huella ni QR. Se muestra en la propia pantalla. */
+/** El PDF de la vista previa no guarda nada: es el mismo documento sin consecutivo ni huella. Se muestra en la propia pantalla. */
 export const descargarVistaPrevia = (entrada: EntradaExpedicion) => api.downloadBlob('/certificados/vista-previa', { method: 'POST', body: entrada });
 
 export const descargarPdfCertificado = (id: string) => api.downloadBlob(`/certificados/${id}/pdf`);
@@ -379,9 +379,8 @@ export interface ResultadoVerificacion {
 }
 
 export interface ConsultaVerificacion {
-  token?: string;
-  codigo?: string;
-  clave?: string;
+  codigo: string;
+  clave: string;
 }
 
 export function useVerificacionPublica(consulta: ConsultaVerificacion | null) {
@@ -426,7 +425,7 @@ export type TamanoDiseno = 'PEQUENO' | 'NORMAL' | 'GRANDE';
 export const ETIQUETA_FUENTE_DISENO: Record<FuenteDiseno, string> = { SANS: 'Sin serifa (Helvetica)', SERIF: 'Con serifa (Times)', MONO: 'Monoespaciada (Courier)' };
 export const ETIQUETA_TAMANO_DISENO: Record<TamanoDiseno, string> = { PEQUENO: 'Pequeño', NORMAL: 'Normal', GRANDE: 'Grande' };
 
-/** Cómo se ve el texto del documento (el encabezado, la tabla de notas, las firmas y el QR los pone el sistema). `null` = el de siempre. */
+/** Cómo se ve el texto del documento (el encabezado, la tabla de notas, las firmas y la verificación los pone el sistema). `null` = el de siempre. */
 export interface DisenoPlantilla {
   fuente: FuenteDiseno;
   tamano: TamanoDiseno;

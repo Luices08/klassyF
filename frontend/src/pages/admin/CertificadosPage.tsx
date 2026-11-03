@@ -25,7 +25,7 @@ export function CertificadosPage() {
 
   return (
     <div className="space-y-4">
-      <PageHeader title="Certificados y constancias" subtitle="Cada documento sale con los datos que el sistema ya conoce, un código único, QR y huella de integridad verificables." />
+      <PageHeader title="Certificados y constancias" subtitle="Cada documento sale con los datos que el sistema ya conoce, un código único y una huella de integridad verificables." />
       <Tabs items={tabs} active={tab} onChange={setTab} />
       <TabPanel active={tab} tabKey="expedir">
         <ExpedirCertificado estudianteInicial={params.get('estudiante') ?? undefined} />

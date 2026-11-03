@@ -15,7 +15,7 @@ interface VistaPreviaExpedicionProps {
 
 /**
  * El documento tal como saldrá, con los datos reales del estudiante, que se vuelve a dibujar solo al cambiar cualquier opción.
- * Es la misma vista previa de siempre (sin consecutivo, QR ni validez): el código y el QR reales nacen al expedir, dentro de la
+ * Es la misma vista previa de siempre (sin consecutivo ni validez): el código real nace al expedir, dentro de la
  * transacción, para que la numeración no tenga huecos. Mientras llega la nueva se conserva la anterior para que no parpadee.
  */
 export function VistaPreviaExpedicion({ entrada, motivoPausa }: VistaPreviaExpedicionProps) {
@@ -55,7 +55,7 @@ export function VistaPreviaExpedicion({ entrada, motivoPausa }: VistaPreviaExped
         <p className="text-sm font-semibold text-ink">Así quedará el documento</p>
         {actualizando && !motivoPausa && <span className="text-xs text-muted">Actualizando…</span>}
       </div>
-      <p className="text-xs text-muted">Con los datos reales del estudiante. El código, el QR y la huella reales se generan al expedir; aquí solo es una muestra.</p>
+      <p className="text-xs text-muted">Con los datos reales del estudiante. El código y la huella reales se generan al expedir; aquí solo es una muestra.</p>
       {!entrada && <p className="rounded-lg border border-dashed border-border p-8 text-center text-sm text-muted">Elige un estudiante y un documento para ver aquí cómo queda.</p>}
       {entrada && motivoPausa && <Alert tone="info">{motivoPausa}</Alert>}
       {entrada && !motivoPausa && consulta.isLoading && <Spinner label="Preparando la vista previa…" />}

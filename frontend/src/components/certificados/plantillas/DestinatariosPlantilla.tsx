@@ -16,7 +16,7 @@ export function DestinatariosPlantilla({ borrador, onCambiar }: { borrador: Cont
   return (
     <div className="space-y-4">
       <Card className="space-y-3">
-        <CardHeader title="Vigencia" subtitle="Cuánto tiempo vale el documento al verificar su código QR." />
+        <CardHeader title="Vigencia" subtitle="Cuánto tiempo vale el documento al verificar su código." />
         <div className="max-w-xs">
           <Input
             label="Vigencia (días)"

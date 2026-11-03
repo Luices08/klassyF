@@ -295,7 +295,7 @@ export function ExpedirCertificado({ estudianteInicial }: { estudianteInicial?: 
               );
             })}
           </div>
-          <p className="mt-4 text-xs text-muted">El código QR y la huella de integridad se incluyen siempre: no se pueden apagar.</p>
+          <p className="mt-4 text-xs text-muted">La huella de integridad se incluye siempre: no se pueden apagar.</p>
         </Card>
       )}
 

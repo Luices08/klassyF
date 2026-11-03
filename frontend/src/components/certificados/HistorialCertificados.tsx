@@ -125,7 +125,7 @@ export function HistorialCertificados() {
                           {e === 'rectoria' ? 'Rectoría' : e === 'secretaria' ? 'Secretaría' : 'Sello'}
                         </Chip>
                       ))}
-                      {!Object.values(c.firmas).some(Boolean) && <span className="text-xs text-muted">Solo QR y huella</span>}
+                      {!Object.values(c.firmas).some(Boolean) && <span className="text-xs text-muted">Solo huella</span>}
                     </span>
                   </Td>
                   <Td>

@@ -57,7 +57,7 @@ const sugerirPrefijo = (nombre: string): string =>
 /**
  * Los tipos de documento que expide la secretaría. No es una lista fija: Secretaría y el administrador los crean, editan, archivan y
  * eliminan. Un tipo nuevo nace en borrador (se redacta y se prueba con la vista previa) y el administrador lo activa. Si ya se expidió
- * algo con él no se elimina —los documentos se verifican por su QR—: se archiva y deja de ofrecerse.
+ * algo con él no se elimina —los documentos se verifican por su código—: se archiva y deja de ofrecerse.
  */
 export function TiposDocumentoPanel() {
   const datos = useTiposCertificado();
@@ -326,7 +326,7 @@ function ConfirmacionDrawer({ tipo, accion, onClose }: { tipo: TipoCertificado; 
       {operacion.isError && <Alert tone="error">{errorMessage(operacion.error)}</Alert>}
       {accion === 'archivar' ? (
         <p className="text-sm text-body">
-          «{tipo.nombre}» deja de ofrecerse al expedir. Los {tipo.emitidos} documento(s) ya expedidos siguen vigentes, se verifican por su QR y se pueden reimprimir. El administrador lo puede volver a activar.
+          «{tipo.nombre}» deja de ofrecerse al expedir. Los {tipo.emitidos} documento(s) ya expedidos siguen vigentes, se verifican por su código y se pueden reimprimir. El administrador lo puede volver a activar.
         </p>
       ) : (
         <p className="text-sm text-body">Se elimina «{tipo.nombre}» junto con los textos que se redactaron para él. Esta acción no se puede deshacer. Como nunca se expidió nada con este tipo, no afecta ningún documento.</p>

@@ -27,7 +27,7 @@ function CampoColor({ label, hint, valor, onChange }: { label: string; hint: str
   );
 }
 
-/** Cómo se ve el texto del documento: letra, tamaño y colores. Se ve al lado en «Así se ve»; lo demás (encabezado, firmas, QR) lo pone el sistema. */
+/** Cómo se ve el texto del documento: letra, tamaño y colores. Se ve al lado en «Así se ve»; lo demás (encabezado, firmas, verificación) lo pone el sistema. */
 export function DisenoPlantillaCard({ diseno, onCambiar }: { diseno: DisenoPlantilla | null | undefined; onCambiar: (diseno: DisenoPlantilla | null) => void }) {
   const actual = diseno ?? DISENO_INICIAL;
   const cambiar = (cambio: Partial<DisenoPlantilla>) => onCambiar({ ...actual, ...cambio });
@@ -57,7 +57,7 @@ export function DisenoPlantillaCard({ diseno, onCambiar }: { diseno: DisenoPlant
         <CampoColor label="Color del texto" hint="Los párrafos del documento." valor={actual.color_texto} onChange={(color_texto) => cambiar({ color_texto })} />
         <CampoColor label="Color de las frases destacadas" hint="La frase de apertura (CERTIFICA / HACE CONSTAR) y los párrafos destacados." valor={actual.color_destacados} onChange={(color_destacados) => cambiar({ color_destacados })} />
       </div>
-      <p className="text-xs text-muted">Los colores deben ser lo bastante oscuros para leerse sobre el papel blanco al imprimir o fotocopiar; si no, el sistema avisa y no deja publicar. El encabezado con el escudo, la tabla de valoraciones, las firmas y el QR no cambian.</p>
+      <p className="text-xs text-muted">Los colores deben ser lo bastante oscuros para leerse sobre el papel blanco al imprimir o fotocopiar; si no, el sistema avisa y no deja publicar. El encabezado con el escudo, la tabla de valoraciones, las firmas y la verificación no cambian.</p>
       <div className="flex justify-end">
         <Button type="button" variant="secondary" disabled={esOriginal} onClick={() => onCambiar(null)}>
           Volver al diseño original

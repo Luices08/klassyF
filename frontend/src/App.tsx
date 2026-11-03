@@ -85,7 +85,6 @@ export default function App() {
       <Route path="/" element={<HomePage />} />
       <Route path="/login" element={<LoginPage />} />
       <Route path="/verificar" element={<VerificarCertificadoPage />} />
-      <Route path="/verificar/:token" element={<VerificarCertificadoPage />} />
       {/* Enlace del correo de una citación (M24): el acudiente responde sin iniciar sesión. */}
       <Route path="/citacion/:token" element={<ConfirmarCitacionPage />} />
 

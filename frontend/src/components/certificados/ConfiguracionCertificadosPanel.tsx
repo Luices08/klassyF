@@ -55,7 +55,7 @@ export function ConfiguracionCertificadosPanel() {
       </Card>
 
       <Card>
-        <CardHeader title="Qué se estampa en cada documento" subtitle="El valor de partida del switch al expedir, y si se puede cambiar. El QR y la huella van siempre." />
+        <CardHeader title="Qué se estampa en cada documento" subtitle="El valor de partida del switch al expedir, y si se puede cambiar. La huella va siempre." />
         <PoliticaTabla configuracion={c} onCambio={(clave, elemento, modo) => actualizar.mutate({ politica: { [clave]: { [elemento]: modo } } })} deshabilitado={actualizar.isPending || !c.puede.ajustes} />
       </Card>
 

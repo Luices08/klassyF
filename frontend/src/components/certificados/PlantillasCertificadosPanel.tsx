@@ -253,7 +253,7 @@ function EditorPlantilla({
           </div>
         </div>
         <p className="text-xs text-muted">
-          Publicada el {formatoFechaHora(plantilla.publicada_at)}. Mínimos que debe conservar: {plantilla.requisitos.fuente}. El encabezado (escudo, nombre, DANE, NIT, resolución, sede, jornada y año), el QR y la huella los pone el sistema: no se editan.
+          Publicada el {formatoFechaHora(plantilla.publicada_at)}. Mínimos que debe conservar: {plantilla.requisitos.fuente}. El encabezado (escudo, nombre, DANE, NIT, resolución, sede, jornada y año) y la huella los pone el sistema: no se editan.
         </p>
       </Card>
 
@@ -360,7 +360,7 @@ function EditorPlantilla({
         onPublicar={publicarVersion}
       />
 
-      <Drawer open={Boolean(previa)} size="xl" title="Vista previa con un estudiante inventado" subtitle="No tiene validez: el QR y la huella solo existen al expedir." onClose={() => setPrevia(null)}>
+      <Drawer open={Boolean(previa)} size="xl" title="Vista previa con un estudiante inventado" subtitle="No tiene validez: la huella solo existe al expedir." onClose={() => setPrevia(null)}>
         {previa && <VisorDocumento url={previa.url} titulo="Así se imprimirá" nombreArchivo="vista-previa-plantilla.pdf" />}
       </Drawer>
     </div>

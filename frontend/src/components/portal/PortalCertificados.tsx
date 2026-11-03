@@ -48,7 +48,7 @@ function TarjetaTipo({ tipo, generando, onGenerar }: { tipo: TipoCertificadoAuto
 
 /**
  * Certificados de estudio que el acudiente genera solo (M26): el sistema arma el PDF con la plantilla vigente del colegio, con su código
- * y QR de verificación, sin esperar a secretaría. Solo se ofrecen los tipos que el administrador habilitó para autoservicio.
+ * y clave de verificación, sin esperar a secretaría. Solo se ofrecen los tipos que el administrador habilitó para autoservicio.
  */
 export function PortalCertificados({ studentId }: { studentId: string }) {
   const { data, isLoading, isError, error } = useCertificadosDelHijo(studentId);

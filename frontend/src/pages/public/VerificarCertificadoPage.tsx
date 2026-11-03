@@ -1,5 +1,5 @@
 import { type FormEvent, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { Alert, errorMessage } from '../../components/ui/Alert';
 import { Button } from '../../components/ui/Button';
 import { Card, CardHeader } from '../../components/ui/Card';
@@ -9,20 +9,18 @@ import { useVerificacionPublica, type ConsultaVerificacion, type ResultadoVerifi
 import { formatoFechaHora } from '../../lib/fechas';
 
 /**
- * Verificación pública de autenticidad (M26), sin sesión. Se llega escaneando el QR del documento (`/verificar/<token>`) o
- * escribiendo el código y la clave impresos en su pie. Solo muestra lo mínimo: nunca notas ni datos sensibles.
+ * Verificación pública de autenticidad (M26), sin sesión: se escriben el código y la clave impresos en el pie del documento.
+ * Solo muestra lo mínimo: nunca notas ni datos sensibles.
  */
 export function VerificarCertificadoPage() {
-  const { token } = useParams<{ token?: string }>();
   const [codigo, setCodigo] = useState('');
   const [clave, setClave] = useState('');
-  const [manual, setManual] = useState<ConsultaVerificacion | null>(null);
-  const consulta: ConsultaVerificacion | null = token ? { token } : manual;
+  const [consulta, setConsulta] = useState<ConsultaVerificacion | null>(null);
   const resultado = useVerificacionPublica(consulta);
 
   const enviar = (e: FormEvent) => {
     e.preventDefault();
-    setManual({ codigo: codigo.trim(), clave: clave.trim() });
+    setConsulta({ codigo: codigo.trim(), clave: clave.trim() });
   };
 
   return (
@@ -36,18 +34,16 @@ export function VerificarCertificadoPage() {
         </div>
       </header>
       <main className="mx-auto max-w-3xl space-y-4 px-4 py-8 sm:px-6">
-        {!token && (
-          <Card>
-            <CardHeader title="Verifica un certificado o constancia" subtitle="Escribe el código y la clave que aparecen al pie del documento, o escanea su código QR." />
-            <form onSubmit={enviar} className="grid gap-3 sm:grid-cols-[1.4fr_1fr_auto] sm:items-end">
-              <Input label="Código del documento" value={codigo} onChange={(e) => setCodigo(e.target.value)} placeholder="CE-2026-0001" required maxLength={30} />
-              <Input label="Clave de verificación" value={clave} onChange={(e) => setClave(e.target.value)} placeholder="12 caracteres" required maxLength={20} />
-              <Button type="submit" disabled={!codigo.trim() || !clave.trim()}>
-                Verificar
-              </Button>
-            </form>
-          </Card>
-        )}
+        <Card>
+          <CardHeader title="Verifica un certificado o constancia" subtitle="Escribe el código y la clave que aparecen al pie del documento." />
+          <form onSubmit={enviar} className="grid gap-3 sm:grid-cols-[1.4fr_1fr_auto] sm:items-end">
+            <Input label="Código del documento" value={codigo} onChange={(e) => setCodigo(e.target.value)} placeholder="CE-2026-0001" required maxLength={30} />
+            <Input label="Clave de verificación" value={clave} onChange={(e) => setClave(e.target.value)} placeholder="12 caracteres" required maxLength={20} />
+            <Button type="submit" disabled={!codigo.trim() || !clave.trim()}>
+              Verificar
+            </Button>
+          </form>
+        </Card>
         {resultado.isFetching && <Spinner label="Verificando..." />}
         {resultado.isError && <Alert tone="error">{errorMessage(resultado.error)}</Alert>}
         {resultado.data && !resultado.isFetching && <Resultado r={resultado.data} />}

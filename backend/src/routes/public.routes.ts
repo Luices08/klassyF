@@ -19,6 +19,8 @@ import * as admissionValidator from '../validators/admissionRequest.validator';
 import * as certificadoValidator from '../validators/certificado.validator';
 import { consultarPublica as consultarCitacion, responderPublica as responderCitacion } from '../controllers/citacion.controller';
 import * as citacionValidator from '../validators/citacion.validator';
+import { solicitar as solicitarClave } from '../controllers/recuperacionClave.controller';
+import * as recuperacionClaveValidator from '../validators/recuperacionClave.validator';
 
 const router = Router();
 
@@ -56,6 +58,11 @@ router.get('/certificados/verificar', verificacionLimiter, validate(certificadoV
 const citacionLimiter = rateLimit({ windowMs: 15 * 60_000, max: 60, standardHeaders: true, legacyHeaders: false });
 router.get('/citaciones/:token', citacionLimiter, validate(citacionValidator.conToken), consultarCitacion);
 router.post('/citaciones/:token/respuesta', citacionLimiter, validate(citacionValidator.responderPorToken), responderCitacion);
+
+// Recuperar la clave: solo deja una solicitud para la secretaría (no cambia nada en la cuenta). Un colegio comparte una misma IP, así que el tope por IP es amplio;
+// lo que frena el abuso es que haya una sola solicitud pendiente por persona.
+const recuperacionClaveLimiter = rateLimit({ windowMs: 60 * 60_000, max: 100, standardHeaders: true, legacyHeaders: false });
+router.post('/recuperacion-clave', recuperacionClaveLimiter, validate(recuperacionClaveValidator.solicitar), solicitarClave);
 
 router.get('/institution-info', lecturaLimiter, obtenerInfoPublica);
 // Términos y condiciones: se leen antes de iniciar sesión (la primera vez que se abre la plataforma en un navegador).

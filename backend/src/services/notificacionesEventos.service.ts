@@ -277,6 +277,20 @@ export function avisarSolicitudAdmision(): Promise<void> {
   });
 }
 
+/** Recuperación de clave: alguien pidió restablecerla → punto en la bandeja de quienes pueden atenderla (secretaría de su sede, coordinación, ADMIN). */
+export function avisarSolicitudClave(roles: Rol[], sedesIds: Id[]): Promise<void> {
+  return sinRomper('solicitud de clave', async () => {
+    for (const rol of roles) {
+      // La secretaría solo ve las solicitudes de sus sedes: se juntan sin repetir para que una con dos sedes no sume dos puntos.
+      const destinatarios =
+        rol === ROLES.SECRETARIA
+          ? [...new Map((await Promise.all(sedesIds.map((sede) => usuariosConRol([rol], sede)))).flat().map((id) => [String(id), id])).values()]
+          : await usuariosConRol([rol]);
+      await sumarInsignia({ destinatarios, rol, ruta: '/admin/solicitudes-clave' });
+    }
+  });
+}
+
 /** Tablero: un anuncio ya vigente → punto en «Anuncios» de cada perfil al que va dirigido (no del autor). */
 export function avisarAnuncioNuevo(roles: Rol[], autorId: Id): Promise<void> {
   return sinRomper('anuncio nuevo', async () => {

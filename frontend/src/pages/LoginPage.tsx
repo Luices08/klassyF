@@ -1,6 +1,7 @@
 import { type FormEvent, useState } from 'react';
 import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { OlasLogin } from '../components/auth/OlasLogin';
+import { RecuperarClaveDrawer } from '../components/auth/RecuperarClaveDrawer';
 import { SelectorRolLogin } from '../components/auth/SelectorRolLogin';
 import { Alert, errorMessage } from '../components/ui/Alert';
 import { Button } from '../components/ui/Button';
@@ -42,6 +43,7 @@ export function LoginPage() {
   const [password, setPassword] = useState('');
   const [rol, setRol] = useState<Rol | null>(leerPerfilGuardado);
   const [error, setError] = useState<string | null>(null);
+  const [recuperando, setRecuperando] = useState(false);
 
   if (isAuthenticated && user) {
     const from = (location.state as { from?: { pathname?: string } } | null)?.from?.pathname;
@@ -172,6 +174,12 @@ export function LoginPage() {
               onChange={(e) => setPassword(e.target.value)}
             />
 
+            <div className="-mt-2 text-right">
+              <button type="button" onClick={() => setRecuperando(true)} className="text-sm font-medium text-primary hover:underline">
+                Olvidé mi contraseña
+              </button>
+            </div>
+
             <Button type="submit" isLoading={isLoading} className="h-12 w-full rounded-xl! text-base">
               Ingresar
               <ArrowRightIcon className="h-5 w-5" />
@@ -202,6 +210,7 @@ export function LoginPage() {
           </form>
         </div>
       </main>
+      <RecuperarClaveDrawer key={recuperando ? 'abierto' : 'cerrado'} open={recuperando} onClose={() => setRecuperando(false)} documentoInicial={numeroDocumento} />
     </div>
   );
 }

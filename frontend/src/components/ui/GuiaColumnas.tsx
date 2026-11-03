@@ -1,3 +1,4 @@
+import { Fragment } from 'react';
 import { Chip } from './Badge';
 import { ChevronDownIcon } from './icons';
 import { Table, TableBody, TableHead, Td, Th } from './Table';
@@ -8,6 +9,10 @@ export interface ColumnaGuia {
   /** Qué formato o valores acepta la columna. */
   formato: string;
   ejemplo: string;
+  /** Qué hace el sistema con el dato y qué pasa si no cumple. Si ninguna columna lo trae, la tabla no muestra esa columna. */
+  uso?: string;
+  /** Sección a la que pertenece: cuando cambia respecto a la fila anterior se dibuja un encabezado de sección. */
+  grupo?: string;
 }
 
 interface GuiaColumnasProps {
@@ -22,6 +27,8 @@ interface GuiaColumnasProps {
  * que espera cada columna. Reemplaza el texto plano con la lista de encabezados.
  */
 export function GuiaColumnas({ titulo = 'Guía de columnas y formato', notas = [], columnas }: GuiaColumnasProps) {
+  const conUso = columnas.some((c) => c.uso);
+  const totalColumnas = conUso ? 5 : 4;
   return (
     <details className="group rounded-xl border border-border bg-surface">
       <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 text-sm font-semibold text-ink [&::-webkit-details-marker]:hidden">
@@ -47,17 +54,28 @@ export function GuiaColumnas({ titulo = 'Guía de columnas y formato', notas = [
               <Th>Obligatoria</Th>
               <Th>Formato o valores válidos</Th>
               <Th>Ejemplo</Th>
+              {conUso && <Th>Qué hace Klassy</Th>}
             </TableHead>
             <TableBody>
-              {columnas.map((c) => (
-                <tr key={c.nombre}>
-                  <Td className="whitespace-nowrap font-mono text-xs font-semibold text-ink">{c.nombre}</Td>
-                  <Td>
-                    <Chip tone={c.obligatoria ? 'green' : 'neutral'}>{c.obligatoria ? 'Sí' : 'No'}</Chip>
-                  </Td>
-                  <Td className="text-xs">{c.formato}</Td>
-                  <Td className="whitespace-nowrap font-mono text-xs">{c.ejemplo}</Td>
-                </tr>
+              {columnas.map((c, i) => (
+                <Fragment key={c.nombre}>
+                  {c.grupo && c.grupo !== columnas[i - 1]?.grupo && (
+                    <tr>
+                      <td colSpan={totalColumnas} className="bg-soft px-4 py-2 text-label font-semibold text-ink">
+                        {c.grupo}
+                      </td>
+                    </tr>
+                  )}
+                  <tr>
+                    <Td className="whitespace-nowrap font-mono text-xs font-semibold text-ink">{c.nombre}</Td>
+                    <Td>
+                      <Chip tone={c.obligatoria ? 'green' : 'neutral'}>{c.obligatoria ? 'Sí' : 'No'}</Chip>
+                    </Td>
+                    <Td className="text-xs">{c.formato}</Td>
+                    <Td className="whitespace-nowrap font-mono text-xs">{c.ejemplo}</Td>
+                    {conUso && <Td className="text-xs">{c.uso}</Td>}
+                  </tr>
+                </Fragment>
               ))}
             </TableBody>
           </Table>

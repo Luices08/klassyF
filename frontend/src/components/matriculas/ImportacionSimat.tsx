@@ -7,6 +7,7 @@ import { Card, CardHeader } from '../ui/Card';
 import { Dropzone } from '../ui/Dropzone';
 import { Input } from '../ui/Field';
 import { FiltrosRapidos } from '../ui/FiltrosRapidos';
+import { GuiaColumnas } from '../ui/GuiaColumnas';
 import { ProgressBar } from '../ui/ProgressBar';
 import { Spinner } from '../ui/Spinner';
 import { Stepper } from '../ui/Stepper';
@@ -22,6 +23,7 @@ import {
   useRefrescarTrasImportacion,
   useSimularImportacionSimat,
 } from '../../hooks/useImportacionSimat';
+import { COLUMNAS_SIMAT_GUIA, NOTAS_SIMAT } from '../../lib/guiaSimat';
 import type { ClasificacionSimat, FilaImportacionSimat, ImportacionSimat } from '../../types/importacionSimat';
 
 const MB = 1024 * 1024;
@@ -190,6 +192,7 @@ function PasoArchivo({ alSimular }: { alSimular: (id: string) => void }) {
             etiqueta="Archivo exportado de SIMAT"
             hint="Excel (.xlsx), CSV o TXT, hasta 25 MB. Si el archivo trae varias instituciones solo se toma la tuya."
           />
+          <GuiaColumnas titulo="Guía del archivo de SIMAT: qué columnas lee Klassy y qué acepta de cada una" notas={NOTAS_SIMAT} columnas={COLUMNAS_SIMAT_GUIA} />
           <div className="grid gap-4 md:grid-cols-2">
             <Switch
               checked={salud}

@@ -154,6 +154,18 @@ Backend `/users` (modelo `User`), frontend `/admin/users` (`UsersPage`).
   tanto en frontend (`IconButton disabled` con tooltip explicativo) como en backend (403 con mensaje de
   jerarquía). Solo puede gestionar o crear usuarios con roles de soporte escolar (`ESTUDIANTE` y `ACUDIENTE`).
 
+### Recuperar la contraseña sin correo (M02) — estado: núcleo completo
+
+Backend `/recuperacion-clave` (modelo `SolicitudRecuperacionClave`; `recuperacionClave.service`, regla pura `utils/permisosRecuperacionClave.ts`, constantes `constants/recuperacionClave.ts`) y `POST /public/recuperacion-clave` (sin sesión); frontend `RecuperarClaveDrawer` (enlace «Olvidé mi contraseña» de `LoginPage`) y `SolicitudesClavePage` (`/admin/solicitudes-clave`, ADMIN, COORDINADOR y SECRETARIA; hook `useRecuperacionClave`). **No usa SMTP** porque casi todos los usuarios son niños sin correo y entran por documento. Reglas que no se ven leyendo un solo archivo:
+
+- **Pedir no cambia nada en la cuenta.** El formulario público recibe el documento (y una nota libre opcional, ≤ 200) y responde siempre el mismo 202, exista o no la cuenta o esté inactiva: no sirve para averiguar quién tiene cuenta. Hay una sola solicitud `PENDIENTE` por persona (índice único parcial); repetir el pedido no hace nada. El límite por IP es amplio (100/h) porque un colegio comparte IP.
+- **Quién atiende es la jerarquía de M02, no una regla nueva** (`puedeAtenderSolicitudClave`): solo ADMIN, COORDINADOR y SECRETARIA (no hay camino para el director de grupo ni para convivencia u orientación), y además `puedeGestionarRoles` sobre **todos** los perfiles de quien pide (la secretaría atiende estudiantes y acudientes, no docentes; coordinación atiende docentes y secretaría; ADMIN, a cualquiera). La SECRETARIA solo ve las de su sede: `sedes_ids` se copia a la solicitud al crearla (sedes propias si es personal; la de la matrícula más reciente si es estudiante; las de sus hijos si es acudiente). Una solicitud sin sede conocida queda para coordinación y ADMIN. «No existe» y «no te toca» responden 404; nadie atiende su propia solicitud (400).
+- **Aprobar = restablecer** (misma consecuencia que el reseteo de M02): clave temporal **aleatoria** (`generarPasswordTemporal`, nunca el documento) que se muestra **una sola vez** a quien atiende, `debe_cambiar_password`, se levantan intentos y bloqueo y sube `version_sesion` (cierra las sesiones abiertas). Reclamar la solicitud y cambiar la clave van en **una transacción**: dos personas que aprueben a la vez no se pisan. Una cuenta inactiva da 409. Rechazar (motivo opcional) no toca la cuenta y la persona puede volver a pedir.
+- **Avisos (M28)**: al crearse suma un punto rojo en «Solicitudes de contraseña» solo a quienes pueden atenderla (`rolesQueAtiendenA`: la secretaría de esa sede y coordinación/ADMIN). Se apaga al entrar a la pantalla.
+- **Auditoría**: `PASSWORD_SOLICITADA`, `PASSWORD_SOLICITUD_APROBADA` y `PASSWORD_SOLICITUD_RECHAZADA` (nunca la clave). Quedan fuera del historial general por el prefijo `PASSWORD_`.
+- **Pruebas:** `tests/permisosRecuperacionClave.test.ts` (regla pura) y `tests/integracion/recuperacionClave.int.test.ts` (base real; no se pudo correr donde no hay binario de MongoDB). La interfaz se revisó en un navegador con la API simulada.
+- **Pendiente, a propósito:** que el director de grupo atienda a sus estudiantes; avisar por correo al acudiente (la cola de M24 ya existe, solo sirve a quien tenga correo); el cambio de contraseña desde «Mi cuenta» y el reseteo directo de Usuarios siguen igual.
+
 ### M05 (Año lectivo y periodos) — estado: completo
 
 Backend `/academic-years` (modelo `AcademicYear` + `PeriodoProrroga`), frontend `/anio-lectivo`

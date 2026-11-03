@@ -51,6 +51,7 @@ import { CatalogoConvivenciaPage } from './pages/admin/CatalogoConvivenciaPage';
 import { SolicitudesCasoPage } from './pages/admin/SolicitudesCasoPage';
 import { EnrollmentDetailPage } from './pages/admin/EnrollmentDetailPage';
 import { DocumentosPorRevisarPage } from './pages/admin/DocumentosPorRevisarPage';
+import { SolicitudesClavePage } from './pages/admin/SolicitudesClavePage';
 import { EnrollmentsPage } from './pages/admin/EnrollmentsPage';
 import { PazYSalvoPage } from './pages/admin/PazYSalvoPage';
 import { SalidasPage } from './pages/admin/SalidasPage';
@@ -111,6 +112,7 @@ export default function App() {
             <Route path="/admin/enrollments" element={<EnrollmentsPage />} />
             <Route path="/admin/enrollments/:id" element={<EnrollmentDetailPage />} />
             <Route path="/admin/documentos-por-revisar" element={<DocumentosPorRevisarPage />} />
+            <Route path="/admin/solicitudes-clave" element={<SolicitudesClavePage />} />
             <Route path="/admin/students" element={<StudentsPage />} />
             <Route path="/admin/students/:id" element={<StudentDetailPage />} />
             <Route path="/admin/admisiones" element={<AdmissionRequestsPage />} />

@@ -21,6 +21,7 @@ import continuidadRoutes from './continuidad.routes';
 import foliaturaRoutes from './foliatura.routes';
 import requisitoDocumentalRoutes from './requisitoDocumental.routes';
 import pazYSalvoRoutes from './pazYSalvo.routes';
+import recuperacionClaveRoutes from './recuperacionClave.routes';
 import espacioRoutes from './espacio.routes';
 import gradeRoutes from './grade.routes';
 import groupRoutes from './group.routes';
@@ -86,6 +87,7 @@ router.use('/foliatura', foliaturaRoutes);
 router.use('/continuidad', continuidadRoutes);
 router.use('/requisitos-documentales', requisitoDocumentalRoutes);
 router.use('/paz-y-salvo', pazYSalvoRoutes);
+router.use('/recuperacion-clave', recuperacionClaveRoutes);
 // Traslados extemporáneos y homologación de notas (M04/M26), con las escalas de otras instituciones (M32)
 router.use('/traslados', trasladoRoutes);
 // M24: citaciones a acudientes (generales y particulares) con correo en cola

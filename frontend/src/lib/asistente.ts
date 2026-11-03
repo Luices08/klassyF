@@ -51,6 +51,10 @@ export const PALABRAS_CLAVE_POR_RUTA: Record<string, { descripcion: string; clav
     descripcion: 'Directorio de usuarios y roles.',
     claves: ['usuarios', 'usuario', 'roles', 'crear usuario', 'docentes', 'resetear contrasena', 'cuentas'],
   },
+  '/admin/solicitudes-clave': {
+    descripcion: 'Solicitudes de contraseña olvidada: verificar a la persona y entregarle una clave temporal.',
+    claves: ['solicitudes de contrasena', 'olvide mi contrasena', 'recuperar contrasena', 'restablecer contrasena', 'clave olvidada', 'cambiar clave', 'nueva clave', 'clave temporal', 'no puedo entrar'],
+  },
   '/admin/historial': {
     descripcion: 'Historial de acciones: quién creó, editó, matriculó o eliminó algo en el sistema y cuándo (bitácora de auditoría).',
     claves: ['historial', 'historial de acciones', 'auditoria', 'bitacora', 'quien hizo', 'quien cambio', 'quien creo', 'quien edito', 'quien elimino', 'quien borro', 'registro de cambios', 'trazabilidad', 'log'],

@@ -1,6 +1,5 @@
 import fs from 'fs/promises';
 import path from 'path';
-import QRCode from 'qrcode';
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import AuditLog from '../../src/models/auditLog.model';
 import Campus from '../../src/models/campus.model';
@@ -20,6 +19,8 @@ import * as tipos from '../../src/services/tipoCertificado.service';
 import { UPLOADS_ROOT } from '../../src/utils/uploadPaths';
 import { detenerBaseDeDatos, iniciarBaseDeDatos, limpiarBaseDeDatos } from './baseDeDatos';
 import { armarEscenario, Escenario } from './escenario';
+import { claveCorta } from '../../src/utils/certificados';
+import { pngDePrueba } from './pngDePrueba';
 
 // `config/env` lee las variables al importarse: se fijan antes que cualquier import.
 vi.hoisted(() => {
@@ -67,7 +68,7 @@ describe('M26: tipos de documento configurables (con base de datos)', () => {
 
     await configuracion.actualizarConfiguracion({ rectoria: { usuario_id: String(e.admin._id) }, secretaria: { usuario_id: String(e.secretaria._id) } }, e.admin);
     for (const elemento of ['rectoria', 'secretaria', 'sello'] as const) {
-      const png = await QRCode.toBuffer(`imagen-${elemento}`, { margin: 1, width: 200 });
+      const png = pngDePrueba(`imagen-${elemento}`);
       await configuracion.guardarImagen(elemento, { ...imagen(`${elemento}.png`), buffer: png, size: png.length }, e.admin);
     }
   });
@@ -187,7 +188,7 @@ describe('M26: tipos de documento configurables (con base de datos)', () => {
     expect((await matriculasDe()).tipos).not.toContain(t.clave);
 
     // Lo ya expedido: se verifica por QR, se reimprime y conserva su nombre.
-    const v = await verificacion.verificarCertificado({ token: c.token_verificacion });
+    const v = await verificacion.verificarCertificado({ codigo: c.codigo, clave: claveCorta(c.hash) });
     expect(v).toMatchObject({ resultado: 'VALIDO', tipo: 'Constancia de conducta', codigo: c.codigo });
     expect((await certificados.verificarIntegridad(String(c._id), e.secretaria)).integro).toBe(true);
     await expect(pdf.generarPdfDeCertificado(String(c._id), 'https://colegio.test', e.secretaria)).resolves.toBeDefined();

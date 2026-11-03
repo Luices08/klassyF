@@ -323,14 +323,14 @@ export async function archivarTipo(clave: string, usuario: UserDocument, ip?: st
 
 /**
  * Elimina un tipo que nunca se usó (con sus borradores de texto). Uno con documentos expedidos no se borra: lo expedido se verifica
- * por QR y su consecutivo no puede quedar con huecos; se archiva.
+ * por su código y su consecutivo no puede quedar con huecos; se archiva.
  */
 export async function eliminarTipo(clave: string, usuario: UserDocument, ip?: string | null): Promise<{ clave: string }> {
   exigirGestionDeTipos(usuario);
   const tipo = await cargarTipo(clave);
   const emitidos = await emitidosDe(clave);
   if (emitidos > 0) {
-    throw new ApiError(409, `Ya se expidieron ${emitidos} documento(s) de este tipo: no se puede eliminar porque se verifican por su código QR. Archívalo y deja de ofrecerse.`);
+    throw new ApiError(409, `Ya se expidieron ${emitidos} documento(s) de este tipo: no se puede eliminar porque se verifican por su código. Archívalo y deja de ofrecerse.`);
   }
   await PlantillaCertificado.deleteMany({ tipo: clave });
   await tipo.deleteOne();

@@ -1,6 +1,5 @@
 import fs from 'fs/promises';
 import path from 'path';
-import QRCode from 'qrcode';
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import AuditLog from '../../src/models/auditLog.model';
 import Campus from '../../src/models/campus.model';
@@ -16,6 +15,8 @@ import * as verificacion from '../../src/services/certificadoVerificacion.servic
 import { UPLOADS_ROOT } from '../../src/utils/uploadPaths';
 import { detenerBaseDeDatos, iniciarBaseDeDatos, limpiarBaseDeDatos } from './baseDeDatos';
 import { armarEscenario, Escenario } from './escenario';
+import { claveCorta } from '../../src/utils/certificados';
+import { pngDePrueba } from './pngDePrueba';
 
 // `config/env` lee las variables al importarse: se fijan antes que cualquier import.
 vi.hoisted(() => {
@@ -37,7 +38,7 @@ describe('M26: anular por elemento comprometido (con base de datos)', () => {
       e.secretaria
     );
   const cargar = async (elemento: 'rectoria' | 'secretaria' | 'sello', semilla: string) => {
-    const png = await QRCode.toBuffer(semilla, { margin: 1, width: 200 });
+    const png = pngDePrueba(semilla);
     return configuracion.guardarImagen(elemento, { ...imagen(`${elemento}.png`), buffer: png, size: png.length }, e.admin);
   };
   const selloDe = async () => (await revocacion.imagenesUsadas(e.admin)).filter((i) => i.elemento === 'sello');
@@ -68,7 +69,7 @@ describe('M26: anular por elemento comprometido (con base de datos)', () => {
     const usadas = await selloDe();
     expect(usadas.map((u) => [u.documentos, u.es_la_actual]).sort()).toEqual([[1, true], [1, false]].sort());
     expect((await CertificadoEmitido.findById(antes._id))!.estado).toBe('VIGENTE');
-    expect((await verificacion.verificarCertificado({ token: antes.token_verificacion })).resultado).toBe('VALIDO');
+    expect((await verificacion.verificarCertificado({ codigo: antes.codigo, clave: claveCorta(antes.hash) })).resultado).toBe('VALIDO');
     await expect(pdf.generarPdfDeCertificado(String(antes._id), 'https://colegio.test', e.secretaria)).resolves.toBeDefined();
     expect(despues.estado).toBe('VIGENTE');
   });
@@ -106,7 +107,7 @@ describe('M26: anular por elemento comprometido (con base de datos)', () => {
     for (const c of [viejo1, viejo2]) {
       const guardado = await CertificadoEmitido.findById(c._id);
       expect(guardado).toMatchObject({ estado: 'ANULADO', anulacion: { motivo: 'El sello fue robado y se usó sin autorización' } });
-      expect((await verificacion.verificarCertificado({ token: c.token_verificacion })).resultado).toBe('ANULADO');
+      expect((await verificacion.verificarCertificado({ codigo: c.codigo, clave: claveCorta(c.hash) })).resultado).toBe('ANULADO');
       // Sigue siendo íntegro y se imprime con la marca «ANULADO».
       expect((await certificados.verificarIntegridad(String(c._id), e.secretaria)).integro).toBe(true);
     }

@@ -8,7 +8,6 @@ import {
   claveCorta,
   describirElemento,
   enmascararDocumento,
-  generarTokenVerificacion,
   huellaDeCertificado,
   resolverElementos,
 } from '../src/utils/certificados';
@@ -39,13 +38,7 @@ describe('huella del certificado (HMAC)', () => {
   });
 });
 
-describe('token y datos mínimos', () => {
-  it('el token es opaco, único y apto para URL', () => {
-    const a = generarTokenVerificacion();
-    expect(a).toMatch(/^[A-Za-z0-9_-]{22}$/);
-    expect(generarTokenVerificacion()).not.toBe(a);
-  });
-
+describe('datos mínimos', () => {
   it('el documento se enmascara dejando los últimos 3 caracteres', () => {
     expect(enmascararDocumento('1020304050')).toBe('•••••••050');
     expect(enmascararDocumento('12')).toBe('12');

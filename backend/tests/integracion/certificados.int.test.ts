@@ -1,7 +1,7 @@
 import fs from 'fs/promises';
 import mongoose from 'mongoose';
 import path from 'path';
-import QRCode from 'qrcode';
+import { inflateSync } from 'zlib';
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ClaveCertificado } from '../../src/constants/certificados';
 import AuditLog from '../../src/models/auditLog.model';
@@ -20,8 +20,28 @@ import { existeImagen } from '../../src/utils/almacenImagenes';
 import { claveCorta } from '../../src/utils/certificados';
 import { detenerBaseDeDatos, iniciarBaseDeDatos, limpiarBaseDeDatos } from './baseDeDatos';
 import { armarEscenario, crearUsuario, Escenario } from './escenario';
+import { pngDePrueba } from './pngDePrueba';
 import { plantillaVigente, contenidoDe } from '../../src/services/certificadoPlantilla.service';
 import { UPLOADS_ROOT, rutaImagenAutenticacion } from '../../src/utils/uploadPaths';
+
+/** Texto de un PDF de pdfkit: sus flujos van comprimidos y las cadenas en hexadecimal. */
+function textoDelPdf(buffer: Buffer): string {
+  const crudo = buffer.toString('latin1');
+  const partes: string[] = [];
+  for (const m of crudo.matchAll(/stream\r?\n([\s\S]*?)\r?\nendstream/g)) {
+    let contenido: string;
+    try {
+      contenido = inflateSync(Buffer.from(m[1] as string, 'latin1')).toString('latin1');
+    } catch {
+      continue;
+    }
+    for (const linea of contenido.split(/\r?\n/)) {
+      if (!/T[Jj]\s*$/.test(linea)) continue;
+      partes.push([...linea.matchAll(/<([0-9a-fA-F]+)>/g)].map((h) => Buffer.from(h[1] as string, 'hex').toString('latin1')).join(''));
+    }
+  }
+  return partes.join('\n');
+}
 
 // `config/env` lee las variables al importarse: se fijan antes que cualquier import.
 vi.hoisted(() => {
@@ -60,7 +80,7 @@ describe('M26 certificados (con base de datos)', () => {
 
     await configuracion.actualizarConfiguracion({ rectoria: { usuario_id: String(e.admin._id) }, secretaria: { usuario_id: String(secretariaAcademica._id) } }, e.admin);
     for (const elemento of ['rectoria', 'secretaria', 'sello'] as const) {
-      const png = await QRCode.toBuffer(`imagen-${elemento}`, { margin: 1, width: 200 });
+      const png = pngDePrueba(`imagen-${elemento}`);
       await configuracion.guardarImagen(elemento, { ...imagen(`${elemento}.png`), buffer: png, size: png.length }, e.admin);
     }
   });
@@ -75,7 +95,6 @@ describe('M26 certificados (con base de datos)', () => {
     expect(s.encabezado).toMatchObject({ institucion: 'Colegio de prueba', codigo_dane: '123456789012' });
     expect(s.estudiante.numero_documento).toBe(e.estudiante.numero_documento);
     expect(s.matricula).toMatchObject({ grado: 'Sexto', grupo: '601', folio_matricula: `F-${e.estudiante.numero_documento}` });
-    expect(primero.token_verificacion).toHaveLength(22);
   });
 
   it('expide en paralelo sin repetir consecutivos', async () => {
@@ -125,7 +144,7 @@ describe('M26 certificados (con base de datos)', () => {
   });
 
   it('secretaría carga su firma, el sello y designa a su firmante', async () => {
-    const png = await QRCode.toBuffer('firma-nueva', { margin: 1, width: 200 });
+    const png = pngDePrueba('firma-nueva');
     const archivo = { ...imagen('nueva.png'), buffer: png, size: png.length };
     const vista = await configuracion.guardarImagen('secretaria', archivo, e.secretaria);
     expect(vista.secretaria.tiene_imagen).toBe(true);
@@ -137,7 +156,7 @@ describe('M26 certificados (con base de datos)', () => {
   });
 
   it('secretaría carga, ve y quita la imagen de la firma de Rectoría', async () => {
-    const png = await QRCode.toBuffer('firma-rector', { margin: 1, width: 200 });
+    const png = pngDePrueba('firma-rector');
     const archivo = { ...imagen('rector.png'), buffer: png, size: png.length };
     await expect(configuracion.guardarImagen('rectoria', archivo, e.secretaria)).resolves.toBeDefined();
     await expect(configuracion.rutaImagenVigente('rectoria', e.secretaria)).resolves.toMatch(/\.png$/);
@@ -233,6 +252,17 @@ describe('M26 certificados (con base de datos)', () => {
       const { buffer } = await pdf.generarPdfDeCertificado(String(c._id), 'https://colegio.test', e.secretaria);
       expect(buffer.subarray(0, 4).toString()).toBe('%PDF');
     });
+
+    it('el pie solo lleva el consecutivo y quién lo expidió: sin clave, dirección ni huella', async () => {
+      const c = await pazYSalvo({ dependencias: todas });
+      const { buffer } = await pdf.generarPdfDeCertificado(String(c._id), 'https://colegio.test', e.secretaria);
+      const texto = textoDelPdf(buffer);
+      expect(texto).toContain(`${c.codigo} · Expedido por`);
+      expect(texto).not.toMatch(/Verifique la autenticidad|Huella de integridad|Ingrese a|colegio\.test/);
+      expect(texto).not.toContain(claveCorta(c.hash));
+      // El backend sigue guardando todo lo necesario para verificar: lo que cambia es solo lo que se pinta.
+      expect(c.hash).toMatch(/^[0-9a-f]{64}$/);
+    });
   });
 
   describe('certificado de estudio (con notas)', () => {
@@ -274,21 +304,18 @@ describe('M26 certificados (con base de datos)', () => {
     await expect(c.save()).rejects.toThrow(/no se puede modificar/);
   });
 
-  it('verifica por el token del QR y por código + clave, mostrando lo mínimo', async () => {
+  it('verifica por código + clave, mostrando lo mínimo', async () => {
     const c = await expedir();
-    const porToken = await verificacion.verificarCertificado({ token: c.token_verificacion });
-    expect(porToken).toMatchObject({ resultado: 'VALIDO', codigo: c.codigo, institucion: 'Colegio de prueba' });
-    expect(JSON.stringify(porToken)).not.toContain(e.estudiante.numero_documento);
-    expect((porToken as { documento: string }).documento).toMatch(/^•+\d{3}$/);
-
     const porCodigo = await verificacion.verificarCertificado({ codigo: c.codigo.toLowerCase(), clave: claveCorta(c.hash).toLowerCase() });
-    expect(porCodigo).toMatchObject({ resultado: 'VALIDO', codigo: c.codigo });
+    expect(porCodigo).toMatchObject({ resultado: 'VALIDO', codigo: c.codigo, institucion: 'Colegio de prueba' });
+    expect(JSON.stringify(porCodigo)).not.toContain(e.estudiante.numero_documento);
+    expect((porCodigo as { documento: string }).documento).toMatch(/^•+\d{3}$/);
   });
 
-  it('un código con la clave equivocada o un token inventado responden igual: no existe', async () => {
+  it('un código con la clave equivocada o inventado responden igual: no existe', async () => {
     const c = await expedir();
     await expect(verificacion.verificarCertificado({ codigo: c.codigo, clave: 'AAAAAAAAAAAA' })).rejects.toMatchObject({ statusCode: 404 });
-    await expect(verificacion.verificarCertificado({ token: 'x'.repeat(22) })).rejects.toMatchObject({ statusCode: 404 });
+    await expect(verificacion.verificarCertificado({ codigo: 'CE-0000-9999', clave: 'AAAAAAAAAAAA' })).rejects.toMatchObject({ statusCode: 404 });
     await expect(verificacion.verificarCertificado({ codigo: c.codigo })).rejects.toMatchObject({ statusCode: 404 });
   });
 
@@ -296,7 +323,7 @@ describe('M26 certificados (con base de datos)', () => {
     const c = await expedir();
     await mongoose.connection.db!.collection('certificadoemitidos').updateOne({ _id: c._id }, { $set: { 'snapshot.estudiante.nombre': 'Otro' } });
     expect(await certificados.verificarIntegridad(String(c._id), e.secretaria)).toMatchObject({ integro: false });
-    expect(await verificacion.verificarCertificado({ token: c.token_verificacion })).toMatchObject({ resultado: 'NO_VERIFICABLE' });
+    expect(await verificacion.verificarCertificado({ codigo: c.codigo, clave: claveCorta(c.hash) })).toMatchObject({ resultado: 'NO_VERIFICABLE' });
     await expect(pdf.generarPdfDeCertificado(String(c._id), 'https://colegio.test', e.secretaria)).rejects.toMatchObject({ statusCode: 409 });
   });
 
@@ -304,7 +331,7 @@ describe('M26 certificados (con base de datos)', () => {
     const c = await expedir();
     await expect(certificados.anularCertificado(String(c._id), 'Datos mal expedidos', e.docenteDeClase)).rejects.toMatchObject({ statusCode: 403 });
     await certificados.anularCertificado(String(c._id), 'Datos mal expedidos', e.secretaria);
-    expect(await verificacion.verificarCertificado({ token: c.token_verificacion })).toMatchObject({ resultado: 'ANULADO' });
+    expect(await verificacion.verificarCertificado({ codigo: c.codigo, clave: claveCorta(c.hash) })).toMatchObject({ resultado: 'ANULADO' });
     await expect(certificados.anularCertificado(String(c._id), 'otra vez', e.admin)).rejects.toMatchObject({ statusCode: 409 });
   });
 
@@ -373,7 +400,7 @@ describe('M26 certificados (con base de datos)', () => {
   });
 
   describe('imágenes: escudo congelado y recuperación', () => {
-    const logo = async (texto: string) => `data:image/png;base64,${(await QRCode.toBuffer(texto, { margin: 1, width: 120 })).toString('base64')}`;
+    const logo = async (texto: string) => `data:image/png;base64,${pngDePrueba(texto, 24).toString('base64')}`;
 
     it('el escudo queda guardado por su huella en lo expedido y cambiar el logo después no altera la reimpresión', async () => {
       await Institution.updateOne({}, { logo_url: await logo('escudo-uno') });

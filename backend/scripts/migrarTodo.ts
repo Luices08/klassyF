@@ -22,6 +22,7 @@ const IDEMPOTENTES = [
   'migrate:folio-al-matricular',
   'migrate:anio-repetible',
   'migrate:certificados-sede',
+  'migrate:retirar-qr-certificados',
   'migrate:requisitos-documentales',
   'migrate:retirar-campos-convivencia',
   'sembrar:tipos-titulacion',

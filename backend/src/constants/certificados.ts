@@ -125,7 +125,7 @@ export const FRASE_OTRO_PREDETERMINADA = 'Se expide para presentar ante {texto}'
 
 // --- Firmas y sellos ---
 
-/** Lo que se puede estampar en el documento al expedirlo. El QR y la huella no son opcionales: no están aquí. */
+/** Lo que se puede estampar en el documento al expedirlo. La huella no es opcional: no están aquí. */
 export const ELEMENTOS_AUTENTICACION = ['rectoria', 'secretaria', 'sello'] as const;
 export type ElementoAutenticacion = (typeof ELEMENTOS_AUTENTICACION)[number];
 

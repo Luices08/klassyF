@@ -1,6 +1,5 @@
 import fs from 'fs/promises';
 import path from 'path';
-import QRCode from 'qrcode';
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import AuditLog from '../../src/models/auditLog.model';
 import Campus from '../../src/models/campus.model';
@@ -16,6 +15,7 @@ import { actualizarTipo } from '../../src/services/tipoCertificado.service';
 import { UPLOADS_ROOT } from '../../src/utils/uploadPaths';
 import { detenerBaseDeDatos, iniciarBaseDeDatos, limpiarBaseDeDatos } from './baseDeDatos';
 import { armarEscenario, crearUsuario, Escenario } from './escenario';
+import { pngDePrueba } from './pngDePrueba';
 
 vi.hoisted(() => {
   process.env.JWT_SECRET = 'secreto-de-pruebas';
@@ -136,7 +136,7 @@ describe('M27: portal del acudiente (con base de datos)', () => {
       await e.secretaria.save();
       await configuracion.actualizarConfiguracion({ rectoria: { usuario_id: String(e.admin._id) }, secretaria: { usuario_id: String(e.secretaria._id) } }, e.admin);
       for (const elemento of ['rectoria', 'secretaria', 'sello'] as const) {
-        const png = await QRCode.toBuffer(`imagen-${elemento}`, { margin: 1, width: 200 });
+        const png = pngDePrueba(`imagen-${elemento}`);
         await configuracion.guardarImagen(elemento, imagen(`${elemento}.png`, png), e.admin);
       }
     });

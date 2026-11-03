@@ -106,15 +106,12 @@ export const actualizarConfiguracion: ValidationSchema = {
 
 export const conElemento: ValidationSchema = { params: Joi.object({ elemento: elemento.required() }) };
 
-// Verificación pública: por el token del QR, o por código + clave impresos en el documento.
+// Verificación pública: por código + clave impresos en el documento.
 export const verificarPublico: ValidationSchema = {
   query: Joi.object({
-    token: Joi.string().trim().pattern(/^[A-Za-z0-9_-]{16,64}$/),
-    codigo: Joi.string().trim().max(30),
-    clave: Joi.string().trim().max(20),
-  })
-    .or('token', 'codigo')
-    .with('codigo', 'clave'),
+    codigo: Joi.string().trim().max(30).required(),
+    clave: Joi.string().trim().max(20).required(),
+  }),
 };
 
 // --- Plantillas (M26): el contenido llega completo; el servicio revisa los mínimos del documento ---

@@ -304,7 +304,7 @@ export interface EntradaCertificadoDelHijo {
 
 /**
  * Genera el certificado al instante, sin que secretaría intervenga: usa el mismo motor del M26 (plantilla vigente, consecutivo sin
- * huecos, QR y huella), con el acudiente como solicitante. Solo vale para los tipos que el ADMIN marcó de autoservicio.
+ * huecos y huella), con el acudiente como solicitante. Solo vale para los tipos que el ADMIN marcó de autoservicio.
  */
 export async function generarCertificadoDelHijo(usuario: UserDocument, studentId: string, entrada: EntradaCertificadoDelHijo, ip?: string | null) {
   const { guardian, estudiante } = await exigirAcudienteDe(usuario, studentId);

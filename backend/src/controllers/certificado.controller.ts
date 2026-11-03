@@ -19,7 +19,7 @@ interface IdParams extends ParamsDictionary {
 
 const ok = (res: Response, data: unknown, status = 200) => res.status(status).json({ success: true, data });
 
-/** El QR apunta al sitio público: la variable PUBLIC_URL si existe; si no, el host con el que llegó la petición (detrás de nginx). */
+/** La dirección de verificación impresa en el documento apunta al sitio público: la variable PUBLIC_URL si existe; si no, el host con el que llegó la petición (detrás de nginx). */
 const urlBase = (req: Request): string => env.urlPublica || `${req.protocol}://${req.get('host')}`;
 
 export const obtenerConfiguracion = catchAsync(async (req, res) => ok(res, await configuracionService.vistaConfiguracion(req.user!)));
@@ -86,8 +86,8 @@ export const revocar = catchAsync(async (req, res) => {
 });
 
 // Público, sin sesión.
-export const verificarPublico = catchAsync<unknown, unknown, unknown, ParsedQs & { token?: string; codigo?: string; clave?: string }>(async (req, res) =>
-  ok(res, await verificacionService.verificarCertificado({ token: req.query.token, codigo: req.query.codigo, clave: req.query.clave }))
+export const verificarPublico = catchAsync<unknown, unknown, unknown, ParsedQs & { codigo?: string; clave?: string }>(async (req, res) =>
+  ok(res, await verificacionService.verificarCertificado({ codigo: req.query.codigo, clave: req.query.clave }))
 );
 
 // Tipos de documento: los gestionan Secretaría y el ADMIN; el servicio aplica la regla fina por estado.

@@ -137,7 +137,7 @@ router.use('/orientacion', orientacionRoutes);
 // M16: Inclusión (PIAR, plan de apoyo pedagógico y sus documentos)
 router.use('/inclusion', inclusionRoutes);
 
-// M26: Secretaría académica — certificados y constancias con QR y huella de integridad
+// M26: Secretaría académica — certificados y constancias con huella de integridad
 router.use('/certificados', certificadoRoutes);
 
 // Prompt 3: Actividades, Calificaciones, Asistencia y Motor de Boletines

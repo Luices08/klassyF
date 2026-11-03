@@ -1,12 +1,11 @@
 import PDFDocument from 'pdfkit';
-import QRCode from 'qrcode';
 import { ClaveCertificado } from '../constants/certificados';
 import { ContenidoPlantilla, DISENO_INICIAL, DisenoPlantilla, FuenteDiseno, TamanoDiseno } from '../constants/plantillasCertificado';
 import AuditLog from '../models/auditLog.model';
 import { UserDocument } from '../models/user.model';
 import ApiError from '../utils/ApiError';
 import { redactarCertificado, nombreDeJornada } from '../utils/certificadoTexto';
-import { BloqueResuelto, ImagenGuardada, SnapshotCertificado, TablaValoraciones, claveCorta } from '../utils/certificados';
+import { BloqueResuelto, ImagenGuardada, SnapshotCertificado, TablaValoraciones } from '../utils/certificados';
 import { leerImagenGuardada } from '../utils/almacenImagenes';
 import { registrarEvento } from './audit.service';
 import { cargarCertificado, huellaActual, prepararVistaPrevia, EntradaExpedicion } from './certificado.service';
@@ -18,14 +17,9 @@ import { CertificadoEmitidoDocument } from '../models/certificadoEmitido.model';
 
 type Documento = InstanceType<typeof PDFDocument>;
 
-/** Lo que el PDF necesita además del snapshot. Sin `codigo` es una vista previa: no tiene QR, huella ni validez. */
+/** Lo que el PDF necesita además del snapshot. Sin `codigo` es una vista previa: no tiene consecutivo ni validez. */
 interface DatosSeguridad {
   codigo: string | null;
-  hash?: string;
-  /** URL que va dentro del QR (lleva el token opaco). */
-  urlVerificacion?: string;
-  /** Dirección para verificar con código y clave, sin QR. */
-  urlManual?: string;
   expedidoPor?: string | null;
   anulado?: boolean;
 }
@@ -131,7 +125,6 @@ async function dibujar(snapshot: SnapshotCertificado, seguridad: DatosSeguridad)
     leerImagen(snapshot.firmas.secretaria.imagen, 'Secretaría Académica'),
     leerImagen(snapshot.firmas.sello.imagen, 'sello institucional'),
   ]);
-  const qr = seguridad.urlVerificacion ? await QRCode.toBuffer(seguridad.urlVerificacion, { errorCorrectionLevel: 'M', margin: 1, width: 300 }) : null;
   const titulo = snapshot.contenido?.titulo ?? (await nombresDeTipos([snapshot.tipo])).get(snapshot.tipo) ?? snapshot.tipo;
 
   return new Promise<Buffer>((resolve, reject) => {
@@ -195,19 +188,16 @@ async function dibujar(snapshot: SnapshotCertificado, seguridad: DatosSeguridad)
         }
       }
 
-      // Verificación: el QR solo lleva un token opaco; los datos no viajan en él.
       const yBloque = Math.max(doc.y + 30, yFirma + 60);
       doc.moveTo(MARGEN, yBloque).lineTo(doc.page.width - MARGEN, yBloque).strokeColor(COLOR.borde).lineWidth(0.7).stroke();
-      const xTexto = qr ? MARGEN + 86 : MARGEN;
-      if (qr) doc.image(qr, MARGEN, yBloque + 8, { fit: [76, 76] });
-      doc.font('Helvetica-Bold').fontSize(8.5).fillColor(COLOR.ink).text('Verifique la autenticidad de este documento', xTexto, yBloque + 10, { width: doc.page.width - MARGEN - xTexto });
-      doc.font('Helvetica').fontSize(8).fillColor(COLOR.cuerpo);
-      if (seguridad.codigo && seguridad.hash && seguridad.urlManual) {
-        doc.text(`Escanee el código QR, o ingrese a ${seguridad.urlManual} e indique el código ${seguridad.codigo} y la clave ${claveCorta(seguridad.hash)}.`, xTexto, doc.y + 2, { width: doc.page.width - MARGEN - xTexto });
-        doc.fillColor(COLOR.tenue).text(`Huella de integridad: ${seguridad.hash.slice(0, 32).toUpperCase()}`, xTexto, doc.y + 4, { width: doc.page.width - MARGEN - xTexto });
-        if (seguridad.expedidoPor) doc.text(`Expedido por ${seguridad.expedidoPor} el ${fechaHora(snapshot.fecha_expedicion)}.`, xTexto, doc.y + 2, { width: doc.page.width - MARGEN - xTexto });
+      const xTexto = MARGEN;
+      // La huella, la clave y la dirección de verificación se calculan y se guardan igual, pero el papel solo lleva el radicado y quién lo expidió.
+      doc.font('Helvetica').fontSize(8);
+      if (seguridad.codigo) {
+        const expedicion = seguridad.expedidoPor ? ` · Expedido por ${seguridad.expedidoPor} el ${fechaHora(snapshot.fecha_expedicion)}` : '';
+        doc.fillColor(COLOR.tenue).text(`${seguridad.codigo}${expedicion}.`, xTexto, yBloque + 10, { width: doc.page.width - MARGEN - xTexto });
       } else {
-        doc.fillColor(COLOR.peligro).text('VISTA PREVIA: este borrador no tiene consecutivo, huella ni código QR y no tiene validez.', xTexto, doc.y + 2, { width: doc.page.width - MARGEN - xTexto });
+        doc.fillColor(COLOR.peligro).text('VISTA PREVIA: este borrador no tiene consecutivo y no tiene validez.', xTexto, yBloque + 10, { width: doc.page.width - MARGEN - xTexto });
       }
 
       if (!seguridad.codigo) marcaDeAgua(doc, 'VISTA PREVIA', COLOR.tenue);
@@ -246,16 +236,13 @@ export async function generarPdfDeCertificado(id: string, urlBase: string, usuar
 }
 
 /** Dibuja un documento ya cargado y autorizado por quien llama (secretaría por sede, o el acudiente de ese estudiante en el portal). */
-export async function dibujarCertificadoEmitido(certificado: CertificadoEmitidoDocument, urlBase: string, usuario: UserDocument, ip?: string | null): Promise<{ buffer: Buffer; nombreArchivo: string }> {
+export async function dibujarCertificadoEmitido(certificado: CertificadoEmitidoDocument, _urlBase: string, usuario: UserDocument, ip?: string | null): Promise<{ buffer: Buffer; nombreArchivo: string }> {
   if (huellaActual(certificado) !== certificado.hash) {
     throw new ApiError(409, 'La huella de este documento no coincide con la sellada al expedirlo: no se puede imprimir. Avisa al administrador.');
   }
   const emisor = await User.findById(certificado.emitido_por).select('nombre apellido');
   const buffer = await dibujar(certificado.snapshot as SnapshotCertificado, {
     codigo: certificado.codigo,
-    hash: certificado.hash,
-    urlVerificacion: `${urlBase}/verificar/${certificado.token_verificacion}`,
-    urlManual: `${urlBase}/verificar`,
     expedidoPor: emisor ? `${emisor.nombre} ${emisor.apellido}` : null,
     anulado: certificado.estado === 'ANULADO',
   });

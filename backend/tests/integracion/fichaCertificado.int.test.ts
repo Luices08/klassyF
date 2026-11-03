@@ -1,6 +1,5 @@
 import fs from 'fs/promises';
 import path from 'path';
-import QRCode from 'qrcode';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import AuditLog from '../../src/models/auditLog.model';
 import Campus from '../../src/models/campus.model';
@@ -18,6 +17,8 @@ import * as verificacion from '../../src/services/certificadoVerificacion.servic
 import { UPLOADS_ROOT } from '../../src/utils/uploadPaths';
 import { detenerBaseDeDatos, iniciarBaseDeDatos, limpiarBaseDeDatos } from './baseDeDatos';
 import { armarEscenario, Escenario } from './escenario';
+import { claveCorta } from '../../src/utils/certificados';
+import { pngDePrueba } from './pngDePrueba';
 
 // `config/env` lee las variables al importarse: se fijan antes que cualquier import.
 vi.hoisted(() => {
@@ -70,7 +71,7 @@ describe('M26: ficha del estudiante, solicitante, EPS y vigencia (con base de da
 
     await configuracion.actualizarConfiguracion({ rectoria: { usuario_id: String(e.admin._id) }, secretaria: { usuario_id: String(e.secretaria._id) } }, e.admin);
     for (const elemento of ['rectoria', 'secretaria', 'sello'] as const) {
-      const png = await QRCode.toBuffer(`imagen-${elemento}`, { margin: 1, width: 200 });
+      const png = pngDePrueba(`imagen-${elemento}`);
       await configuracion.guardarImagen(elemento, { ...imagen(`${elemento}.png`), buffer: png, size: png.length }, e.admin);
     }
   });
@@ -192,13 +193,13 @@ describe('M26: ficha del estudiante, solicitante, EPS y vigencia (con base de da
   describe('la vigencia al verificar', () => {
     it('una constancia con vigencia de 30 días sale válida hasta que se cumple y luego «vigencia cumplida»', async () => {
       const c = await expedir();
-      expect(await verificacion.verificarCertificado({ token: c.token_verificacion })).toMatchObject({ resultado: 'VALIDO', vigencia: { dias: 30 } });
+      expect(await verificacion.verificarCertificado({ codigo: c.codigo, clave: claveCorta(c.hash) })).toMatchObject({ resultado: 'VALIDO', vigencia: { dias: 30 } });
 
       vi.useFakeTimers({ toFake: ['Date'] });
       vi.setSystemTime(Date.now() + 29 * 24 * 60 * 60 * 1000);
-      expect((await verificacion.verificarCertificado({ token: c.token_verificacion })).resultado).toBe('VALIDO');
+      expect((await verificacion.verificarCertificado({ codigo: c.codigo, clave: claveCorta(c.hash) })).resultado).toBe('VALIDO');
       vi.setSystemTime(Date.now() + 3 * 24 * 60 * 60 * 1000);
-      const vencida = await verificacion.verificarCertificado({ token: c.token_verificacion });
+      const vencida = await verificacion.verificarCertificado({ codigo: c.codigo, clave: claveCorta(c.hash) });
       expect(vencida).toMatchObject({ resultado: 'VIGENCIA_CUMPLIDA', codigo: c.codigo });
       expect(vencida.vigencia?.hasta).toBeTruthy();
     });
@@ -207,12 +208,12 @@ describe('M26: ficha del estudiante, solicitante, EPS y vigencia (con base de da
       const sinVigencia = await expedir({ tipo: 'CERTIFICADO_MATRICULA' });
       vi.useFakeTimers({ toFake: ['Date'] });
       vi.setSystemTime(Date.now() + 400 * 24 * 60 * 60 * 1000);
-      expect((await verificacion.verificarCertificado({ token: sinVigencia.token_verificacion })).resultado).toBe('VALIDO');
+      expect((await verificacion.verificarCertificado({ codigo: sinVigencia.codigo, clave: claveCorta(sinVigencia.hash) })).resultado).toBe('VALIDO');
       vi.useRealTimers();
 
       const c = await expedir();
       await certificados.anularCertificado(String(c._id), 'Se expidió por error', e.admin);
-      expect((await verificacion.verificarCertificado({ token: c.token_verificacion })).resultado).toBe('ANULADO');
+      expect((await verificacion.verificarCertificado({ codigo: c.codigo, clave: claveCorta(c.hash) })).resultado).toBe('ANULADO');
     });
   });
 });

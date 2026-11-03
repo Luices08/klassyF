@@ -31,6 +31,7 @@
     "migrate:retirar-banco-curricular": "tsx scripts/migrateRetirarBancoCurricular.ts",
     "migrate:lideres-de-area": "tsx scripts/migrateLideresDeArea.ts",
     "migrate:anio-repetible": "tsx scripts/migrateAnioRepetible.ts",
+    "migrate:retirar-qr-certificados": "tsx scripts/migrateRetirarQrCertificados.ts",
     "migrate:retirar-campos-convivencia": "tsx scripts/migrateRetirarCamposConvivencia.ts",
     "reset-admin-password": "tsx scripts/resetAdminPassword.ts",
     "matricular:estudiantes": "tsx scripts/matricularEstudiantes.ts",
@@ -59,7 +60,6 @@
     "multer": "^2.4.0",
     "nodemailer": "^6.10.1",
     "pdfkit": "^0.20.2",
-    "qrcode": "^1.5.4",
     "sanitize-html": "^2.18.1"
   },
   "devDependencies": {
@@ -72,7 +72,6 @@
     "@types/node": "^22.20.2",
     "@types/nodemailer": "^6.4.24",
     "@types/pdfkit": "^0.17.6",
-    "@types/qrcode": "^1.5.6",
     "@types/sanitize-html": "^2.16.2",
     "mongodb-memory-server": "^11.3.0",
     "oxlint": "^1.86.0",

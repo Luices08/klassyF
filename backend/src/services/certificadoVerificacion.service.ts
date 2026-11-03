@@ -5,7 +5,6 @@ import { huellaActual } from './certificado.service';
 import { nombresDeTipos } from './tipoCertificado.service';
 
 export interface ConsultaVerificacion {
-  token?: string;
   codigo?: string;
   clave?: string;
 }
@@ -14,11 +13,6 @@ export interface ConsultaVerificacion {
 const noEncontrado = () => new ApiError(404, 'No encontramos un documento con esos datos.');
 
 async function buscar(consulta: ConsultaVerificacion): Promise<CertificadoEmitidoDocument> {
-  if (consulta.token) {
-    const porToken = await CertificadoEmitido.findOne({ token_verificacion: consulta.token });
-    if (!porToken) throw noEncontrado();
-    return porToken;
-  }
   if (consulta.codigo && consulta.clave) {
     const porCodigo = await CertificadoEmitido.findOne({ codigo: consulta.codigo.trim().toUpperCase() });
     if (!porCodigo || !compararClave(claveCorta(porCodigo.hash), consulta.clave)) throw noEncontrado();

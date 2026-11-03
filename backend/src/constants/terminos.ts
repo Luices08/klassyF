@@ -92,7 +92,7 @@ const GENERAL: DocumentoTerminos = {
     {
       titulo: '8. Documentos expedidos por la plataforma',
       parrafos: [
-        'Los certificados y constancias llevan un código y un mecanismo de verificación (código QR y clave) que permite confirmar su autenticidad en la propia plataforma. Esto no constituye una firma digital certificada en los términos de la Ley 527 de 1999.',
+        'Los certificados y constancias llevan un código y un mecanismo de verificación (código y clave) que permite confirmar su autenticidad en la propia plataforma. Esto no constituye una firma digital certificada en los términos de la Ley 527 de 1999.',
       ],
     },
     {

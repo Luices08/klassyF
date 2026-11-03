@@ -1,4 +1,4 @@
-import { createHmac, randomBytes } from 'crypto';
+import { createHmac } from 'crypto';
 import {
   CLAVE_DESTINATARIO_OTRO,
   ClaveCertificado,
@@ -159,10 +159,7 @@ export function huellaDeCertificado(clave: string, contenido: { tipo: ClaveCerti
   return createHmac('sha256', clave).update(serializacionEstable({ tipo: contenido.tipo, codigo: contenido.codigo, snapshot: contenido.snapshot })).digest('hex');
 }
 
-/** Token opaco del QR (128 bits): no se deduce del consecutivo, así los certificados no se pueden enumerar. */
-export const generarTokenVerificacion = (): string => randomBytes(16).toString('base64url');
-
-/** La clave corta que se imprime en el pie y que acompaña al código para verificar sin QR. */
+/** La clave corta que se imprime en el pie y que acompaña al código para verificar el documento. */
 export const claveCorta = (huella: string): string => huella.slice(0, 12).toUpperCase();
 
 export const compararClave = (a: string, b: string): boolean => a.trim().toUpperCase() === b.trim().toUpperCase();

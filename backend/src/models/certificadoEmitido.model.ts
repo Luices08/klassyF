@@ -3,8 +3,8 @@ import { ClaveCertificado, ESTADOS_CERTIFICADO, EstadoCertificado, MAX_MOTIVO_AN
 
 /**
  * Un certificado o constancia expedido (M26). El contenido se CONGELA en `snapshot` y el PDF se dibuja solo desde él, así
- * una reimpresión es el mismo documento con el mismo código. `hash` es el HMAC del contenido; `token_verificacion` es lo
- * único que va dentro del QR. Nada se borra: un documento mal expedido se anula con motivo.
+ * una reimpresión es el mismo documento con el mismo código. `hash` es el HMAC del contenido.
+ * Nada se borra: un documento mal expedido se anula con motivo.
  */
 /** A quién se entregó el documento. Se guarda al expedir y no se edita; no se imprime en el documento. */
 export interface SolicitanteCertificado {
@@ -29,7 +29,6 @@ export interface ICertificadoEmitido {
   academic_year_id: Types.ObjectId;
   snapshot: unknown;
   hash: string;
-  token_verificacion: string;
   estado: EstadoCertificado;
   anulacion: { por: Types.ObjectId; fecha: Date; motivo: string } | null;
   emitido_por: Types.ObjectId;
@@ -56,7 +55,6 @@ const certificadoSchema = new Schema<ICertificadoEmitido, CertificadoEmitidoMode
     academic_year_id: { type: Schema.Types.ObjectId, ref: 'AcademicYear', required: true },
     snapshot: { type: Schema.Types.Mixed, required: true },
     hash: { type: String, required: true },
-    token_verificacion: { type: String, required: true },
     estado: { type: String, enum: ESTADOS_CERTIFICADO, default: 'VIGENTE' },
     anulacion: {
       type: new Schema(
@@ -90,7 +88,7 @@ const certificadoSchema = new Schema<ICertificadoEmitido, CertificadoEmitidoMode
 );
 
 // Lo expedido es inmutable en el modelo (no solo en el servicio): únicamente cambian el estado y la anulación.
-const CAMPOS_INMUTABLES = ['tipo', 'codigo', 'consecutivo', 'anio_emision', 'student_id', 'sede_id', 'enrollment_id', 'academic_year_id', 'snapshot', 'hash', 'token_verificacion', 'emitido_por', 'fecha_emision', 'solicitante'];
+const CAMPOS_INMUTABLES = ['tipo', 'codigo', 'consecutivo', 'anio_emision', 'student_id', 'sede_id', 'enrollment_id', 'academic_year_id', 'snapshot', 'hash', 'emitido_por', 'fecha_emision', 'solicitante'];
 certificadoSchema.pre('save', function protegerCertificado(next) {
   if (!this.isNew) {
     if (CAMPOS_INMUTABLES.some((campo) => this.isModified(campo))) return next(new Error('Un certificado expedido no se puede modificar: se anula y se expide uno nuevo.'));
@@ -100,7 +98,6 @@ certificadoSchema.pre('save', function protegerCertificado(next) {
 });
 
 certificadoSchema.index({ codigo: 1 }, { unique: true });
-certificadoSchema.index({ token_verificacion: 1 }, { unique: true });
 certificadoSchema.index({ student_id: 1, fecha_emision: -1 });
 certificadoSchema.index({ sede_id: 1, fecha_emision: -1 });
 certificadoSchema.index({ tipo: 1, anio_emision: 1, consecutivo: 1 }, { unique: true });

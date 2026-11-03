@@ -13,7 +13,7 @@ interface HijoParams extends ParamsDictionary {
   studentId: string;
 }
 
-/** El QR del certificado apunta al sitio público: PUBLIC_URL si existe; si no, el host con el que llegó la petición. */
+/** La dirección de verificación impresa en el certificado apunta al sitio público: PUBLIC_URL si existe; si no, el host con el que llegó la petición. */
 const urlBase = (req: Request): string => env.urlPublica || `${req.protocol}://${req.get('host')}`;
 
 export const listarHijos = catchAsync(async (req, res) => {

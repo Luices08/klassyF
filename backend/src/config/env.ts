@@ -13,7 +13,7 @@ export interface Env {
   asistenteModelo: string;
   /** M26: secreto de la huella (HMAC) de los certificados. Vacío en producción = no se expide ni se verifica nada. */
   certificadosSecret: string;
-  /** M26: URL pública del sitio, para el QR de los certificados. Vacía = se toma del host de la petición. */
+  /** URL pública del sitio, para la dirección de verificación de los certificados y los enlaces de los correos. Vacía = se toma del host de la petición. */
   urlPublica: string;
   /** Salida de correo (SMTP). Sin `host` o sin `remitente` el servidor no envía correos: las citaciones se crean igual y se avisa. */
   correo: { host: string; puerto: number; seguro: boolean; usuario: string; clave: string; remitente: string };

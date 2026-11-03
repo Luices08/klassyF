@@ -40,7 +40,7 @@ export const TAMANOS_DISENO = ['PEQUENO', 'NORMAL', 'GRANDE'] as const;
 export type TamanoDiseno = (typeof TAMANOS_DISENO)[number];
 
 /**
- * Cómo se ve el texto del documento. Solo el cuerpo: el encabezado institucional, la tabla de valoraciones, las firmas y el QR los pone el
+ * Cómo se ve el texto del documento. Solo el cuerpo: el encabezado institucional, la tabla de valoraciones, las firmas y la verificación los pone el
  * sistema y no cambian. `null` (o ausente) es el diseño de siempre. Va dentro de la versión de la plantilla y se congela en el documento
  * al expedirlo, así una reimpresión sale idéntica aunque después se cambie.
  */

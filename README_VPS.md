@@ -33,7 +33,27 @@ Lo mínimo que debe tener:
 | `MONGO_DB` | `klassy` (la base de trabajo) |
 | `PUERTO_WEB` | `80`, o el puerto que se use |
 | `SEED_ADMIN_*` | Datos del primer administrador (se inicia sesión con `SEED_ADMIN_NUMERO_DOCUMENTO`) |
-| `PUBLIC_URL`, `DOMINIO` | Opcionales: la dirección pública y el dominio para HTTPS |
+| `PUBLIC_URL`, `DOMINIO` | La dirección pública (ej. `https://colegio.edu.co`) y el dominio para HTTPS. **Sin `PUBLIC_URL` no sale ningún correo** |
+| `SMTP_*`, `CORREO_REMITENTE` | Correo de citaciones (ver «Correo saliente» abajo) |
+
+### Correo saliente (citaciones a acudientes)
+
+Ya vienen los valores de Gmail con `institucion.klassy@gmail.com`; solo falta `SMTP_PASS`, que es una **contraseña de aplicación** de esa
+misma cuenta (https://myaccount.google.com/apppasswords, con la verificación en 2 pasos activa): 16 letras, sin espacios ni comillas.
+Después de cambiar el `.env`:
+
+```bash
+docker compose up -d backend                    # el backend solo lee el .env al arrancar
+docker compose logs backend | grep correo       # debe decir «[correo] Envío activo por smtp.gmail.com:587 …»
+docker compose build herramientas               # una vez, para que tenga el script de prueba
+docker compose run --rm herramientas npm run probar:correo -- --para=su-correo@gmail.com
+```
+
+| Error de la prueba | Causa |
+|---|---|
+| `535 Username and Password not accepted` | La contraseña no es de aplicación o se creó en otra cuenta de Google |
+| `ETIMEDOUT` / `ECONNREFUSED` | El proveedor del VPS bloquea el puerto 587 de salida: pedir que lo abran, probar `SMTP_PORT=465` con `SMTP_SECURE=true`, o usar Brevo/SendGrid |
+| `falta PUBLIC_URL` | Llenar `PUBLIC_URL` con la dirección pública del sitio |
 
 ## Paso 2. Construir y levantar el sistema
 

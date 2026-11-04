@@ -51,3 +51,8 @@ export async function enviarCorreo(mensaje: MensajeCorreo): Promise<void> {
   if (!correoConfigurado()) throw new Error(motivoCorreoNoConfigurado() ?? 'Correo no configurado.');
   await obtenerTransporte().sendMail({ from: env.correo.remitente, to: mensaje.para, subject: mensaje.asunto, text: mensaje.texto, html: mensaje.html });
 }
+
+/** Comprueba conexión y autenticación con el SMTP sin enviar nada (lo usa `npm run probar:correo`). */
+export async function verificarCorreo(): Promise<void> {
+  await obtenerTransporte().verify();
+}

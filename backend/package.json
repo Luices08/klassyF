@@ -17,6 +17,7 @@
     "predictivo:modelo-demo": "tsx scripts/predictivo/generarModeloDemostracion.ts",
     "migrate:roles-multiples": "tsx scripts/migrateRolesMultiples.ts",
     "notificar:diario": "tsx scripts/notificarDiario.ts",
+    "probar:correo": "tsx scripts/probarCorreo.ts",
     "storage:purge-periodo": "tsx scripts/purgarAlmacenamientoPeriodo.ts",
     "migrate:superadmin-to-admin": "tsx scripts/migrateSuperadminToAdmin.ts",
     "sembrar:tipos-titulacion": "tsx scripts/sembrarTiposTitulacion.ts",

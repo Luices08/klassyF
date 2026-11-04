@@ -3,7 +3,8 @@ import { CORREOS_EN_PARALELO, CORREOS_POR_TANDA, MINUTOS_RESERVA_CORREO, SEGUNDO
 import CorreoEnCola, { CorreoEnColaDocument } from '../models/correoEnCola.model';
 import { estadoTrasFallo, proximoIntento } from '../utils/citaciones';
 import { armarMensajeDeCitacion } from './citacionCorreo.service';
-import { correoConfigurado, enviarCorreo } from './correo.service';
+import { env } from '../config/env';
+import { correoConfigurado, enviarCorreo, motivoCorreoNoConfigurado } from './correo.service';
 
 /**
  * Cola de correo en segundo plano. Quien convoca solo escribe filas (`encolarCorreo`, milisegundos aunque sean 40 acudientes); un
@@ -107,6 +108,9 @@ export async function procesarCola(opciones: { ahora?: Date; limite?: number; pa
 /** Arranca el envío en segundo plano: una pasada cada pocos segundos y otra cada vez que se encola algo. */
 export function iniciarColaCorreo(): void {
   colaActiva = true;
+  // En producción conviene verlo en `docker compose logs backend`: una variable vacía apaga el correo sin ningún otro síntoma.
+  if (correoConfigurado()) console.log(`[correo] Envío activo por ${env.correo.host}:${env.correo.puerto} como ${env.correo.remitente}`);
+  else console.warn(`[correo] ${motivoCorreoNoConfigurado()} Las citaciones se crean, pero no se envían correos.`);
   const pasada = (): void => {
     procesarCola().catch((err) => console.error('[correo] Error procesando la cola:', err));
   };

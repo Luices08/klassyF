@@ -9,7 +9,7 @@ import { ESTADOS_CORREO, EstadoCorreo, TIPOS_CORREO, TipoCorreo } from '../const
  */
 export interface ICorreoEnCola {
   tipo: TipoCorreo;
-  /** Entidad que origina el correo (hoy el `CitacionDestinatario`). */
+  /** Entidad que origina el correo: el `CitacionDestinatario` en una citación, la `AdmissionRequest` en un aviso de admisión. */
   referencia_id: Types.ObjectId;
   para: string;
   estado: EstadoCorreo;

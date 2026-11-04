@@ -45,3 +45,7 @@ backend/exportacion-sim/
 
 # Documento de funciones esenciales generado localmente (mapa del código), no se sube
 doc/Funciones_Esenciales_Klassy.docx
+
+# Diagramas generados localmente
+doc/Klassy_Diagrama_Entidad_Relacion.drawio
+doc/Klassy_Diagrama_Flujo_Datos.drawio

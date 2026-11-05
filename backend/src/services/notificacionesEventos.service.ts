@@ -13,7 +13,7 @@ import User from '../models/user.model';
 import { finDelDia, inicioDelDia } from '../utils/calendarioAcademico';
 import { ESTADO_ACTIVO } from '../utils/filtroEstado';
 import { acudientesConPortalDe, usuariosConRol } from './destinatariosNotificacion.service';
-import { avisar, sumarInsignia } from './notificaciones.service';
+import { avisar, sumarInsignia, type AvisarInput } from './notificaciones.service';
 
 type Id = Types.ObjectId | string;
 
@@ -419,6 +419,34 @@ export function avisarCitacionRespondida(citacion: { _id: Id; titulo: string; co
   });
 }
 
+/** «5/11/2026 a las 10:00 (Sala de juntas)»: la fecha de una sesión se guarda a medianoche UTC, por eso se escribe en UTC (en hora local saldría el día anterior). */
+function cuandoDeSesion(sesion: { fecha: Date; hora?: string | null; lugar?: string | null }): string {
+  return `${new Date(sesion.fecha).toLocaleDateString('es-CO', { timeZone: 'UTC' })}${sesion.hora ? ` a las ${sesion.hora}` : ''}${sesion.lugar ? ` (${sesion.lugar})` : ''}`;
+}
+
+/**
+ * La campanita es por perfil: una persona con varios perfiles recibe el aviso en cada uno desde el que puede ser parte de la sesión
+ * (un estudiante nunca integra un comité). `armar` decide la ruta según el perfil, porque no todos pueden abrir la misma pantalla.
+ */
+async function avisarAIntegrantes(
+  userIds: Id[],
+  permitidos: readonly Rol[],
+  armar: (rol: Rol) => Omit<AvisarInput, 'destinatarios' | 'rol'> & { insigniaEn?: string }
+): Promise<void> {
+  if (userIds.length === 0) return;
+  const usuarios = await User.find({ _id: { $in: userIds }, estado: ESTADO_ACTIVO }).select('_id roles').lean();
+  for (const u of usuarios) {
+    for (const rol of (u.roles ?? []).filter((r) => permitidos.includes(r))) {
+      const { insigniaEn, ...aviso } = armar(rol);
+      await avisar({ ...aviso, destinatarios: [u._id], rol });
+      if (insigniaEn) await sumarInsignia({ destinatarios: [u._id], rol, ruta: insigniaEn });
+    }
+  }
+}
+
+/** Quién puede abrir `/comision`: el servidor solo le muestra a cada integrante sus sesiones (ver `listarSesiones`). */
+const ROLES_DE_COMISION: readonly Rol[] = [ROLES.ADMIN, ROLES.COORDINADOR, ROLES.COORDINADOR_CONVIVENCIA, ROLES.ORIENTADOR, ROLES.DOCENTE, ROLES.ACUDIENTE];
+
 /** M20: sesión de comisión o consejo convocada → los integrantes con cuenta reciben la alerta en la campanita. */
 export function avisarSesionConvocada(sesion: {
   _id: Id;
@@ -429,26 +457,52 @@ export function avisarSesionConvocada(sesion: {
   miembros: Array<{ user_id?: Id | null }>;
 }): Promise<void> {
   return sinRomper('sesion convocada', async () => {
-    const userIds = sesion.miembros.map((m) => m.user_id).filter((u): u is Id => Boolean(u));
-    if (userIds.length === 0) return;
-    const usuarios = await User.find({ _id: { $in: userIds } }).select('_id roles').lean();
     const nombresInstancia: Record<string, string> = {
       COMISION_EVALUACION: 'Comisión de Evaluación y Promoción',
       CONSEJO_ACADEMICO: 'Consejo Académico',
       CONSEJO_DIRECTIVO: 'Consejo Directivo',
     };
-    const cuando = `${new Date(sesion.fecha).toLocaleDateString('es-CO')}${sesion.hora ? ` a las ${sesion.hora}` : ''}${sesion.lugar ? ` (${sesion.lugar})` : ''}`;
-    for (const u of usuarios) {
-      const rol = u.roles?.[0] ?? ROLES.DOCENTE;
-      await avisar({
-        destinatarios: [u._id],
-        rol,
+    const cuando = cuandoDeSesion(sesion);
+    await avisarAIntegrantes(
+      sesion.miembros.map((m) => m.user_id).filter((u): u is Id => Boolean(u)),
+      ROLES_DE_COMISION,
+      () => ({
         evento: 'SESION_COMISION_CONVOCADA',
         entidad_id: String(sesion._id),
         datos: { nombre: nombresInstancia[sesion.instancia] ?? 'Comisión', cuando },
-        ruta: '/admin/comision',
-      });
-      await sumarInsignia({ destinatarios: [u._id], rol, ruta: '/admin/comision', pestana: 'sesiones' });
-    }
+        // Es la ruta real de la pantalla (`/comision`): el punto del menú se apaga al entrar.
+        ruta: '/comision',
+        insigniaEn: '/comision',
+      })
+    );
+  });
+}
+
+/** Quién puede abrir `/convivencia/comite` (el resto de los miembros no tiene esa pantalla: el aviso les llega completo y sin enlace). */
+const ROLES_QUE_GESTIONAN_EL_COMITE: readonly Rol[] = [ROLES.ADMIN, ROLES.COORDINADOR_CONVIVENCIA];
+
+/**
+ * M15: sesión del comité de convivencia convocada, reprogramada o anulada → los miembros que son usuarios del sistema lo ven en su campanita, con la fecha, hora y
+ * lugar escritos en el propio aviso. Los miembros externos (personero, representante de padres) no tienen cuenta: a ellos los cita quien convoca por el medio que
+ * dejó anotado en la sesión. Quien convoca no se avisa a sí mismo.
+ */
+export function avisarSesionDelComite(
+  sesion: { _id: Id; tipo: string; fecha: Date; hora?: string | null; lugar?: string | null },
+  usuariosIds: Id[],
+  cambio?: 'CAMBIADA' | 'ANULADA'
+): Promise<void> {
+  return sinRomper('sesion del comite de convivencia', async () => {
+    const cuando = cuandoDeSesion(sesion);
+    const nombre = `${sesion.tipo === 'EXTRAORDINARIA' ? 'extraordinaria' : 'ordinaria'} del Comité de Convivencia`;
+    await avisarAIntegrantes(
+      usuariosIds,
+      Object.values(ROLES).filter((r) => r !== ROLES.ESTUDIANTE),
+      (rol) => ({
+        evento: 'SESION_COMITE_CONVOCADA',
+        entidad_id: String(sesion._id),
+        datos: { nombre, cuando, ...(cambio ? { cambio } : {}) },
+        ruta: ROLES_QUE_GESTIONAN_EL_COMITE.includes(rol) ? '/convivencia/comite' : null,
+      })
+    );
   });
 }

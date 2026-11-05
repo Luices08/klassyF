@@ -25,6 +25,7 @@ import User from '../models/user.model';
 import ApiError from '../utils/ApiError';
 import { MENSAJE_NOMBRE_INCOMPLETO, resolverNombre } from '../utils/nombres';
 import { concederRolAcudiente } from '../utils/concederRolAcudiente';
+import { ENCABEZADOS_PLANTILLA_ESTUDIANTES } from '../constants/importacionEstudiantes';
 import { leerCsv } from '../utils/csv';
 import { ocultarSaludAdministrativa } from '../utils/datosSensibles';
 
@@ -55,6 +56,14 @@ export async function listarEstudiantes(filter: ListarEstudiantesFilter, rolSoli
   if (filter.search) {
     const regex = new RegExp(escapeRegex(filter.search), 'i');
     matchUser.$or = [{ nombre: regex }, { apellido: regex }, { numero_documento: regex }, { email: regex }];
+    // También se encuentra al estudiante por el documento o el nombre de su acudiente: es la forma de ubicar a una familia con la cédula de la madre o el padre.
+    if (filter.search.trim().length >= 3) {
+      const acudientes = await Guardian.find({ $or: [{ nombre: regex }, { apellido: regex }, { numero_documento: regex }] }).select('_id').limit(200).lean();
+      if (acudientes.length > 0) {
+        const vinculos = await StudentGuardian.find({ guardian_id: { $in: acudientes.map((a) => a._id) } }).select('student_id').lean();
+        if (vinculos.length > 0) (matchUser.$or as Array<Record<string, unknown>>).push({ _id: { $in: vinculos.map((v) => v.student_id) } });
+      }
+    }
   }
 
   const pipeline: PipelineStage[] = [
@@ -104,7 +113,7 @@ export async function listarEstudiantes(filter: ListarEstudiantesFilter, rolSoli
   const ids = data.map((d) => d._id);
   const principales = await StudentGuardian.find({ student_id: { $in: ids }, es_principal: true }).populate(
     'guardian_id',
-    'nombre apellido telefono_principal email'
+    'nombre apellido tipo_documento numero_documento telefono_principal email'
   );
   const principalPorEstudiante = new Map(principales.map((p) => [String(p.student_id), p.guardian_id]));
 
@@ -173,6 +182,15 @@ function parsearFechaNacimiento(valor: string): Date {
   }
   if (fecha.getTime() > Date.now()) throw new ApiError(400, `fecha_nacimiento "${valor}" no puede ser futura.`);
   return fecha;
+}
+
+/** CSV con solo el encabezado: UTF-8 con BOM y punto y coma, así lo abre Excel en español sin dañar tildes ni la ñ. */
+export function generarPlantillaEstudiantesCsv() {
+  return {
+    buffer: Buffer.from(`﻿${ENCABEZADOS_PLANTILLA_ESTUDIANTES.join(';')}\r\n`, 'utf8'),
+    nombreArchivo: 'plantilla-estudiantes.csv',
+    contentType: 'text/csv; charset=utf-8',
+  };
 }
 
 const COLUMNAS_ACUDIENTE = [

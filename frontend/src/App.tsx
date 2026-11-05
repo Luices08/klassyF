@@ -66,6 +66,7 @@ import { MiHorarioPage } from './pages/MiHorarioPage';
 import { InstitutionSetupPage } from './pages/admin/InstitutionSetupPage';
 import { SitioPublicoPage } from './pages/admin/SitioPublicoPage';
 import { SedesPage } from './pages/admin/SedesPage';
+import { ImportarAcudientesPage } from './pages/admin/ImportarAcudientesPage';
 import { StudentDetailPage } from './pages/admin/StudentDetailPage';
 import { StudentsPage } from './pages/admin/StudentsPage';
 import { StudyPlanPage } from './pages/admin/StudyPlanPage';
@@ -116,6 +117,11 @@ export default function App() {
             <Route path="/admin/students" element={<StudentsPage />} />
             <Route path="/admin/students/:id" element={<StudentDetailPage />} />
             <Route path="/admin/admisiones" element={<AdmissionRequestsPage />} />
+          </Route>
+
+          {/* Importar acudientes en bloque: la hacen ADMIN y secretaría (el servidor lo vuelve a comprobar). */}
+          <Route element={<ProtectedRoute allowedRoles={['ADMIN', 'SECRETARIA']} />}>
+            <Route path="/admin/students/importar-acudientes" element={<ImportarAcudientesPage />} />
           </Route>
 
           {/* El docente entra a la ruta: el servidor dice si la institución lo habilitó (Configuración institucional). */}

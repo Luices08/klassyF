@@ -21,6 +21,8 @@ router.get('/estudiantes/:studentId/ficha', validate(v.ficha), c.fichaDeEstudian
 
 // Sesiones: gestionan ADMIN/COORDINADOR (el Consejo Directivo, solo ADMIN: lo comprueba el servicio); los integrantes leen y firman las suyas.
 router.get('/sesiones', validate(v.listarSesiones), c.listarSesiones);
+// Consulta del propio usuario (¿integra alguna sesión?): la usa el menú para mostrar u ocultar la pantalla.
+router.get('/mi-participacion', c.miParticipacion);
 router.post('/sesiones', gestion, validate(v.crearSesion), c.crearSesion);
 router.get('/sesiones/:id', validate(v.idSesion), c.obtenerSesion);
 router.patch('/sesiones/:id', gestion, validate(v.actualizarSesion), c.actualizarSesion);

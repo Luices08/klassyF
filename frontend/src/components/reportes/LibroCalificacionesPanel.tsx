@@ -9,6 +9,7 @@ import { Drawer } from '../ui/Drawer';
 import { Textarea } from '../ui/Field';
 import { EmptyRow, Table, TableBody, TableHead, Td, Th } from '../ui/Table';
 import { FiltrosAlcance, useFiltrosAlcance } from './FiltrosAlcance';
+import { type SolicitudDeVista, VistaPreviaReporte } from './VistaPreviaReporte';
 
 const fecha = (iso: string) => new Date(iso).toLocaleDateString('es-CO', { day: 'numeric', month: 'short', year: 'numeric' });
 
@@ -25,6 +26,7 @@ export function LibroCalificacionesPanel({ anioPorDefecto }: { anioPorDefecto?: 
   const descargar = useDescargarLibro();
   const verificar = useVerificarLibro();
   const [aAnular, setAAnular] = useState<LibroCalificaciones | null>(null);
+  const [vista, setVista] = useState<SolicitudDeVista | null>(null);
   const [motivo, setMotivo] = useState('');
   const [integridad, setIntegridad] = useState<{ codigo: string; integro: boolean } | null>(null);
   const puedeEmitir = user?.rol === 'ADMIN' || user?.rol === 'SECRETARIA';
@@ -94,6 +96,12 @@ export function LibroCalificacionesPanel({ anioPorDefecto }: { anioPorDefecto?: 
                 </Td>
                 <Td>
                   <div className="flex flex-wrap gap-2">
+                    <Button
+                      variant="secondary"
+                      onClick={() => setVista({ ruta: `libro-calificaciones/${l._id}/pdf`, consulta: {}, nombreArchivo: `libro-calificaciones-${l.codigo}.pdf`, titulo: `Libro ${l.codigo} · ${l.grado} · ${l.sede}` })}
+                    >
+                      Ver
+                    </Button>
                     <Button variant="outline" onClick={() => descargar.mutate({ id: l._id, codigo: l.codigo })} disabled={descargar.isPending}>
                       PDF
                     </Button>
@@ -113,6 +121,8 @@ export function LibroCalificacionesPanel({ anioPorDefecto }: { anioPorDefecto?: 
           </TableBody>
         </Table>
       </Card>
+
+      {vista && <VistaPreviaReporte vista={vista} onCerrar={() => setVista(null)} />}
 
       {aAnular && (
         <Drawer

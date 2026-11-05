@@ -1,3 +1,4 @@
+import { NIVELES_VALORACION, NivelValoracion } from '../constants/valoracionDescriptiva';
 import { contarReprobadas } from './recuperaciones';
 
 export interface AsignaturaSabana {
@@ -12,6 +13,8 @@ export interface NotaSabana {
   exenta: boolean;
   /** La nota ya incluye una recuperación. */
   recuperada: boolean;
+  /** Solo en los grupos de Preescolar (sin notas): el nivel de la valoración descriptiva. Ausente = no es un grupo descriptivo. */
+  valoracion?: NivelValoracion | null;
 }
 
 export interface EstudianteSabanaEntrada {
@@ -39,12 +42,16 @@ export interface ResumenAsignatura {
   aprobaron: number;
   reprobaron: number;
   sin_nota: number;
+  /** Solo en los grupos descriptivos: cuántos estudiantes hay en cada nivel (no hay promedio ni aprobados). */
+  niveles?: Record<NivelValoracion, number>;
 }
 
 export interface Sabana {
   asignaturas: AsignaturaSabana[];
   filas: FilaSabana[];
   resumen: ResumenAsignatura[];
+  /** Preescolar no tiene notas ni promedios (Decreto 2247 de 1997): las celdas son niveles de valoración descriptiva. Ausente = grupo con notas. */
+  descriptiva?: boolean;
 }
 
 const redondear = (n: number, decimales: number): number => {
@@ -84,19 +91,39 @@ export function armarSabana(params: {
   notaAprobatoria: number;
   decimales: number;
   mostrarPuesto: boolean;
+  /** Grupo de Preescolar: las celdas son valoraciones descriptivas; no hay promedio, puesto ni asignaturas perdidas. */
+  descriptiva?: boolean;
 }): Sabana {
   const { asignaturas, notaAprobatoria, decimales } = params;
+  const descriptiva = Boolean(params.descriptiva);
   const ordenados = [...params.estudiantes].sort((a, b) => comparar(a.apellidos, b.apellidos) || comparar(a.nombres, b.nombres));
 
   const filas: FilaSabana[] = ordenados.map((e) => {
     const celdas = asignaturas.map((a) => e.notas[a.subject_id] ?? { nota: null, exenta: false, recuperada: false });
     return {
       ...e,
+      promedio: descriptiva ? null : e.promedio,
       puesto: null,
-      reprobadas: contarReprobadas(celdas.map((c) => ({ nota: c.nota, exenta: c.exenta })), notaAprobatoria),
-      sin_nota: celdas.filter((c) => !c.exenta && c.nota === null).length,
+      reprobadas: descriptiva ? 0 : contarReprobadas(celdas.map((c) => ({ nota: c.nota, exenta: c.exenta })), notaAprobatoria),
+      // En Preescolar lo que falta es la valoración, no una nota.
+      sin_nota: celdas.filter((c) => !c.exenta && (descriptiva ? !c.valoracion : c.nota === null)).length,
     };
   });
+
+  if (descriptiva) {
+    const resumen: ResumenAsignatura[] = asignaturas.map((a) => {
+      const niveles = Object.fromEntries(NIVELES_VALORACION.map((n) => [n, 0])) as Record<NivelValoracion, number>;
+      let sinValoracion = 0;
+      for (const f of filas) {
+        const celda = f.notas[a.subject_id];
+        if (celda?.exenta) continue;
+        if (celda?.valoracion) niveles[celda.valoracion] += 1;
+        else sinValoracion += 1;
+      }
+      return { subject_id: a.subject_id, promedio: null, aprobaron: 0, reprobaron: 0, sin_nota: sinValoracion, niveles };
+    });
+    return { asignaturas, filas, resumen, descriptiva: true };
+  }
 
   if (params.mostrarPuesto) {
     const puestos = calcularPuestos(filas.map((f) => ({ id: f.student_id, promedio: f.promedio, completo: f.sin_nota === 0 })));

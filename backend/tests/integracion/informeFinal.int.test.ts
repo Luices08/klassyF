@@ -3,6 +3,9 @@ import { PERIODO_INFORME_FINAL } from '../../src/constants/boletin';
 import CalificacionAsignatura from '../../src/models/calificacionAsignatura.model';
 import Campus from '../../src/models/campus.model';
 import Enrollment from '../../src/models/enrollment.model';
+import Grade from '../../src/models/grade.model';
+import Group from '../../src/models/group.model';
+import ValoracionDescriptiva from '../../src/models/valoracionDescriptiva.model';
 import { informeFinalParaFamilia, informeFinalParaPersonal } from '../../src/services/informeFinal.service';
 import { generarPdfInformeFinal } from '../../src/services/informeFinalPdf.service';
 import { cerrarGrupo } from '../../src/services/evaluacionPromocion.service';
@@ -83,6 +86,43 @@ describe('Informe final del año', () => {
     const { buffer, nombreArchivo } = await generarPdfInformeFinal(filtros(), e.admin);
     expect(buffer.subarray(0, 4).toString()).toBe('%PDF');
     expect(nombreArchivo).toMatch(/^informe_final_.*\.pdf$/);
+  });
+
+  it('Preescolar: el informe trae la valoración descriptiva de cada periodo y no calcula promedio ni puesto', async () => {
+    const grupo = (await Group.findById(n.grupoId))!;
+    await Grade.updateOne({ _id: grupo.grade_id }, { nivel: 'PREESCOLAR' });
+    await CalificacionAsignatura.deleteMany({});
+    const valorar = (estudiante: unknown, periodo: number, nivel: 'INICIADO' | 'EN_PROCESO' | 'ALCANZADO') =>
+      ValoracionDescriptiva.create({
+        academic_year_id: n.anioId,
+        teacher_assignment_id: n.asignacion._id,
+        student_id: estudiante,
+        periodo_numero: periodo,
+        nivel,
+        fortalezas: 'Participa con entusiasmo en clase',
+        recomendaciones: 'Practicar el conteo en casa',
+        registrado_por: e.docenteDeClase._id,
+      });
+    await valorar(e.estudiante._id, 1, 'INICIADO');
+    await valorar(e.estudiante._id, 2, 'EN_PROCESO');
+
+    const r = await informeFinalParaPersonal(filtros(), e.admin);
+    const con = r.estudiantes.find((s) => s.student_id === String(e.estudiante._id))!;
+    const sin = r.estudiantes.find((s) => s.student_id === String(e.tercerEstudiante._id))!;
+    const asignatura = con.areas.flatMap((a) => a.asignaturas)[0]!;
+    expect(con.descriptivo).toBe(true);
+    expect(asignatura.periodos.map((p) => p.valoracion)).toEqual(['INICIADO', 'EN_PROCESO', null, null]);
+    expect(asignatura.periodos.every((p) => p.nota === null)).toBe(true);
+    expect(asignatura.nivel_descriptivo).toBe('EN_PROCESO');
+    expect(asignatura.nota_final).toBeNull();
+    expect(con.promedio_general).toBeNull();
+    expect(con.puesto).toBeNull();
+    expect(con.completo).toBe(true);
+    // Quien aún no tiene ninguna valoración queda con el informe parcial, y Preescolar igual se promueve.
+    expect(sin.completo).toBe(false);
+    expect(con.promocion.codigo).toBe('PROMOVIDO');
+    const { buffer } = await generarPdfInformeFinal(filtros(), e.admin);
+    expect(buffer.subarray(0, 4).toString()).toBe('%PDF');
   });
 
   it('un docente no lo descarga; secretaría solo de sus sedes', async () => {

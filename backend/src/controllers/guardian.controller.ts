@@ -7,7 +7,7 @@ import catchAsync from '../utils/catchAsync';
 
 function contexto(req: Request<any, any, any, any>) {
   if (!req.user) throw new ApiError(401, 'Usuario no autenticado.');
-  return { usuarioId: req.user._id, ip: req.ip ?? null };
+  return { usuarioId: req.user._id, ip: req.ip ?? null, roles: req.user.roles };
 }
 
 interface ListarQuery {
@@ -77,7 +77,13 @@ interface GuardianParams extends ParamsDictionary {
   id: string;
 }
 
+export const estudiantesDeAcudiente = catchAsync<GuardianParams>(async (req, res) => {
+  res.status(200).json({ success: true, data: await guardianService.estudiantesDeAcudiente(req.params.id) });
+});
+
 interface ActualizarAcudienteBody {
+  tipo_documento?: TipoDocumento;
+  numero_documento?: string;
   nombre?: string;
   apellido?: string;
   telefono_principal?: string;

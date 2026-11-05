@@ -1,6 +1,7 @@
 import { Types } from 'mongoose';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import AuditLog from '../../src/models/auditLog.model';
+import Notificacion from '../../src/models/notificacion.model';
 import { MiembroComite, SesionComite } from '../../src/models/comiteConvivencia.model';
 import { User } from '../../src/models/user.model';
 import { generarPdfActa } from '../../src/services/actaComitePdf.service';
@@ -280,6 +281,61 @@ describe('M15 comité y actas (con base de datos)', () => {
       expect((await comite.listarSesiones(e.coordConvivencia)).periodicidad.vencida).toBe(true);
       await SesionComite.collection.updateOne({ _id: deHoy._id }, { $set: { estado: 'FIRMADA' } });
       expect((await comite.listarSesiones(e.coordConvivencia)).periodicidad.vencida).toBe(false);
+    });
+  });
+
+  describe('aviso a los miembros con cuenta (campanita)', () => {
+    const avisos = () => Notificacion.find({ evento: 'SESION_COMITE_CONVOCADA' }).lean();
+
+    // Un docente designado en el comité: tiene cuenta pero no la pantalla de gestión, así que el aviso debe traer todo lo que necesita saber.
+    const agregarDocente = async () => comite.crearMiembro({ cargo: 'Representante de los docentes', usuario_id: String(e.docenteDeClase._id) }, e.admin);
+
+    it('convocar avisa a cada miembro con cuenta, con fecha, hora y lugar, y no a quien convoca ni a los externos', async () => {
+      await agregarDocente();
+      const sesion = await crear(enDias(10));
+
+      const lista = await avisos();
+      expect(lista.map((n) => String(n.usuario_id)).sort()).toEqual([String(e.admin._id), String(e.docenteDeClase._id)].sort());
+      const docente = lista.find((n) => String(n.usuario_id) === String(e.docenteDeClase._id))!;
+      expect(docente).toMatchObject({ rol: 'DOCENTE', entidad_id: String(sesion._id), ruta: null, leida: false });
+      expect(docente.datos).toMatchObject({ nombre: 'ordinaria del Comité de Convivencia' });
+      expect(docente.datos.cuando).toMatch(/08:30.*Sala de juntas/);
+      // Quien sí tiene la pantalla de gestión llega a ella desde el aviso.
+      expect(lista.find((n) => String(n.usuario_id) === String(e.admin._id))).toMatchObject({ ruta: '/convivencia/comite' });
+    });
+
+    it('la fecha del aviso es la de la sesión, no el día anterior por la hora local del servidor', async () => {
+      await agregarDocente();
+      const fecha = enDias(10);
+      await crear(fecha);
+      const [anio, mes, dia] = fecha.split('-').map(Number);
+      const docente = (await avisos()).find((n) => String(n.usuario_id) === String(e.docenteDeClase._id))!;
+      expect(docente.datos.cuando).toContain(`${dia}/${mes}/${anio}`);
+    });
+
+    it('cambiar la fecha o el lugar vuelve a avisar; marcar asistencia o escribir el desarrollo no', async () => {
+      await agregarDocente();
+      const sesion = await crear(enDias(10));
+      const id = String(sesion._id);
+
+      await comite.actualizarSesion(id, { asistencia: asistencia([0, 1]), desarrollo: 'Notas de la reunión.' }, e.coordConvivencia);
+      expect((await avisos()).every((n) => n.contador === 1 && !n.datos.cambio)).toBe(true);
+
+      await comite.actualizarSesion(id, { lugar: 'Biblioteca' }, e.coordConvivencia);
+      const docente = (await avisos()).find((n) => String(n.usuario_id) === String(e.docenteDeClase._id))!;
+      expect(docente.datos).toMatchObject({ cambio: 'CAMBIADA' });
+      expect(docente.datos.cuando).toContain('Biblioteca');
+    });
+
+    it('anular la sesión avisa; una sesión cuya fecha ya pasó (un acta de algo que ocurrió) no convoca a nadie', async () => {
+      await agregarDocente();
+      const sesion = await crear(enDias(10));
+      await comite.anularSesion(String(sesion._id), 'Se pasa a la otra semana.', e.coordConvivencia);
+      expect((await avisos()).find((n) => String(n.usuario_id) === String(e.docenteDeClase._id))!.datos).toMatchObject({ cambio: 'ANULADA' });
+
+      await Notificacion.deleteMany({});
+      await crear(enDias(-3));
+      expect(await avisos()).toHaveLength(0);
     });
   });
 

@@ -73,6 +73,15 @@ export async function listarSesiones(filtros: { academic_year_id?: string; insta
   return SesionComision.find(consulta).sort({ fecha: -1, createdAt: -1 }).select('-miembros.firma -casos -compromisos -desarrollo -conclusiones -orden_del_dia');
 }
 
+/**
+ * ¿Esta persona integra alguna sesión (no anulada)? Es lo que decide si le sirve ver «Comisión de evaluación» en el menú: rectoría y coordinación siempre la ven (la
+ * gestionan); los demás perfiles solo si los designaron en una sesión, porque el servidor no les muestra otra cosa.
+ */
+export async function participaEnSesiones(usuario: UserDocument): Promise<{ integra: boolean }> {
+  const integra = await SesionComision.exists({ 'miembros.user_id': usuario._id, estado: { $ne: 'ANULADA' } });
+  return { integra: Boolean(integra) };
+}
+
 export async function obtenerSesion(id: string, usuario: UserDocument) {
   return cargarVisible(id, usuario);
 }

@@ -5,7 +5,8 @@ import { MenuIcon, XIcon } from '../ui/icons';
 import { useAuth } from '../../context/AuthContext';
 import { useInstitution } from '../../hooks/useInstitution';
 import { ForcedPasswordChangeGate } from './ForcedPasswordChangeGate';
-import { NAV_ITEMS } from './navigation';
+import { useIntegraComision } from '../../hooks/useComision';
+import { NAV_ITEMS, PERFILES_CON_COMISION_POR_DESIGNACION, esVisibleParaRol } from './navigation';
 import { BotonNoticias } from '../noticias/BotonNoticias';
 import { Campanita } from '../notificaciones/Campanita';
 import { MenuDeUsuario } from './MenuDeUsuario';
@@ -19,6 +20,8 @@ export function AppShell() {
   const { user } = useAuth();
   const { data: institucion } = useInstitution();
   const { data: resumen } = useResumenNotificaciones();
+  // Solo los perfiles a los que la comisión les llega «por designación» preguntan si integran alguna sesión; mientras responde, la entrada no se muestra.
+  const { data: participacion } = useIntegraComision(Boolean(user && PERFILES_CON_COMISION_POR_DESIGNACION.includes(user.rol)));
   const marcarVisto = useMarcarVisto();
   const { pathname } = useLocation();
   const zonaContenido = useRef<HTMLElement>(null);
@@ -54,9 +57,7 @@ export function AppShell() {
 
 
   const esVirtual = institucion?.modalidad === 'VIRTUAL';
-  const items = NAV_ITEMS.filter(
-    (item) => (!item.roles || item.roles.includes(user.rol)) && !(item.soloPresencial && esVirtual)
-  );
+  const items = NAV_ITEMS.filter((item) => esVisibleParaRol(item, user.rol, participacion?.integra ?? false) && !(item.soloPresencial && esVirtual));
 
   const hayNovedadesEnMenu = items.some((i) => contadorDeRuta(resumen, i.to) > 0);
 

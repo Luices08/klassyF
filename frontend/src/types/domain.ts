@@ -773,7 +773,7 @@ export interface StudentGuardianRelation {
 
 export interface StudentDirectoryItem extends User {
   perfil?: StudentProfile;
-  acudiente_principal: { nombre: string; apellido: string; telefono_principal: string; email?: string | null } | null;
+  acudiente_principal: { nombre: string; apellido: string; tipo_documento?: TipoDocumento; numero_documento?: string; telefono_principal: string; email?: string | null } | null;
 }
 
 export interface StudentFicha360 {

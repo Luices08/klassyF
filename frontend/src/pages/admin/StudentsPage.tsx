@@ -16,8 +16,10 @@ import { Spinner } from '../../components/ui/Spinner';
 import { Stepper } from '../../components/ui/Stepper';
 import { EmptyRow, Table, TableBody, TableHead, Td, Th } from '../../components/ui/Table';
 import { EyeIcon, PlusIcon, SearchIcon, UploadIcon } from '../../components/ui/icons';
+import { useAuth } from '../../context/AuthContext';
 import { COLUMNAS_ESTUDIANTES, NOTAS_CSV_ESTUDIANTES } from '../../lib/columnasImportacion';
 import {
+  descargarPlantillaEstudiantes,
   useBulkImportStudents,
   useCrearEstudianteCompleto,
   useStudentsDirectory,
@@ -87,6 +89,7 @@ const FORM_VACIO = {
 
 export function StudentsPage() {
   const navigate = useNavigate();
+  const { user } = useAuth();
 
   const [searchInput, setSearchInput] = useState('');
   const [search, setSearch] = useState('');
@@ -207,6 +210,7 @@ export function StudentsPage() {
 
   const [importarOpen, setImportarOpen] = useState(false);
   const [archivo, setArchivo] = useState<File | null>(null);
+  const [errorPlantilla, setErrorPlantilla] = useState<string | null>(null);
   const bulkImport = useBulkImportStudents();
 
   async function handleImportar(e: FormEvent) {
@@ -230,6 +234,12 @@ export function StudentsPage() {
               <UploadIcon className="h-4 w-4" />
               Carga masiva
             </Button>
+            {(user?.rol === 'ADMIN' || user?.rol === 'SECRETARIA') && (
+              <Button variant="outline" onClick={() => navigate('/admin/students/importar-acudientes')}>
+                <UploadIcon className="h-4 w-4" />
+                Importar acudientes
+              </Button>
+            )}
             <Button onClick={() => setDrawerOpen(true)}>
               <PlusIcon className="h-4 w-4" />
               Nuevo estudiante
@@ -246,7 +256,7 @@ export function StudentsPage() {
               <div className="relative">
                 <Input
                   label="Buscar"
-                  placeholder="Nombre, documento o correo"
+                  placeholder="Estudiante o acudiente: nombre o documento"
                   value={searchInput}
                   onChange={(e) => setSearchInput(e.target.value)}
                   className="w-56 pl-9"
@@ -331,7 +341,16 @@ export function StudentsPage() {
                     <Td>{s.perfil?.eps || '—'}</Td>
                     <Td>
                       {s.acudiente_principal ? (
-                        `${s.acudiente_principal.nombre} ${s.acudiente_principal.apellido}`
+                        <div>
+                          <p>
+                            {s.acudiente_principal.nombre} {s.acudiente_principal.apellido}
+                          </p>
+                          {s.acudiente_principal.numero_documento && (
+                            <p className="text-xs text-muted">
+                              {s.acudiente_principal.tipo_documento} {s.acudiente_principal.numero_documento}
+                            </p>
+                          )}
+                        </div>
                       ) : (
                         <Chip tone="orange">Sin registrar</Chip>
                       )}
@@ -718,6 +737,13 @@ export function StudentsPage() {
       >
         {bulkImport.isError && <Alert tone="error">{errorMessage(bulkImport.error)}</Alert>}
         <GuiaColumnas notas={NOTAS_CSV_ESTUDIANTES} columnas={COLUMNAS_ESTUDIANTES} />
+        <div className="space-y-2">
+          <p className="text-sm text-body">¿No sabes cómo armar el archivo? Descarga la plantilla, ábrela en Excel, diligénciala y guárdala como CSV.</p>
+          <Button type="button" variant="outline" onClick={() => { setErrorPlantilla(null); descargarPlantillaEstudiantes().catch((e) => setErrorPlantilla(errorMessage(e))); }}>
+            Descargar plantilla CSV
+          </Button>
+          {errorPlantilla && <Alert tone="error">{errorPlantilla}</Alert>}
+        </div>
         <Input label="Archivo CSV" type="file" accept=".csv,text/csv" onChange={(e) => setArchivo(e.target.files?.[0] ?? null)} />
         {bulkImport.data && (
           <div className="space-y-2">

@@ -58,6 +58,8 @@ router.get('/casos/:id', validate(v.obtenerCaso), ctrl.obtenerCaso);
 router.post('/casos/:id/estado', validate(v.cambiarEstadoCaso), ctrl.cambiarEstadoCaso);
 router.post('/casos/:id/tipo', validate(v.reclasificarCaso), ctrl.reclasificarCaso);
 router.put('/casos/:id/atencion', validate(v.registrarAtencion), ctrl.registrarAtencion);
+router.post('/casos/:id/protocolo/sincronizar', validate(v.sincronizarProtocolo), ctrl.sincronizarProtocolo);
+router.put('/casos/:id/justificacion-sin-remision', validate(v.justificacionSinRemision), ctrl.registrarJustificacionSinRemision);
 router.patch('/casos/:id/pasos/:pasoId', validate(v.actualizarPaso), ctrl.actualizarPaso);
 router.post('/casos/:id/registros/:coleccion', ctrl.validarRegistroDeCaso, ctrl.agregarRegistroCaso);
 router.put('/casos/:id/decision', validate(v.registrarDecision), ctrl.registrarDecision);

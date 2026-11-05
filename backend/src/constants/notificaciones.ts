@@ -42,6 +42,7 @@ export const EVENTOS_NOTIFICACION = [
   'CITACION_CANCELADA',
   'CITACION_RESPONDIDA',
   'SESION_COMISION_CONVOCADA',
+  'SESION_COMITE_CONVOCADA',
   'NOTICIA_NUEVA',
   'RECUPERACION_FECHAS',
   'RECUPERACION_INICIA',
@@ -79,6 +80,8 @@ export const METADATOS_EVENTO: Record<EventoNotificacion, MetadatoEvento> = {
   CITACION_CANCELADA: { severidad: 'IMPORTANTE', canales: ['CAMPANITA'] },
   CITACION_RESPONDIDA: { severidad: 'INFO', canales: ['CAMPANITA'] },
   SESION_COMISION_CONVOCADA: { severidad: 'IMPORTANTE', canales: ['CAMPANITA'] },
+  // Comité de convivencia (M15): convocatoria, cambio de fecha o anulación de una sesión, para los miembros que son usuarios del sistema.
+  SESION_COMITE_CONVOCADA: { severidad: 'IMPORTANTE', canales: ['CAMPANITA'] },
   // Una noticia o evento nuevo es informativo: no interrumpe como una falta grave.
   NOTICIA_NUEVA: { severidad: 'INFO', canales: ['CAMPANITA'] },
   // M18: lo que se avisa de las recuperaciones. Las fechas son informativas; el inicio, el cierre y el resultado sí piden atención.

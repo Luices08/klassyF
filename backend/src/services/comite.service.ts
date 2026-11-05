@@ -15,6 +15,7 @@ import { fechaDeClase, hoyColombia } from './attendance.service';
 import { registrarEvento } from './audit.service';
 import { cargarCaso } from './caso.service';
 import { obtenerConfiguracion } from './convivenciaCatalogo.service';
+import { avisarSesionDelComite } from './notificacionesEventos.service';
 
 const ROLES_CONVIVENCIA: string[] = [ROLES.ADMIN, ROLES.COORDINADOR_CONVIVENCIA];
 
@@ -126,6 +127,17 @@ export async function eliminarMiembro(id: string, usuario: UserDocument, ip?: st
 
 // --- Sesiones y actas ---
 
+/**
+ * Avisa a los miembros que son usuarios del sistema (los externos, como el personero, no tienen cuenta) y no a quien hizo el cambio. Una sesión cuya fecha ya pasó
+ * (se crea para documentar un acta de algo que ya ocurrió) no convoca a nadie.
+ */
+async function avisarALosMiembros(sesion: SesionComiteDocument, actor: UserDocument, cambio?: 'CAMBIADA' | 'ANULADA'): Promise<void> {
+  if (sesion.fecha < hoyColombia()) return;
+  const miembros = await MiembroComite.find({ _id: { $in: sesion.asistentes.map((a) => a.miembro_id) }, usuario_id: { $ne: null } }).select('usuario_id').lean();
+  const usuarios = miembros.map((m) => m.usuario_id as Types.ObjectId).filter((id) => String(id) !== String(actor._id));
+  await avisarSesionDelComite(sesion, usuarios, cambio);
+}
+
 export async function listarSesiones(usuario: UserDocument, anioId?: string) {
   exigirConvivencia(usuario);
   const anio = await resolverAnio(anioId);
@@ -190,6 +202,7 @@ export async function crearSesion(input: DatosSesion, usuario: UserDocument, ip?
     creado_por: usuario._id,
   });
   await registrarEvento({ usuario_id: usuario._id, accion: 'SESION_COMITE_CREADA', entidad: 'SesionComite', entidad_id: sesion._id, ip });
+  await avisarALosMiembros(sesion, usuario);
   return sesion;
 }
 
@@ -215,6 +228,7 @@ export async function actualizarSesion(id: string, input: ActualizarSesionInput,
   exigirConvivencia(usuario);
   const sesion = await cargarSesion(id);
   exigirBorrador(sesion);
+  const antes = { fecha: sesion.fecha.getTime(), hora: sesion.hora, lugar: sesion.lugar };
 
   if (input.fecha) sesion.fecha = fechaDeClase(input.fecha);
   if (input.convocatoria) {
@@ -264,6 +278,8 @@ export async function actualizarSesion(id: string, input: ActualizarSesionInput,
   recalcularQuorumDeCasos(sesion, configuracion.quorum_porcentaje);
   await sesion.save();
   await registrarEvento({ usuario_id: usuario._id, accion: 'SESION_COMITE_ACTUALIZADA', entidad: 'SesionComite', entidad_id: sesion._id, ip });
+  // Solo lo que cambia la cita (cuándo y dónde) vuelve a avisar: marcar asistencia o escribir el desarrollo no es una reprogramación.
+  if (sesion.fecha.getTime() !== antes.fecha || sesion.hora !== antes.hora || sesion.lugar !== antes.lugar) await avisarALosMiembros(sesion, usuario, 'CAMBIADA');
   return sesion;
 }
 
@@ -371,5 +387,6 @@ export async function anularSesion(id: string, motivo: string, usuario: UserDocu
   sesion.anulacion = { motivo: motivo.trim(), por: usuario._id, fecha: new Date() };
   await sesion.save();
   await registrarEvento({ usuario_id: usuario._id, accion: 'SESION_COMITE_ANULADA', entidad: 'SesionComite', entidad_id: sesion._id, ip });
+  await avisarALosMiembros(sesion, usuario, 'ANULADA');
   return sesion;
 }

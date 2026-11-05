@@ -6,6 +6,7 @@ import { Button } from '../ui/Button';
 import { Card } from '../ui/Card';
 import { Select } from '../ui/Field';
 import { FiltrosAlcance, useFiltrosAlcance } from './FiltrosAlcance';
+import { type SolicitudDeVista, VistaPreviaReporte } from './VistaPreviaReporte';
 
 const PERSONAL_DE_MATRICULAS = ['ADMIN', 'COORDINADOR', 'SECRETARIA'];
 // El balance de inclusión es información de estudiantes con necesidades de apoyo: Secretaría no entra (el servidor lo vuelve a comprobar).
@@ -47,21 +48,24 @@ export function ListadosPanel({ anioPorDefecto }: { anioPorDefecto?: string }) {
   const filtros = useFiltrosAlcance(anioPorDefecto);
   const [elegido, setTipo] = useState<TipoListado | ''>('');
   const exportar = useExportarListado();
+  const [vista, setVista] = useState<SolicitudDeVista | null>(null);
   const listado = disponibles.find((l) => l.clave === elegido) ?? disponibles[0];
 
   if (!listado) return <Alert tone="info">Su perfil no tiene listados de cierre disponibles.</Alert>;
   const tipo = listado.clave;
 
+  const nombreArchivo = [tipo, filtros.anio?.year ?? '', filtros.grupo ? `${typeof filtros.grupo.grade_id === 'object' ? filtros.grupo.grade_id.numero : ''}-${filtros.grupo.nomenclatura}` : 'todos-los-grupos']
+    .filter((x) => x !== '')
+    .join('-');
+
   const descargar = (formato: FormatoListado) => {
     if (!filtros.alcance.academic_year_id) return;
-    exportar.mutate({
-      tipo,
-      formato,
-      filtros: filtros.alcance,
-      nombreArchivo: [tipo, filtros.anio?.year ?? '', filtros.grupo ? `${typeof filtros.grupo.grade_id === 'object' ? filtros.grupo.grade_id.numero : ''}-${filtros.grupo.nomenclatura}` : 'todos-los-grupos']
-        .filter((x) => x !== '')
-        .join('-'),
-    });
+    exportar.mutate({ tipo, formato, filtros: filtros.alcance, nombreArchivo });
+  };
+
+  const verVistaPrevia = () => {
+    if (!filtros.alcance.academic_year_id) return;
+    setVista({ ruta: `${tipo}/pdf`, consulta: { ...filtros.alcance }, nombreArchivo: `${nombreArchivo}.pdf`, titulo: `Vista previa · ${listado.nombre}` });
   };
 
   return (
@@ -86,8 +90,12 @@ export function ListadosPanel({ anioPorDefecto }: { anioPorDefecto?: string }) {
           <Button variant="outline" onClick={() => descargar('pdf')} disabled={!filtros.alcance.academic_year_id || exportar.isPending}>
             Exportar (PDF)
           </Button>
+          <Button variant="secondary" onClick={verVistaPrevia} disabled={!filtros.alcance.academic_year_id}>
+            Vista previa (PDF)
+          </Button>
         </div>
       </Card>
+      {vista && <VistaPreviaReporte vista={vista} onCerrar={() => setVista(null)} />}
       {exportar.isError && <Alert tone="error">{errorMessage(exportar.error)}</Alert>}
       {exportar.isPending && <Alert tone="info">Preparando el archivo…</Alert>}
     </div>

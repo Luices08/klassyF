@@ -3,6 +3,7 @@ import { ROLES } from '../constants/roles';
 import {
   actualizarAcudiente,
   actualizarEstadoAcudiente,
+  estudiantesDeAcudiente,
   listarAcudientes,
 } from '../controllers/guardian.controller';
 import { authenticate, checkRole } from '../middlewares/auth.middleware';
@@ -16,6 +17,8 @@ const STAFF = [ROLES.ADMIN, ROLES.COORDINADOR, ROLES.SECRETARIA];
 router.use(authenticate);
 
 router.get('/', checkRole(...STAFF), validate(guardianValidator.listarAcudientes), listarAcudientes);
+
+router.get('/:id/estudiantes', checkRole(...STAFF), validate(guardianValidator.estudiantesDeAcudiente), estudiantesDeAcudiente);
 
 router.patch('/:id', checkRole(...STAFF), validate(guardianValidator.actualizarAcudiente), actualizarAcudiente);
 

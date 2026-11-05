@@ -125,6 +125,14 @@ export const reclasificarCaso = catchAsync<IdParams, unknown, { tipo_situacion: 
   res.status(200).json({ success: true, data: await casoService.reclasificarCaso(req.params.id, req.body.tipo_situacion, req.body.motivo, req.user!, req.ip) });
 });
 
+export const sincronizarProtocolo = catchAsync<IdParams>(async (req, res) => {
+  res.status(200).json({ success: true, data: await casoService.sincronizarProtocolo(req.params.id, req.user!, req.ip) });
+});
+
+export const registrarJustificacionSinRemision = catchAsync<IdParams, unknown, { justificacion: string }>(async (req, res) => {
+  res.status(200).json({ success: true, data: await casoService.registrarJustificacionSinRemision(req.params.id, req.body.justificacion, req.user!, req.ip) });
+});
+
 export const registrarAtencion = catchAsync<IdParams, unknown, { descripcion: string; hubo_dano?: boolean }>(async (req, res) => {
   res.status(200).json({ success: true, data: await casoService.registrarAtencion(req.params.id, req.body, req.user!, req.ip) });
 });

@@ -22,6 +22,10 @@ export const listarAcudientes: ValidationSchema = {
   }),
 };
 
+export const estudiantesDeAcudiente: ValidationSchema = {
+  params: Joi.object({ id: objectId.required() }),
+};
+
 export const listarAcudientesDeEstudiante: ValidationSchema = {
   params: Joi.object({ userId: objectId.required() }),
 };
@@ -65,6 +69,9 @@ export const desvincularAcudiente: ValidationSchema = {
 export const actualizarAcudiente: ValidationSchema = {
   params: Joi.object({ id: objectId.required() }),
   body: Joi.object({
+    // Corregir el documento lo permite el servicio solo a ADMIN y SECRETARIA (es también el usuario de la cuenta del portal).
+    tipo_documento: Joi.string().valid(...TIPOS_DOCUMENTO),
+    numero_documento: Joi.string().trim().pattern(/^[A-Za-z0-9]{3,20}$/).messages({ 'string.pattern.base': 'El documento solo lleva letras y números (3 a 20), sin puntos ni espacios.' }),
     nombre: Joi.string(),
     apellido: Joi.string(),
     telefono_principal: Joi.string(),

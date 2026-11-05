@@ -14,18 +14,33 @@ export interface FiltrosSabana {
 
 export type FormatoSabana = 'excel' | 'pdf';
 
-/** Los reportes son de acceso autenticado: se bajan con el token y se guardan con el nombre dado. */
-export async function descargarReporte(ruta: string, consulta: Record<string, string | number | undefined>, nombreArchivo: string): Promise<void> {
+export type ConsultaReporte = Record<string, string | number | undefined>;
+
+/** Los reportes son de acceso autenticado: se piden con el token (nunca por URL directa), con solo los filtros que tienen valor. */
+function pedirReporte(ruta: string, consulta: ConsultaReporte) {
   const parametros = new URLSearchParams();
   Object.entries(consulta).forEach(([clave, valor]) => {
     if (valor !== undefined && valor !== '') parametros.set(clave, String(valor));
   });
-  const { url } = await api.downloadBlob(`/reportes/${ruta}?${parametros.toString()}`);
+  return api.downloadBlob(`/reportes/${ruta}?${parametros.toString()}`);
+}
+
+/** Se baja con el token y se guarda con el nombre dado. */
+export async function descargarReporte(ruta: string, consulta: ConsultaReporte, nombreArchivo: string): Promise<void> {
+  const { url } = await pedirReporte(ruta, consulta);
   const enlace = document.createElement('a');
   enlace.href = url;
   enlace.download = nombreArchivo;
   enlace.click();
   URL.revokeObjectURL(url);
+}
+
+/**
+ * El mismo PDF que se descarga, pero como blob URL para verlo en pantalla antes (`VistaPreviaPdf`). Es el mismo cálculo y el mismo archivo: lo que
+ * se ve es lo que se baja. Cada vista queda en la auditoría como una descarga, porque genera el documento completo.
+ */
+export function cargarReporte(ruta: string, consulta: ConsultaReporte) {
+  return pedirReporte(ruta, consulta);
 }
 
 export function useExportarSabana() {

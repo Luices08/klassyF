@@ -435,7 +435,12 @@ function PasoResultado({ lote, alTerminar }: { lote: ImportacionSimat; alTermina
           )}
           {lote.estado === 'APLICADO' && lote.resumen.sin_acudiente > 0 && (
             <Alert tone="warning">
-              Falta crear el acudiente de {lote.resumen.sin_acudiente} estudiantes. Entra a su ficha para registrarlo y, cuando la información esté bien, márcalos como revisados.
+              Falta crear el acudiente de {lote.resumen.sin_acudiente} estudiantes. Puedes cargarlos todos de una vez con la importación de acudientes, o entrar a cada ficha para registrarlo y, cuando la información esté bien, marcarlos como revisados.
+              <div className="mt-2">
+                <Button variant="outline" onClick={() => navigate('/admin/students/importar-acudientes')}>
+                  Importar acudientes
+                </Button>
+              </div>
             </Alert>
           )}
           {errorInforme && <Alert tone="error">{errorInforme}</Alert>}

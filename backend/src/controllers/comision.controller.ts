@@ -29,6 +29,9 @@ export const fichaDeEstudiante = catchAsync<{ studentId: string }, unknown, unkn
 export const listarSesiones = catchAsync<unknown, unknown, unknown, ParsedQs & { academic_year_id?: string; instancia?: InstanciaSesion; estado?: string }>(async (req, res) => {
   res.status(200).json(ok(await sesiones.listarSesiones(req.query, req.user!)));
 });
+export const miParticipacion = catchAsync(async (req, res) => {
+  res.status(200).json(ok(await sesiones.participaEnSesiones(req.user!)));
+});
 export const obtenerSesion = catchAsync<Id>(async (req, res) => {
   res.status(200).json(ok(await sesiones.detalleDeSesion(req.params.id, req.user!)));
 });

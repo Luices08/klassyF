@@ -3,7 +3,9 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import Campus from '../../src/models/campus.model';
 import CalificacionAsignatura from '../../src/models/calificacionAsignatura.model';
 import Enrollment from '../../src/models/enrollment.model';
+import Grade from '../../src/models/grade.model';
 import Group from '../../src/models/group.model';
+import ValoracionDescriptiva from '../../src/models/valoracionDescriptiva.model';
 import { cerrarGrupo } from '../../src/services/evaluacionPromocion.service';
 import { generarSabana } from '../../src/services/sabanaCalificaciones.service';
 import { generarExcelSabana } from '../../src/services/sabanaExcel.service';
@@ -85,6 +87,61 @@ describe('Sábana de calificaciones', () => {
     const mal = r.grupos[0]!.filas.find((f) => f.student_id === String(e.otroEstudiante._id))!;
     expect(mal.notas[n.materiaId]?.nota).toBe(2);
     expect(mal.promocion).toBeNull();
+  });
+
+  it('Preescolar no tiene notas: muestra la valoración descriptiva (la del último periodo valorado), sin promedio, puesto ni asignaturas perdidas', async () => {
+    const grupo = (await Group.findById(n.grupoId))!;
+    await Grade.updateOne({ _id: grupo.grade_id }, { nivel: 'PREESCOLAR' });
+    await CalificacionAsignatura.deleteMany({});
+    const valorar = (estudiante: unknown, periodo: number, nivel: 'INICIADO' | 'EN_PROCESO' | 'ALCANZADO') =>
+      ValoracionDescriptiva.create({
+        academic_year_id: n.anioId,
+        teacher_assignment_id: n.asignacion._id,
+        student_id: estudiante,
+        periodo_numero: periodo,
+        nivel,
+        fortalezas: 'Participa con entusiasmo en clase',
+        recomendaciones: 'Practicar el conteo en casa',
+        registrado_por: e.docenteDeClase._id,
+      });
+    await valorar(e.estudiante._id, 1, 'INICIADO');
+    await valorar(e.estudiante._id, 2, 'EN_PROCESO');
+    await valorar(e.otroEstudiante._id, 1, 'ALCANZADO');
+
+    const r = await generarSabana({ academic_year_id: n.anioId }, e.admin);
+    const g = r.grupos[0]!;
+    const fila = (id: unknown) => g.filas.find((f) => f.student_id === String(id))!;
+    expect(g.descriptiva).toBe(true);
+    expect(r.leyenda).toMatch(/Preescolar no lleva notas/);
+    expect(fila(e.estudiante._id).notas[n.materiaId]).toMatchObject({ nota: null, valoracion: 'EN_PROCESO' });
+    expect(fila(e.otroEstudiante._id).notas[n.materiaId]?.valoracion).toBe('ALCANZADO');
+    expect(fila(e.tercerEstudiante._id).notas[n.materiaId]?.valoracion).toBeNull();
+    for (const f of g.filas) {
+      expect(f.promedio).toBeNull();
+      expect(f.puesto).toBeNull();
+      expect(f.reprobadas).toBe(0);
+    }
+    expect(fila(e.tercerEstudiante._id).sin_nota).toBe(1);
+    // Preescolar no reprueba: aunque no haya una sola nota, la decisión (proyectada) es promovido.
+    expect(fila(e.estudiante._id).promocion?.codigo).toBe('PROMOVIDO');
+    expect(g.resumen[0]?.niveles).toEqual({ INICIADO: 0, EN_PROCESO: 1, ALCANZADO: 1 });
+
+    // Por periodo se ve el nivel de ese periodo, no el último.
+    const p1 = await generarSabana({ academic_year_id: n.anioId, periodo_numero: 1 }, e.admin);
+    expect(p1.grupos[0]!.filas.find((f) => f.student_id === String(e.estudiante._id))!.notas[n.materiaId]?.valoracion).toBe('INICIADO');
+
+    // El Excel no trae la columna de promedio y escribe el nombre del nivel; el PDF es un PDF.
+    const libro = new ExcelJS.Workbook();
+    await libro.xlsx.load((await generarExcelSabana(r)).buffer as unknown as ArrayBuffer);
+    const hoja = libro.worksheets[0]!;
+    const encabezados = (hoja.getRow(5).values as unknown[]).map(String);
+    expect(encabezados).not.toContain('Promedio');
+    expect(encabezados).toContain('Fallas');
+    const celdas: unknown[] = [];
+    hoja.eachRow((f) => f.eachCell((c) => celdas.push(c.value)));
+    expect(celdas).toContain('En proceso');
+    expect(celdas).toContain('Alcanzado');
+    expect((await generarPdfSabana(r)).buffer.subarray(0, 4).toString()).toBe('%PDF');
   });
 
   it('un periodo que el año no tiene se rechaza con 400', async () => {

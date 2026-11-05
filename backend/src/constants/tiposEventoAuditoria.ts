@@ -42,6 +42,7 @@ const FUERA_DEL_HISTORIAL: RegExp[] = [
   /^PREDICTIVO_/,
   // Simular un archivo de SIMAT o descartar la simulación no escribe ningún estudiante ni matrícula: solo la aplicación lo hace.
   /^IMPORTACION_SIMAT_(SIMULADA|DESCARTADA)$/,
+  /^IMPORTACION_ACUDIENTES_(SIMULADA|DESCARTADA)$/,
 ];
 
 const MATRICULACION: RegExp[] = [

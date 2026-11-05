@@ -1,6 +1,7 @@
 import { Types } from 'mongoose';
 import { ESTADOS_MATRICULA_ACTIVOS } from '../constants/enums';
 import { ROLES } from '../constants/roles';
+import { NivelValoracion } from '../constants/valoracionDescriptiva';
 import Enrollment from '../models/enrollment.model';
 import EvaluacionPromocion from '../models/evaluacionPromocionEstudiante.model';
 import Institution from '../models/institution.model';
@@ -8,6 +9,7 @@ import NotaHomologada from '../models/notaHomologada.model';
 import Subject from '../models/subject.model';
 import TeacherAssignment from '../models/teacherAssignment.model';
 import User, { UserDocument } from '../models/user.model';
+import ValoracionDescriptiva from '../models/valoracionDescriptiva.model';
 import ApiError from '../utils/ApiError';
 import { calcularPromedioGeneral } from '../utils/calculoNotas';
 import { escalaEfectiva } from '../utils/escalaEvaluacion';
@@ -26,6 +28,7 @@ import { registrarEvento } from './audit.service';
 import { leerConfiguracionBoletin } from './boletinConfig.service';
 import { asistenciaDeGrupos } from './attendanceStats.service';
 import { cargarAnio } from './configuracionRecuperaciones.service';
+import { idsDeGradosSinReprobacion } from './nivelesSinReprobacion.service';
 import { construirEntradasDeGrupos } from './promocionContexto.service';
 import { datosDePolitica, obtenerPolitica } from './politicaPromocion.service';
 import { cargarContextoNotas, clave } from './recuperacion.service';
@@ -60,6 +63,31 @@ export interface ReporteSabana {
   /** Las columnas de promoción solo existen en el cierre del año. */
   incluye_promocion: boolean;
   grupos: SabanaDeGrupo[];
+}
+
+/**
+ * La valoración descriptiva de cada estudiante en cada asignatura de los grupos de Preescolar: «asignatura|estudiante» → su nivel. Con periodo, el de ese
+ * periodo; sin él, el del último periodo que ya tiene valoración (el cierre del año). Una sola lectura para todos los grupos descriptivos del alcance.
+ */
+async function valoracionesDeGrupos(anioId: Types.ObjectId, asignaciones: Array<{ _id: Types.ObjectId; subject_id: Types.ObjectId }>, periodo: number | undefined): Promise<Map<string, NivelValoracion>> {
+  const resultado = new Map<string, NivelValoracion>();
+  if (asignaciones.length === 0) return resultado;
+  const asignaturaDe = new Map(asignaciones.map((a) => [String(a._id), String(a.subject_id)]));
+  const valoraciones = await ValoracionDescriptiva.find({
+    academic_year_id: anioId,
+    teacher_assignment_id: { $in: asignaciones.map((a) => a._id) },
+    ...(periodo === undefined ? {} : { periodo_numero: periodo }),
+  })
+    .select('teacher_assignment_id student_id periodo_numero nivel')
+    .lean();
+  const periodoPor = new Map<string, number>();
+  for (const v of valoraciones) {
+    const llave = `${asignaturaDe.get(String(v.teacher_assignment_id))}|${String(v.student_id)}`;
+    if ((periodoPor.get(llave) ?? 0) >= v.periodo_numero) continue;
+    periodoPor.set(llave, v.periodo_numero);
+    resultado.set(llave, v.nivel);
+  }
+  return resultado;
 }
 
 /** Los periodos en que cada estudiante está exento de cada asignatura por traslado (M04): «estudiante|asignatura» → periodos. Una exenta no es un cero ni una perdida. */
@@ -136,6 +164,15 @@ export async function generarSabana(filtros: FiltrosSabana, usuario: UserDocumen
   const entradasPorGrupo = esCierreDelAnio ? await construirEntradasDeGrupos(anio, grupos, 'CIERRE', { asistencia }) : null;
   const ctxPeriodo = esCierreDelAnio ? null : await cargarContextoNotas(anio, asignacionesTodas.map((a) => a._id));
 
+  // Preescolar no tiene notas (Decreto 2247/1997): sus grupos se muestran con la valoración descriptiva en vez de celdas vacías.
+  const gradosSinReprobacion = new Set(await idsDeGradosSinReprobacion());
+  const gruposDescriptivos = new Set(grupos.filter((g) => gradosSinReprobacion.has(String(g.grade_id))).map((g) => String(g._id)));
+  const valoracionPor = await valoracionesDeGrupos(
+    anio._id,
+    asignacionesTodas.filter((a) => gruposDescriptivos.has(String(a.group_id))).map((a) => ({ _id: a._id, subject_id: a.subject_id as Types.ObjectId })),
+    periodo
+  );
+
   for (const grupo of grupos) {
     const grupoId = String(grupo._id);
     const estudiantesIds = (matriculasPorGrupo.get(grupoId) ?? []).map((m) => String(m.student_id));
@@ -208,7 +245,17 @@ export async function generarSabana(filtros: FiltrosSabana, usuario: UserDocumen
       }
     }
 
-    const sabana = armarSabana({ asignaturas, estudiantes, notaAprobatoria: escala.nota_aprobatoria, decimales: escala.precision_decimales, mostrarPuesto: config.mostrar_puesto });
+    const descriptiva = gruposDescriptivos.has(grupoId);
+    if (descriptiva) {
+      for (const e of estudiantes) {
+        e.promedio = null;
+        e.notas = Object.fromEntries(
+          asignaturas.map((a) => [a.subject_id, { nota: null, exenta: false, recuperada: false, valoracion: valoracionPor.get(`${a.subject_id}|${e.student_id}`) ?? null } satisfies NotaSabana])
+        );
+      }
+    }
+
+    const sabana = armarSabana({ asignaturas, estudiantes, notaAprobatoria: escala.nota_aprobatoria, decimales: escala.precision_decimales, mostrarPuesto: config.mostrar_puesto, descriptiva });
     resultado.push({
       grupo: { _id: String(grupo._id), etiqueta: grupo.etiqueta, grado: grupo.grado, nomenclatura: grupo.nomenclatura, sede: grupo.sede, jornada: grupo.jornada },
       ...sabana,
@@ -222,6 +269,7 @@ export async function generarSabana(filtros: FiltrosSabana, usuario: UserDocumen
       : estado === 'DEFINITIVO'
         ? 'Definitiva: todos los estudiantes tienen el cierre de promoción del año.'
         : 'Preliminar: aún hay estudiantes sin cierre de promoción; la decisión mostrada es una proyección y las notas incluyen las recuperaciones registradas hasta hoy.';
+  const notaPreescolar = gruposDescriptivos.size > 0 ? ` Preescolar no lleva notas ni promedios (Decreto 2247 de 1997): sus grupos muestran el nivel de la valoración descriptiva${periodo === undefined ? ' del último periodo valorado' : ''}.` : '';
 
   await registrarEvento({
     usuario_id: usuario._id,
@@ -238,7 +286,7 @@ export async function generarSabana(filtros: FiltrosSabana, usuario: UserDocumen
     anio: anio.year,
     corte: periodo === undefined ? 'Cierre del año' : `Periodo ${periodo}`,
     estado_datos: estado,
-    leyenda,
+    leyenda: `${leyenda}${notaPreescolar}`,
     nota_aprobatoria: escala.nota_aprobatoria,
     mostrar_puesto: config.mostrar_puesto,
     incluye_promocion: esCierreDelAnio,

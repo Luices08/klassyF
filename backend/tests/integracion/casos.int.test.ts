@@ -380,6 +380,90 @@ describe('M15 casos de convivencia (con base de datos)', () => {
     expect(await AuditLog.countDocuments({ accion: 'CONVIVENCIA_CASO_CONSULTADO' })).toBe(2);
   });
 
+  describe('sincronizar el protocolo en un caso ya abierto', () => {
+    const comoSincronizado = (c: unknown) => c as ReturnType<typeof comoCaso> & { pasos_agregados: number };
+
+    it('un caso abierto antes de configurar su protocolo trae los pasos después, sin tocar los que ya tenía ni duplicarlos', async () => {
+      const caso = await abrir(e.coordConvivencia, 'III');
+      expect(caso.pasos).toEqual([]);
+      // Sin protocolo configurado no hay nada que traer, y se dice por qué.
+      await expect(casos.sincronizarProtocolo(caso._id, e.coordConvivencia)).rejects.toMatchObject({ statusCode: 409, message: expect.stringContaining('no tiene pasos') });
+
+      await catalogosCaso.guardarProtocolo('III', [{ nombre: 'Remitir a la autoridad', obligatorio: true }, { nombre: 'Reportar al SIUCE', obligatorio: false }], actor(e.admin));
+      const primera = comoSincronizado(await casos.sincronizarProtocolo(caso._id, e.coordConvivencia));
+      expect(primera.pasos_agregados).toBe(2);
+      expect(primera.pasos.map((p) => p.nombre)).toEqual(['Remitir a la autoridad', 'Reportar al SIUCE']);
+
+      // Lo ya cumplido se conserva y un paso nuevo del protocolo llega solo él.
+      await casos.actualizarPaso(caso._id, primera.pasos[0]!._id, { estado: 'CUMPLIDO' }, e.coordConvivencia);
+      await catalogosCaso.guardarProtocolo('III', [{ nombre: 'Remitir a la autoridad', obligatorio: true }, { nombre: 'Reportar al SIUCE', obligatorio: false }, { nombre: 'Citar al comité', obligatorio: true }], actor(e.admin));
+      const segunda = comoSincronizado(await casos.sincronizarProtocolo(caso._id, e.coordConvivencia));
+      expect(segunda.pasos_agregados).toBe(1);
+      expect(segunda.pasos.map((p) => [p.nombre, p.estado])).toEqual([['Remitir a la autoridad', 'CUMPLIDO'], ['Reportar al SIUCE', 'PENDIENTE'], ['Citar al comité', 'PENDIENTE']]);
+
+      expect(comoSincronizado(await casos.sincronizarProtocolo(caso._id, e.coordConvivencia)).pasos_agregados).toBe(0);
+      expect(await AuditLog.countDocuments({ accion: 'CASO_CONVIVENCIA_ACTUALIZADO', detalle: 'protocolo sincronizado: 2 paso(s)' })).toBe(1);
+    });
+
+    it('solo convivencia de la sede lo hace y un caso cerrado no admite cambios', async () => {
+      const caso = await abrir();
+      await expect(casos.sincronizarProtocolo(caso._id, e.coordConvivenciaOtraSede)).rejects.toMatchObject({ statusCode: 404 });
+      await expect(casos.sincronizarProtocolo(caso._id, e.docenteDeClase)).rejects.toMatchObject({ statusCode: 404 });
+
+      await avanzar(caso._id, 'EN_ATENCION');
+      await casos.actualizarPaso(caso._id, caso.pasos[0]!._id, { estado: 'CUMPLIDO' }, e.coordConvivencia);
+      await casos.cerrarCaso(caso._id, { resultado: 'SOLUCIONADO', motivo: 'Resuelto con diálogo.' }, e.coordConvivencia);
+      await expect(casos.sincronizarProtocolo(caso._id, e.coordConvivencia)).rejects.toMatchObject({ statusCode: 409 });
+    });
+  });
+
+  describe('justificar la falta de remisión de un tipo III antes de cerrarlo', () => {
+    const conPlazoVencido = async (id: string) => CasoConvivencia.collection.updateOne({ _id: new Types.ObjectId(id) }, { $set: { createdAt: new Date(Date.now() - 48 * 3_600_000) } });
+    const alertas = async (id: string) => comoCaso(await casos.obtenerCaso(id, e.coordConvivencia)).alertas.map((a) => a.codigo);
+    const JUSTIFICACION = 'No se configura un presunto delito: fue una pelea entre pares ya resuelta.';
+
+    it('apaga la alerta de remisión pendiente sin cerrar el caso, y retirarla la vuelve a encender', async () => {
+      const caso = await abrir(e.coordConvivencia, 'III');
+      await conPlazoVencido(caso._id);
+      expect(await alertas(caso._id)).toEqual(['REMISION_TIPO_III_PENDIENTE']);
+
+      const con = comoCaso(await casos.registrarJustificacionSinRemision(caso._id, JUSTIFICACION, e.coordConvivencia));
+      expect(con.alertas).toEqual([]);
+      expect(await CasoConvivencia.findById(caso._id)).toMatchObject({ justificacion_sin_remision: JUSTIFICACION, estado: 'ABIERTO' });
+
+      expect(comoCaso(await casos.registrarJustificacionSinRemision(caso._id, '', e.coordConvivencia)).alertas.map((a) => a.codigo)).toEqual(['REMISION_TIPO_III_PENDIENTE']);
+    });
+
+    it('con la justificación ya escrita, el cierre no vuelve a pedirla', async () => {
+      const caso = await abrir(e.coordConvivencia, 'III');
+      await avanzar(caso._id, 'EN_ATENCION');
+      await casos.registrarAtencion(caso._id, { descripcion: 'Atención en enfermería.' }, e.coordConvivencia);
+      await casos.agregarRegistroCaso(caso._id, 'notificaciones', { tipo: 'ACUDIENTES', fecha: hoy(), medio: 'LLAMADA', dirigida_a: 'Madre' }, e.coordConvivencia);
+      await expect(casos.cerrarCaso(caso._id, { resultado: 'SOLUCIONADO', motivo: 'Terminado.' }, e.coordConvivencia)).rejects.toMatchObject({ statusCode: 409, message: expect.stringContaining('remisión') });
+
+      await casos.registrarJustificacionSinRemision(caso._id, JUSTIFICACION, e.coordConvivencia);
+      expect(await casos.cerrarCaso(caso._id, { resultado: 'SOLUCIONADO', motivo: 'Terminado.' }, e.coordConvivencia)).toMatchObject({ estado: 'CERRADO' });
+    });
+
+    it('solo aplica a un tipo III sin remisión, solo lo hace convivencia de la sede y la auditoría no lleva el texto', async () => {
+      const leve = await abrir();
+      await expect(casos.registrarJustificacionSinRemision(leve._id, JUSTIFICACION, e.coordConvivencia)).rejects.toMatchObject({ statusCode: 409 });
+
+      const caso = await abrir(e.coordConvivencia, 'III');
+      await expect(casos.registrarJustificacionSinRemision(caso._id, JUSTIFICACION, e.coordConvivenciaOtraSede)).rejects.toMatchObject({ statusCode: 404 });
+      await expect(casos.registrarJustificacionSinRemision(caso._id, JUSTIFICACION, e.docenteDeClase)).rejects.toMatchObject({ statusCode: 404 });
+
+      await casos.registrarJustificacionSinRemision(caso._id, JUSTIFICACION, e.coordConvivencia);
+      const registros = await AuditLog.find({ accion: 'CASO_CONVIVENCIA_ACTUALIZADO', entidad_id: new Types.ObjectId(caso._id) }).lean();
+      expect(registros.map((r) => r.detalle)).toContain('justificacion_sin_remision');
+      expect(JSON.stringify(registros)).not.toContain('delito');
+
+      // Con una remisión registrada la justificación no tiene sentido.
+      await casos.agregarRegistroCaso(caso._id, 'remisiones', { entidad_id: entidadId, fecha: hoy() }, e.coordConvivencia);
+      await expect(casos.registrarJustificacionSinRemision(caso._id, JUSTIFICACION, e.coordConvivencia)).rejects.toMatchObject({ statusCode: 409, message: expect.stringContaining('ya tiene una remisión') });
+    });
+  });
+
   it('los catálogos del caso no eliminan lo ya usado', async () => {
     const caso = await abrir();
     await avanzar(caso._id, 'EN_ATENCION');

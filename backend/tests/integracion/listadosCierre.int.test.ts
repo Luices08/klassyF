@@ -1,11 +1,15 @@
 import ExcelJS from 'exceljs';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import Attendance from '../../src/models/attendance.model';
+import AttendanceJustification from '../../src/models/attendanceJustification.model';
 import CalificacionAsignatura from '../../src/models/calificacionAsignatura.model';
 import Campus from '../../src/models/campus.model';
 import ConfiguracionRecuperaciones from '../../src/models/configuracionRecuperaciones.model';
 import Enrollment from '../../src/models/enrollment.model';
 import Grade from '../../src/models/grade.model';
 import { RegistroServicioSocial } from '../../src/models/registrosTitulacion.model';
+import { hoyColombia } from '../../src/services/attendance.service';
+import { listarEstados } from '../../src/services/attendanceState.service';
 import { obtenerPoliticaDelAnio } from '../../src/services/configuracionRecuperaciones.service';
 import { reporteRecuperacionFinal, reporteRetirados, reporteServicioSocial } from '../../src/services/listadosCierre.service';
 import { generarExcelTabular } from '../../src/services/reporteTabularExcel.service';
@@ -107,6 +111,47 @@ describe('Listados de cierre (recuperación final y retirados)', () => {
       expect(r.filas[0]).toMatchObject({ documento: e.otroEstudiante.numero_documento, tipo: 'Traslado', motivo: 'Cambio de ciudad', recibe: 'Colegio Nuevo · Cali', justificadas: 0, injustificadas: 0 });
       expect(r.resumen).toContainEqual(['Traslados', 1]);
       expect((await generarPdfTabular(r)).buffer.subarray(0, 4).toString()).toBe('%PDF');
+    });
+
+    it('cuenta las fallas de cada retirado solo hasta su fecha de salida, separando las excusadas', async () => {
+      const dia = (atras: number) => new Date(hoyColombia().getTime() - atras * 86_400_000);
+      const estados = await listarEstados(false);
+      const falla = estados.find((s) => s.cuenta_como_falla && !s.es_justificada)!;
+      const planilla = (fecha: Date, estudiantes: unknown[]) =>
+        Attendance.create({
+          group_id: n.grupoId,
+          subject_id: n.materiaId,
+          academic_year_id: n.anioId,
+          fecha,
+          periodo_numero: 1,
+          registros: estudiantes.map((student_id) => ({ student_id, state_id: falla._id })),
+          registrado_por: e.docenteDeClase._id,
+        });
+      // Ayer y antier faltaron los dos retirados; dentro de dos días (después de la salida de ambos) también, y no debe contar.
+      const antier = await planilla(dia(2), [e.otroEstudiante._id, e.estudiante._id]);
+      await planilla(dia(1), [e.otroEstudiante._id, e.estudiante._id]);
+      await planilla(dia(-2), [e.otroEstudiante._id, e.estudiante._id]);
+      await AttendanceJustification.create({
+        attendance_id: antier._id,
+        registro_id: antier.registros.find((r) => String(r.student_id) === String(e.otroEstudiante._id))!._id,
+        student_id: e.otroEstudiante._id,
+        motivo: 'Cita médica',
+        estado: 'APROBADA',
+        registrado_por: e.admin._id,
+      });
+      e.secretaria.sedes_ids = [(await Campus.findOne({ es_principal: true }))!._id];
+      await e.secretaria.save();
+      await Enrollment.updateMany({ student_id: { $in: [e.otroEstudiante._id, e.estudiante._id] } }, { $set: { fecha_matricula: dia(5) } });
+      // Una sale hoy; el otro, ayer: el corte de cada uno es el suyo.
+      const salida = async (estudiante: unknown, fecha: Date) =>
+        registrarSalida(String((await Enrollment.findOne({ student_id: estudiante }))!._id), { tipo: 'RETIRO', motivo: 'Cambio de ciudad', fecha_efectiva: fecha }, e.secretaria);
+      await salida(e.otroEstudiante._id, dia(0));
+      await salida(e.estudiante._id, dia(1));
+
+      const r = await reporteRetirados(filtros(), e.secretaria);
+      const de = (est: { numero_documento: string }) => r.filas.find((f) => f.documento === est.numero_documento);
+      expect(de(e.otroEstudiante)).toMatchObject({ justificadas: 1, injustificadas: 1 });
+      expect(de(e.estudiante)).toMatchObject({ justificadas: 0, injustificadas: 2 });
     });
 
     it('sin salidas, lo dice', async () => {

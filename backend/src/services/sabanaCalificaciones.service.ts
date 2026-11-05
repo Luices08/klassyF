@@ -24,9 +24,9 @@ import {
 import { gruposDelAlcance } from './alcanceReportes.service';
 import { registrarEvento } from './audit.service';
 import { leerConfiguracionBoletin } from './boletinConfig.service';
-import { calcularEstadisticas } from './attendanceStats.service';
+import { asistenciaDeGrupos } from './attendanceStats.service';
 import { cargarAnio } from './configuracionRecuperaciones.service';
-import { construirEntradasDelGrupo } from './promocionContexto.service';
+import { construirEntradasDeGrupos } from './promocionContexto.service';
 import { datosDePolitica, obtenerPolitica } from './politicaPromocion.service';
 import { cargarContextoNotas, clave } from './recuperacion.service';
 
@@ -79,20 +79,16 @@ function exigirAcceso(usuario: UserDocument): void {
   if (!PUEDEN_CONSULTAR.includes(usuario.rol)) throw new ApiError(403, 'Solo administración, coordinación y secretaría descargan la sábana de calificaciones.');
 }
 
-/** Las asignaturas con docente (CLASE activa) del grupo, con su nombre, en orden alfabético. */
-async function asignaturasDelGrupo(anioId: Types.ObjectId, grupoId: Types.ObjectId) {
-  const asignaciones = await TeacherAssignment.find({ academic_year_id: anioId, group_id: grupoId, tipo_asignacion: 'CLASE', estado: ESTADO_ACTIVO }).select('_id subject_id').lean();
-  const subjects = await Subject.find({ _id: { $in: asignaciones.map((a) => a.subject_id) } }).select('nombre abreviatura').lean();
-  const asignaturas: AsignaturaSabana[] = subjects
-    .map((s) => ({ subject_id: String(s._id), nombre: s.nombre, abreviatura: s.abreviatura }))
-    .sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'));
-  return { asignaciones, asignaturas };
-}
-
-/** Totales de fallas por estudiante en el grupo (todas las fallas, justificadas o no). */
-async function fallasPorEstudiante(anioId: string, grupoId: string, periodo?: number): Promise<Map<string, number>> {
-  const { filas } = await calcularEstadisticas({ academic_year_id: anioId, agrupar_por: 'estudiante', group_id: grupoId, periodo_numero: periodo }, null);
-  return new Map(filas.map((f) => [f.clave, f.fallas]));
+/** Agrupa una lista por la llave de cada elemento (id de grupo, de estudiante…) para no filtrarla entera por cada grupo. */
+export function agruparPor<T>(lista: readonly T[], llave: (x: T) => string): Map<string, T[]> {
+  const mapa = new Map<string, T[]>();
+  for (const x of lista) {
+    const k = llave(x);
+    const actual = mapa.get(k);
+    if (actual) actual.push(x);
+    else mapa.set(k, [x]);
+  }
+  return mapa;
 }
 
 export async function generarSabana(filtros: FiltrosSabana, usuario: UserDocument, ip?: string | null): Promise<ReporteSabana> {
@@ -118,22 +114,45 @@ export async function generarSabana(filtros: FiltrosSabana, usuario: UserDocumen
   let conCierre = 0;
   const resultado: SabanaDeGrupo[] = [];
 
+  // Todo lo que antes se consultaba grupo por grupo se lee una vez para el alcance completo y se reparte con mapas por id: el bucle de abajo
+  // solo calcula en memoria. Con decenas de grupos eso pasa de cientos de consultas a unas pocas.
+  const grupoIds = grupos.map((g) => g._id);
+  const [matriculas, asignacionesTodas, asistencia, cierresTodos] = await Promise.all([
+    Enrollment.find({ group_id: { $in: grupoIds }, academic_year_id: anio._id, estado: { $in: ESTADOS_MATRICULA_ACTIVOS } }).select('student_id group_id').lean(),
+    TeacherAssignment.find({ academic_year_id: anio._id, group_id: { $in: grupoIds }, tipo_asignacion: 'CLASE', estado: ESTADO_ACTIVO }).select('_id subject_id group_id').lean(),
+    // Las fallas de la sábana son todas las del estudiante, justificadas o no: es la suma de su asistencia, la misma que usa el motor de promoción.
+    asistenciaDeGrupos(filtros.academic_year_id, grupoIds.map(String), periodo),
+    esCierreDelAnio ? EvaluacionPromocion.find({ academic_year_id: anio._id, group_id: { $in: grupoIds }, vigente: true }).select('student_id group_id resultado').lean() : Promise.resolve([]),
+  ]);
+  const [usuarios, subjects] = await Promise.all([
+    User.find({ _id: { $in: matriculas.map((m) => m.student_id) } }).select('nombre apellido numero_documento').lean(),
+    Subject.find({ _id: { $in: asignacionesTodas.map((a) => a.subject_id) } }).select('nombre abreviatura').lean(),
+  ]);
+  const usuarioPor = new Map(usuarios.map((u) => [String(u._id), u]));
+  const subjectPor = new Map(subjects.map((s) => [String(s._id), s]));
+  const matriculasPorGrupo = agruparPor(matriculas, (m) => String(m.group_id));
+  const asignacionesPorGrupo = agruparPor(asignacionesTodas, (a) => String(a.group_id));
+  const cierrePor = new Map(cierresTodos.map((c) => [`${String(c.group_id)}|${String(c.student_id)}`, c.resultado]));
+  const entradasPorGrupo = esCierreDelAnio ? await construirEntradasDeGrupos(anio, grupos, 'CIERRE', { asistencia }) : null;
+  const ctxPeriodo = esCierreDelAnio ? null : await cargarContextoNotas(anio, asignacionesTodas.map((a) => a._id));
+
   for (const grupo of grupos) {
-    const matriculas = await Enrollment.find({ group_id: grupo._id, academic_year_id: anio._id, estado: { $in: ESTADOS_MATRICULA_ACTIVOS } }).select('student_id').lean();
-    const estudiantesIds = matriculas.map((m) => String(m.student_id));
-    const [usuarios, { asignaciones, asignaturas }, fallas] = await Promise.all([
-      User.find({ _id: { $in: estudiantesIds } }).select('nombre apellido numero_documento').lean(),
-      asignaturasDelGrupo(anio._id, grupo._id),
-      fallasPorEstudiante(filtros.academic_year_id, String(grupo._id), periodo),
-    ]);
-    const usuarioPor = new Map(usuarios.map((u) => [String(u._id), u]));
+    const grupoId = String(grupo._id);
+    const estudiantesIds = (matriculasPorGrupo.get(grupoId) ?? []).map((m) => String(m.student_id));
+    const asignaciones = asignacionesPorGrupo.get(grupoId) ?? [];
+    // Las asignaturas con docente del grupo, sin repetir, en orden alfabético.
+    const asignaturas: AsignaturaSabana[] = [...new Set(asignaciones.map((a) => String(a.subject_id)))]
+      .map((id) => subjectPor.get(id))
+      .filter((s): s is NonNullable<typeof s> => Boolean(s))
+      .map((s) => ({ subject_id: String(s._id), nombre: s.nombre, abreviatura: s.abreviatura }))
+      .sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'));
     const asignacionDe = new Map(asignaciones.map((a) => [String(a.subject_id), a._id]));
+    const fallasDe = (estudianteId: string): number => asistencia.get(grupoId)?.get(estudianteId)?.global.fallas ?? 0;
 
     const estudiantes: EstudianteSabanaEntrada[] = [];
 
-    if (periodo === undefined) {
-      const entradas = await construirEntradasDelGrupo(anio, grupo, 'CIERRE');
-      const cierres = new Map((await EvaluacionPromocion.find({ academic_year_id: anio._id, group_id: grupo._id, vigente: true }).select('student_id resultado').lean()).map((c) => [String(c.student_id), c.resultado]));
+    if (entradasPorGrupo) {
+      const entradas = entradasPorGrupo.get(grupoId) ?? [];
       for (const e of entradas) {
         const u = usuarioPor.get(e.student_id);
         const notas: Record<string, NotaSabana> = {};
@@ -145,7 +164,7 @@ export async function generarSabana(filtros: FiltrosSabana, usuario: UserDocumen
             recuperada: a.nota_final !== a.nota_antes,
           };
         }
-        const oficial = cierres.get(e.student_id);
+        const oficial = cierrePor.get(`${grupoId}|${e.student_id}`);
         const resultadoPromocion = oficial ?? evaluarPromocion(e.entrada, politica!, 'CIERRE').resultado;
         estudiantesTotal += 1;
         if (oficial) conCierre += 1;
@@ -156,22 +175,23 @@ export async function generarSabana(filtros: FiltrosSabana, usuario: UserDocumen
           apellidos: u?.apellido ?? '',
           notas,
           promedio: calcularPromedioGeneral(e.entrada.areas.map((a) => a.nota_final)),
-          fallas: fallas.get(e.student_id) ?? 0,
+          fallas: fallasDe(e.student_id),
           promocion: { codigo: resultadoPromocion, texto: ETIQUETA_PROMOCION_SABANA[resultadoPromocion] ?? resultadoPromocion, oficial: Boolean(oficial) },
         });
       }
     } else {
-      const ctx = await cargarContextoNotas(anio, asignaciones.map((a) => a._id));
+      const ctx = ctxPeriodo!;
+      const numeroPeriodo = periodo as number;
       for (const id of estudiantesIds) {
         const u = usuarioPor.get(id);
         const notas: Record<string, NotaSabana> = {};
         for (const a of asignaturas) {
           const entrada = ctx.notas.get(clave(asignacionDe.get(a.subject_id), id));
-          const efectiva = entrada?.efectivas.get(periodo) ?? null;
+          const efectiva = entrada?.efectivas.get(numeroPeriodo) ?? null;
           notas[a.subject_id] = {
             nota: efectiva,
-            exenta: entrada?.exentos.has(periodo) ?? false,
-            recuperada: efectiva !== null && entrada?.cerradas.get(periodo) !== undefined && entrada?.cerradas.get(periodo) !== efectiva,
+            exenta: entrada?.exentos.has(numeroPeriodo) ?? false,
+            recuperada: efectiva !== null && entrada?.cerradas.get(numeroPeriodo) !== undefined && entrada?.cerradas.get(numeroPeriodo) !== efectiva,
           };
         }
         estudiantes.push({
@@ -182,7 +202,7 @@ export async function generarSabana(filtros: FiltrosSabana, usuario: UserDocumen
           notas,
           // Promedio simple de las asignaturas cursadas: en un periodo no hay áreas ponderadas que consolidar.
           promedio: calcularPromedioGeneral(Object.values(notas).filter((n) => !n.exenta).map((n) => n.nota)),
-          fallas: fallas.get(id) ?? 0,
+          fallas: fallasDe(id),
           promocion: null,
         });
       }

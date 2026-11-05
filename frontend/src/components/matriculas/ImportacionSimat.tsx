@@ -135,7 +135,7 @@ function FilaDeImportacion({ fila }: { fila: FilaImportacionSimat }) {
       <Td>
         <div className="space-y-1">
           <Chip tone={c.tono}>{c.etiqueta}</Chip>
-          {r && <div>{r.estado === 'CORRECTA' ? <Chip tone="green">{r.matricula === 'CREADA' ? 'Matrícula creada' : r.matricula === 'FORMALIZADA' ? 'Matrícula formalizada' : 'Matrícula vigente'}</Chip> : <Chip tone="red">Falló</Chip>}</div>}
+          {r && <div>{r.estado === 'CORRECTA' ? <Chip tone="green">{r.matricula === 'CREADA' ? 'Matrícula creada' : r.matricula === 'FORMALIZADA' ? 'Matrícula formalizada' : r.matricula === 'RETIRADA' ? 'Matrícula retirada' : 'Matrícula vigente'}</Chip> : <Chip tone="red">Falló</Chip>}</div>}
         </div>
       </Td>
       <Td>
@@ -295,10 +295,11 @@ function PasoRevision({ lote, alContinuar, alSalir }: { lote: ImportacionSimat; 
           <Tarjeta valor={r.por_clasificacion.CONFLICTO ?? 0} etiqueta="Requieren decisión" tono="orange" />
           <Tarjeta valor={r.por_clasificacion.ERROR ?? 0} etiqueta="Con errores" tono="red" />
         </div>
-        <div className="mt-3 grid grid-cols-2 gap-3 md:grid-cols-4">
+        <div className="mt-3 grid grid-cols-2 gap-3 md:grid-cols-5">
           <Tarjeta valor={r.matriculas_por_crear} etiqueta="Matrículas por crear" />
           <Tarjeta valor={r.matriculas_por_formalizar} etiqueta="Pre-matrículas por formalizar" />
           <Tarjeta valor={r.matriculas_confirmadas} etiqueta="Ya matriculados (se confirman)" />
+          <Tarjeta valor={r.matriculas_por_retirar ?? 0} etiqueta="Matrículas por retirar" tono="red" />
           <Tarjeta valor={r.con_cambios} etiqueta="Con datos por actualizar" />
         </div>
         {errorInforme && (

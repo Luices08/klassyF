@@ -29,41 +29,55 @@ async function contarRegistros(
   campos: Record<string, string>,
   filtroRegistro: Record<string, unknown> = {}
 ): Promise<ConteoPorEstado[]> {
-  const filas = await Attendance.aggregate<{
-    _id: { clave: Record<string, unknown>; state_id: Types.ObjectId; justificada: boolean };
-    total: number;
-  }>([
-    { $match: filtroPlanillas },
-    { $unwind: '$registros' },
-    ...(Object.keys(filtroRegistro).length > 0 ? [{ $match: filtroRegistro }] : []),
+  type FilaConteo = { _id: { clave: Record<string, unknown>; state_id: Types.ObjectId }; total: number };
+  const desenrollar = [{ $unwind: '$registros' }, ...(Object.keys(filtroRegistro).length > 0 ? [{ $match: filtroRegistro }] : [])];
+  const agrupar = { $group: { _id: { clave: campos, state_id: '$registros.state_id' }, total: { $sum: 1 } } };
+
+  // Antes cada registro consultaba la colección de excusas (un $lookup por fila: millones de búsquedas). Las excusas aprobadas son pocas,
+  // así que se leen una vez y solo las planillas que las contienen se vuelven a contar para separar las fallas justificadas.
+  const [base, aprobadas] = await Promise.all([
+    Attendance.aggregate<FilaConteo>([{ $match: filtroPlanillas }, ...desenrollar, agrupar]),
+    excusasAprobadasDe(filtroPlanillas),
+  ]);
+  const justificadasPor = new Map<string, number>();
+  if (aprobadas.registros.length > 0) {
+    const justificadas = await Attendance.aggregate<FilaConteo>([
+      { $match: { $and: [filtroPlanillas, { _id: { $in: aprobadas.planillas } }] } },
+      ...desenrollar,
+      { $match: { 'registros._id': { $in: aprobadas.registros } } },
+      agrupar,
+    ]);
+    for (const f of justificadas) justificadasPor.set(claveDeConteo(f._id), f.total);
+  }
+
+  const conteos: ConteoPorEstado[] = [];
+  for (const f of base) {
+    const justificadas = justificadasPor.get(claveDeConteo(f._id)) ?? 0;
+    const comun = { clave: f._id.clave, state_id: String(f._id.state_id) };
+    if (justificadas > 0) conteos.push({ ...comun, justificada: true, total: justificadas });
+    if (f.total - justificadas > 0) conteos.push({ ...comun, justificada: false, total: f.total - justificadas });
+  }
+  return conteos;
+}
+
+const claveDeConteo = (id: { clave: Record<string, unknown>; state_id: Types.ObjectId }): string => `${JSON.stringify(id.clave)}|${String(id.state_id)}`;
+
+/** Los registros con excusa APROBADA que están en las planillas del filtro, y esas planillas (para no recorrer las demás). */
+async function excusasAprobadasDe(filtroPlanillas: Record<string, unknown>): Promise<{ registros: Types.ObjectId[]; planillas: Types.ObjectId[] }> {
+  const filas = await AttendanceJustification.aggregate<{ registro_id: Types.ObjectId; attendance_id: Types.ObjectId }>([
+    { $match: { estado: 'APROBADA' } },
     {
       $lookup: {
-        from: AttendanceJustification.collection.name,
-        let: { registroId: '$registros._id' },
-        pipeline: [
-          { $match: { $expr: { $and: [{ $eq: ['$registro_id', '$$registroId'] }, { $eq: ['$estado', 'APROBADA'] }] } } },
-          { $limit: 1 },
-        ],
-        as: 'aprobada',
+        from: Attendance.collection.name,
+        let: { planilla: '$attendance_id' },
+        pipeline: [{ $match: { $and: [{ $expr: { $eq: ['$_id', '$$planilla'] } }, filtroPlanillas] } }, { $project: { _id: 1 } }],
+        as: 'planilla',
       },
     },
-    {
-      $group: {
-        _id: {
-          clave: campos,
-          state_id: '$registros.state_id',
-          justificada: { $gt: [{ $size: '$aprobada' }, 0] },
-        },
-        total: { $sum: 1 },
-      },
-    },
+    { $match: { 'planilla.0': { $exists: true } } },
+    { $project: { registro_id: 1, attendance_id: 1 } },
   ]);
-  return filas.map((f) => ({
-    clave: f._id.clave,
-    state_id: String(f._id.state_id),
-    justificada: f._id.justificada,
-    total: f.total,
-  }));
+  return { registros: filas.map((f) => f.registro_id), planillas: [...new Set(filas.map((f) => String(f.attendance_id)))].map((id) => new Types.ObjectId(id)) };
 }
 
 export interface TotalesAsistencia {
@@ -276,6 +290,76 @@ export async function estadisticasPorGrupoYAsignatura(
     filas.set(clave, fila);
   }
   return [...filas.values()];
+}
+
+export interface AsistenciaDeEstudiante {
+  /** Todas las asignaturas del grupo juntas. */
+  global: TotalesAsistencia;
+  /** `subject_id` → totales de esa asignatura. */
+  porAsignatura: Map<string, TotalesAsistencia>;
+}
+
+/** `group_id` → `student_id` → su asistencia. Un estudiante sin registros no aparece (se lee como ceros). */
+export type AsistenciaDeGrupos = Map<string, Map<string, AsistenciaDeEstudiante>>;
+
+/**
+ * La asistencia de muchos grupos en UNA sola agregación, ya separada por estudiante y por asignatura. Los reportes de cierre antes pedían una
+ * agregación por grupo más una por cada asignatura de cada grupo, y cada una recorría las mismas planillas; aquí se recorren una vez y los totales
+ * se arman en memoria (el global de un estudiante es la suma de sus asignaturas, igual que antes).
+ */
+export async function asistenciaDeGrupos(academicYearId: string, grupoIds: readonly string[], periodoNumero?: number): Promise<AsistenciaDeGrupos> {
+  const resultado: AsistenciaDeGrupos = new Map();
+  if (grupoIds.length === 0) return resultado;
+  const [conteos, estados] = await Promise.all([
+    contarRegistros(
+      {
+        academic_year_id: new Types.ObjectId(academicYearId),
+        group_id: { $in: grupoIds.map((g) => new Types.ObjectId(g)) },
+        ...(periodoNumero ? { periodo_numero: periodoNumero } : {}),
+      },
+      { grupo: '$group_id', estudiante: '$registros.student_id', asignatura: '$subject_id' }
+    ),
+    mapaDeEstados(),
+  ]);
+  for (const conteo of conteos) {
+    const grupo = String(conteo.clave.grupo);
+    const estudiante = String(conteo.clave.estudiante);
+    const asignatura = String(conteo.clave.asignatura);
+    const delGrupo = resultado.get(grupo) ?? new Map<string, AsistenciaDeEstudiante>();
+    const delEstudiante = delGrupo.get(estudiante) ?? { global: totalesVacios(), porAsignatura: new Map<string, TotalesAsistencia>() };
+    const deLaAsignatura = delEstudiante.porAsignatura.get(asignatura) ?? totalesVacios();
+    acumular(delEstudiante.global, conteo, estados);
+    acumular(deLaAsignatura, conteo, estados);
+    delEstudiante.porAsignatura.set(asignatura, deLaAsignatura);
+    delGrupo.set(estudiante, delEstudiante);
+    resultado.set(grupo, delGrupo);
+  }
+  return resultado;
+}
+
+/**
+ * La asistencia del año de varios estudiantes en UNA agregación, cada uno con su propia fecha de corte (`hasta` inclusive; sin ella cuenta todo el año).
+ * El listado de retirados antes pedía una agregación por estudiante y cada una recorría el año completo de planillas.
+ */
+export async function asistenciaDeEstudiantesHasta(academicYearId: string, cortes: ReadonlyArray<{ student_id: string; hasta?: Date | null }>): Promise<Map<string, TotalesAsistencia>> {
+  const resultado = new Map<string, TotalesAsistencia>();
+  if (cortes.length === 0) return resultado;
+  const ids = cortes.map((c) => new Types.ObjectId(c.student_id));
+  const [conteos, estados] = await Promise.all([
+    contarRegistros(
+      { academic_year_id: new Types.ObjectId(academicYearId), 'registros.student_id': { $in: ids } },
+      { estudiante: '$registros.student_id' },
+      { $or: cortes.map((c) => ({ 'registros.student_id': new Types.ObjectId(c.student_id), ...(c.hasta ? { fecha: { $lte: finDelDia(c.hasta) } } : {}) })) }
+    ),
+    mapaDeEstados(),
+  ]);
+  for (const conteo of conteos) {
+    const estudiante = String(conteo.clave.estudiante);
+    const totales = resultado.get(estudiante) ?? totalesVacios();
+    acumular(totales, conteo, estados);
+    resultado.set(estudiante, totales);
+  }
+  return resultado;
 }
 
 /** Suma varios totales y recalcula el porcentaje con el total, no promediando porcentajes. */

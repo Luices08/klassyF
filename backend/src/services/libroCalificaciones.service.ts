@@ -42,9 +42,10 @@ async function firmantesDelLibro(): Promise<ContenidoLibro['firmantes']> {
     const u = id ? await User.findById(id).select('nombre apellido').lean() : null;
     return u ? `${u.nombre} ${u.apellido}` : '';
   };
+  const [rector, secretaria] = await Promise.all([nombre(config?.rectoria?.usuario_id), nombre(config?.secretaria?.usuario_id)]);
   return [
-    { cargo: config?.rectoria?.cargo || 'Rector(a)', nombre: await nombre(config?.rectoria?.usuario_id) },
-    { cargo: config?.secretaria?.cargo || 'Secretario(a) académico(a)', nombre: await nombre(config?.secretaria?.usuario_id) },
+    { cargo: config?.rectoria?.cargo || 'Rector(a)', nombre: rector },
+    { cargo: config?.secretaria?.cargo || 'Secretario(a) académico(a)', nombre: secretaria },
   ];
 }
 
@@ -63,7 +64,8 @@ export async function emitirLibro(entrada: EntradaLibro, usuario: UserDocument, 
   const vigente = await LibroCalificaciones.findOne({ academic_year_id: anio._id, sede_id: entrada.sede_id, grade_id: entrada.grade_id, estado: 'VIGENTE' }).select('codigo').lean();
   if (vigente) throw new ApiError(409, `Ya hay un libro vigente para ese grado y sede (${vigente.codigo}). Anúlalo con su motivo para emitir otro.`);
 
-  const sabana = await generarSabana({ academic_year_id: entrada.academic_year_id, sede_id: entrada.sede_id, grade_id: entrada.grade_id }, usuario, ip);
+  // Los firmantes no dependen de la sábana: se leen mientras ella se calcula.
+  const [sabana, firmantes] = await Promise.all([generarSabana({ academic_year_id: entrada.academic_year_id, sede_id: entrada.sede_id, grade_id: entrada.grade_id }, usuario, ip), firmantesDelLibro()]);
   const bloquean = estudiantesQueBloqueanElLibro(sabana.grupos.map((g) => ({ etiqueta: g.grupo.etiqueta, filas: g.filas })));
   const total = sabana.grupos.reduce((s, g) => s + g.filas.length, 0);
   if (total === 0) throw new ApiError(409, 'Ese grado no tiene estudiantes con matrícula activa en el año: no hay nada que consolidar.');
@@ -80,7 +82,7 @@ export async function emitirLibro(entrada: EntradaLibro, usuario: UserDocument, 
     nota_aprobatoria: sabana.nota_aprobatoria,
     mostrar_puesto: sabana.mostrar_puesto,
     grupos: sabana.grupos,
-    firmantes: await firmantesDelLibro(),
+    firmantes,
     total_estudiantes: total,
   };
   // Las hojas del libro no dependen de los dígitos de los folios: se cuentan con unos de prueba y luego se reservan los reales.

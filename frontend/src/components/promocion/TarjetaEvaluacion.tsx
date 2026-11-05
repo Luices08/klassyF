@@ -22,7 +22,7 @@ export function TarjetaEvaluacion({ valor: b, onChange, bloqueado }: Props) {
 
   // Una materia imprescindible no puede ser a la vez una de las que se permite deber.
   const opcionesAsignaturas = asignaturas.filter((s) => !b.asignaturas_arrastrables_ids.includes(s._id)).map((s) => ({ value: s._id, label: s.nombre }));
-  const opcionesAreas = areas.map((a) => ({ value: a._id, label: a.nombre }));
+  const opcionesAreas = areas.filter((a) => !b.areas_arrastrables_ids.includes(a._id)).map((a) => ({ value: a._id, label: a.nombre }));
 
   return (
     <Card>

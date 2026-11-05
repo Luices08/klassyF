@@ -356,6 +356,42 @@ export async function registrarAtencion(id: string, datos: { descripcion: string
   return guardarYAuditar(caso, usuario, 'CASO_CONVIVENCIA_ACTUALIZADO', 'atencion_inmediata', ip);
 }
 
+/**
+ * Trae al caso los pasos de su protocolo que todavía no tiene. Los pasos se copian al abrir el caso (para que editar el protocolo no altere un proceso en curso), así
+ * que un caso abierto antes de configurar el protocolo de su tipo —o antes de que el colegio agregara un paso— quedó sin ellos. Solo suma: no toca lo ya cumplido ni los
+ * pasos que el caso trae. `pasos_agregados` dice cuántos llegaron (0 = ya tenía todos).
+ */
+export async function sincronizarProtocolo(id: string, usuario: UserDocument, ip?: string | null) {
+  const caso = await cargarCaso(id, usuario);
+  exigirEditable(caso);
+  const protocolo = await ProtocoloConvivencia.findOne({ tipo_situacion: caso.tipo_situacion });
+  if (!protocolo || protocolo.pasos.length === 0) {
+    throw new ApiError(409, `El protocolo de la situación tipo ${caso.tipo_situacion} no tiene pasos definidos: configúralo en el catálogo de convivencia.`);
+  }
+  const nuevos = pasosFaltantes(caso.pasos, protocolo.pasos);
+  if (nuevos.length === 0) return { ...(await vistaCaso(caso)), pasos_agregados: 0 };
+
+  const base = caso.pasos.length;
+  nuevos.forEach((p, i) => caso.pasos.push({ nombre: p.nombre, obligatorio: p.obligatorio, orden: base + i + 1, estado: 'PENDIENTE', fecha: null, por: null, nota: '' }));
+  const vista = await guardarYAuditar(caso, usuario, 'CASO_CONVIVENCIA_ACTUALIZADO', `protocolo sincronizado: ${nuevos.length} paso(s)`, ip);
+  return { ...vista, pasos_agregados: nuevos.length };
+}
+
+/**
+ * Un caso tipo III exige remisión a la autoridad o, si no la hubo, explicar por qué (RN-15-05). Esa explicación solo se podía escribir al cerrar el caso, de modo que
+ * mientras seguía abierto la alerta de «remisión pendiente» no tenía salida salvo remitir. Con un texto vacío se retira.
+ */
+export async function registrarJustificacionSinRemision(id: string, justificacion: string, usuario: UserDocument, ip?: string | null) {
+  const caso = await cargarCaso(id, usuario);
+  exigirEditable(caso);
+  if (caso.tipo_situacion !== 'III') throw new ApiError(409, 'Solo un caso tipo III exige remisión a la autoridad o la justificación de por qué no la hubo.');
+  const texto = justificacion.trim();
+  if (texto && caso.remisiones.length > 0) throw new ApiError(409, 'El caso ya tiene una remisión registrada: no necesita justificación.');
+  caso.justificacion_sin_remision = texto;
+  // La auditoría nunca lleva el contenido: solo que se escribió o se retiró.
+  return guardarYAuditar(caso, usuario, 'CASO_CONVIVENCIA_ACTUALIZADO', texto ? 'justificacion_sin_remision' : 'justificacion_sin_remision_retirada', ip);
+}
+
 export async function actualizarPaso(id: string, pasoId: string, datos: { estado: 'PENDIENTE' | 'CUMPLIDO' | 'NO_APLICA'; nota?: string }, usuario: UserDocument, ip?: string | null) {
   const caso = await cargarCaso(id, usuario);
   exigirEditable(caso);

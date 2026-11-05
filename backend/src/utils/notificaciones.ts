@@ -24,6 +24,8 @@ export interface DatosNotificacion {
   nota_nueva?: number;
   superada?: boolean;
   intentos_restantes?: number;
+  /** Sesión del comité de convivencia: sin valor es la convocatoria; `CAMBIADA` cuando se movió la fecha, la hora o el lugar; `ANULADA` cuando se canceló. */
+  cambio?: 'CAMBIADA' | 'ANULADA';
 }
 
 const plural = (n: number, uno: string, varios: string) => (n === 1 ? uno : varios);
@@ -174,5 +176,11 @@ export function renderizarNotificacion(evento: EventoNotificacion, contador: num
         titulo: 'Sesión convocada',
         mensaje: `Has sido convocado(a) a la sesión de «${datos.nombre ?? 'Comisión'}»${datos.cuando ? ` el ${datos.cuando}` : ''}. Revisa el orden del día y participa.`,
       };
+    case 'SESION_COMITE_CONVOCADA': {
+      const sesion = datos.nombre ?? 'del Comité de Convivencia';
+      if (datos.cambio === 'ANULADA') return { titulo: 'Sesión del comité anulada', mensaje: `Se anuló la sesión ${sesion}${datos.cuando ? ` que estaba prevista para el ${datos.cuando}` : ''}.` };
+      if (datos.cambio === 'CAMBIADA') return { titulo: 'Sesión del comité reprogramada', mensaje: `Cambió la convocatoria a la sesión ${sesion}${datos.cuando ? `: ahora es el ${datos.cuando}` : ''}.` };
+      return { titulo: 'Sesión del comité convocada', mensaje: `Has sido convocado(a) a la sesión ${sesion}${datos.cuando ? ` el ${datos.cuando}` : ''}.` };
+    }
   }
 }

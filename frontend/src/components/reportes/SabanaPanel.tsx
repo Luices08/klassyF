@@ -10,6 +10,7 @@ import { Button } from '../ui/Button';
 import { Card } from '../ui/Card';
 import { Select } from '../ui/Field';
 import { SelectBuscable } from '../ui/SelectBuscable';
+import { type SolicitudDeVista, VistaPreviaReporte } from './VistaPreviaReporte';
 
 const NOMBRES_JORNADA: Record<string, string> = { MANANA: 'Mañana', TARDE: 'Tarde', UNICA: 'Única', NOCTURNA: 'Nocturna', SABATINA: 'Sabatina' };
 
@@ -31,6 +32,7 @@ export function SabanaPanel({ anioPorDefecto }: { anioPorDefecto?: string }) {
   const [gradoId, setGradoId] = useState('');
   const [grupoId, setGrupoId] = useState('');
   const exportar = useExportarSabana();
+  const [vista, setVista] = useState<SolicitudDeVista | null>(null);
 
   const anioElegido = anioId || anioPorDefecto || '';
   useEffect(() => {
@@ -51,20 +53,23 @@ export function SabanaPanel({ anioPorDefecto }: { anioPorDefecto?: string }) {
     : 'todos-los-grupos';
   const nombreArchivo = ['sabana', anio?.year ?? '', corte === 'FINAL' ? 'cierre-del-año' : `periodo-${corte}`, etiquetaGrupo].filter((x) => x !== '').join('-');
 
+  const filtrosActuales = () => ({
+    academic_year_id: anioElegido,
+    sede_id: sedeId || undefined,
+    jornada_id: jornadaId || undefined,
+    grade_id: gradoId || undefined,
+    group_id: grupoId || undefined,
+    periodo_numero: corte === 'FINAL' ? undefined : Number(corte),
+  });
+
   const descargar = (formato: FormatoSabana) => {
     if (!anioElegido) return;
-    exportar.mutate({
-      formato,
-      nombreArchivo,
-      filtros: {
-        academic_year_id: anioElegido,
-        sede_id: sedeId || undefined,
-        jornada_id: jornadaId || undefined,
-        grade_id: gradoId || undefined,
-        group_id: grupoId || undefined,
-        periodo_numero: corte === 'FINAL' ? undefined : Number(corte),
-      },
-    });
+    exportar.mutate({ formato, nombreArchivo, filtros: filtrosActuales() });
+  };
+
+  const verVistaPrevia = () => {
+    if (!anioElegido) return;
+    setVista({ ruta: 'sabana/pdf', consulta: filtrosActuales(), nombreArchivo: `${nombreArchivo}.pdf`, titulo: 'Vista previa de la sábana' });
   };
 
   return (
@@ -133,8 +138,13 @@ export function SabanaPanel({ anioPorDefecto }: { anioPorDefecto?: string }) {
           <Button variant="outline" onClick={() => descargar('pdf')} disabled={!anioElegido || exportar.isPending}>
             Exportar Sábana (PDF)
           </Button>
+          <Button variant="secondary" onClick={verVistaPrevia} disabled={!anioElegido}>
+            Vista previa (PDF)
+          </Button>
         </div>
+        <p className="mt-2 text-xs text-muted">La vista previa muestra el PDF; el Excel trae los mismos datos. Con varios grupos genera todo el documento: para revisarlo más rápido, elige un grupo.</p>
       </Card>
+      {vista && <VistaPreviaReporte vista={vista} onCerrar={() => setVista(null)} />}
       {exportar.isError && <Alert tone="error">{errorMessage(exportar.error)}</Alert>}
       {exportar.isPending && <Alert tone="info">Preparando el archivo…</Alert>}
     </div>

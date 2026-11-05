@@ -17,7 +17,8 @@ import { PageHeader } from '../../components/ui/PageHeader';
 import { Spinner } from '../../components/ui/Spinner';
 import { TabPanel, Tabs } from '../../components/ui/Tabs';
 import { EmptyRow, Table, TableBody, TableHead, Td, Th } from '../../components/ui/Table';
-import { KeyIcon, PlusIcon, RefreshIcon, StarIcon, TrashIcon } from '../../components/ui/icons';
+import { EyeIcon, KeyIcon, PlusIcon, RefreshIcon, StarIcon, TrashIcon } from '../../components/ui/icons';
+import { DatosAcudienteDrawer } from '../../components/estudiantes/DatosAcudienteDrawer';
 import { useAuth } from '../../context/AuthContext';
 import {
   useActualizarVinculo,
@@ -477,6 +478,7 @@ function NucleoFamiliarTab({
   const [modo, setModo] = useState<'buscar' | 'nuevo'>('buscar');
   const [busqueda, setBusqueda] = useState('');
   const [form, setForm] = useState(ACUDIENTE_VACIO);
+  const [verAcudiente, setVerAcudiente] = useState<import('../../types/domain').StudentGuardianRelation | null>(null);
 
   const buscarQuery = useGuardiansSearch(busqueda);
   const vincular = useVincularAcudiente();
@@ -545,6 +547,7 @@ function NucleoFamiliarTab({
       <Table>
         <TableHead>
           <Th>Nombre</Th>
+          <Th>Documento</Th>
           <Th>Parentesco</Th>
           <Th>Teléfono</Th>
           <Th>Principal</Th>
@@ -557,6 +560,9 @@ function NucleoFamiliarTab({
             <tr key={rel._id}>
               <Td className="font-medium text-ink">
                 {rel.guardian_id.nombre} {rel.guardian_id.apellido}
+              </Td>
+              <Td>
+                {rel.guardian_id.tipo_documento} {rel.guardian_id.numero_documento}
               </Td>
               <Td>{rel.parentesco}</Td>
               <Td>{rel.guardian_id.telefono_principal}</Td>
@@ -577,6 +583,7 @@ function NucleoFamiliarTab({
               </Td>
               <Td>
                 <div className="flex justify-end gap-2">
+                  <IconButton tone="edit" label="Ver datos del acudiente" icon={<EyeIcon />} onClick={() => setVerAcudiente(rel)} />
                   {!rel.guardian_id.user_id && (
                     <IconButton
                       tone="neutral"
@@ -622,9 +629,11 @@ function NucleoFamiliarTab({
               </Td>
             </tr>
           ))}
-          {acudientes.length === 0 && <EmptyRow colSpan={7}>Este estudiante aún no tiene acudientes registrados.</EmptyRow>}
+          {acudientes.length === 0 && <EmptyRow colSpan={8}>Este estudiante aún no tiene acudientes registrados.</EmptyRow>}
         </TableBody>
       </Table>
+
+      {verAcudiente && <DatosAcudienteDrawer key={verAcudiente._id} relacion={verAcudiente} onClose={() => setVerAcudiente(null)} />}
 
       <Drawer
         open={drawerOpen}

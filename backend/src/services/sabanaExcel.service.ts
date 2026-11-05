@@ -1,9 +1,13 @@
 import ExcelJS from 'exceljs';
+import { NOMBRES_NIVEL_VALORACION, NivelValoracion } from '../constants/valoracionDescriptiva';
 import { neutralizarFormula } from '../utils/importacion';
 import { ReporteSabana, SabanaDeGrupo } from './sabanaCalificaciones.service';
 
 // Los mismos tonos de la guía visual, para que el archivo se parezca a la pantalla.
-const COLOR = { azulSuave: 'FFEAF3FF', rojoSuave: 'FFFFF0F0', rojo: 'FFEF5350', naranjaSuave: 'FFFFF5E6', gris: 'FFF1F5F9', texto: 'FF172235', borde: 'FFDDE4EC' };
+const COLOR = { azulSuave: 'FFEAF3FF', rojoSuave: 'FFFFF0F0', rojo: 'FFEF5350', naranjaSuave: 'FFFFF5E6', verdeSuave: 'FFE5F7EF', gris: 'FFF1F5F9', texto: 'FF172235', borde: 'FFDDE4EC' };
+
+/** Un nivel de valoración nunca se pinta de rojo: en Preescolar nadie «pierde». Alcanzado verde suave, iniciado naranja suave, en proceso sin relleno. */
+const RELLENO_NIVEL: Record<NivelValoracion, string | null> = { ALCANZADO: COLOR.verdeSuave, EN_PROCESO: null, INICIADO: COLOR.naranjaSuave };
 
 function nombreDeHoja(grupo: SabanaDeGrupo['grupo'], usados: Set<string>): string {
   const limpio = (t: string) => t.replace(/[\\/?*[\]:]/g, ' ').trim().slice(0, 31);
@@ -19,10 +23,12 @@ function nombreDeHoja(grupo: SabanaDeGrupo['grupo'], usados: Set<string>): strin
 function escribirHoja(libro: ExcelJS.Workbook, reporte: ReporteSabana, g: SabanaDeGrupo, nombre: string): void {
   const hoja = libro.addWorksheet(nombre, { views: [{ state: 'frozen', xSplit: 4, ySplit: 5 }] });
   const nAsig = g.asignaturas.length;
-  const colPromedio = 5 + nAsig;
-  const colPuesto = reporte.mostrar_puesto ? colPromedio + 1 : 0;
-  const colReprobadas = (colPuesto || colPromedio) + 1;
-  const colFallas = colReprobadas + 1;
+  // Un grupo de Preescolar no tiene promedio, puesto ni asignaturas perdidas: sus celdas son niveles de valoración descriptiva.
+  const desc = Boolean(g.descriptiva);
+  const colPromedio = desc ? 0 : 5 + nAsig;
+  const colPuesto = !desc && reporte.mostrar_puesto ? colPromedio + 1 : 0;
+  const colReprobadas = desc ? 0 : (colPuesto || colPromedio) + 1;
+  const colFallas = desc ? 5 + nAsig : colReprobadas + 1;
   const colPromocion = reporte.incluye_promocion ? colFallas + 1 : 0;
   const ultima = colPromocion || colFallas;
 
@@ -33,9 +39,13 @@ function escribirHoja(libro: ExcelJS.Workbook, reporte: ReporteSabana, g: Sabana
   hoja.getCell(3, 1).value = neutralizarFormula(`${reporte.leyenda} Generado el ${reporte.generado_en.toLocaleString('es-CO')}.`);
   hoja.getCell(3, 1).font = { italic: true, size: 9, color: { argb: 'FF788794' } };
 
-  const encabezados = ['N.º', 'Documento', 'Apellidos', 'Nombres', ...g.asignaturas.map((a) => a.abreviatura), 'Promedio'];
-  if (colPuesto) encabezados.push('Puesto');
-  encabezados.push('Reprobadas', 'Fallas');
+  const encabezados = ['N.º', 'Documento', 'Apellidos', 'Nombres', ...g.asignaturas.map((a) => a.abreviatura)];
+  if (!desc) {
+    encabezados.push('Promedio');
+    if (colPuesto) encabezados.push('Puesto');
+    encabezados.push('Reprobadas');
+  }
+  encabezados.push('Fallas');
   if (colPromocion) encabezados.push('Promoción');
   const filaEncabezado = hoja.getRow(5);
   encabezados.forEach((t, i) => {
@@ -61,6 +71,13 @@ function escribirHoja(libro: ExcelJS.Workbook, reporte: ReporteSabana, g: Sabana
       const n = f.notas[a.subject_id];
       const c = fila.getCell(5 + j);
       c.alignment = { horizontal: 'center' };
+      if (desc) {
+        if (!n?.valoracion) return;
+        c.value = NOMBRES_NIVEL_VALORACION[n.valoracion];
+        const relleno = RELLENO_NIVEL[n.valoracion];
+        if (relleno) c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: relleno } };
+        return;
+      }
       if (!n || (n.nota === null && !n.exenta)) return;
       if (n.exenta) {
         c.value = 'EX';
@@ -75,18 +92,20 @@ function escribirHoja(libro: ExcelJS.Workbook, reporte: ReporteSabana, g: Sabana
         c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: COLOR.naranjaSuave } };
       }
     });
-    const promedio = fila.getCell(colPromedio);
-    promedio.value = f.promedio;
-    promedio.numFmt = '0.00';
-    promedio.alignment = { horizontal: 'center' };
-    promedio.font = { bold: true };
-    if (colPuesto) {
-      fila.getCell(colPuesto).value = f.puesto;
-      fila.getCell(colPuesto).alignment = { horizontal: 'center' };
+    if (!desc) {
+      const promedio = fila.getCell(colPromedio);
+      promedio.value = f.promedio;
+      promedio.numFmt = '0.00';
+      promedio.alignment = { horizontal: 'center' };
+      promedio.font = { bold: true };
+      if (colPuesto) {
+        fila.getCell(colPuesto).value = f.puesto;
+        fila.getCell(colPuesto).alignment = { horizontal: 'center' };
+      }
+      fila.getCell(colReprobadas).value = f.reprobadas;
+      fila.getCell(colReprobadas).alignment = { horizontal: 'center' };
+      if (f.reprobadas > 0) fila.getCell(colReprobadas).font = { color: { argb: COLOR.rojo }, bold: true };
     }
-    fila.getCell(colReprobadas).value = f.reprobadas;
-    fila.getCell(colReprobadas).alignment = { horizontal: 'center' };
-    if (f.reprobadas > 0) fila.getCell(colReprobadas).font = { color: { argb: COLOR.rojo }, bold: true };
     fila.getCell(colFallas).value = f.fallas;
     fila.getCell(colFallas).alignment = { horizontal: 'center' };
     if (colPromocion) {
@@ -98,12 +117,19 @@ function escribirHoja(libro: ExcelJS.Workbook, reporte: ReporteSabana, g: Sabana
 
   // Resumen para el docente, bajo cada asignatura.
   const base = 6 + g.filas.length + 1;
-  const resumenes: Array<[string, (r: SabanaDeGrupo['resumen'][number]) => number | null, string]> = [
-    ['Promedio de la asignatura', (r) => r.promedio, '0.00'],
-    ['Aprobaron', (r) => r.aprobaron, '0'],
-    ['Reprobaron', (r) => r.reprobaron, '0'],
-    ['Sin nota', (r) => r.sin_nota, '0'],
-  ];
+  const resumenes: Array<[string, (r: SabanaDeGrupo['resumen'][number]) => number | null, string]> = desc
+    ? [
+        ['Alcanzado', (r) => r.niveles?.ALCANZADO ?? 0, '0'],
+        ['En proceso', (r) => r.niveles?.EN_PROCESO ?? 0, '0'],
+        ['Iniciado', (r) => r.niveles?.INICIADO ?? 0, '0'],
+        ['Sin valoración', (r) => r.sin_nota, '0'],
+      ]
+    : [
+        ['Promedio de la asignatura', (r) => r.promedio, '0.00'],
+        ['Aprobaron', (r) => r.aprobaron, '0'],
+        ['Reprobaron', (r) => r.reprobaron, '0'],
+        ['Sin nota', (r) => r.sin_nota, '0'],
+      ];
   resumenes.forEach(([titulo, valor, formato], i) => {
     const fila = hoja.getRow(base + i);
     const etiqueta = fila.getCell(4);
@@ -120,15 +146,17 @@ function escribirHoja(libro: ExcelJS.Workbook, reporte: ReporteSabana, g: Sabana
   });
 
   const notaPie = hoja.getCell(base + resumenes.length + 1, 1);
-  notaPie.value = `Rojo: nota por debajo de ${reporte.nota_aprobatoria}. Naranja: nota con recuperación. EX: exenta por traslado. Vacío: aún sin nota cerrada.`;
+  notaPie.value = desc
+    ? 'Valoración descriptiva de Preescolar (Decreto 2247 de 1997): no hay notas ni promedios ni asignaturas perdidas. Verde: alcanzado. Naranja: iniciado. Vacío: aún sin valoración.'
+    : `Rojo: nota por debajo de ${reporte.nota_aprobatoria}. Naranja: nota con recuperación. EX: exenta por traslado. Vacío: aún sin nota cerrada.`;
   notaPie.font = { italic: true, size: 9, color: { argb: 'FF788794' } };
 
   hoja.getColumn(1).width = 5;
   hoja.getColumn(2).width = 14;
   hoja.getColumn(3).width = 22;
   hoja.getColumn(4).width = 22;
-  for (let c = 5; c < 5 + nAsig; c++) hoja.getColumn(c).width = 7;
-  for (let c = colPromedio; c <= ultima; c++) hoja.getColumn(c).width = c === colPromocion ? 28 : 11;
+  for (let c = 5; c < 5 + nAsig; c++) hoja.getColumn(c).width = desc ? 12 : 7;
+  for (let c = desc ? colFallas : colPromedio; c <= ultima; c++) hoja.getColumn(c).width = c === colPromocion ? 28 : 11;
   hoja.getRow(5).height = 30;
 }
 

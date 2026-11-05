@@ -10,6 +10,24 @@ export function useGuardiansSearch(search: string, enabled = true) {
   });
 }
 
+export interface HijoDeAcudiente {
+  vinculo_id: string;
+  estudiante_id: string;
+  nombre: string;
+  documento: string;
+  parentesco: Parentesco;
+  es_principal: boolean;
+}
+
+/** Los estudiantes a cargo de un acudiente (sus hermanos, si tiene varios hijos en el colegio). */
+export function useEstudiantesDeAcudiente(guardianId: string | undefined) {
+  return useQuery({
+    queryKey: ['guardians', guardianId, 'estudiantes'],
+    queryFn: () => api.get<HijoDeAcudiente[]>(`/guardians/${guardianId}/estudiantes`),
+    enabled: Boolean(guardianId),
+  });
+}
+
 export function useStudentGuardians(studentId: string | undefined) {
   return useQuery({
     queryKey: ['students', studentId, 'guardians'],
@@ -90,6 +108,8 @@ export function useActualizarAcudiente() {
       ...patch
     }: {
       id: string;
+      tipo_documento?: TipoDocumento;
+      numero_documento?: string;
       nombre?: string;
       apellido?: string;
       telefono_principal?: string;

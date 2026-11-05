@@ -210,6 +210,17 @@ export function useSesiones(filtros: { academic_year_id?: string; instancia?: In
   });
 }
 
+/** ¿Integra alguna sesión de la comisión? Decide si el menú le ofrece la pantalla; solo se pregunta a los perfiles que dependen de ser designados. */
+export function useIntegraComision(habilitada: boolean) {
+  return useQuery({
+    queryKey: ['comision', 'mi-participacion'],
+    queryFn: () => api.get<{ integra: boolean }>('/comision/mi-participacion'),
+    enabled: habilitada,
+    staleTime: 60_000,
+    refetchInterval: 120_000,
+  });
+}
+
 export function useSesion(id: string | undefined) {
   return useQuery({ queryKey: ['comision', 'sesion', id], queryFn: () => api.get<Sesion>(`/comision/sesiones/${id}`), enabled: Boolean(id) });
 }

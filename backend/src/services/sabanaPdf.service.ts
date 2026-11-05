@@ -1,10 +1,14 @@
 import PDFDocument from 'pdfkit';
+import { LEYENDA_SIGLAS_VALORACION, NivelValoracion, SIGLA_NIVEL_VALORACION } from '../constants/valoracionDescriptiva';
 import { ReporteSabana, SabanaDeGrupo } from './sabanaCalificaciones.service';
 
 type Documento = InstanceType<typeof PDFDocument>;
 
 // Los mismos tonos de la guía visual, para que el papel se parezca a la pantalla.
-const COLOR = { ink: '#172235', cuerpo: '#3F4D61', tenue: '#788794', borde: '#DDE4EC', azulSuave: '#EAF3FF', rojo: '#EF5350', rojoSuave: '#FFF0F0', naranjaSuave: '#FFF5E6', gris: '#F1F5F9' };
+const COLOR = { ink: '#172235', cuerpo: '#3F4D61', tenue: '#788794', borde: '#DDE4EC', azulSuave: '#EAF3FF', rojo: '#EF5350', rojoSuave: '#FFF0F0', naranjaSuave: '#FFF5E6', verdeSuave: '#E5F7EF', gris: '#F1F5F9' };
+
+/** En Preescolar nadie «pierde»: alcanzado verde suave, iniciado naranja suave y en proceso sin relleno (nunca rojo). */
+const RELLENO_NIVEL: Record<NivelValoracion, string | null> = { ALCANZADO: COLOR.verdeSuave, EN_PROCESO: null, INICIADO: COLOR.naranjaSuave };
 const MARGEN = 30;
 const ALTO_FILA = 14;
 
@@ -29,9 +33,13 @@ function columnasDe(reporte: ReporteSabana, g: SabanaDeGrupo, anchoUtil: number)
     { titulo: 'Documento', ancho: 52, alinear: 'left' },
     { titulo: 'Apellidos y nombres', ancho: 140, alinear: 'left' },
   ];
-  const finales: Columna[] = [{ titulo: 'Prom.', ancho: 32, alinear: 'center' }];
-  if (reporte.mostrar_puesto) finales.push({ titulo: 'Puesto', ancho: 30, alinear: 'center' });
-  finales.push({ titulo: 'Rep.', ancho: 26, alinear: 'center' }, { titulo: 'Fallas', ancho: 30, alinear: 'center' });
+  const finales: Columna[] = [];
+  if (!g.descriptiva) {
+    finales.push({ titulo: 'Prom.', ancho: 32, alinear: 'center' });
+    if (reporte.mostrar_puesto) finales.push({ titulo: 'Puesto', ancho: 30, alinear: 'center' });
+    finales.push({ titulo: 'Rep.', ancho: 26, alinear: 'center' });
+  }
+  finales.push({ titulo: 'Fallas', ancho: 30, alinear: 'center' });
   if (reporte.incluye_promocion) finales.push({ titulo: 'Promoción', ancho: 96, alinear: 'left' });
   const usado = [...fijas, ...finales].reduce((s, c) => s + c.ancho, 0);
   const porAsignatura = Math.max(18, Math.min(34, (anchoUtil - usado) / Math.max(1, g.asignaturas.length)));
@@ -63,7 +71,8 @@ export function dibujarGrupo(doc: Documento, reporte: ReporteSabana, g: SabanaDe
   const ancho = columnas.reduce((s, c) => s + c.ancho, 0);
   let y = encabezadoDeTabla(doc, columnas, doc.y + 6);
   const nAsig = g.asignaturas.length;
-  const colPromedio = 3 + nAsig;
+  const desc = Boolean(g.descriptiva);
+  const colPromedio = desc ? -1 : 3 + nAsig;
 
   g.filas.forEach((f, i) => {
     if (y + ALTO_FILA > limite) {
@@ -75,10 +84,8 @@ export function dibujarGrupo(doc: Documento, reporte: ReporteSabana, g: SabanaDe
     const celdasNota = g.asignaturas.map((a) => f.notas[a.subject_id]);
     const textos = [
       ...valores,
-      ...celdasNota.map((c) => (!c ? '' : c.exenta ? 'EX' : nota(c.nota, 1))),
-      nota(f.promedio),
-      ...(reporte.mostrar_puesto ? [f.puesto === null ? '' : String(f.puesto)] : []),
-      String(f.reprobadas),
+      ...celdasNota.map((c) => (!c ? '' : desc ? (c.valoracion ? SIGLA_NIVEL_VALORACION[c.valoracion] : '') : c.exenta ? 'EX' : nota(c.nota, 1))),
+      ...(desc ? [] : [nota(f.promedio), ...(reporte.mostrar_puesto ? [f.puesto === null ? '' : String(f.puesto)] : []), String(f.reprobadas)]),
       String(f.fallas),
       ...(reporte.incluye_promocion ? [f.promocion ? `${f.promocion.texto}${f.promocion.oficial ? '' : '*'}` : ''] : []),
     ];
@@ -86,10 +93,12 @@ export function dibujarGrupo(doc: Documento, reporte: ReporteSabana, g: SabanaDe
     textos.forEach((t, k) => {
       const c = columnas[k]!;
       const celda = k >= 3 && k < 3 + nAsig ? celdasNota[k - 3] : undefined;
-      const perdida = celda && !celda.exenta && celda.nota !== null && celda.nota < reporte.nota_aprobatoria;
+      const perdida = !desc && celda && !celda.exenta && celda.nota !== null && celda.nota < reporte.nota_aprobatoria;
+      const relleno = desc && celda?.valoracion ? RELLENO_NIVEL[celda.valoracion] : null;
       if (perdida) doc.rect(x, y, c.ancho, ALTO_FILA).fill(COLOR.rojoSuave);
-      else if (celda?.recuperada) doc.rect(x, y, c.ancho, ALTO_FILA).fill(COLOR.naranjaSuave);
-      const reprobadas = k === colPromedio + (reporte.mostrar_puesto ? 2 : 1) && f.reprobadas > 0;
+      else if (relleno) doc.rect(x, y, c.ancho, ALTO_FILA).fill(relleno);
+      else if (!desc && celda?.recuperada) doc.rect(x, y, c.ancho, ALTO_FILA).fill(COLOR.naranjaSuave);
+      const reprobadas = !desc && k === colPromedio + (reporte.mostrar_puesto ? 2 : 1) && f.reprobadas > 0;
       doc.font(perdida || reprobadas || k === colPromedio ? 'Helvetica-Bold' : 'Helvetica').fontSize(6.5).fillColor(perdida || reprobadas ? COLOR.rojo : COLOR.ink);
       doc.text(recortar(doc, t, c.ancho - 3), x + 1.5, y + 4, { width: c.ancho - 3, align: c.alinear, lineBreak: false });
       x += c.ancho;
@@ -98,12 +107,19 @@ export function dibujarGrupo(doc: Documento, reporte: ReporteSabana, g: SabanaDe
   });
 
   // Resumen para el docente, bajo cada asignatura.
-  const resumenes: Array<[string, (r: SabanaDeGrupo['resumen'][number]) => string]> = [
-    ['Promedio', (r) => nota(r.promedio)],
-    ['Aprobaron', (r) => String(r.aprobaron)],
-    ['Reprobaron', (r) => String(r.reprobaron)],
-    ['Sin nota', (r) => String(r.sin_nota)],
-  ];
+  const resumenes: Array<[string, (r: SabanaDeGrupo['resumen'][number]) => string]> = desc
+    ? [
+        ['Alcanzado', (r) => String(r.niveles?.ALCANZADO ?? 0)],
+        ['En proceso', (r) => String(r.niveles?.EN_PROCESO ?? 0)],
+        ['Iniciado', (r) => String(r.niveles?.INICIADO ?? 0)],
+        ['Sin valoración', (r) => String(r.sin_nota)],
+      ]
+    : [
+        ['Promedio', (r) => nota(r.promedio)],
+        ['Aprobaron', (r) => String(r.aprobaron)],
+        ['Reprobaron', (r) => String(r.reprobaron)],
+        ['Sin nota', (r) => String(r.sin_nota)],
+      ];
   y += 4;
   if (y + ALTO_FILA * resumenes.length > limite) {
     doc.addPage();
@@ -123,7 +139,10 @@ export function dibujarGrupo(doc: Documento, reporte: ReporteSabana, g: SabanaDe
   }
 
   const abreviaturas = g.asignaturas.map((a) => `${a.abreviatura} = ${a.nombre}`).join('   ·   ');
-  const pie = `${abreviaturas}\nRojo: por debajo de ${reporte.nota_aprobatoria}. Naranja: nota con recuperación. EX: exenta por traslado. Vacío: sin nota cerrada.${reporte.incluye_promocion ? ' * Decisión proyectada (aún sin cierre de promoción).' : ''}`;
+  const proyectada = reporte.incluye_promocion && g.filas.some((f) => f.promocion && !f.promocion.oficial) ? ' * Decisión proyectada (aún sin cierre de promoción).' : '';
+  const pie = desc
+    ? `${abreviaturas}\nValoración descriptiva de Preescolar (Decreto 2247 de 1997): ${LEYENDA_SIGLAS_VALORACION}. Verde: alcanzado. Naranja: iniciado. Vacío: aún sin valoración. No hay notas, promedios ni asignaturas perdidas.${proyectada}`
+    : `${abreviaturas}\nRojo: por debajo de ${reporte.nota_aprobatoria}. Naranja: nota con recuperación. EX: exenta por traslado. Vacío: sin nota cerrada.${proyectada}`;
   doc.font('Helvetica').fontSize(6.5).fillColor(COLOR.tenue);
   const altoPie = doc.heightOfString(pie, { width: anchoUtil });
   if (y + 8 + altoPie > doc.page.height - 36) {

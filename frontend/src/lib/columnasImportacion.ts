@@ -35,7 +35,7 @@ export const NOTAS_CSV_USUARIOS = [
 
 export const NOTAS_CSV_ESTUDIANTES = [
   ...NOTAS_CSV_GENERALES,
-  'Los datos del acudiente son opcionales, pero si llenas alguna columna acudiente_* debes completar todas (tipo de documento aparte: si va vacío se usa CC).',
+  'Los datos del acudiente son opcionales, pero si llenas alguna columna acudiente_* debes completar todas (tipo de documento aparte: si va vacío se usa CC). Esta carga admite un solo acudiente por estudiante: para registrar a varios, o a un acudiente con varios hijos, usa «Importar acudientes».',
   'Si llenas rh, eps o regimen_salud, autorizacion_datos_sensibles debe ir en SI (Ley 1581 de 2012, art. 6): son datos sensibles y exigen la autorización explícita del acudiente. Queda registrado el acudiente de la misma fila, si lo diligenciaste.',
   'A cada estudiante creado se le asigna una contraseña temporal que deberá cambiar en su primer ingreso.',
 ];

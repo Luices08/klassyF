@@ -74,6 +74,16 @@ export interface ImportacionResultado {
   errores: Array<{ fila: number; numero_documento?: string; motivo: string }>;
 }
 
+/** La plantilla se baja con la sesión (nunca por una dirección directa). */
+export async function descargarPlantillaEstudiantes(): Promise<void> {
+  const { url } = await api.downloadBlob('/students/plantilla-importacion');
+  const enlace = document.createElement('a');
+  enlace.href = url;
+  enlace.download = 'plantilla-estudiantes.csv';
+  enlace.click();
+  URL.revokeObjectURL(url);
+}
+
 export function useBulkImportStudents() {
   const queryClient = useQueryClient();
   return useMutation({

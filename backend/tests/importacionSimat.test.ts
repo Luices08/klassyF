@@ -240,6 +240,16 @@ describe('SIMAT: una fila normalizada', () => {
     expect(normalizarFila({ ...CRUDA, fecha_nacimiento: '2999-01-01' }, 1).errores.join(' ')).toMatch(/futura/);
   });
 
+  it('la fecha de fin de un retirado se lee como día de calendario; una inválida avisa y queda vacía', () => {
+    expect(normalizarFila({ ...CRUDA, estado: 'RETIRADO', fecha_fin: '2026-03-10 14:30:00' }, 1).fila.fecha_fin).toBe('2026-03-10');
+    expect(normalizarFila({ ...CRUDA, estado: 'RETIRADO', fecha_fin: '10/03/2026' }, 1).fila.fecha_fin).toBe('2026-03-10');
+    expect(normalizarFila({ ...CRUDA, estado: 'RETIRADO', fecha_fin: 46091 }, 1).fila.fecha_fin).toBe('2026-03-10');
+    expect(normalizarFila({ ...CRUDA, estado: 'RETIRADO', fecha_fin: '' }, 1)).toMatchObject({ fila: { fecha_fin: null }, avisos: [] });
+    const mala = normalizarFila({ ...CRUDA, estado: 'RETIRADO', fecha_fin: 'pronto' }, 1);
+    expect(mala.fila.fecha_fin).toBeNull();
+    expect(mala.avisos.join(' ')).toMatch(/fecha de fin/);
+  });
+
   it('el estado decide la acción: solo «MATRICULADO» matricula', () => {
     expect(normalizarFila({ ...CRUDA, estado: 'RETIRADO' }, 1).fila.accion).toBe('RETIRADO');
     for (const e of ['SIN CONTINUIDAD', 'NUEVO', 'ASIGNADO POR CONTINUIDAD', 'GRADUADO']) expect(normalizarFila({ ...CRUDA, estado: e }, 1).fila.accion).toBe('OMITIR');

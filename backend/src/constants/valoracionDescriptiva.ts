@@ -11,6 +11,16 @@ export const NOMBRES_NIVEL_VALORACION: Record<NivelValoracion, string> = {
   ALCANZADO: 'Alcanzado',
 };
 
+/** Siglas para los reportes de una hoja donde el nombre completo no cabe (sábana, informe final); siempre con su leyenda. */
+export const SIGLA_NIVEL_VALORACION: Record<NivelValoracion, string> = {
+  INICIADO: 'I',
+  EN_PROCESO: 'EP',
+  ALCANZADO: 'A',
+};
+
+/** La leyenda de las siglas, para el pie de cada reporte que las use. */
+export const LEYENDA_SIGLAS_VALORACION = 'I = Iniciado · EP = En proceso · A = Alcanzado';
+
 /** El descriptor es obligatorio: un nivel sin palabras no dice nada a la familia. */
 export const MIN_CARACTERES_DESCRIPTOR = 10;
 export const MAX_CARACTERES_DESCRIPTOR = 1500;

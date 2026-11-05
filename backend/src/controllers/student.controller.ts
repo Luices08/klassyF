@@ -54,6 +54,14 @@ export const bulkImportStudents = catchAsync(async (req, res) => {
   res.status(200).json({ success: true, data: resultado });
 });
 
+/** La plantilla del CSV de estudiantes: solo el encabezado, para no importar por error una fila de ejemplo. */
+export const descargarPlantillaEstudiantes = catchAsync(async (_req, res) => {
+  const { buffer, nombreArchivo, contentType } = studentService.generarPlantillaEstudiantesCsv();
+  res.setHeader('Content-Type', contentType);
+  res.setHeader('Content-Disposition', `attachment; filename="${nombreArchivo}"`);
+  res.status(200).send(buffer);
+});
+
 export const crearEstudianteCompleto = catchAsync(async (req, res) => {
   const resultado = await studentService.crearEstudianteCompleto(req.body, req.user!._id);
 

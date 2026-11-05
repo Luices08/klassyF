@@ -6,6 +6,7 @@ import { ROLES } from '../constants/roles';
 import { AcademicYearDocument } from '../models/academicYear.model';
 import CalificacionAsignatura from '../models/calificacionAsignatura.model';
 import Enrollment from '../models/enrollment.model';
+import EvaluacionPromocion from '../models/evaluacionPromocionEstudiante.model';
 import Group from '../models/group.model';
 import NotaHomologada from '../models/notaHomologada.model';
 import PromocionAnticipada from '../models/promocionAnticipada.model';
@@ -31,6 +32,7 @@ import {
 import { integracionDe, IntegracionPeriodo, integrarRecuperacion, ResultadoIntegracion } from '../utils/integracionRecuperacion';
 import { notaEfectivaDePeriodo } from '../utils/notaEfectiva';
 import { periodosParaPromediar } from '../utils/promocionAnticipada';
+import { UnidadesDeRecuperacion, unidadesDeRecuperacion } from '../utils/promocion';
 import { asignacionDelDocente } from './activity.service';
 import { registrarEvento } from './audit.service';
 import { cargarAnio, obtenerPolitica } from './configuracionRecuperaciones.service';
@@ -65,14 +67,43 @@ export const clave = (asignacionId: unknown, estudianteId: unknown): string => `
 export const claveRecuperacion = (asignacionId: unknown, estudianteId: unknown, tipo: TipoRecuperacion, periodo: number): string =>
   `${clave(asignacionId, estudianteId)}|${tipo}|${periodo}`;
 
-export async function cargarContextoNotas(anio: AcademicYearDocument, asignacionIds: Types.ObjectId[]): Promise<ContextoNotas> {
-  const politicaDoc = await obtenerPolitica(anio);
+/**
+ * Lo que depende del año y no de las asignaturas pedidas: la política, las notas homologadas por traslado y las promociones anticipadas aplicadas.
+ * Un reporte que recorre muchos grupos lo lee una vez y lo pasa a `cargarContextoNotas` (antes cada grupo lo volvía a leer entero).
+ */
+export async function cargarDatosDelAnio(anio: AcademicYearDocument) {
+  const [politicaDoc, homologadas, tramitesAnticipados] = await Promise.all([
+    obtenerPolitica(anio),
+    NotaHomologada.find({ academic_year_id: anio._id }).select('student_id subject_id periodo_numero estado nota').lean(),
+    PromocionAnticipada.find({ academic_year_id: anio._id, estado: 'APLICADA' }).lean(),
+  ]);
+  // Estudiante → grupo de su matrícula activa, solo de quienes tienen algo homologado.
+  const grupoDeHomologado = new Map<string, string>();
+  if (homologadas.length > 0) {
+    const matriculas = await Enrollment.find({
+      academic_year_id: anio._id,
+      student_id: { $in: [...new Set(homologadas.map((h) => String(h.student_id)))] },
+      estado: { $in: ESTADOS_MATRICULA_ACTIVOS },
+    })
+      .select('student_id group_id')
+      .lean();
+    for (const m of matriculas) grupoDeHomologado.set(String(m.student_id), String(m.group_id));
+  }
+  return { politicaDoc, homologadas, grupoDeHomologado, tramitesAnticipados };
+}
+
+export type DatosDelAnio = Awaited<ReturnType<typeof cargarDatosDelAnio>>;
+
+export async function cargarContextoNotas(anio: AcademicYearDocument, asignacionIds: Types.ObjectId[], compartido?: DatosDelAnio): Promise<ContextoNotas> {
   const escala = escalaEfectiva(anio.escala_evaluacion);
-  const [calificaciones, recuperaciones, asignaciones, homologadas] = await Promise.all([
-    CalificacionAsignatura.find({ teacher_assignment_id: { $in: asignacionIds }, estado: { $in: ESTADOS_NOTA_CERRADOS } }).lean(),
+  const [calificaciones, recuperaciones, asignaciones, datos] = await Promise.all([
+    // De cada calificación solo se usa la nota final: traer el documento completo (bloques y detalle del resultado) multiplicaba lo que viaja desde Mongo.
+    CalificacionAsignatura.find({ teacher_assignment_id: { $in: asignacionIds }, estado: { $in: ESTADOS_NOTA_CERRADOS } })
+      .select('teacher_assignment_id student_id periodo_numero resultado.nota_asignatura')
+      .lean(),
     Recuperacion.find({ teacher_assignment_id: { $in: asignacionIds }, academic_year_id: anio._id }),
     TeacherAssignment.find({ _id: { $in: asignacionIds } }).select('subject_id group_id').lean(),
-    NotaHomologada.find({ academic_year_id: anio._id }).select('student_id subject_id periodo_numero estado nota').lean(),
+    compartido ? Promise.resolve(compartido) : cargarDatosDelAnio(anio),
   ]);
 
   const recuperacionesPorClave = new Map<string, RecuperacionDocument>();
@@ -93,18 +124,10 @@ export async function cargarContextoNotas(anio: AcademicYearDocument, asignacion
   }
 
   // Traslados: lo homologado cuenta en la definitiva del año (no es candidato a recuperar el periodo: no lo cerró un docente) y lo exento no entra.
-  if (homologadas.length > 0) {
-    const matriculas = await Enrollment.find({
-      academic_year_id: anio._id,
-      student_id: { $in: [...new Set(homologadas.map((h) => String(h.student_id)))] },
-      estado: { $in: ESTADOS_MATRICULA_ACTIVOS },
-    })
-      .select('student_id group_id')
-      .lean();
-    const grupoDe = new Map(matriculas.map((m) => [String(m.student_id), String(m.group_id)]));
+  if (datos.homologadas.length > 0) {
     const asignacionDe = new Map(asignaciones.map((a) => [`${String(a.group_id)}|${String(a.subject_id)}`, a._id]));
-    for (const h of homologadas) {
-      const asignacionId = asignacionDe.get(`${grupoDe.get(String(h.student_id)) ?? ''}|${String(h.subject_id)}`);
+    for (const h of datos.homologadas) {
+      const asignacionId = asignacionDe.get(`${datos.grupoDeHomologado.get(String(h.student_id)) ?? ''}|${String(h.subject_id)}`);
       if (!asignacionId) continue;
       const k = clave(asignacionId, h.student_id);
       const entrada = notas.get(k) ?? { cerradas: new Map(), efectivas: new Map(), exentos: new Set<number>() };
@@ -114,11 +137,11 @@ export async function cargarContextoNotas(anio: AcademicYearDocument, asignacion
     }
   }
 
-  const omitidos = await aplicarPromocionAnticipada(anio, asignacionIds, notas);
+  const omitidos = aplicarPromocionAnticipada(datos.tramitesAnticipados, asignaciones, notas);
 
   return {
     anio,
-    politica: politicaDoc.toObject() as unknown as PoliticaRecuperacion,
+    politica: datos.politicaDoc.toObject() as unknown as PoliticaRecuperacion,
     aprobatoria: escala.nota_aprobatoria,
     decimales: escala.precision_decimales,
     notas,
@@ -132,17 +155,26 @@ export async function cargarContextoNotas(anio: AcademicYearDocument, asignacion
  * asignatura (nota copiada, nivelación o periodo sin nota) ocupa ese lugar. Una nota realmente cerrada en el grupo nuevo siempre manda.
  * Sin trámites aplicados no hace nada.
  */
-async function aplicarPromocionAnticipada(anio: AcademicYearDocument, asignacionIds: Types.ObjectId[], notas: Map<string, NotasDeEstudiante>): Promise<Map<string, Set<number>>> {
+function aplicarPromocionAnticipada(
+  aplicadas: DatosDelAnio['tramitesAnticipados'],
+  asignaciones: Array<{ _id: Types.ObjectId; subject_id?: Types.ObjectId | null; group_id?: Types.ObjectId | null }>,
+  notas: Map<string, NotasDeEstudiante>
+): Map<string, Set<number>> {
   const omitidos = new Map<string, Set<number>>();
-  const aplicadas = await PromocionAnticipada.find({ academic_year_id: anio._id, estado: 'APLICADA' }).lean();
   if (aplicadas.length === 0) return omitidos;
-  const asignaciones = await TeacherAssignment.find({ _id: { $in: asignacionIds } }).select('subject_id group_id').lean();
+  // Las asignaciones por grupo: cada trámite solo mira las de su grupo de destino, no todas las del reporte.
+  const porGrupo = new Map<string, typeof asignaciones>();
+  for (const a of asignaciones) {
+    const g = String(a.group_id);
+    const lista = porGrupo.get(g);
+    if (lista) lista.push(a);
+    else porGrupo.set(g, [a]);
+  }
 
   for (const tramite of aplicadas) {
     if (!tramite.aplicacion) continue;
     const noCursados = Array.from({ length: tramite.reglas.periodo_evaluacion }, (_, i) => i + 1);
-    for (const asignacion of asignaciones) {
-      if (String(asignacion.group_id) !== String(tramite.aplicacion.grupo_destino_id)) continue;
+    for (const asignacion of porGrupo.get(String(tramite.aplicacion.grupo_destino_id)) ?? []) {
       const resuelta = tramite.aplicacion.notas.find((n) => String(n.subject_id) === String(asignacion.subject_id));
       if (!resuelta) continue;
       const k = clave(asignacion._id, tramite.student_id);
@@ -185,6 +217,44 @@ function asignaturasPerdidas(ctx: ContextoNotas, asignacionesDelGrupo: Types.Obj
   );
 }
 
+/**
+ * Si la política de promoción (M19) evalúa por ÁREAS, la recuperación final tiene que seguir la misma unidad: el tope se mide en áreas y solo se
+ * recupera una asignatura cuya área se perdió. Devuelve, por estudiante, lo que el motor de promoción cuenta; `null` cuando la política evalúa por
+ * asignaturas (o por ambas, donde el tope ya es de asignaturas) y no hay nada que ajustar. Se importa tarde porque el contexto de promoción lee este módulo.
+ */
+async function unidadesDePromocion(anio: AcademicYearDocument, gruposIds: string[]): Promise<Map<string, UnidadesDeRecuperacion> | null> {
+  const { datosDePolitica, obtenerPolitica: obtenerPoliticaPromocion } = await import('./politicaPromocion.service');
+  const politica = datosDePolitica(await obtenerPoliticaPromocion(String(anio._id)));
+  if (politica.unidad !== 'AREA') return null;
+  const { construirEntradasDeGrupos } = await import('./promocionContexto.service');
+  const grupos = await Group.find({ _id: { $in: gruposIds } }).select('grade_id sede_id jornada_id');
+  const porGrupo = await construirEntradasDeGrupos(anio, grupos, 'CIERRE');
+  const resultado = new Map<string, UnidadesDeRecuperacion>();
+  for (const lista of porGrupo.values()) for (const e of lista) resultado.set(e.student_id, unidadesDeRecuperacion(e.entrada, politica));
+  return resultado;
+}
+
+/**
+ * Quienes la comisión o un consejo mandó a recuperar con un acta firmada (M20 → M19: el cierre vigente es `PENDIENTE_RECUPERACION` por decisión de una
+ * instancia). El tope de la recuperación final es una regla automática; la instancia que decidió enviarlos tiene la última palabra y el tope no los frena,
+ * o quedarían pendientes de una recuperación que nadie puede registrar.
+ */
+async function enviadosARecuperarPorInstancia(anioId: Types.ObjectId, estudiantesIds: string[]): Promise<Set<string>> {
+  if (estudiantesIds.length === 0) return new Set();
+  const cierres = await EvaluacionPromocion.find({
+    academic_year_id: anioId,
+    student_id: { $in: estudiantesIds },
+    vigente: true,
+    resultado: 'PENDIENTE_RECUPERACION',
+    'detalle.decision_instancia': { $exists: true },
+  })
+    .select('student_id')
+    .lean();
+  return new Set(cierres.map((c) => String(c.student_id)));
+}
+
+const MOTIVO_AREA_APROBADA ='Su área está aprobada: el colegio evalúa la promoción por áreas y esta asignatura no tiene que recuperarla.';
+
 // --- Listado de quién debe recuperar ---
 
 export interface FiltrosCandidatos {
@@ -193,6 +263,8 @@ export interface FiltrosCandidatos {
   periodo_numero?: number;
   teacher_assignment_id?: string;
   group_id?: string;
+  /** Varios grupos en una sola lectura (los reportes de cierre); `group_id` sigue valiendo para uno. */
+  group_ids?: string[];
 }
 
 export interface FilaRecuperacion {
@@ -240,10 +312,10 @@ async function asignacionesAConsultar(filtros: FiltrosCandidatos, usuario: UserD
     return [asignacion];
   }
   if (usuario.rol === ROLES.DOCENTE) throw new ApiError(400, 'Indica la asignación (clase) sobre la que consultas.');
-  if (!filtros.group_id) throw new ApiError(400, 'Indica un grupo o una asignación.');
+  if (!filtros.group_id && !filtros.group_ids) throw new ApiError(400, 'Indica un grupo o una asignación.');
   return TeacherAssignment.find({
     academic_year_id: filtros.academic_year_id,
-    group_id: filtros.group_id,
+    group_id: filtros.group_ids ? { $in: filtros.group_ids } : filtros.group_id,
     tipo_asignacion: 'CLASE',
     estado: ESTADO_ACTIVO,
   });
@@ -303,16 +375,21 @@ export async function listarCandidatos(filtros: FiltrosCandidatos, usuario: User
   const idsDelGrupo = new Map<string, Types.ObjectId[]>();
   for (const a of delGrupo) idsDelGrupo.set(String(a.group_id), [...(idsDelGrupo.get(String(a.group_id)) ?? []), a._id]);
 
-  const ctx = await cargarContextoNotas(anio, delGrupo.map((a) => a._id));
+  const [ctx, unidades] = await Promise.all([
+    cargarContextoNotas(anio, delGrupo.map((a) => a._id)),
+    filtros.tipo === 'ANUAL' ? unidadesDePromocion(anio, gruposIds) : Promise.resolve(null),
+  ]);
   const consultadas = new Set(asignaciones.map((a) => String(a._id)));
   const maxIntentos = filtros.tipo === 'PERIODO' ? politica.periodo.max_intentos : politica.anual.max_intentos;
+  const porInstancia = filtros.tipo === 'ANUAL' ? await enviadosARecuperarPorInstancia(anio._id, [...new Set([...ctx.notas.keys()].map((k) => k.split('|')[1] ?? ''))]) : new Set<string>();
 
   const [grupos, asignaturas] = await Promise.all([
     Group.find({ _id: { $in: gruposIds } }).select('nomenclatura'),
-    Subject.find({ _id: { $in: asignaciones.map((a) => a.subject_id) } }).select('nombre'),
+    Subject.find({ _id: { $in: asignaciones.map((a) => a.subject_id) } }).select('nombre area_id'),
   ]);
   const nombreGrupo = new Map(grupos.map((g) => [String(g._id), g.nomenclatura]));
   const nombreAsignatura = new Map(asignaturas.map((s) => [String(s._id), s.nombre]));
+  const areaDeAsignatura = new Map(asignaturas.map((s) => [String(s._id), String(s.area_id)]));
   const porAsignacion = new Map(asignaciones.map((a) => [String(a._id), a]));
 
   interface Previa {
@@ -337,13 +414,18 @@ export async function listarCandidatos(filtros: FiltrosCandidatos, usuario: User
     if (notaOriginal === null) continue;
     if (!existente && !necesitaRecuperar(notaOriginal, ctx.aprobatoria)) continue;
 
+    // Con promoción por áreas, una asignatura perdida dentro de un área aprobada no se recupera (el motor de M19 la da por aprobada).
+    const deAreas = filtros.tipo === 'ANUAL' ? unidades?.get(estudianteId) : undefined;
+    if (!existente && deAreas?.areas_perdidas && !deAreas.areas_perdidas.has(areaDeAsignatura.get(String(asignacion.subject_id)) ?? '')) continue;
+
     let habilitado = true;
     let motivo: string | null = null;
-    if (filtros.tipo === 'ANUAL' && !existente && politica.anual.max_asignaturas_pendientes > 0) {
-      const perdidas = asignaturasPerdidas(ctx, idsDelGrupo.get(String(asignacion.group_id)) ?? [], estudianteId);
+    if (filtros.tipo === 'ANUAL' && !existente && politica.anual.max_asignaturas_pendientes > 0 && !porInstancia.has(estudianteId)) {
+      // El tope se mide en la misma unidad que usa la promoción: áreas o asignaturas.
+      const perdidas = deAreas ? deAreas.cantidad : asignaturasPerdidas(ctx, idsDelGrupo.get(String(asignacion.group_id)) ?? [], estudianteId);
       if (perdidas > politica.anual.max_asignaturas_pendientes) {
         habilitado = false;
-        motivo = `Perdió ${perdidas} asignaturas; el colegio permite recuperar hasta ${politica.anual.max_asignaturas_pendientes}.`;
+        motivo = `Perdió ${perdidas} ${deAreas?.areas_perdidas ? 'áreas' : 'asignaturas'}; el colegio permite recuperar hasta ${politica.anual.max_asignaturas_pendientes}.`;
       }
     }
     previas.push({ asignacion, estudianteId, notaOriginal, habilitado, motivo });
@@ -505,10 +587,16 @@ export async function registrarIntento(
 
   if (!existente) {
     if (!necesitaRecuperar(notaOriginal, ctx.aprobatoria)) throw new ApiError(409, 'El estudiante no tiene que recuperar esta asignatura (la aprobó).');
-    if (input.tipo === 'ANUAL' && politica.anual.max_asignaturas_pendientes > 0) {
-      const perdidas = asignaturasPerdidas(ctx, delGrupo.map((a) => a._id), estudianteId);
+    const deAreas = input.tipo === 'ANUAL' ? (await unidadesDePromocion(anio, [String(grupoId)]))?.get(String(estudianteId)) : undefined;
+    if (deAreas?.areas_perdidas) {
+      const area = (await Subject.findById(asignacion.subject_id).select('area_id').lean())?.area_id;
+      if (!deAreas.areas_perdidas.has(String(area))) throw new ApiError(409, MOTIVO_AREA_APROBADA);
+    }
+    const porInstancia = input.tipo === 'ANUAL' && (await enviadosARecuperarPorInstancia(anio._id, [String(estudianteId)])).has(String(estudianteId));
+    if (input.tipo === 'ANUAL' && politica.anual.max_asignaturas_pendientes > 0 && !porInstancia) {
+      const perdidas = deAreas ? deAreas.cantidad : asignaturasPerdidas(ctx, delGrupo.map((a) => a._id), estudianteId);
       if (perdidas > politica.anual.max_asignaturas_pendientes) {
-        throw new ApiError(409, `Perdió ${perdidas} asignaturas; el colegio permite recuperar hasta ${politica.anual.max_asignaturas_pendientes}.`);
+        throw new ApiError(409, `Perdió ${perdidas} ${deAreas?.areas_perdidas ? 'áreas' : 'asignaturas'}; el colegio permite recuperar hasta ${politica.anual.max_asignaturas_pendientes}.`);
       }
     }
   } else if (existente.estado === 'SUPERADA') {

@@ -10,10 +10,11 @@ import ApiError from '../utils/ApiError';
 import { ReporteTabular, nombreDeArchivo } from '../utils/reporteTabular';
 import { FiltrosAlcance, GrupoDelAlcance, describirAlcance, gruposDelAlcance } from './alcanceReportes.service';
 import { registrarEvento } from './audit.service';
-import { calcularEstadisticas } from './attendanceStats.service';
+import { TotalesAsistencia, asistenciaDeEstudiantesHasta, calcularEstadisticas } from './attendanceStats.service';
 import { cargarAnio } from './configuracionRecuperaciones.service';
 import { datosDePolitica, obtenerPolitica } from './politicaPromocion.service';
 import { listarCandidatos } from './recuperacion.service';
+import { agruparPor } from './sabanaCalificaciones.service';
 
 export interface FiltrosListado extends FiltrosAlcance {
   academic_year_id: string;
@@ -26,6 +27,7 @@ function exigirAcceso(usuario: UserDocument): void {
 }
 
 const fecha = (d: Date | null | undefined): string => (d ? new Date(d).toLocaleDateString('es-CO', { timeZone: 'UTC', day: 'numeric', month: 'long', year: 'numeric' }) : '');
+const SIN_ASISTENCIA: Pick<TotalesAsistencia, 'fallas_justificadas' | 'fallas_injustificadas'> = { fallas_justificadas: 0, fallas_injustificadas: 0 };
 const ESTADO_RECUPERACION: Record<string, string> = { PENDIENTE: 'Pendiente', SUPERADA: 'Superó', NO_SUPERADA: 'No superó' };
 
 /**
@@ -58,27 +60,30 @@ export async function reporteRecuperacionFinal(filtros: FiltrosListado, usuario:
     nombre_archivo: nombreDeArchivo('recuperacion-final', anio.year, filtros.group_id && grupos.length === 1 ? grupos[0]?.etiqueta : 'todos-los-grupos'),
   };
 
-  const listados = [];
-  for (const g of grupos) listados.push({ grupo: g, listado: await listarCandidatos({ tipo: 'ANUAL', academic_year_id: filtros.academic_year_id, group_id: String(g._id) }, usuario) });
-  const sinPolitica = listados.find((l) => !l.listado.aplica);
-  if (sinPolitica) {
+  // Todos los grupos en una sola lectura (antes era una llamada completa por grupo, en serie); la política y la ventana son del año, iguales para todos.
+  const listado = grupos.length > 0 ? await listarCandidatos({ tipo: 'ANUAL', academic_year_id: filtros.academic_year_id, group_ids: grupos.map((g) => String(g._id)) }, usuario) : null;
+  if (listado && !listado.aplica) {
     return {
       ...base,
       leyenda: 'Sin recuperación de fin de año según la política del colegio (SIEE).',
       resumen: [],
       filas: [],
-      mensaje_vacio: sinPolitica.listado.motivo_no_aplica ?? 'El colegio no tiene recuperación de fin de año.',
+      mensaje_vacio: listado.motivo_no_aplica ?? 'El colegio no tiene recuperación de fin de año.',
     };
   }
 
-  const asignacionIds = listados.flatMap((l) => l.listado.filas.map((f) => f.teacher_assignment_id));
+  // Se reparte por grupo conservando el orden del alcance; dentro de cada grupo ya vienen ordenadas por apellido.
+  const filasPorGrupo = agruparPor(listado?.filas ?? [], (f) => f.group_id);
+  const listados = grupos.map((grupo) => ({ grupo, filas: filasPorGrupo.get(String(grupo._id)) ?? [] }));
+
+  const asignacionIds = (listado?.filas ?? []).map((f) => f.teacher_assignment_id);
   const asignaciones = await TeacherAssignment.find({ _id: { $in: asignacionIds } }).select('docente_id').lean();
   const docentes = await User.find({ _id: { $in: asignaciones.map((a) => a.docente_id) } }).select('nombre apellido').lean();
   const docentePorId = new Map(docentes.map((d) => [String(d._id), `${d.apellido} ${d.nombre}`]));
   const docenteDeAsignacion = new Map(asignaciones.map((a) => [String(a._id), docentePorId.get(String(a.docente_id)) ?? '']));
 
-  const filas = listados.flatMap(({ grupo, listado }) =>
-    listado.filas.map((f) => ({
+  const filas = listados.flatMap(({ grupo, filas: delGrupo }) =>
+    delGrupo.map((f) => ({
       grupo: grupo.etiqueta,
       documento: f.estudiante.numero_documento,
       estudiante: `${f.estudiante.apellido} ${f.estudiante.nombre}`,
@@ -89,7 +94,7 @@ export async function reporteRecuperacionFinal(filtros: FiltrosListado, usuario:
       derecho: f.habilitado ? `Sí (${f.intentos_restantes} intento${f.intentos_restantes === 1 ? '' : 's'})` : `No: ${f.motivo_no_habilitado ?? ''}`,
     }))
   );
-  const ventana = listados[0]?.listado.ventana ?? null;
+  const ventana = listado?.ventana ?? null;
   const textoVentana = ventana?.abierta
     ? `La recuperación final está abierta${ventana.hasta ? ` hasta el ${fecha(ventana.hasta)}` : ''}.`
     : ventana?.motivo
@@ -103,7 +108,7 @@ export async function reporteRecuperacionFinal(filtros: FiltrosListado, usuario:
     resumen: [
       ['Estudiantes', new Set(filas.map((f) => f.documento)).size],
       ['Asignaturas pendientes', filas.filter((f) => f.estado === 'Pendiente').length],
-      ['Con derecho a recuperar', listados.reduce((s, l) => s + l.listado.filas.filter((f) => f.habilitado).length, 0)],
+      ['Con derecho a recuperar', listados.reduce((s, l) => s + l.filas.filter((f) => f.habilitado).length, 0)],
       ['Sin derecho', filas.filter((f) => f.derecho.startsWith('No')).length],
     ],
     filas,
@@ -126,13 +131,27 @@ export async function reporteRetirados(filtros: FiltrosListado, usuario: UserDoc
   const matriculas = await Enrollment.find({ academic_year_id: anio._id, estado: 'RETIRADO', group_id: { $in: grupos.map((g) => g._id) } }).lean();
   const usuarios = await User.find({ _id: { $in: matriculas.map((m) => m.student_id) } }).select('nombre apellido numero_documento').lean();
   const usuarioPor = new Map(usuarios.map((u) => [String(u._id), u]));
+  // Lo normal es una matrícula retirada por estudiante: todas se cuentan juntas en una sola agregación. Quien tiene dos (retirado, vuelto a matricular y
+  // retirado otra vez) tiene dos cortes distintos y se cuenta aparte, matrícula por matrícula, para no mezclarlos.
+  const matriculasPor = agruparPor(matriculas, (m) => String(m.student_id));
+  const unaSola = [...matriculasPor].filter(([, lista]) => lista.length === 1);
+  const asistencia = await asistenciaDeEstudiantesHasta(
+    filtros.academic_year_id,
+    unaSola.map(([student_id, [m]]) => ({ student_id, hasta: m?.salida?.fecha_efectiva }))
+  );
+  const fallasDe = async (m: (typeof matriculas)[number]) => {
+    const propia = (matriculasPor.get(String(m.student_id)) ?? []).length === 1 ? asistencia.get(String(m.student_id)) : undefined;
+    if (propia) return propia;
+    if ((matriculasPor.get(String(m.student_id)) ?? []).length === 1) return SIN_ASISTENCIA;
+    return (await calcularEstadisticas({ academic_year_id: filtros.academic_year_id, agrupar_por: 'estudiante', student_id: String(m.student_id), hasta: m.salida?.fecha_efectiva }, null)).total;
+  };
 
   const filas = [];
   for (const m of matriculas) {
     const u = usuarioPor.get(String(m.student_id));
     const grupo = grupoPor.get(String(m.group_id));
     const salida = m.salida;
-    const fallas = (await calcularEstadisticas({ academic_year_id: filtros.academic_year_id, agrupar_por: 'estudiante', student_id: String(m.student_id), hasta: salida?.fecha_efectiva }, null)).total;
+    const fallas = await fallasDe(m);
     filas.push({
       fecha: salida ? fecha(salida.fecha_efectiva) : '',
       orden: salida ? new Date(salida.fecha_efectiva).getTime() : 0,

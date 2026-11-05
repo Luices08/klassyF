@@ -269,7 +269,7 @@ export function grupoDeSimat(valor: unknown): string {
 
 export type AccionPorEstadoSimat = 'MATRICULAR' | 'RETIRADO' | 'OMITIR';
 
-/** Solo «MATRICULADO» matricula. Un retirado se informa; el resto (asignado, nuevo, sin continuidad…) todavía no es una matrícula confirmada. */
+/** Solo «MATRICULADO» matricula. Un «RETIRADO» con fecha de fin retira la matrícula vigente (ver `clasificarFila`); el resto (asignado, nuevo, sin continuidad…) todavía no es una matrícula confirmada. */
 export function accionPorEstadoSimat(valor: unknown): AccionPorEstadoSimat {
   const k = claveDeNombre(textoDeCelda(valor));
   if (k === 'matriculado') return 'MATRICULAR';
@@ -305,6 +305,8 @@ export interface FilaSimat {
   genero: 'M' | 'F' | null;
   fecha_nacimiento: string | null;
   fecha_matricula: string | null;
+  /** Día en que SIMAT dio de baja al estudiante (`AAAA-MM-DD`). Solo se usa cuando el estado es RETIRADO. */
+  fecha_fin: string | null;
   per_id: string;
   nui: string;
   barrio: string | null;
@@ -372,13 +374,17 @@ export function normalizarFila(cruda: FilaCruda, numero: number): FilaNormalizad
 
   const etnia = etniaDeSimat(cruda.etnia);
 
+  const accion = accionPorEstadoSimat(cruda.estado);
+  const fechaFin = fechaDeCelda(cruda.fecha_fin);
+  if (accion === 'RETIRADO' && fechaFin === null && t(cruda.fecha_fin) !== '') avisos.push(`La fecha de fin «${t(cruda.fecha_fin)}» no es una fecha válida.`);
+
   return {
     errores,
     avisos,
     fila: {
       numero,
       estado_simat: t(cruda.estado).toUpperCase(),
-      accion: accionPorEstadoSimat(cruda.estado),
+      accion,
       ano: /^\d{4}$/.test(t(cruda.ano)) ? Number(t(cruda.ano)) : null,
       dane: t(cruda.dane).replace(/\D/g, ''),
       dane_sede: t(cruda.dane_sede).replace(/\D/g, ''),
@@ -398,6 +404,7 @@ export function normalizarFila(cruda: FilaCruda, numero: number): FilaNormalizad
       genero: generoDeSimat(cruda.genero),
       fecha_nacimiento: fechaNacimiento,
       fecha_matricula: fechaHoraDeCelda(cruda.fecha_inicio),
+      fecha_fin: fechaFin,
       per_id: t(cruda.per_id),
       nui: t(cruda.nui).toUpperCase(),
       barrio: barrioDeSimat(cruda.barrio),

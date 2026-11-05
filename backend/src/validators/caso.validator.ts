@@ -132,6 +132,14 @@ export const registrarAtencion: ValidationSchema = {
   body: Joi.object({ descripcion: Joi.string().trim().min(5).max(2000).required(), hubo_dano: Joi.boolean() }),
 };
 
+export const sincronizarProtocolo: ValidationSchema = { params: idParam.params };
+
+// Vacío = retirar la justificación que se había escrito.
+export const justificacionSinRemision: ValidationSchema = {
+  params: idParam.params,
+  body: Joi.object({ justificacion: Joi.string().trim().min(10).max(1000).allow('').required() }),
+};
+
 export const actualizarPaso: ValidationSchema = {
   params: Joi.object({ id: objectId.required(), pasoId: objectId.required() }),
   body: Joi.object({ estado: Joi.string().valid(...ESTADOS_PASO_PROTOCOLO).required(), nota: Joi.string().trim().max(1000).allow('') }),

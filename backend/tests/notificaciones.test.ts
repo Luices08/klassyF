@@ -44,6 +44,26 @@ describe('renderizarNotificacion', () => {
   });
 });
 
+describe('sesión del comité de convivencia', () => {
+  const datos = { nombre: 'ordinaria del Comité de Convivencia', cuando: '12/11/2026 a las 10:00 (Sala de juntas)' };
+
+  it('la convocatoria lleva la fecha, la hora y el lugar en el propio aviso (el miembro no tiene otra pantalla donde verlos)', () => {
+    const { titulo, mensaje } = renderizarNotificacion('SESION_COMITE_CONVOCADA', 1, datos);
+    expect(titulo).toBe('Sesión del comité convocada');
+    expect(mensaje).toBe('Has sido convocado(a) a la sesión ordinaria del Comité de Convivencia el 12/11/2026 a las 10:00 (Sala de juntas).');
+  });
+
+  it('un cambio de fecha y una anulación se distinguen de la convocatoria', () => {
+    expect(renderizarNotificacion('SESION_COMITE_CONVOCADA', 1, { ...datos, cambio: 'CAMBIADA' }).mensaje).toContain('ahora es el 12/11/2026');
+    expect(renderizarNotificacion('SESION_COMITE_CONVOCADA', 1, { ...datos, cambio: 'ANULADA' }).mensaje).toContain('Se anuló la sesión');
+  });
+
+  it('el aviso no menciona casos ni estudiantes', () => {
+    const { mensaje } = renderizarNotificacion('SESION_COMITE_CONVOCADA', 1, { ...datos, estudiante: 'Ana', motivo: 'agresión' });
+    expect(mensaje).not.toMatch(/Ana|agresión|CC-/);
+  });
+});
+
 describe('pestanaDeHijo', () => {
   it('cabe en lo que acepta el validador de «visto» (minúsculas, números y guiones, hasta 40)', () => {
     for (const pestana of ['inasistencias', 'convivencia', 'documentos']) {

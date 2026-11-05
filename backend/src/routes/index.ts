@@ -16,6 +16,7 @@ import orientacionRoutes from './orientacion.routes';
 import dashboardRoutes from './dashboard.routes';
 import documentoReferenciaRoutes from './documentoReferencia.routes';
 import enrollmentRoutes from './enrollment.routes';
+import importacionAcudientesRoutes from './importacionAcudientes.routes';
 import importacionSimatRoutes from './importacionSimat.routes';
 import continuidadRoutes from './continuidad.routes';
 import foliaturaRoutes from './foliatura.routes';
@@ -108,6 +109,8 @@ router.use('/academic-years', academicYearRoutes);
 
 // M03: Expediente y hoja de vida del estudiante
 router.use('/students', studentRoutes);
+// Antes de /guardians: «importacion» no debe tomarse como el id de un acudiente.
+router.use('/guardians/importacion', importacionAcudientesRoutes);
 router.use('/guardians', guardianRoutes);
 
 // M04: Admisiones — revision interna de secretaria y sitio publico sin login

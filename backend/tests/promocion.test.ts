@@ -7,6 +7,7 @@ import {
   conceptoOficial,
   evaluarPromocion,
   politicaInicial,
+  unidadesDeRecuperacion,
   validarPolitica,
 } from '../src/utils/promocion';
 import { entradaDeCasoSimulado } from '../src/utils/simulacionPromocion';
@@ -166,6 +167,49 @@ describe('unidad por área', () => {
     e.asignaturas[1].area_id = 'ar';
     expect(evaluarPromocion(e, pol, 'CIERRE').resultado).toBe('NO_PROMOVIDO');
     expect(evaluarPromocion(e, { ...pol, area_pierde_con_asignatura_perdida: false }, 'CIERRE').resultado).toBe('PROMOVIDO');
+  });
+
+  describe('arrastre y recuperación cuando se evalúa por áreas', () => {
+    const arrastre = { admite: true, max_unidades: 1, condicion: 'NINGUNA' as const, nota_minima: null, hasta_periodo: 1, si_incumple: 'SOLO_ALERTA' as const };
+    // Dos asignaturas en el área «edu» (perdida al final) y una aprobada en «mat».
+    const caso = () => {
+      const e = entrada([asig('fut', 2, { nota_final: 2.4 }), asig('dan', 2.2, { nota_final: 2.4 }), asig('alg', 4)]);
+      e.asignaturas[0]!.area_id = 'edu';
+      e.asignaturas[1]!.area_id = 'edu';
+      e.asignaturas[2]!.area_id = 'mat';
+      e.areas = [
+        { area_id: 'edu', nombre: 'Educación física', nota_antes: 2.1, nota_final: 2.4, recuperacion: 'NO_SUPERADA' },
+        { area_id: 'mat', nombre: 'Matemáticas', nota_antes: 4, nota_final: 4, recuperacion: null },
+      ];
+      return e;
+    };
+
+    it('el arrastre usa las áreas permitidas: una lista de asignaturas no sirve', () => {
+      const base = politica([], { unidad: 'AREA', arrastre });
+      expect(evaluarPromocion(caso(), { ...base, asignaturas_arrastrables_ids: ['fut', 'dan'] }, 'TRAS_RECUPERACION').resultado).toBe('NO_PROMOVIDO');
+      const r = evaluarPromocion(caso(), { ...base, areas_arrastrables_ids: ['edu'] }, 'TRAS_RECUPERACION');
+      expect(r.resultado).toBe('PROMOVIDO_CON_ARRASTRE');
+      expect(r.arrastres.map((u) => u.id)).toEqual(['edu']);
+    });
+
+    it('una política por áreas con arrastre sin áreas permitidas se rechaza en vez de quedar activa sin efecto', () => {
+      const base = politica([], { unidad: 'AREA', arrastre });
+      expect(validarPolitica({ ...base, asignaturas_arrastrables_ids: ['fut'] })).toMatch(/Marca qué áreas/);
+      expect(validarPolitica({ ...base, areas_arrastrables_ids: ['edu'] })).toBeNull();
+      // Por asignaturas o por ambas sigue aceptando cualquiera de las dos listas.
+      expect(validarPolitica(politica([], { unidad: 'ASIGNATURA', arrastre, asignaturas_arrastrables_ids: ['fut'] }))).toBeNull();
+    });
+
+    it('M18 cuenta las áreas perdidas, no las asignaturas, y solo recupera las de un área perdida', () => {
+      const base = politica([], { unidad: 'AREA' });
+      const u = unidadesDeRecuperacion(caso(), base);
+      expect(u.cantidad).toBe(1);
+      expect([...(u.areas_perdidas ?? [])]).toEqual(['edu']);
+      // Por asignaturas el tope se mide en asignaturas y no hay lista de áreas.
+      const porAsignaturas = unidadesDeRecuperacion(caso(), politica([], { unidad: 'ASIGNATURA' }));
+      expect(porAsignaturas.cantidad).toBe(2);
+      expect(porAsignaturas.areas_perdidas).toBeNull();
+    });
   });
 });
 

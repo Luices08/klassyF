@@ -28,7 +28,7 @@ const DANE = '123456789012';
 const SEDE = '123456789001';
 
 const ENCABEZADO = [
-  'ANO', 'ESTADO', 'DANE', 'CODIGO_DANE_SEDE', 'SEDE', 'JORNADA', 'GRADO_COD', 'GRUPO', 'FECHAINI', 'NUI', 'PER_ID', 'DOC', 'TIPODOC',
+  'ANO', 'ESTADO', 'DANE', 'CODIGO_DANE_SEDE', 'SEDE', 'JORNADA', 'GRADO_COD', 'GRUPO', 'FECHAINI', 'FECHAFIN', 'NUI', 'PER_ID', 'DOC', 'TIPODOC',
   'APELLIDO1', 'APELLIDO2', 'NOMBRE1', 'NOMBRE2', 'GENERO', 'FECHA_NACIMIENTO', 'BARRIO', 'EPS', 'TIPO DE SANGRE', 'ESTRATO', 'SISBEN IV',
   'DISCAPACIDAD', 'TRA_ESP_APR_ESCOLAR', 'ETNIA', 'TELEFONO', 'CORREO', 'HA_ESTADO_VINCULADO_SRPA',
 ];
@@ -200,10 +200,55 @@ describe('Importación de matrículas desde SIMAT (M04)', () => {
       expect(await Enrollment.countDocuments({ student_id: e.tercerEstudiante._id, origen: 'IMPORTACION_SIMAT' })).toBe(1);
     });
 
-    it('si SIMAT dice retirado y Klassy lo tiene matriculado, es una diferencia por revisar (no se retira solo)', async () => {
+    it('si SIMAT dice retirado pero el archivo no trae la fecha de fin, es una diferencia por revisar (no se inventa la fecha)', async () => {
       const lote = await simularImportacion(csv([fila(e.estudiante.numero_documento, { ESTADO: 'RETIRADO' })]), e.admin, {});
       expect(lote.resumen.por_clasificacion).toEqual({ CONFLICTO: 1 });
-      expect(lote.resumen.por_motivo).toEqual({ RETIRADO_EN_SIMAT: 1 });
+      expect(lote.resumen.por_motivo).toEqual({ RETIRADO_SIN_FECHA: 1 });
+      await aplicar(lote);
+      expect((await Enrollment.findOne({ student_id: e.estudiante._id }))!.estado).toBe('MATRICULADO_DEFINITIVO');
+    });
+
+    it('una fecha de fin futura o anterior a la matrícula no sirve para retirar', async () => {
+      const futura = new Date(Date.now() + 5 * 86_400_000).toISOString().slice(0, 10);
+      const lote = await simularImportacion(
+        csv([fila(e.estudiante.numero_documento, { ESTADO: 'RETIRADO', FECHAFIN: futura }), fila(e.otroEstudiante.numero_documento, { ESTADO: 'RETIRADO', FECHAFIN: '2000-01-01' })]),
+        e.admin,
+        {}
+      );
+      expect(lote.resumen.por_motivo).toEqual({ FECHA_RETIRO_INVALIDA: 2 });
+      expect(lote.resumen.matriculas_por_retirar).toBe(0);
+    });
+  });
+
+  describe('retiros desde SIMAT', () => {
+    const hoy = () => new Date(Date.now() - 5 * 3_600_000).toISOString().slice(0, 10);
+
+    it('un estudiante RETIRADO con fecha de fin y matrícula vigente se retira con esa fecha efectiva', async () => {
+      const lote = await simularImportacion(csv([fila(e.estudiante.numero_documento, { ESTADO: 'RETIRADO', FECHAFIN: hoy() }), fila('9001')]), e.admin, {});
+      expect(lote.resumen.por_clasificacion).toEqual({ NUEVO: 1, ANTIGUO: 1 });
+      expect(lote.resumen.matriculas_por_retirar).toBe(1);
+      expect(lote.resumen.avisos_previos.find((a) => a.clave === 'RETIROS')).toMatchObject({ cantidad: 1, severidad: 'warning' });
+      // Simular no retira a nadie.
+      expect((await Enrollment.findOne({ student_id: e.estudiante._id }))!.estado).toBe('MATRICULADO_DEFINITIVO');
+
+      await aplicar(lote);
+      const matricula = (await Enrollment.findOne({ student_id: e.estudiante._id }))!;
+      expect(matricula.estado).toBe('RETIRADO');
+      expect(matricula.salida?.tipo).toBe('RETIRO');
+      expect(matricula.salida?.fecha_efectiva.toISOString().slice(0, 10)).toBe(hoy());
+      expect(matricula.folio_matricula).toBe(`F-${e.estudiante.numero_documento}`);
+      expect((await resultadoDe(lote._id, e.estudiante.numero_documento)).resultado).toMatchObject({ estado: 'CORRECTA', matricula: 'RETIRADA' });
+      // Los demás compañeros siguen matriculados y el estudiante nuevo del mismo archivo sí se matriculó.
+      expect((await Enrollment.findOne({ student_id: e.otroEstudiante._id }))!.estado).toBe('MATRICULADO_DEFINITIVO');
+      expect(await Enrollment.countDocuments({ origen: 'IMPORTACION_SIMAT' })).toBe(1);
+    });
+
+    it('si ya no tiene matrícula vigente no hay nada que retirar (se omite) y volver a importar no repite el retiro', async () => {
+      const archivo = () => csv([fila(e.estudiante.numero_documento, { ESTADO: 'RETIRADO', FECHAFIN: hoy() })]);
+      await aplicar(await simularImportacion(archivo(), e.admin, {}));
+      const segunda = await simularImportacion(archivo(), e.admin, {});
+      expect(segunda.resumen.por_clasificacion).toEqual({ OMITIDA: 1 });
+      expect(segunda.resumen.por_motivo).toEqual({ RETIRADO_EN_SIMAT: 1 });
     });
   });
 

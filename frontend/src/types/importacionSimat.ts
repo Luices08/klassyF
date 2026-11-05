@@ -6,7 +6,7 @@ export type ClasificacionSimat = (typeof CLASIFICACIONES_SIMAT)[number];
 export type EstadoLoteSimat = 'SIMULADO' | 'EN_COLA' | 'APLICANDO' | 'APLICADO' | 'FALLIDO' | 'DESCARTADO';
 
 export interface AvisoPrevioSimat {
-  clave: 'ACUDIENTE' | 'REVISION' | 'MARCA' | 'SALUD' | 'FOLIOS' | 'GRUPOS' | 'CONFLICTOS';
+  clave: 'ACUDIENTE' | 'REVISION' | 'MARCA' | 'SALUD' | 'FOLIOS' | 'GRUPOS' | 'RETIROS' | 'CONFLICTOS';
   titulo: string;
   detalle: string;
   severidad: 'info' | 'warning';
@@ -34,6 +34,8 @@ export interface ResumenImportacionSimat {
   matriculas_por_crear: number;
   matriculas_por_formalizar: number;
   matriculas_confirmadas: number;
+  /** Ausente en las importaciones hechas antes de que SIMAT pudiera retirar estudiantes. */
+  matriculas_por_retirar?: number;
   fecha_mas_reciente: string | null;
   advertencias: string[];
   avisos_previos: AvisoPrevioSimat[];
@@ -67,7 +69,7 @@ export interface ResultadoFilaSimat {
   estado: 'CORRECTA' | 'ERROR' | 'OMITIDA';
   detalle: string;
   estudiante_creado: boolean;
-  matricula: 'CREADA' | 'FORMALIZADA' | 'CONFIRMADA' | 'NINGUNA';
+  matricula: 'CREADA' | 'FORMALIZADA' | 'CONFIRMADA' | 'RETIRADA' | 'NINGUNA';
   campos_actualizados: string[];
   folio: string | null;
 }

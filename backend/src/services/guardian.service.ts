@@ -12,6 +12,8 @@ import { registrarEvento } from './audit.service';
 export interface ContextoActor {
   usuarioId: Types.ObjectId | string;
   ip?: string | null;
+  /** Perfiles de quien actúa: solo `actualizarAcudiente` los lee, para decidir si puede corregir el documento. */
+  roles?: readonly string[];
 }
 
 export interface DatosNuevoAcudiente {
@@ -358,13 +360,65 @@ export async function desvincularAcudiente(relationId: string, { usuarioId, ip }
   });
 }
 
+const PUEDEN_CORREGIR_DOCUMENTO: string[] = [ROLES.ADMIN, ROLES.SECRETARIA];
+
+/**
+ * Corregir el documento de un acudiente (un error de digitación) cambia también el usuario de su cuenta del portal, porque entra con ese número.
+ * Si esa cuenta es además de personal del colegio no se toca desde aquí: cambiaría el acceso de un docente o directivo.
+ */
+async function corregirDocumento(guardian: GuardianDocument, patch: Partial<DatosNuevoAcudiente>, actor: ContextoActor): Promise<boolean> {
+  const numero = patch.numero_documento?.trim().toUpperCase();
+  const tipo = patch.tipo_documento;
+  const cambiaNumero = numero !== undefined && numero !== guardian.numero_documento;
+  const cambiaTipo = tipo !== undefined && tipo !== guardian.tipo_documento;
+  if (!cambiaNumero && !cambiaTipo) {
+    delete patch.numero_documento;
+    delete patch.tipo_documento;
+    return false;
+  }
+  if (!actor.roles?.some((r) => PUEDEN_CORREGIR_DOCUMENTO.includes(r))) {
+    throw new ApiError(403, 'Solo el administrador y la secretaría pueden corregir el documento de un acudiente.');
+  }
+  if (cambiaNumero) {
+    if (await Guardian.exists({ numero_documento: numero, _id: { $ne: guardian._id } })) {
+      throw new ApiError(409, 'Ya existe otro acudiente con ese número de documento. Si es la misma persona, vincula a ese acudiente en lugar de cambiar este.');
+    }
+    if (await User.exists({ numero_documento: numero, _id: { $ne: guardian.user_id } })) {
+      throw new ApiError(409, 'Ese número de documento ya pertenece a otra persona del sistema.');
+    }
+  }
+
+  await runTransaction(async (session) => {
+    if (guardian.user_id) {
+      const cuenta = await User.findById(guardian.user_id).session(session);
+      if (cuenta) {
+        if (cuenta.roles.some((r) => r !== ROLES.ACUDIENTE)) {
+          throw new ApiError(409, 'Este acudiente también es personal del colegio: su documento se corrige desde Usuarios, porque cambia su acceso.');
+        }
+        if (cambiaNumero) cuenta.numero_documento = numero!;
+        if (cambiaTipo) cuenta.tipo_documento = tipo!;
+        await cuenta.save({ session });
+      }
+    }
+    if (cambiaNumero) guardian.numero_documento = numero!;
+    if (cambiaTipo) guardian.tipo_documento = tipo!;
+    await guardian.save({ session });
+  });
+  delete patch.numero_documento;
+  delete patch.tipo_documento;
+  return true;
+}
+
 export async function actualizarAcudiente(
   guardianId: string,
   patch: Partial<DatosNuevoAcudiente>,
-  { usuarioId, ip }: ContextoActor
+  actor: ContextoActor
 ): Promise<GuardianDocument> {
+  const { usuarioId, ip } = actor;
   const guardian = await Guardian.findById(guardianId);
   if (!guardian) throw new ApiError(404, 'Acudiente no encontrado.');
+  const campos = Object.keys(patch);
+  const corrigioDocumento = await corregirDocumento(guardian, patch, actor);
   Object.assign(guardian, patch);
   await guardian.save();
 
@@ -373,11 +427,40 @@ export async function actualizarAcudiente(
     accion: 'ACUDIENTE_ACTUALIZADO',
     entidad: 'Guardian',
     entidad_id: guardian._id,
-    detalle: Object.keys(patch).join(', '),
+    detalle: `${campos.join(', ')}${corrigioDocumento ? ' (se corrigió el documento)' : ''}`,
     ip,
   });
 
   return guardian;
+}
+
+export interface HijoDeAcudiente {
+  vinculo_id: string;
+  estudiante_id: string;
+  nombre: string;
+  documento: string;
+  parentesco: Parentesco;
+  es_principal: boolean;
+}
+
+/** Los estudiantes a cargo de un acudiente: así se ve si es responsable de varios hermanos sin buscarlos uno por uno. */
+export async function estudiantesDeAcudiente(guardianId: string): Promise<HijoDeAcudiente[]> {
+  if (!Types.ObjectId.isValid(guardianId) || !(await Guardian.exists({ _id: guardianId }))) throw new ApiError(404, 'Acudiente no encontrado.');
+  const vinculos = await StudentGuardian.find({ guardian_id: guardianId }).populate<{ student_id: { _id: Types.ObjectId; nombre: string; apellido: string; numero_documento: string } | null }>(
+    'student_id',
+    'nombre apellido numero_documento'
+  );
+  return vinculos
+    .filter((v) => v.student_id)
+    .map((v) => ({
+      vinculo_id: String(v._id),
+      estudiante_id: String(v.student_id!._id),
+      nombre: `${v.student_id!.apellido} ${v.student_id!.nombre}`,
+      documento: v.student_id!.numero_documento,
+      parentesco: v.parentesco,
+      es_principal: v.es_principal,
+    }))
+    .sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'));
 }
 
 export async function actualizarEstadoAcudiente(

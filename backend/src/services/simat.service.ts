@@ -16,8 +16,8 @@ import { registrarEvento } from './audit.service';
 import { cargarAnio } from './configuracionRecuperaciones.service';
 import { FiltrosListado } from './listadosCierre.service';
 import { datosDePolitica, obtenerPolitica } from './politicaPromocion.service';
-import { construirEntradasDelGrupo } from './promocionContexto.service';
-import { exentosDelAnio } from './sabanaCalificaciones.service';
+import { construirEntradasDeGrupos } from './promocionContexto.service';
+import { agruparPor, exentosDelAnio } from './sabanaCalificaciones.service';
 
 export interface ResultadoSimat {
   anio: number;
@@ -56,13 +56,20 @@ export async function armarSimat(filtros: FiltrosListado, usuario: UserDocument,
   }
   const porEstudiante = new Map<string, Candidato>();
 
+  // Entradas, cierres y retirados de TODOS los grupos del alcance se leen una vez (antes eran tres consultas por grupo, en serie) y se reparten por id.
+  const grupoIds = grupos.map((g) => g._id);
+  const [entradasPorGrupo, cierresDocs, retiradosDocs] = await Promise.all([
+    construirEntradasDeGrupos(anio, grupos, 'CIERRE'),
+    EvaluacionPromocion.find({ academic_year_id: anio._id, group_id: { $in: grupoIds }, vigente: true }).select('student_id group_id resultado').lean(),
+    Enrollment.find({ academic_year_id: anio._id, group_id: { $in: grupoIds }, estado: 'RETIRADO' }).select('student_id group_id').lean(),
+  ]);
+  const cierres = new Map(cierresDocs.map((c) => [`${String(c.group_id)}|${String(c.student_id)}`, c.resultado as string]));
+  const retiradosPorGrupo = agruparPor(retiradosDocs, (m) => String(m.group_id));
+
   for (const grupo of grupos) {
-    const entradas = await construirEntradasDelGrupo(anio, grupo, 'CIERRE');
-    const cierres = new Map(
-      (await EvaluacionPromocion.find({ academic_year_id: anio._id, group_id: grupo._id, vigente: true }).select('student_id resultado').lean()).map((c) => [String(c.student_id), c.resultado as string])
-    );
+    const entradas = entradasPorGrupo.get(String(grupo._id)) ?? [];
     for (const e of entradas) {
-      const oficial = cierres.get(e.student_id);
+      const oficial = cierres.get(`${String(grupo._id)}|${e.student_id}`);
       const reprobadas = contarReprobadas(
         e.entrada.asignaturas.map((a) => ({ nota: a.nota_final, exenta: anio.periodos.every((p) => exentos.get(`${e.student_id}|${a.subject_id}`)?.has(p.numero)) })),
         e.entrada.nota_aprobatoria
@@ -70,8 +77,7 @@ export async function armarSimat(filtros: FiltrosListado, usuario: UserDocument,
       porEstudiante.set(e.student_id, { student_id: e.student_id, grupo, retirado: false, reprobadas, resultado: oficial ?? evaluarPromocion(e.entrada, politica, 'CIERRE').resultado, oficial: Boolean(oficial) });
     }
     // Quien se retiró durante el año va en el archivo como «D»; si además tiene una matrícula viva, esa manda.
-    const retirados = await Enrollment.find({ academic_year_id: anio._id, group_id: grupo._id, estado: 'RETIRADO' }).select('student_id').lean();
-    for (const m of retirados) {
+    for (const m of retiradosPorGrupo.get(String(grupo._id)) ?? []) {
       const id = String(m.student_id);
       if (!porEstudiante.has(id)) porEstudiante.set(id, { student_id: id, grupo, retirado: true, reprobadas: 0, resultado: null, oficial: true });
     }

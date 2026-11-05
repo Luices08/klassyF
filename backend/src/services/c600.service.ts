@@ -71,7 +71,14 @@ async function leerMatriculas(anioId: unknown, gruposIds: unknown[], gradoPorGru
     .select('student_id group_id estado fecha_matricula')
     .lean();
   const conViva = new Set(matriculas.filter((m) => m.estado !== 'RETIRADO').map((m) => String(m.student_id)));
-  const utiles = matriculas.filter((m) => m.estado !== 'RETIRADO' || !conViva.has(String(m.student_id)));
+  // Quien se retiró, reingresó y se retiró otra vez tiene dos matrículas RETIRADO el mismo año: cuenta una sola vez, con la más reciente.
+  const masReciente = new Map<string, (typeof matriculas)[number]>();
+  for (const m of matriculas) {
+    if (m.estado !== 'RETIRADO' || conViva.has(String(m.student_id))) continue;
+    const previa = masReciente.get(String(m.student_id));
+    if (!previa || m.fecha_matricula.getTime() > previa.fecha_matricula.getTime()) masReciente.set(String(m.student_id), m);
+  }
+  const utiles = matriculas.filter((m) => (m.estado !== 'RETIRADO' ? true : masReciente.get(String(m.student_id)) === m));
   const estudiantes = [...new Set(utiles.map((m) => String(m.student_id)))];
 
   const [perfiles, cierres] = await Promise.all([

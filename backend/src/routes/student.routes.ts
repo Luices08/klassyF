@@ -4,6 +4,7 @@ import { ROLES } from '../constants/roles';
 import {
   bulkImportStudents,
   crearEstudianteCompleto,
+  descargarPlantillaEstudiantes,
   listarEstudiantes,
   obtenerFicha360,
   expedienteDigital,
@@ -37,6 +38,8 @@ router.post(
 );
 
 router.post('/bulk-import', checkRole(...STAFF), upload.single('file'), bulkImportStudents);
+// Antes de '/:id': «plantilla-importacion» no es el id de un estudiante.
+router.get('/plantilla-importacion', checkRole(...STAFF), descargarPlantillaEstudiantes);
 
 // Antes de '/:id': Express tomaría «expediente» como parte de otra ruta. Quién ve qué lo decide el servicio (y cada descarga, el módulo dueño del archivo).
 router.get('/:id/expediente', checkRole(ROLES.ADMIN, ROLES.COORDINADOR, ROLES.SECRETARIA), validate(studentValidator.obtenerFicha360), expedienteDigital);

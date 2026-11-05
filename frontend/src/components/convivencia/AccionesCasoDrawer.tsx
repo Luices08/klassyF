@@ -16,6 +16,7 @@ import {
   useCerrarCaso,
   NOMBRES_ROL_INVOLUCRADO,
   useDeclararImpedimento,
+  useJustificarSinRemision,
   useRemitirAOrientacion,
   useReabrirCaso,
   useReclasificarCaso,
@@ -43,6 +44,7 @@ export type ModoAccionCaso =
   | 'impedimento'
   | 'orientacion'
   | 'paso-no-aplica'
+  | 'justificacion-sin-remision'
   | ColeccionRegistro;
 
 const TITULOS: Record<ModoAccionCaso, string> = {
@@ -56,6 +58,7 @@ const TITULOS: Record<ModoAccionCaso, string> = {
   impedimento: 'Declararme impedido',
   orientacion: 'Remitir a orientación',
   'paso-no-aplica': 'Marcar el paso como «No aplica»',
+  'justificacion-sin-remision': 'Justificar la falta de remisión',
   seguimientos: 'Registrar seguimiento',
   notificaciones: 'Anotar el informe a los acudientes',
   descargos: 'Registrar descargos',
@@ -92,13 +95,15 @@ function Formulario({ caso, modo, esAdmin, paso, onClose }: Props & { modo: Modo
   const remitirOrientacion = useRemitirAOrientacion();
   const registro = useAgregarRegistroCaso();
   const actualizarPaso = useActualizarPaso();
+  const justificarSinRemision = useJustificarSinRemision();
   const catalogos = useCatalogosCaso();
   const catalogoFaltas = useCatalogoConvivencia();
 
   const [estado, setEstado] = useState<EstadoCaso>(SIGUIENTES_ESTADOS[caso.estado][0] ?? 'EN_ATENCION');
   const [tipo, setTipo] = useState<TipoSituacion>(TIPOS_SITUACION.find((t) => t !== caso.tipo_situacion) ?? 'II');
   const [resultado, setResultado] = useState<ResultadoCierre>('SOLUCIONADO');
-  const [texto, setTexto] = useState('');
+  // Al editar la justificación de la falta de remisión se parte de la que ya estaba escrita.
+  const [texto, setTexto] = useState(modo === 'justificacion-sin-remision' ? caso.justificacion_sin_remision : '');
   const [textoExtra, setTextoExtra] = useState('');
   const [fecha, setFecha] = useState(hoyLocal());
   const [proxima, setProxima] = useState('');
@@ -112,7 +117,7 @@ function Formulario({ caso, modo, esAdmin, paso, onClose }: Props & { modo: Modo
   const [faltas, setFaltas] = useState<Set<string>>(new Set());
   const [aRemitir, setARemitir] = useState<Set<string>>(new Set());
 
-  const mutation = { estado: cambiarEstado, tipo: reclasificar, atencion, decision, cierre: cerrar, reapertura: reabrir, anulacion: anular, impedimento, orientacion: remitirOrientacion, 'paso-no-aplica': actualizarPaso }[modo as string] ?? registro;
+  const mutation = { estado: cambiarEstado, tipo: reclasificar, atencion, decision, cierre: cerrar, reapertura: reabrir, anulacion: anular, impedimento, orientacion: remitirOrientacion, 'paso-no-aplica': actualizarPaso, 'justificacion-sin-remision': justificarSinRemision }[modo as string] ?? registro;
   const medida = catalogos.data?.medidas.find((m) => m._id === medidaId);
 
   const tiposDisponibles = TIPOS_SITUACION.filter((t) => t !== caso.tipo_situacion && (esAdmin || TIPOS_SITUACION.indexOf(t) > TIPOS_SITUACION.indexOf(caso.tipo_situacion)));
@@ -153,6 +158,9 @@ function Formulario({ caso, modo, esAdmin, paso, onClose }: Props & { modo: Modo
       case 'paso-no-aplica':
         if (paso) await actualizarPaso.mutateAsync({ id, pasoId: paso.id, estado: 'NO_APLICA', nota: texto });
         break;
+      case 'justificacion-sin-remision':
+        await justificarSinRemision.mutateAsync({ id, justificacion: texto });
+        break;
       case 'seguimientos':
         await registro.mutateAsync({ id, coleccion: modo, fecha, nota: texto, proxima_fecha: proxima || null });
         break;
@@ -178,7 +186,7 @@ function Formulario({ caso, modo, esAdmin, paso, onClose }: Props & { modo: Modo
   const requiereFecha = ['seguimientos', 'notificaciones', 'descargos', 'medidas-proteccion', 'remisiones', 'medidas-aplicadas'].includes(modo);
   // El texto es obligatorio salvo en el estado, y en las remisiones y medidas aplicadas, donde es el resultado u observaciones.
   const TEXTO_OPCIONAL: ModoAccionCaso[] = ['estado', 'remisiones', 'medidas-aplicadas'];
-  const textoMinimo = TEXTO_OPCIONAL.includes(modo) ? 0 : modo === 'decision' ? 20 : modo === 'seguimientos' ? 3 : 5;
+  const textoMinimo = TEXTO_OPCIONAL.includes(modo) ? 0 : modo === 'decision' ? 20 : modo === 'justificacion-sin-remision' ? 10 : modo === 'seguimientos' ? 3 : 5;
   const deshabilitar =
     texto.trim().length < textoMinimo ||
     (modo === 'remisiones' && !entidadId) ||
@@ -229,6 +237,10 @@ function Formulario({ caso, modo, esAdmin, paso, onClose }: Props & { modo: Modo
         <Alert tone="warning">«{paso.nombre}» es un paso obligatorio del protocolo: explica por qué no aplica a este caso.</Alert>
       )}
 
+      {modo === 'justificacion-sin-remision' && (
+        <Alert tone="warning">Un caso tipo III debe remitirse a la autoridad competente. Escribe aquí solo si de verdad no hubo remisión y por qué no corresponde; si sí la hubo, usa «Registrar remisión».</Alert>
+      )}
+
       {modo === 'estado' && (
         <Select label="Nuevo estado" value={estado} onChange={(e) => setEstado(e.target.value as EstadoCaso)}>
           {SIGUIENTES_ESTADOS[caso.estado].map((s) => (
@@ -262,7 +274,7 @@ function Formulario({ caso, modo, esAdmin, paso, onClose }: Props & { modo: Modo
               </option>
             ))}
           </Select>
-          {caso.tipo_situacion === 'III' && sinRemision && (
+          {caso.tipo_situacion === 'III' && sinRemision && !caso.justificacion_sin_remision && (
             <Textarea label="Justificación de la falta de remisión" rows={2} maxLength={1000} value={textoExtra} onChange={(e) => setTextoExtra(e.target.value)} hint="Un caso tipo III exige remisión o explicar por qué no la hubo." />
           )}
         </>
@@ -378,6 +390,7 @@ const MAX_TEXTO: Partial<Record<ModoAccionCaso, number>> = {
 function etiquetaTexto(modo: ModoAccionCaso): string {
   switch (modo) {
     case 'paso-no-aplica':
+    case 'justificacion-sin-remision':
       return 'Justificación';
     case 'atencion':
       return 'Descripción de la atención';

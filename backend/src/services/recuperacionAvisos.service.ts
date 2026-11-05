@@ -59,16 +59,17 @@ async function pendientesDe(anioId: Id, tipo: TipoRecuperacion, periodo: number)
   const clases = await TeacherAssignment.find({ academic_year_id: anioId, tipo_asignacion: 'CLASE', estado: ESTADO_ACTIVO, group_id: { $ne: null } }).select('docente_id group_id');
   const docenteDe = new Map(clases.map((c) => [String(c._id), String(c.docente_id)]));
 
-  for (const grupo of new Set(clases.map((c) => String(c.group_id)))) {
-    const listado = await listarCandidatos({ academic_year_id: String(anioId), tipo, ...(tipo === 'PERIODO' ? { periodo_numero: periodo } : {}), group_id: grupo }, admin);
-    if (!listado.aplica) return vacio;
-    for (const fila of listado.filas.filter(sigueEnPendientes)) {
-      const docente = docenteDe.get(fila.teacher_assignment_id);
-      const estudiante = fila.estudiante._id;
-      if (docente) vacio.porDocente.set(docente, (vacio.porDocente.get(docente) ?? new Set()).add(estudiante));
-      vacio.porEstudiante.set(estudiante, (vacio.porEstudiante.get(estudiante) ?? 0) + 1);
-      vacio.estudiantes.add(estudiante);
-    }
+  const grupos = [...new Set(clases.map((c) => String(c.group_id)))];
+  if (grupos.length === 0) return vacio;
+  // Todos los grupos en una sola lectura: con la promoción por áreas cada llamada vuelve a armar las entradas de promoción del grupo.
+  const listado = await listarCandidatos({ academic_year_id: String(anioId), tipo, ...(tipo === 'PERIODO' ? { periodo_numero: periodo } : {}), group_ids: grupos }, admin);
+  if (!listado.aplica) return vacio;
+  for (const fila of listado.filas.filter(sigueEnPendientes)) {
+    const docente = docenteDe.get(fila.teacher_assignment_id);
+    const estudiante = fila.estudiante._id;
+    if (docente) vacio.porDocente.set(docente, (vacio.porDocente.get(docente) ?? new Set()).add(estudiante));
+    vacio.porEstudiante.set(estudiante, (vacio.porEstudiante.get(estudiante) ?? 0) + 1);
+    vacio.estudiantes.add(estudiante);
   }
   return vacio;
 }

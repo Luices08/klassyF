@@ -33,7 +33,10 @@ export const ETIQUETA_CLASIFICACION: Record<ClasificacionSimat, string> = {
 /** Por qué una fila no se importa (o se importa con reservas). Son claves estables: la pantalla las muestra tal cual. */
 export const MOTIVOS_SIMAT = {
   ESTADO_NO_MATRICULADO: 'En SIMAT no figura como matriculado.',
-  RETIRADO_EN_SIMAT: 'En SIMAT figura retirado: no se matricula. Si en Klassy sigue matriculado, es una diferencia por revisar.',
+  RETIRADO_EN_SIMAT: 'En SIMAT figura retirado y en Klassy no tiene una matrícula vigente este año: no hay nada que retirar.',
+  RETIRADO_SIN_FECHA: 'En SIMAT figura retirado pero el archivo no trae la fecha de fin (FECHAFIN): sin ella no se puede registrar la salida. Retíralo a mano desde «Salidas» o corrige el archivo.',
+  FECHA_RETIRO_INVALIDA: 'La fecha de fin (FECHAFIN) no sirve como fecha de retiro: no puede ser futura ni anterior a la fecha de su matrícula en Klassy.',
+  RETIRADO_PREINSCRITA: 'En SIMAT figura retirado, pero su matrícula en Klassy está preinscrita (aún sin folio): no se retira desde la importación; si desistió, anula la matrícula.',
   GRADO_NO_SOPORTADO: 'El grado (ciclos de jóvenes y adultos o aceleración) aún no está soportado en Klassy.',
   GRADO_SIN_CATALOGO: 'El grado no existe o está inactivo en el catálogo de grados de Klassy.',
   JORNADA_NO_SOPORTADA: 'La jornada de SIMAT no tiene equivalente en Klassy.',
@@ -70,6 +73,7 @@ export const COLUMNAS_SIMAT = {
   grupo: { alias: ['GRUPO'], obligatoria: true },
   modelo: { alias: ['MODELO'], obligatoria: false },
   fecha_inicio: { alias: ['FECHAINI', 'FECHAINICIO', 'FECHAMATRICULA'], obligatoria: false },
+  fecha_fin: { alias: ['FECHAFIN', 'FECHAFINAL', 'FECHARETIRO'], obligatoria: false },
   nui: { alias: ['NUI'], obligatoria: false },
   per_id: { alias: ['PERID', 'IDPERSONA'], obligatoria: false },
   documento: { alias: ['DOC', 'DOCUMENTO', 'NUMERODOCUMENTO', 'NUMDOC'], obligatoria: true },

@@ -50,10 +50,13 @@ import {
   plazoDeCompromiso,
 } from '../utils/importacionSimat';
 import { ESTADO_ACTIVO } from '../utils/filtroEstado';
+import { aDiaDeCalendario, motivoFechaEfectivaInvalida } from '../utils/salidas';
+import { runTransaction } from '../utils/runTransaction';
 import { ESTADOS_QUE_EXIGEN_REINGRESO } from '../utils/situacionEstudiante';
 import { registrarEvento } from './audit.service';
 import { createEnrollment, formalizarMatriculaPreinscrita } from './enrollment.service';
 import { obtenerConfiguracion as obtenerFoliatura } from './foliatura.service';
+import { aplicarSalida } from './salidaMatricula.service';
 import { leerArchivoSimat } from './importacionSimatLectura.service';
 import { crearEstudianteCompleto } from './student.service';
 
@@ -74,7 +77,9 @@ export interface OpcionesEntrada {
   dias_compromiso?: number;
 }
 
-type AccionMatricula = 'CREAR' | 'FORMALIZAR' | 'CONFIRMADA' | 'NINGUNA';
+type AccionMatricula = 'CREAR' | 'FORMALIZAR' | 'CONFIRMADA' | 'RETIRAR' | 'NINGUNA';
+
+const MOTIVO_RETIRO_SIMAT = 'Retirado en SIMAT (importación masiva).';
 
 interface Clasificada {
   clasificacion: ClasificacionSimat;
@@ -125,6 +130,8 @@ interface Catalogo {
   jornadas: Map<string, JornadaOperativaDocument>;
   grados: Map<number, GradeDocument>;
   grupos: Map<string, GrupoDoc>;
+  /** Los mismos grupos por id: para saber de qué sede es la matrícula que SIMAT manda retirar. */
+  gruposPorId: Map<string, GrupoDoc>;
 }
 
 const llaveGrupo = (sede: unknown, jornada: unknown, grado: unknown, codigo: string): string => `${sede}|${jornada}|${grado}|${codigo.toUpperCase()}`;
@@ -147,6 +154,7 @@ async function cargarCatalogo(institucionId: Types.ObjectId, anioId: Types.Objec
     jornadas: new Map(jornadasDocs.map((j) => [`${j.sede_id}|${j.nombre}`, j])),
     grados: new Map(gradosDocs.map((g) => [g.numero, g])),
     grupos,
+    gruposPorId: new Map((gruposDocs as GrupoDoc[]).map((g) => [String(g._id), g])),
   };
 }
 
@@ -193,6 +201,28 @@ const vacia = (extra: Partial<Clasificada> = {}): Clasificada => ({
 const conMotivo = (clasificacion: ClasificacionSimat, codigo: MotivoSimat, extra: Partial<Clasificada> = {}): Clasificada => vacia({ ...extra, clasificacion, codigo_motivo: codigo });
 const omitida = (codigo: MotivoSimat, extra: Partial<Clasificada> = {}): Clasificada => conMotivo('OMITIDA', codigo, extra);
 
+/**
+ * Un estudiante RETIRADO en SIMAT. Si en Klassy tiene una matrícula vigente y el archivo trae la fecha de fin, se retira con esa fecha efectiva
+ * (el mismo `aplicarSalida` del botón «Retirar»). Sin fecha, con una fecha que no sirve, preinscrita (sin folio) o de una sede ajena, la fila
+ * no se toca y queda para que alguien decida: nunca se inventa una fecha de salida.
+ */
+function clasificarRetiro(f: FilaSimat, usuario: UserDocument | null, avisos: string[], ctx: Contexto): Clasificada {
+  const matriculas = usuario ? (ctx.matriculasPorUsuario.get(String(usuario._id)) ?? []) : [];
+  const viva = matriculas.find((m) => ESTADOS_MATRICULA_VIVOS.includes(m.estado)) ?? null;
+  if (!usuario || !viva) return omitida('RETIRADO_EN_SIMAT', { avisos });
+
+  const usuarioId = String(usuario._id);
+  const sedeDeLaMatricula = ctx.catalogo.gruposPorId.get(String(viva.group_id))?.sede_id;
+  if (ctx.sedesPermitidas && (!sedeDeLaMatricula || !ctx.sedesPermitidas.has(String(sedeDeLaMatricula)))) return omitida('SEDE_SIN_ACCESO', { avisos });
+
+  if (viva.estado === 'PREINSCRITO') return conMotivo('CONFLICTO', 'RETIRADO_PREINSCRITA', { avisos, usuario_id: usuarioId });
+  if (!f.fecha_fin) return conMotivo('CONFLICTO', 'RETIRADO_SIN_FECHA', { avisos, usuario_id: usuarioId });
+  const rechazo = motivoFechaEfectivaInvalida(aDiaDeCalendario(f.fecha_fin), viva.fecha_matricula);
+  if (rechazo) return conMotivo('CONFLICTO', 'FECHA_RETIRO_INVALIDA', { avisos: [rechazo, ...avisos], usuario_id: usuarioId });
+
+  return vacia({ avisos: [`Se retirará desde el ${f.fecha_fin}.`, ...avisos], clasificacion: 'ANTIGUO', matricula: 'RETIRAR', usuario_id: usuarioId });
+}
+
 function clasificarFila(f: FilaSimat, errores: string[], avisosFila: string[], ctx: Contexto, opciones: IOpcionesImportacionSimat): Clasificada {
   const avisos = [...avisosFila];
 
@@ -205,11 +235,7 @@ function clasificarFila(f: FilaSimat, errores: string[], avisosFila: string[], c
 
   const usuario = ctx.usuariosPorDocumento.get(f.documento) ?? null;
 
-  if (f.accion === 'RETIRADO') {
-    // Retirado en SIMAT: no se matricula. Si en Klassy sigue matriculado es una diferencia que alguien debe revisar (no se retira solo: no hay fecha de salida).
-    const sigueMatriculado = usuario && (ctx.matriculasPorUsuario.get(String(usuario._id)) ?? []).some((m) => ESTADOS_MATRICULA_VIVOS.includes(m.estado));
-    return sigueMatriculado ? conMotivo('CONFLICTO', 'RETIRADO_EN_SIMAT', { avisos, usuario_id: String(usuario!._id) }) : omitida('RETIRADO_EN_SIMAT', { avisos });
-  }
+  if (f.accion === 'RETIRADO') return clasificarRetiro(f, usuario, avisos, ctx);
 
   if (f.tipo_documento === null) return omitida('TIPO_DOCUMENTO_NO_SOPORTADO', { avisos: [`Tipo de documento «${f.tipo_documento_texto}».`, ...avisos] });
 
@@ -434,6 +460,18 @@ function avisosPrevios(r: Omit<IResumenImportacionSimat, 'avisos_previos'>, opci
       detalle: 'Se asignan en el orden en que SIMAT registró cada matrícula. Los folios no se pueden deshacer (una matrícula con folio se anula con motivo, no se borra).',
     });
   }
+  const porRetirar = r.matriculas_por_retirar ?? 0;
+  if (porRetirar > 0) {
+    avisos.push({
+      clave: 'RETIROS',
+      severidad: 'warning',
+      cantidad: porRetirar,
+      titulo: `Se retirarán ${plural(porRetirar, 'estudiante', 'estudiantes')} (figuran retirados en SIMAT con fecha de fin)`,
+      detalle:
+        'Cada retiro usa la fecha de fin del archivo como fecha efectiva: la matrícula pasa a RETIRADO, el estudiante deja de aparecer en asistencia, actividades y planillas (lo anterior se conserva), ' +
+        'se abre su paz y salvo de salida y el cupo se libera según la política del colegio. Un retiro no se deshace desde aquí: se corrige con un reingreso guiado en Matrículas.',
+    });
+  }
   if (gruposPorCrear > 0) {
     avisos.push({
       clave: 'GRUPOS',
@@ -500,6 +538,7 @@ export async function simularImportacion(archivo: ArchivoSimat, usuario: UserDoc
   let porCrear = 0;
   let porFormalizar = 0;
   let confirmadas = 0;
+  let porRetirar = 0;
   let fechaReciente: Date | null = null;
   const sedesSinRegistrar = new Map<string, { nombre: string; filas: number }>();
   const jornadasSinConfigurar = new Map<string, number>();
@@ -519,6 +558,10 @@ export async function simularImportacion(archivo: ArchivoSimat, usuario: UserDoc
     }
     if (c.codigo_motivo === 'JORNADA_SIN_CONFIGURAR') jornadasSinConfigurar.set(`${f.sede_nombre} · ${f.jornada_texto}`, (jornadasSinConfigurar.get(`${f.sede_nombre} · ${f.jornada_texto}`) ?? 0) + 1);
     if (c.clasificacion !== 'NUEVO' && c.clasificacion !== 'ANTIGUO') continue;
+    if (c.matricula === 'RETIRAR') {
+      porRetirar += 1;
+      continue;
+    }
     if (c.sin_acudiente) sinAcudiente += 1;
     if (f.eps || f.rh) conSalud += 1;
     if (c.campos.length > 0) conCambios += 1;
@@ -581,6 +624,7 @@ export async function simularImportacion(archivo: ArchivoSimat, usuario: UserDoc
     matriculas_por_crear: porCrear,
     matriculas_por_formalizar: porFormalizar,
     matriculas_confirmadas: confirmadas,
+    matriculas_por_retirar: porRetirar,
     fecha_mas_reciente: fechaReciente,
     advertencias,
   };
@@ -729,7 +773,7 @@ export async function aplicarImportacion(id: string, datos: DatosAplicacion, usu
     accion: 'IMPORTACION_SIMAT_APLICADA',
     entidad: 'ImportacionSimat',
     entidad_id: lote._id,
-    detalle: `Se confirmó la importación: ${resumen.por_clasificacion.NUEVO ?? 0} estudiantes nuevos, ${resumen.por_clasificacion.ANTIGUO ?? 0} ya registrados`,
+    detalle: `Se confirmó la importación: ${resumen.por_clasificacion.NUEVO ?? 0} estudiantes nuevos, ${resumen.por_clasificacion.ANTIGUO ?? 0} ya registrados, ${resumen.matriculas_por_retirar ?? 0} retiros`,
     ip,
   });
   despertarProcesador();
@@ -876,7 +920,31 @@ async function marcarEnMatricula(matriculaId: Types.ObjectId, loteId: Types.Obje
   await Enrollment.updateOne({ _id: matriculaId }, { $set: { origen: 'IMPORTACION_SIMAT', importacion_simat_id: loteId } });
 }
 
-async function procesarFila(lote: ImportacionSimatDocument, anio: AcademicYearDocument, catalogo: Catalogo, actor: UserDocument, f: FilaSimat & { _clasificada?: { reingreso?: boolean } }): Promise<IResultadoFilaSimat> {
+/** Retira la matrícula vigente de un estudiante que SIMAT trae RETIRADO, con la fecha de fin del archivo como fecha efectiva (mismo camino que el botón «Retirar»). */
+async function retirarDesdeSimat(lote: ImportacionSimatDocument, catalogo: Catalogo, actor: UserDocument, f: FilaSimat): Promise<IResultadoFilaSimat> {
+  const sinNada = (detalle: string): IResultadoFilaSimat => ({ estado: 'OMITIDA', detalle, estudiante_creado: false, matricula: 'NINGUNA', campos_actualizados: [], folio: null });
+  const usuario = await User.findOne({ numero_documento: f.documento }).select('_id');
+  const vigente = usuario
+    ? await Enrollment.findOne({ student_id: usuario._id, academic_year_id: lote.academic_year_id, estado: { $in: ESTADOS_MATRICULA_VIVOS } })
+    : null;
+  if (!vigente) return sinNada('Ya no tiene una matrícula vigente este año: no hay nada que retirar.');
+  if (!f.fecha_fin) throw new ApiError(409, MOTIVOS_SIMAT.RETIRADO_SIN_FECHA);
+
+  // Se vuelve a respetar el alcance de sedes con que se simuló: la matrícula pudo cambiar de grupo entre la simulación y la aplicación.
+  const permitidas = lote.sedes_permitidas?.map(String) ?? null;
+  const sede = catalogo.gruposPorId.get(String(vigente.group_id))?.sede_id;
+  if (permitidas && (!sede || !permitidas.includes(String(sede)))) return sinNada(MOTIVOS_SIMAT.SEDE_SIN_ACCESO);
+
+  await runTransaction(async (session) => {
+    const matricula = await Enrollment.findById(vigente._id).session(session);
+    if (!matricula) throw new ApiError(404, 'Matrícula no encontrada.');
+    await aplicarSalida(matricula, { tipo: 'RETIRO', fecha_efectiva: f.fecha_fin!, motivo: MOTIVO_RETIRO_SIMAT }, { id: actor._id }, session);
+  });
+  return { estado: 'CORRECTA', detalle: `Matrícula retirada desde el ${f.fecha_fin}.`, estudiante_creado: false, matricula: 'RETIRADA', campos_actualizados: [], folio: vigente.folio_matricula };
+}
+
+async function procesarFila(lote: ImportacionSimatDocument, anio: AcademicYearDocument, catalogo: Catalogo, actor: UserDocument, f: FilaSimat & { _clasificada?: { reingreso?: boolean; matricula?: string } }): Promise<IResultadoFilaSimat> {
+  if (f._clasificada?.matricula === 'RETIRAR') return retirarDesdeSimat(lote, catalogo, actor, f);
   const ubicacion = ubicar(f, catalogo);
   if (!ubicacion.grupo || !ubicacion.grado) throw new ApiError(409, MOTIVOS_SIMAT.GRUPO_NO_SE_PUDO_CREAR);
   const grupo = ubicacion.grupo;
@@ -1002,7 +1070,9 @@ async function ejecutarLote(lote: ImportacionSimatDocument): Promise<void> {
     // Solo las filas que aún no tienen resultado: así un lote retomado tras una caída no repite lo ya hecho.
     const pendientes = await ImportacionSimatFila.find({ lote_id: lote._id, clasificacion: { $in: ['NUEVO', 'ANTIGUO'] }, resultado: null }).select('+datos').lean();
     const porNumero = new Map(pendientes.map((p) => [p.numero, p]));
-    const orden = ordenarParaFolio(pendientes.map((p) => ({ ...(p.datos as FilaSimat), numero: p.numero })));
+    // Los retiros van primero: liberan cupo (según la política del colegio) antes de matricular a quien llega al mismo grupo.
+    const esRetiro = (p: { _clasificada?: { matricula?: string } }): number => (p._clasificada?.matricula === 'RETIRAR' ? 0 : 1);
+    const orden = ordenarParaFolio(pendientes.map((p) => ({ ...(p.datos as FilaSimat), numero: p.numero }))).sort((a, b) => esRetiro(a as never) - esRetiro(b as never));
 
     for (const fila of orden) {
       const doc = porNumero.get(fila.numero)!;
@@ -1075,6 +1145,7 @@ export async function informeExcel(id: string, usuario: UserDocument): Promise<B
     ['Matrículas creadas/por crear', r.matriculas_por_crear],
     ['Matrículas formalizadas/por formalizar', r.matriculas_por_formalizar],
     ['Matrículas ya vigentes (confirmadas)', r.matriculas_confirmadas],
+    ['Matrículas retiradas/por retirar', r.matriculas_por_retirar ?? 0],
     ...r.advertencias.map((a, i) => [`Advertencia ${i + 1}`, neutralizarFormula(a)] as [string, string]),
   ];
   for (const l of lineas) resumen.addRow(l);

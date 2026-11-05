@@ -56,8 +56,12 @@ export function resumenPolitica(p: PoliticaPromocion, notaAprobatoria: number, n
   if (p.piar.derivar_a_comision) frases.push('Si un estudiante con PIAR reprueba, no se aplica la regla automática: la Comisión decide en acta.');
 
   if (p.arrastre.admite) {
-    const cuales = p.asignaturas_arrastrables_ids.map((id) => nombres.asignaturas.get(id) ?? '').filter(Boolean);
-    frases.push(`Puede pasar de grado debiendo hasta ${plural(p.arrastre.max_unidades, 'materia', 'materias')}${cuales.length > 0 ? ` (solo ${listar(cuales)})` : ''}.`);
+    // Con la evaluación por áreas lo que se debe son áreas, y las permitidas son áreas.
+    const cuales = [
+      ...(p.unidad !== 'AREA' ? p.asignaturas_arrastrables_ids.map((id) => nombres.asignaturas.get(id) ?? '') : []),
+      ...(p.unidad !== 'ASIGNATURA' ? p.areas_arrastrables_ids.map((id) => nombres.areas.get(id) ?? '') : []),
+    ].filter(Boolean);
+    frases.push(`Puede pasar de grado debiendo hasta ${p.unidad === 'AREA' ? plural(p.arrastre.max_unidades, 'área', 'áreas') : plural(p.arrastre.max_unidades, 'materia', 'materias')}${cuales.length > 0 ? ` (solo ${listar(cuales)})` : ''}.`);
   }
   return frases;
 }

@@ -33,7 +33,19 @@ export interface NavItem {
   soloPresencial?: boolean;
   /** No sale en el menú lateral ni en los accesos del inicio: tiene su botón en el encabezado (el asistente sí lo conoce). */
   soloEncabezado?: boolean;
+  /**
+   * Perfiles (de `roles`) para los que la pantalla solo sale si la persona integra una sesión de la comisión; los demás perfiles de `roles` la ven siempre. Quien no está
+   * designado no tiene nada que ver ahí (el servidor solo le muestra sus propias sesiones), así que el menú no se la ofrece.
+   */
+  soloSiIntegraComision?: Rol[];
 }
+
+/** ¿Este perfil necesita comprobar si integra alguna sesión de la comisión para ver su entrada del menú? */
+export const PERFILES_CON_COMISION_POR_DESIGNACION: Rol[] = ['COORDINADOR_CONVIVENCIA', 'ORIENTADOR', 'DOCENTE', 'ACUDIENTE'];
+
+/** Una entrada del menú o de los accesos del inicio es visible si el perfil está en `roles` y, cuando aplica, si integra la comisión. */
+export const esVisibleParaRol = (item: NavItem, rol: Rol, integraComision: boolean): boolean =>
+  (!item.roles || item.roles.includes(rol)) && !(item.soloSiIntegraComision?.includes(rol) && !integraComision);
 
 const STAFF: Rol[] = ['ADMIN', 'COORDINADOR', 'SECRETARIA'];
 const GROUP_MANAGERS: Rol[] = ['ADMIN', 'COORDINADOR'];
@@ -81,7 +93,7 @@ export const NAV_ITEMS: NavItem[] = [
   { to: '/admin/reportes-cierre', label: 'Reportes de cierre anual', icon: FileTextIcon, roles: [...STAFF, 'ORIENTADOR'] },
   { to: '/admin/reporte-c600', label: 'Reporte DANE C-600', icon: FileTextIcon, roles: STAFF },
   { to: '/admin/promocion-anticipada', label: 'Promoción anticipada', icon: GraduationCapIcon, roles: GROUP_MANAGERS },
-  { to: '/comision', label: 'Comisión de evaluación', icon: UsersIcon, roles: ['ADMIN', 'COORDINADOR', 'COORDINADOR_CONVIVENCIA', 'ORIENTADOR', 'DOCENTE', 'ACUDIENTE'] },
+  { to: '/comision', label: 'Comisión de evaluación', icon: UsersIcon, roles: ['ADMIN', 'COORDINADOR', 'COORDINADOR_CONVIVENCIA', 'ORIENTADOR', 'DOCENTE', 'ACUDIENTE'], soloSiIntegraComision: PERFILES_CON_COMISION_POR_DESIGNACION },
   { to: '/secretaria/titulacion', label: 'Titulación', icon: GraduationCapIcon, roles: STAFF },
   { to: '/docente/mi-carga', label: 'Mi asignación', icon: ClipboardListIcon, roles: ['DOCENTE'] },
   { to: '/docente/planeacion', label: 'Planeación', icon: BookIcon, roles: ['DOCENTE'] },

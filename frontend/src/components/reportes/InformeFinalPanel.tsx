@@ -12,6 +12,7 @@ import { Card, CardHeader } from '../ui/Card';
 import { Select } from '../ui/Field';
 import { SelectBuscable } from '../ui/SelectBuscable';
 import { Switch } from '../ui/Switch';
+import { type SolicitudDeVista, VistaPreviaReporte } from './VistaPreviaReporte';
 
 const NOMBRES_JORNADA: Record<string, string> = { MANANA: 'Mañana', TARDE: 'Tarde', UNICA: 'Única', NOCTURNA: 'Nocturna', SABATINA: 'Sabatina' };
 
@@ -50,6 +51,7 @@ export function InformeFinalPanel({ anioPorDefecto }: { anioPorDefecto?: string 
   const descargar = useDescargarInformeFinal();
   const publicacion = usePublicacionInformeFinal({ academic_year_id: anioElegido, group_id: grupoId });
   const publicar = useEstablecerPublicacionInformeFinal();
+  const [vista, setVista] = useState<SolicitudDeVista | null>(null);
   const esAdmin = user?.rol === 'ADMIN';
   const etiquetaGrupo = grupo ? `${typeof grupo.grade_id === 'object' ? grupo.grade_id.numero : ''}-${grupo.nomenclatura}` : 'grupo';
 
@@ -101,15 +103,30 @@ export function InformeFinalPanel({ anioPorDefecto }: { anioPorDefecto?: string 
         <p className="mt-3 text-xs text-muted">
           El informe se arma por grupo, con un estudiante por hoja. Se calcula al descargarlo: antes de las recuperaciones sale marcado como preliminar y, cuando el colegio ya hizo el cierre de promoción, sale definitivo.
         </p>
-        <div className="mt-4">
+        <div className="mt-4 flex flex-wrap gap-3">
           <Button
             onClick={() => descargar.mutate({ referencia: { academic_year_id: anioElegido, group_id: grupoId }, nombreArchivo: `informe-final-${anio?.year ?? ''}-${etiquetaGrupo}` })}
             disabled={!anioElegido || !grupoId || descargar.isPending}
           >
             Descargar informe final (PDF)
           </Button>
+          <Button
+            variant="secondary"
+            onClick={() =>
+              setVista({
+                ruta: 'informe-final/pdf',
+                consulta: { academic_year_id: anioElegido, group_id: grupoId },
+                nombreArchivo: `informe-final-${anio?.year ?? ''}-${etiquetaGrupo}.pdf`,
+                titulo: `Vista previa del informe final · ${etiquetaGrupo}`,
+              })
+            }
+            disabled={!anioElegido || !grupoId}
+          >
+            Vista previa
+          </Button>
         </div>
       </Card>
+      {vista && <VistaPreviaReporte vista={vista} onCerrar={() => setVista(null)} />}
       {descargar.isError && <Alert tone="error">{errorMessage(descargar.error)}</Alert>}
       {descargar.isPending && <Alert tone="info">Preparando el informe…</Alert>}
 

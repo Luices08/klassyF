@@ -11,7 +11,7 @@ import { Spinner } from '../../components/ui/Spinner';
 import { TabPanel, Tabs } from '../../components/ui/Tabs';
 import { useAuth } from '../../context/AuthContext';
 import { NOMBRES_ESTADO_CITACION } from '../../hooks/useCitaciones';
-import { CERRABLES, NOMBRES_RESULTADO, NOMBRES_ROL_INVOLUCRADO, SIGUIENTES_ESTADOS, useActualizarPaso, useCaso, type CasoDetalle } from '../../hooks/useCasos';
+import { CERRABLES, NOMBRES_RESULTADO, NOMBRES_ROL_INVOLUCRADO, SIGUIENTES_ESTADOS, useActualizarPaso, useCaso, useJustificarSinRemision, useSincronizarProtocolo, type CasoDetalle } from '../../hooks/useCasos';
 import { formatoFechaCalendario } from '../../lib/fechas';
 
 /**
@@ -79,6 +79,8 @@ function Contenido({ caso }: { caso: CasoDetalle }) {
   const [pasoOmitido, setPasoOmitido] = useState<{ id: string; nombre: string } | null>(null);
   const [citando, setCitando] = useState<{ id: string; nombre: string } | null>(null);
   const actualizarPaso = useActualizarPaso();
+  const sincronizarProtocolo = useSincronizarProtocolo();
+  const justificarSinRemision = useJustificarSinRemision();
 
   const finalizado = caso.estado === 'CERRADO' || caso.estado === 'ANULADO';
   return (
@@ -136,7 +138,10 @@ function Contenido({ caso }: { caso: CasoDetalle }) {
           <TabPanel active={tab} tabKey="protocolo">
             <div className="space-y-4">
               {caso.pasos.length === 0 ? (
-                <p className="text-sm text-muted">El protocolo de este tipo no tiene pasos definidos. Se configuran en el catálogo de convivencia.</p>
+                <p className="text-sm text-muted">
+                  Este caso no trae pasos de protocolo. Los pasos se copian al abrir el caso: si el protocolo de este tipo se configuró después, o aún no se ha configurado, no llegaron. Se definen en el
+                  catálogo de convivencia y, una vez definidos, puedes traerlos con «Traer los pasos del protocolo».
+                </p>
               ) : (
                 <ul className="space-y-2">
                   {caso.pasos.map((p) => (
@@ -178,6 +183,19 @@ function Contenido({ caso }: { caso: CasoDetalle }) {
                 </ul>
               )}
               {actualizarPaso.isError && <Alert tone="error">{errorMessage(actualizarPaso.error)}</Alert>}
+              {!finalizado && (
+                <Button variant="soft-edit" className="px-3 py-1 text-xs" isLoading={sincronizarProtocolo.isPending} onClick={() => sincronizarProtocolo.mutate({ id: caso._id })}>
+                  Traer los pasos del protocolo
+                </Button>
+              )}
+              {sincronizarProtocolo.isError && <Alert tone="error">{errorMessage(sincronizarProtocolo.error)}</Alert>}
+              {sincronizarProtocolo.isSuccess && (
+                <Alert tone={sincronizarProtocolo.data.pasos_agregados ? 'success' : 'info'}>
+                  {sincronizarProtocolo.data.pasos_agregados
+                    ? `Se agregaron ${sincronizarProtocolo.data.pasos_agregados} paso(s) del protocolo. Los que ya estaban no se tocaron.`
+                    : 'El caso ya tiene todos los pasos del protocolo vigente.'}
+                </Alert>
+              )}
 
               <Fila etiqueta="Atención inmediata">
                 {caso.atencion_inmediata ? (
@@ -267,7 +285,23 @@ function Contenido({ caso }: { caso: CasoDetalle }) {
                   {caso.remisiones.length === 0 && <li className="text-muted">Sin remisiones{caso.justificacion_sin_remision ? `. Justificación: ${caso.justificacion_sin_remision}` : ''}.</li>}
                 </ul>
               </Fila>
-              {!finalizado && <Boton onAccion={setAccion} modo="remisiones">Registrar remisión</Boton>}
+              {!finalizado && (
+                <div className="flex flex-wrap gap-2">
+                  <Boton onAccion={setAccion} modo="remisiones">Registrar remisión</Boton>
+                  {/* Un tipo III sin remisión puede explicar por qué no la hubo sin esperar al cierre: es lo que apaga la alerta de remisión pendiente. */}
+                  {caso.tipo_situacion === 'III' && caso.remisiones.length === 0 && (
+                    <>
+                      <Boton onAccion={setAccion} modo="justificacion-sin-remision">{caso.justificacion_sin_remision ? 'Editar la justificación' : 'Justificar la falta de remisión'}</Boton>
+                      {caso.justificacion_sin_remision && (
+                        <Button variant="soft-danger" className="px-3 py-1 text-xs" isLoading={justificarSinRemision.isPending} onClick={() => justificarSinRemision.mutate({ id: caso._id, justificacion: '' })}>
+                          Retirar la justificación
+                        </Button>
+                      )}
+                    </>
+                  )}
+                </div>
+              )}
+              {justificarSinRemision.isError && <Alert tone="error">{errorMessage(justificarSinRemision.error)}</Alert>}
 
               <Fila etiqueta="Remisiones a orientación">
                 <ul className="space-y-2">

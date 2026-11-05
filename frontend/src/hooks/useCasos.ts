@@ -108,6 +108,8 @@ export interface CasoDetalle {
   citaciones: { _id: string; titulo: string; fecha_hora: string; estado: 'PROGRAMADA' | 'REALIZADA' | 'CANCELADA'; student_id: string | null }[];
   sesiones_comite: { _id: string; codigo: string | null; estado: 'BORRADOR' | 'FIRMADA'; tipo: 'ORDINARIA' | 'EXTRAORDINARIA'; fecha: string }[];
   alertas: AlertaCaso[];
+  /** Solo viene en la respuesta de «sincronizar con el protocolo»: cuántos pasos se agregaron (0 = ya tenía todos). */
+  pasos_agregados?: number;
 }
 
 export interface RemisionOrientacionResumen {
@@ -243,6 +245,9 @@ function usarAccionDeCaso<T>(ruta: (id: string, entrada: T) => { metodo: 'post' 
 export const useCambiarEstadoCaso = usarAccionDeCaso<{ estado: EstadoCaso }>((id, e) => ({ metodo: 'post', url: `/convivencia/casos/${id}/estado`, cuerpo: e }));
 export const useReclasificarCaso = usarAccionDeCaso<{ tipo_situacion: TipoSituacion; motivo: string }>((id, e) => ({ metodo: 'post', url: `/convivencia/casos/${id}/tipo`, cuerpo: e }));
 export const useRegistrarAtencion = usarAccionDeCaso<{ descripcion: string; hubo_dano: boolean }>((id, e) => ({ metodo: 'put', url: `/convivencia/casos/${id}/atencion`, cuerpo: e }));
+export const useSincronizarProtocolo = usarAccionDeCaso<unknown>((id) => ({ metodo: 'post', url: `/convivencia/casos/${id}/protocolo/sincronizar`, cuerpo: {} }));
+/** Texto vacío retira la justificación que se había escrito. */
+export const useJustificarSinRemision = usarAccionDeCaso<{ justificacion: string }>((id, e) => ({ metodo: 'put', url: `/convivencia/casos/${id}/justificacion-sin-remision`, cuerpo: e }));
 export const useActualizarPaso = usarAccionDeCaso<{ pasoId: string; estado: 'PENDIENTE' | 'CUMPLIDO' | 'NO_APLICA'; nota?: string }>((id, { pasoId, ...e }) => ({
   metodo: 'patch',
   url: `/convivencia/casos/${id}/pasos/${pasoId}`,

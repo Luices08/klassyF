@@ -25,7 +25,7 @@ export interface IGrupoPorCrear {
 
 /** Lo que el usuario debe leer antes de confirmar (acudiente por crear, información por revisar, marca de los registros…). */
 export interface IAvisoPrevio {
-  clave: 'ACUDIENTE' | 'REVISION' | 'MARCA' | 'SALUD' | 'FOLIOS' | 'GRUPOS' | 'CONFLICTOS';
+  clave: 'ACUDIENTE' | 'REVISION' | 'MARCA' | 'SALUD' | 'FOLIOS' | 'GRUPOS' | 'RETIROS' | 'CONFLICTOS';
   titulo: string;
   detalle: string;
   severidad: 'info' | 'warning';
@@ -48,6 +48,8 @@ export interface IResumenImportacionSimat {
   matriculas_por_crear: number;
   matriculas_por_formalizar: number;
   matriculas_confirmadas: number;
+  /** Matrículas vigentes que se retirarán porque SIMAT trae al estudiante RETIRADO con su fecha de fin. Los lotes anteriores no lo traen. */
+  matriculas_por_retirar?: number;
   /** FECHAINI más reciente del archivo: da idea de qué tan viejo es el corte. */
   fecha_mas_reciente: Date | null;
   advertencias: string[];
@@ -118,7 +120,7 @@ export interface IResultadoFilaSimat {
   estado: 'CORRECTA' | 'ERROR' | 'OMITIDA';
   detalle: string;
   estudiante_creado: boolean;
-  matricula: 'CREADA' | 'FORMALIZADA' | 'CONFIRMADA' | 'NINGUNA';
+  matricula: 'CREADA' | 'FORMALIZADA' | 'CONFIRMADA' | 'RETIRADA' | 'NINGUNA';
   campos_actualizados: string[];
   folio: string | null;
 }

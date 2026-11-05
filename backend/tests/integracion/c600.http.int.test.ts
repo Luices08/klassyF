@@ -85,6 +85,16 @@ describe('M30: reporte tipo C-600 y consolidado institucional (capa HTTP)', () =
     expect(d.balance.total).toEqual({ matricula_inicial: 2, ingresados: 1, retirados: 1, matricula_final: 2 });
   });
 
+  it('quien se retiró, reingresó y volvió a retirarse el mismo año cuenta una sola vez', async () => {
+    const original = (await Enrollment.collection.findOne({ student_id: e.tercerEstudiante._id }))!;
+    const { _id, folio_matricula, numero_libro, numero_folio, ...resto } = original;
+    void _id; void folio_matricula; void numero_libro; void numero_folio;
+    await Enrollment.collection.insertOne({ ...resto, folio_matricula: null, numero_libro: null, numero_folio: null });
+    const d = (await vista(e.admin)).cuerpo.data;
+    expect(d.balance.total).toEqual({ matricula_inicial: 2, ingresados: 1, retirados: 1, matricula_final: 2 });
+    expect(d.resultados.filas[0].desertores.total).toBe(1);
+  });
+
   it('resultados por sexo: sin cierre quedan sin resultado final, y el retirado de sexo «otro» abre esa columna', async () => {
     const d = (await vista(e.admin)).cuerpo.data;
     const fila = d.resultados.filas[0];

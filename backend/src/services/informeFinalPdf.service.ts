@@ -1,10 +1,11 @@
 import PDFDocument from 'pdfkit';
 import { PlantillaBoletin } from '../constants/boletin';
+import { LEYENDA_SIGLAS_VALORACION, NOMBRES_NIVEL_VALORACION, SIGLA_NIVEL_VALORACION } from '../constants/valoracionDescriptiva';
 import { UserDocument } from '../models/user.model';
 import { imagenDesdeDataUri } from '../utils/almacenImagenes';
 import { leerConfiguracionBoletin } from './boletinConfig.service';
 import { cargarLogo, COLOR, MARGEN } from './encabezadoInstitucional.service';
-import { AsignaturaInforme, EstudianteInforme, FiltrosInformeFinal, InformeFinal, informeFinalParaFamilia, informeFinalParaPersonal } from './informeFinal.service';
+import { AreaInforme, AsignaturaInforme, EstudianteInforme, FiltrosInformeFinal, InformeFinal, informeFinalParaFamilia, informeFinalParaPersonal } from './informeFinal.service';
 import { ESCALA_TEXTO, FUENTES, dibujarMarcaDeAgua, limpiarNombre, nuevoDocumento } from './reportCardPdf.service';
 
 type Documento = InstanceType<typeof PDFDocument>;
@@ -19,10 +20,41 @@ interface Estilo {
   p: PlantillaBoletin;
   fuente: { n: string; b: string; i: string };
   u: (n: number) => number;
+  /** Cierra la hoja actual (con su pie) y abre otra con una cabecera corta. Lo fija cada estudiante porque el pie lleva su nombre. */
+  continuar: () => void;
 }
 
-function asegurarEspacio({ doc }: Estilo, alto: number): void {
-  if (doc.y + alto > doc.page.height - doc.page.margins.bottom) doc.addPage();
+/** Una columna de la tabla: lo que dice su título y cómo se escribe cada fila (asignatura o área). */
+interface Columna {
+  titulo: string;
+  ancho: number;
+  x: number;
+  valor: (a: AsignaturaInforme) => string;
+  valorArea: (a: AreaInforme) => string;
+  negrita?: boolean;
+  /** La fila de un área escribe algo en esta columna: el título del área puede ocupar todo lo que hay antes de la primera de ellas. */
+  enArea?: boolean;
+}
+
+const limiteInferior = ({ doc }: Estilo): number => doc.page.height - doc.page.margins.bottom;
+
+/** Si lo que sigue no cabe en la hoja, pasa a otra (y, si es una tabla, repite su cabecera). */
+function asegurarEspacio(e: Estilo, alto: number, alContinuar?: () => void): void {
+  if (e.doc.y + alto > limiteInferior(e)) {
+    e.continuar();
+    alContinuar?.();
+  }
+}
+
+/**
+ * El pie de la hoja. Se dibuja con el margen inferior en cero: si no, el texto cae fuera del área útil y pdfkit abre una hoja nueva solo para él
+ * (así salía el «Generado el…» solo en una página en blanco).
+ */
+function pie({ doc, fuente, u }: Estilo, texto: string): void {
+  const margen = doc.page.margins.bottom;
+  doc.page.margins.bottom = 0;
+  doc.font(fuente.n).fontSize(u(7)).fillColor(COLOR.tenue).text(texto, MARGEN, doc.page.height - u(32), { width: doc.page.width - MARGEN * 2, align: 'right', lineBreak: false });
+  doc.page.margins.bottom = margen;
 }
 
 function encabezado(e: Estilo, informe: InformeFinal, escudo: Buffer | null): void {
@@ -61,6 +93,16 @@ function encabezado(e: Estilo, informe: InformeFinal, escudo: Buffer | null): vo
   if (p.subtitulo.trim()) doc.font(fuente.i).fontSize(u(9.5)).fillColor(COLOR.tenue).text(p.subtitulo, MARGEN, doc.y, { width: ancho });
 }
 
+/** La cabecera corta de las hojas que continúan: de quién es el informe, para que ninguna hoja suelta quede sin dueño. */
+function cabeceraDeContinuacion(e: Estilo, informe: InformeFinal, s: EstudianteInforme): void {
+  const { doc, fuente, u } = e;
+  const ancho = doc.page.width - MARGEN * 2;
+  doc.font(fuente.b).fontSize(u(9)).fillColor(COLOR.ink).text(s.nombre_completo, MARGEN, doc.y, { width: ancho, continued: true });
+  doc.font(fuente.n).fillColor(COLOR.tenue).text(`  ·  ${informe.grupo.etiqueta}  ·  Informe final ${informe.anio} (continuación)`, { width: ancho });
+  doc.y += u(8);
+  doc.x = MARGEN;
+}
+
 function datos(e: Estilo, informe: InformeFinal, s: EstudianteInforme): void {
   const { doc, p, fuente, u } = e;
   const ancho = doc.page.width - MARGEN * 2;
@@ -77,72 +119,152 @@ function datos(e: Estilo, informe: InformeFinal, s: EstudianteInforme): void {
 
   const xDerecha = MARGEN + ancho * 0.68;
   const anchoDerecha = ancho * 0.32 - 10;
-  doc.font(fuente.n).fontSize(u(8)).fillColor(COLOR.tenue).text('PROMEDIO GENERAL DEL AÑO', xDerecha, y + u(8), { width: anchoDerecha, align: 'right' });
-  doc.font(fuente.b).fontSize(u(16)).fillColor(COLOR.ink).text(nota(s.promedio_general), xDerecha, y + u(19), { width: anchoDerecha, align: 'right' });
-  const resumen = [s.desempeno_general?.etiqueta, informe.mostrar_puesto && s.puesto !== null ? `Puesto ${s.puesto} de ${informe.estudiantes.length}` : null].filter(Boolean).join(' · ');
-  if (resumen) doc.font(fuente.n).fontSize(u(8.5)).fillColor(COLOR.cuerpo).text(resumen, xDerecha, y + u(41), { width: anchoDerecha, align: 'right' });
+  if (s.descriptivo) {
+    // Preescolar no tiene promedio ni puesto: se dice de qué evaluación se trata en vez de mostrar un guion.
+    doc.font(fuente.n).fontSize(u(8)).fillColor(COLOR.tenue).text('EVALUACIÓN', xDerecha, y + u(8), { width: anchoDerecha, align: 'right' });
+    doc.font(fuente.b).fontSize(u(12)).fillColor(COLOR.ink).text('Descriptiva', xDerecha, y + u(20), { width: anchoDerecha, align: 'right' });
+    doc.font(fuente.n).fontSize(u(8.5)).fillColor(COLOR.cuerpo).text('Sin notas numéricas', xDerecha, y + u(41), { width: anchoDerecha, align: 'right' });
+  } else {
+    doc.font(fuente.n).fontSize(u(8)).fillColor(COLOR.tenue).text('PROMEDIO GENERAL DEL AÑO', xDerecha, y + u(8), { width: anchoDerecha, align: 'right' });
+    doc.font(fuente.b).fontSize(u(16)).fillColor(COLOR.ink).text(nota(s.promedio_general), xDerecha, y + u(19), { width: anchoDerecha, align: 'right' });
+    const resumen = [s.desempeno_general?.etiqueta, informe.mostrar_puesto && s.puesto !== null ? `Puesto ${s.puesto} de ${informe.estudiantes.length}` : null].filter(Boolean).join(' · ');
+    if (resumen) doc.font(fuente.n).fontSize(u(8.5)).fillColor(COLOR.cuerpo).text(resumen, xDerecha, y + u(41), { width: anchoDerecha, align: 'right' });
+  }
   doc.y = y + alto + 6;
   doc.x = MARGEN;
+}
+
+/**
+ * Las columnas de la tabla. Los anchos fijos se reducen en proporción si el tamaño de texto del colegio o la cantidad de periodos no dejan lugar
+ * al nombre (mínimo 120 pt): antes el nombre quedaba con ancho negativo y se montaba sobre las notas.
+ */
+function columnasDe(e: Estilo, informe: InformeFinal, descriptivo: boolean): { columnas: Columna[]; anchoNombre: number } {
+  const { doc, u } = e;
+  const ancho = doc.page.width - MARGEN * 2;
+  const periodos = informe.periodos;
+  const definicion: Array<Omit<Columna, 'x' | 'ancho'> & { base: number }> = [
+    ...periodos.map((periodo, i) => ({
+      titulo: `P${periodo.numero}`,
+      base: descriptivo ? 32 : 30,
+      valor: (a: AsignaturaInforme) => {
+        const celda = a.periodos[i];
+        if (!celda) return '';
+        if (descriptivo) return celda.valoracion ? SIGLA_NIVEL_VALORACION[celda.valoracion] : '—';
+        return celda.exenta ? 'E' : nota(celda.nota);
+      },
+      valorArea: () => '',
+    })),
+  ];
+  if (descriptivo) {
+    definicion.push({
+      titulo: 'NIVEL FINAL',
+      base: 84,
+      negrita: true,
+      valor: (a) => (a.nivel_descriptivo ? NOMBRES_NIVEL_VALORACION[a.nivel_descriptivo] : '—'),
+      valorArea: () => '',
+    });
+  } else {
+    definicion.push(
+      { titulo: 'AÑO', base: 34, valor: (a) => (a.exenta ? 'E' : nota(a.nota_anual)), valorArea: () => '' },
+      { titulo: 'RECUP.', base: 36, valor: (a) => (a.nota_recuperacion === null ? '' : nota(a.nota_recuperacion)), valorArea: () => '' },
+      { titulo: 'FINAL', base: 34, negrita: true, enArea: true, valor: (a) => (a.exenta ? 'E' : nota(a.nota_final)), valorArea: (ar) => nota(ar.nota_final) },
+      { titulo: 'NIVEL', base: 84, enArea: true, valor: (a) => a.desempeno?.etiqueta ?? '', valorArea: (ar) => ar.desempeno?.etiqueta ?? '' }
+    );
+  }
+  definicion.push({ titulo: 'FALLAS', base: 38, valor: (a) => (a.fallas > 0 ? String(a.fallas) : ''), valorArea: () => '' });
+
+  const fijo = definicion.reduce((s, c) => s + u(c.base), 0);
+  const escala = ancho - fijo < 120 ? Math.max(0.5, (ancho - 120) / fijo) : 1;
+  const anchoNombre = ancho - fijo * escala;
+  let x = MARGEN + anchoNombre;
+  const columnas = definicion.map((c) => {
+    const w = u(c.base) * escala;
+    const columna: Columna = { titulo: c.titulo, ancho: w, x, valor: c.valor, valorArea: c.valorArea, negrita: c.negrita, enArea: c.enArea };
+    x += w;
+    return columna;
+  });
+  return { columnas, anchoNombre };
 }
 
 function tabla(e: Estilo, informe: InformeFinal, s: EstudianteInforme): void {
   const { doc, fuente, u } = e;
   const ancho = doc.page.width - MARGEN * 2;
-  const n = informe.periodos.length;
-  const anchoPeriodo = u(32);
-  const anchoNota = u(36);
-  const anchoNivel = u(58);
-  const anchoFallas = u(28);
-  const anchoNombre = ancho - n * anchoPeriodo - anchoNota * 3 - anchoNivel - anchoFallas;
-  const columnas = {
-    periodo: (i: number) => MARGEN + anchoNombre + i * anchoPeriodo,
-    anual: MARGEN + anchoNombre + n * anchoPeriodo,
-    recuperacion: MARGEN + anchoNombre + n * anchoPeriodo + anchoNota,
-    final: MARGEN + anchoNombre + n * anchoPeriodo + anchoNota * 2,
-    nivel: MARGEN + anchoNombre + n * anchoPeriodo + anchoNota * 3,
-    fallas: MARGEN + anchoNombre + n * anchoPeriodo + anchoNota * 3 + anchoNivel,
-  };
+  const { columnas, anchoNombre } = columnasDe(e, informe, s.descriptivo);
+  const relleno = u(2.5);
+  const anchoTextoNombre = anchoNombre - 6;
+  // En la fila de un área las columnas de notas están vacías: su título se extiende hasta la primera columna que sí lleva algo (o hasta el final).
+  const primeraDeArea = columnas.find((c) => c.enArea);
+  const anchoTextoArea = (primeraDeArea ? primeraDeArea.x - MARGEN : ancho) - 8;
+  const columnaNivel = columnas.find((c) => c.titulo === 'NIVEL' || c.titulo === 'NIVEL FINAL');
+
+  /** El alto de una línea de texto con la fuente y el tamaño dados. */
+  const lineaDe = (f: string, tam: number): number => doc.font(f).fontSize(tam).currentLineHeight();
+  /** El alto que ocupa un texto que puede partirse en varias líneas dentro de un ancho. */
+  const altoDe = (texto: string, f: string, tam: number, w: number): number => doc.font(f).fontSize(tam).heightOfString(texto || ' ', { width: w });
 
   const cabecera = () => {
-    asegurarEspacio(e, u(40));
+    const alto = u(18);
+    asegurarEspacio(e, alto + u(24));
     const y = doc.y;
-    doc.rect(MARGEN, y, ancho, u(18)).fill(COLOR.primario);
+    doc.rect(MARGEN, y, ancho, alto).fill(COLOR.primario);
     doc.font(fuente.b).fontSize(u(7.5)).fillColor('#FFFFFF');
-    doc.text('ÁREA / ASIGNATURA', MARGEN + 6, y + u(6), { width: anchoNombre - 6, lineBreak: false });
-    informe.periodos.forEach((p, i) => doc.text(`P${p.numero}`, columnas.periodo(i), y + u(6), { width: anchoPeriodo, align: 'center', lineBreak: false }));
-    doc.text('AÑO', columnas.anual, y + u(6), { width: anchoNota, align: 'center', lineBreak: false });
-    doc.text('RECUP.', columnas.recuperacion, y + u(6), { width: anchoNota, align: 'center', lineBreak: false });
-    doc.text('FINAL', columnas.final, y + u(6), { width: anchoNota, align: 'center', lineBreak: false });
-    doc.text('NIVEL', columnas.nivel, y + u(6), { width: anchoNivel, align: 'center', lineBreak: false });
-    doc.text('FALLAS', columnas.fallas, y + u(6), { width: anchoFallas, align: 'center', lineBreak: false });
-    doc.y = y + u(22);
+    const yTexto = y + (alto - doc.currentLineHeight()) / 2;
+    doc.text('ÁREA / ASIGNATURA', MARGEN + 6, yTexto, { width: anchoTextoNombre, lineBreak: false });
+    for (const c of columnas) doc.text(c.titulo, c.x, yTexto, { width: c.ancho, align: 'center', lineBreak: false });
+    doc.y = y + alto + u(3);
   };
   cabecera();
 
+  /** Una fila (de asignatura o de área): su alto sale de lo que ocupen el nombre y el nivel, así nada se monta sobre la fila siguiente. */
+  const alturaDeFila = (nombre: string, nivel: string, fNombre: string, tam: number, anchoNombreFila = anchoTextoNombre): number =>
+    Math.max(altoDe(nombre, fNombre, tam, anchoNombreFila), columnaNivel ? altoDe(nivel, fuente.n, tam - 0.5, columnaNivel.ancho - 4) : 0, lineaDe(fuente.n, tam)) + relleno * 2;
+
   const fila = (a: AsignaturaInforme) => {
-    asegurarEspacio(e, u(16));
+    const tam = u(8.5);
+    const alto = alturaDeFila(a.nombre, columnaNivel ? columnaNivel.valor(a) : '', fuente.n, tam);
+    asegurarEspacio(e, alto, cabecera);
     const y = doc.y;
-    doc.font(fuente.n).fontSize(u(8.5)).fillColor(COLOR.ink).text(a.nombre, MARGEN + 6, y, { width: anchoNombre - 6, lineBreak: false });
-    doc.fillColor(COLOR.cuerpo);
-    a.periodos.forEach((p, i) => doc.text(p.exenta ? 'E' : nota(p.nota), columnas.periodo(i), y, { width: anchoPeriodo, align: 'center', lineBreak: false }));
-    doc.text(a.exenta ? 'E' : nota(a.nota_anual), columnas.anual, y, { width: anchoNota, align: 'center', lineBreak: false });
-    doc.text(a.nota_recuperacion === null ? '' : nota(a.nota_recuperacion), columnas.recuperacion, y, { width: anchoNota, align: 'center', lineBreak: false });
-    doc.font(fuente.b).fillColor(COLOR.ink).text(a.exenta ? 'E' : nota(a.nota_final), columnas.final, y, { width: anchoNota, align: 'center', lineBreak: false });
-    doc.font(fuente.n).fillColor(COLOR.cuerpo).text(a.desempeno?.etiqueta ?? '', columnas.nivel, y, { width: anchoNivel, align: 'center', lineBreak: false });
-    doc.text(a.fallas > 0 ? String(a.fallas) : '', columnas.fallas, y, { width: anchoFallas, align: 'center', lineBreak: false });
-    doc.y = y + u(13);
-    doc.moveTo(MARGEN, doc.y).lineTo(MARGEN + ancho, doc.y).lineWidth(0.3).strokeColor(COLOR.borde).stroke();
-    doc.y += u(2);
+    const linea = lineaDe(fuente.n, tam);
+    // Las cifras van centradas en vertical: con un nombre de dos líneas no quedan pegadas a la primera.
+    const yCentro = y + (alto - linea) / 2;
+    doc.font(fuente.n).fontSize(tam).fillColor(COLOR.ink).text(a.nombre, MARGEN + 6, y + relleno, { width: anchoTextoNombre });
+    for (const c of columnas) {
+      const esNivel = c === columnaNivel;
+      doc
+        .font(c.negrita ? fuente.b : fuente.n)
+        .fontSize(esNivel ? tam - 0.5 : tam)
+        .fillColor(c.negrita ? COLOR.ink : COLOR.cuerpo);
+      const texto = c.valor(a);
+      if (esNivel) doc.text(texto, c.x + 2, y + relleno, { width: c.ancho - 4, align: 'center' });
+      else doc.text(texto, c.x, yCentro, { width: c.ancho, align: 'center', lineBreak: false });
+    }
+    doc.y = y + alto;
+    doc.moveTo(MARGEN, doc.y).lineWidth(0.3).strokeColor(COLOR.borde).lineTo(MARGEN + ancho, doc.y).stroke();
+  };
+
+  const filaDeArea = (area: AreaInforme) => {
+    const tam = u(8.5);
+    const alto = alturaDeFila(area.nombre.toUpperCase(), columnaNivel ? columnaNivel.valorArea(area) : '', fuente.b, tam, anchoTextoArea);
+    const primera = area.asignaturas[0];
+    // El título de un área no se deja solo al final de la hoja: va con su primera asignatura.
+    asegurarEspacio(e, alto + (primera ? alturaDeFila(primera.nombre, columnaNivel ? columnaNivel.valor(primera) : '', fuente.n, tam) : 0), cabecera);
+    const y = doc.y;
+    doc.rect(MARGEN, y, ancho, alto).fill(COLOR.suave);
+    doc.font(fuente.b).fontSize(tam).fillColor(COLOR.ink).text(area.nombre.toUpperCase(), MARGEN + 6, y + relleno, { width: anchoTextoArea });
+    const yCentro = y + (alto - lineaDe(fuente.b, tam)) / 2;
+    for (const c of columnas) {
+      const texto = c.valorArea(area);
+      if (!texto) continue;
+      const esNivel = c === columnaNivel;
+      doc.font(esNivel ? fuente.n : fuente.b).fontSize(esNivel ? tam - 0.5 : tam).fillColor(COLOR.ink);
+      if (esNivel) doc.text(texto, c.x + 2, y + relleno, { width: c.ancho - 4, align: 'center' });
+      else doc.text(texto, c.x, yCentro, { width: c.ancho, align: 'center', lineBreak: false });
+    }
+    doc.y = y + alto;
   };
 
   for (const area of s.areas) {
-    asegurarEspacio(e, u(34));
-    const y = doc.y;
-    doc.rect(MARGEN, y, ancho, u(15)).fill(COLOR.suave);
-    doc.font(fuente.b).fontSize(u(8.5)).fillColor(COLOR.ink).text(area.nombre.toUpperCase(), MARGEN + 6, y + u(4), { width: anchoNombre - 6, lineBreak: false });
-    doc.text(nota(area.nota_final), columnas.final, y + u(4), { width: anchoNota, align: 'center', lineBreak: false });
-    doc.font(fuente.n).text(area.desempeno?.etiqueta ?? '', columnas.nivel, y + u(4), { width: anchoNivel, align: 'center', lineBreak: false });
-    doc.y = y + u(18);
+    filaDeArea(area);
     for (const a of area.asignaturas) fila(a);
   }
   if (s.areas.length === 0) doc.font(fuente.n).fontSize(u(9)).fillColor(COLOR.tenue).text('Este grupo no tiene asignaturas con docente asignado.', MARGEN, doc.y);
@@ -152,21 +274,30 @@ function tabla(e: Estilo, informe: InformeFinal, s: EstudianteInforme): void {
 function notasAlPie(e: Estilo, informe: InformeFinal, s: EstudianteInforme): void {
   const { doc, fuente, u } = e;
   const ancho = doc.page.width - MARGEN * 2;
-  doc.moveDown(0.4);
-  const texto = [
-    `Nota aprobatoria: ${informe.nota_aprobatoria.toFixed(1)}.`,
-    'P1…P4: nota efectiva de cada periodo (con la recuperación del periodo si la hubo). AÑO: nota del año antes de la recuperación final. RECUP.: nota tras la recuperación final, solo si cambió la del año.',
-    'E: exenta por traslado (no se cursó). —: aún no hay nota cerrada.',
-  ];
-  if (!s.completo) texto.push('El estudiante tiene asignaturas sin nota del año: este informe es parcial y no hay promedio definitivo.');
-  doc.font(fuente.i).fontSize(u(7.5)).fillColor(COLOR.tenue).text(texto.join(' '), MARGEN, doc.y, { width: ancho });
+  const texto = s.descriptivo
+    ? [
+        'Preescolar no tiene notas ni promedios (Decreto 2247 de 1997).',
+        `P1…P${informe.periodos.length}: nivel de la valoración descriptiva de cada periodo (${LEYENDA_SIGLAS_VALORACION}). NIVEL FINAL: el del último periodo valorado. —: aún sin valoración.`,
+        s.completo ? '' : 'Faltan valoraciones por registrar en algunas asignaturas: este informe es parcial.',
+      ]
+    : [
+        `Nota aprobatoria: ${informe.nota_aprobatoria.toFixed(1)}.`,
+        'P1…P4: nota efectiva de cada periodo (con la recuperación del periodo si la hubo). AÑO: nota del año antes de la recuperación final. RECUP.: nota tras la recuperación final, solo si cambió la del año.',
+        'E: exenta por traslado. —: aún no hay nota cerrada.',
+        s.completo ? '' : 'El estudiante tiene asignaturas sin nota del año: este informe es parcial y no hay promedio definitivo.',
+      ];
+  const cuerpo = texto.filter(Boolean).join(' ');
+  doc.font(fuente.i).fontSize(u(7.5));
+  asegurarEspacio(e, doc.heightOfString(cuerpo, { width: ancho }) + u(8));
+  doc.y += u(5);
+  doc.font(fuente.i).fontSize(u(7.5)).fillColor(COLOR.tenue).text(cuerpo, MARGEN, doc.y, { width: ancho });
 }
 
 function promocion(e: Estilo, s: EstudianteInforme): void {
   const { doc, fuente, u } = e;
   const ancho = doc.page.width - MARGEN * 2;
-  asegurarEspacio(e, u(52));
-  doc.moveDown(0.8).font(fuente.b).fontSize(u(9)).fillColor(e.p.color_acento).text('ESTADO FINAL DE PROMOCIÓN', MARGEN, doc.y, { characterSpacing: 0.4 });
+  asegurarEspacio(e, u(58));
+  doc.moveDown(0.6).font(fuente.b).fontSize(u(9)).fillColor(e.p.color_acento).text('ESTADO FINAL DE PROMOCIÓN', MARGEN, doc.y, { characterSpacing: 0.4 });
   doc.moveDown(0.25);
   const y = doc.y;
   doc.roundedRect(MARGEN, y, ancho, u(30), 4).fillAndStroke(COLOR.suave, COLOR.borde);
@@ -174,13 +305,15 @@ function promocion(e: Estilo, s: EstudianteInforme): void {
   doc.y = y + u(36);
   if (!s.promocion.oficial) {
     doc.font(fuente.i).fontSize(u(8)).fillColor(COLOR.peligro).text('Proyección con las notas registradas hasta hoy; la decisión oficial la toma el cierre de promoción del colegio.', MARGEN, doc.y, { width: ancho });
+  } else if (s.descriptivo) {
+    doc.font(fuente.i).fontSize(u(8)).fillColor(COLOR.tenue).text('Preescolar no reprueba: el estudiante avanza al grado siguiente (Decreto 2247 de 1997).', MARGEN, doc.y, { width: ancho });
   }
 }
 
 function firmas(e: Estilo, informe: InformeFinal): void {
   const { doc, p, fuente, u } = e;
   if (p.firmas.length === 0) return;
-  asegurarEspacio(e, u(80));
+  asegurarEspacio(e, u(84));
   const ancho = doc.page.width - MARGEN * 2;
   const columna = ancho / p.firmas.length;
   doc.moveDown(1.2);
@@ -198,19 +331,28 @@ function firmas(e: Estilo, informe: InformeFinal): void {
   if (p.pie_texto.trim()) doc.moveDown(0.6).font(fuente.i).fontSize(u(8)).fillColor(COLOR.tenue).text(p.pie_texto, MARGEN, doc.y, { width: ancho, align: 'center' });
 }
 
-/** Dibuja el informe final: un estudiante por hoja (sigue si no cabe), con el diseño del boletín del colegio. Pura: no toca la base. */
+/** Dibuja el informe final: un estudiante por hoja (sigue en otra, con su cabecera, si no cabe), con el diseño del boletín del colegio. Pura: no toca la base. */
 export async function renderizarInformeFinal(informe: InformeFinal, logo: Buffer | null, p: PlantillaBoletin): Promise<Buffer> {
   const escudo = p.escudo.mostrar ? (imagenDesdeDataUri(p.escudo.url)?.buffer ?? logo) : null;
   const { doc, listo } = nuevoDocumento(p.papel);
   const factor = ESCALA_TEXTO[p.tamano_texto];
-  const e: Estilo = { doc, p, fuente: FUENTES[p.fuente], u: (n) => n * factor };
+  const e: Estilo = { doc, p, fuente: FUENTES[p.fuente], u: (n) => n * factor, continuar: () => undefined };
   if (escudo && p.escudo.posicion === 'MARCA_DE_AGUA') doc.on('pageAdded', () => dibujarMarcaDeAgua(doc, escudo, p.escudo.tamano));
+  const generado = informe.generado_en.toLocaleString('es-CO', { timeZone: 'America/Bogota' });
 
   if (informe.estudiantes.length === 0) {
     doc.addPage();
     doc.font(e.fuente.n).fontSize(e.u(11)).fillColor(COLOR.cuerpo).text('Este grupo no tiene estudiantes con matrícula activa.');
   }
   for (const s of informe.estudiantes) {
+    let hoja = 1;
+    const textoPie = () => `Generado el ${generado} · ${informe.grupo.etiqueta} · ${s.nombre_completo} · hoja ${hoja}`;
+    e.continuar = () => {
+      pie(e, textoPie());
+      hoja += 1;
+      doc.addPage();
+      cabeceraDeContinuacion(e, informe, s);
+    };
     doc.addPage();
     encabezado(e, informe, escudo);
     if (informe.estado_datos === 'PRELIMINAR') {
@@ -221,7 +363,7 @@ export async function renderizarInformeFinal(informe: InformeFinal, logo: Buffer
     notasAlPie(e, informe, s);
     promocion(e, s);
     firmas(e, informe);
-    doc.font(e.fuente.n).fontSize(e.u(7)).fillColor(COLOR.tenue).text(`Generado el ${informe.generado_en.toLocaleString('es-CO', { timeZone: 'America/Bogota' })}`, MARGEN, doc.y + 6, { width: doc.page.width - MARGEN * 2, align: 'right' });
+    pie(e, textoPie());
   }
   doc.end();
   return listo;

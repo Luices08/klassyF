@@ -33,7 +33,7 @@ export const MODULOS_AUDITORIA = [
     ],
   },
   { clave: 'SALIDAS', nombre: 'Retiros, traslados y homologación', prefijos: ['SALIDA_', 'PAZ_Y_SALVO_SALIDA_', 'TRASLADO_', 'NOTA_HOMOLOGADA_', 'ESCALA_EXTERNA_'] },
-  { clave: 'ESTUDIANTES', nombre: 'Estudiantes y acudientes', prefijos: ['ACUDIENTE_', 'EXPEDIENTE_DIGITAL_'] },
+  { clave: 'ESTUDIANTES', nombre: 'Estudiantes y acudientes', prefijos: ['ACUDIENTE_', 'IMPORTACION_ACUDIENTES_', 'EXPEDIENTE_DIGITAL_'] },
   {
     clave: 'INSTITUCION',
     nombre: 'Institución, sedes y espacios',
@@ -130,6 +130,9 @@ const ETIQUETAS: Partial<Record<AccionAuditoria, string>> = {
   IMPORTACION_SIMAT_DESCARTADA: 'Simulación de SIMAT descartada',
   IMPORTACION_SIMAT_REINGRESO: 'Reingreso por importación de SIMAT',
   ESTUDIANTE_SIMAT_REVISADO: 'Estudiante importado de SIMAT revisado',
+  IMPORTACION_ACUDIENTES_SIMULADA: 'Archivo de acudientes revisado (simulación)',
+  IMPORTACION_ACUDIENTES_APLICADA: 'Importación de acudientes confirmada',
+  IMPORTACION_ACUDIENTES_DESCARTADA: 'Simulación de acudientes descartada',
   MATRICULA_PREINSCRITA: 'Preinscripción creada',
   MATRICULA_CREADA: 'Matrícula creada',
   MATRICULA_ESTADO_CAMBIADO: 'Cambio de estado de la matrícula',

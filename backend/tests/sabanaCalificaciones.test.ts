@@ -51,4 +51,48 @@ describe('armarSabana', () => {
     expect(s.resumen[0]).toMatchObject({ subject_id: 'mat', promedio: 3.33, aprobaron: 2, reprobaron: 1, sin_nota: 0 });
     expect(s.resumen[1]).toMatchObject({ subject_id: 'len', promedio: 3, aprobaron: 1, reprobaron: 1, sin_nota: 1 });
   });
+
+  describe('grupo descriptivo (Preescolar)', () => {
+    type Nivel = 'INICIADO' | 'EN_PROCESO' | 'ALCANZADO' | null;
+    const conNivel = (id: string, apellidos: string, mat: Nivel, len: Nivel): EstudianteSabanaEntrada => ({
+      student_id: id,
+      numero_documento: id,
+      nombres: 'N',
+      apellidos,
+      notas: { mat: { nota: null, exenta: false, recuperada: false, valoracion: mat }, len: { nota: null, exenta: false, recuperada: false, valoracion: len } },
+      promedio: 4.2, // aunque llegara un promedio, en Preescolar no se muestra
+      fallas: 0,
+      promocion: null,
+    });
+
+    it('no calcula promedio, puesto ni asignaturas perdidas: nadie «pierde» en Preescolar', () => {
+      const s = armarSabana({ ...base, descriptiva: true, estudiantes: [conNivel('1', 'A', 'ALCANZADO', 'INICIADO'), conNivel('2', 'B', 'EN_PROCESO', 'EN_PROCESO')] });
+      expect(s.descriptiva).toBe(true);
+      expect(s.filas.map((f) => [f.promedio, f.puesto, f.reprobadas])).toEqual([
+        [null, null, 0],
+        [null, null, 0],
+      ]);
+    });
+
+    it('lo que falta es la valoración, no una nota: se cuenta como «sin valoración»', () => {
+      const s = armarSabana({ ...base, descriptiva: true, estudiantes: [conNivel('1', 'A', 'ALCANZADO', null), conNivel('2', 'B', null, null)] });
+      expect(s.filas.map((f) => f.sin_nota)).toEqual([1, 2]);
+    });
+
+    it('el resumen cuenta cuántos hay en cada nivel y cuántos no tienen valoración', () => {
+      const s = armarSabana({
+        ...base,
+        descriptiva: true,
+        estudiantes: [conNivel('1', 'A', 'ALCANZADO', 'INICIADO'), conNivel('2', 'B', 'ALCANZADO', 'EN_PROCESO'), conNivel('3', 'C', null, 'EN_PROCESO')],
+      });
+      expect(s.resumen[0]).toMatchObject({ subject_id: 'mat', promedio: null, aprobaron: 0, reprobaron: 0, sin_nota: 1, niveles: { INICIADO: 0, EN_PROCESO: 0, ALCANZADO: 2 } });
+      expect(s.resumen[1]).toMatchObject({ subject_id: 'len', sin_nota: 0, niveles: { INICIADO: 1, EN_PROCESO: 2, ALCANZADO: 0 } });
+    });
+
+    it('un grupo con notas no se marca como descriptivo ni trae niveles', () => {
+      const s = armarSabana({ ...base, estudiantes: [estudiante('1', 'A', 'a', 5, 4, 4.5)] });
+      expect(s.descriptiva).toBeUndefined();
+      expect(s.resumen[0]?.niveles).toBeUndefined();
+    });
+  });
 });

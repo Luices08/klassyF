@@ -125,7 +125,10 @@ export async function obtenerRecuperaciones(filtros: FiltrosDashboard, usuario: 
 
     // La de fin de año solo tiene sentido cuando ya cerraron todos los periodos.
     const terminoElAnio = ctx.anio.periodos.length > 0 && ctx.anio.periodos.every((p) => p.estado === 'CERRADO');
-    const anual = terminoElAnio ? resumirListados(await enLotes(grupos, 4, (g) => consultar('ANUAL', g.id))) : null;
+    // Una sola lectura de todos los grupos: con la promoción por áreas cada llamada vuelve a armar las entradas de promoción del grupo.
+    const anual = terminoElAnio
+      ? resumirListados(grupos.length > 0 ? [await listarCandidatos({ academic_year_id: anioId, tipo: 'ANUAL', group_ids: grupos.map((g) => g.id) }, usuario)] : [])
+      : null;
 
     const porGrado = new Map<string, number>();
     for (const f of [...periodo.filas, ...(anual?.filas ?? [])]) {

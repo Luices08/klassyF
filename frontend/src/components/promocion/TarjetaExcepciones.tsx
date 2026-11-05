@@ -2,7 +2,7 @@ import { Card, CardHeader } from '../ui/Card';
 import { Input, Select } from '../ui/Field';
 import { MultiSelect } from '../ui/MultiSelect';
 import { Switch } from '../ui/Switch';
-import { useSubjects } from '../../hooks/useCatalogoAcademico';
+import { useAreas, useSubjects } from '../../hooks/useCatalogoAcademico';
 import type { CondicionArrastre, ConsecuenciaArrastre, PoliticaPromocion } from '../../hooks/usePromocion';
 
 interface Props {
@@ -28,7 +28,12 @@ const CONSECUENCIAS: Record<ConsecuenciaArrastre, string> = {
 /** Tarjeta 3: casos especiales. Todo el arrastre vive aquí, completo, en un solo bloque. */
 export function TarjetaExcepciones({ valor: b, onChange, bloqueado, periodos }: Props) {
   const asignaturas = useSubjects().data ?? [];
+  const areas = useAreas().data ?? [];
+  // Lo que se debe y se puede arrastrar es de la misma unidad con que se evalúa: con «por áreas» son áreas, no asignaturas.
+  const conAreas = b.unidad !== 'ASIGNATURA';
+  const conAsignaturas = b.unidad !== 'AREA';
   const opciones = asignaturas.filter((s) => !b.asignaturas_criticas_ids.includes(s._id)).map((s) => ({ value: s._id, label: s.nombre }));
+  const opcionesAreas = areas.filter((x) => !b.areas_criticas_ids.includes(x._id)).map((x) => ({ value: x._id, label: x.nombre }));
   const a = b.arrastre;
   const cambiarArrastre = (cambios: Partial<PoliticaPromocion['arrastre']>) => onChange({ ...b, arrastre: { ...a, ...cambios } });
 
@@ -55,14 +60,25 @@ export function TarjetaExcepciones({ valor: b, onChange, bloqueado, periodos }: 
           {a.admite && (
             <div className="space-y-4 rounded-lg bg-soft p-4">
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                <Input label="Puede deber hasta (asignaturas)" type="number" min={1} max={20} value={a.max_unidades} disabled={bloqueado} onChange={(e) => cambiarArrastre({ max_unidades: Number(e.target.value) })} />
-                <MultiSelect
-                  label="Solo de estas asignaturas permitidas (p. ej. Educación Física, Artística)"
-                  options={opciones}
-                  selected={b.asignaturas_arrastrables_ids}
-                  onChange={(v) => !bloqueado && onChange({ ...b, asignaturas_arrastrables_ids: v })}
-                  emptyLabel="Elige al menos una"
-                />
+                <Input label={`Puede deber hasta (${b.unidad === 'AREA' ? 'áreas' : 'asignaturas'})`} type="number" min={1} max={20} value={a.max_unidades} disabled={bloqueado} onChange={(e) => cambiarArrastre({ max_unidades: Number(e.target.value) })} />
+                {conAsignaturas && (
+                  <MultiSelect
+                    label="Solo de estas asignaturas permitidas (p. ej. Educación Física, Artística)"
+                    options={opciones}
+                    selected={b.asignaturas_arrastrables_ids}
+                    onChange={(v) => !bloqueado && onChange({ ...b, asignaturas_arrastrables_ids: v })}
+                    emptyLabel={conAreas ? undefined : 'Elige al menos una'}
+                  />
+                )}
+                {conAreas && (
+                  <MultiSelect
+                    label="Solo de estas áreas permitidas (p. ej. Educación Física, Artística)"
+                    options={opcionesAreas}
+                    selected={b.areas_arrastrables_ids}
+                    onChange={(v) => !bloqueado && onChange({ ...b, areas_arrastrables_ids: v })}
+                    emptyLabel={conAsignaturas ? undefined : 'Elige al menos una'}
+                  />
+                )}
               </div>
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <Select label="Para quedar al día debe" value={a.condicion} disabled={bloqueado} onChange={(e) => cambiarArrastre({ condicion: e.target.value as CondicionArrastre })}>

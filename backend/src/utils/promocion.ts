@@ -212,6 +212,8 @@ export function validarPolitica(p: PoliticaPromocion, ultimoPeriodo?: number): s
     if (!Number.isInteger(p.arrastre.max_unidades) || p.arrastre.max_unidades < 1) return 'El arrastre debe permitir al menos una asignatura pendiente.';
     if (['NOTA_MINIMA_PRIMER_PERIODO'].includes(p.arrastre.condicion) && typeof p.arrastre.nota_minima !== 'number') return 'Indica la nota mínima que se exigirá en el arrastre.';
     if (p.arrastre.hasta_periodo < 1 || (ultimoPeriodo !== undefined && p.arrastre.hasta_periodo > ultimoPeriodo)) return 'El periodo límite del arrastre no existe en el calendario.';
+    // Con la evaluación por áreas, lo que se debe son áreas: una lista de asignaturas no permitiría arrastrar a nadie y el arrastre quedaría activo sin efecto.
+    if (p.unidad === 'AREA' && p.areas_arrastrables_ids.length === 0) return 'Marca qué áreas se pueden deber (p. ej. educación física).';
     if (p.asignaturas_arrastrables_ids.length === 0 && p.areas_arrastrables_ids.length === 0) return 'Marca qué asignaturas o áreas se pueden deber (p. ej. educación física).';
   }
   const t = p.titulacion;
@@ -341,6 +343,22 @@ export function unidadesPerdidas(e: EntradaPromocion, p: PoliticaPromocion, mome
  * (la recuperación final de M18 es por asignatura; las áreas tienen su propio umbral de reprobación).
  */
 const unidadesDeTope = (perdidas: UnidadPerdida[], p: PoliticaPromocion): UnidadPerdida[] => (p.unidad === 'AMBAS' ? perdidas.filter((u) => u.tipo === 'ASIGNATURA') : perdidas);
+
+export interface UnidadesDeRecuperacion {
+  /** Cuántas unidades cuentan contra el tope de la recuperación final (áreas si la política evalúa por áreas; asignaturas en los demás casos). */
+  cantidad: number;
+  /** Solo con unidad `AREA`: las áreas que el estudiante tiene perdidas. Una asignatura de un área aprobada no obliga a recuperar. */
+  areas_perdidas: Set<string> | null;
+}
+
+/**
+ * Lo que M18 necesita saber del motor para no contradecirlo: con la política por ÁREAS el tope de la recuperación final se mide en áreas y solo hay
+ * que recuperar las asignaturas perdidas de un área perdida. Se calcula al CIERRE (nota antes de la recuperación), igual que `evaluarPromocion`.
+ */
+export function unidadesDeRecuperacion(e: EntradaPromocion, p: PoliticaPromocion): UnidadesDeRecuperacion {
+  const perdidas = unidadesPerdidas(e, p, 'CIERRE');
+  return { cantidad: unidadesDeTope(perdidas, p).length, areas_perdidas: p.unidad === 'AREA' ? new Set(perdidas.filter((u) => u.tipo === 'AREA').map((u) => u.id)) : null };
+}
 
 /** Las reglas que salen de las tarjetas «Inasistencia» y «Umbrales», sumadas a las propias del colegio. Pura: no se guardan en `reglas[]`. */
 export function reglasEfectivas(p: PoliticaPromocion): Regla[] {

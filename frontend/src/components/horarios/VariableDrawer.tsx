@@ -65,6 +65,7 @@ function FormularioVariable({ variable, contexto, grados, catalogo, espacios, on
 
   // Parámetros (se guardan todos en estado; al enviar se arma solo lo del tipo elegido).
   const [bloques, setBloques] = useState(Array.isArray(p.bloques) ? (p.bloques as number[]).join(', ') : '2, 2');
+  const [cruzaDescansos, setCruzaDescansos] = useState(p.cruza_descansos === true);
   const [nombreReunion, setNombreReunion] = useState(typeof p.nombre === 'string' ? p.nombre : '');
   const [duracion, setDuracion] = useState(numeroO(p.duracion, 2));
   const [sesiones, setSesiones] = useState(numeroO(p.sesiones, 1));
@@ -89,7 +90,7 @@ function FormularioVariable({ variable, contexto, grados, catalogo, espacios, on
       case 'DISTRIBUCION_BLOQUES': {
         const lista = bloques.split(/[,\s]+/).filter(Boolean).map(Number);
         if (lista.length === 0 || lista.some((n) => !Number.isInteger(n) || n < 1)) return 'Escribe los bloques como números enteros separados por comas, ej. 2, 2, 1.';
-        return { bloques: lista };
+        return { bloques: lista, cruza_descansos: cruzaDescansos };
       }
       case 'REUNION_COLECTIVA':
         if (!nombreReunion.trim()) return 'Escribe el nombre de la reunión.';
@@ -225,7 +226,16 @@ function FormularioVariable({ variable, contexto, grados, catalogo, espacios, on
         )}
 
         {tipo === 'DISTRIBUCION_BLOQUES' && (
-          <Input label="Bloques (horas seguidas)" value={bloques} onChange={(e) => setBloques(e.target.value)} hint="Separados por comas. Ej. 5 horas = 2, 2, 1." />
+          <>
+            <Input label="Bloques (horas seguidas)" value={bloques} onChange={(e) => setBloques(e.target.value)} hint="Separados por comas. Ej. 5 horas = 2, 2, 1; una técnica de 6 horas en un solo bloque = 6." />
+            <label className="flex items-start gap-2 text-sm text-body">
+              <input type="checkbox" checked={cruzaDescansos} onChange={(e) => setCruzaDescansos(e.target.checked)} className={casilla} />
+              <span>
+                Bloque continuo: puede atravesar el descanso
+                <span className="block text-xs text-muted">Para dar 4 o 6 horas seguidas de una sola asignatura (ej. toda la mañana). Sin marcar, un bloque nunca se monta sobre el descanso y se parte si no cabe entre dos.</span>
+              </span>
+            </label>
+          </>
         )}
         {tipo === 'REUNION_COLECTIVA' && (
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">

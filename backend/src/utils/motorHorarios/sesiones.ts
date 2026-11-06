@@ -48,9 +48,17 @@ function ajustarBloquesDeLaSemana(
   bloquesPorAsignacion: Map<string, number[]>,
   asignaciones: readonly AsignacionMotor[],
   variables: readonly VariableMotor[],
-  estructura: EstructuraSemana
+  estructura: EstructuraSemana,
+  continuas: ReadonlySet<string>
 ): void {
-  const reajustar = (delas: readonly AsignacionMotor[], tramos: readonly number[]) => {
+  // Un bloque continuo solo debe caber en el día: se parte únicamente si pasa de las horas de clase de un día.
+  const horasDia = Math.max(1, estructura.periodos.length);
+  for (const id of continuas) {
+    const bloques = bloquesPorAsignacion.get(id);
+    if (bloques) bloquesPorAsignacion.set(id, ajustarBloquesATramos(bloques.map((tamano) => ({ tamano })), Array.from({ length: estructura.dias.length }, () => horasDia)).map((b) => b.tamano));
+  }
+  const reajustar = (todas: readonly AsignacionMotor[], tramos: readonly number[]) => {
+    const delas = todas.filter((a) => !continuas.has(a.id));
     const bloques = delas.flatMap((a) => (bloquesPorAsignacion.get(a.id) ?? []).map((tamano) => ({ asignacion: a.id, tamano })));
     const ajustados = ajustarBloquesATramos(bloques, tramos);
     for (const a of delas) bloquesPorAsignacion.set(a.id, ajustados.filter((b) => b.asignacion === a.id).map((b) => b.tamano));
@@ -90,6 +98,7 @@ export function expandirSesiones(
 
   const conCarga = asignaciones.filter((a) => a.horas_semanales > 0);
   const pedidos = new Map<string, number[]>();
+  const continuas = new Set<string>();
   for (const a of conCarga) {
     const sujeto = { group_id: a.group_id, grade_id: a.grade_id, subject_id: a.subject_id, docente_ids: [a.docente_id] };
     const distribucion = resolverVariables(variables, sujeto).find((v): v is VariableDeTipo<'DISTRIBUCION_BLOQUES'> => v.tipo === 'DISTRIBUCION_BLOQUES');
@@ -101,9 +110,10 @@ export function expandirSesiones(
       });
     }
     pedidos.set(a.id, bloques);
+    if (distribucion?.parametros.cruza_descansos) continuas.add(a.id);
   }
   const bloquesPorAsignacion = new Map([...pedidos].map(([id, bloques]) => [id, [...bloques]]));
-  ajustarBloquesDeLaSemana(bloquesPorAsignacion, conCarga, variables, estructura);
+  ajustarBloquesDeLaSemana(bloquesPorAsignacion, conCarga, variables, estructura, continuas);
 
   for (const a of conCarga) {
     const finales = bloquesPorAsignacion.get(a.id)!;
@@ -111,7 +121,9 @@ export function expandirSesiones(
     if (orden(finales) !== orden(pedidos.get(a.id)!)) {
       avisos.push({
         codigo: 'BLOQUES_PARTIDOS',
-        mensaje: `Los bloques [${orden(pedidos.get(a.id)!)}] de la asignación ${a.id} no caben enteros entre descansos y en el tiempo libre de su docente; se partieron en [${orden(finales)}] para no montar un bloque sobre el descanso.`,
+        mensaje: continuas.has(a.id)
+          ? `Los bloques continuos [${orden(pedidos.get(a.id)!)}] de la asignación ${a.id} pasan de las ${estructura.periodos.length} horas de clase de un día; se partieron en [${orden(finales)}].`
+          : `Los bloques [${orden(pedidos.get(a.id)!)}] de la asignación ${a.id} no caben enteros entre descansos y en el tiempo libre de su docente; se partieron en [${orden(finales)}] para no montar un bloque sobre el descanso.`,
       });
     }
 
@@ -130,6 +142,7 @@ export function expandirSesiones(
           indice,
           espacios_permitidos: espacio ? [...espacio.parametros.espacio_ids] : null,
           fija: null,
+          ...(continuas.has(a.id) && duracion > 1 ? { cruza_descansos: true } : {}),
         });
       });
   }
@@ -158,6 +171,44 @@ export function expandirSesiones(
   }
 
   return { sesiones, avisos };
+}
+
+/** Horas de clase que la carga le pone a un docente en esta jornada (suma de las duraciones de sus sesiones). */
+export function horasDelDocente(sesiones: readonly SesionMotor[], docente: string): number {
+  return sesiones.reduce((suma, s) => (s.docente_ids.includes(docente) ? suma + s.duracion : suma), 0);
+}
+
+function franjasBloqueadasDelDocente(docente: string, variables: readonly VariableMotor[]): Set<string> {
+  const sujeto = { group_id: null, grade_id: null, subject_id: null, docente_ids: [docente] };
+  const bloqueadas = new Set<string>();
+  for (const v of resolverVariables(variables, sujeto)) {
+    if (v.tipo !== 'DISPONIBILIDAD' || v.severidad !== 'DURA' || v.docente_ids.length === 0) continue;
+    for (const c of v.parametros.celdas) if (c.valor === 'NO_DISPONIBLE') bloqueadas.add(`${c.dia}-${c.periodo}`);
+  }
+  return bloqueadas;
+}
+
+/** Franjas de la semana que le quedan a un docente después de su tiempo libre NO disponible y de severidad dura. */
+export function franjasLibresDelDocente(docente: string, variables: readonly VariableMotor[], estructura: EstructuraSemana): number {
+  return estructura.dias.length * estructura.periodos.length - franjasBloqueadasDelDocente(docente, variables).size;
+}
+
+/** Días de la semana en que al docente le queda al menos una franja disponible. */
+export function diasDisponiblesDelDocente(docente: string, variables: readonly VariableMotor[], estructura: EstructuraSemana): number {
+  const bloqueadas = franjasBloqueadasDelDocente(docente, variables);
+  return estructura.dias.filter((d) => estructura.periodos.some((_, p) => !bloqueadas.has(`${d}-${p}`))).length;
+}
+
+/**
+ * La clase del docente que más veces se reúne en la semana. El motor no repite una asignatura del grupo el mismo día salvo que no haya
+ * otra salida, así que el docente necesita al menos ese número de días disponibles (sin pasar de los días de la jornada).
+ */
+export function claseMasRepartidaDelDocente(sesiones: readonly SesionMotor[], docente: string): { asignacion_id: string; sesiones: number } | null {
+  const porAsignacion = new Map<string, number>();
+  for (const s of sesiones) if (s.asignacion_id && s.docente_ids.includes(docente)) porAsignacion.set(s.asignacion_id, (porAsignacion.get(s.asignacion_id) ?? 0) + 1);
+  let mayor: { asignacion_id: string; sesiones: number } | null = null;
+  for (const [asignacion_id, n] of porAsignacion) if (!mayor || n > mayor.sesiones) mayor = { asignacion_id, sesiones: n };
+  return mayor;
 }
 
 /**
@@ -210,13 +261,7 @@ export function diagnosticarCapacidad(
   }
 
   for (const [docente, horas] of horasPorDocente) {
-    const sujeto = { group_id: null, grade_id: null, subject_id: null, docente_ids: [docente] };
-    const bloqueadas = new Set<string>();
-    for (const v of resolverVariables(variables, sujeto)) {
-      if (v.tipo !== 'DISPONIBILIDAD' || v.severidad !== 'DURA' || v.docente_ids.length === 0) continue;
-      for (const c of v.parametros.celdas) if (c.valor === 'NO_DISPONIBLE') bloqueadas.add(`${c.dia}-${c.periodo}`);
-    }
-    const libres = totalPeriodos - bloqueadas.size;
+    const libres = franjasLibresDelDocente(docente, variables, estructura);
     if (horas > libres) {
       avisos.push({ codigo: 'DOCENTE_EXCEDE_DISPONIBILIDAD', mensaje: `El docente ${docente} tiene ${horas} horas y solo ${libres} franjas disponibles.` });
     }

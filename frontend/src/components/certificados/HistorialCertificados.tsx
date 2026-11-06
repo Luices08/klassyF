@@ -21,6 +21,7 @@ import {
 } from '../../hooks/useCertificados';
 import { useAuth } from '../../context/AuthContext';
 import { formatoFechaHora } from '../../lib/fechas';
+import { Paginacion } from '../ui/Paginacion';
 
 /** Todo lo expedido, con quién lo expidió y cuándo. Nada se borra: un documento mal expedido se anula con motivo. */
 export function HistorialCertificados() {
@@ -151,19 +152,7 @@ export function HistorialCertificados() {
             </TableBody>
           </Table>
           {lista.data.pages > 1 && (
-            <div className="flex items-center justify-between text-sm text-muted">
-              <span>
-                Página {lista.data.page} de {lista.data.pages} · {lista.data.total} documentos
-              </span>
-              <span className="space-x-2">
-                <Button variant="secondary" disabled={pagina <= 1} onClick={() => setPagina((p) => p - 1)}>
-                  Anterior
-                </Button>
-                <Button variant="secondary" disabled={pagina >= lista.data.pages} onClick={() => setPagina((p) => p + 1)}>
-                  Siguiente
-                </Button>
-              </span>
-            </div>
+            <Paginacion pagina={lista.data.page} paginas={lista.data.pages} onCambiar={setPagina} resumen={`${lista.data.total} documentos`} />
           )}
         </>
       )}

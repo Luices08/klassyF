@@ -343,7 +343,7 @@ export function useCertificados(filtro: FiltroCertificados) {
   return useQuery({
     queryKey: ['certificados', 'lista', filtro],
     queryFn: () =>
-      api.raw<{ success: true; data: CertificadoExpedido[]; total: number; page: number; pages: number }>('/certificados', { query: { ...filtro, limite: 15 } }),
+      api.raw<{ success: true; data: CertificadoExpedido[]; total: number; page: number; pages: number }>('/certificados', { query: { ...filtro, limite: 20 } }),
     select: (res) => ({ data: res.data, total: res.total, page: res.page, pages: res.pages }),
   });
 }

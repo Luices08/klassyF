@@ -1,5 +1,5 @@
 import { type FormEvent, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Alert, errorMessage } from '../../components/ui/Alert';
 import { Chip } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
@@ -49,8 +49,10 @@ export function HomePage() {
   const infoQuery = usePublicInstitutionInfo();
   const ofertaQuery = useOfertaDeAdmision();
 
-  const [solicitarOpen, setSolicitarOpen] = useState(false);
-  const [consultarOpen, setConsultarOpen] = useState(false);
+  // ?accion=solicitar|consultar abre directamente el formulario (lo usan los botones de la vista previa del módulo Sitio público).
+  const [parametros] = useSearchParams();
+  const [solicitarOpen, setSolicitarOpen] = useState(() => parametros.get('accion') === 'solicitar');
+  const [consultarOpen, setConsultarOpen] = useState(() => parametros.get('accion') === 'consultar');
   const [paso, setPaso] = useState<1 | 2>(1);
   const [form, setForm] = useState(SOLICITUD_VACIA);
 

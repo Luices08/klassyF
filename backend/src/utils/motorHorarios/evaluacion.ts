@@ -389,13 +389,13 @@ export class EstadoHorario {
             mensaje: `Programada en ${condicional} franja(s) condicional(es) (${this.nombreDia(d)}).`,
           });
         }
-      } else if (v.tipo === 'RECREO_NO_INTERRUMPE' && s.duracion > 1) {
+      } else if (v.tipo === 'RECREO_NO_INTERRUMPE' && s.duracion > 1 && !s.cruza_descansos) {
         let cruza = false;
         for (let k = 1; k < s.duracion; k += 1) if (this.descansoAntes[p + k]) cruza = true;
         this.penalizar(acc, 'RECREO_NO_INTERRUMPE', v, cruza ? 1 : 0, [i], () => `El bloque de ${s.duracion} horas queda partido por el descanso.`);
       }
     }
-    if (s.duracion > 1 && !this.recreoDuro[i]) {
+    if (s.duracion > 1 && !this.recreoDuro[i] && !s.cruza_descansos) {
       let cruza = false;
       for (let k = 1; k < s.duracion; k += 1) if (this.descansoAntes[p + k]) cruza = true;
       this.penalizarDelMotor(acc, 'BLOQUE_PARTIDO', PESO_BLOQUE_PARTIDO, cruza ? 1 : 0, [i], () => `El bloque de ${s.duracion} horas queda montado sobre el descanso (${this.nombreDia(d)}).`);

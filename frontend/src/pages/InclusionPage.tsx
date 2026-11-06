@@ -32,24 +32,10 @@ import {
   useValorarSolicitud,
 } from '../hooks/useInclusion';
 import { formatoFechaCalendario, formatoFechaLocal } from '../lib/fechas';
+import { Paginacion } from '../components/ui/Paginacion';
 
 function Paginador({ pagina, paginas, onChange }: { pagina: number; paginas: number; onChange: (p: number) => void }) {
-  if (paginas <= 1) return null;
-  return (
-    <div className="flex items-center justify-between p-4 text-sm text-muted">
-      <span>
-        Página {pagina} de {paginas}
-      </span>
-      <span className="flex gap-2">
-        <Button variant="secondary" disabled={pagina <= 1} onClick={() => onChange(pagina - 1)}>
-          Anterior
-        </Button>
-        <Button variant="secondary" disabled={pagina >= paginas} onClick={() => onChange(pagina + 1)}>
-          Siguiente
-        </Button>
-      </span>
-    </div>
-  );
+  return <Paginacion pagina={pagina} paginas={paginas} onCambiar={onChange} className="p-4" />;
 }
 
 /**

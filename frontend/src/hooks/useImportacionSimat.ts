@@ -46,7 +46,7 @@ export function useFilasImportacionSimat(id: string | null, filtro: FiltroFilasS
     queryKey: ['importacion-simat', id, 'filas', filtro, estado],
     queryFn: () =>
       api.raw<{ success: true; data: FilaImportacionSimat[]; total: number; page: number; pages: number }>(`${BASE}/${id}/filas`, {
-        query: { clasificacion: filtro.clasificacion, search: filtro.search || undefined, page: filtro.page, limit: 25 },
+        query: { clasificacion: filtro.clasificacion, search: filtro.search || undefined, page: filtro.page, limit: 20 },
       }),
     enabled: Boolean(id),
     select: (r) => ({ data: r.data, total: r.total, page: r.page, pages: r.pages }),

@@ -16,6 +16,7 @@ import { formatoFechaHora } from '../../lib/fechas';
 import { nombreDeUsuario, tonoDeAccion, tonoDeTipo } from '../../lib/historial';
 import { opcionesDePersonas } from '../../lib/opcionesBuscables';
 import type { FiltrosHistorial } from '../../types/historial';
+import { Paginacion } from '../../components/ui/Paginacion';
 
 const SIN_FILTROS: FiltrosHistorial = { modulo: '', tipo: '', accion: '', usuario_id: '', desde: '', hasta: '', texto: '' };
 
@@ -177,19 +178,7 @@ export function HistorialAccionesPage() {
       )}
 
       {pagina && pagina.pages > 1 && (
-        <div className="flex items-center justify-between">
-          <p className="text-sm text-muted">
-            Página {pagina.page} de {pagina.pages} ({pagina.total} eventos)
-          </p>
-          <div className="flex gap-2">
-            <Button variant="secondary" disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>
-              Anterior
-            </Button>
-            <Button variant="secondary" disabled={page >= pagina.pages} onClick={() => setPage((p) => p + 1)}>
-              Siguiente
-            </Button>
-          </div>
-        </div>
+        <Paginacion pagina={pagina.page} paginas={pagina.pages} onCambiar={setPage} resumen={`${pagina.total} eventos`} />
       )}
     </div>
   );

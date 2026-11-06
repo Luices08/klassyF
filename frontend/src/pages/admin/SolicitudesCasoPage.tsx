@@ -12,6 +12,7 @@ import { Spinner } from '../../components/ui/Spinner';
 import { EmptyRow, Table, TableBody, TableHead, Td, Th } from '../../components/ui/Table';
 import { NOMBRES_ROL_INVOLUCRADO, type SolicitudCasoVista, useBandejaSolicitudes, useDescartarSolicitud } from '../../hooks/useCasos';
 import { formatoFechaCalendario } from '../../lib/fechas';
+import { Paginacion } from '../../components/ui/Paginacion';
 
 /** Lo que convivencia tiene por atender: situaciones II/III y disciplinarias que un docente pidió escalar. */
 export function SolicitudesCasoPage() {
@@ -89,19 +90,7 @@ export function SolicitudesCasoPage() {
             </TableBody>
           </Table>
           {paginas > 1 && (
-            <div className="flex items-center justify-between p-4 text-sm text-muted">
-              <span>
-                Página {pagina} de {paginas}
-              </span>
-              <span className="flex gap-2">
-                <Button variant="secondary" disabled={pagina <= 1} onClick={() => setPagina((p) => p - 1)}>
-                  Anterior
-                </Button>
-                <Button variant="secondary" disabled={pagina >= paginas} onClick={() => setPagina((p) => p + 1)}>
-                  Siguiente
-                </Button>
-              </span>
-            </div>
+            <Paginacion pagina={pagina} paginas={paginas} onCambiar={setPagina} className="p-4" />
           )}
         </Card>
       )}

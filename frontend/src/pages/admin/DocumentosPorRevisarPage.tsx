@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Alert, errorMessage } from '../../components/ui/Alert';
-import { Button } from '../../components/ui/Button';
 import { Card } from '../../components/ui/Card';
 import { Drawer } from '../../components/ui/Drawer';
 import { FiltrosRapidos } from '../../components/ui/FiltrosRapidos';
@@ -16,8 +15,9 @@ import { type DocumentoPorRevisar, useDocumentosPorRevisar, useRevisarDocumentoM
 import { api } from '../../lib/apiClient';
 import { formatoFechaHora } from '../../lib/fechas';
 import { nombreDeItem } from '../../types/domain';
+import { Paginacion } from '../../components/ui/Paginacion';
 
-const PAGE_SIZE = 25;
+const PAGE_SIZE = 20;
 
 const nombreDelDocumento = (d: DocumentoPorRevisar) => nombreDeItem(d);
 
@@ -127,19 +127,7 @@ export function DocumentosPorRevisarPage() {
               </Table>
 
               {lista.data.pages > 1 && (
-                <div className="mt-3 flex items-center justify-between text-sm text-muted">
-                  <span>
-                    Página {lista.data.page} de {lista.data.pages} ({lista.data.total} documentos)
-                  </span>
-                  <div className="flex gap-2">
-                    <Button variant="secondary" disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>
-                      Anterior
-                    </Button>
-                    <Button variant="secondary" disabled={page >= lista.data.pages} onClick={() => setPage((p) => p + 1)}>
-                      Siguiente
-                    </Button>
-                  </div>
-                </div>
+                <Paginacion pagina={lista.data.page} paginas={lista.data.pages} onCambiar={setPage} resumen={`${lista.data.total} documentos`} className="mt-3" />
               )}
             </>
           )}

@@ -109,7 +109,7 @@ function construirUnidades(entrada: EntradaMotor, estado: EstadoHorario, avisos:
             for (let k = 0; k < s.duracion; k += 1) prohibidas.add(d * nP + c.periodo - k);
           }
         }
-        if (v.tipo === 'RECREO_NO_INTERRUMPE' && v.severidad === 'DURA' && s.duracion > 1) {
+        if (v.tipo === 'RECREO_NO_INTERRUMPE' && v.severidad === 'DURA' && s.duracion > 1 && !s.cruza_descansos) {
           entrada.estructura.periodos.forEach((per, p) => {
             if (!per.descanso_antes) return;
             for (let k = 1; k < s.duracion; k += 1) for (let d = 0; d < estado.nDias; d += 1) prohibidas.add(d * nP + p - k);
@@ -121,7 +121,9 @@ function construirUnidades(entrada: EntradaMotor, estado: EstadoHorario, avisos:
     // Un bloque de varias horas se queda entero entre descansos; solo si no hay otra franja posible se deja montar sobre uno.
     const montaSobreDescanso = (duracion: number, p: number) =>
       Array.from({ length: duracion - 1 }, (_, k) => entrada.estructura.periodos[p + k + 1]?.descanso_antes).some(Boolean);
-    const sinMontar = podado.filter((x) => sesiones.every((i) => !montaSobreDescanso(entrada.sesiones[i]!.duracion, x % nP)));
+    const sinMontar = podado.filter((x) =>
+      sesiones.every((i) => entrada.sesiones[i]!.cruza_descansos || !montaSobreDescanso(entrada.sesiones[i]!.duracion, x % nP))
+    );
     if (podado.length === 0 && !fija) {
       avisos.push({
         codigo: 'SESION_SIN_FRANJA_LIBRE',

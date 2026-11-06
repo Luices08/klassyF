@@ -2,7 +2,6 @@ import { type ChangeEvent, useEffect, useState } from 'react';
 import { Alert, errorMessage } from '../../components/ui/Alert';
 import { Chip } from '../../components/ui/Badge';
 import type { Tone } from '../../components/ui/Badge';
-import { Button } from '../../components/ui/Button';
 import { Card } from '../../components/ui/Card';
 import { Drawer } from '../../components/ui/Drawer';
 import { Input, Select } from '../../components/ui/Field';
@@ -25,8 +24,9 @@ import {
 import { formatoFechaHora } from '../../lib/fechas';
 import { SelectBuscable } from '../../components/ui/SelectBuscable';
 import { opcionesDeGrupos } from '../../lib/opcionesBuscables';
+import { Paginacion } from '../../components/ui/Paginacion';
 
-const PAGE_SIZE = 25;
+const PAGE_SIZE = 20;
 
 const TONO_ESTADO: Record<FiltroEstadoPazYSalvo, Tone> = {
   SIN_CARGAR: 'neutral',
@@ -245,19 +245,7 @@ export function PazYSalvoPage() {
                 </Table>
 
                 {lista.data.pages > 1 && (
-                  <div className="mt-3 flex items-center justify-between text-sm text-muted">
-                    <span>
-                      Página {lista.data.page} de {lista.data.pages} ({lista.data.total} estudiantes)
-                    </span>
-                    <div className="flex gap-2">
-                      <Button variant="secondary" disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>
-                        Anterior
-                      </Button>
-                      <Button variant="secondary" disabled={page >= lista.data.pages} onClick={() => setPage((p) => p + 1)}>
-                        Siguiente
-                      </Button>
-                    </div>
-                  </div>
+                  <Paginacion pagina={lista.data.page} paginas={lista.data.pages} onCambiar={setPage} resumen={`${lista.data.total} estudiantes`} className="mt-3" />
                 )}
               </>
             )}

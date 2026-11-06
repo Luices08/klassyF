@@ -38,7 +38,7 @@ interface VariableBase {
 
 export type VariableMotor = VariableBase &
   (
-    | { tipo: 'DISTRIBUCION_BLOQUES'; parametros: { bloques: number[] } }
+    | { tipo: 'DISTRIBUCION_BLOQUES'; parametros: { bloques: number[]; cruza_descansos?: boolean } }
     | { tipo: 'REUNION_COLECTIVA'; parametros: { nombre: string; duracion: number; sesiones: number } }
     | { tipo: 'DISPONIBILIDAD'; parametros: { celdas: CeldaDisponibilidad[] } }
     | { tipo: 'NO_MISMO_DIA'; parametros: Record<string, never> }
@@ -90,6 +90,8 @@ export interface SesionMotor extends SujetoVariable {
   espacios_permitidos: string[] | null;
   /** Posición fijada a mano por el coordinador: el motor no la mueve. */
   fija: UbicacionFija | null;
+  /** Bloque continuo (DISTRIBUCION_BLOQUES con `cruza_descansos`): puede atravesar el descanso y no se parte en los tramos. */
+  cruza_descansos?: boolean;
 }
 
 /** Lo que se guarda y lo que ve el usuario: día ISO (1 = lunes) y periodo (0…) entre las franjas de CLASE. */

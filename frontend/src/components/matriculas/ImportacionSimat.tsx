@@ -25,6 +25,7 @@ import {
 } from '../../hooks/useImportacionSimat';
 import { COLUMNAS_SIMAT_GUIA, NOTAS_SIMAT } from '../../lib/guiaSimat';
 import type { ClasificacionSimat, FilaImportacionSimat, ImportacionSimat } from '../../types/importacionSimat';
+import { Paginacion } from '../ui/Paginacion';
 
 const MB = 1024 * 1024;
 const PASOS = ['Archivo', 'Revisión', 'Confirmación', 'Resultado'];
@@ -103,19 +104,7 @@ function TablaDeFilas({ loteId, estado, aplicada }: { loteId: string; estado: st
             </TableBody>
           </Table>
           {filas.data.pages > 1 && (
-            <div className="flex items-center justify-between text-sm text-muted">
-              <span>
-                Página {filas.data.page} de {filas.data.pages} ({filas.data.total} filas)
-              </span>
-              <div className="flex gap-2">
-                <Button variant="secondary" disabled={pagina <= 1} onClick={() => setPagina((p) => p - 1)}>
-                  Anterior
-                </Button>
-                <Button variant="secondary" disabled={pagina >= filas.data.pages} onClick={() => setPagina((p) => p + 1)}>
-                  Siguiente
-                </Button>
-              </div>
-            </div>
+            <Paginacion pagina={filas.data.page} paginas={filas.data.pages} onCambiar={setPagina} resumen={`${filas.data.total} filas`} />
           )}
         </>
       )}

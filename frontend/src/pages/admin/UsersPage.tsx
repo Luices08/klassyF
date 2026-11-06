@@ -40,6 +40,7 @@ import {
 } from '../../hooks/useUsers';
 import { ROLES, ROLES_STAFF, type Rol, puedeGestionarRol } from '../../types/api';
 import { TIPOS_DOCUMENTO, type TipoDocumento, type User } from '../../types/domain';
+import { Paginacion } from '../../components/ui/Paginacion';
 
 const DEFAULT_ROLES_FILTRO: Rol[] = ['ADMIN', 'COORDINADOR', 'COORDINADOR_CONVIVENCIA', 'ORIENTADOR', 'DOCENTE', 'SECRETARIA'];
 const PAGE_SIZE = 20;
@@ -435,19 +436,7 @@ export function UsersPage() {
             </Table>
 
             {paginaInfo.pages > 1 && (
-              <div className="mt-3 flex items-center justify-between text-sm text-muted">
-                <span>
-                  Página {paginaInfo.page} de {paginaInfo.pages} ({paginaInfo.total} usuarios)
-                </span>
-                <div className="flex gap-2">
-                  <Button variant="secondary" disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>
-                    Anterior
-                  </Button>
-                  <Button variant="secondary" disabled={page >= paginaInfo.pages} onClick={() => setPage((p) => p + 1)}>
-                    Siguiente
-                  </Button>
-                </div>
-              </div>
+              <Paginacion pagina={paginaInfo.page} paginas={paginaInfo.pages} onCambiar={setPage} resumen={`${paginaInfo.total} usuarios`} className="mt-3" />
             )}
           </>
         )}

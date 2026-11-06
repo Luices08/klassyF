@@ -38,15 +38,19 @@ import {
 } from '../utils/horarioCoherencia';
 import {
   AsignacionMotor,
+  claseMasRepartidaDelDocente,
   Aviso,
   EntradaMotor,
   EstructuraSemana,
   VariableMotor,
   construirEstructura,
   diagnosticarCapacidad,
+  diasDisponiblesDelDocente,
   evaluarHorario,
   expandirSesiones,
+  franjasLibresDelDocente,
   generarEnHilo,
+  horasDelDocente,
   Incidencia,
 } from '../utils/motorHorarios';
 import { aMinutos } from '../utils/franjas';
@@ -676,6 +680,44 @@ async function validarReferencias(
   }
 }
 
+/**
+ * Un tiempo libre duro no puede dejar a un docente con menos franjas disponibles que las horas de clase que tiene asignadas en esta
+ * jornada, ni con menos días disponibles que las veces por semana que se reúne su clase más repartida (no puede quedar viniendo un solo
+ * día si dicta una asignatura cuatro veces a la semana): el horario no tendría solución. Se mide con la misma cuenta del diagnóstico de capacidad, con la variable tal como quedaría
+ * (reemplaza a su versión guardada) y con el resto del tiempo libre del docente, incluido lo que ya ocupa en otra jornada.
+ */
+async function exigirDisponibilidadSuficiente(variable: VariableHorarioDocument): Promise<void> {
+  if (variable.tipo !== 'DISPONIBILIDAD' || variable.severidad !== 'DURA' || variable.estado === 'inactivo' || variable.docente_ids.length === 0) return;
+  const ctx = await cargarContexto(String(variable.academic_year_id), String(variable.jornada_id));
+  const candidata = aVariableMotor(variable);
+  const variables = [...ctx.entrada.variables.filter((v) => v.id !== candidata.id), candidata];
+  const faltantes: string[] = [];
+  for (const docente of candidata.docente_ids) {
+    const horas = horasDelDocente(ctx.entrada.sesiones, docente);
+    if (horas === 0) continue;
+    const libres = franjasLibresDelDocente(docente, variables, ctx.estructura);
+    const nombre = ctx.catalogo.docentes.find((d) => d._id === docente)?.nombre ?? 'El docente';
+    if (libres < horas) {
+      faltantes.push(`${nombre} tiene ${horas} horas de clase asignadas y le quedarían ${Math.max(libres, 0)} franjas disponibles`);
+      continue;
+    }
+    const clase = claseMasRepartidaDelDocente(ctx.entrada.sesiones, docente);
+    const diasNecesarios = Math.min(clase?.sesiones ?? 0, ctx.estructura.dias.length);
+    const dias = diasDisponiblesDelDocente(docente, variables, ctx.estructura);
+    if (clase && dias < diasNecesarios) {
+      faltantes.push(
+        ctx.humanizar(`${nombre} dicta ${clase.asignacion_id} ${clase.sesiones} veces por semana y le quedaría${dias === 1 ? '' : 'n'} ${dias} día${dias === 1 ? '' : 's'} disponible${dias === 1 ? '' : 's'} (necesita al menos ${diasNecesarios})`)
+      );
+    }
+  }
+  if (faltantes.length > 0) {
+    throw new ApiError(
+      409,
+      `El tiempo libre no puede ser mayor que lo que la carga permite: ${faltantes.join('; ')}. Deja disponibles suficientes franjas y días para su carga, o márcalo como condicional.`
+    );
+  }
+}
+
 export async function listarVariables(query: ListarPorContexto) {
   return VariableHorario.find({ academic_year_id: query.academic_year_id, jornada_id: query.jornada_id }).sort({ createdAt: 1 }).lean();
 }
@@ -690,7 +732,9 @@ export async function crearVariable(input: VariableInput, { usuarioId, ip }: Con
     docente_ids: input.docente_ids ?? [],
   };
   await validarReferencias(datos, jornada);
-  const variable = await VariableHorario.create({ ...datos, creado_por: usuarioId });
+  const nueva = new VariableHorario({ ...datos, creado_por: usuarioId });
+  await exigirDisponibilidadSuficiente(nueva);
+  const variable = await nueva.save();
   await registrarEvento({
     usuario_id: usuarioId,
     accion: 'VARIABLE_HORARIO_CREADA',
@@ -729,6 +773,7 @@ export async function actualizarVariable(id: string, input: ActualizarVariableIn
     { tipo: variable.tipo, asignatura_ids: variable.asignatura_ids.map(String), docente_ids: variable.docente_ids.map(String), parametros: variable.parametros },
     jornada
   );
+  await exigirDisponibilidadSuficiente(variable);
   await variable.save();
   await registrarEvento({ usuario_id: usuarioId, accion: 'VARIABLE_HORARIO_ACTUALIZADA', entidad: 'VariableHorario', entidad_id: variable._id, ip });
   return variable;
@@ -737,6 +782,7 @@ export async function actualizarVariable(id: string, input: ActualizarVariableIn
 export async function cambiarEstadoVariable(id: string, estado: EstadoUsuario, { usuarioId, ip }: ContextoUsuario) {
   const { variable } = await exigirVariableEditable(id);
   variable.estado = estado;
+  await exigirDisponibilidadSuficiente(variable);
   await variable.save();
   await registrarEvento({
     usuario_id: usuarioId,

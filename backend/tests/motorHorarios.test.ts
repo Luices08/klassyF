@@ -5,7 +5,9 @@ import {
   EstructuraSemana,
   VariableMotor,
   construirEstructura,
+  claseMasRepartidaDelDocente,
   diagnosticarCapacidad,
+  diasDisponiblesDelDocente,
   evaluarHorario,
   expandirSesiones,
   PESO_BLOQUE_PARTIDO,
@@ -139,6 +141,31 @@ describe('bloques que caben entre descansos', () => {
     const variables = [variable('DISTRIBUCION_BLOQUES', { bloques: [4] })];
     const { sesiones } = expandirSesiones([asignacion('a1', '6A', 'g6', 'MAT', 'd1', 4)], variables, estructura);
     expect(horasDe(sesiones, 'a1')).toEqual([2, 2]);
+  });
+
+  it('un bloque continuo de 6 horas no se parte y puede ocupar todo el día atravesando el descanso', () => {
+    const variables = [variable('DISTRIBUCION_BLOQUES', { bloques: [6, 4], cruza_descansos: true })];
+    const asignaciones = [asignacion('a1', '10A', 'g10', 'TEC', 'd1', 10)];
+    const { sesiones, avisos } = expandirSesiones(asignaciones, variables, estructura);
+    expect(horasDe(sesiones, 'a1')).toEqual([6, 4]);
+    expect(sesiones.every((s) => s.cruza_descansos)).toBe(true);
+    expect(avisos).toEqual([]);
+    const entrada: EntradaMotor = { estructura, variables, espacios: [], sesiones };
+    const r = evaluarHorario(entrada, [
+      { sesion_id: 'a1#0', dia: 1, periodo: 0 },
+      { sesion_id: 'a1#1', dia: 2, periodo: 1 },
+    ]);
+    expect(r.conflictos_duros).toBe(0);
+    expect(r.incidencias.map((x) => x.codigo)).not.toContain('BLOQUE_PARTIDO');
+    const generado = generarHorario(entrada, { semilla: 1, tiempo_max_ms: 2000 });
+    expect(generado.conflictos_duros).toBe(0);
+  });
+
+  it('un bloque continuo más largo que el día sí se parte', () => {
+    const variables = [variable('DISTRIBUCION_BLOQUES', { bloques: [8], cruza_descansos: true })];
+    const { sesiones, avisos } = expandirSesiones([asignacion('a1', '10A', 'g10', 'TEC', 'd1', 8)], variables, estructura);
+    expect(horasDe(sesiones, 'a1')).toEqual([4, 4]);
+    expect(avisos.map((a) => a.codigo)).toEqual(['BLOQUES_PARTIDOS']);
   });
 
   it('el tiempo no disponible del docente también corta los tramos', () => {
@@ -368,4 +395,15 @@ describe('generarHorario', () => {
     },
     40_000
   );
+});
+
+describe('disponibilidad mínima del docente', () => {
+  it('cuenta los días en que le queda alguna franja y la clase que más veces se reúne', () => {
+    const soloLunes = variable('DISPONIBILIDAD', { celdas: [2, 3, 4, 5].flatMap((dia) => [0, 1, 2, 3, 4, 5].map((periodo) => ({ dia, periodo, valor: 'NO_DISPONIBLE' as const }))) }, { docente_ids: ['d1'] });
+    expect(diasDisponiblesDelDocente('d1', [soloLunes], estructura)).toBe(1);
+    expect(diasDisponiblesDelDocente('d1', [], estructura)).toBe(5);
+    const { sesiones } = expandirSesiones([asignacion('a1', '6A', 'g6', 'MAT', 'd1', 4), asignacion('a2', '6B', 'g6', 'MAT', 'd1', 2)], [], estructura);
+    expect(claseMasRepartidaDelDocente(sesiones, 'd1')).toEqual({ asignacion_id: 'a1', sesiones: 4 });
+    expect(claseMasRepartidaDelDocente(sesiones, 'otro')).toBeNull();
+  });
 });

@@ -25,6 +25,7 @@ import {
 } from '../hooks/useObservaciones';
 import { formatoFechaCalendario } from '../lib/fechas';
 import { SelectBuscable } from '../components/ui/SelectBuscable';
+import { Paginacion } from '../components/ui/Paginacion';
 
 export function ObservadorPage() {
   const { user } = useAuth();
@@ -306,19 +307,7 @@ function MisReportesTab() {
         </TableBody>
       </Table>
       {paginas > 1 && (
-        <div className="flex items-center justify-between p-4 text-sm text-muted">
-          <span>
-            Página {pagina} de {paginas}
-          </span>
-          <span className="flex gap-2">
-            <Button variant="secondary" disabled={pagina <= 1} onClick={() => setPagina((p) => p - 1)}>
-              Anterior
-            </Button>
-            <Button variant="secondary" disabled={pagina >= paginas} onClick={() => setPagina((p) => p + 1)}>
-              Siguiente
-            </Button>
-          </span>
-        </div>
+        <Paginacion pagina={pagina} paginas={paginas} onCambiar={setPagina} className="p-4" />
       )}
     </Card>
   );
@@ -366,19 +355,7 @@ function MisRegistrosTab() {
         </TableBody>
       </Table>
       {paginas > 1 && (
-        <div className="flex items-center justify-between p-4 text-sm text-muted">
-          <span>
-            Página {pagina} de {paginas}
-          </span>
-          <span className="flex gap-2">
-            <Button variant="secondary" disabled={pagina <= 1} onClick={() => setPagina((p) => p - 1)}>
-              Anterior
-            </Button>
-            <Button variant="secondary" disabled={pagina >= paginas} onClick={() => setPagina((p) => p + 1)}>
-              Siguiente
-            </Button>
-          </span>
-        </div>
+        <Paginacion pagina={pagina} paginas={paginas} onCambiar={setPagina} className="p-4" />
       )}
     </Card>
   );

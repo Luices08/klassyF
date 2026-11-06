@@ -1,11 +1,11 @@
 import { useState } from 'react';
 import { ApiError } from '../../types/api';
 import { Alert, errorMessage } from '../ui/Alert';
-import { Button } from '../ui/Button';
 import { Spinner } from '../ui/Spinner';
 import { useHistorialObservaciones } from '../../hooks/useObservaciones';
 import { AccionesObservacion } from './AccionesObservacion';
 import { ObservacionesTimeline } from './ObservacionesTimeline';
+import { Paginacion } from '../ui/Paginacion';
 
 interface Props {
   studentId: string;
@@ -39,19 +39,7 @@ export function HistorialObservaciones({ studentId, conAcciones = true }: Props)
       />
 
       {paginas > 1 && (
-        <div className="flex items-center justify-between text-sm text-muted">
-          <span>
-            Página {pagina} de {paginas} · {total} registros
-          </span>
-          <span className="flex gap-2">
-            <Button variant="secondary" disabled={pagina <= 1} onClick={() => setPagina((p) => p - 1)}>
-              Anterior
-            </Button>
-            <Button variant="secondary" disabled={pagina >= paginas} onClick={() => setPagina((p) => p + 1)}>
-              Siguiente
-            </Button>
-          </span>
-        </div>
+        <Paginacion pagina={pagina} paginas={paginas} onCambiar={setPagina} resumen={`${total} registros`} />
       )}
     </div>
   );

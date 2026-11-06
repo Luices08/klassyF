@@ -1,5 +1,5 @@
 import { Button } from '../../ui/Button';
-import { Logo, MenuEnlaces, enlacesDeMenu, type PropsPlantilla } from '../seccionesSitio';
+import { Logo, MenuEnlaces, MenuMovil, enlacesDeMenu, type PropsPlantilla } from '../seccionesSitio';
 
 /** Cabecera de las plantillas con barra superior: el logo va a la izquierda o centrado y el menú en la misma fila o debajo del logo. */
 export function CabeceraSuperior({ info, config, acciones, vistaPrevia }: Pick<PropsPlantilla, 'info' | 'config' | 'acciones' | 'vistaPrevia'>) {
@@ -11,7 +11,13 @@ export function CabeceraSuperior({ info, config, acciones, vistaPrevia }: Pick<P
       <span className="text-h3 text-ink">{info.nombre}</span>
     </div>
   );
-  const ingreso = <Button onClick={acciones.iniciarSesion}>Iniciar sesión</Button>;
+  // En celular los enlaces no caben en la barra: van en el botón de menú, junto al ingreso.
+  const ingreso = (
+    <div className="flex items-center gap-2">
+      <MenuMovil enlaces={enlaces} vistaPrevia={vistaPrevia} className="sm:hidden" />
+      <Button onClick={acciones.iniciarSesion}>Iniciar sesión</Button>
+    </div>
+  );
   const menu = <MenuEnlaces enlaces={enlaces} vistaPrevia={vistaPrevia} />;
 
   return (

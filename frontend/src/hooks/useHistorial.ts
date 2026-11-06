@@ -9,7 +9,7 @@ export function useHistorial(filtros: FiltrosHistorial, page: number) {
   const consulta = limpios(filtros);
   return useQuery({
     queryKey: ['historial', consulta, page],
-    queryFn: () => api.raw<{ success: true } & PaginaHistorial>('/audit-logs', { query: { ...consulta, page, limit: 25 } }),
+    queryFn: () => api.raw<{ success: true } & PaginaHistorial>('/audit-logs', { query: { ...consulta, page, limit: 20 } }),
     select: (res): PaginaHistorial => ({ data: res.data, total: res.total, page: res.page, pages: res.pages }),
     placeholderData: (anterior) => anterior,
   });

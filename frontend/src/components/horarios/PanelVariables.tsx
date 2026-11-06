@@ -31,7 +31,7 @@ function resumenParametros(v: VariableHorario, nombreEspacio: Map<string, string
   const p = v.parametros;
   switch (v.tipo) {
     case 'DISTRIBUCION_BLOQUES':
-      return `Bloques ${(p.bloques as number[]).join(' + ')}`;
+      return `Bloques ${(p.bloques as number[]).join(' + ')}${p.cruza_descansos ? ' · continuos (atraviesan el descanso)' : ''}`;
     case 'REUNION_COLECTIVA':
       return `${String(p.nombre)} · ${String(p.duracion)} h × ${String(p.sesiones ?? 1)}`;
     case 'DISTRIBUCION_SEMANAL':

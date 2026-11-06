@@ -19,7 +19,11 @@ const sinParametros = Joi.object({});
 // Forma de `parametros` según el tipo. Que una celda caiga dentro de la jornada (día hábil, periodo existente) lo revisa
 // el servicio, que sí conoce la jornada.
 const PARAMETROS: Record<TipoVariableHorario, Joi.ObjectSchema> = {
-  DISTRIBUCION_BLOQUES: Joi.object({ bloques: Joi.array().items(entero(1).max(12)).min(1).max(20).required() }),
+  DISTRIBUCION_BLOQUES: Joi.object({
+    bloques: Joi.array().items(entero(1).max(12)).min(1).max(20).required(),
+    // Bloque continuo: puede atravesar el descanso (ej. una técnica de 4 o 6 horas seguidas).
+    cruza_descansos: Joi.boolean().default(false),
+  }),
   REUNION_COLECTIVA: Joi.object({
     nombre: Joi.string().trim().max(80).required(),
     duracion: entero(1).max(12).required(),

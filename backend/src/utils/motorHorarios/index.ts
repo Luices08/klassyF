@@ -3,6 +3,14 @@ export { EstadoHorario, PESO_ASIGNATURA_MISMO_DIA, PESO_ASIGNATURA_SEGUIDA, PESO
 export { ajustarBloquesATramos, tramosDeSemana } from './bloques';
 export { evaluarHorario, generarHorario } from './generador';
 export type { OpcionesGeneracion, ResultadoMotor, UbicacionSesion } from './generador';
-export { construirEstructura, diagnosticarCapacidad, expandirSesiones } from './sesiones';
+export {
+  claseMasRepartidaDelDocente,
+  construirEstructura,
+  diagnosticarCapacidad,
+  diasDisponiblesDelDocente,
+  expandirSesiones,
+  franjasLibresDelDocente,
+  horasDelDocente,
+} from './sesiones';
 export * from './tipos';
 export { generarEnHilo } from './hilo';

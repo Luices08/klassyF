@@ -14,6 +14,7 @@ import { useCasosConAlertas } from '../../hooks/useComite';
 import { ESTADOS_CASO, NOMBRES_ESTADO_CASO, NOMBRES_ROL_INVOLUCRADO, useCasos, type EstadoCaso } from '../../hooks/useCasos';
 import { TIPOS_SITUACION, type TipoSituacion } from '../../hooks/useObservaciones';
 import { formatoFechaCalendario } from '../../lib/fechas';
+import { Paginacion } from '../../components/ui/Paginacion';
 
 /** Casos de convivencia (M15): solo ADMIN y el coordinador de convivencia de la sede. */
 export function CasosConvivenciaPage() {
@@ -143,19 +144,7 @@ export function CasosConvivenciaPage() {
           </Table>
         )}
         {paginas > 1 && (
-          <div className="flex items-center justify-between p-4 text-sm text-muted">
-            <span>
-              Página {pagina} de {paginas}
-            </span>
-            <span className="flex gap-2">
-              <Button variant="secondary" disabled={pagina <= 1} onClick={() => setPagina((p) => p - 1)}>
-                Anterior
-              </Button>
-              <Button variant="secondary" disabled={pagina >= paginas} onClick={() => setPagina((p) => p + 1)}>
-                Siguiente
-              </Button>
-            </span>
-          </div>
+          <Paginacion pagina={pagina} paginas={paginas} onCambiar={setPagina} className="p-4" />
         )}
       </Card>
 

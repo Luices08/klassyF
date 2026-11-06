@@ -8,7 +8,7 @@ export function PlantillaDividida(props: PropsPlantilla) {
   return (
     <div className={`${vistaPrevia ? '' : 'min-h-screen'} bg-soft text-body`}>
       <CabeceraSuperior info={info} config={config} acciones={acciones} vistaPrevia={vistaPrevia} />
-      <section id="inicio" className="mx-auto grid max-w-6xl grid-cols-1 items-center gap-10 px-4 py-14 sm:px-6 lg:grid-cols-2">
+      <section id="inicio" className="scroll-mt-28 mx-auto grid max-w-6xl grid-cols-1 items-center gap-10 px-4 py-14 sm:px-6 lg:grid-cols-2">
         <TextoHero info={info} acciones={acciones} centrado={false} />
         <CarruselSitio imagenes={imagenes} className="h-72 w-full rounded-2xl shadow-lg sm:h-96" />
       </section>

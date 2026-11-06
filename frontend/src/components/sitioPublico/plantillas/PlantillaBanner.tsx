@@ -8,7 +8,7 @@ export function PlantillaBanner(props: PropsPlantilla) {
   return (
     <div className={`${vistaPrevia ? '' : 'min-h-screen'} bg-soft text-body`}>
       <CabeceraSuperior info={info} config={config} acciones={acciones} vistaPrevia={vistaPrevia} />
-      <section id="inicio">
+      <section id="inicio" className="scroll-mt-28">
         <CarruselSitio imagenes={imagenes} className="h-64 w-full sm:h-80" />
         <div className="mx-auto max-w-6xl px-4 py-12 sm:px-6">
           <TextoHero info={info} acciones={acciones} />

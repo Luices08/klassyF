@@ -22,7 +22,14 @@ import { usePublicInstitutionInfo } from '../../hooks/usePublicInfo';
 import { ETIQUETA_LOGO, ETIQUETA_MENU, ETIQUETA_SECCION, type ConfiguracionSitio } from '../../types/sitioPublico';
 
 const MAX_BYTES_IMAGEN = 2 * 1024 * 1024;
-const NADA = () => undefined;
+// En la vista previa los botones abren la página pública real en otra pestaña (así se prueban sin salir de la configuración).
+const abrirAparte = (ruta: string) => () => void window.open(ruta, '_blank', 'noopener');
+const ACCIONES_VISTA_PREVIA = {
+  iniciarSesion: abrirAparte('/login'),
+  solicitar: abrirAparte('/?accion=solicitar'),
+  consultar: abrirAparte('/?accion=consultar'),
+  irA: (ruta: string) => abrirAparte(ruta)(),
+};
 
 type Tipografia = ConfiguracionSitio['tipografia'];
 
@@ -248,7 +255,7 @@ export function SitioPublicoPage() {
                   info={info.data}
                   config={config}
                   imagenes={imagenesVisibles}
-                  acciones={{ iniciarSesion: NADA, solicitar: NADA, consultar: NADA, irA: NADA }}
+                  acciones={ACCIONES_VISTA_PREVIA}
                   vistaPrevia
                 />
               </div>

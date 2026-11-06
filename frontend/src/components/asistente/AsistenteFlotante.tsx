@@ -43,12 +43,18 @@ export function AsistenteFlotante({ items }: AsistenteFlotanteProps) {
   const finRef = useRef<HTMLDivElement>(null);
   const panelRef = useRef<HTMLElement>(null);
   const botonRef = useRef<HTMLButtonElement>(null);
+  const entradaRef = useRef<HTMLInputElement>(null);
   const contador = useRef(1);
   const { posicion, ventana, margen, debeIgnorarClic, handlers } = useBotonArrastrable(TAMANO_BOTON);
 
   useEffect(() => {
     finRef.current?.scrollIntoView({ block: 'end' });
   }, [mensajes, abierto]);
+
+  // Al abrir el chat se puede escribir de una vez.
+  useEffect(() => {
+    if (abierto) entradaRef.current?.focus();
+  }, [abierto]);
 
   // Con el chat abierto, un clic o toque fuera de él (y fuera del botón, que ya alterna) lo cierra, igual que Escape.
   useEffect(() => {
@@ -106,6 +112,8 @@ export function AsistenteFlotante({ items }: AsistenteFlotanteProps) {
       destino: { ruta, url, nombre },
     });
     navigate(url);
+    // Ya llegó a donde iba: el chat se cierra para no tapar la pantalla (la conversación se conserva al volver a abrirlo).
+    setAbierto(false);
     setVisitados((actuales) => registrarVisita(actuales, { ruta, url, nombre }));
   }
 
@@ -267,6 +275,7 @@ export function AsistenteFlotante({ items }: AsistenteFlotanteProps) {
 
           <form onSubmit={enviar} className="flex items-center gap-2 border-t border-border px-3 py-3">
             <input
+              ref={entradaRef}
               value={texto}
               onChange={(e) => setTexto(e.target.value)}
               placeholder="¿Qué estás buscando?"

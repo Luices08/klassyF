@@ -41,7 +41,11 @@ export function LoginPage() {
   const info = usePublicInstitutionInfo();
   const [numeroDocumento, setNumeroDocumento] = useState('');
   const [password, setPassword] = useState('');
-  const [rol, setRol] = useState<Rol | null>(leerPerfilGuardado);
+  // ?perfil= (p. ej. desde las tarjetas del sitio público) preselecciona el perfil; si no, el último con el que se entró.
+  const [rol, setRol] = useState<Rol | null>(() => {
+    const pedido = new URLSearchParams(location.search).get('perfil');
+    return (ROLES as readonly string[]).includes(pedido ?? '') ? (pedido as Rol) : leerPerfilGuardado();
+  });
   const [error, setError] = useState<string | null>(null);
   const [recuperando, setRecuperando] = useState(false);
 

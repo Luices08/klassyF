@@ -8,7 +8,7 @@ export function PlantillaGaleria(props: PropsPlantilla) {
   return (
     <div className={`${vistaPrevia ? '' : 'min-h-screen'} bg-soft text-body`}>
       <CabeceraSuperior info={info} config={config} acciones={acciones} vistaPrevia={vistaPrevia} />
-      <section id="inicio" className="relative">
+      <section id="inicio" className="scroll-mt-28 relative">
         <CarruselSitio imagenes={imagenes} className="h-[26rem] w-full sm:h-[32rem]" />
         <div className="pointer-events-none absolute inset-0 flex items-center justify-center px-4">
           <div className="pointer-events-auto max-w-3xl rounded-2xl bg-surface/90 px-6 py-8 shadow-lg backdrop-blur sm:px-10">

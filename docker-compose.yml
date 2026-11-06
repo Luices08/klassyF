@@ -41,6 +41,10 @@ services:
     depends_on:
       mongo:
         condition: service_healthy
+    networks:
+      default:
+        aliases:
+          - klassy-api
 
   frontend:
     build:
@@ -51,7 +55,9 @@ services:
       - "${PUERTO_WEB:-80}:80"
     depends_on:
       - backend
-
+    networks:
+      - default
+      - infrastructure
   # Seeds y migraciones: docker compose run --rm herramientas npm run seed
   herramientas:
     build:
@@ -72,3 +78,8 @@ services:
 volumes:
   mongo_datos:
   uploads:
+
+networks:
+  infrastructure:
+    external: true
+    name: infrastructure
